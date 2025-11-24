@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"go.uber.org/zap"
 
 	errorspkg "github.com/pkg/errors"
@@ -156,8 +157,14 @@ func (s *Service) Stop() error {
 	return s.Server.Stop()
 }
 
-func (s *Service) API() interface{} {
-	return &API{}
+func (s *Service) APIs() []gethrpc.API {
+	return []gethrpc.API{
+		{
+			Namespace: "media",
+			Version:   "1.0",
+			Service:   &API{},
+		},
+	}
 }
 
 func (s *Service) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {

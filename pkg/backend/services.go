@@ -1,9 +1,6 @@
 package backend
 
 import (
-	"time"
-
-	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -107,7 +104,6 @@ func (s *services) All() []StatusBackendService {
 		s.walletSrvc,
 		s.localNotificationsSrvc,
 		s.personalSrvc,
-		s.timeSourceSrvc,
 		s.wakuV2ExtSrvc,
 		s.ensSrvc,
 		s.communityTokensSrvc,
@@ -141,6 +137,8 @@ func (s *services) Register() error {
 			}
 		}
 	}
+
+	return nil
 }
 
 // Start starts all created, but still idle (not started) services.
@@ -228,18 +226,6 @@ func (s *services) createMedia(address, advertizeHost string, advertizePort int)
 	}
 	//mediaService.SetDataProviders(b.ActiveAccount.appDB, b.ActiveAccount.walletDB, b.ipfs)
 
-	// Register service
-	err = b.rpcServer.RegisterName("media", mediaService.API())
-	if err != nil {
-		return errors.Wrap(err, "failed to register media server")
-	}
-
-	// Start service
-	err = s.mediaService.Start()
-	if err != nil {
-		return err
-	}
-
 	s.mediaService = mediaService
 	s.addService(s.mediaService)
 
@@ -309,14 +295,14 @@ func (s *services) createWalletService() {
 	s.walletSrvc = wallet.NewService(
 		s.backend.activeAccount.walletDB,
 		s.backend.activeAccount.accountsDB,
-		b.rpcClient,
+		s.rpcClient,
 		s.accountsSrvc.Publisher(),
 		s.backend.activeAccount.accsManager,
-		b.transactor,
+		s.transactor,
 		s.backend.activeAccount.nodeConfig,
 		ensResolver,
 		s.mediaService,
-		b.tokenManager,
+		s.tokenManager,
 		statusProxyStageName,
 	)
 	s.addService(s.walletSrvc)
