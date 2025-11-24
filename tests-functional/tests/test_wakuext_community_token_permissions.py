@@ -100,7 +100,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         return community_id, permission_resp
 
-    @pytest.mark.skip(reason="Pending on issue resolution https://github.com/status-im/status-go/issues/7114")
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_token_gated_community_membership_no_valid_tokens(self):
         """Test that users must hold required tokens to join community"""
         # Owner creates token-gated community
@@ -191,7 +191,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_public_key = self.member_with_snt.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
-    @pytest.mark.skip(reason="Pending on issue resolution https://github.com/status-im/status-go/issues/7135")
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
     def test_admin_token_permissions_with_valid_tokens(self, foundry_client):
         """Test that users with required tokens get admin privileges"""
         # Get member's wallet address
@@ -285,6 +285,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert 1 in owner_community["members"][owner_key].get("roles", [])
 
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7139")
     def test_owner_edits_visible_before_and_after_minting_owner_token(self):
         """Test that owner edits are visible before and after minting the owner token"""
         # Owner creates a community
@@ -332,38 +333,38 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         retry_call(check_member_community_updated)
 
-        # # When the Owner mints the owner token
-        # # Simulate minting owner token by saving and adding a community token with owner privileges
-        # token_data = {
-        #     "tokenType": 2,  # ERC721
-        #     "communityId": community_id,
-        #     "address": "0x1234567890123456789012345678901234567890",  # Fake address for test
-        #     "chainId": 31337,
-        #     "name": "OwnerToken",
-        #     "supply": "1",
-        #     "symbol": "OT",
-        #     "privilegesLevel": 1,  # Owner level
-        # }
-        # self.owner.wakuext_service.save_community_token(token_data)
-        # self.owner.wakuext_service.add_community_token(community_id, 31337, "0x1234567890123456789012345678901234567890")
-        #
-        # # And the Owner edits the community again
-        # new_name2 = fake.community_name()
-        # new_description2 = fake.community_description()
-        # edit_resp2 = self.owner.wakuext_service.edit_community(
-        #     community_id=community_id,
-        #     name=new_name2,
-        #     description=new_description2,
-        # )
-        # assert edit_resp2 is not None
-        #
-        # # Then the Member sees the updated community
-        # def check_member_community_updated2():
-        #     member_communities = self.member.wakuext_service.communities()
-        #     member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-        #     return member_community and member_community.get("name") == new_name2 and member_community.get("description") == new_description2
-        #
-        # retry_call(check_member_community_updated2)
+        # When the Owner mints the owner token
+        # Simulate minting owner token by saving and adding a community token with owner privileges
+        token_data = {
+            "tokenType": 2,  # ERC721
+            "communityId": community_id,
+            "address": "0x1234567890123456789012345678901234567890",  # Fake address for test
+            "chainId": 31337,
+            "name": "OwnerToken",
+            "supply": "1",
+            "symbol": "OT",
+            "privilegesLevel": 1,  # Owner level
+        }
+        self.owner.wakuext_service.save_community_token(token_data)
+        self.owner.wakuext_service.add_community_token(community_id, 31337, "0x1234567890123456789012345678901234567890")
+
+        # And the Owner edits the community again
+        new_name2 = fake.community_name()
+        new_description2 = fake.community_description()
+        edit_resp2 = self.owner.wakuext_service.edit_community(
+            community_id=community_id,
+            name=new_name2,
+            description=new_description2,
+        )
+        assert edit_resp2 is not None
+
+        # Then the Member sees the updated community
+        def check_member_community_updated2():
+            member_communities = self.member.wakuext_service.communities()
+            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
+            return member_community and member_community.get("name") == new_name2 and member_community.get("description") == new_description2
+
+        retry_call(check_member_community_updated2)
 
         # When the Owner restarts the messenger
         self.owner.wakuext_service.stop_messenger()  # <-- Not implemented in API
