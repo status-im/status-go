@@ -243,7 +243,7 @@ func (b *StatusNode) pendingTrackerService() *pendingtxtracker.PendingTxTracker 
 
 func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 	if b.communityTokensSrvc == nil {
-		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.appDB, b.walletSrvc.EventsFeed(), b.transactor)
+		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountsManager, b.appDB, b.walletSrvc.EventsFeed())
 	}
 	return b.communityTokensSrvc
 }

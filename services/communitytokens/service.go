@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 // Collectibles service
@@ -46,22 +45,19 @@ type Service struct {
 	Messenger       *protocol.Messenger
 	walletFeed      *event.Feed
 	walletWatcher   *walletevent.Watcher
-	transactor      *transactions.Transactor
 	feeManager      *fees.FeeManager
 	ethClientGetter rpc.EthClientGetter
 	logger          *zap.Logger
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, appDb *sql.DB,
-	walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, appDb *sql.DB, walletFeed *event.Feed) *Service {
 	logger := logutils.ZapLogger().Named("communitytokens")
 	return &Service{
 		manager:         NewManager(rpcClient),
 		accountsManager: accountsManager,
 		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
 		walletFeed:      walletFeed,
-		transactor:      transactor,
 		feeManager:      fees.NewFeeManager(rpcClient, logger.Named("feeManager")),
 		ethClientGetter: rpcClient,
 		logger:          logger,
