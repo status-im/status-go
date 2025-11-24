@@ -303,7 +303,7 @@ func (s *services) createWalletService() {
 		ensResolver,
 		&s.backend.walletFeed,
 		s.mediaService,
-		s.tokenManager,
+		s.backend.tokenManager,
 		statusProxyStageName,
 	)
 	s.addService(s.walletSrvc)
@@ -361,7 +361,7 @@ func (s *services) createWakuExtService() error {
 		AccountsPublisher:      s.accountsSrvc.Publisher(),
 		TimeSource:             s.timeSourceSrvc,
 		MetricsEnabled:         s.backend.prometheusMetrics != nil,
-		TokenManager:           adapters.NewCommunitiesTokenManager(s.statusNode.TokenManager()),
+		TokenManager:           adapters.NewCommunitiesTokenManager(s.backend.tokenManager),
 		TokenBalanceManager:    adapters.NewCommunitiesTokenBalanceManager(s.statusNode.TokenBalancesFetcher(), s.statusNode.TokenBalancesStorage()),
 		NetworkManager:         adapters.NewCommunitiesNetworkManager(s.backend.rpcClient.GetNetworkManager()),
 	}

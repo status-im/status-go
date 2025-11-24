@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -18,10 +19,13 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/pkg/backend/jsonrpc"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/community"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -50,6 +54,8 @@ type StatusBackend struct {
 	centralizedMetrics *centralizedmetrics.MetricService
 	prometheusMetrics  *metrics.Server
 	transactor         *transactions.Transactor
+	tokenManager       *token.Manager
+	cancelTokenManager context.CancelFunc // TODO: This is a temporary solution. TokenManager should be properly stopped.
 
 	// FIXME: Replace events feed with pubsub - https://github.com/status-im/status-go/issues/6744
 	// FIXME: It should not be a part of the backend, but rather a part of the wallet service
@@ -178,6 +184,7 @@ func (b *StatusBackend) Start() {
 	//	b.rpcServer.RegisterName("settings", settingsService.API())
 }
 
+// FIXME: Also implement Logout. This should keep the main services running, but stop the services started at login.
 func (b *StatusBackend) Shutdown() error {
 	var err error
 
@@ -187,6 +194,8 @@ func (b *StatusBackend) Shutdown() error {
 
 	b.rpcClient.Stop()
 	b.rpcClient = nil
+
+	b.cancelTokenManager()
 
 	b.transactor = nil
 
@@ -257,26 +266,81 @@ type ServicesConfig struct {
 	wakuV2ExtEnabled          bool
 }
 
+func (b *StatusBackend) createRPCClient() error {
+	rpcClient, err := rpc.NewClient(rpc.ClientConfig{
+		Networks:          b.activeAccount.nodeConfig.Networks,
+		DB:                b.activeAccount.appDB,
+		AccountsPublisher: b.services.accountsSrvc.Publisher(),
+	})
+	if err != nil {
+		return err
+	}
+
+	b.rpcClient = rpcClient
+	return nil
+}
+
+func (b *StatusBackend) createTokenManager() error {
+	accDB, err := accounts.NewDB(b.activeAccount.appDB)
+	if err != nil {
+		return err
+	}
+
+	b.tokenManager = token.NewTokenManager(
+		b.activeAccount.walletDB,
+		b.rpcClient,
+		community.NewManager(b.activeAccount.appDB, b.services.mediaService, nil),
+		b.rpcClient.GetNetworkManager(),
+		b.activeAccount.appDB,
+		b.services.mediaService,
+		&b.walletFeed,
+		b.services.accountsSrvc.Publisher(),
+		accDB,
+		token.NewPersistence(b.activeAccount.walletDB),
+	)
+
+	return nil
+}
+
+func (b *StatusBackend) tokenManagerAutoRefreshInterval() (time.Duration, time.Duration) {
+	const (
+		defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
+		defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
+	)
+
+	autoRefreshInterval := defaultAutoRefreshInterval
+	autoRefreshCheckInterval := defaultAutoRefreshCheckInterval
+
+	configInterval := b.activeAccount.nodeConfig.WalletConfig.TokensListsAutoRefreshInterval
+	configCheckInterval := b.activeAccount.nodeConfig.WalletConfig.TokensListsAutoRefreshCheckInterval
+
+	if configInterval > 0 && configCheckInterval > 0 && configInterval > configCheckInterval {
+		autoRefreshInterval = time.Duration(configInterval) * time.Second
+		autoRefreshCheckInterval = time.Duration(configCheckInterval) * time.Second
+	}
+
+	return autoRefreshInterval, autoRefreshCheckInterval
+}
+
 // Register and start services, according to persisted settings
 // Root service should only load the settings required to define the list of services to start
 // Other services should load their settings through its persistence interfaces.
 // NOTE: For now we always register and start all services, as we did before. (messenger and wallet started by client)
 func (b *StatusBackend) startServices() error {
 	// 0. Start prerequisites that are not yet extracted as services
-	rpcClient, err := rpc.NewClient(rpc.ClientConfig{
-		Networks:          n.config.Networks,
-		DB:                n.appDB,
-		AccountsPublisher: n.accountsSrvc.Publisher(),
-	})
+	err := b.createRPCClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to create rpc client")
 	}
-	b.rpcClient = rpcClient
-	b.rpcClient.Start()
+
+	err = b.createTokenManager()
+	if err != nil {
+		return errors.Wrap(err, "failed to create token manager")
+	}
 
 	b.transactor = transactions.NewTransactor()
 
-	// 1. Spawn settings service
+	// TODO: 1. Spawn settings service
 
 	// 2. Read settings required to decide which allServices to start
 	cfg, err := b.activeAccount.ServicesConfig()
@@ -340,6 +404,14 @@ func (b *StatusBackend) startServices() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to register services")
 	}
+
+	// TEMP: Start non-services
+	b.rpcClient.Start()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	interval, checkInterval := b.tokenManagerAutoRefreshInterval()
+	b.tokenManager.Start(ctx, interval, checkInterval)
+	b.cancelTokenManager = cancel
 
 	// Start all created services
 	err = b.services.Start()
