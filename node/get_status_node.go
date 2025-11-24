@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node/backup"
 	"github.com/status-im/status-go/params"
-	rpc2 "github.com/status-im/status-go/pkg/backend/rpc"
+	"github.com/status-im/status-go/pkg/backend/jsonrpc"
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
@@ -476,7 +476,7 @@ func (n *StatusNode) ConnectionChanged(state connection.State) {
 }
 
 func (n *StatusNode) CallInProcessRPC(inputJSON string) string {
-	codec := rpc2.NewSingleRequestCodec(inputJSON)
+	codec := jsonrpc.NewSingleRequestCodec(inputJSON)
 	n.rpcServer.ServeCodec(codec.GethCodec(), 0)
 	return codec.Output()
 }

@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/pkg/backend/rpc"
+	"github.com/status-im/status-go/pkg/backend/jsonrpc"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 )
@@ -206,7 +206,7 @@ func (b *StatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInf
 }
 
 func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
-	codec := rpc.NewSingleRequestCodec(inputJSON)
+	codec := jsonrpc.NewSingleRequestCodec(inputJSON)
 	b.rpcServer.ServeCodec(codec.GethCodec(), 0)
 	return codec.Output()
 }
