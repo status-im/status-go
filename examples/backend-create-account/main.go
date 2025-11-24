@@ -33,7 +33,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	accs, err := b.RootService().ListAccounts()
+	ctx := context.Background()
+
+	accs, err := b.API().ListAccounts(ctx)
 	if err != nil {
 		fmt.Printf("Error listing accounts: %v\n", err)
 		os.Exit(1)
@@ -48,7 +50,7 @@ func main() {
 		DisplayName:       "test-user",
 		WakuV2LightClient: false,
 	}
-	acc, err := b.RootService().CreateAccount(context.Background(), request, nil)
+	acc, err := b.API().CreateAccount(ctx, request, nil)
 	if err != nil {
 		fmt.Printf("Error creating account: %v\n", err)
 		os.Exit(1)
@@ -56,7 +58,7 @@ func main() {
 
 	fmt.Printf("Account created: %+v\n", acc)
 
-	accs, err = b.RootService().ListAccounts()
+	accs, err = b.API().ListAccounts(ctx)
 	if err != nil {
 		fmt.Printf("Error listing accounts: %v\n", err)
 		os.Exit(1)

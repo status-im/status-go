@@ -52,9 +52,9 @@ type StatusBackendService interface {
 // FIXME: Ideally, backend pointer should not be needed here. Instead, services should refer to each other with provider interfaces.
 type services struct {
 	backend *StatusBackend
-	
+
 	// lgoger is used to derive a logger for all services. And for logging.
-	logger  *zap.Logger
+	logger *zap.Logger
 
 	//backend                *API
 	mediaService           *media.Service
@@ -313,9 +313,8 @@ func (s *services) createWalletService() {
 		s.accountsSrvc.Publisher(),
 		s.backend.activeAccount.accsManager,
 		b.transactor,
-		nodeConfig,
+		s.backend.activeAccount.nodeConfig,
 		ensResolver,
-		s.pendingTracker,
 		s.mediaService,
 		b.tokenManager,
 		statusProxyStageName,
@@ -348,7 +347,7 @@ func (s *services) createTimeSource() {
 }
 
 func (s *services) createWakuExtService() error {
-	s.wakuV2ExtSrvc = wakuext.New(nodeConfig, s.rpcClient, s.logger.Named("protocol"))
+	s.wakuV2ExtSrvc = wakuext.New(*s.backend.activeAccount.nodeConfig, s.rpcClient, s.logger.Named("protocol"))
 	s.addService(s.wakuV2ExtSrvc)
 
 	if s.walletSrvc != nil {
@@ -394,8 +393,6 @@ func (s *services) createEnsService() {
 	timeSourceCb := s.timeSourceSrvc.Now // TODO: Replace callback with proper interface
 	s.ensSrvc = ens.NewService(
 		s.rpcClient,
-		s.backend.activeAccount.accsManager,
-		s.pendingTracker,
 		s.backend.activeAccount.appDB,
 		timeSourceCb,
 	)
@@ -433,7 +430,6 @@ func (s *services) createStickersService() {
 		s.backend.activeAccount.accsManager,
 		s.backend.ipfs,
 		s.mediaService,
-		s.pendingTracker,
 	)
 	s.addService(s.stickersSrvc)
 }
@@ -477,8 +473,8 @@ func (s *services) createConnectorService() {
 		fees.NewFeeManager(s.rpcClient, logger.Named("feeManager")),
 		s.rpcClient.GetNetworkManager(),
 		&connector.Config{
-			WSHost: s.config.WSHost,
-			WSPort: s.config.WSPort,
+			WSHost: s.backend.activeAccount.nodeConfig.WSHost,
+			WSPort: s.backend.activeAccount.nodeConfig.WSPort,
 		},
 	)
 	s.addService(s.connectorSrvc)

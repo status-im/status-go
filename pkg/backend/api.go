@@ -52,7 +52,7 @@ func (a *API) CreateAccount(ctx context.Context, request *requests2.CreateAccoun
 //}
 //
 
-func (a *API) Login(request requests2.Login) error {
+func (a *API) Login(request *requests2.Login) error {
 	b := a.backend
 
 	// TODO: Validate request
@@ -76,6 +76,12 @@ func (a *API) Login(request requests2.Login) error {
 	activeAccount, err := login(b.rootDataDir, b.logger, acc, request.Password)
 	if err != nil {
 		return errors.Wrap(err, "failed to login")
+	}
+
+	// TEMP: prepare node config from given login request. Check ActiveAccount.nodeConfig for more info.
+	err = activeAccount.prepareLoginNodeConfig(a.backend.rootDataDir, request)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare node config")
 	}
 
 	// Update account last login timestamp

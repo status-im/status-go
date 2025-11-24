@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	errorsog "errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -83,37 +82,15 @@ func (a *ActiveAccount) GetSettings() (*settings.Settings, error) {
 	return &s, nil
 }
 
-func (a *ActiveAccount) SetNodeConfig(rootDataDir string, request *requests2.Login) error {
-	// FIXME: Problem is that currently we don't save NodeConfig into database.
-	//        Hence, we can't read it from the database.
-
-}
-
-// GetNodeConfig returns a node configuration based on the persisted settings and given runtime overrides.
-// TODO: This is a temporary solution. Instead, we should
-func (a *ActiveAccount) GetNodeConfig() (*params.NodeConfig, error) {
-	if a.nodeConfig != nil {
-		// Used cached value
-		return a.nodeConfig, nil
-	}
-
-	//return a.accountsDB.GetNodeConfig()
-}
-
 // ServicesConfig reads accounts settings from database and returns a configuration of services that should be started.
 // NOTE: Currently this is an adapter to NodeConfig, later should be stored in the database as is.
 func (a *ActiveAccount) ServicesConfig() (*ServicesConfig, error) {
-	nodeConfig, err := a.GetNodeConfig()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get node config")
-	}
-
 	cfg := &ServicesConfig{
-		browserEnabled:            nodeConfig.BrowsersConfig.Enabled,
-		permissionsServiceEnabled: nodeConfig.PermissionsConfig.Enabled,
-		connectorEnabled:          nodeConfig.ConnectorConfig.Enabled,
-		walletEnabled:             nodeConfig.WalletConfig.Enabled,
-		wakuV2ExtEnabled:          nodeConfig.WakuV2Config.Enabled,
+		browserEnabled:            a.nodeConfig.BrowsersConfig.Enabled,
+		permissionsServiceEnabled: a.nodeConfig.PermissionsConfig.Enabled,
+		connectorEnabled:          a.nodeConfig.ConnectorConfig.Enabled,
+		walletEnabled:             a.nodeConfig.WalletConfig.Enabled,
+		wakuV2ExtEnabled:          a.nodeConfig.WakuV2Config.Enabled,
 	}
 
 	return cfg, nil
@@ -209,7 +186,7 @@ func createAccount(dataDir string, logger *zap.Logger, request *requests2.Create
 		return nil, errors.Wrap(err, "failed to create wallet account")
 	}
 
-	// TEMP: write nodeConfig to database
+	// TEMP: write nodeConfig to database. Check ActiveAccount.nodeConfig for more info.
 	nodeConfig, err := createNodeConfig(request, "", activeAccount.account.KeyUID, dataDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create node config")
@@ -482,7 +459,7 @@ func createNodeConfig(request *requests2.CreateAccount, installationID string, k
 	return api.DefaultNodeConfig(installationID, keyUID, oldRequest)
 }
 
-func (a *ActiveAccount) loginNodeConfig(rootDataDir string, request *requests2.Login) (*params.NodeConfig, error) {
+func (a *ActiveAccount) prepareLoginNodeConfig(rootDataDir string, request *requests2.Login) error {
 	// NOTE: You might want to say that this function is very complex and should be refactored. And you'll be right.
 	//       This is a copy of code in GethStatusBackend.loginAccount. I left it as is not to break anything.
 	//       Some of the internal calls were decapsulated: loadNodeConfig, UpdateNodeConfigFleet.
@@ -497,7 +474,7 @@ func (a *ActiveAccount) loginNodeConfig(rootDataDir string, request *requests2.L
 
 	accountSettings, err := a.GetSettings()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load accountSettings")
+		return errors.Wrap(err, "failed to load accountSettings")
 	}
 
 	fleet := accountSettings.GetFleet()
@@ -508,15 +485,15 @@ func (a *ActiveAccount) loginNodeConfig(rootDataDir string, request *requests2.L
 
 	err = api.SetFleet(fleet, defaultCfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to set fleet")
+		return errors.Wrap(err, "failed to set fleet")
 	}
 
 	persistedNodeConfig, err := nodecfg.GetNodeConfigFromDB(a.appDB)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get persisted node config")
+		return errors.Wrap(err, "failed to get persisted node config")
 	}
 	if persistedNodeConfig == nil {
-		return nil, errors.New("persisted node config is nil")
+		return errors.New("persisted node config is nil")
 	}
 
 	// If an installationID is provided, we override it
@@ -525,35 +502,35 @@ func (a *ActiveAccount) loginNodeConfig(rootDataDir string, request *requests2.L
 	}
 
 	if err := mergo.Merge(persistedNodeConfig, defaultCfg, mergo.WithOverride); err != nil {
-		return nil, err
+		return err
 	}
 
 	persistedNodeConfig.Networks = defaultCfg.Networks
 
 	err = nodecfg.SaveNodeConfig(a.appDB, persistedNodeConfig)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to save node config")
+		return errors.Wrap(err, "failed to save node config")
 	}
 
 	persistedNodeConfig.RootDataDir = rootDataDir
 
-	out := persistedNodeConfig
+	a.nodeConfig = persistedNodeConfig
 
 	if request.RuntimeOverrides.LogLevel != nil {
-		out.LogLevel = *request.RuntimeOverrides.LogLevel
+		a.nodeConfig.LogLevel = *request.RuntimeOverrides.LogLevel
 	}
 	if request.RuntimeOverrides.WakuV2Nameserver != nil {
-		out.WakuV2Config.Nameserver = *request.RuntimeOverrides.WakuV2Nameserver
+		a.nodeConfig.WakuV2Config.Nameserver = *request.RuntimeOverrides.WakuV2Nameserver
 	}
 	if request.RuntimeOverrides.BandwidthStatsEnabled != nil {
-		out.ShhextConfig.BandwidthStatsEnabled = *request.RuntimeOverrides.BandwidthStatsEnabled
+		a.nodeConfig.ShhextConfig.BandwidthStatsEnabled = *request.RuntimeOverrides.BandwidthStatsEnabled
 	}
 
-	out.Networks = api.BuildDefaultNetworks(&request.RuntimeConfig.WalletSecrets, accountSettings.ThirdpartyServicesEnabled)
+	a.nodeConfig.Networks = api.BuildDefaultNetworks(&request.RuntimeConfig.WalletSecrets, accountSettings.ThirdpartyServicesEnabled)
 
 	if request.RuntimeConfig.APIConfig != nil {
-		api.OverrideApiConfig(out, request.RuntimeConfig.APIConfig)
+		api.OverrideApiConfig(a.nodeConfig, request.RuntimeConfig.APIConfig)
 	}
 
-	return out, nil
+	return nil
 }
