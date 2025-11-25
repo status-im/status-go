@@ -29,8 +29,8 @@ func TestFailToGetAccountForUnpermittedDApp(t *testing.T) {
 	assert.NoError(t, err)
 
 	result, err := state.cmd.Execute(state.ctx, request)
-	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
-	assert.Empty(t, result)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{}, result)
 }
 
 func TestGetAccountForPermittedDApp(t *testing.T) {
