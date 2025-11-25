@@ -280,6 +280,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         retry_call(check_member_community_updated)
 
         # When the Owner mints the owner token
+        # Simulate minting owner token by saving and adding a community token with owner privileges
         token_data = {
             "tokenType": 2,  # ERC721
             "communityId": community_id,
@@ -291,6 +292,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             "privilegesLevel": 1,  # Owner level
         }
         self.owner.wakuext_service.save_community_token(token_data)
+        self.owner.wakuext_service.add_community_token(community_id, 31337, "0x1234567890123456789012345678901234567890")
 
         # And the Owner edits the community again
         new_name2 = fake.community_name()
