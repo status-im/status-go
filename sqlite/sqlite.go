@@ -198,6 +198,12 @@ func openDB(path string, key string, kdfIterationsNumber int, cipherPageSize int
 				return errors.New("failed to set `kdf_iter` pragma")
 			}
 
+			// Test if the password is correct by attempting to read from the database
+			// This should be done before setting journal_mode to get proper password error
+			if _, err := conn.Exec("SELECT count(*) FROM sqlite_master", []driver.Value{}); err != nil {
+				return fmt.Errorf("invalid password or corrupted database: %w", err)
+			}
+
 			// readers do not block writers and faster i/o operations
 			if _, err := conn.Exec("PRAGMA journal_mode=WAL", []driver.Value{}); err != nil && path != InMemoryPath {
 				return fmt.Errorf("failed to set `journal_mode` pragma: %w", err)
