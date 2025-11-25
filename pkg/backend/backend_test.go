@@ -15,6 +15,20 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+func TestNewDataDir(t *testing.T) {
+	b, err := NewStatusBackend(
+		t.TempDir(),
+		WithLogger(testutils.MustCreateTestLogger().Named("backend")),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, b)
+
+	// No accounts yet
+	accs, err := b.API().ListAccounts(t.Context())
+	require.NoError(t, err)
+	require.Empty(t, accs)
+}
+
 func TestCreateAccount(t *testing.T) {
 	dataDir := t.TempDir()
 	b, err := NewStatusBackend(
@@ -23,11 +37,6 @@ func TestCreateAccount(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, b)
-
-	// Check accounts before creating
-	accs, err := b.API().ListAccounts(t.Context())
-	require.NoError(t, err)
-	require.Empty(t, accs)
 
 	// Create new account
 	request := &requests.CreateAccount{
@@ -41,9 +50,7 @@ func TestCreateAccount(t *testing.T) {
 	acc, err := b.API().CreateAccount(t.Context(), request)
 	require.NoError(t, err)
 
-	fmt.Printf("Account created: %+v\n", acc)
-
-	accs, err = b.API().ListAccounts(t.Context())
+	accs, err := b.API().ListAccounts(t.Context())
 	require.NoError(t, err)
 	require.Len(t, accs, 1)
 	assert.Equal(t, acc.KeyUID, accs[0].KeyUID)
