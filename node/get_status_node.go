@@ -259,14 +259,11 @@ func (n *StatusNode) StartLocalBackup() error {
 			return "", err
 		}
 
-		var backupDir string
-		if backupPath != "" {
-			backupDir = backupPath
-		} else {
-			backupDir = filepath.Join(n.config.RootDataDir, "backups")
+		if backupPath == "" {
+			return "", errors.New("backup path is not set")
 		}
 
-		fullPath := filepath.Join(backupDir, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
+		fullPath := filepath.Join(backupPath, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
 
 		return fullPath, nil
 	}

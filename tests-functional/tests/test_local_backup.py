@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 
@@ -6,6 +7,7 @@ from clients.status_backend import StatusBackend
 from resources.constants import Account, user_1
 from resources.test_data import profile_showcase_utils
 from utils import fake
+from clients.api import ApiResponseError
 
 test_one_to_one_chat_id = (
     "0x043329fc08727f15c4ec9a17bf7d6a3dc44e9d0d8f782a55804f3660b28827194a365dc1765cf96b6fa5cd666b9ee5298e8ac82f51f7952c4110cbf321d4f63864"
@@ -193,6 +195,11 @@ class TestLocalBackup:
 
         assert group_chat_recovered, "Group chat was not restored correctly"
         assert one_on_one_chat_recovered, "One-to-one chat was not restored correctly"
+
+        # Test that it fails if no backupPath is set
+        backend_client.settings_service.save_setting("backup-path", "")
+        with pytest.raises(ApiResponseError, match=re.escape("backup path is not set")):
+            backend_client.api_request_json("PerformLocalBackup", "")
 
         # Change the backup path (Docker restricts access to a lot of folders)
         backend_client.settings_service.save_setting("backup-path", "/usr/status-user/backups")
