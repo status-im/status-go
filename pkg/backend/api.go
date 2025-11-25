@@ -19,7 +19,7 @@ func (a *API) ListAccounts(ctx context.Context) ([]multiaccounts.Account, error)
 	return a.backend.ListAccounts(ctx)
 }
 
-func (a *API) CreateAccount(ctx context.Context, request *requests2.CreateAccount, keycardData *requests2.KeycardData) (*multiaccounts.Account, error) {
+func (a *API) CreateAccount(ctx context.Context, request *requests2.CreateAccount) (*multiaccounts.Account, error) {
 	//return a.backend.createAccount(ctx, request, keycardData)
 
 	//creator := NewAccountCreator(b.rootDataDir, b.logger.Named("account-creator"), b.multiaccountsDB, b.mediaService)
