@@ -108,3 +108,27 @@ func TestCreateAccount(t *testing.T) {
 	require.NotNil(t, nodeConfig)
 	assert.Equal(t, request.WakuV2LightClient, nodeConfig.WakuV2Config.LightClient)
 }
+
+func TestLoginWrongPassword(t *testing.T) {
+	b, err := NewStatusBackend(
+		t.TempDir(),
+		WithLogger(testutils.MustCreateTestLogger().Named("backend")),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, b)
+
+	request := &requests.CreateAccount{
+		Password:      gofakeit.LetterN(10),
+		KdfIterations: gofakeit.Number(1, 10),
+	}
+	acc, err := b.API().CreateAccount(t.Context(), request)
+	require.NoError(t, err)
+
+	loginRequest := &requests.Login{
+		KeyUID:   acc.KeyUID,
+		Password: request.Password + "wrong",
+	}
+	err = b.API().Login(loginRequest)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid password or corrupted database")
+}
