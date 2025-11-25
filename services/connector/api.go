@@ -34,10 +34,12 @@ func NewAPI(s *Service) *API {
 	r.Register("eth_signTypedData_v4", commands.NewSignCommand(s.db, c))
 
 	// Accounts query and dapp permissions
-	// NOTE: Some dApps expect same behavior for both eth_accounts and eth_requestAccounts
-	accountsCommand := commands.NewRequestAccountsCommand(s.db, c)
+	// NOTE: eth_accounts returns accounts only if already permitted, without user prompt
+	// eth_requestAccounts always prompts the user for permission (EIP-1102)
+	accountsCommand := commands.NewAccountsCommand(s.db)
+	requestAccountsCommand := commands.NewRequestAccountsCommand(s.db, c)
 	r.Register("eth_accounts", accountsCommand)
-	r.Register("eth_requestAccounts", accountsCommand)
+	r.Register("eth_requestAccounts", requestAccountsCommand)
 
 	// Active chain per dapp management
 	defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(s.nm)
