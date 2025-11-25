@@ -54,14 +54,26 @@ class TestStatusConnector:
         assert message.get("result") == hex(backend.network_id)
 
     def test_connect_and_accounts(self, backend, connector, wallet_account):
-        # Request accounts through connector
+        # eth_accounts returns empty array when not connected (per EIP-1102)
         connector.eth_accounts()
+        message = connector.receive()
+        assert message.get("result") == []
+
+        # Use eth_requestAccounts to trigger connection request
+        connector.eth_request_accounts()
         # And accept connection request
         accept_connector(backend, connector, wallet_account)
 
         # Receive accounts on connector
         message = connector.receive()
         assert message.get("result") is not None
+        accounts = message.get("result")
+        assert len(accounts) == 1
+        assert accounts[0] == wallet_account
+
+        # Now eth_accounts should return the connected account
+        connector.eth_accounts()
+        message = connector.receive()
         accounts = message.get("result")
         assert len(accounts) == 1
         assert accounts[0] == wallet_account
@@ -86,7 +98,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -105,7 +117,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -124,7 +136,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -144,7 +156,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -164,7 +176,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -184,7 +196,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -206,7 +218,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -232,7 +244,7 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -249,7 +261,7 @@ class TestStatusConnector:
     def test_revoke_permissions_on_disconnect(self, backend, connector, wallet_account):
         # Request accounts through connector
         # And accept connection request
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -266,7 +278,7 @@ class TestStatusConnector:
 
     def test_unavailable_statusgo_method(self, backend, connector, wallet_account):
         # First, register the dApp by calling some proper command
-        connector.eth_accounts()
+        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         connector.receive()  # Read out the message
 
