@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
@@ -48,13 +47,12 @@ func (a *LinkPreviewMessengerAdapter) FetchContact(contactID string, waitForResp
 	return a.messenger.FetchContact(contactID, waitForResponse)
 }
 
-func (a *LinkPreviewMessengerAdapter) FetchCommunity(communityID string, shard *messagingtypes.Shard) (*communities.Community, error) {
+func (a *LinkPreviewMessengerAdapter) FetchCommunity(communityID string) (*communities.Community, error) {
 	if a.messenger == nil {
 		return nil, ErrMessengerNotReady
 	}
 	return a.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
-		Shard:           shard,
 		TryDatabase:     true,
 		WaitForResponse: true,
 	})

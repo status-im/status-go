@@ -574,7 +574,7 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 
 	// Instantiate provider
 	dataProvider := mock_unfurlers.NewMockStatusDataProvider(s.ctrl)
-	dataProvider.EXPECT().FetchCommunity(gomock.Eq(community.IDString()), gomock.Eq(community.Shard())).
+	dataProvider.EXPECT().FetchCommunity(gomock.Eq(community.IDString())).
 		Return(community, nil).Times(1)
 
 	// Unfurl community shared URL

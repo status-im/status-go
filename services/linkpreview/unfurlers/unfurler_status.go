@@ -19,7 +19,7 @@ import (
 type StatusDataProvider interface {
 	GetContactByID(pubKey string) (*contacts.Contact, error)
 	FetchContact(contactID string, waitForResponse bool) (*contacts.Contact, error)
-	FetchCommunity(communityID string, shard *messagingtypes.Shard) (*communities.Community, error)
+	FetchCommunity(communityID string) (*communities.Community, error)
 }
 
 type StatusUnfurler struct {
