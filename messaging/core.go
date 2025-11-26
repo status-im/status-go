@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
 
 	cryptotypes "github.com/status-im/status-go/crypto/types"
@@ -92,6 +93,8 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		params.Identity,
 		config.logger,
 	)
+
+	stack.SDSManager = initSDS(config.logger)
 
 	publisher := pubsub.NewPublisher()
 
@@ -366,4 +369,34 @@ func (c *Core) decryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *e
 	}
 
 	return decrypted.DecryptedMessage, nil
+}
+
+func initSDS(logger *zap.Logger) *sds.ReliabilityManager {
+	sds.SetLogger(logger)
+
+	reliabilityManager, err := sds.NewReliabilityManager()
+	if err != nil {
+		logger.Error("SDS: failed to create ReliabilityManager", zap.Error(err))
+		return nil
+	}
+
+	callbacks := sds.EventCallbacks{
+		OnMessageSent: func(messageId sds.MessageID, channelId string) {
+			logger.Debug("SDS: message sent", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
+		},
+		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.MessageID, channelId string) {
+			logger.Debug("SDS: missing dependencies",
+				zap.String("messageId", string(messageId)),
+				zap.String("channelId", channelId),
+				zap.Any("missingDeps", missingDeps))
+		},
+		OnMessageReady: func(messageId sds.MessageID, channelId string) {
+			logger.Debug("SDS: message ready",
+				zap.String("messageId", string(messageId)),
+				zap.String("channelId", channelId))
+		},
+	}
+	reliabilityManager.RegisterCallbacks(callbacks)
+
+	return reliabilityManager
 }

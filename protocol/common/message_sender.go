@@ -6,8 +6,12 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+<<<<<<< HEAD
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
+=======
+	"github.com/waku-org/sds-go-bindings/sds"
+>>>>>>> 71440e009 (feat: enable sds for wrap message)
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -355,6 +359,15 @@ func (s *MessageSender) SendCommunity(
 		zap.String("sender", crypto.PubkeyToHex(&rawMessage.Sender.PublicKey)),
 	)
 
+	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+		s.logger.Debug("SDS: dispatchCommunityChatMessage with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
+		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
+		}
+		wrappedMessage = sdsWrappedPayload
+	}
+
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
 			return nil, err
@@ -495,4 +508,20 @@ func linkSpanWithMessage(span oteltrace.Span, message *RawMessage) {
 	)
 	linkSpanCtx := trace.DeriveSpanContext([]byte(message.ID), false)
 	span.AddLink(oteltrace.Link{SpanContext: linkSpanCtx})
+
+	// Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
+func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
+	sdsMessageID := crypto.Keccak256(payload)
+
+	s.logger.Debug("SDS: original payload",
+		zap.String("channelId", cryptotypes.EncodeHex(communityID)),
+		zap.Int("payload-length", len(payload)),
+		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
+	)
+	sdsWrappedPayload, err := s.messaging.SDSManager().WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
+	if err != nil {
+		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
+	}
+
+	return sdsWrappedPayload, nil
 }

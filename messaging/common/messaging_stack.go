@@ -1,6 +1,8 @@
 package common
 
 import (
+	"github.com/waku-org/sds-go-bindings/sds"
+
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/reliability"
 	"github.com/status-im/status-go/messaging/layers/segmentation"
@@ -12,4 +14,5 @@ type MessagingStack struct {
 	Segmentation *segmentation.Segmenter
 	Encryption   *encryption.Protocol
 	Reliability  *reliability.Reliability
+	SDSManager   *sds.ReliabilityManager
 }
