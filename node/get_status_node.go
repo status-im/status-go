@@ -49,7 +49,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/sharedurls"
-	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/utils"
@@ -107,7 +106,6 @@ type StatusNode struct {
 	// we explicitly list every service, we could use interfaces
 	// and store them in a nicer way and user reflection, but for now stupid is good
 	rpcStatsSrvc           *rpcstats.Service
-	statusPublicSrvc       *status.Service
 	accountsSrvc           *accountssvc.Service
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
@@ -291,8 +289,8 @@ func (n *StatusNode) StartLocalBackup() error {
 		n.localBackup.Register("wallet", n.walletSrvc)
 	}
 
-	if n.statusPublicSrvc != nil {
-		n.localBackup.Register("messenger", n.statusPublicSrvc.Messenger())
+	if n.wakuV2ExtSrvc != nil {
+		n.localBackup.Register("messenger", n.wakuV2ExtSrvc.Messenger())
 	}
 
 	n.localBackup.Start()
