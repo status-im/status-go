@@ -40,14 +40,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         accounts = self.member_with_snt.accounts_service.get_accounts()
         member_address = accounts[0]["address"] if accounts else self.fake_address
         token_amount = str(10 * 10**18)  # 10 tokens with 18 decimals
-        generate_cmd = (
-            f"cast send {self.controller_address} 'generateTokens(address,uint256)' "
-            f"{member_address} {token_amount} --rpc-url http://anvil:8545 "
-            f"--private-key {user_1.private_key}"
-        )
-        result = foundry_client.container.exec_run(generate_cmd)
-        logger.debug(f"Generate tokens result for member: exit_code={result.exit_code}, output={result.output.decode()}")
-
+        foundry_client.generate_tokens(self.controller_address, member_address, token_amount, user_1.private_key)
         logger.debug(f"Funded {member_address} with 10 SNT tokens at contract {self.snt_address}")
 
     def create_token_gated_community(
