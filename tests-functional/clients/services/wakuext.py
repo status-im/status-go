@@ -108,6 +108,13 @@ class CommunityTokenPrivilegesLevel(Enum):
     COMMUNITY_LEVEL = 3
 
 
+class CommunityRoles(Enum):
+    ROLE_NONE = 0
+    ROLE_OWNER = 1
+    ROLE_ADMIN = 4
+    ROLE_TOKEN_MASTER = 5
+
+
 class Error(Exception):
     def __init__(self, message):
         self.message = message
