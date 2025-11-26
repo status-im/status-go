@@ -199,5 +199,4 @@ class Foundry:
             f"--private-key {private_key}"
         )
         result = self.container.exec_run(generate_cmd)
-        logging.debug(f"Generate tokens result: exit_code={result.exit_code}, output={result.output.decode()}")
         return result
