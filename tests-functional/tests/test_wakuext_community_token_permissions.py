@@ -1,5 +1,4 @@
 import logging
-import time
 import pytest
 
 from clients.contract_deployers.snt import SNTDeployer
@@ -156,11 +155,13 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if requests:
             req_id = requests[0].get("id")
             # Since member has valid tokens, request should not be declined
-            # Wait a bit for token validation to complete, then try to accept directly
-            time.sleep(2)
+            # Wait for token validation to complete, then try to accept directly
 
-            # Owner can accept the request since member has tokens
-            accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+            def try_accept_request(req_id):
+                resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+                return resp if resp is not None else None
+
+            accept_resp = retry_call(try_accept_request, req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is now in community (check from owner's perspective since acceptance happened there)
@@ -219,16 +220,13 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Fetch community as member
         self.fetch_community(self.member_with_snt, community_id)
 
-        for i in range(10):
-            permissions_resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
-            # Inspect response to see if admin permission is satisfied
-            # Exact response shape depends on your RPC wrapper; pseudocode:
-            if permissions_resp.get("satisfied"):
-                break
-            elif i == 9:
-                pytest.fail("Permissions to join never became satisfied for member_with_snt")
+        def check_permissions_satisfied(community_id):
+            resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
+            return resp if resp.get("satisfied") else None
 
-            time.sleep(1)
+        permissions_resp = retry_call(check_permissions_satisfied, community_id)
+        if not permissions_resp:
+            pytest.fail("Permissions to join never became satisfied for member_with_snt")
 
         # Member with tokens requests to join community
         join_resp = self.member_with_snt.wakuext_service.request_to_join_community(community_id, member_address)
@@ -238,9 +236,11 @@ class TestCommunityTokenPermissions(MessengerSteps):
             req_id = requests[0].get("id")
             # Wait for token validation
 
-            time.sleep(2)
-            # Owner accepts the request since member has tokens
-            accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+            def try_accept_request(req_id):
+                resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+                return resp if resp is not None else None
+
+            accept_resp = retry_call(try_accept_request, req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Explicitly reevaluate community members so token-based roles are applied
