@@ -110,8 +110,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_address = accounts[0]["address"] if accounts else self.fake_address
 
         # Verify the balance directly with cast
-        balance_cmd = f"cast call {self.snt_address} 'balanceOf(address)' {member_address} --rpc-url http://anvil:8545"
-        balance_result = foundry_client.container.exec_run(balance_cmd)
+        balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
         logger.debug(f"SNT balance check: exit_code={balance_result.exit_code}, output={balance_result.output.decode()}")
 
         token_address = self.snt_address
@@ -174,8 +173,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_address = accounts[0]["address"] if accounts else self.fake_address
 
         # Verify the balance directly with cast
-        balance_cmd = f"cast call {self.snt_address} 'balanceOf(address)' {member_address} --rpc-url http://anvil:8545"
-        balance_result = foundry_client.container.exec_run(balance_cmd)
+        balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
         logger.debug(f"SNT balance check: exit_code={balance_result.exit_code}, output={balance_result.output.decode()}")
 
         # Owner creates token-gated community with admin permission
