@@ -35,7 +35,8 @@ func (c *AccountsCommand) Execute(ctx context.Context, request RPCRequest) (inte
 	}
 
 	if dApp == nil {
-		return "", ErrDAppIsNotPermittedByUser
+		// Per EIP-1102, eth_accounts should return empty array if not permitted
+		return []string{}, nil
 	}
 
 	return FormatAccountAddressToResponse(dApp.SharedAccount), nil
