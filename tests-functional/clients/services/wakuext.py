@@ -88,7 +88,7 @@ class CommunityPermissionsAccess(Enum):
     MANUAL_ACCEPT = 3
 
 
-class CommunityTokenPermissionType:
+class CommunityTokenPermissionType(Enum):
     BECOME_MEMBER = 1
     BECOME_ADMIN = 2
     BECOME_TOKEN_MASTER = 3
@@ -96,13 +96,13 @@ class CommunityTokenPermissionType:
     CAN_VIEW_AND_POST_CHANNEL = 5
 
 
-class CommunityTokenType:
+class CommunityTokenType(Enum):
     ERC20 = 1
     ERC721 = 2
     ENS = 3
 
 
-class CommunityTokenPrivilegesLevel:
+class CommunityTokenPrivilegesLevel(Enum):
     OWNER_LEVEL = 1
     MASTER_LEVEL = 2
     COMMUNITY_LEVEL = 3
@@ -843,11 +843,13 @@ class WakuextService(Service):
         response = self.rpc_request("generateHashRatchetKey", params)
         return response
 
-    def create_community_token_permission(self, community_id: str, permission_type: int, token_criteria: list, chat_ids: Optional[list] = None):
+    def create_community_token_permission(
+        self, community_id: str, permission_type: CommunityTokenPermissionType, token_criteria: list, chat_ids: Optional[list] = None
+    ):
         params = [
             {
                 "communityId": community_id,
-                "type": permission_type,
+                "type": permission_type.value,
                 "tokenCriteria": token_criteria,
             }
         ]
@@ -857,14 +859,19 @@ class WakuextService(Service):
         return response
 
     def edit_community_token_permission(
-        self, permission_id: str, community_id: str, permission_type: int, token_criteria: list, chat_ids: Optional[list] = None
+        self,
+        permission_id: str,
+        community_id: str,
+        permission_type: CommunityTokenPermissionType,
+        token_criteria: list,
+        chat_ids: Optional[list] = None,
     ):
         params = [
             {
                 "permissionId": permission_id,
                 "createCommunityTokenPermission": {
                     "communityId": community_id,
-                    "type": permission_type,
+                    "type": permission_type.value,
                     "tokenCriteria": token_criteria,
                 },
             }
