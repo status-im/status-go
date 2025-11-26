@@ -1,9 +1,8 @@
-package protocol
+package linkpreview
 
 import (
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	neturl "net/url"
 	"regexp"
@@ -16,37 +15,12 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/services/linkpreview/unfurlers"
 	"github.com/status-im/status-go/services/sharedurls"
 )
 
-const UnfurledLinksPerMessageLimit = 5
-
-type URLUnfurlPermission int
-
-const (
-	URLUnfurlingAllowed URLUnfurlPermission = iota
-	URLUnfurlingAskUser
-	URLUnfurlingForbiddenBySettings
-	URLUnfurlingNotSupported
-)
-
-type URLUnfurlingMetadata struct {
-	URL               string              `json:"url"`
-	Permission        URLUnfurlPermission `json:"permission"`
-	IsStatusSharedURL bool                `json:"isStatusSharedURL"`
-}
-
-type URLsUnfurlPlan struct {
-	URLs []URLUnfurlingMetadata `json:"urls"`
-}
-
 func URLUnfurlingSupported(url string) bool {
 	return !strings.HasSuffix(url, ".gif")
-}
-
-type UnfurlURLsResponse struct {
-	LinkPreviews       []*common.LinkPreview       `json:"linkPreviews,omitempty"`
-	StatusLinkPreviews []*common.StatusLinkPreview `json:"statusLinkPreviews,omitempty"`
 }
 
 func normalizeHostname(hostname string) string {
@@ -55,31 +29,20 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) Unfurler {
-
-	if IsSupportedImageURL(url) {
-		return NewImageUnfurler(
-			url,
-			m.logger,
-			httpClient)
+func newURLUnfurler(httpClient *http.Client, url *neturl.URL, logger *zap.Logger) unfurlers.Unfurler {
+	if unfurlers.IsSupportedImageURL(url) {
+		return unfurlers.NewImageUnfurler(url, logger, httpClient)
 	}
 
 	switch normalizeHostname(url.Hostname()) {
 	case "reddit.com":
-		return NewOEmbedUnfurler(
-			"https://www.reddit.com/oembed",
-			url,
-			m.logger,
-			httpClient)
+		return unfurlers.NewOEmbedUnfurler("https://www.reddit.com/oembed", url, logger, httpClient)
 	default:
-		return NewOpenGraphUnfurler(
-			url,
-			m.logger,
-			httpClient)
+		return unfurlers.NewOpenGraphUnfurler(url, logger, httpClient)
 	}
 }
 
-func (m *Messenger) unfurlURL(httpClient *http.Client, url string) (*common.LinkPreview, error) {
+func UnfurlURL(url string, httpClient *http.Client, logger *zap.Logger) (*common.LinkPreview, error) {
 	preview := new(common.LinkPreview)
 
 	parsedURL, err := neturl.Parse(url)
@@ -87,7 +50,7 @@ func (m *Messenger) unfurlURL(httpClient *http.Client, url string) (*common.Link
 		return preview, err
 	}
 
-	unfurler := m.newURLUnfurler(httpClient, parsedURL)
+	unfurler := newURLUnfurler(httpClient, parsedURL, logger)
 	preview, err = unfurler.Unfurl()
 	if err != nil {
 		return preview, err
@@ -117,14 +80,7 @@ func parseValidURL(rawURL string) (*neturl.URL, error) {
 	return u, nil
 }
 
-func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
-	s, err := m.getSettings()
-	if err != nil {
-		// log the error and keep parsing the text
-		m.logger.Error("GetTextURLsToUnfurl: failed to get settings", zap.Error(err))
-		s.URLUnfurlingMode = settings.URLUnfurlingDisableAll
-	}
-
+func GetTextURLsToUnfurl(text string, URLUnfurlingMode settings.URLUnfurlingModeType) *URLsUnfurlPlan {
 	indexedUrls := map[string]struct{}{}
 	result := &URLsUnfurlPlan{
 		// The usage of `UnfurledLinksPerMessageLimit` is quite random here. I wanted to allocate
@@ -162,7 +118,7 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 		} else if metadata.IsStatusSharedURL {
 			metadata.Permission = URLUnfurlingAllowed
 		} else {
-			switch s.URLUnfurlingMode {
+			switch URLUnfurlingMode {
 			case settings.URLUnfurlingAlwaysAsk:
 				metadata.Permission = URLUnfurlingAskUser
 			case settings.URLUnfurlingEnableAll:
@@ -180,30 +136,13 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 	return result
 }
 
-// Deprecated: GetURLs is deprecated in favor of more generic GetTextURLsToUnfurl.
-//
-// This is a wrapper around GetTextURLsToUnfurl that returns the list of URLs found in the text
-// without any additional information.
-func (m *Messenger) GetURLs(text string) []string {
-	plan := m.GetTextURLsToUnfurl(text)
-	limit := int(math.Min(UnfurledLinksPerMessageLimit, float64(len(plan.URLs))))
-	urls := make([]string, 0, limit)
-	for _, metadata := range plan.URLs {
-		urls = append(urls, metadata.URL)
-		if len(urls) == limit {
-			break
-		}
-	}
-	return urls
-}
-
 func NewDefaultHTTPClient() *http.Client {
-	return &http.Client{Timeout: DefaultRequestTimeout}
+	return &http.Client{Timeout: unfurlers.DefaultRequestTimeout}
 }
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
-// processed by GetURLs.
-func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlURLsResponse, error) {
+// processed by GetTextURLsToUnfurl.
+func UnfurlURLs(urls []string, httpClient *http.Client, statusDataProvider unfurlers.StatusDataProvider, logger *zap.Logger) (UnfurlURLsResponse, error) {
 	response := UnfurlURLsResponse{}
 
 	// Unfurl in a loop
@@ -216,22 +155,22 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 	}
 
 	for _, url := range urls {
-		m.logger.Debug("unfurling", zap.String("url", url))
+		logger.Debug("unfurling", zap.String("url", url))
 
 		if sharedurls.IsStatusSharedURL(url) {
-			unfurler := NewStatusUnfurler(url, m, m.logger)
+			unfurler := unfurlers.NewStatusUnfurler(url, statusDataProvider, logger)
 			preview, err := unfurler.Unfurl()
 			if err != nil {
-				m.logger.Warn("failed to unfurl status link", zap.String("url", url), zap.Error(err))
+				logger.Warn("failed to unfurl status link", zap.String("url", url), zap.Error(err))
 				continue
 			}
 			response.StatusLinkPreviews = append(response.StatusLinkPreviews, preview)
 			continue
 		}
 
-		p, err := m.unfurlURL(httpClient, url)
+		p, err := UnfurlURL(url, httpClient, logger)
 		if err != nil {
-			m.logger.Warn("failed to unfurl", zap.String("url", url), zap.Error(err))
+			logger.Warn("failed to unfurl", zap.String("url", url), zap.Error(err))
 			continue
 		}
 		response.LinkPreviews = append(response.LinkPreviews, p)
