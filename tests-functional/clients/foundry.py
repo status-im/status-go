@@ -188,3 +188,16 @@ class Foundry:
                 return os.path.join(temp_dir, tar.getmembers()[0].name)
 
         return temp_dir
+
+    def generate_tokens(self, controller_address, to_address, token_amount, private_key):
+        if not self.container:
+            raise Exception("Container not found")
+
+        generate_cmd = (
+            f"cast send {controller_address} 'generateTokens(address,uint256)' "
+            f"{to_address} {token_amount} --rpc-url http://anvil:8545 "
+            f"--private-key {private_key}"
+        )
+        result = self.container.exec_run(generate_cmd)
+        logging.debug(f"Generate tokens result: exit_code={result.exit_code}, output={result.output.decode()}")
+        return result
