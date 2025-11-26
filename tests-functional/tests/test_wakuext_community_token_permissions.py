@@ -65,7 +65,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Add token permission
         token_criteria = [
             {
-                "type": CommunityTokenType.ERC20,
+                "type": CommunityTokenType.ERC20.value,
                 "contract_addresses": {31337: "0x1234567890123456789012345678901234567890"},
                 "symbol": "TEST",
                 "amountInWei": "1",  # 1 wei required
@@ -133,7 +133,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Add token permission requiring 1 SNT token
         token_criteria = [
             {
-                "type": CommunityTokenType.ERC20,
+                "type": CommunityTokenType.ERC20.value,
                 "contract_addresses": {31337: token_address},
                 "symbol": "SNT",
                 "amountInWei": "1000000000000000000",  # 1 token
@@ -195,7 +195,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Add token permission requiring 1 SNT token for admin
         token_criteria = [
             {
-                "type": CommunityTokenType.ERC20,
+                "type": CommunityTokenType.ERC20.value,
                 "contract_addresses": {31337: self.snt_address},
                 "symbol": "SNT",
                 "amountInWei": "1000000000000000000",  # 1 token
