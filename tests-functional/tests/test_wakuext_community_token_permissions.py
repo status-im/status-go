@@ -202,9 +202,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
             accept_resp = retry_call(try_accept_request, req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
-        # Explicitly reevaluate community members so token-based roles are applied
-        self.owner.wakuext_service.reevaluate_community_members_permissions(community_id)
-
         # Verify member is now in community and has admin role
         communities = self.owner.wakuext_service.communities()
         owner_community = next(
