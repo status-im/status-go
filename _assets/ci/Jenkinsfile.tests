@@ -95,6 +95,9 @@ pipeline {
 
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
+
+    /* nwaku source directory */
+    NIM_SDS_SOURCE_DIR = "${WORKSPACE_TMP}/nim-sds"
   }
 
   stages {
