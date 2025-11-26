@@ -200,3 +200,11 @@ class Foundry:
         )
         result = self.container.exec_run(generate_cmd)
         return result
+
+    def get_erc20_balance(self, token_address, owner_address):
+        if not self.container:
+            raise Exception("Container not found")
+
+        balance_cmd = f"cast call {token_address} 'balanceOf(address)' {owner_address} --rpc-url http://anvil:8545"
+        result = self.container.exec_run(balance_cmd)
+        return result
