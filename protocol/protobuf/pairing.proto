@@ -500,8 +500,19 @@ message BackedUpMessage {
   repeated PaymentRequest payment_requests = 14;
 
   string pinned_by = 15;
+
+  repeated BackedUpEmojiReaction emoji_reactions = 16;
 }
 
 message BackedUpMessageBatch {
   repeated BackedUpMessage messages = 1;
+}
+
+message BackedUpEmojiReaction {
+  // clock Lamport timestamp of the chat message
+  uint64 clock = 1;
+
+  string from = 2;
+
+  string emoji = 3;
 }

@@ -146,7 +146,12 @@ func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
 
 			m1.payment_requests,
 
-			pm.pinned_by`
+			pm.pinned_by,
+			
+			e.clock_value,
+			e.source,
+			e.emoji
+		`
 }
 
 // keep the same order as in tableUserMessagesScanAllFields
@@ -529,92 +534,6 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	return nil
 }
 
-// keep the same order as in tableUserMessagesProtobufFields
-func (db sqlitePersistence) tableUserMessagesScanProtobufFields(row scanner, message *protobuf.BackedUpMessage, others ...interface{}) error {
-
-	sticker := &protobuf.StickerMessage{}
-	image := &protobuf.ImageMessage{}
-	var serializedLinks []byte
-	var serializedUnfurledLinks []byte
-	var serializedPaymentRequests []byte
-	var serializedUnfurledStatusLinks []byte
-	var pinnedBy sql.NullString
-
-	args := []interface{}{
-		&message.Id,
-		&message.Timestamp,
-		&message.Clock,
-		&message.Text,
-		&message.From, // source in table
-		&message.ResponseTo,
-		&message.ChatId,
-		&message.MessageType,
-		&message.ContentType,
-
-		&sticker.Pack,
-		&sticker.Hash,
-
-		&image.Payload,
-		&image.Format,
-
-		&image.AlbumId,
-		&image.AlbumImagesCount,
-		&image.Width,
-		&image.Height,
-
-		&serializedLinks,
-		&serializedUnfurledLinks,
-		&serializedUnfurledStatusLinks,
-
-		&serializedPaymentRequests,
-
-		&pinnedBy,
-	}
-	err := row.Scan(append(args, others...)...)
-	if err != nil {
-		return err
-	}
-
-	if serializedUnfurledLinks != nil {
-		err = json.Unmarshal(serializedUnfurledLinks, &message.UnfurledLinks)
-		if err != nil {
-			return err
-		}
-	}
-
-	if serializedUnfurledStatusLinks != nil {
-		// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
-		var links protobuf.UnfurledStatusLinks
-		err = proto.Unmarshal(serializedUnfurledStatusLinks, &links)
-		if err != nil {
-			return err
-		}
-		message.UnfurledStatusLinks = &links
-	}
-
-	if serializedPaymentRequests != nil {
-		err := json.Unmarshal(serializedPaymentRequests, &message.PaymentRequests)
-		if err != nil {
-			return err
-		}
-	}
-
-	if pinnedBy.Valid {
-		message.PinnedBy = pinnedBy.String
-	}
-
-	switch message.ContentType {
-	case int64(protobuf.ChatMessage_STICKER):
-		message.Payload = &protobuf.BackedUpMessage_Sticker{Sticker: sticker}
-
-	case int64(protobuf.ChatMessage_IMAGE):
-		message.Payload = &protobuf.BackedUpMessage_Image{Image: image}
-
-	}
-
-	return nil
-}
-
 func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) ([]interface{}, error) {
 	var gapFrom, gapTo uint32
 
@@ -917,7 +836,7 @@ func (db sqlitePersistence) FirstUnseenMessageID(chatID string) (string, error) 
 			LIMIT 1`,
 		chatID).Scan(&id)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {
@@ -1033,7 +952,7 @@ func (db sqlitePersistence) LatestPendingContactRequestIDForContact(contactID st
 			LIMIT 1
 		`, cursor),
 		contactID, protobuf.ChatMessage_CONTACT_REQUEST).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 
@@ -1229,7 +1148,7 @@ func (db sqlitePersistence) CountActiveChattersInCommunity(communityID string, a
 			WHERE chats.community_id = ?
 			AND user_messages.timestamp >= ?
 		`, communityID, activeAfterTimestamp).Scan(&activeChattersCount)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
 	if err != nil {
@@ -1394,31 +1313,162 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	return result, newCursor, nil
 }
 
+// AllMessagesForBackup fetches all messages and pins
+// with their non-retracted emoji reactions in a single query, and assembles them into
+// protobuf-backed structures suitable for backups.
 func (db sqlitePersistence) AllMessagesForBackup() ([]*protobuf.BackedUpMessage, error) {
-	where := "WHERE NOT(m1.hide) AND (discord_message_id IS NULL OR discord_message_id == '')"
 	fields := db.tableUserMessagesProtobufFields()
-	selectQuery := `SELECT    %s
-				FROM      user_messages m1
-				LEFT JOIN pin_messages pm
-				ON 	      m1.id = pm.message_id AND pm.pinned = 1`
-	query := fmt.Sprintf(selectQuery, fields) + " " + where
+	//nolint: gosec
+	query := fmt.Sprintf(`SELECT %s
+			FROM user_messages m1
+            LEFT JOIN pin_messages pm
+                ON pm.message_id = m1.id AND pm.pinned = 1
+			LEFT JOIN emoji_reactions e
+			  ON e.message_id = m1.id AND NOT(e.retracted)
+			WHERE NOT(m1.hide) AND (discord_message_id IS NULL OR discord_message_id == '')
+			ORDER BY m1.local_chat_id, m1.id, e.clock_value`, fields)
+
 	rows, err := db.db.Query(query)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []*protobuf.BackedUpMessage{}, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
 
-	var messages []*protobuf.BackedUpMessage
+	messages := make(map[string]*protobuf.BackedUpMessage)
+	order := make([]string, 0, 128)
+
 	for rows.Next() {
-		message := &protobuf.BackedUpMessage{}
-		if err := db.tableUserMessagesScanProtobufFields(rows, message); err != nil {
+		var (
+			// message fields
+			msgID, msgSource, msgText, msgLocalChatID string
+			msgTimestamp, msgClockValue               uint64
+			msgContentType                            int64
+			msgType                                   int64
+			msgResponseTo                             string
+			pinnedBy                                  sql.NullString
+			// reaction fields (nullable)
+			rClock                        sql.NullInt64
+			rSource                       sql.NullString
+			rEmoji                        sql.NullString
+			serializedLinks               []byte
+			serializedUnfurledLinks       []byte
+			serializedPaymentRequests     []byte
+			serializedUnfurledStatusLinks []byte
+		)
+
+		sticker := &protobuf.StickerMessage{}
+		image := &protobuf.ImageMessage{}
+
+		// keep the same order as in tableUserMessagesProtobufFields
+		if err := rows.Scan(
+			&msgID,
+			&msgTimestamp,
+			&msgClockValue,
+			&msgText,
+			&msgSource,
+			&msgResponseTo,
+			&msgLocalChatID,
+			&msgType,
+			&msgContentType,
+
+			&sticker.Pack,
+			&sticker.Hash,
+
+			&image.Payload,
+			&image.Format,
+			&image.AlbumId,
+			&image.AlbumImagesCount,
+			&image.Width,
+			&image.Height,
+
+			&serializedLinks,
+			&serializedUnfurledLinks,
+			&serializedUnfurledStatusLinks,
+
+			&serializedPaymentRequests,
+
+			&pinnedBy,
+
+			&rClock,
+			&rSource,
+			&rEmoji,
+		); err != nil {
 			return nil, err
 		}
 
-		messages = append(messages, message)
+		bm, ok := messages[msgID]
+		if !ok {
+			bm = &protobuf.BackedUpMessage{
+				Id:          msgID,
+				Timestamp:   msgTimestamp,
+				Clock:       msgClockValue,
+				Text:        msgText,
+				From:        msgSource,
+				ResponseTo:  msgResponseTo,
+				ChatId:      msgLocalChatID,
+				MessageType: protobuf.MessageType(msgType),
+				ContentType: msgContentType,
+			}
+			if serializedUnfurledLinks != nil {
+				err = json.Unmarshal(serializedUnfurledLinks, &bm.UnfurledLinks)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if serializedUnfurledStatusLinks != nil {
+				// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
+				var links protobuf.UnfurledStatusLinks
+				err = proto.Unmarshal(serializedUnfurledStatusLinks, &links)
+				if err != nil {
+					return nil, err
+				}
+				bm.UnfurledStatusLinks = &links
+			}
+			if serializedPaymentRequests != nil {
+				err := json.Unmarshal(serializedPaymentRequests, &bm.PaymentRequests)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if pinnedBy.Valid {
+				bm.PinnedBy = pinnedBy.String
+			}
+
+			switch bm.ContentType {
+			case int64(protobuf.ChatMessage_STICKER):
+				bm.Payload = &protobuf.BackedUpMessage_Sticker{Sticker: sticker}
+
+			case int64(protobuf.ChatMessage_IMAGE):
+				bm.Payload = &protobuf.BackedUpMessage_Image{Image: image}
+
+			}
+			messages[msgID] = bm
+			order = append(order, msgID)
+		}
+
+		// Append reaction if present (LEFT JOIN may yield NULLs when none)
+		if rEmoji.Valid {
+			bm.EmojiReactions = append(bm.EmojiReactions, &protobuf.BackedUpEmojiReaction{
+				Clock: uint64(rClock.Int64),
+				From:  rSource.String,
+				Emoji: rEmoji.String,
+			})
+		}
 	}
 
-	return messages, nil
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Preserve row order grouping
+	result := make([]*protobuf.BackedUpMessage, 0, len(order))
+	for _, k := range order {
+		result = append(result, messages[k])
+	}
+	return result, nil
 }
 
 func (db sqlitePersistence) saveBackedUpMessages(messages []*protobuf.BackedUpMessage) error {
@@ -1508,7 +1558,85 @@ func (db sqlitePersistence) SaveBackedUpMessages(messages []*protobuf.BackedUpMe
 		return err
 	}
 
+	// Save emoji reactions attached to backed up messages
+	err = db.saveBackedUpEmojiReactions(messages)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// saveBackedUpEmojiReactions persists emoji reactions found on backed up messages.
+// Only non-retracted reactions are included in backups, so we store them directly.
+func (db sqlitePersistence) saveBackedUpEmojiReactions(messages []*protobuf.BackedUpMessage) error {
+	reactions := make([]*EmojiReaction, 0)
+	for _, msg := range messages {
+		if len(msg.EmojiReactions) == 0 {
+			continue
+		}
+		for _, er := range msg.EmojiReactions {
+			reactions = append(reactions, &EmojiReaction{
+				EmojiReaction: &protobuf.EmojiReaction{
+					Clock:       er.Clock,
+					ChatId:      msg.ChatId,
+					MessageId:   msg.Id,
+					MessageType: msg.MessageType,
+					Retracted:   false,
+					Emoji:       er.Emoji,
+				},
+				From:        er.From,
+				LocalChatID: msg.ChatId,
+			})
+		}
+	}
+	if len(reactions) == 0 {
+		return nil
+	}
+	return db.SaveEmojiReactions(reactions)
+}
+
+// SaveEmojiReactions persists multiple emoji reactions efficiently in a single transaction.
+func (db sqlitePersistence) SaveEmojiReactions(reactions []*EmojiReaction) (err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
+	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted,emoji) VALUES (?,?,?,?,?,?,?,?,?)"
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+
+	for _, emojiReaction := range reactions {
+		if emojiReaction == nil {
+			continue
+		}
+		_, err = stmt.Exec(
+			emojiReaction.ID(),
+			emojiReaction.Clock,
+			emojiReaction.From,
+			emojiReaction.Type,
+			emojiReaction.MessageId,
+			emojiReaction.ChatId,
+			emojiReaction.LocalChatID,
+			emojiReaction.Retracted,
+			emojiReaction.Emoji,
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf.BackedUpMessage) ([]interface{}, error) {
@@ -3446,7 +3574,7 @@ func (db sqlitePersistence) GetCommunityMemberAllMessages(member string, communi
 	rows, err := db.db.Query(query, communityID, member)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return []*common.Message{}, nil
 		}
 
