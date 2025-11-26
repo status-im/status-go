@@ -120,7 +120,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
         assert balance_result.exit_code == 0, "Balance check command failed"
         balance = int(balance_result.output.decode().strip(), 16)
-        assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at least 1000000000000000000 wei (1 token)"
+        assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at least 1 token"
 
         # Owner creates token-gated community with the deployed token
         community_id = self.create_token_gated_community(
@@ -167,12 +167,15 @@ class TestCommunityTokenPermissions(MessengerSteps):
         balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
         assert balance_result.exit_code == 0, "Balance check command failed"
         balance = int(balance_result.output.decode().strip(), 16)
-        assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at least 1000000000000000000 wei (1 token)"
+        assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at 1 token"
 
         # Owner creates token-gated community with member and admin permissions
         community_id = self.create_token_gated_community(
             self.owner,
-            permission_types=[CommunityTokenPermissionType.BECOME_MEMBER, CommunityTokenPermissionType.BECOME_ADMIN],
+            permission_types=[
+                CommunityTokenPermissionType.BECOME_MEMBER,
+                CommunityTokenPermissionType.BECOME_ADMIN,
+            ],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
