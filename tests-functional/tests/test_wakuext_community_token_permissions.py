@@ -3,7 +3,7 @@ import time
 import pytest
 
 from clients.contract_deployers.snt import SNTDeployer
-from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType
+from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from steps.messenger import MessengerSteps
 from utils.retry_utils import retry_call
 from utils import fake
@@ -257,10 +257,10 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_key = self.member_with_snt.public_key
         owner_key = self.owner.public_key
 
-        # Member should have admin role (4), granted via BECOME_ADMIN token permission
+        # Member should have admin role, granted via BECOME_ADMIN token permission
         assert member_key in owner_community.get("members", {})
-        assert 4 in owner_community["members"][member_key].get("roles", [])
+        assert CommunityRoles.ROLE_ADMIN.value in owner_community["members"][member_key].get("roles", [])
 
-        # Owner should remain owner (1) only, not changed by token reevaluation
+        # Owner should remain owner only, not changed by token reevaluation
         assert owner_key in owner_community.get("members", {})
-        assert 1 in owner_community["members"][owner_key].get("roles", [])
+        assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
