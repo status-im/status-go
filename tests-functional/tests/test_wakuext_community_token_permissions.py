@@ -81,7 +81,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         return community_id, permission_resp
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
-    def test_token_gated_community_membership_no_valid_tokens(self):
+    def test_membership_no_valid_tokens(self):
         """Test that users must hold required tokens to join community"""
         # Owner creates token-gated community
         community_id, _ = self.create_token_gated_community(
@@ -110,7 +110,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert member_community is None or not member_community.get("joined", False)
 
-    def test_token_gated_community_membership_with_valid_tokens(self, foundry_client):
+    def test_membership_with_valid_tokens(self, foundry_client):
         """Test that users with required tokens can successfully join community as member"""
         # Get member's wallet address
         accounts = self.member_with_snt.accounts_service.get_accounts()
