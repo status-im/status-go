@@ -3,33 +3,13 @@ import time
 import pytest
 
 from clients.contract_deployers.snt import SNTDeployer
-from clients.services.wakuext import CommunityPermissionsAccess
+from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType
 from steps.messenger import MessengerSteps
 from utils.retry_utils import retry_call
 from utils import fake
 from resources.constants import user_1
 
 logger = logging.getLogger(__name__)
-
-
-class CommunityTokenPermissionType:
-    BECOME_MEMBER = 1
-    BECOME_ADMIN = 2
-    BECOME_TOKEN_MASTER = 3
-    CAN_VIEW_CHANNEL = 4
-    CAN_VIEW_AND_POST_CHANNEL = 5
-
-
-class CommunityTokenType:
-    ERC20 = 1
-    ERC721 = 2
-    ENS = 3
-
-
-class CommunityTokenPrivilegesLevel:
-    OWNER_LEVEL = 1
-    MASTER_LEVEL = 2
-    COMMUNITY_LEVEL = 3
 
 
 @pytest.mark.rpc
