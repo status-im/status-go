@@ -1,5 +1,6 @@
 import logging
 import pytest
+from typing import Optional, List
 
 from clients.contract_deployers.snt import SNTDeployer
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
@@ -45,9 +46,26 @@ class TestCommunityTokenPermissions(MessengerSteps):
         logger.debug(f"Funded {member_address} with 10 SNT tokens at contract {self.snt_address}")
 
     def create_token_gated_community(
-        self, owner_backend, permission_type=CommunityTokenPermissionType.BECOME_MEMBER, membership=CommunityPermissionsAccess.AUTO_ACCEPT
+        self,
+        owner_backend,
+        permission_types: Optional[List[CommunityTokenPermissionType]] = None,
+        token_criteria: Optional[List[dict]] = None,
+        membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
     ):
-        """Helper to create a community with token permissions"""
+        """Helper to create a community and add token permissions"""
+        if permission_types is None:
+            permission_types = [CommunityTokenPermissionType.BECOME_MEMBER]
+        if token_criteria is None:
+            token_criteria = [
+                {
+                    "type": CommunityTokenType.ERC20.value,
+                    "contract_addresses": {31337: self.snt_address},
+                    "symbol": "SNT",
+                    "amountInWei": "1",  # 1 wei required
+                    "decimals": 18,
+                }
+            ]
+
         # Create basic community
         community_resp = owner_backend.wakuext_service.create_community(
             name=fake.community_name(),
@@ -56,30 +74,19 @@ class TestCommunityTokenPermissions(MessengerSteps):
         )
         community_id = community_resp.get("communities", [{}])[0].get("id")
 
-        # Add token permission
-        token_criteria = [
-            {
-                "type": CommunityTokenType.ERC20.value,
-                "contract_addresses": {31337: "0x1234567890123456789012345678901234567890"},
-                "symbol": "TEST",
-                "amountInWei": "1",  # 1 wei required
-                "decimals": 18,
-            }
-        ]
+        # Add token permissions
+        for permission_type in permission_types:
+            owner_backend.wakuext_service.create_community_token_permission(
+                community_id=community_id, permission_type=permission_type, token_criteria=token_criteria
+            )
 
-        permission_resp = owner_backend.wakuext_service.create_community_token_permission(
-            community_id=community_id, permission_type=permission_type, token_criteria=token_criteria
-        )
-
-        return community_id, permission_resp
+        return community_id
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens(self):
         """Test that users must hold required tokens to join community"""
         # Owner creates token-gated community
-        community_id, _ = self.create_token_gated_community(
-            self.owner, CommunityTokenPermissionType.BECOME_MEMBER, CommunityPermissionsAccess.MANUAL_ACCEPT
-        )
+        community_id = self.create_token_gated_community(self.owner, membership=CommunityPermissionsAccess.MANUAL_ACCEPT)
 
         # Fetch community as member
         self.fetch_community(self.member, community_id)
@@ -115,29 +122,11 @@ class TestCommunityTokenPermissions(MessengerSteps):
         balance = int(balance_result.output.decode().strip(), 16)
         assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at least 1000000000000000000 wei (1 token)"
 
-        token_address = self.snt_address
-
         # Owner creates token-gated community with the deployed token
-        community_resp = self.owner.wakuext_service.create_community(
-            name=fake.community_name(),
-            description=fake.community_description(),
+        community_id = self.create_token_gated_community(
+            self.owner,
+            permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
-        )
-        community_id = community_resp.get("communities", [{}])[0].get("id")
-
-        # Add token permission requiring 1 SNT token
-        token_criteria = [
-            {
-                "type": CommunityTokenType.ERC20.value,
-                "contract_addresses": {31337: token_address},
-                "symbol": "SNT",
-                "amountInWei": "1000000000000000000",  # 1 token
-                "decimals": 18,
-            }
-        ]
-
-        self.owner.wakuext_service.create_community_token_permission(
-            community_id=community_id, permission_type=CommunityTokenPermissionType.BECOME_MEMBER, token_criteria=token_criteria
         )
 
         # Fetch community as member
@@ -180,37 +169,11 @@ class TestCommunityTokenPermissions(MessengerSteps):
         balance = int(balance_result.output.decode().strip(), 16)
         assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at least 1000000000000000000 wei (1 token)"
 
-        # Owner creates token-gated community with admin permission
-        community_resp = self.owner.wakuext_service.create_community(
-            name=fake.community_name(),
-            description=fake.community_description(),
+        # Owner creates token-gated community with member and admin permissions
+        community_id = self.create_token_gated_community(
+            self.owner,
+            permission_types=[CommunityTokenPermissionType.BECOME_MEMBER, CommunityTokenPermissionType.BECOME_ADMIN],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
-        )
-        community_id = community_resp.get("communities", [{}])[0].get("id")
-
-        # Add token permission requiring 1 SNT token for admin
-        token_criteria = [
-            {
-                "type": CommunityTokenType.ERC20.value,
-                "contract_addresses": {31337: self.snt_address},
-                "symbol": "SNT",
-                "amountInWei": "1000000000000000000",  # 1 token
-                "decimals": 18,
-            }
-        ]
-
-        # Add BECOME_MEMBER permission so join can succeed based on tokens
-        self.owner.wakuext_service.create_community_token_permission(
-            community_id=community_id,
-            permission_type=CommunityTokenPermissionType.BECOME_MEMBER,
-            token_criteria=token_criteria,
-        )
-
-        # Add BECOME_ADMIN permission with same criteria
-        self.owner.wakuext_service.create_community_token_permission(
-            community_id=community_id,
-            permission_type=CommunityTokenPermissionType.BECOME_ADMIN,
-            token_criteria=token_criteria,
         )
 
         # Fetch community as member
