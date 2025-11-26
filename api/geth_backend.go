@@ -2259,8 +2259,6 @@ func (b *GethStatusBackend) initProtocol() error {
 	}
 
 	messenger := st.Messenger()
-	// Init public status api
-	b.statusNode.StatusPublicService().Init(messenger)
 	b.statusNode.AccountService().Init(messenger, acc)
 	// Init chat service
 	accDB, err := accounts.NewDB(b.appDB)
