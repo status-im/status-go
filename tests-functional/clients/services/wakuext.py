@@ -120,9 +120,6 @@ class WakuextService(Service):
     def start_messenger(self):
         self.rpc_request("startMessenger")
 
-    def stop_messenger(self):
-        self.rpc_request("stopMessenger")
-
     def send_contact_request(self, contact_id: str, message: str):
         params = [{"id": contact_id, "message": message}]
         response = self.rpc_request("sendContactRequest", params)
