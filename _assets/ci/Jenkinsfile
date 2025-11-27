@@ -94,8 +94,10 @@ pipeline {
   } // stages
 
   post {
-    always { dir(env.REPO) {
-      sh 'make clean-release'
-    } }
+    cleanup {
+      dir(env.REPO) { sh 'make clean-release' }
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
   }
 }

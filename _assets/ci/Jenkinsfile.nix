@@ -34,6 +34,9 @@ pipeline {
   }
 
   post {
-    cleanup { cleanWs() }
+    cleanup {
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
   }
 }

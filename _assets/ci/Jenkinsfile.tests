@@ -212,7 +212,7 @@ pipeline {
     }
     cleanup {
       cleanWs()
-      dir("${env.WORKSPACE}@tmp") { deleteDir() }
+      dir(env.WORKSPACE_TMP) { deleteDir() }
     }
   } // post
 } // pipeline
