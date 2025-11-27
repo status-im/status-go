@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/eth"
+	"github.com/status-im/status-go/services/linkpreview"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/sharedurls"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
-	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/wakuv2ext"
@@ -61,7 +61,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appgeneralService())
 	services = append(services, b.personalService())
-	services = append(services, b.statusPublicService())
 	services = append(services, b.pendingTrackerService(&b.walletFeed))
 	services = append(services, b.ensService(b.timeSourceNow()))
 	services = append(services, b.CommunityTokensService())
@@ -110,6 +109,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 
 	services = append(services, b.NewsFeedService())
 	services = append(services, b.sharedUrlsService())
+	services = append(services, b.linkPreviewService(accDB))
 
 	b.services = services
 
@@ -144,17 +144,6 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 	}
 
 	return b.wakuV2ExtSrvc, nil
-}
-
-func (b *StatusNode) statusPublicService() *status.Service {
-	if b.statusPublicSrvc == nil {
-		b.statusPublicSrvc = status.New()
-	}
-	return b.statusPublicSrvc
-}
-
-func (b *StatusNode) StatusPublicService() *status.Service {
-	return b.statusPublicSrvc
 }
 
 func (b *StatusNode) AccountService() *accountssvc.Service {
@@ -338,6 +327,18 @@ func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
 
 func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
 	return b.sharedUrlsSrvc
+}
+
+func (b *StatusNode) linkPreviewService(accDB *accounts.Database) *linkpreview.Service {
+	if b.linkPreviewSrvc == nil {
+		settingsProvider := adapters.NewLinkPreviewSettingsAdapter(accDB)
+		b.linkPreviewSrvc = linkpreview.NewService(b.logger.Named("linkpreview"), settingsProvider, nil)
+	}
+	return b.linkPreviewSrvc
+}
+
+func (b *StatusNode) LinkPreviewService() *linkpreview.Service {
+	return b.linkPreviewSrvc
 }
 
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {

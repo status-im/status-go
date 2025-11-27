@@ -468,7 +468,7 @@ func (s *ShareUrlsSuite) TestShareUserURLWithData() {
 	url, err := s.service.ShareUserURLWithData(contact.ID)
 	s.Require().NoError(err)
 
-	userData, chatKey, err := s.service.prepareEncodedUserData(contact)
+	userData, chatKey, err := prepareEncodedUserData(contact)
 	s.Require().NoError(err)
 
 	expectedURL := fmt.Sprintf("%s/u/%s#%s", baseShareURL, userData, chatKey)
@@ -483,7 +483,7 @@ func (s *ShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
 	s.provider.EXPECT().GetContactByID(gomock.Any()).Return(contact, nil).Times(0)
 	s.provider.EXPECT().GetCommunityByID(gomock.Any()).Times(0)
 
-	userData, chatKey, err := s.service.prepareEncodedUserData(contact)
+	userData, chatKey, err := prepareEncodedUserData(contact)
 	s.Require().NoError(err)
 	// The data should be empty if no display name or bio is set
 	s.Require().Empty(userData)

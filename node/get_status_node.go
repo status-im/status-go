@@ -42,13 +42,13 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
+	"github.com/status-im/status-go/services/linkpreview"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/sharedurls"
-	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
 	"github.com/status-im/status-go/services/utils"
@@ -106,7 +106,6 @@ type StatusNode struct {
 	// we explicitly list every service, we could use interfaces
 	// and store them in a nicer way and user reflection, but for now stupid is good
 	rpcStatsSrvc           *rpcstats.Service
-	statusPublicSrvc       *status.Service
 	accountsSrvc           *accountssvc.Service
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
@@ -127,6 +126,7 @@ type StatusNode struct {
 	ethSrvc                *eth.Service
 	newsfeedSrvc           *newsfeed.Service
 	sharedUrlsSrvc         *sharedurls.Service
+	linkPreviewSrvc        *linkpreview.Service
 
 	walletFeed        event.Feed
 	accountsPublisher *pubsub.Publisher
@@ -289,8 +289,8 @@ func (n *StatusNode) StartLocalBackup() error {
 		n.localBackup.Register("wallet", n.walletSrvc)
 	}
 
-	if n.statusPublicSrvc != nil {
-		n.localBackup.Register("messenger", n.statusPublicSrvc.Messenger())
+	if n.wakuV2ExtSrvc != nil {
+		n.localBackup.Register("messenger", n.wakuV2ExtSrvc.Messenger())
 	}
 
 	n.localBackup.Start()

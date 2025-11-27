@@ -2259,8 +2259,6 @@ func (b *GethStatusBackend) initProtocol() error {
 	}
 
 	messenger := st.Messenger()
-	// Init public status api
-	b.statusNode.StatusPublicService().Init(messenger)
 	b.statusNode.AccountService().Init(messenger, acc)
 	// Init chat service
 	accDB, err := accounts.NewDB(b.appDB)
@@ -2272,6 +2270,7 @@ func (b *GethStatusBackend) initProtocol() error {
 	b.statusNode.CommunityTokensService().Init(messenger)
 	b.statusNode.SharedUrlsService().SetDataProvider(adapters.NewSharedUrlsMessengerAdapter(messenger))
 	b.statusNode.NewsFeedService().SetActivityCenter(adapters.NewNewsFeedActivityCenterAdapter(messenger))
+	b.statusNode.LinkPreviewService().SetStatusDataProvider(adapters.NewLinkPreviewMessengerAdapter(messenger))
 
 	return nil
 }
