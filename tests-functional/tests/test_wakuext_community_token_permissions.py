@@ -5,9 +5,10 @@ from typing import Optional, List
 from clients.contract_deployers.snt import SNTDeployer
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from steps.messenger import MessengerSteps
-from utils.retry_utils import retry_call
+from clients.signals import SignalType
 from utils import fake
 from resources.constants import user_1
+from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
             # If request was created, check that it gets declined
             req_id = requests[0].get("id")
             # Check that request is declined due to insufficient permissions
-            declined_reqs = retry_call(self.owner.wakuext_service.declined_requests_to_join_for_community, community_id)
+            self.owner.wait_for_signal(SignalType.MESSAGES_NEW)
+            declined_reqs = self.owner.wakuext_service.declined_requests_to_join_for_community(community_id)
             assert len(declined_reqs) == 1
             assert declined_reqs[0].get("id") == req_id
         else:
@@ -141,11 +143,16 @@ class TestCommunityTokenPermissions(MessengerSteps):
             # Since member has valid tokens, request should not be declined
             # Wait for token validation to complete, then try to accept directly
 
+            received_signal = self.owner.wait_for_signal(SignalType.MESSAGES_NEW, timeout=60)
+            logger.info(f"Received signal: {received_signal}")
+
             def try_accept_request(req_id):
                 resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
                 return resp if resp is not None else None
 
             accept_resp = retry_call(try_accept_request, req_id)
+
+            # accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is now in community (check from owner's perspective since acceptance happened there)
@@ -182,11 +189,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Fetch community as member
         self.fetch_community(self.member_with_snt, community_id)
 
-        def check_permissions_satisfied(community_id):
-            resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
-            return resp if resp.get("satisfied") else None
-
-        permissions_resp = retry_call(check_permissions_satisfied, community_id)
+        self.member_with_snt.wait_for_signal(SignalType.MESSAGES_NEW)
+        permissions_resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
         if not permissions_resp:
             pytest.fail("Permissions to join never became satisfied for member_with_snt")
 
@@ -197,12 +201,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if requests:
             req_id = requests[0].get("id")
             # Wait for token validation
-
-            def try_accept_request(req_id):
-                resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
-                return resp if resp is not None else None
-
-            accept_resp = retry_call(try_accept_request, req_id)
+            self.owner.wait_for_signal(SignalType.MESSAGES_NEW)
+            accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is now in community and has admin role
