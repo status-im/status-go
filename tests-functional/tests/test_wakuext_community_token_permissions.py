@@ -39,7 +39,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Fund the member_with_snt with 10 SNT tokens
         accounts = self.member_with_snt.accounts_service.get_accounts()
-        member_address = accounts[0]["address"] if accounts else self.fake_address
+        member_address = accounts[0]["address"]
         token_amount = str(10 * 10**18)  # 10 tokens with 18 decimals
         gen_tokens_result = foundry_client.generate_tokens(self.controller_address, member_address, token_amount, user_1.private_key)
         logging.debug(f"Generate tokens result: exit_code={gen_tokens_result.exit_code}, output={gen_tokens_result.output.decode()}")
@@ -114,7 +114,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         """Test that users with required tokens can successfully join community as member"""
         # Get member's wallet address
         accounts = self.member_with_snt.accounts_service.get_accounts()
-        member_address = accounts[0]["address"] if accounts else self.fake_address
+        member_address = accounts[0]["address"]
 
         # Verify the balance directly with cast
         balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
@@ -161,7 +161,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         """Test that users with required tokens get admin privileges"""
         # Get member's wallet address
         accounts = self.member_with_snt.accounts_service.get_accounts()
-        member_address = accounts[0]["address"] if accounts else self.fake_address
+        member_address = accounts[0]["address"]
 
         # Verify the balance directly with cast
         balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
