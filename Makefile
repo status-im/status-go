@@ -107,7 +107,6 @@ ifeq ($(USE_NWAKU), true)
 	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
 endif
 
-
 # `nim-sds` variables
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
@@ -253,7 +252,7 @@ rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 $(NIM_SDS_SOURCE_DIR): ##@build Clone nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Cloning nim-sds ..."
-	git clone --branch v0.1.0 https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
+	git clone --branch v0.2.0 https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
 endif
 
 clone-nim-sds: $(NIM_SDS_SOURCE_DIR)
@@ -272,6 +271,10 @@ build-libsds: $(LIBSDS)
 build-libsds-android: clone-nim-sds
 	@echo "Building nim-sds for Android" $(LIBSDS)
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+
+build-libsds-ios: clone-nim-sds
+	@echo "Building nim-sds for iOS" $(LIBSDS)
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
 
 clean-libsds:
 	@echo "Removing libsds"
@@ -343,7 +346,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
@@ -352,7 +355,7 @@ statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compi
 	@echo "Android library built"
 	@file build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
