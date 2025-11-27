@@ -53,11 +53,11 @@ func (m *CommunitiesTokenManager) FindOrCreateTokenByAddress(ctx context.Context
 }
 
 type CommunitiesTokenBalanceManager struct {
-	tokenBalancesFetcher *tokenbalances.Fetcher
+	tokenBalancesFetcher tokenbalances.FetcherIface
 	tokenBalancesStorage tokenbalances.Storage
 }
 
-func NewCommunitiesTokenBalanceManager(f *tokenbalances.Fetcher, s tokenbalances.Storage) *CommunitiesTokenBalanceManager {
+func NewCommunitiesTokenBalanceManager(f tokenbalances.FetcherIface, s tokenbalances.Storage) *CommunitiesTokenBalanceManager {
 	return &CommunitiesTokenBalanceManager{tokenBalancesFetcher: f, tokenBalancesStorage: s}
 }
 
