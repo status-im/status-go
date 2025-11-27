@@ -520,9 +520,9 @@ func (n *StatusNode) TokenManager() *token.Manager {
 	return n.tokenManager
 }
 
-func (n *StatusNode) TokenBalancesFetcher() *tokenbalances.Fetcher {
+func (n *StatusNode) TokenBalancesFetcher() tokenbalances.FetcherIface {
 	if n.walletSrvc != nil {
-		n.walletSrvc.GetTokenBalancesFetcher()
+		return n.walletSrvc.GetTokenBalancesFetcher()
 	}
 	return nil
 }
