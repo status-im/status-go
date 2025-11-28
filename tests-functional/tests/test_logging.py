@@ -3,27 +3,14 @@ import re
 
 import pytest
 
-from clients.status_backend import StatusBackend
-from utils import fake
-
 
 @pytest.mark.rpc
 class TestLogging:
 
-    @pytest.fixture(autouse=True)
-    def setup_cleanup(self, close_status_backend_containers):
-        """Automatically cleanup containers after each test"""
-        yield
-
     @pytest.mark.init
-    def test_logging(self, tmp_path):
-        backend_client = StatusBackend()
+    def test_logging(self, tmp_path, backend_new_profile):
+        backend_client = backend_new_profile("logger")
         assert backend_client is not None
-
-        # Init and login
-        backend_client.init_status_backend()
-        backend_client.create_account_and_login(password=fake.profile_password())
-        backend_client.wait_for_login()
 
         # Configure logging
         backend_client.api_request_json("SetLogLevel", {"logLevel": "ERROR"})

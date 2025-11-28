@@ -3,24 +3,16 @@ import os
 
 import pytest
 
-from clients.status_backend import StatusBackend
+from resources.constants import user_1
 
 
 @pytest.mark.create_account
 @pytest.mark.rpc
 class TestInitialiseApp:
 
-    @pytest.fixture(autouse=True)
-    def setup_cleanup(self, close_status_backend_containers):
-        """Automatically cleanup containers after each test"""
-        yield
-
     @pytest.mark.init
-    def test_init_app(self):
-
-        backend_client = StatusBackend()
-        backend_client.init_status_backend()
-        backend_client.restore_account_and_login()
+    def test_init_app(self, backend_recovered_profile):
+        backend_client = backend_recovered_profile("init_app", user=user_1)
 
         assert backend_client is not None
 
@@ -40,8 +32,8 @@ def assert_file_first_line(path, pattern: str, expected: bool):
 @pytest.mark.rpc
 @pytest.mark.init
 @pytest.mark.parametrize("log_enabled,api_logging_enabled", [(False, False), (True, True)])
-def test_check_logs(log_enabled: bool, api_logging_enabled: bool, close_status_backend_containers):
-    backend = StatusBackend()
+def test_check_logs(log_enabled: bool, api_logging_enabled: bool, backend_factory):
+    backend = backend_factory("prelogin")
 
     data_dir = os.path.join(backend.data_dir, "data")
     logs_dir = os.path.join(backend.data_dir, "logs")

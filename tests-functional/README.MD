@@ -184,17 +184,43 @@ For more specific use cases, you can use these specialized fixtures:
 
 #### 3. Manual/Custom Backend Setup
 
-For advanced scenarios, you may set up backends manually in your test or test class (for example, to use custom logic or direct instantiation).  
-**In this case, you must ensure containers are cleaned up by using the `close_status_backend_containers` fixture.**
+For advanced scenarios where you need full control, use `backend_factory`.
 
-Example (from `test_local_pairing.py`):
+Key points:
+- `backend_factory` returns a fresh `StatusBackend` with no automatic login. You call `init_status_backend()` and any RPCs manually.
+- All backends created by the factory within a test are automatically shutdown on teardown.
+- You can parametrize the factory (e.g., `ipv6`, `privileged`) via `pytest.mark.parametrize(..., indirect=True)`.
+
+Examples:
+
+1) Negative validation on restore (pre-login error expected):
 ```python
-@pytest.fixture(autouse=True)
-def setup_cleanup(self, close_status_backend_containers):
-    """Automatically cleanup containers after each test"""
-    yield
+import pytest
+from clients.api import ApiResponseError
+from resources.constants import user_mnemonic_12
+import copy
+
+def test_restore_with_empty_mnemonic(backend_factory):
+    user = copy.deepcopy(user_mnemonic_12)
+    backend = backend_factory("invalid_mnemonic")
+    backend.init_status_backend()
+    backend._set_display_name()
+    data = backend._create_account_request(password=user.password)
+    data["mnemonic"] = ""
+    with pytest.raises(ApiResponseError, match=r"restore-account: mnemonic is not set"):
+        backend.api_request_json("RestoreAccountAndLogin", data)
 ```
-This fixture will stop, save logs, and remove all containers created during the test, preventing resource leaks.
+
+2) Parametrizing the factory (e.g., enabling IPv6 and privileged mode):
+```python
+import pytest
+
+@pytest.mark.parametrize("backend_factory", [{"privileged": True, "ipv6": "Yes"}], indirect=True)
+def test_with_ipv6_and_privileged(backend_factory):
+    be = backend_factory("node")
+    be.init_status_backend()
+    # ... continue with manual RPCs
+```
 
 #### 4. Summary Table
 
@@ -206,13 +232,11 @@ This fixture will stop, save logs, and remove all containers created during the 
 | `backend_new_profile`              | function  | New user profile creation    | Automatic       | Created from scratch              |
 | `backend_recovered_profile`        | function  | Existing profile recovery    | Automatic       | Recovered from seed phrase        |
 | `waku_light_client`                | function  | Light client parametrization | N/A             | N/A (configuration only)          |
-| `close_status_backend_containers`  | function  | For manual/custom setup      | Must be used manually | N/A (depends on your setup)   |
 
 #### 5. Best Practices
 
 - **Prefer the factory fixtures** for most tests—they are robust, reusable, and handle cleanup for you.
 - **Use specialized fixtures** (`backend_new_profile`, `backend_recovered_profile`) when you need specific profile creation behavior.
-- **Use `close_status_backend_containers`** if you create backends manually or outside the provided factories.
 - **Never leave containers running** after a test—always ensure cleanup is in place.
 
 For more details, see the docstrings in `tests/conftest.py` and the example usages in the test files.

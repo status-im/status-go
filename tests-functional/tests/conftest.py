@@ -5,7 +5,6 @@ import pytest
 from requests import ReadTimeout
 
 from clients.status_backend import StatusBackend
-from clients.statusgo_container import StatusGoContainer
 from clients.anvil import Anvil
 from clients.foundry import Foundry
 from clients.contract_deployers.multicall3 import Multicall3Deployer
@@ -42,7 +41,11 @@ def backend_factory(request):
     # Store created backends for cleanup
     created_backends: list[StatusBackend] = []
 
-    test_name = request.node.name if hasattr(request, "cls") else str(uuid4)
+    # Safe generation of names for logs/teardown for both class and function tests
+    _cls_obj = getattr(request, "cls", None)
+    cls_name = _cls_obj.__name__ if _cls_obj is not None else None
+    node = getattr(request, "node", None)
+    test_name = getattr(node, "name", f"test-{uuid4()}")
 
     def factory(name, **kwargs) -> StatusBackend:
         """
@@ -55,8 +58,7 @@ def backend_factory(request):
         Returns:
             StatusBackend: Created backend instance
         """
-        logging.debug(f"🔧 [SETUP] Creating {name} backend for {request.cls.__name__}")
-        logging.debug(f"🔧 [SETUP] Creating {name} backend for {test_name}")
+        logging.debug(f"🔧 [SETUP] Creating {name} backend for {cls_name or test_name}")
         logging.debug(f"📋 [SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
 
         # Create backend
@@ -69,7 +71,7 @@ def backend_factory(request):
     yield factory
 
     # Cleanup all created backends
-    logging.debug(f"🧹 [TEARDOWN] Cleaning up {len(created_backends)} backends for {request.cls.__name__ if hasattr(request, 'cls') else 'test'}")
+    logging.debug(f"🧹 [TEARDOWN] Cleaning up {len(created_backends)} backends for {cls_name or 'test'}")
 
     for i, backend in enumerate(reversed(created_backends)):
         logging.debug(f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
@@ -126,53 +128,6 @@ def backend_recovered_profile(request, backend_factory):
 
     for backend in backends:
         backend.logout()
-
-
-@pytest.fixture(scope="function", autouse=False)
-def close_status_backend_containers(request):
-    """
-    Fixture to automatically cleanup Status backend containers after each test.
-    Should be used ONLY for tests that do not use backend_factory or class_backend fixtures.
-
-    This fixture ensures that all Status backend containers are properly stopped,
-    logs are saved, and containers are removed to prevent resource leaks and
-    conflicts between tests.
-
-    How it works:
-    1. Yields immediately (runs before test execution)
-    2. After test completes, stops all containers in StatusGoContainer.all_containers
-    3. Saves logs from each container for debugging
-    4. Removes containers to free up system resources
-    5. Clears the containers list
-
-    Usage:
-    # Automatic cleanup for all tests in a class
-    @pytest.fixture(autouse=True)
-    def setup_cleanup(self, close_status_backend_containers):
-        yield
-
-    # Manual cleanup for specific test
-    def test_something(self, close_status_backend_containers):
-        # test code here
-        pass
-
-    Parameters:
-        request: pytest request object containing test metadata
-
-    Dependencies:
-        - StatusGoContainer.all_containers: Global list of active containers
-        - Container objects with stop(), save_logs(), remove() methods
-
-    Scope: function (runs once per test function)
-    Autouse: False (must be explicitly requested)
-    """
-    yield
-    for container in StatusGoContainer.all_containers:
-        try:
-            container.shutdown(log_sufix=request.node.name)  # pyright: ignore[reportAttributeAccessIssue]
-        except Exception as e:
-            logging.error(f"Error cleaning up container: {e}")
-    StatusGoContainer.all_containers = []
 
 
 @pytest.fixture(scope="session")
