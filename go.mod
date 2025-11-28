@@ -103,7 +103,6 @@ require (
 	github.com/status-im/extkeys v1.4.0
 	github.com/status-im/go-wallet-sdk v0.0.0-20251027141302-43edbd6abc92
 	github.com/waku-org/go-waku v0.10.1-0.20251003225121-06c9af60f35b
-	github.com/waku-org/sds-go-bindings v0.0.0-20251119184907-e78f76307965
 	github.com/waku-org/waku-go-bindings v0.0.0-20251030105913-aa64c47d2bf3
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.uber.org/atomic v1.11.0

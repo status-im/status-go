@@ -91,7 +91,7 @@ pipeline {
     failure { script { github.notifyPR(false) } }
     cleanup {
       cleanWs()
-      dir("${env.WORKSPACE}@tmp") { deleteDir() }
+      dir(env.WORKSPACE_TMP) { deleteDir() }
     }
   } // post
 } // pipeline

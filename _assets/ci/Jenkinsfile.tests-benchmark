@@ -70,12 +70,11 @@ pipeline {
       }
     }
     cleanup {
-      script {
-        sh '''
-          docker ps -a --filter "name=status-go-func-tests-${BUILD_ID}" -q | xargs -r docker rm -f
-        '''
-        cleanWs(disableDeferredWipeout: true, deleteDirs: true)
-      }
+      sh '''
+        docker ps -a --filter "name=status-go-func-tests-${BUILD_ID}" -q | xargs -r docker rm -f
+      '''
+      cleanWs(disableDeferredWipeout: true, deleteDirs: true)
+      dir(env.WORKSPACE_TMP) { deleteDir() }
     }
   } // post
 } // pipeline

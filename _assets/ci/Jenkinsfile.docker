@@ -77,8 +77,10 @@ pipeline {
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    always  { dir(env.REPO) {
-      sh 'make clean-docker-images'
-    } }
+    cleanup {
+      dir(env.REPO) { sh 'make clean-docker-images' }
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
   } // post
 } // pipeline

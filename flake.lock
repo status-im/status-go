@@ -1,25 +1,5 @@
 {
   "nodes": {
-    "nim-sds": {
-      "inputs": {
-        "nixpkgs": "nixpkgs"
-      },
-      "locked": {
-        "lastModified": 1762510817,
-        "narHash": "sha256-VwTp+2JB8ZM8Yx9RPOZ95GBrw5hFdDGMKhS5w9uQ2CQ=",
-        "rev": "b6431260110fe62956ff4d7bab6767556c19d040",
-        "revCount": 67,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/waku-org/nim-sds"
-      },
-      "original": {
-        "rev": "b6431260110fe62956ff4d7bab6767556c19d040",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/waku-org/nim-sds"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1757590060,
@@ -38,22 +18,6 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1757590060,
-        "narHash": "sha256-EWwwdKLMZALkgHFyKW7rmyhxECO74+N+ZO5xTDnY/5c=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
-        "type": "github"
-      }
-    },
-    "nixpkgs_3": {
-      "locked": {
         "lastModified": 1740603184,
         "narHash": "sha256-t+VaahjQAWyA+Ctn2idyo1yxRIYpaDxMgHkgCNiMJa4=",
         "owner": "NixOS",
@@ -70,7 +34,7 @@
     },
     "nwaku": {
       "inputs": {
-        "nixpkgs": "nixpkgs_3",
+        "nixpkgs": "nixpkgs_2",
         "zerokit": "zerokit"
       },
       "locked": {
@@ -92,8 +56,7 @@
     },
     "root": {
       "inputs": {
-        "nim-sds": "nim-sds",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs",
         "nwaku": "nwaku"
       }
     },

@@ -125,12 +125,12 @@ pipeline {
     }
 } // stages
   post {
-     success { script { github.notifyPR(true) } }
-     failure { script { github.notifyPR(false) } }
-     cleanup {
-       cleanWs()
-       dir("${env.WORKSPACE}@tmp") { deleteDir() }
-     }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    cleanup {
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
   } // post
 } // pipeline
 
