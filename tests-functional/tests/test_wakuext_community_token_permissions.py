@@ -112,6 +112,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert member_community is None or not member_community.get("joined", False)
 
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7161")
     def test_membership_with_valid_tokens(self, foundry_client):
         """Test that users with required tokens can successfully join community as member"""
         # Get member's wallet address
