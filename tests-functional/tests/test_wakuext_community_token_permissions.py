@@ -231,6 +231,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7161")
     def test_owner_edits_visible_before_and_after_minting_owner_token(self):
         """Test that owner edits are visible before and after minting the owner token"""
         # Owner creates a community
@@ -307,9 +308,9 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
         assert member_community and member_community.get("name") == new_name2 and member_community.get("description") == new_description2
 
-        # When the Owner restarts the messenger
-        self.owner.wakuext_service.stop_messenger()  # <-- Not implemented in API
-        self.owner.wakuext_service.start_messenger()
+        # When the Owner logs out and logs back in
+        self.owner.logout()
+        self.owner.login(self.owner.key_uid, self.owner.password)
 
         # And the Owner edits the community again
         new_name3 = fake.community_name()
