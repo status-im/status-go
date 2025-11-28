@@ -1,13 +1,16 @@
 import logging
-import pytest
+import time
 from typing import Optional, List
+
+import pytest
 
 from clients.contract_deployers.snt import SNTDeployer
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
-from steps.messenger import MessengerSteps
 from clients.signals import SignalType
-from utils import fake
 from resources.constants import user_1
+from resources.enums import RequestToJoinState
+from steps.messenger import MessengerSteps
+from utils import fake
 from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
@@ -164,7 +167,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_public_key = self.member_with_snt.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
+    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
     def test_admin_token_permissions_with_valid_tokens(self, foundry_client):
         """Test that users with required tokens get admin privileges"""
         # Get member's wallet address
@@ -187,24 +190,41 @@ class TestCommunityTokenPermissions(MessengerSteps):
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
-        # Fetch community as member
-        self.fetch_community(self.member_with_snt, community_id)
+        # We should give some time for the token permissions to be distributed over network to store nodes.
+        # If we don't wait enough, community can be found without token permissions (or with only 1).
+        # Proper way would be this:
+        # 1. wakuext_SpectateCommunity - this makes us subscribe to community updates
+        # 2. if token permissions are not present,
+        #    wait for `messages.new` with community update and token permissions. (might need skip a few signals)
+        time.sleep(5)
 
-        self.member_with_snt.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
+        # Fetch community as member
+        response = self.fetch_community(self.member_with_snt, community_id)
+        assert response, "Community not found"
+        assert response["tokenPermissions"], "No token permissions found"
+        assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"  # FIXME: Fails here
+
+        # self.member_with_snt.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
         permissions_resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
-        if not permissions_resp:
-            pytest.fail("Permissions to join never became satisfied for member_with_snt")
+        assert permissions_resp, "Failed to check permissions to join community"
+        assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
         # Member with tokens requests to join community
         join_resp = self.member_with_snt.wakuext_service.request_to_join_community(community_id, member_address)
         requests = join_resp.get("requestsToJoinCommunity", [])
+        assert requests, "No requests to join community"
+        assert len(requests) == 1, "Unexpected multiple requests to join community"
 
-        if requests:
-            req_id = requests[0].get("id")
-            # Wait for token validation
-            self.owner.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
-            accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
-            assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
+        req_id = requests[0].get("id")
+        # Wait for token validation
+        self.owner.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
+            == RequestToJoinState.RequestToJoinStatePending.value,
+        )
+
+        accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+        assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is now in community and has admin role
         communities = self.owner.wakuext_service.communities()
