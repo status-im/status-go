@@ -231,7 +231,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7139")
     def test_owner_edits_visible_before_and_after_minting_owner_token(self):
         """Test that owner edits are visible before and after minting the owner token"""
         # Owner creates a community
@@ -251,7 +250,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if requests:
             req_id = requests[0].get("id")
             # Wait for the request to propagate to the owner
-            time.sleep(2)
+            self.owner.wait_for_signal(SignalType.MESSAGES_NEW)
             # Accept the request
             self.owner.wakuext_service.accept_request_to_join_community(req_id)
 
@@ -272,12 +271,10 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert edit_resp is not None
 
         # Then the Member sees the updated community
-        def check_member_community_updated():
-            member_communities = self.member.wakuext_service.communities()
-            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-            return member_community and member_community.get("name") == new_name and member_community.get("description") == new_description
-
-        retry_call(check_member_community_updated)
+        self.member.wait_for_signal(SignalType.MESSAGES_NEW)
+        member_communities = self.member.wakuext_service.communities()
+        member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
+        assert member_community and member_community.get("name") == new_name and member_community.get("description") == new_description
 
         # When the Owner mints the owner token
         # Simulate minting owner token by saving and adding a community token with owner privileges
@@ -305,12 +302,10 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert edit_resp2 is not None
 
         # Then the Member sees the updated community
-        def check_member_community_updated2():
-            member_communities = self.member.wakuext_service.communities()
-            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-            return member_community and member_community.get("name") == new_name2 and member_community.get("description") == new_description2
-
-        retry_call(check_member_community_updated2)
+        self.member.wait_for_signal(SignalType.MESSAGES_NEW)
+        member_communities = self.member.wakuext_service.communities()
+        member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
+        assert member_community and member_community.get("name") == new_name2 and member_community.get("description") == new_description2
 
         # When the Owner restarts the messenger
         self.owner.wakuext_service.stop_messenger()  # <-- Not implemented in API
@@ -327,9 +322,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert edit_resp3 is not None
 
         # Then the Member sees the updated community
-        def check_member_community_updated3():
-            member_communities = self.member.wakuext_service.communities()
-            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-            return member_community and member_community.get("name") == new_name3 and member_community.get("description") == new_description3
-
-        retry_call(check_member_community_updated3)
+        self.member.wait_for_signal(SignalType.MESSAGES_NEW)
+        member_communities = self.member.wakuext_service.communities()
+        member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
+        assert member_community and member_community.get("name") == new_name3 and member_community.get("description") == new_description3
