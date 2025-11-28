@@ -35,6 +35,7 @@ class SignalType(Enum):
     CONNECTOR_DAPP_PERMISSION_GRANTED = "connector.dAppPermissionGranted"
     CONNECTOR_DAPP_PERMISSION_REVOKED = "connector.dAppPermissionRevoked"
     CONNECTOR_DAPP_CHAIN_ID_SWITCHED = "connector.dAppChainIdSwitched"
+    COMMUNITY_MEMBER_REEVALUATION_STATUS = "community.memberReevaluationStatus"
 
 
 class WalletEventType(Enum):

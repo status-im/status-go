@@ -143,7 +143,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             # Since member has valid tokens, request should not be declined
             # Wait for token validation to complete, then try to accept directly
 
-            received_signal = self.owner.wait_for_signal(SignalType.MESSAGES_NEW, timeout=60)
+            received_signal = self.owner.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
             logger.info(f"Received signal: {received_signal}")
 
             def try_accept_request(req_id):
@@ -189,7 +189,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Fetch community as member
         self.fetch_community(self.member_with_snt, community_id)
 
-        self.member_with_snt.wait_for_signal(SignalType.MESSAGES_NEW)
+        self.member_with_snt.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
         permissions_resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
         if not permissions_resp:
             pytest.fail("Permissions to join never became satisfied for member_with_snt")
@@ -201,7 +201,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if requests:
             req_id = requests[0].get("id")
             # Wait for token validation
-            self.owner.wait_for_signal(SignalType.MESSAGES_NEW)
+            self.owner.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
             accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
