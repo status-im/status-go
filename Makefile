@@ -252,7 +252,7 @@ rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 $(NIM_SDS_SOURCE_DIR): ##@build Clone nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Cloning nim-sds ..."
-	git clone --branch v0.2.0 https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
+	git clone --branch v0.2.1 https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
 endif
 
 clone-nim-sds: $(NIM_SDS_SOURCE_DIR)
