@@ -206,7 +206,7 @@ func (s *MessengerSyncActivityCenterSuite) addContactAndShareCommunity(userB *Me
 		return false
 	}, "contact request not received on device 2")
 	s.Require().NoError(err)
-	_, err = s.m.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: contactRequestMessageID})
+	_, err = s.m.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: contactRequestMessageID, ContactID: crypto.PubkeyToHex(&s.m2.identity.PublicKey)})
 	s.Require().NoError(err)
 	_, err = WaitOnMessengerResponse(s.m2, func(r *MessengerResponse) bool {
 		if len(r.ActivityCenterNotifications()) > 0 {

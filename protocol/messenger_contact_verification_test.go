@@ -77,7 +77,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
 
 	// Accept contact request, receiver side
-	resp, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
+	resp, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID), ContactID: contactRequests[0].From})
 	s.Require().NoError(err)
 
 	// Make sure the message is updated

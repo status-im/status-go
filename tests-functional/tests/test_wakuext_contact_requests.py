@@ -48,7 +48,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_accept_contact_request(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.accept_contact_request(message_id)
+        response = self.receiver.wakuext_service.accept_contact_request(message_id, self.sender.public_key)
         # TODO: Add more assertions on response
 
         contacts = response.get("contacts", [])
@@ -69,7 +69,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_decline_contact_request(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(self.sender, self.receiver)
-        response = self.receiver.wakuext_service.decline_contact_request(message_id)
+        response = self.receiver.wakuext_service.decline_contact_request(message_id, self.sender.public_key)
         # TODO: Add more assertions on response
 
         contacts = response.get("contacts", [])
