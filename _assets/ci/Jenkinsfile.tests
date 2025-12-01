@@ -50,6 +50,11 @@ pipeline {
       defaultValue: false,
       description: 'Should the job report ignore the actual test run and just print the test plan?'
     )
+    booleanParam(
+      name: 'USE_NWAKU',
+      description: 'Whether to build with nwaku or not',
+      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
+    )
   }
 
   options {
@@ -95,6 +100,9 @@ pipeline {
 
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
+    USE_NWAKU = "${params.USE_NWAKU}"
+    /* nwaku source directory */
+    NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
   }
 
   stages {
@@ -228,3 +236,13 @@ def getDefaultUnitTestCount() { isNightlyJob() ? '20' : '1' }
 def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
 
 def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '30' : '5' }
+
+/* We extract the name of the job from currentThread because
+ * before an agent is picked env is not available. */
+def getJobPathTokens() {
+  return Thread.currentThread().getName().split('/')
+}
+
+def getNWakuMode() {
+  return getJobPathTokens().contains('nwaku')
+}

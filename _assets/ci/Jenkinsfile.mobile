@@ -20,6 +20,11 @@ pipeline {
       defaultValue: false,
       description: 'Enable to create build for release.',
     )
+    booleanParam(
+      name: 'USE_NWAKU',
+      description: 'Whether to build with nwaku or not',
+      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
+    )
   }
 
   options {
@@ -54,6 +59,9 @@ pipeline {
     )
     /* prevent sharing cache dir across different jobs */
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
+    USE_NWAKU = "${params.USE_NWAKU}"
+    /* nwaku source directory */
+    NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
   }
 
   stages {
@@ -101,4 +109,14 @@ def getPlatform(String label = params.AGENT_LABEL) {
 /* Extract file extension from agent label */
 def getExtension(String label = params.AGENT_LABEL) {
     return label.contains('linux') ? 'so' : 'a'
+}
+
+/* We extract the name of the job from currentThread because
+ * before an agent is picked env is not available. */
+def getJobPathTokens() {
+  return Thread.currentThread().getName().split('/')
+}
+
+def getNWakuMode() {
+  return getJobPathTokens().contains('nwaku')
 }

@@ -30,6 +30,11 @@ pipeline {
       choices: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
       description: 'pytest log level'
     )
+    booleanParam(
+      name: 'USE_NWAKU',
+      description: 'Whether to build with nwaku or not',
+      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
+    )
   }
 
   options {
@@ -54,6 +59,9 @@ pipeline {
     BRANCH =                          "${params.BRANCH}"
     FUNCTIONAL_TESTS_REPORT_CODECOV = "${params.FUNCTIONAL_TESTS_REPORT_CODECOV}"
     FUNCTIONAL_TESTS_LOG_LEVEL =      "${params.FUNCTIONAL_TESTS_LOG_LEVEL}"
+    USE_NWAKU = "${params.USE_NWAKU}"
+    /* nwaku source directory */
+    NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
   }
 
   stages {
@@ -106,3 +114,13 @@ pipeline {
 def isDevelopJob() { env.JOB_BASE_NAME == 'tests-rpc-develop' }
 
 def getAmountToKeep() { isDevelopJob() ? '30' : '5' }
+
+/* We extract the name of the job from currentThread because
+ * before an agent is picked env is not available. */
+def getJobPathTokens() {
+    return Thread.currentThread().getName().split('/')
+}
+
+def getNWakuMode() {
+    return getJobPathTokens().contains('nwaku')
+}

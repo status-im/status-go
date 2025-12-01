@@ -62,6 +62,8 @@ pipeline {
       GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
       /* Ensure env var is set on first run. */
       USE_NWAKU = "${params.USE_NWAKU}"
+      /* nwaku source directory */
+      NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
 
       /* fixes nim cache collision */
       XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
