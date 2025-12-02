@@ -243,17 +243,31 @@ class TestCommunityTokenPermissions(MessengerSteps):
         community_id = community_resp.get("communities", [{}])[0].get("id")
 
         # Fetch community as member
-        self.fetch_community(self.member, community_id)
+        response = self.fetch_community(self.member, community_id)
+        assert response, "Community not found"
 
-        # Member joins the community
+        permissions_resp = self.member.wakuext_service.check_permissions_to_join_community(community_id)
+        assert permissions_resp, "Failed to check permissions to join community"
+        assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
+
+        # Member with tokens requests to join community
         join_resp = self.member.wakuext_service.request_to_join_community(community_id, self.fake_address)
         requests = join_resp.get("requestsToJoinCommunity", [])
-        if requests:
-            req_id = requests[0].get("id")
-            # Wait for the request to propagate to the owner
-            time.sleep(2)
-            # Accept the request
-            self.owner.wakuext_service.accept_request_to_join_community(req_id)
+        assert requests, "No requests to join community"
+        assert len(requests) == 1, "Unexpected multiple requests to join community"
+
+        req_id = requests[0].get("id")
+        # Wait for member validation
+        self.owner.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
+            == RequestToJoinState.RequestToJoinStatePending.value,
+        )
+
+        time.sleep(5)
+
+        accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+        assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is in community
         communities = self.owner.wakuext_service.communities()
@@ -312,7 +326,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         retry_call(check_member_community_updated2)
 
-        # When the Owner logs out and logs back in
+        # When the Owner logouts and logs back in
         self.owner.logout()
         self.owner.login(self.owner.key_uid, self.owner.password)
 
