@@ -52,7 +52,7 @@ func createWalletDB(t *testing.T) (db *sql.DB) {
 }
 
 func setupTests(t *testing.T) (state testState) {
-	state.ctx = WithConnectionType(context.Background(), ConnectionTypeHTTP)
+	state.ctx = WithConnectionType(context.Background(), ConnectionTypeUntrusted)
 
 	state.db = createDB(t)
 	state.walletDb = createWalletDB(t)
