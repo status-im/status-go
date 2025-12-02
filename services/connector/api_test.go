@@ -45,7 +45,7 @@ func TestCallRPC_UntrustedConnection(t *testing.T) {
 				"iconUrl": "https://example.com/icon.png",
 				"clientId": "wallet-connect"
 			}`,
-			expectError: ErrCannotOverrideClientIDForHttpConnection,
+			expectError: ErrCannotOverrideClientIDForUntrustedConnection,
 		},
 	}
 
