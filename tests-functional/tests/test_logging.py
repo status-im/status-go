@@ -9,7 +9,7 @@ class TestLogging:
 
     @pytest.mark.init
     def test_logging(self, tmp_path, backend_new_profile):
-        backend_client = backend_new_profile("logger")
+        backend_client = backend_new_profile("logging_profile")
         assert backend_client is not None
 
         # Configure logging
