@@ -92,7 +92,6 @@ class ConnectorClient:
             "name": self.name,
             "url": "http://localhost/",
             "method": method,
-            "clientId": "tests-functional",
         }
         if params is not None:
             request["params"] = params
