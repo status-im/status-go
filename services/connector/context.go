@@ -2,14 +2,17 @@ package connector
 
 import (
 	"context"
+
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 // ConnectionType represents the source of the RPC connection
 type ConnectionType string
 
 const (
-	ConnectionTypeHTTP     ConnectionType = "http"     // Untrusted - from WebSocket
-	ConnectionTypeInternal ConnectionType = "internal" // Trusted - from CallRPC (status-desktop)
+	ConnectionTypeHTTP     ConnectionType = "http"     // Untrusted - from HTTP
+	ConnectionTypeWS       ConnectionType = "ws"       // Untrusted - from WebSocket
+	ConnectionTypeInternal ConnectionType = "internal" // Trusted - from internal RPC (status-desktop)
 )
 
 // ContextKey is a type used for keys in connector Context.
@@ -28,6 +31,17 @@ func WithConnectionType(ctx context.Context, connType ConnectionType) context.Co
 
 // GetConnectionType retrieves connection type from context
 func GetConnectionType(ctx context.Context) ConnectionType {
+	// Check go-ethereum's PeerInfo first - this is set automatically by the RPC server
+	// for HTTP and WebSocket connections
+	peerInfo := gethrpc.PeerInfoFromContext(ctx)
+	if peerInfo.Transport == "ws" {
+		return ConnectionTypeWS
+	}
+	if peerInfo.Transport == "http" {
+		return ConnectionTypeHTTP
+	}
+
+	// Fall back to context property
 	if connType, ok := ctx.Value(connectionTypeKey).(ConnectionType); ok {
 		return connType
 	}
@@ -36,5 +50,6 @@ func GetConnectionType(ctx context.Context) ConnectionType {
 
 // IsUntrustedConnection checks if the connection is from HTTP/WebSocket
 func IsUntrustedConnection(ctx context.Context) bool {
-	return GetConnectionType(ctx) == ConnectionTypeHTTP
+	connType := GetConnectionType(ctx)
+	return connType == ConnectionTypeHTTP || connType == ConnectionTypeWS
 }
