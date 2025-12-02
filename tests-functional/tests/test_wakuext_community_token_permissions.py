@@ -285,12 +285,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert edit_resp is not None
 
         # Then the Member sees the updated community
-        def check_member_community_updated():
-            member_communities = self.member.wakuext_service.communities()
-            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-            return member_community and member_community.get("name") == new_name and member_community.get("description") == new_description
-
-        retry_call(check_member_community_updated)
+        retry_call(self.check_member_community_updated, community_id, new_name, new_description)
 
         # When the Owner mints the owner token
         # Simulate minting owner token by saving and adding a community token with owner privileges
@@ -318,12 +313,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert edit_resp2 is not None
 
         # Then the Member sees the updated community
-        def check_member_community_updated2():
-            member_communities = self.member.wakuext_service.communities()
-            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-            return member_community and member_community.get("name") == new_name2 and member_community.get("description") == new_description2
-
-        retry_call(check_member_community_updated2)
+        retry_call(self.check_member_community_updated, community_id, new_name2, new_description2)
 
         # When the Owner logouts and logs back in
         self.owner.logout()
@@ -340,9 +330,4 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert edit_resp3 is not None
 
         # Then the Member sees the updated community
-        def check_member_community_updated3():
-            member_communities = self.member.wakuext_service.communities()
-            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-            return member_community and member_community.get("name") == new_name3 and member_community.get("description") == new_description3
-
-        retry_call(check_member_community_updated3)
+        retry_call(self.check_member_community_updated, community_id, new_name3, new_description3)
