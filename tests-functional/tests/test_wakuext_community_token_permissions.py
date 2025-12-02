@@ -233,6 +233,18 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
     def test_owner_edits_visible_before_and_after_minting_owner_token(self):
         """Test that owner edits are visible before and after minting the owner token"""
+
+        def edit_community(community_id):
+            new_name = fake.community_name()
+            new_description = fake.community_description()
+            edit_resp = self.owner.wakuext_service.edit_community(
+                community_id=community_id,
+                name=new_name,
+                description=new_description,
+            )
+            assert edit_resp is not None
+            return new_name, new_description
+
         # Owner creates a community
         community_resp = self.owner.wakuext_service.create_community(
             name=fake.community_name(),
@@ -275,14 +287,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert self.member.public_key in owner_community.get("members", {})
 
         # When the Owner edits the community
-        new_name = fake.community_name()
-        new_description = fake.community_description()
-        edit_resp = self.owner.wakuext_service.edit_community(
-            community_id=community_id,
-            name=new_name,
-            description=new_description,
-        )
-        assert edit_resp is not None
+        new_name, new_description = edit_community(community_id)
 
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, community_id, new_name, new_description)
@@ -303,14 +308,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         self.owner.wakuext_service.add_community_token(community_id, 31337, "0x1234567890123456789012345678901234567890")
 
         # And the Owner edits the community again
-        new_name2 = fake.community_name()
-        new_description2 = fake.community_description()
-        edit_resp2 = self.owner.wakuext_service.edit_community(
-            community_id=community_id,
-            name=new_name2,
-            description=new_description2,
-        )
-        assert edit_resp2 is not None
+        new_name2, new_description2 = edit_community(community_id)
 
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, community_id, new_name2, new_description2)
@@ -320,14 +318,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         self.owner.login(self.owner.key_uid, self.owner.password)
 
         # And the Owner edits the community again
-        new_name3 = fake.community_name()
-        new_description3 = fake.community_description()
-        edit_resp3 = self.owner.wakuext_service.edit_community(
-            community_id=community_id,
-            name=new_name3,
-            description=new_description3,
-        )
-        assert edit_resp3 is not None
+        new_name3, new_description3 = edit_community(community_id)
 
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, community_id, new_name3, new_description3)
