@@ -7,6 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	_ "github.com/waku-org/sds-go-bindings/sds"
+
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsproto "github.com/status-im/mvds/protobuf"
 	mvdsstate "github.com/status-im/mvds/state"
