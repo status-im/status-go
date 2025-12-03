@@ -1,5 +1,5 @@
-import json
 import itertools
+import json
 import logging
 import os
 import tempfile
@@ -151,7 +151,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
             "mediaServerAddress": f"""{"0.0.0.0" if self.container else "127.0.0.1"}:{self.media_server_port}""",
-            "mediaServerAdvertizeHost": "127.0.0.1" if self.container else "",
+            "mediaServerAdvertizeHost": "localhost" if self.container else "",
             "mediaServerAdvertizePort": self.container.media_server_port if self.container else 0,
         }
 
