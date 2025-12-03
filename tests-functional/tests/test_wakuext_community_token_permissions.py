@@ -4,6 +4,8 @@ from typing import Optional, List
 
 import pytest
 
+from clients.contract_deployers.erc721 import ERC721Deployer
+from clients.contract_deployers.snt import SNTDeployer
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from clients.signals import SignalType, WalletEventType
 from clients.status_backend import StatusBackend
@@ -288,6 +290,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # When the Owner edits the community
         new_name, new_description = edit_community(community_id)
+        logger.info(f"New name: {new_name}, new description2: {new_description}")
 
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, community_id, new_name, new_description)
@@ -297,18 +300,19 @@ class TestCommunityTokenPermissions(MessengerSteps):
         token_data = {
             "tokenType": 2,  # ERC721
             "communityId": community_id,
-            "address": "0x1234567890123456789012345678901234567890",  # Fake address for test
+            "address": self.mock_erc721_address,
             "chainId": 31337,
-            "name": "OwnerToken",
+            "name": "Owner Token",
             "supply": "1",
             "symbol": "OT",
             "privilegesLevel": 1,  # Owner level
         }
         self.owner.wakuext_service.save_community_token(token_data)
-        self.owner.wakuext_service.add_community_token(community_id, 31337, "0x1234567890123456789012345678901234567890")
+        self.owner.wakuext_service.add_community_token(community_id, 31337, self.mock_erc721_address)
 
         # And the Owner edits the community again
         new_name2, new_description2 = edit_community(community_id)
+        logger.info(f"New name2: {new_name2}, new description2: {new_description2}")
 
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, community_id, new_name2, new_description2)
