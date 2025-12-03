@@ -8,24 +8,19 @@ import (
 )
 
 func TestConnectionType(t *testing.T) {
-	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeUntrusted)
 	require.True(t, IsUntrustedConnection(ctx))
-	require.Equal(t, ConnectionTypeHTTP, GetConnectionType(ctx))
+	require.Equal(t, ConnectionTypeUntrusted, GetConnectionType(ctx))
 
-	ctx = WithConnectionType(context.Background(), ConnectionTypeInternal)
+	ctx = WithConnectionType(context.Background(), ConnectionTypeTrusted)
 	require.False(t, IsUntrustedConnection(ctx))
-	require.Equal(t, ConnectionTypeInternal, GetConnectionType(ctx))
+	require.Equal(t, ConnectionTypeTrusted, GetConnectionType(ctx))
 }
 
 func TestConnectionTypeDefault(t *testing.T) {
-	// Context without connection type should default to untrusted
+	// Default should be untrusted for safety
 	ctx := context.Background()
 
-	if IsUntrustedConnection(ctx) {
-		t.Error("Default connection type should be untrusted (HTTP)")
-	}
-
-	if got := GetConnectionType(ctx); got != ConnectionTypeInternal {
-		t.Errorf("Default GetConnectionType() = %v, want %v", got, ConnectionTypeInternal)
-	}
+	require.True(t, IsUntrustedConnection(ctx))
+	require.Equal(t, ConnectionTypeUntrusted, GetConnectionType(ctx))
 }

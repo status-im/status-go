@@ -79,7 +79,7 @@ func (s *Service) Start() error {
 		}
 
 		// Inject connection type into request context
-		ctx := WithConnectionType(r.Context(), ConnectionTypeHTTP)
+		ctx := WithConnectionType(r.Context(), ConnectionTypeUntrusted)
 		r = r.WithContext(ctx)
 
 		// FIXME: this is a temporary solution to allow all origins

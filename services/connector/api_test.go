@@ -45,11 +45,11 @@ func TestCallRPC_UntrustedConnection(t *testing.T) {
 				"iconUrl": "https://example.com/icon.png",
 				"clientId": "wallet-connect"
 			}`,
-			expectError: ErrCannotOverrideClientIDForHttpConnection,
+			expectError: ErrCannotOverrideClientIDForUntrustedConnection,
 		},
 	}
 
-	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeUntrusted)
 	for _, tt := range tests {
 		t.Run(tt.request, func(t *testing.T) {
 			_, err := state.api.CallRPC(ctx, tt.request)
@@ -63,7 +63,7 @@ func TestCallRPC_TrustedConnectionRequiresClientID(t *testing.T) {
 	state := setupTests(t)
 
 	// Trusted connection (Internal) without ClientID should fail
-	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeTrusted)
 
 	request := `{
 		"method": "eth_chainId",
@@ -81,7 +81,7 @@ func TestCallRPC_TrustedConnectionRequiresClientID(t *testing.T) {
 func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
 	state := setupTests(t)
 
-	ctx := WithConnectionType(context.Background(), ConnectionTypeInternal)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeTrusted)
 
 	request := `{
 		"method": "eth_chainId",
@@ -101,7 +101,7 @@ func TestChangeAccount_UntrustedConnection(t *testing.T) {
 	state := setupTests(t)
 
 	// Test untrusted connection (HTTP)
-	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeUntrusted)
 
 	args := commands.ChangeAccountArgs{
 		URL:      "https://example.com",
@@ -116,7 +116,7 @@ func TestChangeAccount_UntrustedConnection(t *testing.T) {
 func TestCallRPC_MethodNotAllowed(t *testing.T) {
 	state := setupTests(t)
 
-	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeUntrusted)
 
 	// Test a method that's not in the allowed list
 	request := `{
@@ -136,7 +136,7 @@ func TestCallRPC_MethodNotAllowed(t *testing.T) {
 func TestCallRPC_InvalidJSON(t *testing.T) {
 	state := setupTests(t)
 
-	ctx := WithConnectionType(context.Background(), ConnectionTypeHTTP)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeUntrusted)
 
 	request := `invalid json`
 
