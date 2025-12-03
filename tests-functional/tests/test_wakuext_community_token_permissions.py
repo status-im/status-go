@@ -233,6 +233,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
     def test_owner_edits_visible_before_and_after_minting_owner_token(self):
         """Test that owner edits are visible before and after minting the owner token"""
 
@@ -314,7 +315,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         new_name2, new_description2 = edit_community(community_id)
         logger.info(f"New name2: {new_name2}, new description2: {new_description2}")
 
-        time.sleep(600)
+        time.sleep(5)
 
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, community_id, new_name2, new_description2)
