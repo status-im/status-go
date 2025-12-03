@@ -314,6 +314,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         new_name2, new_description2 = edit_community(community_id)
         logger.info(f"New name2: {new_name2}, new description2: {new_description2}")
 
+        time.sleep(600)
+
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, community_id, new_name2, new_description2)
 
