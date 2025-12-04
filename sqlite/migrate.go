@@ -220,7 +220,19 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 		return err
 	}
 
-	if !exists {
+	storedVersion := uint(0)
+
+	if exists {
+		dirty := false
+		row = tx.QueryRow(fmt.Sprintf("SELECT version, dirty FROM %s", migrationTableName))
+		err = row.Scan(&storedVersion, &dirty)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if dirty {
+			return fmt.Errorf("cannot update migration table version; current table %s is dirty at version %d", migrationTableName, storedVersion)
+		}
+	} else {
 		createTable := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);`, migrationTableName)
 		_, err = tx.Exec(createTable)
 		if err != nil {
@@ -233,8 +245,9 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 		}
 	}
 
-	version := getMaxMigrationVersion(assetNames, maxVersion)
-	if version > 0 {
+	targetVersion := getMaxMigrationVersion(assetNames, maxVersion)
+	// Never downgrade the version in the migration table!
+	if targetVersion > 0 && targetVersion > storedVersion {
 		// #nosec G201 -- migrationTableName is a trusted constant, not user input
 		deleteQuery := fmt.Sprintf("DELETE FROM %s", migrationTableName)
 		_, err = tx.Exec(deleteQuery)
@@ -243,7 +256,7 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 		}
 
 		insertVersion := fmt.Sprintf(`INSERT INTO %s (version, dirty)`, migrationTableName) + `VALUES (?, ?)`
-		_, err = tx.Exec(insertVersion, version, false)
+		_, err = tx.Exec(insertVersion, targetVersion, false)
 		if err != nil {
 			return err
 		}
