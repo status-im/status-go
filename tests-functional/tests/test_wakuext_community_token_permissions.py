@@ -34,10 +34,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         self.snt_address = self.snt_deployer.snt_contract_address
         self.controller_address = self.snt_deployer.snt_token_controller_address
 
-        # Create token overrides for wallet service
-        token_overrides = [{"symbol": "SNT", "address": self.snt_address}]
-
-        self.member_with_snt = backend_new_profile("member_with_snt", token_overrides=token_overrides)
+        self.member_with_snt = backend_new_profile("member_with_snt")
 
         # Fund the member_with_snt with 10 SNT tokens
         accounts = self.member_with_snt.accounts_service.get_accounts()
