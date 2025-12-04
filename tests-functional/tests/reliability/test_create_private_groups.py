@@ -9,33 +9,38 @@ from resources.constants import USE_IPV6
 @pytest.mark.reliability
 class TestCreatePrivateGroups(MessengerSteps):
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_new_profile("sender", bridge_network=True)
-        self.receiver = backend_new_profile("receiver", bridge_network=True)
+    @pytest.fixture()
+    def admin(self, backend_new_profile):
+        return backend_new_profile("admin", bridge_network=True)
 
-    def test_create_private_group_baseline(self, private_groups_count=1):
-        self.make_contacts(self.sender, self.receiver)
-        self.create_private_group(private_groups_count)
+    @pytest.fixture()
+    def member(self, backend_new_profile):
+        return backend_new_profile("member", bridge_network=True)
 
-    def test_multiple_create_private_groups(self):
-        self.test_create_private_group_baseline(private_groups_count=50)
+    def _run_create_private_group_baseline(self, admin, member, private_groups_count=1):
+        self.make_contacts(admin, member)
+        self.create_private_group(private_groups_count, admin=admin, member=member)
 
-    def test_create_private_groups_with_node_pause_30_seconds(self):
-        self.make_contacts(self.sender, self.receiver)
+    def test_create_private_group_baseline(self, admin, member, private_groups_count=1):
+        self._run_create_private_group_baseline(admin, member, private_groups_count)
 
-        with self.node_pause(self.receiver):
+    def test_multiple_create_private_groups(self, admin, member):
+        self._run_create_private_group_baseline(admin, member, private_groups_count=50)
+
+    def test_create_private_groups_with_node_pause_30_seconds(self, admin, member):
+        self.make_contacts(admin, member)
+
+        with self.node_pause(member):
             private_group_name = f"private_group_{uuid4()}"
-            self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
+            admin.wakuext_service.create_group_chat_with_members([member.public_key], private_group_name)
             sleep(30)
-        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)
+        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
-    def test_create_private_groups_with_ip_change(self):
-        self.make_contacts(self.sender, self.receiver)
-        self.receiver.change_container_ip()
+    def test_create_private_groups_with_ip_change(self, admin, member):
+        self.make_contacts(admin, member)
+        member.change_container_ip()
 
         private_group_name = f"private_group_{uuid4()}"
-        self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
-        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)
+        admin.wakuext_service.create_group_chat_with_members([member.public_key], private_group_name)
+        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)

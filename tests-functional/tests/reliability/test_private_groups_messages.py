@@ -9,50 +9,55 @@ from resources.constants import USE_IPV6
 @pytest.mark.reliability
 class TestPrivateGroupMessages(MessengerSteps):
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_new_profile("sender", bridge_network=True)
-        self.receiver = backend_new_profile("receiver", bridge_network=True)
+    @pytest.fixture()
+    def admin(self, backend_new_profile):
+        return backend_new_profile("admin", bridge_network=True)
 
-    def test_private_group_messages_baseline(self, message_count=1):
-        self.make_contacts(self.sender, self.receiver)
-        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
-        self.private_group_message(message_count, self.private_group_id, sender=self.sender, receiver=self.receiver)
+    @pytest.fixture()
+    def member(self, backend_new_profile):
+        return backend_new_profile("member", bridge_network=True)
 
-    def test_multiple_group_chat_messages(self):
-        self.test_private_group_messages_baseline(message_count=50)
+    def _run_private_group_messages_baseline(self, admin, member, message_count=1):
+        self.make_contacts(admin, member)
+        private_group_id = self.join_private_group(admin=admin, member=member)
+        self.private_group_message(message_count, private_group_id, sender=admin, receiver=member)
 
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_private_group_chat_messages_with_latency(self):
-        with self.add_latency(self.receiver):
-            self.test_private_group_messages_baseline(message_count=50)
+    def test_private_group_messages_baseline(self, admin, member, message_count=1):
+        self._run_private_group_messages_baseline(admin, member, message_count)
 
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_private_group_chat_messages_with_packet_loss(self):
-        with self.add_packet_loss(self.receiver):
-            self.test_private_group_messages_baseline(message_count=50)
+    def test_multiple_group_chat_messages(self, admin, member):
+        self._run_private_group_messages_baseline(admin, member, message_count=50)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_private_group_chat_messages_with_low_bandwidth(self):
-        with self.add_low_bandwith(self.receiver):
-            self.test_private_group_messages_baseline(message_count=50)
+    def test_private_group_chat_messages_with_latency(self, admin, member):
+        with self.add_latency(member):
+            self._run_private_group_messages_baseline(admin, member, message_count=50)
 
-    def test_private_group_messages_with_node_pause_30_seconds(self):
-        self.make_contacts(self.sender, self.receiver)
-        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_private_group_chat_messages_with_packet_loss(self, admin, member):
+        with self.add_packet_loss(member):
+            self._run_private_group_messages_baseline(admin, member, message_count=50)
 
-        with self.node_pause(self.receiver):
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_private_group_chat_messages_with_low_bandwidth(self, admin, member):
+        with self.add_low_bandwith(member):
+            self._run_private_group_messages_baseline(admin, member, message_count=50)
+
+    def test_private_group_messages_with_node_pause_30_seconds(self, admin, member):
+        self.make_contacts(admin, member)
+        private_group_id = self.join_private_group(admin=admin, member=member)
+
+        with self.node_pause(member):
             message_text = f"test_message_{uuid4()}"
-            self.sender.wakuext_service.send_group_chat_message(self.private_group_id, message_text)
+            admin.wakuext_service.send_group_chat_message(private_group_id, message_text)
             sleep(30)
-        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
-        self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
+        admin.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
-    def test_private_group_messages_with_ip_change(self):
-        self.make_contacts(self.sender, self.receiver)
-        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
-        self.private_group_message(1, self.private_group_id, sender=self.sender, receiver=self.receiver)
-        self.receiver.change_container_ip()
-        self.private_group_message(1, self.private_group_id, sender=self.sender, receiver=self.receiver)
+    def test_private_group_messages_with_ip_change(self, admin, member):
+        self.make_contacts(admin, member)
+        private_group_id = self.join_private_group(admin=admin, member=member)
+        self.private_group_message(1, private_group_id, sender=admin, receiver=member)
+        member.change_container_ip()
+        self.private_group_message(1, private_group_id, sender=admin, receiver=member)
