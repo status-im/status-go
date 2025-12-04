@@ -1,3 +1,4 @@
+import copy
 import itertools
 import json
 import logging
@@ -33,7 +34,6 @@ from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID
 from utils import fake
 from utils import keys
 from utils.config import Config
-import copy
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -166,7 +166,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 {
                     "chainId": self.network_id,
                     "name": "Anvil Direct",
-                    "url": "http://anvil:8545",
+                    "url": Config.anvil_url,
                     "enableRpsLimiter": False,
                     "type": "embedded-direct",
                     "enabled": True,
