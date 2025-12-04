@@ -4,7 +4,6 @@ from typing import Optional, List
 
 import pytest
 
-from clients.contract_deployers.snt import SNTDeployer
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from clients.signals import SignalType
 from resources.constants import user_1
@@ -17,32 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.rpc
+@pytest.mark.usefixtures("snt_deployment")
 class TestCommunityTokenPermissions(MessengerSteps):
+    snt_address: Optional[str] = None
+    snt_controller_address: Optional[str] = None
+
     def _communities_list(self, communities_response):
         if isinstance(communities_response, dict):
             return communities_response.get("communities", []) or []
         return communities_response or []
-
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile, foundry_client):
-        """Initialize backends for token permission tests"""
-        self.owner = backend_new_profile("owner")
-        self.member = backend_new_profile("member")
-
-        # Deploy SNT token for tests that need it
-        self.snt_deployer = SNTDeployer(foundry_client)
-        self.snt_address = self.snt_deployer.snt_contract_address
-        self.controller_address = self.snt_deployer.snt_token_controller_address
-
-        self.member_with_snt = backend_new_profile("member_with_snt")
-
-        # Fund the member_with_snt with 10 SNT tokens
-        accounts = self.member_with_snt.accounts_service.get_accounts()
-        member_address = accounts[0]["address"]
-        token_amount = str(10 * 10**18)  # 10 tokens with 18 decimals
-        gen_tokens_result = foundry_client.generate_tokens(self.controller_address, member_address, token_amount, user_1.private_key)
-        logging.debug(f"Generate tokens result: exit_code={gen_tokens_result.exit_code}, output={gen_tokens_result.output.decode()}")
-        logger.debug(f"Funded {member_address} with 10 SNT tokens at contract {self.snt_address}")
 
     def create_token_gated_community(
         self,
@@ -81,25 +63,44 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         return community_id
 
+    def fund_backend_account_with_snt(self, backend, foundry_client, amount=10):
+        """Fund the given backend's first account with the specified amount of SNT tokens."""
+        accounts = backend.accounts_service.get_accounts()
+        member_address = accounts[0]["address"]
+        token_amount = str(amount * 10**18)  # amount tokens with 18 decimals
+        gen_tokens_result = foundry_client.generate_tokens(self.snt_controller_address, member_address, token_amount, user_1.private_key)
+        logging.debug(f"Generate tokens result: exit_code={gen_tokens_result.exit_code}, output={gen_tokens_result.output.decode()}")
+        logger.debug(f"Funded {member_address} with {amount} SNT tokens at contract {self.snt_address}")
+
+        return member_address
+
+    def verify_snt_balance(self, foundry_client, member_address, min_wei: int = 1000000000000000000):
+        """Verify the SNT balance using foundry client."""
+        balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
+        assert balance_result.exit_code == 0, "Balance check command failed"
+        balance = int(balance_result.output.decode().strip(), 16)
+        assert balance >= min_wei, f"Insufficient SNT balance: {balance}, expected at least 1 token"
+
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
-    def test_membership_no_valid_tokens(self):
+    def test_membership_no_valid_tokens(self, owner_backend, member_backend):
         """Test that users must hold required tokens to join community"""
+
         # Owner creates token-gated community
-        community_id = self.create_token_gated_community(self.owner, membership=CommunityPermissionsAccess.MANUAL_ACCEPT)
+        community_id = self.create_token_gated_community(owner_backend, membership=CommunityPermissionsAccess.MANUAL_ACCEPT)
 
         # Fetch community as member
-        self.fetch_community(self.member, community_id)
+        self.fetch_community(member_backend, community_id)
 
         # Member tries to join without tokens - should fail at request time
         fake_address = "0x" + "0" * 40
-        join_req = self.member.wakuext_service.request_to_join_community(community_id, fake_address)
+        join_req = member_backend.wakuext_service.request_to_join_community(community_id, fake_address)
         requests = join_req.get("requestsToJoinCommunity", [])
         if requests:
             # If request was created, check that it gets declined
             req_id = requests[0].get("id")
             # Check that request is declined due to insufficient permissions
-            self.owner.wait_for_signal(SignalType.MESSAGES_NEW)
-            declined_reqs = self.owner.wakuext_service.declined_requests_to_join_for_community(community_id)
+            owner_backend.wait_for_signal(SignalType.MESSAGES_NEW)
+            declined_reqs = owner_backend.wakuext_service.declined_requests_to_join_for_community(community_id)
             assert len(declined_reqs) == 1
             assert declined_reqs[0].get("id") == req_id
         else:
@@ -107,35 +108,30 @@ class TestCommunityTokenPermissions(MessengerSteps):
             pass
 
         # Verify member is not in community
-        communities = self.member.wakuext_service.communities()
+        communities = member_backend.wakuext_service.communities()
         member_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert member_community is None or not member_community.get("joined", False)
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7161")
-    def test_membership_with_valid_tokens(self, foundry_client):
+    def test_membership_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens can successfully join community as member"""
-        # Get member's wallet address
-        accounts = self.member_with_snt.accounts_service.get_accounts()
-        member_address = accounts[0]["address"]
 
-        # Verify the balance directly with cast
-        balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
-        assert balance_result.exit_code == 0, "Balance check command failed"
-        balance = int(balance_result.output.decode().strip(), 16)
-        assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at least 1 token"
+        # Fund the member_with_snt with 10 SNT tokens
+        member_address = self.fund_backend_account_with_snt(member_with_snt_backend, foundry_client)
+        self.verify_snt_balance(foundry_client, member_address)
 
         # Owner creates token-gated community with the deployed token
         community_id = self.create_token_gated_community(
-            self.owner,
+            owner_backend,
             permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
         # Fetch community as member
-        self.fetch_community(self.member_with_snt, community_id)
+        self.fetch_community(member_with_snt_backend, community_id)
 
         # Member tries to join with their wallet address (should have tokens)
-        join_req = self.member_with_snt.wakuext_service.request_to_join_community(community_id, member_address)
+        join_req = member_with_snt_backend.wakuext_service.request_to_join_community(community_id, member_address)
         requests = join_req.get("requestsToJoinCommunity", [])
 
         if requests:
@@ -143,42 +139,37 @@ class TestCommunityTokenPermissions(MessengerSteps):
             # Since member has valid tokens, request should not be declined
             # Wait for token validation to complete, then try to accept directly
 
-            received_signal = self.owner.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
+            received_signal = owner_backend.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
             logger.info(f"Received signal: {received_signal}")
 
             def try_accept_request(req_id):
-                resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+                resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
                 return resp if resp is not None else None
 
             accept_resp = retry_call(try_accept_request, req_id)
 
-            # accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+            # accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
             assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is now in community (check from owner's perspective since acceptance happened there)
-        communities = self.owner.wakuext_service.communities()
+        communities = owner_backend.wakuext_service.communities()
         owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
         # Check that member is in the community members list
-        member_public_key = self.member_with_snt.public_key
+        member_public_key = member_with_snt_backend.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
-    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
-    def test_admin_token_permissions_with_valid_tokens(self, foundry_client):
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
+    def test_admin_token_permissions_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens get admin privileges"""
-        # Get member's wallet address
-        accounts = self.member_with_snt.accounts_service.get_accounts()
-        member_address = accounts[0]["address"]
 
-        # Verify the balance directly with cast
-        balance_result = foundry_client.get_erc20_balance(self.snt_address, member_address)
-        assert balance_result.exit_code == 0, "Balance check command failed"
-        balance = int(balance_result.output.decode().strip(), 16)
-        assert balance >= 1000000000000000000, f"Insufficient SNT balance: {balance}, expected at 1 token"
+        # Fund the member_with_snt with 10 SNT tokens
+        member_address = self.fund_backend_account_with_snt(member_with_snt_backend, foundry_client)
+        self.verify_snt_balance(foundry_client, member_address)
 
         # Owner creates token-gated community with member and admin permissions
         community_id = self.create_token_gated_community(
-            self.owner,
+            owner_backend,
             permission_types=[
                 CommunityTokenPermissionType.BECOME_MEMBER,
                 CommunityTokenPermissionType.BECOME_ADMIN,
@@ -195,43 +186,43 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(5)
 
         # Fetch community as member
-        response = self.fetch_community(self.member_with_snt, community_id)
+        response = self.fetch_community(member_with_snt_backend, community_id)
         assert response, "Community not found"
         assert response["tokenPermissions"], "No token permissions found"
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"  # FIXME: Fails here
 
-        # self.member_with_snt.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
-        permissions_resp = self.member_with_snt.wakuext_service.check_permissions_to_join_community(community_id)
+        # member_with_snt_backend.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
+        permissions_resp = member_with_snt_backend.wakuext_service.check_permissions_to_join_community(community_id)
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
         # Member with tokens requests to join community
-        join_resp = self.member_with_snt.wakuext_service.request_to_join_community(community_id, member_address)
+        join_resp = member_with_snt_backend.wakuext_service.request_to_join_community(community_id, member_address)
         requests = join_resp.get("requestsToJoinCommunity", [])
         assert requests, "No requests to join community"
         assert len(requests) == 1, "Unexpected multiple requests to join community"
 
         req_id = requests[0].get("id")
         # Wait for token validation
-        self.owner.wait_for_signal(
+        owner_backend.wait_for_signal(
             SignalType.MESSAGES_NEW,
             lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
             == RequestToJoinState.RequestToJoinStatePending.value,
         )
 
-        accept_resp = self.owner.wakuext_service.accept_request_to_join_community(req_id)
+        accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
         assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is now in community and has admin role
-        communities = self.owner.wakuext_service.communities()
+        communities = owner_backend.wakuext_service.communities()
         owner_community = next(
             (c for c in self._communities_list(communities) if c.get("id") == community_id),
             None,
         )
         assert owner_community is not None
 
-        member_key = self.member_with_snt.public_key
-        owner_key = self.owner.public_key
+        member_key = member_with_snt_backend.public_key
+        owner_key = owner_backend.public_key
 
         # Member should have admin role, granted via BECOME_ADMIN token permission
         assert member_key in owner_community.get("members", {})
