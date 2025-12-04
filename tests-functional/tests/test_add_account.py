@@ -8,103 +8,108 @@ from clients.api import ApiResponseError
 @pytest.mark.rpc
 class TestAddAccount:
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        self.account = backend_new_profile("sender")
-        self.account_data = copy.deepcopy(new_account_data_1)
+    @pytest.fixture()
+    def account(self, backend_new_profile):
+        return backend_new_profile("account-backend")
 
-    def test_add_second_wallet_account_to_profile_keypair(self):
+    @pytest.fixture()
+    def account_data(self):
+        return copy.deepcopy(new_account_data_1)
+
+    def test_add_second_wallet_account_to_profile_keypair(self, account, account_data):
         # add account on path m/44'/60'/0'/0/1 to profile keypair
         path = "m/44'/60'/0'/0/1"
-        derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(self.account.mnemonic, [path])
+        derived_addresses_response = account.wallet_service.get_derived_addresses_for_mnemonic(account.mnemonic, [path])
 
         # update account being added with necessary details
-        self.account_data["key-uid"] = self.account.key_uid  # keyuid of profile keypair
-        self.account_data["path"] = path
-        self.account_data["address"] = derived_addresses_response[0].get("address")
-        self.account_data["public-key"] = derived_addresses_response[0].get("public-key")
+        account_data["key-uid"] = account.key_uid  # keyuid of profile keypair
+        account_data["path"] = path
+        account_data["address"] = derived_addresses_response[0].get("address")
+        account_data["public-key"] = derived_addresses_response[0].get("public-key")
 
-        self.account.accounts_service.add_account(self.account.password, self.account_data)
+        account.accounts_service.add_account(account.password, account_data)
         # TODO: Add more assertions on response
 
         # After adding the account check that the get accounts will retrieve the new account
-        accounts_response = self.account.accounts_service.get_accounts()
-        self.check_new_account_was_created(accounts_response, self.account_data)
+        accounts_response = account.accounts_service.get_accounts()
+        self.check_new_account_was_created(accounts_response, account_data)
 
-    def test_add_duplicate_account(self):
+    def test_add_duplicate_account(self, account):
         # since default wallet account is already added by creating the backend profile, we can try just adding the same account again
-        accounts_response = self.account.accounts_service.get_accounts()
+        accounts_response = account.accounts_service.get_accounts()
         assert len(accounts_response) == 2
-        defaultAccount = accounts_response[0]
-        if not defaultAccount["wallet"]:
-            defaultAccount = accounts_response[1]
-        assert defaultAccount["wallet"] is True
+        default_account = accounts_response[0]
+        if not default_account["wallet"]:
+            default_account = accounts_response[1]
+        assert default_account["wallet"] is True
 
         # Add the same account second time
         with pytest.raises(ApiResponseError, match=re.escape("account already exists")):
-            self.account.accounts_service.add_account(self.account.password, defaultAccount)
+            account.accounts_service.add_account(account.password, default_account)
 
-    def test_add_account_for_unknown_key_uid(self):
-        self.account_data["key-uid"] = "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4"
+    def test_add_account_for_unknown_key_uid(self, account, account_data):
+        account_data["key-uid"] = "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4"
         with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
-            self.account.accounts_service.add_account(self.account.password, self.account_data)
+            account.accounts_service.add_account(account.password, account_data)
 
-    def test_add_account_for_empty_address(self):
-        self.account_data["address"] = ""
+    def test_add_account_for_empty_address(self, account, account_data):
+        account_data["address"] = ""
         with pytest.raises(ApiResponseError, match=re.escape("invalid argument 1: hex string has length 0, want 40 for types.Address")):
-            self.account.accounts_service.add_account(self.account.password, self.account_data)
+            account.accounts_service.add_account(account.password, account_data)
 
-    def test_add_account_for_empty_path(self):
-        self.account_data["path"] = ""
+    def test_add_account_for_empty_path(self, account, account_data):
+        account_data["path"] = ""
         with pytest.raises(ApiResponseError, match=re.escape("[account] account mismatch")):
-            self.account.accounts_service.add_account(self.account.password, self.account_data)
+            account.accounts_service.add_account(account.password, account_data)
 
     @pytest.mark.parametrize(
         "key, error", [("wallet", "[database] cannot add default wallet account"), ("chat", "[database] cannot add default chat account")]
     )
-    def test_add_account_with_key_set_on_true__(self, key, error):
-        self.account_data["key-uid"] = self.account.key_uid
-        self.account_data[key] = True
+    def test_add_account_with_key_set_on_true__(self, account, account_data, key, error):
+        account_data["key-uid"] = account.key_uid
+        account_data[key] = True
         with pytest.raises(ApiResponseError, match=re.escape(error)):
-            self.account.accounts_service.add_account(self.account.password, self.account_data)
+            account.accounts_service.add_account(account.password, account_data)
 
-    def test_add_watch_account(self):
-        self.account_data["type"] = "watch"
-        self.account.accounts_service.add_account(self.account.password, self.account_data)
+    def test_add_watch_account(self, account, account_data):
+        account_data["type"] = "watch"
+        account.accounts_service.add_account(account.password, account_data)
         # TODO: Add more assertions on response
 
         # After adding the account check that the get accounts will retrieve the new account
-        accounts_response = self.account.accounts_service.get_accounts()
+        accounts_response = account.accounts_service.get_accounts()
         accounts = accounts_response
-        self.check_new_account_was_created(accounts, self.account_data)
+        self.check_new_account_was_created(accounts, account_data)
 
-    def test_add_account_to_seed_imported_keypair(self):
+    def test_add_account_to_seed_imported_keypair(self, account, account_data):
         used_mnemonic = user_1.passphrase
-        profile_password = self.account.password
-        add_keypair_response = self.account.accounts_service.add_keypair_via_seed_phrase(
+        profile_password = account.password
+        add_keypair_response = account.accounts_service.add_keypair_via_seed_phrase(
             used_mnemonic, profile_password, keypair_name, wallet_account_details_derivation
         )
 
         path = "m/44'/60'/0'/0/1"
-        derived_addresses_response = self.account.wallet_service.get_derived_addresses_for_mnemonic(used_mnemonic, [path])
+        derived_addresses_response = account.wallet_service.get_derived_addresses_for_mnemonic(used_mnemonic, [path])
         derived_addresses = derived_addresses_response
 
         # update account being added with necessary details
-        self.account_data["key-uid"] = add_keypair_response["key-uid"]
-        self.account_data["path"] = path
-        self.account_data["address"] = derived_addresses[0].get("address")
-        self.account_data["public-key"] = derived_addresses[0].get("public-key")
+        account_data["key-uid"] = add_keypair_response["key-uid"]
+        account_data["path"] = path
+        account_data["address"] = derived_addresses[0].get("address")
+        account_data["public-key"] = derived_addresses[0].get("public-key")
 
-        self.account.accounts_service.add_account(profile_password, self.account_data)
+        account.accounts_service.add_account(profile_password, account_data)
         # TODO: Add more assertions on response
 
-    def get_account_keypairs(self):
-        keypairs_response = self.account.accounts_service.get_account_keypairs()
+    @staticmethod
+    def get_account_keypairs(account):
+        keypairs_response = account.accounts_service.get_account_keypairs()
         keypairs = keypairs_response
         assert len(keypairs) > 0
         return keypairs
 
-    def check_new_account_was_created(self, accounts, account_data):
+    @staticmethod
+    def check_new_account_was_created(accounts, account_data):
         mismatch_details = ""
         for acc in accounts:
             mismatches = []
