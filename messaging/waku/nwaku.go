@@ -51,7 +51,6 @@ import (
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/waku-org/waku-go-bindings/waku"
@@ -171,8 +170,6 @@ type Waku struct {
 	onPeerStats                     func(types.ConnStatus)
 
 	metricsHandler IMetricsHandler
-
-	defaultShardInfo protocol.RelayShards
 }
 
 // timesource provided in constructor is managed by status-go; go-waku must not invoke Start or Stop.
@@ -1403,9 +1400,11 @@ func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
 }
 
 func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-	defer cancel()
-	return w.node.DialPeerByID(ctx, peerID, relay.WakuRelayID_v200)
+	// TODO-nwaku maybe???
+	// ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
+	// defer cancel()
+	// return w.node.DialPeerByID(ctx, peerID, relay.WakuRelayID_v200)
+	return nil
 }
 
 func (w *Waku) DropPeer(peerID peer.ID) error {
