@@ -1,18 +1,16 @@
 import tempfile
+
 import pytest
 import requests
 
 from clients.signals import SignalType
-from clients.status_backend import StatusBackend
 
 
 @pytest.mark.rpc
 class TestMediaServer:
-    @pytest.fixture()
-    def backend(self, backend_new_profile) -> StatusBackend:
-        return backend_new_profile("sender")
 
-    def test_media_server_health(self, backend):
+    def test_media_server_health(self, backend_new_profile):
+        backend = backend_new_profile("sender")
         signal = backend.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)
         event = signal["event"]
 
@@ -29,4 +27,25 @@ class TestMediaServer:
 
         # Make a health request to the media server with the loaded certificate
         response = requests.get(media_server_url + "/health", timeout=10, verify=cert_file_path)
+        assert response.status_code == 200
+
+    def test_multiple_media_servers(self, backend_new_profile):
+        backend_1 = backend_new_profile("backend_1")
+        backend_2 = backend_new_profile("backend_2")
+
+        _ = backend_1.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)["event"]
+        _ = backend_2.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)["event"]
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".crt", delete=False) as cert_file:
+            cert_file.write(backend_1.image_server_tls_cert())
+            cert_file_path_1 = cert_file.name
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".crt", delete=False) as cert_file:
+            cert_file.write(backend_2.image_server_tls_cert())
+            cert_file_path_2 = cert_file.name
+
+        response = requests.get(f"https://localhost:{backend_1.media_server_port}/health", timeout=10, verify=cert_file_path_1)
+        assert response.status_code == 200
+
+        response = requests.get(f"https://localhost:{backend_2.media_server_port}/health", timeout=10, verify=cert_file_path_2)
         assert response.status_code == 200
