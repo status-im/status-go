@@ -7,7 +7,8 @@ from requests import ReadTimeout
 from clients.anvil import Anvil
 from clients.contract_deployers.multicall3 import Multicall3Deployer
 from clients.foundry import Foundry
-from clients.status_backend import StatusBackend
+from clients.contract_deployers.multicall3 import Multicall3Deployer
+from clients.contract_deployers.snt import SNTDeployer
 from resources.constants import USE_IPV6
 from utils import fake
 
@@ -145,3 +146,27 @@ def foundry_client():
 @pytest.fixture(scope="session")
 def multicall3_deployer(foundry_client):
     return Multicall3Deployer(foundry_client)
+
+
+@pytest.fixture(scope="function")
+def snt_deployment(foundry_client, request):
+    deployer = SNTDeployer(foundry_client)
+    request.cls.snt_deployer = deployer
+    request.cls.snt_address = deployer.snt_contract_address
+    request.cls.snt_controller_address = deployer.snt_token_controller_address
+    yield deployer
+
+
+@pytest.fixture(scope="function", autouse=False)
+def owner_backend(backend_new_profile):
+    return backend_new_profile("owner")
+
+
+@pytest.fixture(scope="function", autouse=False)
+def member_backend(backend_new_profile):
+    return backend_new_profile("member")
+
+
+@pytest.fixture(scope="function", autouse=False)
+def member_with_snt_backend(backend_new_profile):
+    return backend_new_profile("member_with_snt")
