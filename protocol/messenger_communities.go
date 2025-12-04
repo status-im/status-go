@@ -1371,7 +1371,10 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, communities.ErrAlreadyJoined
 	}
 
-	requestToJoin := m.communitiesManager.CreateRequestToJoin(request, m.account.GetCustomizationColor())
+	requestToJoin, err := m.communitiesManager.CreateRequestToJoin(request, m.account.GetCustomizationColor())
+	if err != nil {
+		return nil, err
+	}
 
 	if len(request.AddressesToReveal) > 0 {
 		revealedAddresses := make([]gethcommon.Address, 0)

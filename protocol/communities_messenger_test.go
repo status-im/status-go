@@ -3555,7 +3555,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
-	rtj := s.alice.communitiesManager.CreateRequestToJoin(request, s.alice.account.GetCustomizationColor())
+	rtj, err := s.alice.communitiesManager.CreateRequestToJoin(request, s.alice.account.GetCustomizationColor())
+	s.Require().NoError(err)
 
 	s.Require().NoError(err)
 
