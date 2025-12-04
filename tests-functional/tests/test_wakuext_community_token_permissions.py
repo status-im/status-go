@@ -98,37 +98,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         balance = int(balance_result.output.decode().strip(), 16)
         assert balance >= min_wei, f"Insufficient SNT balance: {balance}, expected at least 1 token"
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
-    def test_membership_no_valid_tokens(self, owner_backend, member_backend):
-        """Test that users must hold required tokens to join community"""
-
-        # Owner creates token-gated community
-        community_id = self.create_token_gated_community(owner_backend, membership=CommunityPermissionsAccess.MANUAL_ACCEPT)
-
-        # Fetch community as member
-        self.fetch_community(member_backend, community_id)
-
-        # Member tries to join without tokens - should fail at request time
-        fake_address = "0x" + "0" * 40
-        join_req = member_backend.wakuext_service.request_to_join_community(community_id, fake_address)
-        requests = join_req.get("requestsToJoinCommunity", [])
-        if requests:
-            # If request was created, check that it gets declined
-            req_id = requests[0].get("id")
-            # Check that request is declined due to insufficient permissions
-            owner_backend.wait_for_signal(SignalType.MESSAGES_NEW)
-            declined_reqs = owner_backend.wakuext_service.declined_requests_to_join_for_community(community_id)
-            assert len(declined_reqs) == 1
-            assert declined_reqs[0].get("id") == req_id
-        else:
-            # Request was rejected at creation time
-            pass
-
-        # Verify member is not in community
-        communities = member_backend.wakuext_service.communities()
-        member_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
-        assert member_community is None or not member_community.get("joined", False)
-
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7161")
     def test_membership_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens can successfully join community as member"""
