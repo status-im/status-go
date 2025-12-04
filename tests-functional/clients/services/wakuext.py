@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum
 from typing import TypedDict, Union, Optional
 
@@ -113,6 +114,13 @@ class CommunityRoles(Enum):
     ROLE_OWNER = 1
     ROLE_ADMIN = 4
     ROLE_TOKEN_MASTER = 5
+
+
+@dataclass
+class SignParams:
+    data: bytes
+    account: str
+    password: str
 
 
 class Error(Exception):
@@ -303,8 +311,15 @@ class WakuextService(Service):
         response = self.rpc_request("fetchCommunity", params)
         return response
 
-    def request_to_join_community(self, community_id, address="fakeaddress"):
-        params = [{"communityId": community_id, "addressesToReveal": [address], "airdropAddress": address}]
+    def request_to_join_community(self, community_id: str, address: str, signatures: list[str]):
+        params = [
+            {
+                "communityId": community_id,
+                "addressesToReveal": [address],
+                "airdropAddress": address,
+                "signatures": signatures,
+            }
+        ]
         response = self.rpc_request("requestToJoinCommunity", params)
         return response
 
@@ -368,7 +383,7 @@ class WakuextService(Service):
         response = self.rpc_request("checkPermissionsToJoinCommunity", params)
         return response
 
-    def generate_joining_community_requests_for_signing(self, member_pub_key: str, community_id: str, addresses_to_reveal: list):
+    def generate_joining_community_requests_for_signing(self, member_pub_key: str, community_id: str, addresses_to_reveal: list[str]):
         params = [member_pub_key, community_id, addresses_to_reveal]
         response = self.rpc_request("generateJoiningCommunityRequestsForSigning", params)
         return response
@@ -896,4 +911,9 @@ class WakuextService(Service):
             }
         ]
         response = self.rpc_request("deleteCommunityTokenPermission", params)
+        return response
+
+    def sign_data(self, sign_params: list[dict]):
+        params = [sign_params]
+        response = self.rpc_request("signData", params)
         return response
