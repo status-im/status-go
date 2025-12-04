@@ -78,6 +78,31 @@ func (t Transfer) IsIncoming(accountAddress common.Address) bool {
 	return t.FromAddress != accountAddress
 }
 
+func (t Transfer) IsValid() bool {
+	if t.BlockNum == nil {
+		return false
+	}
+	switch t.Category {
+	case TransferCategoryExternal:
+		return t.RawContract.Value != nil
+	case TransferCategoryErc20:
+		return t.RawContract.Address != nil && t.RawContract.Value != nil
+	case TransferCategoryErc721:
+		return t.TokenID != nil && t.RawContract.Address != nil
+	case TransferCategoryErc1155:
+		if t.RawContract.Address == nil || len(t.Erc1155Metadata) == 0 {
+			return false
+		}
+		for _, m := range t.Erc1155Metadata {
+			if m.TokenID == nil || m.Value == nil {
+				return false
+			}
+		}
+		return true
+	}
+	return true
+}
+
 type Erc1155Metadata struct {
 	TokenID *bigint.VarHexBigInt `json:"tokenId"`
 	Value   *bigint.VarHexBigInt `json:"value"`
