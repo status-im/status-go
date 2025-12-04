@@ -17,6 +17,10 @@ from utils.config import Config
 DATA_DIR = "/usr/status-user"
 
 
+def _localhost(ipv6: bool):
+    return "::1" if ipv6 else "127.0.0.1"
+
+
 class StatusGoContainer:
     all_containers = []
     container = None
@@ -356,11 +360,6 @@ class PortsMapping:
         self.container_port = container_port
         self.host_port = StatusGoContainer.acquire_port()
 
-    # def add_ipv6(self, ports_dict: dict):
-    #     key = f"{self.container_port}/tcp"
-    #     value = [{"HostIp": "::", "HostPort": str(self.host_port)}]
-    #     ports_dict[key] = value
-
     def host_url(self, ipv6: bool):
         if ipv6:
             return f"http://[::1]:{self.host_port}"
@@ -434,8 +433,8 @@ class StatusBackendContainer(StatusGoContainer):
             "true" if kwargs.get("pprof_enabled", False) else "false",
         ]
 
-        self.url = self.ports.backend.host_url(ipv6)
-        self.connector_ws_url = self.ports.connector.host_url(ipv6) if self.ports.connector else ""
+        self.url = f"http://{_localhost(ipv6)}:{self.ports.backend.host_port}"
+        self.connector_ws_url = f"ws://{_localhost(ipv6)}:{self.ports.connector.host_port}" if self.ports.connector else ""
 
         super().__init__(entrypoint, self.ports.ports(ipv6), privileged, container_name_suffix=f"-status-backend-{self.ports.backend.host_port}")
 
