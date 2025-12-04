@@ -6,6 +6,7 @@ import pytest
 
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from clients.signals import SignalType
+from clients.status_backend import StatusBackend
 from resources.constants import user_1
 from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
@@ -13,6 +14,22 @@ from utils import fake
 from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
+
+
+def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]) -> list[str]:
+    # Generate signatures for joining community with selected addresses to reveal
+    # Address must correspond to a non-chat and non-watch account
+    sign_params = backend.wakuext_service.generate_joining_community_requests_for_signing(backend.public_key, community_id, addresses)
+
+    # Set password for each sign parameter
+    for i in range(len(sign_params)):
+        sign_params[i]["password"] = backend.password
+
+    # Sign addresses to reveal
+    signatures = backend.wakuext_service.sign_data(sign_params)
+
+    # Send request to join with addresses to reveal and signatures
+    return backend.wakuext_service.request_to_join_community(community_id, addresses, signatures)
 
 
 @pytest.mark.rpc
