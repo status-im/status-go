@@ -1,5 +1,5 @@
-from typing import List, Iterator
 from dataclasses import field
+from typing import List, Iterator
 
 
 class Config:
@@ -7,6 +7,7 @@ class Config:
     base_dir: str = ""
 
     status_backend_urls: Iterator[str] | None = None
+    anvil_url: str = ""
     password: str = ""  # FIXME: remove
     docker_project_name: str = ""
     docker_image: str = ""
