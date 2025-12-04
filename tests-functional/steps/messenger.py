@@ -259,7 +259,7 @@ class MessengerSteps(NetworkConditionsSteps):
             expected_message=expected_message,
         )
 
-    def create_private_group(self, private_groups_count, admin=None, member=None):
+    def create_private_group(self, private_groups_count, admin, member):
         """Create one or more private groups between admin and member and validate signals.
 
         Args:
