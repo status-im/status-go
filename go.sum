@@ -2418,6 +2418,8 @@ github.com/waku-org/sds-go-bindings v0.0.0-20251119184907-e78f76307965 h1:1xx0AQ
 github.com/waku-org/sds-go-bindings v0.0.0-20251119184907-e78f76307965/go.mod h1:rC5yaoM7ee8h/zEyCGfdnYTOEhyW3jpdck7maoiRQQE=
 github.com/waku-org/waku-go-bindings v0.0.0-20251125210804-dbe238895a21 h1:J/Pl4v6ryCgLhZBKI20XDjSPiKNaID9uoOmPW5/GkPc=
 github.com/waku-org/waku-go-bindings v0.0.0-20251125210804-dbe238895a21/go.mod h1:v6ogkMCyQRUTazRyQR5LIouukY4/2bkjjHpnBKBxcAY=
+github.com/waku-org/waku-go-bindings v0.0.0-20251202095947-63b01b7d0ca9 h1:x4SKQ8zceFNhSBG02yULii7m/bFtGDuqX5XuahpSTCo=
+github.com/waku-org/waku-go-bindings v0.0.0-20251202095947-63b01b7d0ca9/go.mod h1:v6ogkMCyQRUTazRyQR5LIouukY4/2bkjjHpnBKBxcAY=
 github.com/wealdtech/go-ens/v3 v3.6.0 h1:EAByZlHRQ3vxqzzwNi0GvEq1AjVozfWO4DMldHcoVg8=
 github.com/wealdtech/go-ens/v3 v3.6.0/go.mod h1:hcmMr9qPoEgVSEXU2Bwzrn/9NczTWZ1rE53jIlqUpzw=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=
