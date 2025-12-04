@@ -11,12 +11,11 @@ from resources.constants import user_1
 from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
 from utils import fake
-from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
 
 
-def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]) -> list[str]:
+def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
     # Generate signatures for joining community with selected addresses to reveal
     # Address must correspond to a non-chat and non-watch account
     sign_params = backend.wakuext_service.generate_joining_community_requests_for_signing(backend.public_key, community_id, addresses)
@@ -83,7 +82,14 @@ class TestCommunityTokenPermissions(MessengerSteps):
     def fund_backend_account_with_snt(self, backend, foundry_client, amount=10):
         """Fund the given backend's first account with the specified amount of SNT tokens."""
         accounts = backend.accounts_service.get_accounts()
-        member_address = accounts[0]["address"]
+        assert accounts, "No accounts found"
+        assert len(accounts) == 2  # Chat and Wallet accounts
+
+        # Select non-chat account
+        wallet_account = next(a for a in accounts if not a.get("chat"))
+        assert wallet_account, "No wallet account found"
+
+        member_address = wallet_account["address"]
         token_amount = str(amount * 10**18)  # amount tokens with 18 decimals
         gen_tokens_result = foundry_client.generate_tokens(self.snt_controller_address, member_address, token_amount, user_1.private_key)
         logging.debug(f"Generate tokens result: exit_code={gen_tokens_result.exit_code}, output={gen_tokens_result.output.decode()}")
@@ -98,7 +104,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         balance = int(balance_result.output.decode().strip(), 16)
         assert balance >= min_wei, f"Insufficient SNT balance: {balance}, expected at least 1 token"
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7161")
     def test_membership_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens can successfully join community as member"""
 
@@ -113,34 +118,36 @@ class TestCommunityTokenPermissions(MessengerSteps):
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
+        # Wait shortly to ensure that we fetch community with token permissions
+        # TODO: Remove this sleep somehow
+        time.sleep(2)
+
         # Fetch community as member
         self.fetch_community(member_with_snt_backend, community_id)
 
         # Member tries to join with their wallet address (should have tokens)
-        join_req = member_with_snt_backend.wakuext_service.request_to_join_community(community_id, member_address)
+        join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
         requests = join_req.get("requestsToJoinCommunity", [])
+        assert requests, "No requests to join community"
+        assert len(requests) == 1, "Unexpected multiple requests to join community"
 
-        if requests:
-            req_id = requests[0].get("id")
-            # Since member has valid tokens, request should not be declined
-            # Wait for token validation to complete, then try to accept directly
+        req_id = requests[0].get("id")
+        print(f"Sent request to join community {community_id} with id {req_id}")
 
-            received_signal = owner_backend.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
-            logger.info(f"Received signal: {received_signal}")
+        # Wait for the request to join to be received
+        owner_backend.wait_for_signal_predicate(
+            signal_type=SignalType.MESSAGES_NEW,
+            predicate=lambda s: (s.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
+        )
 
-            def try_accept_request(req_id):
-                resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
-                return resp if resp is not None else None
-
-            accept_resp = retry_call(try_accept_request, req_id)
-
-            # accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
-            assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
+        # Accept request to join
+        owner_backend.wakuext_service.accept_request_to_join_community(req_id)
 
         # Verify member is now in community (check from owner's perspective since acceptance happened there)
         communities = owner_backend.wakuext_service.communities()
         owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
+
         # Check that member is in the community members list
         member_public_key = member_with_snt_backend.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
@@ -183,7 +190,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
         # Member with tokens requests to join community
-        join_resp = member_with_snt_backend.wakuext_service.request_to_join_community(community_id, member_address)
+        join_resp = member_with_snt_backend.wakuext_service.request_to_join_community(community_id, [member_address])
         requests = join_resp.get("requestsToJoinCommunity", [])
         assert requests, "No requests to join community"
         assert len(requests) == 1, "Unexpected multiple requests to join community"
