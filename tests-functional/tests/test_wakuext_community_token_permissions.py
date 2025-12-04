@@ -28,7 +28,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         """Initialize backends for token permission tests"""
         self.owner = backend_new_profile("owner")
         self.member = backend_new_profile("member")
-        self.non_member = backend_new_profile("non_member")
         self.fake_address = "0x" + "0" * 40  # Fake address for testing
 
         # Deploy SNT token for tests that need it
