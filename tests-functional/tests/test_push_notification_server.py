@@ -53,35 +53,37 @@ def expect_push_notification(gorush, sender, receiver):
 @pytest.mark.rpc
 class TestPushNotificationServer(MessengerSteps):
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        """Initialize two backends (alice and bob) for each test function"""
-        self.sender = backend_new_profile("alice")
-        self.receiver = backend_new_profile("bob")
+    @pytest.fixture()
+    def sender(self, backend_new_profile):
+        """Backend for Alice (push notification sender/receiver)."""
+        return backend_new_profile("alice")
 
-    def test_push_notification_delivery(self, push_notification_server):
+    @pytest.fixture()
+    def receiver(self, backend_new_profile):
+        """Backend for Bob (push notification sender/receiver)."""
+        return backend_new_profile("bob")
+
+    def test_push_notification_delivery(self, push_notification_server, sender, receiver):
         server, gorush = push_notification_server
-        alice = self.sender
-        bob = self.receiver
 
         # Register devices
-        alice.device_platform = PushNotificationRegistrationTokenType.APN_TOKEN
-        alice.wakuext_service.register_for_push_notifications(alice.device_id, APN_TOPIC, alice.device_platform)
+        sender.device_platform = PushNotificationRegistrationTokenType.APN_TOKEN
+        sender.wakuext_service.register_for_push_notifications(sender.device_id, APN_TOPIC, sender.device_platform)
 
-        bob.device_platform = PushNotificationRegistrationTokenType.FIREBASE_TOKEN
-        bob.wakuext_service.register_for_push_notifications(bob.device_id, APN_TOPIC, bob.device_platform)
+        receiver.device_platform = PushNotificationRegistrationTokenType.FIREBASE_TOKEN
+        receiver.wakuext_service.register_for_push_notifications(receiver.device_id, APN_TOPIC, receiver.device_platform)
 
         # There is currently no way to reliably check if the devices have been registered, so we just wait a few seconds
         time.sleep(10)
 
         # Make contacts, this should force delivery of a push notification
-        self.make_contacts(alice, bob)
-        expect_push_notification(gorush, alice, bob)
+        self.make_contacts(sender, receiver)
+        expect_push_notification(gorush, sender, receiver)
 
         # Send a message from Alice to Bob
-        alice.wakuext_service.send_one_to_one_message(bob.public_key, f"Message {uuid.uuid4()}")
-        expect_push_notification(gorush, alice, bob)
+        sender.wakuext_service.send_one_to_one_message(receiver.public_key, f"Message {uuid.uuid4()}")
+        expect_push_notification(gorush, sender, receiver)
 
         # Send a message from Bob to Alice
-        bob.wakuext_service.send_one_to_one_message(alice.public_key, f"Message {uuid.uuid4()}")
-        expect_push_notification(gorush, bob, alice)
+        receiver.wakuext_service.send_one_to_one_message(sender.public_key, f"Message {uuid.uuid4()}")
+        expect_push_notification(gorush, receiver, sender)

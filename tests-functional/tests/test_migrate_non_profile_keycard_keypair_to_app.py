@@ -6,14 +6,14 @@ from resources.constants import keycard_1, user_1, wallet_account_details_deriva
 @pytest.mark.rpc
 class TestMigrateNonProfileKeycardKeypairToApp:
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        self.account = backend_new_profile("sender")
+    @pytest.fixture()
+    def account(self, backend_new_profile):
+        return backend_new_profile("account-backend")
 
-    def test_full_migrate_flow(self):
+    def test_full_migrate_flow(self, account):
         # 1) Add a seed-derived keypair (simulates a keypair that will later be converted to a keycard)
-        add_resp = self.account.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, self.account.password, keypair_name, wallet_account_details_derivation
+        add_resp = account.accounts_service.add_keypair_via_seed_phrase(
+            user_1.passphrase, account.password, keypair_name, wallet_account_details_derivation
         )
         assert "error" not in add_resp
         add_result = add_resp
@@ -33,34 +33,34 @@ class TestMigrateNonProfileKeycardKeypairToApp:
         addresses = [kc["accounts-addresses"][0], add_result.get("derived-from")]
 
         for address in addresses:
-            resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
+            resp = account.accounts_service.verify_keystore_file_for_account(address, account.password)
             assert resp is True
 
-        self.account.accounts_service.save_or_update_keycard(kc, self.account.password)
+        account.accounts_service.save_or_update_keycard(kc, account.password)
 
         for address in addresses:
-            resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
+            resp = account.accounts_service.verify_keystore_file_for_account(address, account.password)
             assert resp is False
 
         # verify keycard present
-        keycards_before = self.account.accounts_service.get_all_known_keycards()
+        keycards_before = account.accounts_service.get_all_known_keycards()
         kcs = keycards_before
         matching = [x for x in kcs if x.get("keycard-uid") == kc["keycard-uid"]]
         assert len(matching) == 1
 
-        kp_resp = self.account.accounts_service.get_keypair_by_key_uid(key_uid)
+        kp_resp = account.accounts_service.get_keypair_by_key_uid(key_uid)
 
         # 3) Migrate the non-profile keycard keypair to app (full flow)
-        migrate_resp = self.account.accounts_service.migrate_non_profile_keycard_keypair_to_app(user_1.passphrase, self.account.password)
+        migrate_resp = account.accounts_service.migrate_non_profile_keycard_keypair_to_app(user_1.passphrase, account.password)
         # many RPC "void" actions return result None
         assert migrate_resp is None
 
         for address in addresses:
-            resp = self.account.accounts_service.verify_keystore_file_for_account(address, self.account.password)
+            resp = account.accounts_service.verify_keystore_file_for_account(address, account.password)
             assert resp is True
 
         # 4) Verify the keypair still exists and that its keycards list is empty (i.e. migrated off keycard)
-        kp_resp = self.account.accounts_service.get_keypair_by_key_uid(key_uid)
+        kp_resp = account.accounts_service.get_keypair_by_key_uid(key_uid)
         assert kp_resp is not None
         # after migration the keypair should no longer have keycards linked
         assert isinstance(kp_resp.get("keycards"), list)
