@@ -17,6 +17,10 @@ from utils.config import Config
 DATA_DIR = "/usr/status-user"
 
 
+def _localhost(ipv6: bool):
+    return "::1" if ipv6 else "127.0.0.1"
+
+
 class StatusGoContainer:
     all_containers = []
     container = None
@@ -351,6 +355,45 @@ class StatusGoContainer:
             raise e
 
 
+class PortsMapping:
+    def __init__(self, container_port: int):
+        self.container_port = container_port
+        self.host_port = StatusGoContainer.acquire_port()
+
+    def host_url(self, ipv6: bool):
+        if ipv6:
+            return f"http://[::1]:{self.host_port}"
+        return f"http://127.0.0.1:{self.host_port}"
+
+
+class StatusPortsMappings:
+    def __init__(self, backend_port: int, media_server_port: int = 0, connector_port: int | None = None):
+        self.backend = PortsMapping(backend_port)
+        self.media_server = PortsMapping(media_server_port)
+        self.connector = PortsMapping(connector_port) if connector_port else None
+
+    def ipv6_ports(self):
+        ports = {
+            f"{self.backend.container_port}/tcp": [{"HostIp": "::", "HostPort": str(self.backend.host_port)}],
+            f"{self.media_server.container_port}/tcp": [{"HostIp": "::", "HostPort": str(self.media_server.host_port)}],
+        }
+        if self.connector:
+            ports[f"{self.connector.container_port}/tcp"] = [{"HostIp": "::", "HostPort": str(self.connector.host_port)}]
+        return ports
+
+    def ipv4_ports(self):
+        ports = {
+            f"{self.backend.container_port}/tcp": str(self.backend.host_port),
+            f"{self.media_server.container_port}/tcp": str(self.media_server.host_port),
+        }
+        if self.connector:
+            ports[f"{self.connector.container_port}/tcp"] = str(self.connector.host_port)
+        return ports
+
+    def ports(self, ipv6: bool):
+        return self.ipv6_ports() if ipv6 else self.ipv4_ports()
+
+
 class PushNotificationServerContainer(StatusGoContainer):
     def __init__(self, identity, gorush_port):
         entrypoint = [
@@ -375,49 +418,27 @@ class StatusBackendContainer(StatusGoContainer):
     def __init__(self, privileged=False, ipv6=False, **kwargs):
         connector_enabled = kwargs.get("connector_enabled", False)
 
-        host_port = StatusGoContainer.acquire_port()
-        connector_ws_port = StatusGoContainer.acquire_port() if connector_enabled else 0
-        self.media_server_port = StatusGoContainer.acquire_port()
+        self.ipv6 = ipv6
+        self.ports = StatusPortsMappings(
+            backend_port=3333,
+            media_server_port=constants.STATUS_MEDIA_SERVER_PORT,
+            connector_port=(constants.STATUS_CONNECTOR_WS_PORT if connector_enabled else None),
+        )
 
-        container_port = 3333
         entrypoint = [
             "status-backend",
             "--address",
-            f"0.0.0.0:{container_port}" if not ipv6 else f"[::]:{container_port}",
+            f"0.0.0.0:{self.ports.backend.container_port}" if not ipv6 else f"[::]:{self.ports.backend.container_port}",
             "--pprof",
             "true" if kwargs.get("pprof_enabled", False) else "false",
         ]
 
-        self.ipv6 = ipv6
+        self.url = f"http://{_localhost(ipv6)}:{self.ports.backend.host_port}"
+        self.connector_ws_url = f"ws://{_localhost(ipv6)}:{self.ports.connector.host_port}" if self.ports.connector else ""
 
-        if ipv6:
-            ports = {
-                f"{container_port}/tcp": [
-                    {"HostIp": "::", "HostPort": str(host_port)},
-                ],
-                f"{constants.STATUS_MEDIA_SERVER_PORT}/tcp": [
-                    {"HostIp": "::", "HostPort": str(self.media_server_port)},
-                ],
-            }
-            if connector_enabled:
-                ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = [{"HostIp": "::", "HostPort": str(connector_ws_port)}]
+        super().__init__(entrypoint, self.ports.ports(ipv6), privileged, container_name_suffix=f"-status-backend-{self.ports.backend.host_port}")
 
-            self.url = f"http://[::1]:{host_port}"
-            self.connector_ws_url = f"ws://[::1]:{connector_ws_port}"
-        else:
-            ports = {
-                f"{container_port}/tcp": str(host_port),
-                f"{constants.STATUS_MEDIA_SERVER_PORT}/tcp": str(self.media_server_port),
-            }
-            if connector_enabled:
-                ports[f"{constants.STATUS_CONNECTOR_WS_PORT}/tcp"] = str(connector_ws_port)
-            self.url = f"http://127.0.0.1:{host_port}"
-            self.connector_ws_url = f"ws://127.0.0.1:{connector_ws_port}"
-
-        super().__init__(entrypoint, ports, privileged, container_name_suffix=f"-status-backend-{host_port}")
-
-        bridge_network = kwargs.get("bridge_network", False)
-        if bridge_network:
+        if kwargs.get("bridge_network", False):
             self.connect_to_bridge_network()
 
     def _change_ip(self, new_ipv4=None, new_ipv6=None):

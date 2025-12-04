@@ -163,7 +163,7 @@ func (s *MediaServer) Start() error {
 
 	port := s.Server.GetPort()
 	s.logger.Info("media server started",
-		zap.Int("listeningPort", port),
+		zap.String("listeningAddress", s.Server.GetListeningAddrPort()),
 		zap.String("advertisingAddress", s.Server.GetAddrPort()))
 	signal.SendMediaServerStarted(port)
 
