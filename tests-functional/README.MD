@@ -135,16 +135,26 @@ The main backend factory fixture:
   import pytest
 
   class TestMessenger:
-      @pytest.fixture(autouse=True)
-      def setup_backends(self, backend_factory):
-          self.sender = backend_factory("sender")
-          self.receiver = backend_factory("receiver")
+      @pytest.fixture()
+      def sender(self, backend_factory):
+          return backend_factory("sender")
 
-      def test_send_message(self):
-          # Use self.sender and self.receiver in your test
-          self.sender.send_message(self.receiver, "Hello!")
-          assert self.receiver.has_received_message("Hello!")
+      @pytest.fixture()
+      def receiver(self, backend_factory):
+          return backend_factory("receiver")
+
+      def test_send_message(self, sender, receiver):
+          sender.send_message(receiver, "Hello!")
+          assert receiver.has_received_message("Hello!")
   ```
+
+  # Or with parameters (using `indirect` parametrization of `backend_factory`):
+  ```python
+  @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+  def test_with_params(self, sender, receiver):
+      ...  # use sender/receiver created by parametrized backend_factory
+  ```
+
   All containers created by this fixture are automatically stopped and removed after the test.
 
 #### 2. Specialized Backend Fixtures

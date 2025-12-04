@@ -18,17 +18,30 @@ def backend_factory(request):
     Individual backend factory that creates backends one by one.
     Each backend is created separately and all are cleaned up at the end.
 
-    Usage:
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_factory):
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+    Recommended usage pattern with explicit fixtures:
+
+    ```python
+    import pytest
+
+    class TestMessenger:
+        @pytest.fixture()
+        def sender(self, backend_factory):
+            return backend_factory("sender")
+
+        @pytest.fixture()
+        def receiver(self, backend_factory):
+            return backend_factory("receiver")
+
+        def test_send_message(self, sender, receiver):
+            sender.send_message(receiver, "Hello!")
+    ```
 
     # Or with parameters:
+    ```python
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_with_params(self, backend_factory):
-        self.sender = backend_factory("sender")
-        self.receiver = backend_factory("receiver")
+    def test_with_params(self, sender, receiver):
+        ...  # use sender/receiver created by parametrized backend_factory
+    ```
     """
 
     # Get parameters from request.param if available
