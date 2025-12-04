@@ -311,12 +311,12 @@ class WakuextService(Service):
         response = self.rpc_request("fetchCommunity", params)
         return response
 
-    def request_to_join_community(self, community_id: str, address: str, signatures: list[str]):
+    def request_to_join_community(self, community_id: str, address: list[str], signatures: list[str]):
         params = [
             {
                 "communityId": community_id,
-                "addressesToReveal": [address],
-                "airdropAddress": address,
+                "addressesToReveal": address,
+                "airdropAddress": address[0],
                 "signatures": signatures,
             }
         ]
