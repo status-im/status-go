@@ -76,6 +76,13 @@ func (s *Server) GetPort() int {
 	return s.address.Port
 }
 
+func (s *Server) GetListeningAddrPort() string {
+	if s.address == nil {
+		return ""
+	}
+	return s.address.String()
+}
+
 func (s *Server) GetCert() *tls.Certificate {
 	return s.config.Cert
 }
