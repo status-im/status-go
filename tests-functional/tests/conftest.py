@@ -4,10 +4,10 @@ from uuid import uuid4
 import pytest
 from requests import ReadTimeout
 
-from clients.status_backend import StatusBackend
 from clients.anvil import Anvil
-from clients.foundry import Foundry
 from clients.contract_deployers.multicall3 import Multicall3Deployer
+from clients.foundry import Foundry
+from clients.status_backend import StatusBackend
 from resources.constants import USE_IPV6
 from utils import fake
 
@@ -98,6 +98,7 @@ def backend_new_profile(request, backend_factory):
         backend.create_account_and_login(password=password, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
+        backend.wallet_service.start_wallet()
         return backend
 
     yield factory
@@ -122,6 +123,7 @@ def backend_recovered_profile(request, backend_factory):
         backend.restore_account_and_login(user=user, waku_light_client=waku_light_client, **kwargs)
         backend.wait_for_login()
         backend.wakuext_service.start_messenger()
+        backend.wallet_service.start_wallet()
         return backend
 
     yield _backend_recovered_profile
