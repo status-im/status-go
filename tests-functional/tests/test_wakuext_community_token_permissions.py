@@ -28,7 +28,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         """Initialize backends for token permission tests"""
         self.owner = backend_new_profile("owner")
         self.member = backend_new_profile("member")
-        self.fake_address = "0x" + "0" * 40  # Fake address for testing
 
         # Deploy SNT token for tests that need it
         self.snt_deployer = SNTDeployer(foundry_client)
@@ -95,7 +94,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         self.fetch_community(self.member, community_id)
 
         # Member tries to join without tokens - should fail at request time
-        join_req = self.member.wakuext_service.request_to_join_community(community_id, self.fake_address)
+        fake_address = "0x" + "0" * 40
+        join_req = self.member.wakuext_service.request_to_join_community(community_id, fake_address)
         requests = join_req.get("requestsToJoinCommunity", [])
         if requests:
             # If request was created, check that it gets declined
