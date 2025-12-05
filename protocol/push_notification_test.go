@@ -11,13 +11,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
+	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -932,6 +936,20 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 		}
 		return nil
 	})
+
+	ctrl := gomock.NewController(s.T())
+	accountsManagerMock := mock_protocol_accounts_manager.NewMockAccountsManager(ctrl)
+	accountsManagerMock.EXPECT().GetVerifiedWalletAccount(gomock.Any(), gomock.Any()).
+		Return(generator.NewAccount(nil, nil), nil).AnyTimes()
+
+	alice.accountsManager = accountsManagerMock
+
+	// add wallet account with keypair
+	kp, _, _, err := accounts.GetProfileKeypairForTest(false, true, false)
+	s.Require().NoError(err)
+	kp.Accounts[0].Address = types.HexToAddress(aliceAddress1)
+	err = alice.settings.SaveOrUpdateKeypair(kp)
+	s.Require().NoError(err)
 
 	request := createRequestToJoinCommunity(&s.Suite, community.ID(), alice, alicePassword, []string{aliceAddress1})
 	alice.communitiesManager.PermissionChecker = &testPermissionChecker{}
