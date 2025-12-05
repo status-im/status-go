@@ -248,31 +248,11 @@ func (n *StatusNode) StartLocalBackup() error {
 
 	privateKey := chatAccount.PrivateKey()
 
-	filenameGetter := func() (string, error) {
-		backupPath, err := n.accountsSrvc.GetBackupPath()
-		if err != nil {
-			return "", err
-		}
-
-		compressedPubKey, err := utils.SerializePublicKey(crypto.CompressPubkey(&privateKey.PublicKey))
-		if err != nil {
-			return "", err
-		}
-
-		if backupPath == "" {
-			return "", errors.New("backup path is not set")
-		}
-
-		fullPath := filepath.Join(backupPath, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
-
-		return fullPath, nil
-	}
-
 	n.localBackup, err = backup.NewController(backup.BackupConfig{
-		PrivateKey:     crypto.Keccak256(crypto.FromECDSA(privateKey)),
-		FileNameGetter: filenameGetter,
-		BackupEnabled:  true,
-		Interval:       time.Minute * 30,
+		PrivateKey:       crypto.Keccak256(crypto.FromECDSA(privateKey)),
+		FileNameProvider: n,
+		BackupEnabled:    true,
+		Interval:         time.Minute * 30,
 	}, n.logger.Named("LocalBackup"))
 	if err != nil {
 		return err
@@ -293,6 +273,33 @@ func (n *StatusNode) StartLocalBackup() error {
 	n.localBackup.Start()
 
 	return nil
+}
+
+func (n *StatusNode) GetBackupFilename() (string, error) {
+	chatAccount, err := n.gethAccountsManager.SelectedChatAccount()
+	if err != nil {
+		return "", err
+	}
+
+	privateKey := chatAccount.PrivateKey()
+
+	backupPath, err := n.accountsSrvc.GetBackupPath()
+	if err != nil {
+		return "", err
+	}
+
+	compressedPubKey, err := utils.SerializePublicKey(crypto.CompressPubkey(&privateKey.PublicKey))
+	if err != nil {
+		return "", err
+	}
+
+	if backupPath == "" {
+		return "", errors.New("backup path is not set")
+	}
+
+	fullPath := filepath.Join(backupPath, fmt.Sprintf("%s_user_data.bkp", compressedPubKey[len(compressedPubKey)-6:]))
+
+	return fullPath, nil
 }
 
 func (n *StatusNode) PerformLocalBackup() (string, error) {

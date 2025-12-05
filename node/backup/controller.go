@@ -14,11 +14,17 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
+//go:generate go tool mockgen -package=mock_backup_controller -source controller.go -destination=mock/mock_backup_controller.go
+
 type BackupConfig struct {
-	PrivateKey     []byte
-	FileNameGetter func() (string, error)
-	BackupEnabled  bool
-	Interval       time.Duration
+	PrivateKey       []byte
+	FileNameProvider FilenameProvider
+	BackupEnabled    bool
+	Interval         time.Duration
+}
+
+type FilenameProvider interface {
+	GetBackupFilename() (string, error)
 }
 
 type BackupProvider interface {
@@ -52,8 +58,8 @@ func NewController(config BackupConfig, logger *zap.Logger) (*Controller, error)
 	if len(config.PrivateKey) == 0 {
 		return nil, errors.New("private key must be provided")
 	}
-	if config.FileNameGetter == nil {
-		return nil, errors.New("filename getter must be provided")
+	if common.IsNil(config.FileNameProvider) {
+		return nil, errors.New("filename provider must be provided")
 	}
 
 	return &Controller{
@@ -111,7 +117,7 @@ func (c *Controller) PerformBackup() (string, error) {
 		return "", err
 	}
 
-	fileName, err := c.config.FileNameGetter()
+	fileName, err := c.config.FileNameProvider.GetBackupFilename()
 	if err != nil {
 		return "", err
 	}
