@@ -103,6 +103,35 @@ class TestCommunityTokenPermissions(MessengerSteps):
         balance = int(balance_result.output.decode().strip(), 16)
         assert balance >= min_wei, f"Insufficient SNT balance: {balance}, expected at least 1 token"
 
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
+    def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
+        """Test that join request with no tokens/fake address fails permission check (no request created)"""
+
+        # Owner creates token-gated community
+        community_id = self.create_token_gated_community(owner_backend, membership=CommunityPermissionsAccess.MANUAL_ACCEPT)
+
+        time.sleep(2)
+
+        # Fetch community as member
+        self.fetch_community(member_backend, community_id)
+
+        # Member tries to join without tokens and with fake address - should fail permission check
+        fake_address = "0x" + "0" * 40
+
+        # Verify request got rejected right away - no request created
+        join_req = request_to_join_with_signatures(member_backend, community_id, [fake_address])
+        requests = join_req.get("requestsToJoinCommunity", [])
+        assert len(requests) == 0, "No request should get accepted"
+
+        # Verify no declined requests created
+        declined_reqs = owner_backend.wakuext_service.declined_requests_to_join_for_community(community_id)
+        assert len(declined_reqs) == 0
+
+        # Verify member is not in community
+        communities = member_backend.wakuext_service.communities()
+        member_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
+        assert member_community is None or not member_community.get("joined", False)
+
     def test_membership_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens can successfully join community as member"""
 
@@ -131,7 +160,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert len(requests) == 1, "Unexpected multiple requests to join community"
 
         req_id = requests[0].get("id")
-        print(f"Sent request to join community {community_id} with id {req_id}")
+        logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
         # Wait for the request to join to be received
         owner_backend.wait_for_signal_predicate(
