@@ -115,25 +115,35 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         if self.container:
             self.container.shutdown(log_sufix)
 
-        if not self.container and Config.logs_dir:
-            timestamp = time.time()
-            log_identifier = self.base_url.replace("http://", "").replace(":", "-")
-            log_name = f"status-backend_{timestamp}_{log_sufix}_{log_identifier}"
-
-            # Create logs subdirectory
-            log_dir_path = os.path.join(Config.logs_dir, log_name)
-            os.makedirs(log_dir_path, exist_ok=True)
-
-            # Copy all .log files from data_dir to log_dir_path
-            for filename in os.listdir(self.data_dir):
-                if not filename.endswith(".log"):
-                    continue
-                src_path = os.path.join(self.data_dir, filename)
-                dst_path = os.path.join(log_dir_path, filename)
-                shutil.copy2(src_path, dst_path)
+        if Config.logs_dir:
+            try:
+                self._export_logs(Config.logs_dir, log_sufix)
+            except Exception as e:
+                logging.warning(f"Failed to export logs: {e}")
 
         if self.temp_dir is not None:
             self.temp_dir.cleanup()
+
+    def _export_logs(self, logs_dir: str, log_sufix: str):
+        if self.container:
+            # Container logs are exported by StatusGoContainer
+            return
+
+        timestamp = time.time()
+        log_identifier = self.base_url.replace("http://", "").replace(":", "-")
+        log_name = f"status-backend_{timestamp}_{log_sufix}_{log_identifier}"
+
+        # Create logs subdirectory
+        log_dir_path = os.path.join(logs_dir, log_name)
+        os.makedirs(log_dir_path, exist_ok=True)
+
+        # Copy all .log files from data_dir to log_dir_path
+        for filename in os.listdir(self.data_dir):
+            if not filename.endswith(".log"):
+                continue
+            src_path = os.path.join(self.data_dir, filename)
+            dst_path = os.path.join(log_dir_path, filename)
+            shutil.copy2(src_path, dst_path)
 
     @retry(
         stop=stop_after_delay(10),
