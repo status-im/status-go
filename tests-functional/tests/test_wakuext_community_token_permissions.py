@@ -180,7 +180,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_public_key = member_with_snt_backend.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
-    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
     def test_admin_token_permissions_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens get admin privileges"""
 
