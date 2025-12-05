@@ -45,17 +45,18 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	"github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	gowakutimesource "github.com/waku-org/go-waku/waku/v2/timesource"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/waku-org/waku-go-bindings/waku"
 	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
+	wakutimesource "github.com/waku-org/waku-go-bindings/waku/timesource"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
@@ -65,7 +66,6 @@ import (
 	"github.com/status-im/status-go/messaging/waku/common"
 	"github.com/status-im/status-go/messaging/waku/types"
 
-	"github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
@@ -155,7 +155,7 @@ type Waku struct {
 
 	logger *zap.Logger
 
-	timesource gowakutimesource.Timesource
+	timesource wakutimesource.Timesource
 
 	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
 	// bootnodes successfully
@@ -209,7 +209,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		}
 	}
 
-	var wakuTimeSource gowakutimesource.Timesource
+	var wakuTimeSource wakutimesource.Timesource
 	if ts != nil {
 		wakuTimeSource = timesourceAdapter{ts}
 	} else {
