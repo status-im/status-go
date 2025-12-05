@@ -1264,7 +1264,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 	}
 
 	if len(addressesToReveal) == 0 {
-		return nil, nil
+		return nil, errors.New("no addresses to reveal")
 	}
 
 	walletAccountsMap := make(map[string]*accsmanagementtypes.Account, len(walletAccounts))
@@ -1361,7 +1361,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	// TODO: Because of changes that need to be done in tests, calling this function and providing `request` without `AddressesToReveal`
 	//       is not an error, but it should be.
 	logger := m.logger.Named("RequestToJoinCommunity")
-	logger.Debug("Addresses to reveal", zap.Any("Addresses:", request.AddressesToReveal))
+	logger.Debug("addresses to reveal", zap.Strings("addresses", request.AddressesToReveal))
 
 	if err := request.Validate(); err != nil {
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
