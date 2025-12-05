@@ -28,7 +28,7 @@ type MessengerDeleteMessageForEveryoneSuite struct {
 func (s *MessengerDeleteMessageForEveryoneSuite) SetupTest() {
 	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 	s.admin = s.newMessenger("", []string{})
-	s.bob = s.newMessenger(bobPassword, []string{bobPassword})
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress})
 	s.moderator = s.newMessenger(aliceAccountAddress, []string{aliceAddress1})
 
 	_, err := s.admin.Start()
