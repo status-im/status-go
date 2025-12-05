@@ -111,7 +111,7 @@ func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress *wallet.S
 	return
 }
 
-func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMessage *protobuf.SyncSavedAddress, statusMessage *common.StatusMessage) (err error) {
+func (m *Messenger) HandleSyncSavedAddress(ctx context.Context, state *ReceivedMessageState, syncMessage *protobuf.SyncSavedAddress, statusMessage *common.StatusMessage) (err error) {
 	address := gethcommon.BytesToAddress(syncMessage.Address)
 	if syncMessage.Removed {
 		deleted, err := m.savedAddressesManager.DeleteSavedAddress(

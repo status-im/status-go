@@ -2,18 +2,20 @@ package encryption
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
 	"github.com/status-im/status-go/messaging/layers/encryption/publisher"
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
@@ -78,6 +80,7 @@ type Protocol struct {
 	subscriptions *Subscriptions
 
 	logger *zap.Logger
+	tracer trace.Tracer
 }
 
 var (
@@ -91,12 +94,14 @@ func New(
 	persistence Persistence,
 	installationID string,
 	logger *zap.Logger,
+	tracer trace.Tracer,
 ) *Protocol {
 	return NewWithEncryptorConfig(
 		persistence,
 		installationID,
 		defaultEncryptorConfig(installationID, logger),
 		logger,
+		tracer,
 	)
 }
 
@@ -107,7 +112,9 @@ func NewWithEncryptorConfig(
 	installationID string,
 	encryptorConfig encryptorConfig,
 	logger *zap.Logger,
+	tracer trace.Tracer,
 ) *Protocol {
+	encryptorConfig.Tracer = tracer
 	return &Protocol{
 		encryptor: newEncryptor(persistence, encryptorConfig),
 		secret:    sharedsecret.New(persistence.SharedSecretStorage(), logger),
@@ -118,6 +125,7 @@ func NewWithEncryptorConfig(
 		}),
 		publisher: publisher.New(logger),
 		logger:    logger.With(zap.Namespace("Protocol")),
+		tracer:    tracer,
 	}
 }
 
@@ -342,7 +350,14 @@ func (p *Protocol) BuildHashRatchetReKeyGroupMessage(myIdentityKey *ecdsa.Privat
 
 // BuildHashRatchetKeyExchangeMessage builds a 1:1 message
 // containing newly generated hash ratchet key
-func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, ratchets []*HashRatchetKeyCompatibility) (*ProtocolMessageSpec, error) {
+func (p *Protocol) BuildHashRatchetKeyExchangeMessage(ctx context.Context, myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, ratchets []*HashRatchetKeyCompatibility) (*ProtocolMessageSpec, error) {
+	_, span := p.tracer.Start(ctx, "Protocol.BuildHashRatchetKeyExchangeMessage",
+		oteltrace.WithAttributes(
+			otelattribute.String("groupID", types.EncodeHex(groupID)),
+			otelattribute.Int("ratchetsCount", len(ratchets)),
+		),
+	)
+	defer span.End()
 
 	keys := p.GetHRKeys(ratchets)
 
@@ -463,7 +478,7 @@ func (p *Protocol) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, sender
 	return decrypt(ecryptedGrant, sharedKey)
 }
 
-func (p *Protocol) GetKeyExMessageSpecs(groupID []byte, identity *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, forceRekey bool) ([]*ProtocolMessageSpec, error) {
+func (p *Protocol) GetKeyExMessageSpecs(ctx context.Context, groupID []byte, identity *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, forceRekey bool) ([]*ProtocolMessageSpec, error) {
 	var ratchets []*HashRatchetKeyCompatibility
 	var err error
 	if !forceRekey {
@@ -481,7 +496,7 @@ func (p *Protocol) GetKeyExMessageSpecs(groupID []byte, identity *ecdsa.PrivateK
 	}
 	specs := make([]*ProtocolMessageSpec, len(recipients))
 	for i, recipient := range recipients {
-		keyExMsg, err := p.BuildHashRatchetKeyExchangeMessage(identity, recipient, groupID, ratchets)
+		keyExMsg, err := p.BuildHashRatchetKeyExchangeMessage(ctx, identity, recipient, groupID, ratchets)
 		if err != nil {
 			return nil, err
 		}
@@ -653,23 +668,23 @@ type DecryptMessageResponse struct {
 	HashRatchetInfo  []*HashRatchetInfo
 }
 
-func (p *Protocol) HandleHashRatchetKeysPayload(groupID, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
+func (p *Protocol) HandleHashRatchetKeysPayload(ctx context.Context, groupID []byte, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
 	keys := &HRKeys{}
 	err := proto.Unmarshal(encodedKeys, keys)
 	if err != nil {
 		return nil, err
 	}
-	return p.HandleHashRatchetKeys(groupID, keys, myIdentityKey, theirIdentityKey)
+	return p.HandleHashRatchetKeys(ctx, groupID, keys, myIdentityKey, theirIdentityKey)
 }
 
-func (p *Protocol) HandleHashRatchetHeadersPayload(encodedHeaders [][]byte) error {
+func (p *Protocol) HandleHashRatchetHeadersPayload(ctx context.Context, encodedHeaders [][]byte) error {
 	for _, encodedHeader := range encodedHeaders {
 		header := &HRHeader{}
 		err := proto.Unmarshal(encodedHeader, header)
 		if err != nil {
 			return err
 		}
-		_, err = p.HandleHashRatchetKeys(header.GroupId, header.Keys, nil, nil)
+		_, err = p.HandleHashRatchetKeys(ctx, header.GroupId, header.Keys, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -677,10 +692,16 @@ func (p *Protocol) HandleHashRatchetHeadersPayload(encodedHeaders [][]byte) erro
 	return nil
 }
 
-func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
+func (p *Protocol) HandleHashRatchetKeys(ctx context.Context, groupID []byte, keys *HRKeys, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
 	if keys == nil {
 		return nil, nil
 	}
+
+	_, span := p.tracer.Start(ctx, "Protocol.HandleHashRatchetKeys", oteltrace.WithAttributes(
+		otelattribute.String("groupID", types.EncodeHex(groupID)),
+		otelattribute.String("from", crypto.PubkeyToHex(theirIdentityKey)),
+	))
+	defer span.End()
 
 	var info []*HashRatchetInfo
 
@@ -699,7 +720,10 @@ func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentit
 		if err != nil {
 			return nil, err
 		}
-		p.logger.Debug("retrieved keys", zap.String("keyID", types.Bytes2Hex(keyID)))
+		p.logger.Debug("retrieved keys", zap.String("keyID", types.EncodeHex(keyID)))
+		span.AddEvent("retrieved key", oteltrace.WithAttributes(
+			otelattribute.String("keyID", types.EncodeHex(keyID)),
+		))
 
 		// Payload contains hash ratchet key
 		err = p.encryptor.persistence.SaveHashRatchetKey(ratchet)
@@ -731,7 +755,10 @@ func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentit
 			if err != nil {
 				return nil, err
 			}
-			p.logger.Debug("retrieved group keys", zap.String("keyID", types.Bytes2Hex(keyID)))
+			p.logger.Debug("retrieved group keys", zap.String("keyID", types.EncodeHex(keyID)))
+			span.AddEvent("retrieved group keys", oteltrace.WithAttributes(
+				otelattribute.String("keyID", types.EncodeHex(keyID)),
+			))
 			// Payload contains hash ratchet key
 			err = p.encryptor.persistence.SaveHashRatchetKey(ratchet)
 			if err != nil {
@@ -752,12 +779,14 @@ func (p *Protocol) HandleHashRatchetKeys(groupID []byte, keys *HRKeys, myIdentit
 
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
 func (p *Protocol) HandleMessage(
+	ctx context.Context,
 	myIdentityKey *ecdsa.PrivateKey,
 	theirPublicKey *ecdsa.PublicKey,
 	protocolMessage *ProtocolMessage,
 	messageID []byte,
 ) (*DecryptMessageResponse, error) {
 	logger := p.logger.With(zap.String("site", "HandleMessage"))
+
 	response := &DecryptMessageResponse{}
 
 	logger.Debug("received a protocol message",
@@ -790,6 +819,7 @@ func (p *Protocol) HandleMessage(
 	// Decrypt message
 	if encryptedMessage := protocolMessage.GetEncryptedMessage(); encryptedMessage != nil {
 		message, err := p.encryptor.DecryptPayload(
+			ctx,
 			myIdentityKey,
 			theirPublicKey,
 			protocolMessage.GetInstallationId(),
@@ -821,14 +851,14 @@ func (p *Protocol) HandleMessage(
 			if hrHeader != nil && hrHeader.SeqNo == 0 {
 				var hashRatchetKeys []*HashRatchetInfo
 				if hrHeader.Keys != nil {
-					hashRatchetKeys, err = p.HandleHashRatchetKeys(hrHeader.GroupId, hrHeader.Keys, myIdentityKey, theirPublicKey)
+					hashRatchetKeys, err = p.HandleHashRatchetKeys(ctx, hrHeader.GroupId, hrHeader.Keys, myIdentityKey, theirPublicKey)
 					if err != nil {
 						return nil, err
 					}
 
 				} else {
 					// For backward compatibility
-					hashRatchetKeys, err = p.HandleHashRatchetKeysPayload(hrHeader.GroupId, message, myIdentityKey, theirPublicKey)
+					hashRatchetKeys, err = p.HandleHashRatchetKeysPayload(ctx, hrHeader.GroupId, message, myIdentityKey, theirPublicKey)
 					if err != nil {
 						return nil, err
 					}
@@ -914,5 +944,5 @@ func (p *Protocol) DecryptWithHashRatchet(keyID []byte, seqNo uint32, payload []
 		return nil, ErrNoRatchetKey
 	}
 
-	return p.encryptor.DecryptWithHR(ratchet, seqNo, payload)
+	return p.encryptor.DecryptWithHR(context.Background(), ratchet, seqNo, payload)
 }

@@ -357,13 +357,13 @@ func (a *API) DecryptCommunityGrant(myIdentityKey *ecdsa.PrivateKey, senderKey *
 	return a.core.stack.Encryption.DecryptCommunityGrant(myIdentityKey, senderKey, grants)
 }
 
-func (a *API) HandleHashRatchetKeysPayload(groupID, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) error {
-	_, err := a.core.stack.Encryption.HandleHashRatchetKeysPayload(groupID, encodedKeys, myIdentityKey, theirIdentityKey)
+func (a *API) HandleHashRatchetKeysPayload(ctx context.Context, groupID, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) error {
+	_, err := a.core.stack.Encryption.HandleHashRatchetKeysPayload(ctx, groupID, encodedKeys, myIdentityKey, theirIdentityKey)
 	return err
 }
 
-func (a *API) HandleHashRatchetHeadersPayload(encodedHeaders [][]byte) error {
-	return a.core.stack.Encryption.HandleHashRatchetHeadersPayload(encodedHeaders)
+func (a *API) HandleHashRatchetHeadersPayload(ctx context.Context, encodedHeaders [][]byte) error {
+	return a.core.stack.Encryption.HandleHashRatchetHeadersPayload(ctx, encodedHeaders)
 }
 
 func (a *API) AddInstallation(identity []byte, timestamp int64, installation *types.Installation, enabled bool) ([]*types.Installation, error) {

@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -351,7 +352,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestEditSharedAddresses()
 		},
 	}
 
-	err = s.owner.HandleCommunityEditSharedAddresses(state, editMsg, nil)
+	err = s.owner.HandleCommunityEditSharedAddresses(context.Background(), state, editMsg, nil)
 	s.Require().Error(err, communities.ErrEditSharedAddressesRequestOutdated)
 }
 
@@ -891,7 +892,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestHandlingOutdatedPrivi
 		},
 	}
 
-	err = s.bob.HandleCommunityPrivilegedUserSyncMessage(state, syncMsg, nil)
+	err = s.bob.HandleCommunityPrivilegedUserSyncMessage(context.Background(), state, syncMsg, nil)
 	s.Require().NoError(err)
 
 	aliceRtj, err := s.bob.communitiesManager.GetRequestToJoinByPkAndCommunityID(s.alice.IdentityPublicKey(), community.ID())
@@ -909,7 +910,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestHandlingOutdatedPrivi
 		s.alice.IdentityPublicKeyString(): invalidAliceCommunityRtj,
 	}
 
-	err = s.bob.HandleCommunityPrivilegedUserSyncMessage(state, syncMsg, nil)
+	err = s.bob.HandleCommunityPrivilegedUserSyncMessage(context.Background(), state, syncMsg, nil)
 	s.Require().NoError(err)
 
 	aliceRtj, err = s.bob.communitiesManager.GetRequestToJoinByPkAndCommunityID(s.alice.IdentityPublicKey(), community.ID())

@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"math"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/common"
 	commonmigrations "github.com/status-im/status-go/messaging/common/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption"
@@ -109,6 +111,7 @@ func (s *ProcessorSuite) SetupTest() {
 		encryption.NewSQLitePersistence(db),
 		"installation-1",
 		s.logger,
+		trace.NewNoopTracer(),
 	)
 
 	stack.Reliability = reliability.NewReliability(
@@ -126,6 +129,7 @@ func (s *ProcessorSuite) SetupTest() {
 		common.NewSQLiteMessageConfirmationPersistence(db),
 		common.NewSQLiteHashRatchetPersistence(db),
 		s.logger,
+		trace.NewNoopTracer(),
 	)
 }
 
@@ -198,6 +202,7 @@ func (s *ProcessorSuite) TestProcessMessageDatasyncEncrypted() {
 		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
+		trace.NewNoopTracer(),
 	)
 
 	messageSpec, err := senderEncryptionProtocol.BuildEncryptedMessage(
@@ -243,6 +248,7 @@ func (s *ProcessorSuite) TestHandleOutOfOrderHashRatchet() {
 		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
+		trace.NewNoopTracer(),
 	)
 
 	ratchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(groupID)
@@ -250,7 +256,7 @@ func (s *ProcessorSuite) TestHandleOutOfOrderHashRatchet() {
 
 	ratchets := []*encryption.HashRatchetKeyCompatibility{ratchet}
 
-	hashRatchetKeyExchangeMessage, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(senderKey, &s.processor.identity.PublicKey, groupID, ratchets)
+	hashRatchetKeyExchangeMessage, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(context.Background(), senderKey, &s.processor.identity.PublicKey, groupID, ratchets)
 	s.Require().NoError(err)
 
 	encryptedPayload1, err := proto.Marshal(hashRatchetKeyExchangeMessage.Message)

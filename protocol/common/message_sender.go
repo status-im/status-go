@@ -6,11 +6,14 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging"
 	messagingevents "github.com/status-im/status-go/messaging/events"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -25,6 +28,7 @@ type MessageSender struct {
 	identity  *ecdsa.PrivateKey
 	messaging *messaging.API
 	logger    *zap.Logger
+	tracer    trace.Tracer
 	publisher *pubsub.Publisher
 
 	wg   sync.WaitGroup
@@ -35,11 +39,13 @@ func NewMessageSender(
 	identity *ecdsa.PrivateKey,
 	messaging *messaging.API,
 	logger *zap.Logger,
+	tracer trace.Tracer,
 ) *MessageSender {
 	return &MessageSender{
 		identity:  identity,
 		messaging: messaging,
 		logger:    logger,
+		tracer:    tracer,
 		publisher: pubsub.NewPublisher(),
 		quit:      make(chan struct{}),
 	}
@@ -126,6 +132,9 @@ func (s *MessageSender) SendPublic(
 	chatName string,
 	rawMessage RawMessage,
 ) ([]byte, error) {
+	ctx, span := s.tracer.Start(ctx, "MessageSender.SendPublic")
+	defer span.End()
+
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = s.identity
 	}
@@ -192,6 +201,10 @@ func (s *MessageSender) SendPublic(
 		zap.String("messageType", "public"),
 	)
 
+	if s.tracer.Enabled() {
+		linkSpanWithMessage(span, &rawMessage)
+	}
+
 	s.messaging.MetricsPushSentMessage(
 		rawMessage.PubsubTopic,
 		rawMessage.ContentTopic,
@@ -206,6 +219,9 @@ func (s *MessageSender) sendPrivate(
 	ctx context.Context,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
+	ctx, span := s.tracer.Start(ctx, "MessageSender.sendPrivate")
+	defer span.End()
+
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = s.identity
 	}
@@ -222,6 +238,9 @@ func (s *MessageSender) sendPrivate(
 	}
 
 	messageID := messagingtypes.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	if err = setMessageID(messageID, rawMessage); err != nil {
+		return nil, err
+	}
 
 	logger := s.logger.Named("sendPrivate").With(
 		zap.Stringer("messageID", messageID),
@@ -231,10 +250,6 @@ func (s *MessageSender) sendPrivate(
 		zap.Strings("recipients", crypto.PubkeysToHex(rawMessage.Recipients)),
 		zap.Stringer("contentType", rawMessage.MessageType),
 	)
-
-	if err = setMessageID(messageID, rawMessage); err != nil {
-		return nil, err
-	}
 
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
@@ -263,6 +278,10 @@ func (s *MessageSender) sendPrivate(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send private message")
 		}
+	}
+
+	if s.tracer.Enabled() {
+		linkSpanWithMessage(span, rawMessage)
 	}
 
 	s.messaging.MetricsPushSentMessage(
@@ -312,6 +331,9 @@ func (s *MessageSender) SendCommunity(
 	ctx context.Context,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
+	ctx, span := s.tracer.Start(ctx, "MessageSender.SendCommunity")
+	defer span.End()
+
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = s.identity
 	}
@@ -395,6 +417,10 @@ func (s *MessageSender) SendCommunity(
 		zap.Any("contentType", rawMessage.MessageType),
 	)
 
+	if s.tracer.Enabled() {
+		linkSpanWithMessage(span, rawMessage)
+	}
+
 	s.messaging.MetricsPushSentMessage(
 		rawMessage.PubsubTopic,
 		rawMessage.ContentTopic,
@@ -411,7 +437,14 @@ func (s *MessageSender) SendPairInstallation(
 	recipient *ecdsa.PublicKey,
 	rawMessage RawMessage,
 ) ([]byte, error) {
+	ctx, span := s.tracer.Start(ctx, "MessageSender.SendPairInstallation")
+	defer span.End()
+
 	s.logger.Debug("sending private message", zap.String("recipient", cryptotypes.EncodeHex(crypto.FromECDSAPub(recipient))))
+
+	if rawMessage.Sender == nil {
+		rawMessage.Sender = s.identity
+	}
 
 	wrappedMessage, err := wrapIntoAppLayerMessage(&rawMessage)
 	if err != nil {
@@ -419,6 +452,10 @@ func (s *MessageSender) SendPairInstallation(
 	}
 
 	messageID := messagingtypes.MessageID(&s.identity.PublicKey, wrappedMessage)
+	err = setMessageID(messageID, &rawMessage)
+	if err != nil {
+		return nil, err
+	}
 
 	s.notifyOnScheduledMessage(recipient, &rawMessage)
 
@@ -432,6 +469,10 @@ func (s *MessageSender) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to send private DH message")
 	}
 
+	if s.tracer.Enabled() {
+		linkSpanWithMessage(span, &rawMessage)
+	}
+
 	s.messaging.MetricsPushSentMessage(
 		rawMessage.PubsubTopic,
 		rawMessage.ContentTopic,
@@ -440,4 +481,18 @@ func (s *MessageSender) SendPairInstallation(
 	)
 
 	return messageID, nil
+}
+
+func linkSpanWithMessage(span oteltrace.Span, message *RawMessage) {
+	span.SetAttributes(
+		otelattribute.String("messageID", message.ID),
+		otelattribute.Stringer("messageType", message.MessageType),
+		otelattribute.String("sender", crypto.PubkeyToHex(&message.Sender.PublicKey)),
+		otelattribute.StringSlice("recipients", crypto.PubkeysToHex(message.Recipients)),
+		otelattribute.String("contentTopic", message.ContentTopic),
+		otelattribute.String("pubsubTopic", message.PubsubTopic),
+		otelattribute.Int("sendCount", message.SendCount),
+	)
+	linkSpanCtx := trace.DeriveSpanContext([]byte(message.ID), false)
+	span.AddLink(oteltrace.Link{SpanContext: linkSpanCtx})
 }

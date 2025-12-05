@@ -1372,7 +1372,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	}
 
 	response := state.Response
-	err = s.m.HandleChatMessage(state, &message, nil, false)
+	err = s.m.HandleChatMessage(context.Background(), state, &message, nil, false)
 	s.Require().NoError(err)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	contacts := s.m.Contacts()
@@ -1382,7 +1382,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	retract := protobuf.RetractContactRequest{
 		Clock: 2,
 	}
-	err = s.m.HandleRetractContactRequest(state, &retract, nil)
+	err = s.m.HandleRetractContactRequest(context.Background(), state, &retract, nil)
 	s.Require().NoError(err)
 
 	// Nothing should have changed
@@ -1433,7 +1433,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 
 	// Restore alice's contact from backup
 	sync := s.syncInstallationContactV2FromContact(aliceFromBob)
-	err = bob2.HandleSyncInstallationContactV2(state, &sync, nil)
+	err = bob2.HandleSyncInstallationContactV2(context.Background(), state, &sync, nil)
 	s.Require().NoError(err)
 
 	// Accept latest CR for a contact
@@ -1508,7 +1508,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 
 	// Restore alice's contact from backup
 	sync := s.syncInstallationContactV2FromContact(bobFromAlice)
-	err := alice2.HandleSyncInstallationContactV2(state, &sync, nil)
+	err := alice2.HandleSyncInstallationContactV2(context.Background(), state, &sync, nil)
 	s.Require().NoError(err)
 
 	// Accept latest CR for a contact

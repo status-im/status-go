@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
@@ -8,11 +9,13 @@ import (
 	"time"
 
 	dr "github.com/status-im/doubleratchet"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
 )
 
@@ -47,6 +50,7 @@ type encryptor struct {
 	messageIDs  map[string]*confirmationData
 	mutex       sync.Mutex
 	logger      *zap.Logger
+	tracer      trace.Tracer
 }
 
 type encryptorConfig struct {
@@ -63,6 +67,8 @@ type encryptorConfig struct {
 	BundleRefreshInterval int64
 	// The logging object
 	Logger *zap.Logger
+	// The tracer object
+	Tracer trace.Tracer
 }
 
 // defaultEncryptorConfig returns the default values used by the encryption service
@@ -79,6 +85,7 @@ func defaultEncryptorConfig(installationID string, logger *zap.Logger) encryptor
 		BundleRefreshInterval:    24 * 60 * 60 * 1000,
 		InstallationID:           installationID,
 		Logger:                   logger,
+		Tracer:                   trace.NewNoopTracer(),
 	}
 }
 
@@ -89,6 +96,7 @@ func newEncryptor(persistence Persistence, config encryptorConfig) *encryptor {
 		config:      config,
 		messageIDs:  make(map[string]*confirmationData),
 		logger:      config.Logger.With(zap.Namespace("encryptor")),
+		tracer:      config.Tracer,
 	}
 }
 
@@ -232,9 +240,19 @@ func (s *encryptor) GetMessage(msgs map[string]*EncryptedMessageProtocol) *Encry
 }
 
 // DecryptPayload decrypts the payload of a EncryptedMessageProtocol, given an identity private key and the sender's public key
-func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*EncryptedMessageProtocol, messageID []byte) ([]byte, error) {
+func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*EncryptedMessageProtocol, messageID []byte) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	ctx, span := s.tracer.Start(ctx, "Encryptor.DecryptPayload",
+		oteltrace.WithAttributes(
+			otelattribute.String("myIdentityKey", crypto.PubkeyToHex(&myIdentityKey.PublicKey)),
+			otelattribute.String("theirIdentityKey", crypto.PubkeyToHex(theirIdentityKey)),
+			otelattribute.String("myInstallationID", s.config.InstallationID),
+			otelattribute.String("theirInstallationID", theirInstallationID),
+		),
+	)
+	defer span.End()
 
 	msg := s.GetMessage(msgs)
 
@@ -333,10 +351,11 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 			ratchet.Timestamp = uint64(header.DeprecatedKeyId)
 		}
 
-		decryptedPayload, err := s.DecryptWithHR(ratchet, header.SeqNo, payload)
+		decryptedPayload, err := s.DecryptWithHR(ctx, ratchet, header.SeqNo, payload)
 
 		return decryptedPayload, err
 	}
+
 	return nil, errors.New("no key specified")
 }
 
@@ -695,11 +714,19 @@ func (s *encryptor) EncryptWithHR(ratchet *HashRatchetKeyCompatibility, payload 
 	return encryptedPayload, newSeqNo, nil
 }
 
-func (s *encryptor) DecryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo uint32, payload []byte) ([]byte, error) {
+func (s *encryptor) DecryptWithHR(ctx context.Context, ratchet *HashRatchetKeyCompatibility, seqNo uint32, payload []byte) ([]byte, error) {
 	// Key exchange message, nothing to decrypt
 	if seqNo == 0 {
 		return payload, nil
 	}
+
+	_, span := s.tracer.Start(ctx, "Encryptor.DecryptWithHR",
+		oteltrace.WithAttributes(
+			otelattribute.String("groupID", types.EncodeHex(ratchet.GroupID)),
+			otelattribute.Int64("seqNo", int64(seqNo)),
+		),
+	)
+	defer span.End()
 
 	hrCache, err := s.persistence.GetHashRatchetCache(ratchet, seqNo)
 	if err != nil {
@@ -709,6 +736,10 @@ func (s *encryptor) DecryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo ui
 	if hrCache == nil {
 		return nil, ErrHashRatchetGroupIDNotFound
 	}
+
+	span.SetAttributes(
+		otelattribute.String("keyID", types.EncodeHex(hrCache.KeyID)),
+	)
 
 	// Handle mesages with seqNo less than the one in db
 	// 1. Check cache. If present for a particular seqNo, all good

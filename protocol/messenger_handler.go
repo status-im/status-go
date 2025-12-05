@@ -61,13 +61,13 @@ var (
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
 // It retrieves chat, if exists, and merges membership updates from the message.
 // Finally, the Chat is updated with the new group events.
-func (m *Messenger) HandleMembershipUpdateMessage(messageState *ReceivedMessageState, rawMembershipUpdate *protobuf.MembershipUpdateMessage, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleMembershipUpdateMessage(ctx context.Context, messageState *ReceivedMessageState, rawMembershipUpdate *protobuf.MembershipUpdateMessage, statusMessage *common.StatusMessage) error {
 	chat, _ := messageState.AllChats.Load(rawMembershipUpdate.ChatId)
 
-	return m.HandleMembershipUpdate(messageState, chat, rawMembershipUpdate, m.systemMessagesTranslations)
+	return m.HandleMembershipUpdate(ctx, messageState, chat, rawMembershipUpdate, m.systemMessagesTranslations)
 }
 
-func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, chat *Chat, rawMembershipUpdate *protobuf.MembershipUpdateMessage, translations *systemMessageTranslationsMap) error {
+func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *ReceivedMessageState, chat *Chat, rawMembershipUpdate *protobuf.MembershipUpdateMessage, translations *systemMessageTranslationsMap) error {
 
 	var group *v1protocol.Group
 	var err error
@@ -263,9 +263,9 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	}
 
 	if message.Message != nil {
-		return m.HandleChatMessage(messageState, message.Message, nil, false)
+		return m.HandleChatMessage(ctx, messageState, message.Message, nil, false)
 	} else if message.EmojiReaction != nil {
-		return m.HandleEmojiReaction(messageState, message.EmojiReaction, nil)
+		return m.HandleEmojiReaction(ctx, messageState, message.EmojiReaction, nil)
 	}
 
 	return nil
@@ -433,7 +433,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *contacts.C
 	return nil
 }
 
-func (m *Messenger) HandleSyncInstallationAccount(state *ReceivedMessageState, message *protobuf.SyncInstallationAccount, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncInstallationAccount(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncInstallationAccount, statusMessage *common.StatusMessage) error {
 	// Noop
 	return nil
 }
@@ -491,7 +491,7 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 	return nil
 }
 
-func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState, message *protobuf.SyncInstallationContactV2, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncInstallationContactV2(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncInstallationContactV2, statusMessage *common.StatusMessage) error {
 	// Ignore own contact installation
 
 	if message.Id == m.myHexIdentity() {
@@ -674,7 +674,7 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 	return nil
 }
 
-func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, message *protobuf.SyncProfilePictures, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncProfilePictures(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncProfilePictures, statusMessage *common.StatusMessage) error {
 	dbImages, err := m.multiAccounts.GetIdentityImages(message.KeyUid)
 	if err != nil {
 		return err
@@ -714,7 +714,7 @@ func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, messa
 	return err
 }
 
-func (m *Messenger) HandleSyncChat(state *ReceivedMessageState, message *protobuf.SyncChat, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncChat(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncChat, statusMessage *common.StatusMessage) error {
 	chatID := message.Id
 	existingChat, ok := state.AllChats.Load(chatID)
 	if ok && (existingChat.Active || uint32(message.GetClock()/1000) < existingChat.SyncedTo) {
@@ -735,7 +735,7 @@ func (m *Messenger) HandleSyncChat(state *ReceivedMessageState, message *protobu
 	return nil
 }
 
-func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message *protobuf.SyncChatRemoved, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncChatRemoved(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncChatRemoved, statusMessage *common.StatusMessage) error {
 	chat, ok := m.allChats.Load(message.Id)
 	if !ok {
 		return ErrChatNotFound
@@ -764,7 +764,7 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message *
 	return state.Response.Merge(response)
 }
 
-func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, message *protobuf.SyncChatMessagesRead, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncChatMessagesRead(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncChatMessagesRead, statusMessage *common.StatusMessage) error {
 	chat, ok := m.allChats.Load(message.Id)
 	if !ok {
 		return ErrChatNotFound
@@ -875,7 +875,7 @@ func (m *Messenger) handlePinMessage(pinner *contacts.Contact, whisperTimestamp 
 	return nil
 }
 
-func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message *protobuf.PinMessage, statusMessage *common.StatusMessage, fromArchive bool) error {
+func (m *Messenger) HandlePinMessage(ctx context.Context, state *ReceivedMessageState, message *protobuf.PinMessage, statusMessage *common.StatusMessage, fromArchive bool) error {
 	return m.handlePinMessage(state.CurrentMessageState.Contact, state.CurrentMessageState.WhisperTimestamp, state.Response, message, fromArchive)
 }
 
@@ -1022,7 +1022,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 	return nil
 }
 
-func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message *protobuf.AcceptContactRequest, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleAcceptContactRequest(ctx context.Context, state *ReceivedMessageState, message *protobuf.AcceptContactRequest, statusMessage *common.StatusMessage) error {
 	err := m.handleAcceptContactRequestMessage(state, message.Clock, message.Id, false)
 	if err != nil {
 		m.logger.Warn("could not accept contact request", zap.Error(err))
@@ -1106,7 +1106,7 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 	return nil
 }
 
-func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message *protobuf.RetractContactRequest, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleRetractContactRequest(ctx context.Context, state *ReceivedMessageState, message *protobuf.RetractContactRequest, statusMessage *common.StatusMessage) error {
 	contact := state.CurrentMessageState.Contact
 	err := m.handleRetractContactRequest(state, contact, message)
 	if err != nil {
@@ -1119,7 +1119,7 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 	return nil
 }
 
-func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *protobuf.ContactUpdate, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleContactUpdate(ctx context.Context, state *ReceivedMessageState, message *protobuf.ContactUpdate, statusMessage *common.StatusMessage) error {
 
 	logger := m.logger.With(zap.String("site", "HandleContactUpdate"))
 	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
@@ -1219,7 +1219,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *pr
 	return nil
 }
 
-func (m *Messenger) HandleSyncPairInstallation(state *ReceivedMessageState, message *protobuf.SyncPairInstallation, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncPairInstallation(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncPairInstallation, statusMessage *common.StatusMessage) error {
 	logger := m.logger.With(zap.String("site", "HandlePairInstallation"))
 	if err := ValidateReceivedPairInstallation(message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
@@ -1413,7 +1413,7 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 	return response, nil
 }
 
-func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageState, cancelRequestToJoinProto *protobuf.CommunityCancelRequestToJoin, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCommunityCancelRequestToJoin(ctx context.Context, state *ReceivedMessageState, cancelRequestToJoinProto *protobuf.CommunityCancelRequestToJoin, statusMessage *common.StatusMessage) error {
 	signer := state.CurrentMessageState.PublicKey
 	if cancelRequestToJoinProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1454,7 +1454,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 }
 
 // HandleCommunityRequestToJoin handles an community request to join
-func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *common.StatusMessage) error {
 	signer := state.CurrentMessageState.PublicKey
 	community, requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, statusMessage.TransportLayer.Dst, requestToJoinProto)
 	if err != nil {
@@ -1543,7 +1543,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 }
 
 // HandleCommunityEditSharedAddresses handles an edit a user has made to their shared addresses
-func (m *Messenger) HandleCommunityEditSharedAddresses(state *ReceivedMessageState, editRevealedAddressesProto *protobuf.CommunityEditSharedAddresses, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCommunityEditSharedAddresses(ctx context.Context, state *ReceivedMessageState, editRevealedAddressesProto *protobuf.CommunityEditSharedAddresses, statusMessage *common.StatusMessage) error {
 	signer := state.CurrentMessageState.PublicKey
 	if editRevealedAddressesProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1563,7 +1563,7 @@ func (m *Messenger) HandleCommunityEditSharedAddresses(state *ReceivedMessageSta
 	return nil
 }
 
-func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageState, requestToJoinResponseProto *protobuf.CommunityRequestToJoinResponse, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, state *ReceivedMessageState, requestToJoinResponseProto *protobuf.CommunityRequestToJoinResponse, statusMessage *common.StatusMessage) error {
 	signer := state.CurrentMessageState.PublicKey
 	if requestToJoinResponseProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1679,7 +1679,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	return nil
 }
 
-func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, requestToLeaveProto *protobuf.CommunityRequestToLeave, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCommunityRequestToLeave(ctx context.Context, state *ReceivedMessageState, requestToLeaveProto *protobuf.CommunityRequestToLeave, statusMessage *common.StatusMessage) error {
 	signer := state.CurrentMessageState.PublicKey
 	if requestToLeaveProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1793,7 +1793,7 @@ func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage E
 	return nil
 }
 
-func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editProto *protobuf.EditMessage, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleEditMessage(ctx context.Context, state *ReceivedMessageState, editProto *protobuf.EditMessage, statusMessage *common.StatusMessage) error {
 	return m.handleEditMessage(state, EditMessage{
 		EditMessage: editProto,
 		From:        state.CurrentMessageState.Contact.ID,
@@ -1802,7 +1802,7 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editProto *pr
 	})
 }
 
-func (m *Messenger) handleDeleteMessage(state *ReceivedMessageState, deleteMessage *DeleteMessage) error {
+func (m *Messenger) handleDeleteMessage(ctx context.Context, state *ReceivedMessageState, deleteMessage *DeleteMessage) error {
 	if deleteMessage == nil {
 		return nil
 	}
@@ -1934,8 +1934,8 @@ func (m *Messenger) handleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	return nil
 }
 
-func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteProto *protobuf.DeleteMessage, statusMessage *common.StatusMessage) error {
-	return m.handleDeleteMessage(state, &DeleteMessage{
+func (m *Messenger) HandleDeleteMessage(ctx context.Context, state *ReceivedMessageState, deleteProto *protobuf.DeleteMessage, statusMessage *common.StatusMessage) error {
+	return m.handleDeleteMessage(ctx, state, &DeleteMessage{
 		DeleteMessage: deleteProto,
 		From:          state.CurrentMessageState.Contact.ID,
 		ID:            state.CurrentMessageState.MessageID,
@@ -1953,7 +1953,7 @@ func (m *Messenger) getMessageFromResponseOrDatabase(response *MessengerResponse
 	return m.persistence.MessageByID(messageID)
 }
 
-func (m *Messenger) HandleSyncDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage *protobuf.SyncDeleteForMeMessage, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncDeleteForMeMessage(ctx context.Context, state *ReceivedMessageState, deleteForMeMessage *protobuf.SyncDeleteForMeMessage, statusMessage *common.StatusMessage) error {
 	if err := ValidateDeleteForMeMessage(deleteForMeMessage); err != nil {
 		return err
 	}
@@ -2033,7 +2033,7 @@ func handleContactRequestChatMessage(receivedMessage *common.Message, contact *c
 	return response.NewContactRequestReceived(), nil
 }
 
-func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen bool) error {
+func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessageState, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
 	if err := ValidateReceivedChatMessage(state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
@@ -2382,12 +2382,12 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	return nil
 }
 
-func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *common.StatusMessage, fromArchive bool) error {
+func (m *Messenger) HandleChatMessage(ctx context.Context, state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *common.StatusMessage, fromArchive bool) error {
 	state.CurrentMessageState.Message = message
-	return m.handleChatMessage(state, fromArchive)
+	return m.handleChatMessage(ctx, state, fromArchive)
 }
 
-func (m *Messenger) HandleSyncSetting(messageState *ReceivedMessageState, message *protobuf.SyncSetting, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncSetting(ctx context.Context, messageState *ReceivedMessageState, message *protobuf.SyncSetting, statusMessage *common.StatusMessage) error {
 	settingField, err := syncing.ExtractAndSaveSyncSetting(m.settings, m.logger, message)
 	if err != nil {
 		return err
@@ -2418,7 +2418,7 @@ func (m *Messenger) HandleSyncSetting(messageState *ReceivedMessageState, messag
 	return nil
 }
 
-func (m *Messenger) HandleSyncAccountCustomizationColor(state *ReceivedMessageState, message *protobuf.SyncAccountCustomizationColor, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncAccountCustomizationColor(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncAccountCustomizationColor, statusMessage *common.StatusMessage) error {
 	affected, err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
 	if err != nil {
 		return err
@@ -2562,7 +2562,7 @@ func (m *Messenger) messageExists(messageID string, existingMessagesMap map[stri
 	return false, nil
 }
 
-func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR *protobuf.EmojiReaction, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleEmojiReaction(ctx context.Context, state *ReceivedMessageState, pbEmojiR *protobuf.EmojiReaction, statusMessage *common.StatusMessage) error {
 	logger := m.logger.With(zap.String("site", "HandleEmojiReaction"))
 	if err := ValidateReceivedEmojiReaction(pbEmojiR, state.Timesource.GetCurrentTime()); err != nil {
 		logger.Error("invalid emoji reaction", zap.Error(err))
@@ -2631,7 +2631,7 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR *p
 	return nil
 }
 
-func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHInvitations *protobuf.GroupChatInvitation, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleGroupChatInvitation(ctx context.Context, state *ReceivedMessageState, pbGHInvitations *protobuf.GroupChatInvitation, statusMessage *common.StatusMessage) error {
 	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, nil)
 	if err != nil {
 		return err
@@ -2681,16 +2681,16 @@ func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHI
 	return nil
 }
 
-func (m *Messenger) HandleContactCodeAdvertisement(state *ReceivedMessageState, cca *protobuf.ContactCodeAdvertisement, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleContactCodeAdvertisement(ctx context.Context, state *ReceivedMessageState, cca *protobuf.ContactCodeAdvertisement, statusMessage *common.StatusMessage) error {
 	if cca.ChatIdentity == nil {
 		return nil
 	}
-	return m.HandleChatIdentity(state, cca.ChatIdentity, nil)
+	return m.HandleChatIdentity(ctx, state, cca.ChatIdentity, nil)
 }
 
 // HandleChatIdentity handles an incoming protobuf.ChatIdentity
 // extracts contact information stored in the protobuf and adds it to the user's contact for update.
-func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf.ChatIdentity, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleChatIdentity(ctx context.Context, state *ReceivedMessageState, ci *protobuf.ChatIdentity, statusMessage *common.StatusMessage) error {
 	s, err := m.settings.GetSettings()
 	if err != nil {
 		return err
@@ -2806,7 +2806,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 	return nil
 }
 
-func (m *Messenger) HandleAnonymousMetricBatch(state *ReceivedMessageState, amb *protobuf.AnonymousMetricBatch, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleAnonymousMetricBatch(ctx context.Context, state *ReceivedMessageState, amb *protobuf.AnonymousMetricBatch, statusMessage *common.StatusMessage) error {
 
 	// TODO
 	return nil
@@ -3329,7 +3329,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 	return dbKeypair, nil
 }
 
-func (m *Messenger) HandleSyncAccountsPositions(state *ReceivedMessageState, message *protobuf.SyncAccountsPositions, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncAccountsPositions(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncAccountsPositions, statusMessage *common.StatusMessage) error {
 	accs, err := m.handleSyncAccountsPositions(message)
 	if err != nil {
 		if err == ErrTryingToApplyOldWalletAccountsOrder ||
@@ -3347,7 +3347,7 @@ func (m *Messenger) HandleSyncAccountsPositions(state *ReceivedMessageState, mes
 	return nil
 }
 
-func (m *Messenger) HandleSyncTokenPreferences(state *ReceivedMessageState, message *protobuf.SyncTokenPreferences, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncTokenPreferences(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncTokenPreferences, statusMessage *common.StatusMessage) error {
 	tokenPreferences, err := m.handleSyncTokenPreferences(message)
 	if err != nil {
 		if err == ErrTryingToApplyOldTokenPreferences {
@@ -3362,7 +3362,7 @@ func (m *Messenger) HandleSyncTokenPreferences(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) HandleSyncCollectiblePreferences(state *ReceivedMessageState, message *protobuf.SyncCollectiblePreferences, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncCollectiblePreferences(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncCollectiblePreferences, statusMessage *common.StatusMessage) error {
 	collectiblePreferences, err := m.handleSyncCollectiblePreferences(message)
 	if err != nil {
 		if err == ErrTryingToApplyOldCollectiblePreferences {
@@ -3377,7 +3377,7 @@ func (m *Messenger) HandleSyncCollectiblePreferences(state *ReceivedMessageState
 	return nil
 }
 
-func (m *Messenger) HandleSyncAccount(state *ReceivedMessageState, message *protobuf.SyncAccount, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncAccount(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncAccount, statusMessage *common.StatusMessage) error {
 	acc, err := syncing.HandleSyncWatchOnlyAccount(m.settings, message, m.config.accountsPublisher)
 	if err != nil {
 		if err == syncing.ErrTryingToStoreOldWalletAccount {
@@ -3391,7 +3391,7 @@ func (m *Messenger) HandleSyncAccount(state *ReceivedMessageState, message *prot
 	return nil
 }
 
-func (m *Messenger) HandleSyncKeypair(state *ReceivedMessageState, message *protobuf.SyncKeypair, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncKeypair(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncKeypair, statusMessage *common.StatusMessage) error {
 	return m.handleSyncKeypairInternal(state, message, false)
 }
 
@@ -3432,7 +3432,7 @@ func (m *Messenger) handleSyncKeypairInternal(state *ReceivedMessageState, messa
 	return nil
 }
 
-func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState, message *protobuf.SyncContactRequestDecision, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncContactRequestDecision(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncContactRequestDecision, statusMessage *common.StatusMessage) error {
 	var err error
 	var response *MessengerResponse
 
@@ -3448,7 +3448,7 @@ func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState
 	return state.Response.Merge(response)
 }
 
-func (m *Messenger) HandlePushNotificationRegistration(state *ReceivedMessageState, encryptedRegistration []byte, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandlePushNotificationRegistration(ctx context.Context, state *ReceivedMessageState, encryptedRegistration []byte, statusMessage *common.StatusMessage) error {
 	if m.pushNotificationServer == nil {
 		return nil
 	}
@@ -3457,7 +3457,7 @@ func (m *Messenger) HandlePushNotificationRegistration(state *ReceivedMessageSta
 	return m.pushNotificationServer.HandlePushNotificationRegistration(publicKey, encryptedRegistration)
 }
 
-func (m *Messenger) HandlePushNotificationResponse(state *ReceivedMessageState, message *protobuf.PushNotificationResponse, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandlePushNotificationResponse(ctx context.Context, state *ReceivedMessageState, message *protobuf.PushNotificationResponse, statusMessage *common.StatusMessage) error {
 	if m.pushNotificationClient == nil {
 		return nil
 	}
@@ -3466,7 +3466,7 @@ func (m *Messenger) HandlePushNotificationResponse(state *ReceivedMessageState, 
 	return m.pushNotificationClient.HandlePushNotificationResponse(publicKey, message)
 }
 
-func (m *Messenger) HandlePushNotificationRegistrationResponse(state *ReceivedMessageState, message *protobuf.PushNotificationRegistrationResponse, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandlePushNotificationRegistrationResponse(ctx context.Context, state *ReceivedMessageState, message *protobuf.PushNotificationRegistrationResponse, statusMessage *common.StatusMessage) error {
 	if m.pushNotificationClient == nil {
 		return nil
 	}
@@ -3475,7 +3475,7 @@ func (m *Messenger) HandlePushNotificationRegistrationResponse(state *ReceivedMe
 	return m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, message)
 }
 
-func (m *Messenger) HandlePushNotificationQuery(state *ReceivedMessageState, message *protobuf.PushNotificationQuery, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandlePushNotificationQuery(ctx context.Context, state *ReceivedMessageState, message *protobuf.PushNotificationQuery, statusMessage *common.StatusMessage) error {
 	if m.pushNotificationServer == nil {
 		return nil
 	}
@@ -3484,7 +3484,7 @@ func (m *Messenger) HandlePushNotificationQuery(state *ReceivedMessageState, mes
 	return m.pushNotificationServer.HandlePushNotificationQuery(publicKey, statusMessage.ApplicationLayer.ID, message)
 }
 
-func (m *Messenger) HandlePushNotificationQueryResponse(state *ReceivedMessageState, message *protobuf.PushNotificationQueryResponse, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandlePushNotificationQueryResponse(ctx context.Context, state *ReceivedMessageState, message *protobuf.PushNotificationQueryResponse, statusMessage *common.StatusMessage) error {
 	if m.pushNotificationClient == nil {
 		return nil
 	}
@@ -3493,7 +3493,7 @@ func (m *Messenger) HandlePushNotificationQueryResponse(state *ReceivedMessageSt
 	return m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, message)
 }
 
-func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, message *protobuf.PushNotificationRequest, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandlePushNotificationRequest(ctx context.Context, state *ReceivedMessageState, message *protobuf.PushNotificationRequest, statusMessage *common.StatusMessage) error {
 	if m.pushNotificationServer == nil {
 		return nil
 	}
@@ -3502,7 +3502,7 @@ func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, m
 	return m.pushNotificationServer.HandlePushNotificationRequest(publicKey, statusMessage.ApplicationLayer.ID, message)
 }
 
-func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCommunityDescription(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *common.StatusMessage) error {
 	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload, nil)
 	if err != nil {
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))
@@ -3511,7 +3511,7 @@ func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) HandleSyncBookmark(state *ReceivedMessageState, message *protobuf.SyncBookmark, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncBookmark(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncBookmark, statusMessage *common.StatusMessage) error {
 	bookmark := &browsers.Bookmark{
 		URL:      message.Url,
 		Name:     message.Name,
@@ -3523,7 +3523,7 @@ func (m *Messenger) HandleSyncBookmark(state *ReceivedMessageState, message *pro
 	return nil
 }
 
-func (m *Messenger) HandleSyncClearHistory(state *ReceivedMessageState, message *protobuf.SyncClearHistory, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncClearHistory(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncClearHistory, statusMessage *common.StatusMessage) error {
 	chatID := message.ChatId
 	existingChat, ok := state.AllChats.Load(chatID)
 	if !ok {
@@ -3555,7 +3555,7 @@ func (m *Messenger) HandleSyncClearHistory(state *ReceivedMessageState, message 
 	return nil
 }
 
-func (m *Messenger) HandleSyncTrustedUser(state *ReceivedMessageState, message *protobuf.SyncTrustedUser, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncTrustedUser(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncTrustedUser, statusMessage *common.StatusMessage) error {
 	updated, err := m.verificationDatabase.UpsertTrustStatus(message.Id, verification.TrustStatus(message.Status), message.Clock)
 	if err != nil {
 		return err
@@ -3577,7 +3577,7 @@ func (m *Messenger) HandleSyncTrustedUser(state *ReceivedMessageState, message *
 
 	return nil
 }
-func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveMagnetlink, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveMagnetlink, statusMessage *common.StatusMessage) error {
 	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)
 }
 
@@ -3609,7 +3609,7 @@ func (m *Messenger) addNewKeypairAddedOnPairedDeviceACNotification(keyUID string
 	return nil
 }
 
-func (m *Messenger) HandleSyncProfileShowcasePreferences(state *ReceivedMessageState, p *protobuf.SyncProfileShowcasePreferences, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncProfileShowcasePreferences(ctx context.Context, state *ReceivedMessageState, p *protobuf.SyncProfileShowcasePreferences, statusMessage *common.StatusMessage) error {
 	_, err := m.saveProfileShowcasePreferencesProto(p, false)
 	return err
 }

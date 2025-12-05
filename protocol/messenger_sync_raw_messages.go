@@ -16,6 +16,9 @@ import (
 type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error)
 
 func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) error {
+	ctx, span := m.tracer.Start(context.Background(), "Messenger.HandleSyncRawMessages")
+	defer span.End()
+
 	state := m.buildMessageState()
 	for _, rawMessage := range rawMessages {
 		switch rawMessage.GetMessageType() {
@@ -51,7 +54,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				Contact:          contact,
 			}
 			state.CurrentMessageState = currentMessageState
-			err = m.HandleContactUpdate(state, &message, nil)
+			err = m.HandleContactUpdate(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Warn("failed to HandleContactUpdate when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -62,7 +65,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncChat(state, &message, nil)
+			err = m.HandleSyncChat(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("error createChat when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -73,7 +76,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncChatRemoved(state, &message, nil)
+			err = m.HandleSyncChatRemoved(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncChatRemoved when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -84,7 +87,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncChatMessagesRead(state, &message, nil)
+			err = m.HandleSyncChatMessagesRead(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncChatMessagesRead when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -95,7 +98,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncClearHistory(state, &message, nil)
+			err = m.HandleSyncClearHistory(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncClearHistory when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -106,7 +109,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncInstallationContactV2(state, &message, nil)
+			err = m.HandleSyncInstallationContactV2(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncInstallationContact when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -117,7 +120,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncInstallationCommunity(state, &message)
+			err = m.handleSyncInstallationCommunity(ctx, state, &message)
 			if err != nil {
 				m.logger.Error("failed to handleSyncCommunity when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -128,7 +131,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncBookmark(state, &message, nil)
+			err = m.HandleSyncBookmark(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncBookmark when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -139,7 +142,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncTrustedUser(state, &message, nil)
+			err = m.HandleSyncTrustedUser(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncTrustedUser when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -150,7 +153,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncVerificationRequest(state, &message, nil)
+			err = m.HandleSyncVerificationRequest(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncVerificationRequest when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -161,7 +164,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncSetting(state, &message, nil)
+			err = m.HandleSyncSetting(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncSetting when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -172,7 +175,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncProfilePictures(state, &message, nil)
+			err = m.HandleSyncProfilePictures(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncProfilePictures when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -183,7 +186,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncContactRequestDecision(state, &message, nil)
+			err = m.HandleSyncContactRequestDecision(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncContactRequestDecision when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -194,7 +197,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncAccount(state, &message, nil)
+			err = m.HandleSyncAccount(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncWatchOnlyAccount when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -216,7 +219,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncAccountsPositions(state, &message, nil)
+			err = m.HandleSyncAccountsPositions(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncAccountsPositions when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -227,7 +230,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncTokenPreferences(state, &message, nil)
+			err = m.HandleSyncTokenPreferences(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncTokenPreferences when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -238,7 +241,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncCollectiblePreferences(state, &message, nil)
+			err = m.HandleSyncCollectiblePreferences(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncCollectiblePreferences when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -249,7 +252,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncSavedAddress(state, &message, nil)
+			err = m.HandleSyncSavedAddress(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncSavedAddress when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -260,7 +263,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncEnsUsernameDetail(state, &message, nil)
+			err = m.HandleSyncEnsUsernameDetail(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncEnsUsernameDetail when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -271,7 +274,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncDeleteForMeMessage(state, &message, nil)
+			err = m.HandleSyncDeleteForMeMessage(ctx, state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleDeleteForMeMessage when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -298,7 +301,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			m.handleInstallations(installations)
 			// set WhisperTimestamp to pass the validation in HandleSyncPairInstallation
 			state.CurrentMessageState = &CurrentMessageState{WhisperTimestamp: message.Clock}
-			err = m.HandleSyncPairInstallation(state, &message, nil)
+			err = m.HandleSyncPairInstallation(ctx, state, &message, nil)
 			if err != nil {
 				return err
 			}

@@ -1,18 +1,23 @@
 package processor
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
+	"github.com/status-im/status-go/messaging/controller/utils"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/messaging/layers/segmentation"
@@ -37,6 +42,8 @@ type Processor struct {
 
 	publisher *pubsub.Publisher
 	logger    *zap.Logger
+
+	tracer trace.Tracer
 }
 
 func NewProcessor(
@@ -45,6 +52,7 @@ func NewProcessor(
 	messageConfirmationStorage common.MessageConfirmationPersistence,
 	hashRatchetStorage common.HashRatchetPersistence,
 	logger *zap.Logger,
+	tracer trace.Tracer,
 ) *Processor {
 	return &Processor{
 		identity:                   identity,
@@ -54,6 +62,7 @@ func NewProcessor(
 		ephemeralKeysManager:       NewEphemeralKeysManager(maxNumOfEphemeralKeys),
 		publisher:                  pubsub.NewPublisher(),
 		logger:                     logger.Named("processor"),
+		tracer:                     tracer,
 	}
 }
 
@@ -122,29 +131,49 @@ func (r *Processor) processMessage(m *types.ReceivedMessage) (*processMessageRes
 		return nil, err
 	}
 
+	hashes := [][]byte{m.Hash}
 	if responseMessage.SegmentationLayer.Segmented {
 		// Segments not completed yet, stop processing
 		if !responseMessage.SegmentationLayer.Completed {
 			return nil, nil
 		}
+		hashes = responseMessage.SegmentationLayer.Hashes
 	}
 
-	err = r.processEncryptionLayer(responseMessage, logger)
-	if err != nil {
-		logger.Debug("failed to process encryption layer", zap.Error(err))
+	ctx, span := r.tracer.Start(trace.DeriveRemoteContext(utils.MergeByteSlices(hashes)), "Processor.processMessage",
+		oteltrace.WithAttributes(
+			otelattribute.String("hash", cryptotypes.EncodeHex(m.Hash)),
+			otelattribute.StringSlice("hashes", cryptotypes.EncodeHexes(hashes)),
+		),
+	)
+	defer span.End()
 
+	err = r.processEncryptionLayer(ctx, responseMessage, logger)
+	if err == nil {
+		span.AddEvent("encryption layer processed")
+	} else {
 		// Hash ratchet with a group id not found yet, save the message for future processing
 		if err == encryption.ErrHashRatchetGroupIDNotFound && len(responseMessage.EncryptionLayer.HashRatchetInfo) == 1 {
 			info := responseMessage.EncryptionLayer.HashRatchetInfo[0]
+			span.AddEvent("hash ratchet with group id not found yet", oteltrace.WithAttributes(
+				otelattribute.String("groupID", cryptotypes.ToHex(info.GroupID)),
+			))
 			return nil, r.hashRatchetStorage.SaveMessage(info.GroupID, info.KeyID, m)
+		} else {
+			span.AddEvent("encryption layer not processed", oteltrace.WithAttributes(
+				otelattribute.String("error", err.Error()),
+			))
+			logger.Debug("failed to process encryption layer", zap.Error(err))
 		}
 	}
 
 	messages, ackedMessageIDs, err := r.processReliabilityLayer(responseMessage, logger)
 	if err == nil {
+		span.AddEvent("reliability layer processed")
 		response.messages = messages
 		response.ackedMessageIDs = ackedMessageIDs
 	} else {
+		span.AddEvent("reliability layer not processed")
 		logger.Debug("failed to process reliability layer", zap.Error(err))
 	}
 
@@ -211,30 +240,36 @@ func processTransportLayer(m *types.Message, receivedMessage *types.ReceivedMess
 	return nil
 }
 
-func (r *Processor) processSegmentationLayer(m *types.Message) (segmented, completed bool, err error) {
-	var reconstructedPayload []byte
-	reconstructedPayload, err = r.stack.Segmentation.Reconstruct(m.TransportLayer.Payload, m.TransportLayer.SigPubKey)
+func (r *Processor) processSegmentationLayer(m *types.Message) error {
+	reconstructedPayload, transportIDs, err := r.stack.Segmentation.Reconstruct(
+		m.TransportLayer.Payload,
+		m.TransportLayer.SigPubKey,
+		m.TransportLayer.Hash)
 
 	switch err {
 	case nil:
 		m.TransportLayer.Payload = reconstructedPayload
-		segmented = true
-		completed = true
+		m.SegmentationLayer.Segmented = true
+		m.SegmentationLayer.Completed = true
+		m.SegmentationLayer.Hashes = transportIDs
 	case segmentation.ErrIncomplete:
-		segmented = true
-		completed = false
+		m.SegmentationLayer.Segmented = true
+		m.SegmentationLayer.Completed = false
 		err = nil
 	case segmentation.ErrInvalidPayload:
-		segmented = false
-		completed = false
+		m.SegmentationLayer.Segmented = false
+		m.SegmentationLayer.Completed = false
 		err = nil
 	}
 
-	return
+	return err
 }
 
-func (r *Processor) processEncryptionLayer(m *types.Message, logger *zap.Logger) error {
+func (r *Processor) processEncryptionLayer(ctx context.Context, m *types.Message, logger *zap.Logger) error {
 	logger = logger.Named("processEncryptionLayer")
+
+	ctx, span := r.tracer.Start(ctx, "Processor.processEncryptionLayer")
+	defer span.End()
 
 	// As we handle non-encrypted messages, we make sure that DecryptPayload
 	// is set regardless of whether this step is successful
@@ -243,6 +278,7 @@ func (r *Processor) processEncryptionLayer(m *types.Message, logger *zap.Logger)
 	// if it's an ephemeral key, we don't negotiate a topic
 	ephemeralKey := r.ephemeralKeysManager.GetPrivateKeyFor(m.TransportLayer.Dst)
 	if ephemeralKey != nil {
+		span.AddEvent("targeted ephemeral key")
 		return nil
 	}
 
@@ -253,6 +289,7 @@ func (r *Processor) processEncryptionLayer(m *types.Message, logger *zap.Logger)
 	}
 
 	response, err := r.stack.Encryption.HandleMessage(
+		ctx,
 		r.identity,
 		m.SigPubKey(),
 		&protocolMessage,

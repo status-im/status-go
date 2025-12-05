@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"database/sql"
 
 	"go.uber.org/zap"
@@ -28,7 +29,7 @@ const (
 	SyncWakuSectionKeyWatchOnlyAccounts = "watchOnlyAccounts"
 )
 
-func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, backup *protobuf.MessengerLocalBackup) []error {
+func (m *Messenger) handleLocalBackup(ctx context.Context, state *ReceivedMessageState, backup *protobuf.MessengerLocalBackup) []error {
 	var errors []error
 
 	err := m.handleBackedUpProfile(backup.Profile, backup.Clock)
@@ -37,7 +38,7 @@ func (m *Messenger) handleLocalBackup(state *ReceivedMessageState, backup *proto
 	}
 
 	for _, contact := range backup.Contacts {
-		err = m.HandleSyncInstallationContactV2(state, contact, nil)
+		err = m.HandleSyncInstallationContactV2(ctx, state, contact, nil)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -189,7 +190,7 @@ func syncInstallationCommunitiesSet(communities []*protobuf.SyncInstallationComm
 func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, communities []*protobuf.SyncInstallationCommunity) []error {
 	var errors []error
 	for _, syncCommunity := range syncInstallationCommunitiesSet(communities) {
-		err := m.handleSyncInstallationCommunity(state, syncCommunity)
+		err := m.handleSyncInstallationCommunity(context.Background(), state, syncCommunity)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -213,6 +214,9 @@ func (m *Messenger) PublishSettingEvent(settingField *settings.SyncSettingField)
 }
 
 func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protobuf.SyncInstallationCommunity) error {
+	ctx, span := m.tracer.Start(context.Background(), "Messenger.requestCommunityKeysAndSharedAddresses")
+	defer span.End()
+
 	if !syncCommunity.Joined {
 		return nil
 	}
@@ -244,7 +248,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_REQUEST,
 	}
 
-	_, err = m.SendMessageToControlNode(community, rawMessage)
+	_, err = m.SendMessageToControlNode(ctx, community, rawMessage)
 
 	if err != nil {
 		m.logger.Error("failed to request shared addresses", zap.String("communityId", utils.TruncateWithDot(community.IDString())), zap.Error(err))
@@ -276,7 +280,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 	return nil
 }
 
-func (m *Messenger) HandleBackedUpMessageBatch(state *ReceivedMessageState, messageBatch *protobuf.BackedUpMessageBatch, msg *common.StatusMessage) error {
+func (m *Messenger) HandleBackedUpMessageBatch(ctx context.Context, state *ReceivedMessageState, messageBatch *protobuf.BackedUpMessageBatch, msg *common.StatusMessage) error {
 	// BackedUpMessages can only be sent in the context of a local backup
 	return nil
 }

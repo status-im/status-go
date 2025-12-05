@@ -13,6 +13,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -53,7 +54,7 @@ func New(config *Config) *Server {
 func (s *Server) Start(persistence Persistence, messaging *messaging.API) error {
 	s.persistence = persistence
 	s.messaging = messaging
-	s.sender = common.NewMessageSender(s.config.Identity, s.messaging, s.config.Logger)
+	s.sender = common.NewMessageSender(s.config.Identity, s.messaging, s.config.Logger, trace.NewNoopTracer())
 	s.sender.Start()
 
 	if s.config.Logger == nil {
