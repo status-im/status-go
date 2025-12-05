@@ -5,10 +5,9 @@ from typing import Optional, List
 import pytest
 
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
-from clients.signals import SignalType
+from clients.signals import SignalType, WalletEventType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
-from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
 from utils import fake
 
@@ -176,15 +175,22 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # 1. wakuext_SpectateCommunity - this makes us subscribe to community updates
         # 2. if token permissions are not present,
         #    wait for `messages.new` with community update and token permissions. (might need skip a few signals)
-        time.sleep(5)
+        time.sleep(2)
 
         # Fetch community as member
         response = self.fetch_community(member_with_snt_backend, community_id)
         assert response, "Community not found"
         assert response["tokenPermissions"], "No token permissions found"
-        assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"  # FIXME: Fails here
+        assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
 
-        # member_with_snt_backend.wait_for_signal(SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS)
+        # Wait for balance to be fetched (request to join uses cached balances)
+        member_with_snt_backend.wallet_service.restart_wallet_reload_timer()  # Force balance fetch
+        member_with_snt_backend.wait_for_signal_predicate(
+            SignalType.WALLET,
+            lambda signal: signal["event"]["type"] == WalletEventType.WALLET_TICK_RELOAD.value,
+            timeout=20,  # 10 seconds backoff + timeout
+        )
+
         permissions_resp = member_with_snt_backend.wakuext_service.check_permissions_to_join_community(community_id)
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
@@ -196,11 +202,11 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert len(requests) == 1, "Unexpected multiple requests to join community"
 
         req_id = requests[0].get("id")
-        # Wait for token validation
+
+        # Wait for request to join to be received
         owner_backend.wait_for_signal(
             SignalType.MESSAGES_NEW,
-            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
-            == RequestToJoinState.RequestToJoinStatePending.value,
+            lambda signal: (signal.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
         )
 
         accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
