@@ -6,9 +6,9 @@ from requests import ReadTimeout
 
 from clients.anvil import Anvil
 from clients.contract_deployers.multicall3 import Multicall3Deployer
-from clients.foundry import Foundry
-from clients.contract_deployers.multicall3 import Multicall3Deployer
 from clients.contract_deployers.snt import SNTDeployer
+from clients.foundry import Foundry
+from clients.status_backend import StatusBackend
 from resources.constants import USE_IPV6
 from utils import fake
 
