@@ -180,7 +180,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_public_key = member_with_snt_backend.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
+    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
     def test_admin_token_permissions_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens get admin privileges"""
 
@@ -225,12 +225,13 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
         # Member with tokens requests to join community
-        join_resp = member_with_snt_backend.wakuext_service.request_to_join_community(community_id, [member_address])
-        requests = join_resp.get("requestsToJoinCommunity", [])
+        join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
+        requests = join_req.get("requestsToJoinCommunity", [])
         assert requests, "No requests to join community"
         assert len(requests) == 1, "Unexpected multiple requests to join community"
 
         req_id = requests[0].get("id")
+        logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
         # Wait for request to join to be received
         owner_backend.wait_for_signal(
