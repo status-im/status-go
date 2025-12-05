@@ -7,10 +7,13 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
+	"go.uber.org/mock/gomock"
 
 	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/require"
+
+	mock_backup_controller "github.com/status-im/status-go/node/backup/mock"
 )
 
 type Foo struct {
@@ -55,9 +58,14 @@ func TestController(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 	filename := t.TempDir() + "/test_backup.bak"
+
+	ctrl := gomock.NewController(t)
+	filenameProvider := mock_backup_controller.NewMockFilenameProvider(ctrl)
+	filenameProvider.EXPECT().GetBackupFilename().Return(filename, nil).AnyTimes()
+
 	controller, err := NewController(BackupConfig{
-		FileNameGetter: func() (string, error) { return filename, nil },
-		PrivateKey:     []byte("0123456789abcdef0123456789abcdef"),
+		FileNameProvider: filenameProvider,
+		PrivateKey:       []byte("0123456789abcdef0123456789abcdef"),
 	}, logger)
 	require.NoError(t, err)
 
