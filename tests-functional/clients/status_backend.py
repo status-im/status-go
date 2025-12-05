@@ -168,7 +168,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 {
                     "chainId": self.network_id,
                     "name": "Anvil Direct",
-                    "url": "http://anvil:8545",
+                    "url": Config.anvil_url,
                     "enableRpsLimiter": False,
                     "type": "embedded-direct",
                     "enabled": True,

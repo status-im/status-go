@@ -1,6 +1,7 @@
-import os
 import logging
+import os
 from typing import Iterator
+
 from utils.config import Config
 
 
@@ -10,6 +11,9 @@ def pytest_addoption(parser):
         action="append",
         help="",
         default=None,
+    )
+    parser.addoption(
+        "--anvil-url", action="store", help="URL of the Anvil node to use. Default: http://anvil:8545 (docker container)", default="http://anvil:8545"
     )
     parser.addoption(
         "--password",
@@ -104,6 +108,7 @@ def _calculate_port_range():
 def pytest_configure(config):
     status_backend_urls = config.getoption("--status_backend_url")
     Config.status_backend_urls = _status_backend_url_generator(status_backend_urls) if status_backend_urls else None
+    Config.anvil_url = config.getoption("--anvil-url")
     Config.password = config.getoption("--password")
     Config.docker_project_name = config.getoption("--docker_project_name")
     Config.docker_image = config.getoption("--docker-image")
