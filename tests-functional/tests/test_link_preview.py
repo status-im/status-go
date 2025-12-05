@@ -1,7 +1,10 @@
+import pytest
+
 from clients.services.linkpreview import URLUnfurlPermission
 from steps.messenger import MessengerSteps
 
 
+@pytest.mark.rpc
 class TestLinkPreview(MessengerSteps):
 
     def test_contact_link_preview(self, backend_new_profile):
