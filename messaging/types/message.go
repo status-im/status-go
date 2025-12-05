@@ -16,8 +16,14 @@ type TransportLayer struct {
 	Payload   []byte           `json:"-"`
 	Hash      []byte           `json:"-"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
-	Dst       *ecdsa.PublicKey
+	Dst       *ecdsa.PublicKey `json:"-"`
 	Message   *ReceivedMessage `json:"message"`
+}
+
+type SegmentationLayer struct {
+	Segmented bool     `json:"segmented"`
+	Completed bool     `json:"completed"`
+	Hashes    [][]byte `json:"hashes"`
 }
 
 // EncryptionLayer handles optional encryption.
@@ -32,8 +38,9 @@ type EncryptionLayer struct {
 
 // Message encapsulates layers of the protocol
 type Message struct {
-	TransportLayer  TransportLayer  `json:"transportLayer"`
-	EncryptionLayer EncryptionLayer `json:"encryptionLayer"`
+	TransportLayer    TransportLayer    `json:"transportLayer"`
+	SegmentationLayer SegmentationLayer `json:"segmentationLayer"`
+	EncryptionLayer   EncryptionLayer   `json:"encryptionLayer"`
 }
 
 // Temporary JSON marshaling for those messages that are not yet processed

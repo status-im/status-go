@@ -4,6 +4,7 @@ import "github.com/status-im/status-go/messaging/layers/segmentation/protobuf"
 
 type Message struct {
 	*protobuf.SegmentMessage
+	transportID []byte
 }
 
 func (s *Message) IsValid() bool {

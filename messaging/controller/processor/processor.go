@@ -117,14 +117,16 @@ func (r *Processor) processMessage(m *types.ReceivedMessage) (*processMessageRes
 		return nil, err
 	}
 
-	isSegmentMessage, completed, err := r.processSegmentationLayer(responseMessage)
+	err = r.processSegmentationLayer(responseMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	// Segments not completed yet, stop processing
-	if isSegmentMessage && !completed {
-		return nil, nil
+	if responseMessage.SegmentationLayer.Segmented {
+		// Segments not completed yet, stop processing
+		if !responseMessage.SegmentationLayer.Completed {
+			return nil, nil
+		}
 	}
 
 	err = r.processEncryptionLayer(responseMessage, logger)
