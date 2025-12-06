@@ -170,16 +170,25 @@ def snt_deployment(foundry_client, request):
     yield deployer
 
 
-@pytest.fixture(scope="function", autouse=False)
-def owner_backend(backend_new_profile):
-    return backend_new_profile("owner")
+@pytest.fixture(scope="function")
+def snt_token_overrides(snt_deployment):
+    return [{"symbol": "SNT", "address": snt_deployment.snt_contract_address}]
 
 
 @pytest.fixture(scope="function", autouse=False)
-def member_backend(backend_new_profile):
-    return backend_new_profile("member")
+def owner_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+    return backend_new_profile(name="owner", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
 
 
 @pytest.fixture(scope="function", autouse=False)
-def member_with_snt_backend(backend_new_profile):
-    return backend_new_profile("member_with_snt")
+def member_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+    return backend_new_profile(name="member", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
+
+
+@pytest.fixture(scope="function", autouse=False)
+def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+    return backend_new_profile(
+        name="member_with_snt",
+        token_overrides=snt_token_overrides,
+        multicall_contract_address=multicall3_deployer.contract_address,
+    )
