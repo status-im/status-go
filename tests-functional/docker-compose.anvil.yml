@@ -5,7 +5,7 @@ services:
     command:
       - anvil --host 0.0.0.0 --block-time 2
     ports:
-      - 8545
+      - "8545:8545"
 
   foundry:
     platform: linux/amd64
