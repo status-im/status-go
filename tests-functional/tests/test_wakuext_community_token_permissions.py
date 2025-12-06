@@ -180,7 +180,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_public_key = member_with_snt_backend.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7135")
     def test_admin_token_permissions_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens get admin privileges"""
 
@@ -234,7 +233,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
         # Wait for request to join to be received
-        owner_backend.wait_for_signal(
+        owner_backend.wait_for_signal_predicate(
             SignalType.MESSAGES_NEW,
             lambda signal: (signal.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
         )
