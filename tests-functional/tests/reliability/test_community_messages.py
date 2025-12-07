@@ -10,53 +10,65 @@ from resources.constants import USE_IPV6
 class TestCommunityMessages(MessengerSteps):
 
     @pytest.fixture()
-    def admin(self, backend_new_profile):
-        return backend_new_profile("admin", bridge_network=True)
+    def community_admin(self, backend_new_profile):
+        return backend_new_profile("community_admin", bridge_network=True)
 
     @pytest.fixture()
-    def member(self, backend_new_profile):
-        return backend_new_profile("member", bridge_network=True)
+    def community_member(self, backend_new_profile):
+        return backend_new_profile("community_member", bridge_network=True)
 
-    def _run_community_messages_baseline(self, admin, member, message_count=1, network_condition=None):
-        self.create_community(admin)
-        message_chat_id = self.join_community(member=member, admin=admin)
+    def _run_community_messages_baseline(
+        self,
+        community_admin,
+        community_member,
+        message_count=1,
+        network_condition=None,
+    ):
+        self.create_community(community_admin)
+        message_chat_id = self.join_community(member=community_member, admin=community_admin)
         if network_condition:
-            network_condition(member)
-        self.community_messages(message_chat_id, message_count, sender=admin, receiver=member)
+            network_condition(community_member)
+        self.community_messages(message_chat_id, message_count, sender=community_admin, receiver=community_member)
 
-    def test_community_messages_baseline(self, admin, member, message_count=1, network_condition=None):
-        self._run_community_messages_baseline(admin, member, message_count, network_condition)
+    def test_community_messages_baseline(
+        self,
+        community_admin,
+        community_member,
+        message_count=1,
+        network_condition=None,
+    ):
+        self._run_community_messages_baseline(community_admin, community_member, message_count, network_condition)
 
-    def test_multiple_community_messages(self, admin, member):
-        self._run_community_messages_baseline(admin, member, message_count=50)
-
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_community_messages_with_latency(self, admin, member):
-        self._run_community_messages_baseline(admin, member, network_condition=self.add_latency)
-
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_community_messages_with_packet_loss(self, admin, member):
-        self._run_community_messages_baseline(admin, member, network_condition=self.add_packet_loss)
+    def test_multiple_community_messages(self, community_admin, community_member):
+        self._run_community_messages_baseline(community_admin, community_member, message_count=50)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_community_messages_with_low_bandwidth(self, admin, member):
-        self._run_community_messages_baseline(admin, member, network_condition=self.add_low_bandwith)
+    def test_community_messages_with_latency(self, community_admin, community_member):
+        self._run_community_messages_baseline(community_admin, community_member, network_condition=self.add_latency)
 
-    def test_community_messages_with_node_pause_30_seconds(self, admin, member):
-        self.create_community(admin)
-        message_chat_id = self.join_community(member=member, admin=admin)
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_community_messages_with_packet_loss(self, community_admin, community_member):
+        self._run_community_messages_baseline(community_admin, community_member, network_condition=self.add_packet_loss)
 
-        with self.node_pause(member):
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_community_messages_with_low_bandwidth(self, community_admin, community_member):
+        self._run_community_messages_baseline(community_admin, community_member, network_condition=self.add_low_bandwith)
+
+    def test_community_messages_with_node_pause_30_seconds(self, community_admin, community_member):
+        self.create_community(community_admin)
+        message_chat_id = self.join_community(member=community_member, admin=community_admin)
+
+        with self.node_pause(community_member):
             message_text = f"test_message_{uuid4()}"
-            admin.wakuext_service.send_chat_message(message_chat_id, message_text)
+            community_admin.wakuext_service.send_chat_message(message_chat_id, message_text)
             sleep(30)
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
+        community_member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
-    def test_community_messages_with_ip_change(self, admin, member):
-        self.create_community(admin)
-        message_chat_id = self.join_community(member=member, admin=admin)
+    def test_community_messages_with_ip_change(self, community_admin, community_member):
+        self.create_community(community_admin)
+        message_chat_id = self.join_community(member=community_member, admin=community_admin)
 
-        self.community_messages(message_chat_id, 1, sender=admin, receiver=member)
-        member.change_container_ip()
-        self.community_messages(message_chat_id, 1, sender=admin, receiver=member)
+        self.community_messages(message_chat_id, 1, sender=community_admin, receiver=community_member)
+        community_member.change_container_ip()
+        self.community_messages(message_chat_id, 1, sender=community_admin, receiver=community_member)
