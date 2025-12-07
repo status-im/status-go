@@ -5,7 +5,7 @@ import pytest
 class TestResolveSuggestedPath:
 
     @pytest.fixture()
-    def account(self, backend_new_profile):
+    def backend(self, backend_new_profile):
         return backend_new_profile("account-backend")
 
     @pytest.mark.parametrize(
@@ -16,10 +16,10 @@ class TestResolveSuggestedPath:
             "test",
         ],
     )
-    def test_resolve_suggested_path_for_random_key(self, account, key_uid):
-        response = account.accounts_service.resolve_suggested_path_for_keypair(key_uid)
+    def test_resolve_suggested_path_for_random_key(self, backend, key_uid):
+        response = backend.accounts_service.resolve_suggested_path_for_keypair(key_uid)
         assert response == "m/44'/60'/0'/0/0"
 
-    def test_resolve_suggested_path_for_used_key(self, account):
-        response = account.accounts_service.resolve_suggested_path_for_keypair(account.key_uid)
+    def test_resolve_suggested_path_for_used_key(self, backend):
+        response = backend.accounts_service.resolve_suggested_path_for_keypair(backend.key_uid)
         assert response == "m/44'/60'/0'/0/1"
