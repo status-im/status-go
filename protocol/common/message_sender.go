@@ -27,6 +27,7 @@ import (
 )
 
 var ErrModifiedRawMessage = errors.New("modified rawMessage")
+var useSDSForCommunitiesByDefault = true
 
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey
@@ -359,7 +360,7 @@ func (s *MessageSender) SendCommunity(
 		zap.String("sender", crypto.PubkeyToHex(&rawMessage.Sender.PublicKey)),
 	)
 
-	if rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		s.logger.Debug("SDS: dispatchCommunityChatMessage with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
 		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
 		if err != nil {
