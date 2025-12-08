@@ -208,3 +208,12 @@ class Foundry:
         balance_cmd = f"cast call {token_address} 'balanceOf(address)' {owner_address} --rpc-url http://anvil:8545"
         result = self.container.exec_run(balance_cmd)
         return result
+
+    def check_contract_exists(self, address: str) -> bool:
+        if not self.container:
+            return False
+        result = self.container.exec_run(f"cast code {address} --rpc-url http://anvil:8545")
+        if result.exit_code != 0:
+            return False
+        code = result.output.decode().strip().lower()
+        return code != "0x"
