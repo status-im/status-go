@@ -8,18 +8,22 @@ from clients.api import ApiResponseError
 @pytest.mark.rpc
 class TestUpdateAccount:
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        self.account = backend_new_profile("sender")
-        self.account_data = copy.deepcopy(new_account_data_1)
+    @pytest.fixture()
+    def backend(self, backend_new_profile):
+        return backend_new_profile("account-backend")
 
-    def test_update_editable_fields_to_all_accounts(self):
+    @pytest.fixture()
+    def account_data(self):
+        """Fresh copy of base account data for each test."""
+        return copy.deepcopy(new_account_data_1)
+
+    def test_update_editable_fields_to_all_accounts(self, backend, account_data):
         # create also a watch account
-        self.account_data["type"] = "watch"
-        self.account.accounts_service.add_account(self.account.password, self.account_data)
+        account_data["type"] = "watch"
+        backend.accounts_service.add_account(backend.password, account_data)
 
         # fetch all accounts(chat, wallet and watch) for update
-        accounts_response_before = self.account.accounts_service.get_accounts()
+        accounts_response_before = backend.accounts_service.get_accounts()
         accounts_before = accounts_response_before
 
         for before in accounts_before:
@@ -29,11 +33,11 @@ class TestUpdateAccount:
             before["name"] = "UpdatedName"
             before["emoji"] = "✨"
             before["prodPreferredChainIds"] = "2:10:42161:8458"
-            update_resp = self.account.accounts_service.update_account(before)
+            update_resp = backend.accounts_service.update_account(before)
             assert update_resp is None
 
         # verify update persisted
-        accounts_response_after = self.account.accounts_service.get_accounts()
+        accounts_response_after = backend.accounts_service.get_accounts()
         accounts_after = accounts_response_after
         assert len(accounts_before) == len(accounts_after)
         for before, after in zip(accounts_before, accounts_after):
@@ -41,9 +45,9 @@ class TestUpdateAccount:
             before["clock"] = after["clock"] = 0
             assert after == before
 
-    def test_try_to_update_non_editable_fields(self):
+    def test_try_to_update_non_editable_fields(self, backend):
         # fetch all accounts
-        accounts_response_before = self.account.accounts_service.get_accounts()
+        accounts_response_before = backend.accounts_service.get_accounts()
         accounts_before = accounts_response_before
 
         for before in accounts_before:
@@ -58,10 +62,10 @@ class TestUpdateAccount:
             )
             before_copy["type"] = "key"
             before_copy["wallet"] = not (before_copy["wallet"])
-            self.account.accounts_service.update_account(before_copy)
+            backend.accounts_service.update_account(before_copy)
 
         # verify that no update was made to non editable fields
-        accounts_response_after = self.account.accounts_service.get_accounts()
+        accounts_response_after = backend.accounts_service.get_accounts()
         accounts_after = accounts_response_after
         assert len(accounts_before) == len(accounts_after)
         for before, after in zip(accounts_before, accounts_after):
@@ -69,7 +73,7 @@ class TestUpdateAccount:
             before["clock"] = after["clock"] = 0
             assert after == before
 
-    def test_update_nonexistent_account(self):
+    def test_update_nonexistent_account(self, backend):
         nonexisting = {"address": "0x0000000000000000000000000000000000000001", "name": "Nope"}
         with pytest.raises(ApiResponseError, match=re.escape("cannot update non-existing account: accounts: account is not found")):
-            self.account.accounts_service.update_account(nonexisting)
+            backend.accounts_service.update_account(nonexisting)

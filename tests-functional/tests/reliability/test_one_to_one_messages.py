@@ -9,43 +9,48 @@ from resources.constants import USE_IPV6
 @pytest.mark.reliability
 class TestOneToOneMessages(MessengerSteps):
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_new_profile("sender", bridge_network=True)
-        self.receiver = backend_new_profile("receiver", bridge_network=True)
+    @pytest.fixture()
+    def sender(self, backend_new_profile):
+        return backend_new_profile("sender", bridge_network=True)
 
-    def test_one_to_one_message_baseline(self, message_count=1):
-        self.one_to_one_message(message_count, sender=self.sender, receiver=self.receiver)
+    @pytest.fixture()
+    def receiver(self, backend_new_profile):
+        return backend_new_profile("receiver", bridge_network=True)
 
-    def test_multiple_one_to_one_messages(self):
-        self.test_one_to_one_message_baseline(message_count=50)
+    def _run_one_to_one_message_baseline(self, sender, receiver, message_count=1):
+        self.one_to_one_message(message_count, sender=sender, receiver=receiver)
 
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_one_to_one_message_with_latency(self):
-        with self.add_latency(self.receiver):
-            self.test_one_to_one_message_baseline(message_count=50)
+    def test_one_to_one_message_baseline(self, sender, receiver, message_count=1):
+        self._run_one_to_one_message_baseline(sender, receiver, message_count)
 
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_one_to_one_message_with_packet_loss(self):
-        with self.add_packet_loss(self.receiver):
-            self.test_one_to_one_message_baseline(message_count=50)
+    def test_multiple_one_to_one_messages(self, sender, receiver):
+        self._run_one_to_one_message_baseline(sender, receiver, message_count=50)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_one_to_one_message_with_low_bandwidth(self):
-        with self.add_low_bandwith(self.receiver):
-            self.test_one_to_one_message_baseline(message_count=50)
+    def test_one_to_one_message_with_latency(self, sender, receiver):
+        with self.add_latency(receiver):
+            self._run_one_to_one_message_baseline(sender, receiver, message_count=50)
 
-    def test_one_to_one_message_with_node_pause_30_seconds(self):
-        with self.node_pause(self.receiver):
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_one_to_one_message_with_packet_loss(self, sender, receiver):
+        with self.add_packet_loss(receiver):
+            self._run_one_to_one_message_baseline(sender, receiver, message_count=50)
+
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_one_to_one_message_with_low_bandwidth(self, sender, receiver):
+        with self.add_low_bandwith(receiver):
+            self._run_one_to_one_message_baseline(sender, receiver, message_count=50)
+
+    def test_one_to_one_message_with_node_pause_30_seconds(self, sender, receiver):
+        with self.node_pause(receiver):
             message_text = f"test_message_{uuid4()}"
-            self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, message_text)
+            sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
             sleep(30)
-        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
-        self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+        receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
+        sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
-    def test_one_to_one_messages_with_ip_change(self):
-        self.test_one_to_one_message_baseline()
-        self.receiver.change_container_ip()
-        self.test_one_to_one_message_baseline()
+    def test_one_to_one_messages_with_ip_change(self, sender, receiver):
+        self._run_one_to_one_message_baseline(sender, receiver)
+        receiver.change_container_ip()
+        self._run_one_to_one_message_baseline(sender, receiver)

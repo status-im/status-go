@@ -7,17 +7,19 @@ from steps.messenger import MessengerSteps
 @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 class TestFetchingChatMessages(MessengerSteps):
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile, waku_light_client):
-        """Initialize two backends (sender and receiver) for each test function"""
-        self.sender = backend_new_profile("sender", waku_light_client=waku_light_client)
-        self.receiver = backend_new_profile("receiver", waku_light_client=waku_light_client)
+    @pytest.fixture()
+    def sender(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("sender", waku_light_client=waku_light_client)
 
-    def test_chat_messages(self):
-        sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
+    @pytest.fixture()
+    def receiver(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("receiver", waku_light_client=waku_light_client)
 
-        sender_chat_id = self.receiver.public_key
-        response = self.sender.wakuext_service.chat_messages(sender_chat_id)
+    def test_chat_messages(self, sender, receiver):
+        sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+
+        sender_chat_id = receiver.public_key
+        response = sender.wakuext_service.chat_messages(sender_chat_id)
         # TODO: Add more assertions on response
 
         messages = response.get("messages", [])
@@ -25,12 +27,12 @@ class TestFetchingChatMessages(MessengerSteps):
         actual_text = messages[0].get("text", "")
         assert actual_text == sent_texts[0]
 
-    def test_chat_messages_with_pagination(self):
-        sent_texts, _ = self.send_multiple_one_to_one_messages(5, sender=self.sender, receiver=self.receiver)
-        sender_chat_id = self.receiver.public_key
+    def test_chat_messages_with_pagination(self, sender, receiver):
+        sent_texts, _ = self.send_multiple_one_to_one_messages(5, sender=sender, receiver=receiver)
+        sender_chat_id = receiver.public_key
 
         # Page 1
-        chat_messages_res1 = self.sender.wakuext_service.chat_messages(sender_chat_id, cursor="", limit=3)
+        chat_messages_res1 = sender.wakuext_service.chat_messages(sender_chat_id, cursor="", limit=3)
 
         cursor1 = chat_messages_res1.get("cursor", "")
         messages_page1 = chat_messages_res1.get("messages", [])
@@ -41,7 +43,7 @@ class TestFetchingChatMessages(MessengerSteps):
         assert cursor1 != ""
 
         # Page 2
-        chat_messages_res2 = self.sender.wakuext_service.chat_messages(sender_chat_id, cursor=cursor1, limit=3)
+        chat_messages_res2 = sender.wakuext_service.chat_messages(sender_chat_id, cursor=cursor1, limit=3)
 
         cursor2 = chat_messages_res2.get("cursor", "")
         messages_page2 = chat_messages_res2.get("messages", [])
@@ -50,52 +52,52 @@ class TestFetchingChatMessages(MessengerSteps):
         assert messages_page2[1].get("text", "") == sent_texts[0]
         assert cursor2 == ""
 
-    def test_message_by_message_id(self):
-        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
+    def test_message_by_message_id(self, sender, receiver):
+        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
 
         message_id = responses[0].get("messages", [])[0].get("id", "")
-        response = self.sender.wakuext_service.message_by_message_id(message_id)
+        response = sender.wakuext_service.message_by_message_id(message_id)
         # TODO: Add more assertions on response
 
         actual_text = response.get("text", "")
         assert actual_text == sent_texts[0]
 
     @pytest.mark.parametrize(
-        "searchTerm,caseSensitive,expectedCount",
+        "search_term,case_sensitive,expected_count",
         [
             ("test_message_1", False, 1),
             ("TEST_MESSAGE_", False, 3),
-            # ("TEST_MESSAGE_", True, 0),  # Skipped due to https://github.com/status-im/status-go/issues/6359
+            # ("TEST_MESSAGE_", True, 0), # Skipped due to https://github.com/status-im/status-go/issues/6359
         ],
     )
-    def test_all_messages_from_chat_which_match_term(self, searchTerm, caseSensitive, expectedCount):
-        self.send_multiple_one_to_one_messages(3, sender=self.sender, receiver=self.receiver)
-        sender_chat_id = self.receiver.public_key
+    def test_all_messages_from_chat_which_match_term(self, sender, receiver, search_term, case_sensitive, expected_count):
+        self.send_multiple_one_to_one_messages(3, sender=sender, receiver=receiver)
+        sender_chat_id = receiver.public_key
 
-        response = self.sender.wakuext_service.all_messages_from_chat_which_match_term(sender_chat_id, searchTerm, caseSensitive)
+        response = sender.wakuext_service.all_messages_from_chat_which_match_term(sender_chat_id, search_term, case_sensitive)
         # TODO: Add more assertions on response
 
         messages = response.get("messages", [])
-        assert len(messages) == expectedCount
+        assert len(messages) == expected_count
 
-    def test_all_messages_from_chats_and_communities_which_match_term(self):
+    def test_all_messages_from_chats_and_communities_which_match_term(self, sender, receiver):
         # One to one
-        self.make_contacts(self.sender, self.receiver)
-        sent_texts_one_to_one, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
-        one_to_one_chat_id = self.receiver.public_key
+        self.make_contacts(sender, receiver)
+        sent_texts_one_to_one, _ = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        one_to_one_chat_id = receiver.public_key
 
         # Group
-        private_group_chat_id = self.join_private_group(admin=self.sender, member=self.receiver)
+        private_group_chat_id = self.join_private_group(admin=sender, member=receiver)
         text_group = "test_message_group"
-        response = self.sender.wakuext_service.send_group_chat_message(private_group_chat_id, text_group)
+        response = sender.wakuext_service.send_group_chat_message(private_group_chat_id, text_group)
 
         # Community
-        self.create_community(self.sender)
-        community_chat_id = self.join_community(member=self.receiver, admin=self.sender)
+        self.create_community(sender)
+        community_chat_id = self.join_community(member=receiver, admin=sender)
         text_community = "test_message_community"
-        response = self.sender.wakuext_service.send_chat_message(community_chat_id, text_community)
+        response = sender.wakuext_service.send_chat_message(community_chat_id, text_community)
 
-        response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
+        response = sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
             [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", False
         )
         # TODO: Add more assertions on response
@@ -107,37 +109,37 @@ class TestFetchingChatMessages(MessengerSteps):
         assert text_community in actual_texts
 
     @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6359")
-    def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self):
+    def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self, sender, receiver):
         # One to one
-        self.make_contacts(self.sender, self.receiver)
-        _, _ = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
-        one_to_one_chat_id = self.receiver.public_key
+        self.make_contacts(sender, receiver)
+        _, _ = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        one_to_one_chat_id = receiver.public_key
 
         # Group
-        private_group_chat_id = self.join_private_group(admin=self.sender, member=self.receiver)
-        self.sender.wakuext_service.send_group_chat_message(private_group_chat_id, "test_message_group")
+        private_group_chat_id = self.join_private_group(admin=sender, member=receiver)
+        sender.wakuext_service.send_group_chat_message(private_group_chat_id, "test_message_group")
 
         # Community
-        self.create_community(self.sender)
-        community_chat_id = self.join_community(member=self.receiver, admin=self.sender)
-        self.sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
+        self.create_community(sender)
+        community_chat_id = self.join_community(member=receiver, admin=sender)
+        sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
 
-        response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
+        response = sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
             [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", True
         )
 
         messages = response.get("messages", [])
         assert len(messages) == 0
 
-    def test_first_unseen_message(self):
-        _, responses = self.send_multiple_one_to_one_messages(1, sender=self.sender, receiver=self.receiver)
-        sender_chat_id = self.receiver.public_key
+    def test_first_unseen_message(self, sender, receiver):
+        _, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        sender_chat_id = receiver.public_key
         message_id = responses[0].get("messages", [])[0].get("id", "")
 
-        self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, message_id)
+        sender.wakuext_service.mark_message_as_unread(sender_chat_id, message_id)
         # TODO: Add more assertions on response
 
-        result = self.sender.wakuext_service.first_unseen_message_id(sender_chat_id)
+        result = sender.wakuext_service.first_unseen_message_id(sender_chat_id)
         # TODO: Add more assertions on response
 
         assert result == message_id

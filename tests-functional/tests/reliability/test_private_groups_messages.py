@@ -9,50 +9,55 @@ from resources.constants import USE_IPV6
 @pytest.mark.reliability
 class TestPrivateGroupMessages(MessengerSteps):
 
-    @pytest.fixture(autouse=True)
-    def setup_backends(self, backend_new_profile):
-        """Initialize two unprivileged backends (sender and receiver) for each test function"""
-        self.sender = backend_new_profile("sender", bridge_network=True)
-        self.receiver = backend_new_profile("receiver", bridge_network=True)
+    @pytest.fixture()
+    def community_admin(self, backend_new_profile):
+        return backend_new_profile("community_admin", bridge_network=True)
 
-    def test_private_group_messages_baseline(self, message_count=1):
-        self.make_contacts(self.sender, self.receiver)
-        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
-        self.private_group_message(message_count, self.private_group_id, sender=self.sender, receiver=self.receiver)
+    @pytest.fixture()
+    def community_member(self, backend_new_profile):
+        return backend_new_profile("community_member", bridge_network=True)
 
-    def test_multiple_group_chat_messages(self):
-        self.test_private_group_messages_baseline(message_count=50)
+    def _run_private_group_messages_baseline(self, community_admin, community_member, message_count=1):
+        self.make_contacts(community_admin, community_member)
+        private_group_id = self.join_private_group(admin=community_admin, member=community_member)
+        self.private_group_message(message_count, private_group_id, sender=community_admin, receiver=community_member)
 
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_private_group_chat_messages_with_latency(self):
-        with self.add_latency(self.receiver):
-            self.test_private_group_messages_baseline(message_count=50)
+    def test_private_group_messages_baseline(self, community_admin, community_member, message_count=1):
+        self._run_private_group_messages_baseline(community_admin, community_member, message_count)
 
-    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_private_group_chat_messages_with_packet_loss(self):
-        with self.add_packet_loss(self.receiver):
-            self.test_private_group_messages_baseline(message_count=50)
+    def test_multiple_group_chat_messages(self, community_admin, community_member):
+        self._run_private_group_messages_baseline(community_admin, community_member, message_count=50)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
-    def test_private_group_chat_messages_with_low_bandwidth(self):
-        with self.add_low_bandwith(self.receiver):
-            self.test_private_group_messages_baseline(message_count=50)
+    def test_private_group_chat_messages_with_latency(self, community_admin, community_member):
+        with self.add_latency(community_member):
+            self._run_private_group_messages_baseline(community_admin, community_member, message_count=50)
 
-    def test_private_group_messages_with_node_pause_30_seconds(self):
-        self.make_contacts(self.sender, self.receiver)
-        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_private_group_chat_messages_with_packet_loss(self, community_admin, community_member):
+        with self.add_packet_loss(community_member):
+            self._run_private_group_messages_baseline(community_admin, community_member, message_count=50)
 
-        with self.node_pause(self.receiver):
+    @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
+    def test_private_group_chat_messages_with_low_bandwidth(self, community_admin, community_member):
+        with self.add_low_bandwith(community_member):
+            self._run_private_group_messages_baseline(community_admin, community_member, message_count=50)
+
+    def test_private_group_messages_with_node_pause_30_seconds(self, community_admin, community_member):
+        self.make_contacts(community_admin, community_member)
+        private_group_id = self.join_private_group(admin=community_admin, member=community_member)
+
+        with self.node_pause(community_member):
             message_text = f"test_message_{uuid4()}"
-            self.sender.wakuext_service.send_group_chat_message(self.private_group_id, message_text)
+            community_admin.wakuext_service.send_group_chat_message(private_group_id, message_text)
             sleep(30)
-        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
-        self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+        community_member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
+        community_admin.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
-    def test_private_group_messages_with_ip_change(self):
-        self.make_contacts(self.sender, self.receiver)
-        self.private_group_id = self.join_private_group(admin=self.sender, member=self.receiver)
-        self.private_group_message(1, self.private_group_id, sender=self.sender, receiver=self.receiver)
-        self.receiver.change_container_ip()
-        self.private_group_message(1, self.private_group_id, sender=self.sender, receiver=self.receiver)
+    def test_private_group_messages_with_ip_change(self, community_admin, community_member):
+        self.make_contacts(community_admin, community_member)
+        private_group_id = self.join_private_group(admin=community_admin, member=community_member)
+        self.private_group_message(1, private_group_id, sender=community_admin, receiver=community_member)
+        community_member.change_container_ip()
+        self.private_group_message(1, private_group_id, sender=community_admin, receiver=community_member)
