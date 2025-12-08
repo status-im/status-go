@@ -64,6 +64,8 @@ class TestCreatePrivateGroups(MessengerSteps):
         third_node = backend_new_profile("third_node")
         self.make_contacts(community_admin, third_node)
 
+        self.make_contacts(community_admin, community_member)
+
         create_group_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
             f"private_group_{uuid4()}",
