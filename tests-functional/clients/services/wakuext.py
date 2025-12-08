@@ -311,15 +311,27 @@ class WakuextService(Service):
         response = self.rpc_request("fetchCommunity", params)
         return response
 
-    def request_to_join_community(self, community_id: str, addresses_to_reveal: list[str] = [], signatures: list[str] = []):
+    def request_to_join_community(
+        self,
+        community_id: str,
+        addresses_to_reveal: Optional[list[str]] = None,
+        signatures: Optional[list[str]] = None,
+    ):
+        # TODO: refactor tests to fully comply with signature:
+        # TODO: (self, community_id: str, addresses_to_reveal: list[str], signatures: list[str]):
+        # TODO: NON-FAKE addresses to reveal, and REAL signatures need to be provided
+        if addresses_to_reveal is None:
+            addresses_to_reveal = ["fakeaddress"]
+
         params = [
             {
                 "communityId": community_id,
                 "addressesToReveal": addresses_to_reveal,
-                "airdropAddress": addresses_to_reveal[0] if len(addresses_to_reveal) > 0 else "",
+                "airdropAddress": addresses_to_reveal[0],
                 "signatures": signatures,
             }
         ]
+
         response = self.rpc_request("requestToJoinCommunity", params)
         return response
 
