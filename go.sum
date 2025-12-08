@@ -2410,6 +2410,8 @@ github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 h1:R
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0/go.mod h1:EhZP9fee0DYjKH/IOQvoNSy1tSHp2iZadsHGphcAJgY=
 github.com/waku-org/go-waku v0.10.1-0.20251003225121-06c9af60f35b h1:3bZ5o2tSiH25jIrwZDiAnRXypjDLI/TVSRhH1xhNwCU=
 github.com/waku-org/go-waku v0.10.1-0.20251003225121-06c9af60f35b/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
+github.com/waku-org/go-waku v0.10.1-0.20251208182050-f19a8c542378 h1:WRDw7uN3CGYXs0G1PWwXdBNYgh4irRtKc070D/WiCsk=
+github.com/waku-org/go-waku v0.10.1-0.20251208182050-f19a8c542378/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 h1:jisj+OCI6QydLtFq3Pyhu49wl9ytPN7oAHjMfepHDrA=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59/go.mod h1:1PdBdPzyTaKt3VnpAHk3zj+r9dXPFOr3IHZP9nFle6E=
 github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b h1:KgZVhsLkxsj5gb/FfndSCQu6VYwALrCOgYI3poR95yE=
