@@ -161,7 +161,7 @@ def multicall3_deployer(foundry_client):
     return Multicall3Deployer(foundry_client)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="class")
 def snt_deployment(foundry_client, request):
     deployer = SNTDeployer(foundry_client)
     request.cls.snt_deployer = deployer
