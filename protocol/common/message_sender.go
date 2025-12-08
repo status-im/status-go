@@ -169,7 +169,7 @@ func (s *MessageSender) SendPublic(
 	)
 
 	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		s.logger.Debug("SDS: send public message with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
+		logger.Debug("SDS: send public message with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
 		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
@@ -370,7 +370,7 @@ func (s *MessageSender) SendCommunity(
 	)
 
 	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		s.logger.Debug("SDS: send community message with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
+		logger.Debug("SDS: send community message with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
 		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
