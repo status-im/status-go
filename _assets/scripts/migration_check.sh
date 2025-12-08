@@ -27,6 +27,8 @@ check_migration_order() {
     local current_migration
     current_migration=$(basename "$file")
 
+    echo "Checking order: ${current_migration} against ${prev_migration}"
+
     # String-based order check (filenames sorted lexicographically)
     if [[ -n "$prev_migration" && "$current_migration" < "$prev_migration" ]]; then
       echo -e "${YLW}Error:${RST}migration ${current_migration} ${YLW}is not in chronological order with ${RST}${prev_migration}"
@@ -59,9 +61,16 @@ git checkout -
 for MIGRATION_DIR in "${MIGRATION_DIRS[@]}"; do
   echo -e "${GRN}Checking migrations:${RST} ${MIGRATION_DIR}"
 
-  # Collect files from base and from current diff
-  base_files=$(git ls-tree -r --name-only ${BASE_COMMIT} ${MIGRATION_DIR}/*.sql | sort)
-  new_files=$(git diff --name-only ${BASE_COMMIT} ${MIGRATION_DIR}/*.sql | sort)
+  # Compute the common ancestor (merge-base) between BASE_COMMIT and HEAD
+  MB=$(git merge-base "${BASE_COMMIT}" HEAD) || { echo "no merge-base"; exit 1; }
+
+  # Files present in BASE_COMMIT
+  base_files=$(git ls-tree -r --name-only "${BASE_COMMIT}" -- "${MIGRATION_DIR}/*.sql" | sort)
+
+  # Files changed on this branch since the merge-base
+  new_files=$(git diff --name-only "${BASE_COMMIT}...HEAD" -- "${MIGRATION_DIR}/*.sql" | sort)
+
+  # Combine lists
   all_files=$(echo -e "$base_files\n$new_files")
 
   # Regex validation: ONLY verify newly added/changed files match ^[0-9]{10}_ prefix
