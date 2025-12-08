@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"sync"
 
@@ -86,6 +87,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.persistence.EncryptionStorage(),
 		params.InstallationID,
 		config.logger,
+		config.tracer,
 	)
 
 	stack.Reliability = reliability.NewReliability(
@@ -103,6 +105,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.persistence.HashRatchetStorage(),
 		publisher,
 		config.logger,
+		config.tracer,
 	)
 
 	return &Core{
@@ -375,7 +378,7 @@ func (c *Core) decryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *e
 		return nil, err
 	}
 
-	decrypted, err := c.stack.Encryption.HandleMessage(myIdentityKey, theirPublicKey, &encryptionMessage, make([]byte, 0))
+	decrypted, err := c.stack.Encryption.HandleMessage(context.Background(), myIdentityKey, theirPublicKey, &encryptionMessage, make([]byte, 0))
 	if err != nil {
 		return nil, err
 	}

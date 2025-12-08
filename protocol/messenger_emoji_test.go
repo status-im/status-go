@@ -264,6 +264,7 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 
 	// Try handling a new emoji (like if it was sent by Alice) (should fail)
 	err = bob.HandleEmojiReaction(
+		context.Background(),
 		messageState,
 		&protobuf.EmojiReaction{
 			MessageId:   messageID,

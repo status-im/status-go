@@ -123,13 +123,14 @@ func (s *Segmenter) Segment(payload []byte, segmentSize int) ([][]byte, error) {
 	return segmentMessages, nil
 }
 
-func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey) ([]byte, error) {
+func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, transportID []byte) ([]byte, [][]byte, error) {
 	segmentMessage := &Message{
 		SegmentMessage: &protobuf.SegmentMessage{},
+		transportID:    transportID,
 	}
 	err := proto.Unmarshal(payload, segmentMessage.SegmentMessage)
 	if err != nil || !segmentMessage.IsValid() {
-		return nil, ErrInvalidPayload
+		return nil, nil, ErrInvalidPayload
 	}
 
 	s.logger.Debug("handling message segment",
@@ -141,24 +142,24 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey) ([]b
 
 	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if alreadyCompleted {
-		return nil, ErrAlreadyCompleted
+		return nil, nil, ErrAlreadyCompleted
 	}
 
 	err = s.persistence.SaveMessageSegment(segmentMessage, sigPubKey, time.Now().Unix())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	segments, err := s.persistence.GetMessageSegments(segmentMessage.EntireMessageHash, sigPubKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(segments) == 0 {
-		return nil, errors.New("unexpected state: no segments found after save operation") // This should theoretically never occur.
+		return nil, nil, errors.New("unexpected state: no segments found after save operation") // This should theoretically never occur.
 	}
 
 	firstSegmentMessage := segments[0]
@@ -166,7 +167,7 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey) ([]b
 
 	// First segment message must not be a parity message.
 	if firstSegmentMessage.IsParityMessage() || len(segments) != int(firstSegmentMessage.SegmentsCount) {
-		return nil, ErrIncomplete
+		return nil, nil, ErrIncomplete
 	}
 
 	payloads := make([][]byte, firstSegmentMessage.SegmentsCount+lastSegmentMessage.ParitySegmentsCount)
@@ -180,7 +181,7 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey) ([]b
 	} else {
 		enc, err := reedsolomon.New(int(firstSegmentMessage.SegmentsCount), int(lastSegmentMessage.ParitySegmentsCount))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		var lastNonParitySegmentPayload []byte
@@ -201,15 +202,15 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey) ([]b
 
 		err = enc.Reconstruct(payloads)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		ok, err := enc.Verify(payloads)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !ok {
-			return nil, ErrInvalidParity
+			return nil, nil, ErrInvalidParity
 		}
 
 		if lastNonParitySegmentPayload != nil {
@@ -222,22 +223,27 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey) ([]b
 	for i := 0; i < int(firstSegmentMessage.SegmentsCount); i++ {
 		_, err := entirePayload.Write(payloads[i])
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to write segment payload")
+			return nil, nil, errors.Wrap(err, "failed to write segment payload")
 		}
 	}
 
 	// Sanity check.
 	entirePayloadHash := crypto.Keccak256(entirePayload.Bytes())
 	if !bytes.Equal(entirePayloadHash, segmentMessage.EntireMessageHash) {
-		return nil, ErrHashMismatch
+		return nil, nil, ErrHashMismatch
 	}
 
 	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, sigPubKey, time.Now().Unix())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return entirePayload.Bytes(), nil
+	transportIDs := make([][]byte, len(segments))
+	for i, segment := range segments {
+		transportIDs[i] = segment.transportID
+	}
+
+	return entirePayload.Bytes(), transportIDs, nil
 }
 
 func (s *Segmenter) CleanupStaleSegments(olderThan time.Time) error {

@@ -2,12 +2,18 @@ package sender
 
 import (
 	"crypto/ecdsa"
+	"runtime/debug"
 
 	"github.com/golang/protobuf/proto"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/common"
+	"github.com/status-im/status-go/messaging/controller/utils"
 	"github.com/status-im/status-go/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -18,17 +24,20 @@ type Sender struct {
 
 	publisher *pubsub.Publisher
 	logger    *zap.Logger
+	tracer    trace.Tracer
 }
 
 func NewSender(
 	identity *ecdsa.PrivateKey,
 	stack *common.MessagingStack,
 	logger *zap.Logger,
+	tracer trace.Tracer,
 ) *Sender {
 	return &Sender{
 		identity:  identity,
 		stack:     stack,
 		logger:    logger.Named("sender"),
+		tracer:    tracer,
 		publisher: pubsub.NewPublisher(),
 	}
 }
@@ -61,4 +70,13 @@ func (s *Sender) processAndMarshalMessageSpec(spec *encryption.ProtocolMessageSp
 	}
 
 	return messageBytes, sharedSecretKey, nil
+}
+
+func linkSpanWithHashes(span oteltrace.Span, hashes [][]byte) {
+	span.SetAttributes(
+		otelattribute.StringSlice("hashes", cryptotypes.EncodeHexes(hashes)),
+		otelattribute.String("stack", string(debug.Stack())),
+	)
+	linkSpanCtx := trace.DeriveSpanContext(utils.MergeByteSlices(hashes), false)
+	span.AddLink(oteltrace.Link{SpanContext: linkSpanCtx})
 }

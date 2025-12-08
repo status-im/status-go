@@ -11,6 +11,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
 	"github.com/status-im/status-go/messaging/controller/processor"
@@ -43,12 +44,13 @@ func NewController(
 	hashRatchetStorage common.HashRatchetPersistence,
 	publisher *pubsub.Publisher,
 	logger *zap.Logger,
+	tracer trace.Tracer,
 ) *Controller {
 	return &Controller{
 		identity:                   identity,
 		stack:                      stack,
-		sender:                     sender.NewSender(identity, stack, logger),
-		processor:                  processor.NewProcessor(identity, stack, messageConfirmationStorage, hashRatchetStorage, logger),
+		sender:                     sender.NewSender(identity, stack, logger, tracer),
+		processor:                  processor.NewProcessor(identity, stack, messageConfirmationStorage, hashRatchetStorage, logger, tracer),
 		messageConfirmationStorage: messageConfirmationStorage,
 		hashRatchetStorage:         hashRatchetStorage,
 		publisher:                  publisher,

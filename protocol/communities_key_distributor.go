@@ -4,7 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -15,6 +20,7 @@ import (
 type CommunitiesKeyDistributorImpl struct {
 	messaging *messaging.API
 	sender    *common.MessageSender
+	tracer    trace.Tracer
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
@@ -98,7 +104,16 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		HashRatchetGroupID:    hashRatchetGroupID,
 		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
-	_, err := ckd.sender.SendCommunity(context.Background(), &rawMessage)
+
+	ctx, span := ckd.tracer.Start(context.Background(), "CommunitiesKeyDistributor.sendKeyExchangeMessage",
+		oteltrace.WithAttributes(
+			otelattribute.String("groupID", types.ToHex(hashRatchetGroupID)),
+			otelattribute.StringSlice("recipients", crypto.PubkeysToHex(pubkeys)),
+		),
+	)
+	defer span.End()
+
+	_, err := ckd.sender.SendCommunity(ctx, &rawMessage)
 
 	if err != nil {
 		return err

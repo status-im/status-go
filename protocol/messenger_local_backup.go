@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -300,6 +301,7 @@ func (m *Messenger) ImportBackup(data []byte) error {
 		ModifiedInstallations: &stringBoolMap{},
 	}
 	errs := m.handleLocalBackup(
+		context.Background(),
 		&state,
 		&backup,
 	)

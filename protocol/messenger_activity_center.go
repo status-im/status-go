@@ -615,7 +615,7 @@ func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCent
 	return notification, nil
 }
 
-func (m *Messenger) HandleSyncActivityCenterRead(state *ReceivedMessageState, message *protobuf.SyncActivityCenterRead, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncActivityCenterRead(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncActivityCenterRead, statusMessage *common.StatusMessage) error {
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -625,7 +625,7 @@ func (m *Messenger) HandleSyncActivityCenterRead(state *ReceivedMessageState, me
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterUnread(state *ReceivedMessageState, message *protobuf.SyncActivityCenterUnread, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncActivityCenterUnread(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncActivityCenterUnread, statusMessage *common.StatusMessage) error {
 	resp, err := m.MarkActivityCenterNotificationsUnread(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -635,7 +635,7 @@ func (m *Messenger) HandleSyncActivityCenterUnread(state *ReceivedMessageState, 
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterDeleted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDeleted, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncActivityCenterDeleted(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncActivityCenterDeleted, statusMessage *common.StatusMessage) error {
 	response, err := m.MarkActivityCenterNotificationsDeleted(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 	if err != nil {
 		return err
@@ -643,7 +643,7 @@ func (m *Messenger) HandleSyncActivityCenterDeleted(state *ReceivedMessageState,
 	return state.Response.Merge(response)
 }
 
-func (m *Messenger) HandleSyncActivityCenterAccepted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterAccepted, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncActivityCenterAccepted(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncActivityCenterAccepted, statusMessage *common.StatusMessage) error {
 	resp, err := m.AcceptActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -653,7 +653,7 @@ func (m *Messenger) HandleSyncActivityCenterAccepted(state *ReceivedMessageState
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterDismissed(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDismissed, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncActivityCenterDismissed(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncActivityCenterDismissed, statusMessage *common.StatusMessage) error {
 	resp, err := m.DismissActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -663,7 +663,7 @@ func (m *Messenger) HandleSyncActivityCenterDismissed(state *ReceivedMessageStat
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) HandleSyncActivityCenterCommunityRequestDecision(state *ReceivedMessageState, a *protobuf.SyncActivityCenterCommunityRequestDecision, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncActivityCenterCommunityRequestDecision(ctx context.Context, state *ReceivedMessageState, a *protobuf.SyncActivityCenterCommunityRequestDecision, statusMessage *common.StatusMessage) error {
 	notification, err := m.persistence.GetActivityCenterNotificationByID(a.Id)
 	if err != nil {
 		return err

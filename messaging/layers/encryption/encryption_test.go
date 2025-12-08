@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/t/helpers"
 )
@@ -50,6 +52,7 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		aliceInstallationID,
 		config,
 		s.logger.With(zap.String("user", "alice")),
+		trace.NewNoopTracer(),
 	)
 
 	db, err = helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
@@ -66,6 +69,7 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		bobInstallationID,
 		config,
 		s.logger.With(zap.String("user", "bob")),
+		trace.NewNoopTracer(),
 	)
 }
 
@@ -92,6 +96,8 @@ func (s *EncryptionServiceTestSuite) TestGetBundle() {
 }
 
 func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
+	ctx := context.Background()
+
 	aliceKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -106,14 +112,14 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	keyID1, err := s.alice.encryptor.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
-	hashRatchetKeyExMsg1, err := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID1})
+	hashRatchetKeyExMsg1, err := s.alice.BuildHashRatchetKeyExchangeMessage(ctx, aliceKey, &bobKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID1})
 	s.Require().NoError(err)
 
 	s.logger.Info("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
 	s.Require().NotNil(hashRatchetKeyExMsg1)
 
 	s.logger.Info("Handle hash ratchet key msg 1")
-	decryptedResponse1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, hashRatchetKeyExMsg1.Message, defaultMessageID)
+	decryptedResponse1, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, hashRatchetKeyExMsg1.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedResponse1)
 
@@ -140,7 +146,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	s.Require().NotNil(hashRatchetMsg1)
 	s.Require().NotNil(hashRatchetMsg1.Message)
 
-	decryptedResponse2, err := s.alice.HandleMessage(aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
+	decryptedResponse2, err := s.alice.HandleMessage(ctx, aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
 
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedResponse2)
@@ -153,7 +159,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	s.Require().NotNil(hashRatchetMsg2)
 	s.Require().NotNil(hashRatchetMsg2.Message)
 
-	decryptedResponse3, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg2.Message, defaultMessageID)
+	decryptedResponse3, err := s.bob.HandleMessage(ctx, bobKey, nil, hashRatchetMsg2.Message, defaultMessageID)
 
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedResponse3)
@@ -164,14 +170,14 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	keyID2, err := s.bob.encryptor.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
-	hashRatchetKeyExMsg2, err := s.bob.BuildHashRatchetKeyExchangeMessage(bobKey, &aliceKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID2})
+	hashRatchetKeyExMsg2, err := s.bob.BuildHashRatchetKeyExchangeMessage(ctx, bobKey, &aliceKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID2})
 	s.Require().NoError(err)
 
 	s.logger.Info("Hash ratchet key exchange 2", zap.Any("msg", hashRatchetKeyExMsg2.Message))
 	s.Require().NotNil(hashRatchetKeyExMsg2)
 
 	s.logger.Info("Handle hash ratchet key msg 2")
-	decryptedResponse4, err := s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, hashRatchetKeyExMsg2.Message, defaultMessageID)
+	decryptedResponse4, err := s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, hashRatchetKeyExMsg2.Message, defaultMessageID)
 	s.Require().NoError(err)
 	decryptedHashRatchetKeyBytes2 := decryptedResponse4.DecryptedMessage
 	decryptedHashRatchetKeyID2, err := s.alice.encryptor.persistence.GetCurrentKeyForGroup(groupID)
@@ -189,7 +195,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 
 	//directMsg1 := hashRatchetMsg.Message.GetEncryptedMessage()
 
-	decryptedResponse5, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg3.Message, defaultMessageID)
+	decryptedResponse5, err := s.bob.HandleMessage(ctx, bobKey, nil, hashRatchetMsg3.Message, defaultMessageID)
 
 	s.logger.Info("HandleHashRatchetMessage err", zap.Any("err", err))
 	s.Require().NotNil(decryptedResponse5)
@@ -207,13 +213,13 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 
 	// Handle them out of order plus an older one we've received earlier with seqNo=1
 
-	decryptedResponse6, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg6.Message, defaultMessageID)
+	decryptedResponse6, err := s.bob.HandleMessage(ctx, bobKey, nil, hashRatchetMsg6.Message, defaultMessageID)
 	s.Require().NoError(err)
-	decryptedResponse7, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg5.Message, defaultMessageID)
+	decryptedResponse7, err := s.bob.HandleMessage(ctx, bobKey, nil, hashRatchetMsg5.Message, defaultMessageID)
 	s.Require().NoError(err)
-	decryptedResponse8, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg4.Message, defaultMessageID)
+	decryptedResponse8, err := s.bob.HandleMessage(ctx, bobKey, nil, hashRatchetMsg4.Message, defaultMessageID)
 	s.Require().NoError(err)
-	decryptedResponse9, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg3.Message, defaultMessageID)
+	decryptedResponse9, err := s.bob.HandleMessage(ctx, bobKey, nil, hashRatchetMsg3.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	s.logger.Info("HandleHashRatchetMessage err", zap.Any("err", err))
@@ -227,7 +233,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 	s.Equal(payload3, decryptedResponse9.DecryptedMessage)
 
 	// Handle message with previous key
-	decryptedResponse10, err := s.bob.HandleMessage(bobKey, nil, hashRatchetMsg2.Message, defaultMessageID)
+	decryptedResponse10, err := s.bob.HandleMessage(ctx, bobKey, nil, hashRatchetMsg2.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedResponse10)
 	s.Equal(payload2, decryptedResponse10.DecryptedMessage)
@@ -238,6 +244,8 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSend() {
 // Bob is able to decrypt it.
 // Alice does not re-use the symmetric key
 func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
+	ctx := context.Background()
+
 	bobKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -260,7 +268,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	s.NotEqual(cyphertext1, cleartext, "It encrypts the payload correctly")
 
 	// On the receiver side, we should be able to decrypt using our private key and the ephemeral just sent
-	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
+	decryptedPayload1, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Equal(cleartext, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using DH")
 
@@ -277,7 +285,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	s.NotEqual(cyphertext1, cyphertext2, "It does not re-use the symmetric key")
 	s.NotEqual(ephemeralKey1, ephemeralKey2, "It does not re-use the ephemeral key")
 
-	decryptedPayload2, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response2.Message, defaultMessageID)
+	decryptedPayload2, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response2.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Equal(cleartext, decryptedPayload2.DecryptedMessage, "It correctly decrypts the payload using DH")
 }
@@ -286,6 +294,8 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 // Alice sends Bob an encrypted message with X3DH and DR using an ephemeral key
 // and Bob's bundle.
 func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
+	ctx := context.Background()
+
 	bobKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -331,7 +341,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	s.Equal(uint32(0), drHeader.GetPn(), "It adds the correct length of the message chain")
 
 	// Bob is able to decrypt it using the bundle
-	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
+	decryptedPayload1, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Equal(cleartext, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using X3DH")
 }
@@ -344,6 +354,8 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 // Bob receives only the last one, he should be able to decrypt it
 // nolint: megacheck
 func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
+	ctx := context.Background()
+
 	cleartext1 := []byte("message 1")
 	cleartext2 := []byte("message 2")
 
@@ -396,7 +408,7 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	s.Equal(uint32(0), drHeader.GetPn(), "It adds the correct length of the message chain")
 
 	// Bob is able to decrypt it using the bundle
-	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
+	decryptedPayload1, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	s.Equal(cleartext2, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using X3DH")
@@ -410,6 +422,8 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 // Alice replies to the message
 
 func (s *EncryptionServiceTestSuite) TestConversation() {
+	ctx := context.Background()
+
 	cleartext1 := []byte("message 1")
 	cleartext2 := []byte("message 2")
 
@@ -440,7 +454,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// Bob receives the message
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// Bob replies to the message
@@ -448,7 +462,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, response.Message, defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, response.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// We send another message using the bundle
@@ -480,7 +494,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Equal(uint32(1), drHeader.GetPn(), "It adds the correct length of the message chain")
 
 	// Bob is able to decrypt it using the bundle
-	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
+	decryptedPayload1, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	s.Equal(cleartext2, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using X3DH")
@@ -492,6 +506,8 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 // Here we are testing that maxSkip only applies to *consecutive* messages, not
 // overall.
 func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
+	ctx := context.Background()
+
 	bobText := []byte("text")
 
 	bobKey, err := crypto.GenerateKey()
@@ -528,7 +544,7 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage1.Message, defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage1.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// Bob sends a message
@@ -541,12 +557,14 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
 
 	// Alice receives the message, we should have maxSkip + 1 keys in the db, but
 	// we should not throw an error
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage2.Message, defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage2.Message, defaultMessageID)
 	s.Require().NoError(err)
 }
 
 // Test that an error is thrown if max skip is reached
 func (s *EncryptionServiceTestSuite) TestMaxSkipKeysError() {
+	ctx := context.Background()
+
 	bobText := []byte("text")
 
 	bobKey, err := crypto.GenerateKey()
@@ -583,11 +601,13 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeysError() {
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage1.Message, defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage1.Message, defaultMessageID)
 	s.Require().Equal(errors.New("can't skip current chain message keys: too many messages"), err)
 }
 
 func (s *EncryptionServiceTestSuite) TestMaxMessageKeysPerSession() {
+	ctx := context.Background()
+
 	config := defaultEncryptorConfig("none", zap.NewNop())
 	// Set MaxKeep and MaxSkip to an high value so it does not interfere
 	config.MaxKeep = 100000
@@ -633,19 +653,21 @@ func (s *EncryptionServiceTestSuite) TestMaxMessageKeysPerSession() {
 	// Another message to trigger the deletion
 	m, err := s.bob.BuildEncryptedMessage(bobKey, &aliceKey.PublicKey, bobText)
 	s.Require().NoError(err)
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, m.Message, defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, m.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// We decrypt the first message, and it should fail
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, messages[0], defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, messages[0], defaultMessageID)
 	s.Require().Equal(errors.New("can't skip current chain message keys: bad until: probably an out-of-order message that was deleted"), err)
 
 	// We decrypt the second message, and it should be decrypted
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, messages[1], defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, messages[1], defaultMessageID)
 	s.Require().NoError(err)
 }
 
 func (s *EncryptionServiceTestSuite) TestMaxKeep() {
+	ctx := context.Background()
+
 	config := defaultEncryptorConfig("none", s.logger)
 	// Set MaxMessageKeysPerSession to an high value so it does not interfere
 	config.MaxMessageKeysPerSession = 100000
@@ -687,7 +709,7 @@ func (s *EncryptionServiceTestSuite) TestMaxKeep() {
 
 		if i != 0 && i != 1 {
 			messageID := []byte(fmt.Sprintf("%d", i))
-			_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, m.Message, messageID)
+			_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, m.Message, messageID)
 			s.Require().NoError(err)
 			err = s.alice.ConfirmMessageProcessed(messageID)
 			s.Require().NoError(err)
@@ -696,11 +718,11 @@ func (s *EncryptionServiceTestSuite) TestMaxKeep() {
 	}
 
 	// We decrypt the first message, and it should fail, as it should have been removed
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, messages[0], defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, messages[0], defaultMessageID)
 	s.Require().Equal(errors.New("can't skip current chain message keys: bad until: probably an out-of-order message that was deleted"), err)
 
 	// We decrypt the second message, and it should be decrypted
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, messages[1], defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, messages[1], defaultMessageID)
 	s.Require().NoError(err)
 }
 
@@ -712,6 +734,8 @@ func (s *EncryptionServiceTestSuite) TestMaxKeep() {
 // Alice receives Bob message
 // Bob sends another message to alice and vice-versa.
 func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
+	ctx := context.Background()
+
 	bobText1 := []byte("bob text 1")
 	bobText2 := []byte("bob text 2")
 	aliceText1 := []byte("alice text 1")
@@ -748,11 +772,11 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// Bob receives the message
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, aliceMessage1.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, aliceMessage1.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage1.Message, defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage1.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// Bob replies to the message
@@ -764,11 +788,11 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// Alice receives the message
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage2.Message, defaultMessageID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage2.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// Bob receives the message
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, aliceMessage2.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, aliceMessage2.Message, defaultMessageID)
 	s.Require().NoError(err)
 }
 
@@ -776,6 +800,8 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 
 // The bundle is lost
 func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
+	ctx := context.Background()
+
 	aliceText := []byte("alice text")
 
 	bobKey, err := crypto.GenerateKey()
@@ -802,13 +828,15 @@ func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 	s.Require().NoError(err)
 
 	// Bob receives the message, and returns a bundlenotfound error
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, aliceMessage.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, aliceMessage.Message, defaultMessageID)
 	s.Require().Error(err)
 	s.Equal(errSessionNotFound, err)
 }
 
 // Device is not included in the bundle
 func (s *EncryptionServiceTestSuite) TestDeviceNotIncluded() {
+	ctx := context.Background()
+
 	bobDevice2InstallationID := "bob2"
 
 	bobKey, err := crypto.GenerateKey()
@@ -835,13 +863,15 @@ func (s *EncryptionServiceTestSuite) TestDeviceNotIncluded() {
 	s.Require().NoError(err)
 
 	// Bob receives the message, and returns a bundlenotfound error
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, aliceMessage.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, aliceMessage.Message, defaultMessageID)
 	s.Require().Error(err)
 	s.Equal(ErrDeviceNotFound, err)
 }
 
 // A new bundle has been received
 func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
+	ctx := context.Background()
+
 	config := defaultEncryptorConfig("none", s.logger)
 	// Set up refresh interval to "always"
 	config.BundleRefreshInterval = 1000
@@ -886,7 +916,7 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Equal(bobBundle1.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader1.GetId())
 
 	// Bob decrypts the message
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
 	s.Require().NoError(err)
 
 	// We add the second bob bundle
@@ -908,11 +938,13 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Equal(bobBundle2.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader2.GetId())
 
 	// Bob decrypts the message
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response2.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, response2.Message, defaultMessageID)
 	s.Require().NoError(err)
 }
 
 func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
+	ctx := context.Background()
+
 	bobText1 := []byte("bob text 1")
 
 	bobKey, err := crypto.GenerateKey()
@@ -943,11 +975,11 @@ func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
 	bobMessage1ID := []byte("bob-message-1-id")
 
 	// Alice receives the message once
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage1.Message, bobMessage1ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage1.Message, bobMessage1ID)
 	s.Require().NoError(err)
 
 	// Alice receives the message twice
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage1.Message, bobMessage1ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage1.Message, bobMessage1ID)
 	s.Require().NoError(err)
 
 	// Alice confirms the message
@@ -955,7 +987,7 @@ func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
 	s.Require().NoError(err)
 
 	// Alice decrypts it again, it should fail
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage1.Message, bobMessage1ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage1.Message, bobMessage1ID)
 	s.Require().Equal(errors.New("can't skip current chain message keys: bad until: probably an out-of-order message that was deleted"), err)
 
 	// Bob sends a message
@@ -969,19 +1001,19 @@ func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
 	bobMessage3ID := []byte("bob-message-3-id")
 
 	// Alice receives message 3 once
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage3.Message, bobMessage3ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage3.Message, bobMessage3ID)
 	s.Require().NoError(err)
 
 	// Alice receives message 3 twice
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage3.Message, bobMessage3ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage3.Message, bobMessage3ID)
 	s.Require().NoError(err)
 
 	// Alice receives message 2 once
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage2.Message, bobMessage2ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage2.Message, bobMessage2ID)
 	s.Require().NoError(err)
 
 	// Alice receives message 2 twice
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage2.Message, bobMessage2ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage2.Message, bobMessage2ID)
 	s.Require().NoError(err)
 
 	// Alice confirms the messages
@@ -991,11 +1023,11 @@ func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
 	s.Require().NoError(err)
 
 	// Alice decrypts it again, it should fail
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage3.Message, bobMessage3ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage3.Message, bobMessage3ID)
 	s.Require().Equal(errors.New("can't skip current chain message keys: bad until: probably an out-of-order message that was deleted"), err)
 
 	// Alice decrypts it again, it should fail
-	_, err = s.alice.HandleMessage(aliceKey, &bobKey.PublicKey, bobMessage2.Message, bobMessage2ID)
+	_, err = s.alice.HandleMessage(ctx, aliceKey, &bobKey.PublicKey, bobMessage2.Message, bobMessage2ID)
 	s.Require().Equal(errors.New("can't skip current chain message keys: bad until: probably an out-of-order message that was deleted"), err)
 }
 
@@ -1044,7 +1076,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetCompatibility() {
 	s.Require().NotEmpty(hashRatchetMsg1.Message.EncryptedMessage["none"].HRHeader.DeprecatedKeyId)
 	s.Require().Equal(timestamp32, hashRatchetMsg1.Message.EncryptedMessage["none"].HRHeader.DeprecatedKeyId)
 
-	decryptedResponse, err := s.alice.HandleMessage(aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
+	decryptedResponse, err := s.alice.HandleMessage(context.Background(), aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Require().NotEmpty(decryptedResponse)
 
@@ -1059,7 +1091,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetCompatibility() {
 	s.Require().NotEmpty(hashRatchetMsg2.Message.EncryptedMessage["none"].HRHeader.KeyId)
 	s.Require().Equal(timestamp32, hashRatchetMsg2.Message.EncryptedMessage["none"].HRHeader.DeprecatedKeyId)
 
-	decryptedResponse, err = s.alice.HandleMessage(aliceKey, nil, hashRatchetMsg2.Message, defaultMessageID)
+	decryptedResponse, err = s.alice.HandleMessage(context.Background(), aliceKey, nil, hashRatchetMsg2.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Require().NotEmpty(decryptedResponse)
 }
@@ -1111,12 +1143,14 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetRekey() {
 
 // We test that adding a new field and leaving the old blank won't crash the app
 func (s *EncryptionServiceTestSuite) TestHashRatchetRekeyCompatibility() {
-	_, err := s.alice.HandleHashRatchetKeys([]byte{0x1}, nil, nil, nil)
+	_, err := s.alice.HandleHashRatchetKeys(context.Background(), []byte{0x1}, nil, nil, nil)
 	s.Require().NoError(err)
 }
 
 // We test that adding a new field and leaving the old blank won't crash the app
 func (s *EncryptionServiceTestSuite) TestHashRatchetRekeyHandleRatchet() {
+	ctx := context.Background()
+
 	aliceKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -1128,14 +1162,15 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetRekeyHandleRatchet() {
 	s.Require().NoError(err)
 	s.Require().NotNil(spec)
 
-	response, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, spec.Message, []byte{0x2})
+	response, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, spec.Message, []byte{0x2})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.HashRatchetInfo, 1)
-
 }
 
 func (s *EncryptionServiceTestSuite) TestHashRatchetSendOutOfOrder() {
+	ctx := context.Background()
+
 	aliceKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -1150,7 +1185,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSendOutOfOrder() {
 	keyID1, err := s.alice.encryptor.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
-	hashRatchetKeyExMsg1, err := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID1})
+	hashRatchetKeyExMsg1, err := s.alice.BuildHashRatchetKeyExchangeMessage(ctx, aliceKey, &bobKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID1})
 	s.Require().NoError(err)
 
 	s.logger.Info("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
@@ -1163,13 +1198,13 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSendOutOfOrder() {
 	s.Require().NotNil(hashRatchetMsg1)
 	s.Require().NotNil(hashRatchetMsg1.Message)
 
-	_, err = s.bob.HandleMessage(aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
+	_, err = s.bob.HandleMessage(ctx, aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
 
 	s.Require().Error(err)
 	s.Require().Equal(err, ErrHashRatchetGroupIDNotFound)
 
 	s.logger.Info("Handle hash ratchet key msg 1")
-	decryptedResponse1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, hashRatchetKeyExMsg1.Message, defaultMessageID)
+	decryptedResponse1, err := s.bob.HandleMessage(ctx, bobKey, &aliceKey.PublicKey, hashRatchetKeyExMsg1.Message, defaultMessageID)
 	s.Require().NoError(err)
 	s.Require().NotNil(decryptedResponse1)
 
@@ -1188,7 +1223,7 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetSendOutOfOrder() {
 	s.Require().NotEmpty(decryptedHashRatchetKeyID1.Timestamp)
 	s.Require().NotNil(decryptedHashRatchetKeyBytes1)
 
-	decryptedPayload2, err := s.bob.HandleMessage(aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
+	decryptedPayload2, err := s.bob.HandleMessage(ctx, aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
 
 	s.Require().NoError(err)
 	s.Require().Equal(payload1, decryptedPayload2.DecryptedMessage)

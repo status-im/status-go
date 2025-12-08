@@ -401,7 +401,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 		Response: &MessengerResponse{},
 	}
 
-	err = member.handleDeleteMessage(state, deleteMessage)
+	err = member.handleDeleteMessage(context.Background(), state, deleteMessage)
 	s.Require().NoError(err)
 
 	removedMessages := state.Response.RemovedMessages()
@@ -445,7 +445,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 		Contact: c,
 	}
 
-	err = memberA.HandleMembershipUpdate(messageState, nil, &message, memberA.systemMessagesTranslations)
+	err = memberA.HandleMembershipUpdate(context.Background(), messageState, nil, &message, memberA.systemMessagesTranslations)
 
 	s.Require().NoError(err)
 	s.Require().NotNil(messageState.Response)

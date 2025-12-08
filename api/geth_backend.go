@@ -15,12 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/afex/hystrix-go/hystrix"
-	"github.com/pkg/errors"
-
 	"github.com/imdario/mergo"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -39,6 +37,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
@@ -101,7 +100,6 @@ type GethStatusBackend struct {
 	transactor               *transactions.Transactor
 	connectionState          connection.State
 	appState                 AppState
-	allowAllRPC              bool // used only for tests, disables api method restrictions
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	centralizedMetrics       *centralizedmetrics.MetricService
 	prometheusMetrics        *metrics.Server
@@ -109,6 +107,8 @@ type GethStatusBackend struct {
 
 	logger            *zap.Logger
 	preLoginLogConfig *logutils.PreLoginLogConfig
+
+	shutdownTasks []func() error
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -117,6 +117,7 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 	backend := &GethStatusBackend{
 		logger:            logger,
 		preLoginLogConfig: logutils.NewPreLoginLogConfig(),
+		shutdownTasks:     []func() error{},
 	}
 	if err := backend.initialize(); err != nil {
 		logger.Error("failed to initialize backend", zap.Error(err))
@@ -1861,6 +1862,24 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		b.prometheusMetrics.RegisterHandler("waku", b.wakuMetricsHandler())
 	}
 
+	if config.OTELConfig.Enabled {
+		b.logger.Info("initializing OpenTelemetry tracer provider",
+			zap.String("endpoint", config.OTELConfig.Endpoint),
+			zap.Bool("insecure", config.OTELConfig.Insecure),
+		)
+
+		shutdownTracer, err := trace.InitProvider(context.Background(), trace.Config{
+			ServiceName:  "status-go",
+			OTLPEndpoint: config.OTELConfig.Endpoint,
+			Insecure:     config.OTELConfig.Insecure,
+		})
+		if err != nil {
+			return err
+		}
+
+		b.shutdownTasks = append(b.shutdownTasks, func() error { return shutdownTracer(context.Background()) })
+	}
+
 	signal.SendNodeReady()
 	return nil
 }
@@ -1879,6 +1898,13 @@ func (b *GethStatusBackend) stopNode() error {
 	if !b.LocalPairingStateManager.IsPairing() {
 		defer signal.SendNodeStopped()
 	}
+
+	for _, task := range b.shutdownTasks {
+		if err := task(); err != nil {
+			b.logger.Error("shutdown task failed", zap.Error(err))
+		}
+	}
+	b.shutdownTasks = []func() error{}
 
 	return b.statusNode.Stop()
 }

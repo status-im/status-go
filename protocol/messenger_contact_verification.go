@@ -777,7 +777,7 @@ func ValidateContactVerificationRequest(request *protobuf.RequestContactVerifica
 	return nil
 }
 
-func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState, request *protobuf.RequestContactVerification, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleRequestContactVerification(ctx context.Context, state *ReceivedMessageState, request *protobuf.RequestContactVerification, statusMessage *common.StatusMessage) error {
 	if err := ValidateContactVerificationRequest(request); err != nil {
 		m.logger.Debug("Invalid verification request", zap.Error(err))
 		return err
@@ -870,7 +870,7 @@ func ValidateAcceptContactVerification(request *protobuf.AcceptContactVerificati
 	return nil
 }
 
-func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState, request *protobuf.AcceptContactVerification, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleAcceptContactVerification(ctx context.Context, state *ReceivedMessageState, request *protobuf.AcceptContactVerification, statusMessage *common.StatusMessage) error {
 	if err := ValidateAcceptContactVerification(request); err != nil {
 		m.logger.Debug("Invalid AcceptContactVerification", zap.Error(err))
 		return err
@@ -964,7 +964,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	return nil
 }
 
-func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState, request *protobuf.DeclineContactVerification, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleDeclineContactVerification(ctx context.Context, state *ReceivedMessageState, request *protobuf.DeclineContactVerification, statusMessage *common.StatusMessage) error {
 	if crypto.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
 	}
@@ -1046,7 +1046,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 	return m.createOrUpdateOutgoingContactVerificationNotification(contact, state.Response, persistedVR, msg, nil)
 }
 
-func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState, request *protobuf.CancelContactVerification, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleCancelContactVerification(ctx context.Context, state *ReceivedMessageState, request *protobuf.CancelContactVerification, statusMessage *common.StatusMessage) error {
 	myPubKey := hexutil.Encode(crypto.FromECDSAPub(&m.identity.PublicKey))
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 

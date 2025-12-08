@@ -8,12 +8,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 )
 
 type config struct {
 	logger                          *zap.Logger
+	tracer                          trace.Tracer
 	envelopesMonitorConfig          *transport.EnvelopesMonitorConfig
 	metricsEnabled                  bool
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
@@ -24,6 +26,7 @@ type config struct {
 func newConfig(options ...Options) *config {
 	config := &config{
 		logger: zap.NewNop(),
+		tracer: trace.NewNoopTracer(),
 		envelopesMonitorConfig: &transport.EnvelopesMonitorConfig{
 			IsMailserver: func(ethtypes.EnodeID) bool {
 				return false
@@ -47,6 +50,12 @@ func WithLogger(logger *zap.Logger) Options {
 	return func(c *config) {
 		c.logger = logger
 		c.envelopesMonitorConfig.Logger = logger
+	}
+}
+
+func WithTracer(tracer trace.Tracer) Options {
+	return func(c *config) {
+		c.tracer = tracer
 	}
 }
 

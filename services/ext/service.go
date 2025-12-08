@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	commongethtypes "github.com/ethereum/go-ethereum/common"
@@ -24,6 +25,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
@@ -160,6 +162,15 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
 	}
 
+	tracer := trace.NewNoopTracer()
+	if s.config.OTELConfig.Enabled {
+		name := params.Account.Name
+		if name == "" {
+			name = crypto.PubkeyToHex(&params.Identity.PublicKey)[0:8]
+		}
+		tracer = trace.NewTracer(otel.Tracer(name))
+	}
+
 	messaging, err := messaging.NewCore(
 		messaging.CoreParams{
 			Identity:       params.Identity,
@@ -175,6 +186,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		messaging.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),
 		messaging.WithPeerStatsHandler(signal.SendPeerStats),
 		messaging.WithMetrics(params.MetricsEnabled),
+		messaging.WithTracer(tracer),
 	)
 	if err != nil {
 		return err
@@ -196,6 +208,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	if err != nil {
 		return err
 	}
+	options = append(options, protocol.WithTracer(tracer))
 
 	messenger, err := protocol.NewMessenger(
 		params.Identity,

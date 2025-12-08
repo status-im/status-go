@@ -143,7 +143,7 @@ func (s *MessageSegmentationSuite) TestHandleSegmentationLayer() {
 			for i, segmentIndex := range tc.retrievedSegments {
 				s.T().Log("i=", i, "segmentIndex=", segmentIndex)
 
-				reconstructedPayload, err := s.segmenter.Reconstruct(segmentedMessages[segmentIndex], &signer.PublicKey)
+				reconstructedPayload, _, err := s.segmenter.Reconstruct(segmentedMessages[segmentIndex], &signer.PublicKey, nil)
 				handledSegments = append(handledSegments, segmentIndex)
 
 				if len(handledSegments) < tc.segmentsCount {

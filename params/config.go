@@ -208,6 +208,9 @@ type NodeConfig struct {
 
 	TorrentConfig TorrentConfig
 
+	// OTELConfig provides configuration for OpenTelemetry tracing
+	OTELConfig OTELConfig
+
 	OutputMessageCSVEnabled bool
 }
 
@@ -278,6 +281,16 @@ type PermissionsConfig struct {
 // ConnectorConfig extra configuration for provider.Service
 type ConnectorConfig struct {
 	Enabled bool
+}
+
+// OTELConfig provides configuration for OpenTelemetry tracing
+type OTELConfig struct {
+	Enabled bool
+	// OTLP traces endpoint the exporter connects to (matches OTEL_EXPORTER_OTLP_TRACES_ENDPOINT)
+	// and defaults to "localhost:4317".
+	Endpoint string
+	// Insecure specifies whether the connection to the OTLP endpoint should be insecure (no TLS).
+	Insecure bool
 }
 
 // ShhextConfig defines options used by shhext service.

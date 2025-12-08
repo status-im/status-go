@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
 	"github.com/status-im/status-go/pkg/testutils"
@@ -64,6 +65,7 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 			NewSQLitePersistence(db),
 			installationID,
 			s.logger.With(zap.String("user", user)),
+			trace.NewNoopTracer(),
 		)
 		s.services[user].services[i] = protocol
 	}
