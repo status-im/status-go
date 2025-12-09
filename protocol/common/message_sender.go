@@ -6,12 +6,9 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-<<<<<<< HEAD
+	"github.com/waku-org/sds-go-bindings/sds"
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
-=======
-	"github.com/waku-org/sds-go-bindings/sds"
->>>>>>> 71440e009 (feat: enable sds for wrap message)
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -199,6 +196,7 @@ func (s *MessageSender) SendPublic(
 	err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 		Sender:              &rawMessage.Sender.PublicKey,
 		Payload:             wrappedMessage,
+		MessageID:           messageID,
 		PubsubTopic:         rawMessage.PubsubTopic,
 		ContentTopic:        rawMessage.ContentTopic,
 		SkipEncryptionLayer: rawMessage.SkipEncryptionLayer,
@@ -410,6 +408,7 @@ func (s *MessageSender) SendCommunity(
 		err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 			Sender:       &rawMessage.Sender.PublicKey,
 			Payload:      wrappedMessage,
+			MessageID:    messageID,
 			PubsubTopic:  rawMessage.PubsubTopic,
 			ContentTopic: rawMessage.ContentTopic,
 			HashRatchet:  hashRatchetParams,
@@ -425,6 +424,7 @@ func (s *MessageSender) SendCommunity(
 		err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 			Sender:             &rawMessage.Sender.PublicKey,
 			Payload:            wrappedMessage,
+			MessageID:          messageID,
 			PubsubTopic:        rawMessage.PubsubTopic,
 			ContentTopic:       rawMessage.ContentTopic,
 			HashRatchet:        hashRatchetParams,
@@ -518,8 +518,9 @@ func linkSpanWithMessage(span oteltrace.Span, message *RawMessage) {
 	)
 	linkSpanCtx := trace.DeriveSpanContext([]byte(message.ID), false)
 	span.AddLink(oteltrace.Link{SpanContext: linkSpanCtx})
+}
 
-	// Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
+// Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
 func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
 	sdsMessageID := crypto.Keccak256(payload)
 

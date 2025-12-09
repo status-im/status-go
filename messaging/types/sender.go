@@ -5,6 +5,7 @@ import "crypto/ecdsa"
 type SendPublicParams struct {
 	Sender              *ecdsa.PublicKey
 	Payload             []byte
+	MessageID           []byte
 	PubsubTopic         string
 	ContentTopic        string
 	SkipEncryptionLayer bool

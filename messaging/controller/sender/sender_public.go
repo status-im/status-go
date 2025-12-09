@@ -19,10 +19,13 @@ import (
 )
 
 func (s *Sender) SendPublic(ctx context.Context, params types.SendPublicParams) error {
-	messageID := types.MessageID(params.Sender, params.Payload)
+	messageID := params.MessageID
+	if len(messageID) == 0 {
+		messageID = types.MessageID(params.Sender, params.Payload)
+	}
 
 	logger := s.logger.Named("sendPublic").With(
-		zap.Stringer("messageID", messageID),
+		zap.String("messageID", cryptotypes.EncodeHex(messageID)),
 	)
 
 	if params.CommunityPublicKey != nil {
