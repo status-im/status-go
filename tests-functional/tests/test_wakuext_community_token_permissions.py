@@ -31,10 +31,11 @@ def request_to_join_with_signatures(backend: StatusBackend, community_id: str, a
 
 
 @pytest.mark.rpc
-@pytest.mark.usefixtures("snt_deployment")
 class TestCommunityTokenPermissions(MessengerSteps):
-    snt_address: Optional[str] = None
-    snt_controller_address: Optional[str] = None
+    @pytest.fixture(autouse=True)
+    def setup_snt(self, snt_addresses):
+        self.snt_address = snt_addresses["snt"]
+        self.snt_controller_address = snt_addresses["controller"]
 
     def _communities_list(self, communities_response):
         if isinstance(communities_response, dict):
