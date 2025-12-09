@@ -40,7 +40,7 @@ func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.Pr
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		SDSManager:            initSDS(logger),
+		SDSManager:            initSDS(logger.Named("sds")),
 		logger:                logger,
 	}
 }

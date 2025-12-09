@@ -23,7 +23,8 @@ import (
 )
 
 var ErrModifiedRawMessage = errors.New("modified rawMessage")
-var useSDSForCommunitiesByDefault = true
+
+const sdsForCommunitiesEnabled = true
 
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey
@@ -164,7 +165,7 @@ func (s *MessageSender) SendPublic(
 		zap.Stringer("messageID", messageID),
 	)
 
-	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+	if sdsForCommunitiesEnabled && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		logger.Debug("send public message with SDS", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
 		sdsWrappedPayload, err := s.messaging.Reliability().WrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
 		if err != nil {
@@ -366,7 +367,7 @@ func (s *MessageSender) SendCommunity(
 		zap.String("sender", crypto.PubkeyToHex(&rawMessage.Sender.PublicKey)),
 	)
 
-	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+	if sdsForCommunitiesEnabled && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		logger.Debug("send community message with SDS", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
 		sdsWrappedPayload, err := s.messaging.Reliability().WrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
 		if err != nil {

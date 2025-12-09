@@ -10,7 +10,6 @@ import (
 )
 
 func initSDS(logger *zap.Logger) *sds.ReliabilityManager {
-	logger = logger.Named("sds")
 	sds.SetLogger(logger)
 
 	reliabilityManager, err := sds.NewReliabilityManager()

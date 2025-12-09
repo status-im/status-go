@@ -327,16 +327,21 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *types.Message
 }
 
 func (r *Processor) processSDSLayer(msg *types.Message) error {
-	if len(msg.EncryptionLayer.Payload) > 0 {
-		unwrappedMessage, err := r.stack.Reliability.SDSManager.UnwrapReceivedMessage(msg.EncryptionLayer.Payload)
-		if err != nil {
-			r.logger.Warn("failed to unwrap received message with SDS", zap.Error(err))
-		} else {
-			msg.EncryptionLayer.Payload = *unwrappedMessage.Message
-			r.logger.Debug("missing deps with SDS",
-				zap.Any("missing-deps", *unwrappedMessage.MissingDeps),
-			)
-		}
+	if len(msg.EncryptionLayer.Payload) <= 0 {
+		return nil
+	}
+
+	unwrappedMessage, err := r.stack.Reliability.SDSManager.UnwrapReceivedMessage(msg.EncryptionLayer.Payload)
+	if err != nil {
+		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
+		// return error after wrapping is forced
+		return nil
+	}
+
+	msg.EncryptionLayer.Payload = *unwrappedMessage.Message
+	missingDeps := *unwrappedMessage.MissingDeps
+	if len(missingDeps) > 0 {
+		r.logger.Debug("missing deps with SDS", zap.Any("missing-deps", missingDeps))
 	}
 
 	return nil
