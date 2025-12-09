@@ -2,6 +2,7 @@ import logging
 from uuid import uuid4
 
 import pytest
+from filelock import FileLock
 from requests import ReadTimeout
 import os
 import json
@@ -154,36 +155,75 @@ def multicall3_deployer(foundry_client):
 def snt_addresses(foundry_client):
     logger = logging.getLogger(__name__)
     addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "snt_addresses.json")
-    data = None
-    if os.path.exists(addresses_file):
-        try:
-            with open(addresses_file, "r") as f:
-                data = json.load(f)
-            if foundry_client.check_contract_exists(data["snt"]) and foundry_client.check_contract_exists(data["controller"]):
-                logger.info("Using existing SNT deployment addresses")
-                return data
-            else:
-                logger.warning("Existing SNT addresses invalid (no code), will redeploy")
-        except (json.JSONDecodeError, KeyError, IOError) as e:
-            logger.warning(f"Failed to load existing addresses: {e}, will redeploy")
-    # Deploy new
-    logger.info("Deploying new SNT token...")
-    deployer = SNTDeployer(foundry_client)
-    data = {
-        "snt": deployer.snt_contract_address,
-        "controller": deployer.snt_token_controller_address,
-    }
-    with open(addresses_file, "w") as f:
-        json.dump(data, f, indent=2)
-    logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
-    return data
+    lock_path = addresses_file + ".lock"  # Lock file next to JSON
+
+    with FileLock(lock_path, timeout=120):  # Acquire lock (120s timeout for deploy)
+        data = None
+        if os.path.exists(addresses_file):
+            try:
+                with open(addresses_file, "r") as f:
+                    data = json.load(f)
+                # Re-check contracts INSIDE lock (critical for races)
+                if foundry_client.check_contract_exists(data["snt"]) and foundry_client.check_contract_exists(data["controller"]):
+                    logger.info("Using existing SNT deployment addresses")
+                    return data
+                else:
+                    logger.warning("Existing SNT addresses invalid (no code), will redeploy")
+            except (json.JSONDecodeError, KeyError, IOError) as e:
+                logger.warning(f"Failed to load existing addresses: {e}, will redeploy")
+
+        # Deploy (now EXCLUSIVE due to lock)
+        logger.info("Deploying new SNT token...")
+        deployer = SNTDeployer(foundry_client)
+        data = {
+            "snt": deployer.snt_contract_address,
+            "controller": deployer.snt_token_controller_address,
+        }
+        with open(addresses_file, "w") as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
+        return data
 
 
-@pytest.fixture(scope="class")
-def snt_deployment(snt_addresses, request):
-    request.cls.snt_address = snt_addresses["snt"]
-    request.cls.snt_controller_address = snt_addresses["controller"]
-    yield
+# @pytest.fixture(scope="session")
+# def snt_addresses(foundry_client):
+#     logger = logging.getLogger(__name__)
+#     addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "snt_addresses.json")
+#     f = open(addresses_file, "a+")
+#     try:
+#         fcntl.flock(f, fcntl.LOCK_EX)
+#         f.seek(0)
+#
+#         try:
+#             data = json.load(f)
+#             if (
+#                 data is not None
+#                 and foundry_client.check_contract_exists(data["snt"])
+#                 and foundry_client.check_contract_exists(data["controller"])
+#             ):
+#                 logger.info("Using existing SNT deployment addresses")
+#                 return data
+#             else:
+#                 logger.warning("Existing SNT addresses invalid (no code), will redeploy")
+#         except (json.JSONDecodeError, KeyError) as e:
+#             logger.warning(f"Failed to load/parse existing addresses: {e}, will redeploy")
+#         # Deploy new
+#         logger.info("Deploying new SNT token...")
+#         deployer = SNTDeployer(foundry_client)
+#         data = {
+#             "snt": deployer.snt_contract_address,
+#             "controller": deployer.snt_token_controller_address,
+#         }
+#         f.seek(0)
+#         f.truncate(0)
+#         json.dump(data, f, indent=2)
+#         f.flush()
+#         os.fsync(f.fileno())
+#         logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
+#         return data
+#     finally:
+#         fcntl.flock(f, fcntl.LOCK_UN)
+#         f.close()
 
 
 @pytest.fixture(scope="function")
