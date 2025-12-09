@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/waku-org/sds-go-bindings/sds"
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -166,8 +165,8 @@ func (s *MessageSender) SendPublic(
 	)
 
 	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		logger.Debug("SDS: send public message with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
+		logger.Debug("send public message with SDS", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
+		sdsWrappedPayload, err := s.messaging.Reliability().WrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
 		}
@@ -368,8 +367,8 @@ func (s *MessageSender) SendCommunity(
 	)
 
 	if useSDSForCommunitiesByDefault && rawMessage.CommunityID != nil && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		logger.Debug("SDS: send community message with communityID", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.wrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
+		logger.Debug("send community message with SDS", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
+		sdsWrappedPayload, err := s.messaging.Reliability().WrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
 		}
@@ -518,21 +517,4 @@ func linkSpanWithMessage(span oteltrace.Span, message *RawMessage) {
 	)
 	linkSpanCtx := trace.DeriveSpanContext([]byte(message.ID), false)
 	span.AddLink(oteltrace.Link{SpanContext: linkSpanCtx})
-}
-
-// Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
-func (s *MessageSender) wrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
-	sdsMessageID := crypto.Keccak256(payload)
-
-	s.logger.Debug("SDS: original payload",
-		zap.String("channelId", cryptotypes.EncodeHex(communityID)),
-		zap.Int("payload-length", len(payload)),
-		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
-	)
-	sdsWrappedPayload, err := s.messaging.SDSManager().WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
-	if err != nil {
-		return nil, errors.Wrap(err, "SDS: failed to wrap a community message")
-	}
-
-	return sdsWrappedPayload, nil
 }

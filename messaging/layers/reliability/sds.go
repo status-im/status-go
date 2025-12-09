@@ -1,0 +1,58 @@
+package reliability
+
+import (
+	"github.com/pkg/errors"
+	"github.com/waku-org/sds-go-bindings/sds"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/crypto"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
+)
+
+func initSDS(logger *zap.Logger) *sds.ReliabilityManager {
+	logger = logger.Named("sds")
+	sds.SetLogger(logger)
+
+	reliabilityManager, err := sds.NewReliabilityManager()
+	if err != nil {
+		logger.Error("failed to create ReliabilityManager", zap.Error(err))
+		return nil
+	}
+
+	callbacks := sds.EventCallbacks{
+		OnMessageSent: func(messageId sds.MessageID, channelId string) {
+			logger.Debug("message sent with sds", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
+		},
+		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.MessageID, channelId string) {
+			logger.Debug("missing dependencies",
+				zap.String("messageId", string(messageId)),
+				zap.String("channelId", channelId),
+				zap.Any("missingDeps", missingDeps))
+		},
+		OnMessageReady: func(messageId sds.MessageID, channelId string) {
+			logger.Debug("message ready",
+				zap.String("messageId", string(messageId)),
+				zap.String("channelId", channelId))
+		},
+	}
+	reliabilityManager.RegisterCallbacks(callbacks)
+
+	return reliabilityManager
+}
+
+// Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
+func (r *Reliability) WrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
+	sdsMessageID := crypto.Keccak256(payload)
+
+	r.logger.Debug("original payload wrapped with SDS",
+		zap.String("channelId", cryptotypes.EncodeHex(communityID)),
+		zap.Int("payload-length", len(payload)),
+		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
+	)
+	sdsWrappedPayload, err := r.SDSManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wrap a community message with SDS")
+	}
+
+	return sdsWrappedPayload, nil
+}

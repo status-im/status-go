@@ -11,7 +11,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/waku-org/go-waku/waku/v2/api/history"
-	"github.com/waku-org/sds-go-bindings/sds"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -19,6 +18,7 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/layers/encryption"
+	"github.com/status-im/status-go/messaging/layers/reliability"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -46,8 +46,8 @@ func (a *API) Publisher() *pubsub.Publisher {
 	return a.core.publisher
 }
 
-func (a *API) SDSManager() *sds.ReliabilityManager {
-	return a.core.stack.SDSManager
+func (a *API) Reliability() *reliability.Reliability {
+	return a.core.stack.Reliability
 }
 
 func (a *API) InitChats(chats types.ChatsToInitialize, publicKeys []*ecdsa.PublicKey) error {
