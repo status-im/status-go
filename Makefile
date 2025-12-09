@@ -399,10 +399,14 @@ generate:  ##@ Run generate for all given packages using go-generate-fast, fallb
 
 generate-contracts:
 	go generate ./contracts
+
 download-tokens:
-	go run -mod=mod ./services/wallet/token/token-lists/default-lists/downloader/main.go
+	echo "Downloading token lists..."; \
+	GOROOT=$$(go env GOROOT) GOFLAGS="-mod=mod" go run ./services/wallet/token/local-token-lists/default-lists/downloader/main.go; \
+	echo "token list downloaded successfully"; \
+
 analyze-token-stores:
-	go run -mod=mod ./services/wallet/token/token-lists/analyzer/main.go
+	go run -mod=mod ./services/wallet/token/local-token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)

@@ -15,7 +15,7 @@ from utils.retry_utils import retry_call
 
 class MessengerSteps(NetworkConditionsSteps):
 
-    def send_contact_request_and_wait_for_signal_to_be_received(self, sender=None, receiver=None) -> str:
+    def send_contact_request_and_wait_for_signal_to_be_received(self, sender, receiver) -> str:
         """
         Send a contact request from sender to receiver and wait for confirmation.
 
@@ -24,8 +24,8 @@ class MessengerSteps(NetworkConditionsSteps):
         This ensures the request has been delivered before proceeding with other operations.
 
         Args:
-            sender: StatusBackend instance of the sender (defaults to self.sender)
-            receiver: StatusBackend instance of the receiver (defaults to self.receiver)
+            sender: StatusBackend instance of the sender
+            receiver: StatusBackend instance of the receiver
 
         Returns:
             str: The message ID of the sent contact request
@@ -39,14 +39,12 @@ class MessengerSteps(NetworkConditionsSteps):
         receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id)
         return message_id
 
-    def accept_contact_request_and_wait_for_signal_to_be_received(self, message_id, sender=None, receiver=None):
-        sender = sender or self.sender
-        receiver = receiver or self.receiver
+    def accept_contact_request_and_wait_for_signal_to_be_received(self, message_id, sender, receiver):
         receiver.wakuext_service.accept_contact_request(message_id)
         accepted_signal = f"@{receiver.public_key} accepted your contact request"
         sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
 
-    def make_contacts(self, sender=None, receiver=None) -> str:
+    def make_contacts(self, sender, receiver) -> str:
         """
         Create a contact between sender and receiver.
 
@@ -54,8 +52,8 @@ class MessengerSteps(NetworkConditionsSteps):
         It also checks if the contact request has been accepted by the receiver.
 
         Args:
-            sender: StatusBackend instance of the sender (defaults to self.sender)
-            receiver: StatusBackend instance of the receiver (defaults to self.receiver)
+            sender: StatusBackend instance of the sender
+            receiver: StatusBackend instance of the receiver
 
         Returns:
             str: The message ID of the sent contact request
@@ -261,13 +259,20 @@ class MessengerSteps(NetworkConditionsSteps):
             expected_message=expected_message,
         )
 
-    def create_private_group(self, private_groups_count):
+    def create_private_group(self, private_groups_count, admin, member):
+        """Create one or more private groups between admin and member and validate signals.
+
+        Args:
+            private_groups_count: number of private groups to create
+            admin: node creating the group (required)
+            member: node invited to the group (required)
+        """
         private_groups = []
         for i in range(private_groups_count):
             private_group_name = f"private_group_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
+            response = admin.wakuext_service.create_group_chat_with_members([member.public_key], private_group_name)
 
-            expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
+            expected_group_creation_msg = f"@{admin.public_key} created the group {private_group_name}"
             expected_message = self.get_message_by_content_type(
                 response,
                 content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
@@ -278,7 +283,7 @@ class MessengerSteps(NetworkConditionsSteps):
             time.sleep(0.01)
 
         for i, expected_message in enumerate(private_groups):
-            messages_new_event = self.receiver.find_signal_containing_pattern(
+            messages_new_event = member.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
                 event_pattern=expected_message.get("id"),
                 timeout=60,

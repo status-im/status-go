@@ -2,6 +2,8 @@ package thirdparty
 
 //go:generate go tool mockgen -package=mock_thirdparty -source=market_types.go -destination=mock/market_types.go
 
+import tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+
 type HistoricalPrice struct {
 	Timestamp int64   `json:"time"`
 	Value     float64 `json:"close"`
@@ -32,9 +34,9 @@ type TokenDetails struct {
 
 type MarketDataProvider interface {
 	ID() string
-	FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error)
-	FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]HistoricalPrice, error)
-	FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]HistoricalPrice, error)
-	FetchTokenMarketValues(symbols []string, currency string) (map[string]TokenMarketValues, error)
-	FetchTokenDetails(symbols []string) (map[string]TokenDetails, error)
+	FetchPrices(tokens []*tokentypes.Token, currencies []string) (map[string]map[string]float64, error)
+	FetchHistoricalDailyPrices(token *tokentypes.Token, currency string, limit int, allData bool, aggregate int) ([]HistoricalPrice, error)
+	FetchHistoricalHourlyPrices(token *tokentypes.Token, currency string, limit int, aggregate int) ([]HistoricalPrice, error)
+	FetchTokenMarketValues(tokens []*tokentypes.Token, currency string) (map[string]TokenMarketValues, error)
+	FetchTokenDetails(tokens []*tokentypes.Token) (map[string]TokenDetails, error)
 }

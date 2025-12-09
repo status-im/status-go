@@ -14,13 +14,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/status-im/status-go/contracts/erc721"
-	"github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	mock_transactor "github.com/status-im/status-go/transactions/mock"
 )
@@ -40,7 +42,7 @@ func TestERC721Handler_Comprehensive(t *testing.T) {
 	// Test GetContractAddress
 	contractAddr := common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
 	params := ProcessorInputParams{
-		FromToken: &tokenTypes.Token{Address: contractAddr},
+		FromToken: &tokentypes.Token{Token: &types.Token{Address: contractAddr}},
 	}
 	address, err := handler.GetContractAddress(params)
 	require.NoError(t, err)
@@ -58,17 +60,17 @@ func TestERC721Handler_WithMocks(t *testing.T) {
 	handler := NewERC721Handler(nil, mockTransactor)
 
 	testTx := ethTypes.NewTransaction(1, common.HexToAddress("0xabcd"), big.NewInt(0), 21000, big.NewInt(1000000000), []byte{})
-	contractAddress := types.Address(common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"))
+	contractAddress := cryptotypes.Address(common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"))
 
 	// Test BuildTransactionV2
 	buildArgs := &wallettypes.SendTxArgs{
 		FromChainID: walletCommon.EthereumMainnet,
-		From:        types.HexToAddress("0x1234567890123456789012345678901234567890"),
+		From:        cryptotypes.HexToAddress("0x1234567890123456789012345678901234567890"),
 		To:          &contractAddress,
 		Gas:         (*hexutil.Uint64)(new(uint64)),
 		GasPrice:    (*hexutil.Big)(big.NewInt(1000000000)),
 		Value:       (*hexutil.Big)(big.NewInt(0)),
-		Data:        types.HexBytes("test_data"),
+		Data:        cryptotypes.HexBytes("test_data"),
 	}
 
 	mockTransactor.EXPECT().ValidateAndBuildTransaction(walletCommon.EthereumMainnet, *buildArgs, int64(-1)).Return(testTx, uint64(1), nil)
@@ -99,7 +101,7 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			params := ProcessorInputParams{
-				FromToken: &tokenTypes.Token{Symbol: tc.tokenID},
+				FromToken: &tokentypes.Token{Token: &types.Token{Symbol: tc.tokenID}},
 				FromAddr:  fromAddr,
 				ToAddr:    toAddr,
 			}
@@ -132,7 +134,7 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 	errorCases := []string{"invalid_token", "", "abc123"}
 	for _, tokenID := range errorCases {
 		params := ProcessorInputParams{
-			FromToken: &tokenTypes.Token{Symbol: tokenID},
+			FromToken: &tokentypes.Token{Token: &types.Token{Symbol: tokenID}},
 			FromAddr:  fromAddr,
 			ToAddr:    toAddr,
 		}
@@ -142,7 +144,7 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 
 	// Test with invalid function name
 	validParams := ProcessorInputParams{
-		FromToken: &tokenTypes.Token{Symbol: "123"},
+		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: "123"}},
 		FromAddr:  fromAddr,
 		ToAddr:    toAddr,
 	}
@@ -157,10 +159,10 @@ func TestERC721Handler_Integration(t *testing.T) {
 	contractAddr := common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
 	params := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokenTypes.Token{
+		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: contractAddr,
 			Symbol:  "789",
-		},
+		}},
 		FromAddr: common.HexToAddress("0x1234567890123456789012345678901234567890"),
 		ToAddr:   common.HexToAddress("0x5678901234567890123456789012345678901234"),
 	}

@@ -4,16 +4,13 @@ import (
 	"database/sql"
 	"time"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/browsers"
-
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/instrumentation/trace"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -21,6 +18,9 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 )
@@ -93,6 +93,7 @@ type config struct {
 	pushNotificationServer       PushNotificationServer
 
 	logger *zap.Logger
+	tracer trace.Tracer
 
 	outputMessagesCSV bool
 
@@ -117,6 +118,8 @@ func messengerDefaultConfig() config {
 	c.codeControlFlags.AutoRequestHistoricMessages = true
 	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
 
+	c.tracer = trace.NewNoopTracer()
+
 	return c
 }
 
@@ -134,6 +137,13 @@ func WithSystemMessagesTranslations(t map[protobuf.MembershipUpdateEvent_EventTy
 func WithCustomLogger(logger *zap.Logger) Option {
 	return func(c *config) error {
 		c.logger = logger
+		return nil
+	}
+}
+
+func WithTracer(tracer trace.Tracer) Option {
+	return func(c *config) error {
+		c.tracer = tracer
 		return nil
 	}
 }

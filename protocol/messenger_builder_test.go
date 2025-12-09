@@ -7,12 +7,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -45,7 +47,7 @@ type testMessengerConfig struct {
 
 func (tmc *testMessengerConfig) complete() error {
 	if len(tmc.name) == 0 {
-		tmc.name = uuid.NewString()
+		tmc.name = uuid.NewString()[0:6]
 	}
 
 	if tmc.privateKey == nil {
@@ -131,6 +133,7 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 			TimeSource:     &testTimeSource{},
 		},
 		messaging.WithLogger(config.logger),
+		messaging.WithTracer(trace.NewTracer(otel.Tracer("messaging_"+config.name))),
 		messaging.WithSQLitePersistence(appDb),
 	)
 	if err != nil {
@@ -145,7 +148,11 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		"",
 	)
 
-	tokenManager := token.NewTokenManager(walletDb, nil, nil, network.NewManager(appDb, nil), appDb, nil, nil, nil, nil, token.NewPersistence(walletDb))
+	tokenManager, err := token.NewTokenManager(walletDb, nil, nil, network.NewManager(appDb, nil), appDb, nil, nil, nil,
+		nil, time.Hour, time.Hour)
+	if err != nil {
+		return nil, err
+	}
 
 	options := []Option{
 		WithCustomLogger(config.logger),
@@ -160,6 +167,7 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 		WithENSVerifier(ensVerifier),
 		WithMessageSigner(NewSignerStub()),
 		WithTokenManager(tokenManager),
+		WithTracer(trace.NewTracer(otel.Tracer("messenger_" + config.name))),
 	}
 	options = append(options, config.extraOptions...)
 

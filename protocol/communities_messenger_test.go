@@ -3149,7 +3149,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_OutdatedDescription() {
 
 	// Then make other device handle sync message with outdated community description
 	messageState := aliceOtherDevice.buildMessageState()
-	err = aliceOtherDevice.handleSyncInstallationCommunity(messageState, syncCommunityMsg)
+	err = aliceOtherDevice.handleSyncInstallationCommunity(context.Background(), messageState, syncCommunityMsg)
 	s.Require().NoError(err)
 
 	// Then community should not be left
@@ -3189,7 +3189,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_LeftCommunity() {
 
 	// Then make other device handle sync message with outdated community description
 	messageState := aliceOtherDevice.buildMessageState()
-	err = aliceOtherDevice.handleSyncInstallationCommunity(messageState, syncCommunityMsg)
+	err = aliceOtherDevice.handleSyncInstallationCommunity(context.Background(), messageState, syncCommunityMsg)
 	s.Require().NoError(err)
 
 	// Then community should not be joined
@@ -3579,7 +3579,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	statusMessage := common.StatusMessage{}
 	statusMessage.TransportLayer.Dst = community.PublicKey()
-	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
+	err = s.owner.HandleCommunityRequestToJoin(context.Background(), messageState, requestToJoinProto, &statusMessage)
 
 	s.Require().ErrorContains(err, "can't request access")
 }
@@ -3960,7 +3960,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 		RevealedAccounts: requestToJoin1.RevealedAccounts,
 	}
 
-	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
+	err = s.owner.HandleCommunityRequestToJoin(context.Background(), messageState, requestToJoinProto, &statusMessage)
 	s.Require().NoError(err)
 	ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
 	// Check Alice has successfully joined at owner side, Because message order was correct
@@ -4019,7 +4019,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 		Accepted:    true,
 	}
 
-	err = s.alice.HandleCommunityRequestToJoinResponse(messageState, requestToJoinCancelProto, &statusMessage)
+	err = s.alice.HandleCommunityRequestToJoinResponse(context.Background(), messageState, requestToJoinCancelProto, &statusMessage)
 	s.Require().NoError(err)
 	aliceJoinedCommunities, err := s.alice.JoinedCommunities()
 	s.Require().NoError(err)
@@ -4048,7 +4048,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 		Accepted:    true,
 	}
 
-	err = s.alice.HandleCommunityRequestToJoinResponse(messageState, requestToJoinResponseProto, &statusMessage)
+	err = s.alice.HandleCommunityRequestToJoinResponse(context.Background(), messageState, requestToJoinResponseProto, &statusMessage)
 	s.Require().NoError(err)
 	// Make sure alice is NOT a member of the community that she cancelled her request to join to
 	s.Require().False(community.HasMember(s.alice.IdentityPublicKey()))
@@ -4655,14 +4655,14 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 		},
 	}
 
-	err = s.alice.HandleCommunityRequestToJoinResponse(state, requestToJoinResponse, nil)
+	err = s.alice.HandleCommunityRequestToJoinResponse(context.Background(), state, requestToJoinResponse, nil)
 	s.Require().Error(err, ErrOutdatedCommunityRequestToJoin)
 
 	// alice receives new request to join when she's already joined
 	// Note: requestToJoinResponse clock is stored as milliseconds, but requestToJoin in database stored
 	// as seconds
 	requestToJoinResponse.Clock = requestToJoinResponse.Clock + 1000
-	err = s.alice.HandleCommunityRequestToJoinResponse(state, requestToJoinResponse, nil)
+	err = s.alice.HandleCommunityRequestToJoinResponse(context.Background(), state, requestToJoinResponse, nil)
 	s.Require().NoError(err)
 }
 

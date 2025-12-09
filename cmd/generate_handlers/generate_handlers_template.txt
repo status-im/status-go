@@ -4,7 +4,8 @@
 package protocol
 
 import (
-        "errors"
+	"context"
+	"errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -15,11 +16,11 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
-func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *common.StatusMessage, filter messagingtypes.ChatFilter, fromArchive bool) error {
+func (m *Messenger) dispatchToHandler(ctx context.Context, messageState *ReceivedMessageState, protoBytes []byte, msg *common.StatusMessage, filter messagingtypes.ChatFilter, fromArchive bool) error {
 	switch msg.ApplicationLayer.Type {
 	{{ range .}}
            case protobuf.ApplicationMetadataMessage_{{.EnumValue}}:
-		return m.{{.MethodName}}(messageState, protoBytes, msg, filter{{ if .FromArchiveArg }}, fromArchive{{ end }})
+		return m.{{.MethodName}}(ctx, messageState, protoBytes, msg, filter{{ if .FromArchiveArg }}, fromArchive{{ end }})
         {{ end }}
 	}
 	m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
@@ -27,8 +28,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 }
 
 {{ range . }}
-func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoBytes []byte, msg *common.StatusMessage, filter messagingtypes.ChatFilter{{ if .FromArchiveArg }}, fromArchive bool{{ end }}) error {
+func (m *Messenger) {{.MethodName}}(ctx context.Context, messageState *ReceivedMessageState, protoBytes []byte, msg *common.StatusMessage, filter messagingtypes.ChatFilter{{ if .FromArchiveArg }}, fromArchive bool{{ end }}) error {
 	m.logger.Info("handling {{ .ProtobufName}}")
+
 	{{ if .SyncMessage }}
 	if !crypto.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		m.logger.Warn("not coming from us, ignoring")
@@ -37,7 +39,7 @@ func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoByt
 	{{ end }}
 
 	{{ if .ProcessRaw }}
-	return m.Handle{{.ProtobufName}}(messageState, protoBytes, msg)
+	return m.Handle{{.ProtobufName}}(ctx, messageState, protoBytes, msg)
 	{{ else }}
 	p := &protobuf.{{.ProtobufName}}{}
 	err := proto.Unmarshal(protoBytes, p)
@@ -47,7 +49,7 @@ func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoByt
 
 	m.outputToCSV(msg.TransportLayer.Message.Timestamp, msg.ApplicationLayer.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic(), filter.ChatID(), msg.ApplicationLayer.Type, p)
 
-	return m.Handle{{.ProtobufName}}(messageState, p, msg{{ if .FromArchiveArg }}, fromArchive {{ end }})
+	return m.Handle{{.ProtobufName}}(ctx, messageState, p, msg{{ if .FromArchiveArg }}, fromArchive {{ end }})
 	{{ end }}
 }
 

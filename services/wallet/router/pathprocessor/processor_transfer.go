@@ -36,16 +36,14 @@ func (s *TransferProcessor) Name() string {
 }
 
 func (s *TransferProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
-	if params.FromChain == nil || params.ToChain == nil {
-		return false, ErrNoChainSet
+	if params.FromToken == nil || params.ToToken == nil {
+		return false, ErrToAndFromTokensMustBeSet
 	}
-	if params.FromToken == nil {
-		return false, ErrNoTokenSet
+	if params.FromToken.ChainID != params.ToToken.ChainID ||
+		params.FromToken.Address != params.ToToken.Address {
+		return false, ErrFromAndToTokensMustBeSame
 	}
-	if params.ToToken != nil {
-		return false, ErrToTokenShouldNotBeSet
-	}
-	return params.FromChain.ChainID == params.ToChain.ChainID, nil
+	return true, nil
 }
 
 func (s *TransferProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
@@ -84,7 +82,7 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams, input []byt
 	var err error
 
 	if params.FromToken.IsNative() {
-		estimation, err = s.transactor.EstimateGas(params.FromChain, params.FromAddr, params.ToAddr, params.AmountIn, input)
+		estimation, err = s.transactor.EstimateGas(params.FromChain.ChainID, params.FromAddr, params.ToAddr, params.AmountIn, input)
 		if err != nil {
 			return 0, createTransferErrorResponse(err)
 		}

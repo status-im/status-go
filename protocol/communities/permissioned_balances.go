@@ -9,10 +9,13 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
+	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 type PermissionedBalance struct {
@@ -223,7 +226,7 @@ func keepRoleTokenPermissions(tokenPermissions map[string]*CommunityTokenPermiss
 // criteria when they refer to the same asset (by symbol).
 func (m *Manager) GetPermissionedBalances(
 	ctx context.Context,
-	communityID types.HexBytes,
+	communityID cryptotypes.HexBytes,
 	accountAddresses []gethcommon.Address,
 ) (map[gethcommon.Address][]PermissionedBalance, error) {
 	community, err := m.GetByID(communityID)
@@ -266,7 +269,14 @@ func (m *Manager) GetPermissionedBalances(
 	erc20ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsSet)
 	erc721ChainIDs := calculateChainIDsSet(accountsAndChainIDs, erc721ChainIDsSet)
 
-	erc20Balances, err := m.tokenBalanceManager.GetBalancesByChain(ctx, accounts, erc20TokenAddresses, erc20ChainIDs)
+	tokens := make([]*tokentypes.Token, 0)
+	for _, chainID := range erc20ChainIDs {
+		for _, tokenAddress := range erc20TokenAddresses {
+			tokens = append(tokens, &tokentypes.Token{Token: &types.Token{ChainID: chainID, Address: tokenAddress}})
+		}
+	}
+
+	erc20Balances, err := m.tokenBalanceManager.GetBalancesByChain(ctx, accounts, tokens)
 	if err != nil {
 		return nil, err
 	}

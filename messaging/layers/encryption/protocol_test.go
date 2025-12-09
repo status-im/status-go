@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"context"
 	"testing"
 
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
@@ -8,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/t/helpers"
@@ -41,6 +43,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		NewSQLitePersistence(db),
 		"1",
 		s.logger.With(zap.String("user", "alice")),
+		trace.NewNoopTracer(),
 	)
 
 	db, err = helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
@@ -55,6 +58,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		NewSQLitePersistence(db),
 		"2",
 		s.logger.With(zap.String("user", "bob")),
+		trace.NewNoopTracer(),
 	)
 }
 
@@ -119,7 +123,7 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadEncryptedMessage() {
 	s.Require().NotNil(msg)
 
 	// Bob is able to decrypt the message
-	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, msg, []byte("message-id"))
+	unmarshaledMsg, err := s.bob.HandleMessage(context.Background(), bobKey, &aliceKey.PublicKey, msg, []byte("message-id"))
 	s.NoError(err)
 	s.NotNil(unmarshaledMsg)
 
@@ -154,7 +158,7 @@ func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
 
 	s.Require().Equal(uint32(1), signedPreKey.GetProtocolVersion())
 
-	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, msgSpec.Message, []byte("message-id"))
+	_, err = s.bob.HandleMessage(context.Background(), bobKey, &aliceKey.PublicKey, msgSpec.Message, []byte("message-id"))
 	s.NoError(err)
 
 	s.Require().NoError(s.bob.Stop())

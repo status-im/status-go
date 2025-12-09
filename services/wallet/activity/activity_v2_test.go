@@ -14,6 +14,8 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 
+	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto/types"
@@ -26,7 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -38,9 +40,6 @@ const (
 	DefaultNonce     = 1
 	TestBlockNumber  = 16777216 // 0x1000000
 
-	TestChainID = uint64(1)
-	TestAsset   = "ETH"
-
 	DefaultLimit  = 10
 	DefaultOffset = 0
 )
@@ -50,6 +49,20 @@ var (
 	TestReceiverAddr  = eth.HexToAddress("0x2222222222222222222222222222222222222222")
 	TestExternalAddr  = eth.HexToAddress("0x3333333333333333333333333333333333333333")
 	TestExternalAddr2 = eth.HexToAddress("0x4444444444444444444444444444444444444444")
+
+	TestEthereumChainToken = &tokentypes.Token{
+		Token: &wsdktypes.Token{
+			Address: eth.HexToAddress("0x"),
+			ChainID: 1,
+		},
+	}
+
+	TestPolygonChainToken = &tokentypes.Token{
+		Token: &wsdktypes.Token{
+			Address: eth.HexToAddress("0x"),
+			ChainID: 137,
+		},
+	}
 )
 
 // setupTestDB creates an in-memory SQLite database for testing
@@ -63,13 +76,15 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 }
 
 // createRouteInputParams creates route input parameters for testing
-func createRouteInputParams(uuid string, fromAddr eth.Address, toAddr eth.Address, value *big.Int, asset string) *requests.RouteInputParams {
+func createRouteInputParams(uuid string, fromAddr eth.Address, toAddr eth.Address, value *big.Int, fromTokenKey string,
+	toTokenKey string) *requests.RouteInputParams {
 	return &requests.RouteInputParams{
 		Uuid:               uuid,
 		AddrFrom:           fromAddr,
 		AddrTo:             toAddr,
 		AmountIn:           (*hexutil.Big)(value),
-		TokenID:            asset,
+		TokenKey:           fromTokenKey,
+		ToTokenKey:         toTokenKey,
 		SendType:           0,
 		SlippagePercentage: 0,
 	}
@@ -100,20 +115,14 @@ func createTransactionData(fromAddr eth.Address, toAddr eth.Address, value *big.
 }
 
 // createRouterPath creates a router path for testing
-func createRouterPath(chainID uint64, asset string, value *big.Int) *routes.Path {
+func createRouterPath(fromToken, toToken *tokentypes.Token, value *big.Int) *routes.Path {
 	return &routes.Path{
 		FromChain: &params.Network{
-			ChainID: chainID,
+			ChainID: fromToken.ChainID,
 		},
-		FromToken: &tokenTypes.Token{
-			Symbol:  asset,
-			ChainID: chainID,
-		},
-		ToToken: &tokenTypes.Token{
-			Symbol:  asset,
-			ChainID: chainID,
-		},
-		AmountIn: (*hexutil.Big)(value),
+		FromToken: fromToken,
+		ToToken:   toToken,
+		AmountIn:  (*hexutil.Big)(value),
 	}
 }
 
@@ -145,17 +154,19 @@ func saveTrackedTransaction(t *testing.T, db *sql.DB, chainID uint64, txHash eth
 	require.NoError(t, err)
 }
 
-func insertTestSavedTransaction(t *testing.T, db *sql.DB, chainID uint64, txHash eth.Hash, fromAddr eth.Address, toAddr eth.Address, value *big.Int, asset string, timestamp int64, uuid string) {
-	routeInputParams := createRouteInputParams(uuid, fromAddr, toAddr, value, asset)
+func insertTestSavedTransaction(t *testing.T, db *sql.DB, txHash eth.Hash, fromAddr eth.Address, toAddr eth.Address,
+	value *big.Int, fromToken *tokentypes.Token, toToken *tokentypes.Token, timestamp int64, uuid string) {
+	routeInputParams := createRouteInputParams(uuid, fromAddr, toAddr, value, fromToken.Key(), toToken.Key())
 	tx := createEthereumTransaction(toAddr, value)
 	txData := createTransactionData(fromAddr, toAddr, value, txHash, tx)
-	routerPath := createRouterPath(chainID, asset, value)
+	routerPath := createRouterPath(fromToken, toToken, value)
 
 	saveRouteData(t, db, routeInputParams, routerPath, txData)
-	saveTrackedTransaction(t, db, chainID, txHash, timestamp)
+	saveTrackedTransaction(t, db, fromToken.ChainID, txHash, timestamp)
 }
 
-func insertTestAlchemyTransfer(t *testing.T, db *sql.DB, chainID uint64, address eth.Address, txHash eth.Hash, timestamp int64, value float64, asset string, fromAddr eth.Address, toAddr eth.Address) {
+func insertTestAlchemyTransfer(t *testing.T, db *sql.DB, address eth.Address, txHash eth.Hash, timestamp int64,
+	value float64, fromToken *tokentypes.Token, fromAddr eth.Address, toAddr eth.Address) {
 	blockNum := big.NewInt(TestBlockNumber)
 
 	ethFloat := big.NewFloat(value)
@@ -168,7 +179,7 @@ func insertTestAlchemyTransfer(t *testing.T, db *sql.DB, chainID uint64, address
 		FromAddress: fromAddr,
 		ToAddress:   &toAddr,
 		Value:       value,
-		Asset:       asset,
+		Asset:       fromToken.Key(),
 		UniqueID:    fmt.Sprintf("%s:external", txHash.Hex()),
 		Hash:        txHash,
 		RawContract: alchemy.RawContract{
@@ -182,30 +193,31 @@ func insertTestAlchemyTransfer(t *testing.T, db *sql.DB, chainID uint64, address
 	}
 
 	persistence := alchemy.NewPersistence(db)
-	err := persistence.SaveTransfers([]alchemy.Transfer{transfer}, chainID, address)
+	err := persistence.SaveTransfers([]alchemy.Transfer{transfer}, fromToken.ChainID, address)
 	require.NoError(t, err)
 }
 
 // Creates internal transfer where sender account sends to receiver account (both in our wallet)
-func createInternalTransferScenario(t *testing.T, db *sql.DB, senderAddr eth.Address, receiverAddr eth.Address, txHash eth.Hash, timestamp int64, value float64, asset string) {
-	chainID := TestChainID
+func createInternalTransferScenario(t *testing.T, db *sql.DB, senderAddr eth.Address, receiverAddr eth.Address, txHash eth.Hash,
+	timestamp int64, value float64, fromToken *tokentypes.Token, toToken *tokentypes.Token) {
 	uuid := fmt.Sprintf("uuid-%d", timestamp)
 
 	ethFloat := big.NewFloat(value)
 	weiFloat := new(big.Float).Mul(ethFloat, big.NewFloat(gethParams.Ether))
 	weiValue, _ := weiFloat.Int(nil)
 
-	insertTestSavedTransaction(t, db, chainID, txHash, senderAddr, receiverAddr, weiValue, asset, timestamp, uuid)
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, txHash, timestamp, value, asset, senderAddr, receiverAddr)
-	insertTestAlchemyTransfer(t, db, chainID, receiverAddr, txHash, timestamp, value, asset, senderAddr, receiverAddr)
+	insertTestSavedTransaction(t, db, txHash, senderAddr, receiverAddr, weiValue, fromToken, toToken, timestamp, uuid)
+	insertTestAlchemyTransfer(t, db, senderAddr, txHash, timestamp, value, fromToken, senderAddr, receiverAddr)
+	insertTestAlchemyTransfer(t, db, receiverAddr, txHash, timestamp, value, fromToken, senderAddr, receiverAddr)
 }
 
 // insertTestPendingTransaction inserts a pending transaction for testing
-func insertTestPendingTransaction(t *testing.T, db *sql.DB, chainID uint64, txHash eth.Hash, fromAddr eth.Address, toAddr eth.Address, value *big.Int, asset string, timestamp int64, uuid string) {
-	routeInputParams := createRouteInputParams(uuid, fromAddr, toAddr, value, asset)
+func insertTestPendingTransaction(t *testing.T, db *sql.DB, chainID uint64, txHash eth.Hash, fromAddr eth.Address, toAddr eth.Address,
+	value *big.Int, fromToken *tokentypes.Token, toToken *tokentypes.Token, timestamp int64, uuid string) {
+	routeInputParams := createRouteInputParams(uuid, fromAddr, toAddr, value, fromToken.Key(), toToken.Key())
 	tx := createEthereumTransaction(toAddr, value)
 	txData := createTransactionData(fromAddr, toAddr, value, txHash, tx)
-	routerPath := createRouterPath(chainID, asset, value)
+	routerPath := createRouterPath(fromToken, toToken, value)
 
 	saveRouteData(t, db, routeInputParams, routerPath, txData)
 
@@ -239,21 +251,19 @@ func TestGetTransactionsOrder_SenderView(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	externalAddr := TestExternalAddr
 	txHash := eth.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	timestamp := int64(1757333323)
 
-	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestAsset)
+	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestEthereumChainToken, TestEthereumChainToken)
 
 	otherTxHash := eth.HexToHash("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, otherTxHash, timestamp-1000, 0.002, TestAsset,
-		externalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, otherTxHash, timestamp-1000, 0.002, TestEthereumChainToken, externalAddr, senderAddr)
 
 	addresses := []eth.Address{senderAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -300,21 +310,19 @@ func TestGetTransactionsOrder_ReceiverView(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	externalAddr := TestExternalAddr2
 	txHash := eth.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	timestamp := int64(1757333323)
 
-	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestAsset)
+	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestEthereumChainToken, TestEthereumChainToken)
 
 	otherTxHash := eth.HexToHash("0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
-	insertTestAlchemyTransfer(t, db, chainID, receiverAddr, otherTxHash, timestamp-2000, 0.003, TestAsset,
-		externalAddr, receiverAddr)
+	insertTestAlchemyTransfer(t, db, receiverAddr, otherTxHash, timestamp-2000, 0.003, TestEthereumChainToken, externalAddr, receiverAddr)
 
 	addresses := []eth.Address{receiverAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -367,7 +375,6 @@ func TestGetTransactionsOrder_AggregatedView(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	externalAddr := TestExternalAddr
@@ -379,16 +386,14 @@ func TestGetTransactionsOrder_AggregatedView(t *testing.T) {
 
 	baseTimestamp := int64(1757333323)
 
-	createInternalTransferScenario(t, db, senderAddr, receiverAddr, internalTxHash, baseTimestamp, 0.001, TestAsset)
+	createInternalTransferScenario(t, db, senderAddr, receiverAddr, internalTxHash, baseTimestamp, 0.001, TestEthereumChainToken, TestEthereumChainToken)
 
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, externalTxHash1, baseTimestamp-1000, 0.002, TestAsset,
-		externalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, externalTxHash1, baseTimestamp-1000, 0.002, TestEthereumChainToken, externalAddr, senderAddr)
 
-	insertTestAlchemyTransfer(t, db, chainID, receiverAddr, externalTxHash2, baseTimestamp-2000, 0.003, TestAsset,
-		externalAddr2, receiverAddr)
+	insertTestAlchemyTransfer(t, db, receiverAddr, externalTxHash2, baseTimestamp-2000, 0.003, TestEthereumChainToken, externalAddr2, receiverAddr)
 
 	addresses := []eth.Address{senderAddr, receiverAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -449,7 +454,6 @@ func TestGetTransactionsOrder_PendingPriority(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	externalAddr := TestExternalAddr
@@ -466,16 +470,14 @@ func TestGetTransactionsOrder_PendingPriority(t *testing.T) {
 	weiValue := new(big.Int).Mul(big.NewInt(1), big.NewInt(gethParams.Ether/1000)) // 0.001 ETH
 	uuid := "pending-test-uuid"
 
-	insertTestPendingTransaction(t, db, chainID, pendingTxHash, senderAddr, receiverAddr, weiValue, TestAsset, pendingTimestamp, uuid)
+	insertTestPendingTransaction(t, db, TestEthereumChainToken.ChainID, pendingTxHash, senderAddr, receiverAddr, weiValue, TestEthereumChainToken, TestEthereumChainToken, pendingTimestamp, uuid)
 
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, otherTxHash1, otherTimestamp1, 0.002, TestAsset,
-		externalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, otherTxHash1, otherTimestamp1, 0.002, TestEthereumChainToken, externalAddr, senderAddr)
 
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, otherTxHash2, otherTimestamp2, 0.003, TestAsset,
-		externalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, otherTxHash2, otherTimestamp2, 0.003, TestEthereumChainToken, externalAddr, senderAddr)
 
 	addresses := []eth.Address{senderAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -532,7 +534,6 @@ func TestGetTransactionsOrder_MixedStatusOrdering(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	externalAddr := TestExternalAddr
@@ -548,15 +549,16 @@ func TestGetTransactionsOrder_MixedStatusOrdering(t *testing.T) {
 
 	weiValue := new(big.Int).Mul(big.NewInt(1), big.NewInt(gethParams.Ether/1000)) // 0.001 ETH
 
-	insertTestPendingTransaction(t, db, chainID, pendingTxHash, senderAddr, receiverAddr, weiValue, TestAsset, pendingTimestamp, "pending-uuid")
+	insertTestPendingTransaction(t, db, TestEthereumChainToken.ChainID, pendingTxHash, senderAddr, receiverAddr, weiValue, TestEthereumChainToken, TestEthereumChainToken,
+		pendingTimestamp, "pending-uuid")
 
-	insertTestSavedTransaction(t, db, chainID, confirmedTxHash, senderAddr, receiverAddr, weiValue, TestAsset, confirmedTimestamp, "confirmed-uuid")
+	insertTestSavedTransaction(t, db, confirmedTxHash, senderAddr, receiverAddr, weiValue, TestEthereumChainToken, TestEthereumChainToken, confirmedTimestamp,
+		"confirmed-uuid")
 
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, fetchedTxHash, fetchedTimestamp, 0.001, TestAsset,
-		externalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, fetchedTxHash, fetchedTimestamp, 0.001, TestEthereumChainToken, externalAddr, senderAddr)
 
 	addresses := []eth.Address{senderAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -591,9 +593,8 @@ func TestGetTransactionsOrder_EmptyResults(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	addresses := []eth.Address{TestSenderAddr, TestReceiverAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -615,16 +616,15 @@ func TestGetTransactionsOrder_EmptyAddressList(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	txHash := eth.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	timestamp := int64(1757333323)
 
-	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestAsset)
+	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestEthereumChainToken, TestEthereumChainToken)
 
 	addresses := []eth.Address{} // Empty address list
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -649,7 +649,6 @@ func TestGetTransactionsOrder_Pagination(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	externalAddr := TestExternalAddr
@@ -657,25 +656,22 @@ func TestGetTransactionsOrder_Pagination(t *testing.T) {
 	baseTimestamp := int64(1757333323)
 
 	internalTx1Hash := eth.HexToHash("0x1000000000000000000000000000000000000000000000000000000000000000")
-	createInternalTransferScenario(t, db, senderAddr, receiverAddr, internalTx1Hash, baseTimestamp, 0.001, TestAsset)
+	createInternalTransferScenario(t, db, senderAddr, receiverAddr, internalTx1Hash, baseTimestamp, 0.001, TestEthereumChainToken, TestEthereumChainToken)
 
 	internalTx2Hash := eth.HexToHash("0x2000000000000000000000000000000000000000000000000000000000000000")
-	createInternalTransferScenario(t, db, receiverAddr, senderAddr, internalTx2Hash, baseTimestamp-1000, 0.002, TestAsset)
+	createInternalTransferScenario(t, db, receiverAddr, senderAddr, internalTx2Hash, baseTimestamp-1000, 0.002, TestEthereumChainToken, TestEthereumChainToken)
 
 	externalTx1Hash := eth.HexToHash("0x3000000000000000000000000000000000000000000000000000000000000000")
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, externalTx1Hash, baseTimestamp-2000, 0.003, TestAsset,
-		externalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, externalTx1Hash, baseTimestamp-2000, 0.003, TestEthereumChainToken, externalAddr, senderAddr)
 
 	externalTx2Hash := eth.HexToHash("0x4000000000000000000000000000000000000000000000000000000000000000")
-	insertTestAlchemyTransfer(t, db, chainID, receiverAddr, externalTx2Hash, baseTimestamp-3000, 0.004, TestAsset,
-		externalAddr, receiverAddr)
+	insertTestAlchemyTransfer(t, db, receiverAddr, externalTx2Hash, baseTimestamp-3000, 0.004, TestEthereumChainToken, externalAddr, receiverAddr)
 
 	externalTx3Hash := eth.HexToHash("0x5000000000000000000000000000000000000000000000000000000000000000")
-	insertTestAlchemyTransfer(t, db, chainID, senderAddr, externalTx3Hash, baseTimestamp-4000, 0.005, TestAsset,
-		externalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, externalTx3Hash, baseTimestamp-4000, 0.005, TestEthereumChainToken, externalAddr, senderAddr)
 
 	addresses := []eth.Address{senderAddr, receiverAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	allResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 10)
 	require.NoError(t, err)
@@ -719,16 +715,15 @@ func TestGetTransactionsOrder_PaginationEdgeCases(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	chainID := TestChainID
 	senderAddr := TestSenderAddr
 	receiverAddr := TestReceiverAddr
 	txHash := eth.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	timestamp := int64(1757333323)
 
-	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestAsset)
+	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestEthereumChainToken, TestEthereumChainToken)
 
 	addresses := []eth.Address{senderAddr, receiverAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(chainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
 
 	normalResults, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, 0, 10)
 	require.NoError(t, err)
@@ -764,8 +759,6 @@ func TestGetTransactionsOrder_MultipleChains(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	ethereumChainID := uint64(1)  // Ethereum mainnet
-	polygonChainID := uint64(137) // Polygon mainnet
 	senderAddr := TestSenderAddr
 
 	ethTxHash := eth.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111")
@@ -773,26 +766,27 @@ func TestGetTransactionsOrder_MultipleChains(t *testing.T) {
 
 	baseTimestamp := int64(1757333323)
 
-	insertTestAlchemyTransfer(t, db, ethereumChainID, senderAddr, ethTxHash, baseTimestamp, 0.001, TestAsset,
-		TestExternalAddr, senderAddr)
-	insertTestAlchemyTransfer(t, db, polygonChainID, senderAddr, polygonTxHash, baseTimestamp-1000, 0.002, "MATIC",
-		TestExternalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, ethTxHash, baseTimestamp, 0.001, TestEthereumChainToken, TestExternalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, polygonTxHash, baseTimestamp-1000, 0.002, TestPolygonChainToken, TestExternalAddr, senderAddr)
 
 	addresses := []eth.Address{senderAddr}
 
-	ethOnlyResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID)}, Filter{}, DefaultOffset, DefaultLimit)
+	ethOnlyResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}, Filter{}, DefaultOffset, DefaultLimit)
 	require.NoError(t, err)
 	require.Len(t, ethOnlyResults, 1, "Should have 1 transaction on Ethereum")
 	require.Equal(t, ethTxHash, ethOnlyResults[0].Hash, "Should be Ethereum transaction")
-	require.Equal(t, walletCommon.ChainID(ethereumChainID), ethOnlyResults[0].ChainID, "Should have correct chain ID")
+	require.Equal(t, walletCommon.ChainID(TestEthereumChainToken.ChainID), ethOnlyResults[0].ChainID, "Should have correct chain ID")
 
-	polygonOnlyResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(polygonChainID)}, Filter{}, DefaultOffset, DefaultLimit)
+	polygonOnlyResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(TestPolygonChainToken.ChainID)}, Filter{}, DefaultOffset, DefaultLimit)
 	require.NoError(t, err)
 	require.Len(t, polygonOnlyResults, 1, "Should have 1 transaction on Polygon")
 	require.Equal(t, polygonTxHash, polygonOnlyResults[0].Hash, "Should be Polygon transaction")
-	require.Equal(t, walletCommon.ChainID(polygonChainID), polygonOnlyResults[0].ChainID, "Should have correct chain ID")
+	require.Equal(t, walletCommon.ChainID(TestPolygonChainToken.ChainID), polygonOnlyResults[0].ChainID, "Should have correct chain ID")
 
-	allChainsResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID), walletCommon.ChainID(polygonChainID)}, Filter{}, DefaultOffset, DefaultLimit)
+	allChainsResults, err := getTransactionsOrder(context.Background(), db, addresses, []walletCommon.ChainID{
+		walletCommon.ChainID(TestEthereumChainToken.ChainID),
+		walletCommon.ChainID(TestPolygonChainToken.ChainID),
+	}, Filter{}, DefaultOffset, DefaultLimit)
 	require.NoError(t, err)
 	require.Len(t, allChainsResults, 2, "Should have 2 transactions across all chains")
 
@@ -816,20 +810,16 @@ func TestGetTransactionsOrder_SameHashDifferentChains(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	ethereumChainID := uint64(1)
-	polygonChainID := uint64(137)
 	senderAddr := TestSenderAddr
 
 	sameHash := eth.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	baseTimestamp := int64(1757333323)
 
-	insertTestAlchemyTransfer(t, db, ethereumChainID, senderAddr, sameHash, baseTimestamp, 0.001, TestAsset,
-		TestExternalAddr, senderAddr)
-	insertTestAlchemyTransfer(t, db, polygonChainID, senderAddr, sameHash, baseTimestamp-1000, 0.002, "MATIC",
-		TestExternalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, sameHash, baseTimestamp, 0.001, TestEthereumChainToken, TestExternalAddr, senderAddr)
+	insertTestAlchemyTransfer(t, db, senderAddr, sameHash, baseTimestamp-1000, 0.002, TestPolygonChainToken, TestExternalAddr, senderAddr)
 
 	addresses := []eth.Address{senderAddr}
-	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(ethereumChainID), walletCommon.ChainID(polygonChainID)}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID), walletCommon.ChainID(TestPolygonChainToken.ChainID)}
 
 	results, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
 
@@ -840,10 +830,10 @@ func TestGetTransactionsOrder_SameHashDifferentChains(t *testing.T) {
 	foundPolygonTx := false
 	for _, tx := range results {
 		require.Equal(t, sameHash, tx.Hash, "Both transactions should have same hash")
-		if tx.ChainID == walletCommon.ChainID(ethereumChainID) {
+		if tx.ChainID == walletCommon.ChainID(TestEthereumChainToken.ChainID) {
 			foundEthereumTx = true
 		}
-		if tx.ChainID == walletCommon.ChainID(polygonChainID) {
+		if tx.ChainID == walletCommon.ChainID(TestPolygonChainToken.ChainID) {
 			foundPolygonTx = true
 		}
 	}
@@ -870,7 +860,7 @@ func TestGetTransactionsOrder_EmptyChainList(t *testing.T) {
 	txHash := eth.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	timestamp := int64(1757333323)
 
-	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestAsset)
+	createInternalTransferScenario(t, db, senderAddr, receiverAddr, txHash, timestamp, 0.001, TestEthereumChainToken, TestEthereumChainToken)
 
 	addresses := []eth.Address{senderAddr}
 	chainIDs := []walletCommon.ChainID{} // Empty chain ID list

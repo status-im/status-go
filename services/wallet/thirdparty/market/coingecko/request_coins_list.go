@@ -5,49 +5,46 @@ import (
 	"encoding/json"
 	"fmt"
 	netUrl "net/url"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/parsers"
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
-const coinsListURL = "%s/coins/list"
+const (
+	coinsListURL = "%s/coins/list"
+
+	nativeEthTokenID = "ethereum"
+)
 
 type GeckoToken struct {
-	ID          string `json:"id"`
-	Symbol      string `json:"symbol"`
-	Name        string `json:"name"`
-	EthPlatform bool
+	ID        string            `json:"id"`
+	Symbol    string            `json:"symbol"`
+	Name      string            `json:"name"`
+	Platforms map[string]string `json:"platforms"`
 }
 
-func (gt *GeckoToken) UnmarshalJSON(data []byte) error {
-	// Define an auxiliary struct to hold the JSON data
-	var aux struct {
-		ID        string `json:"id"`
-		Symbol    string `json:"symbol"`
-		Name      string `json:"name"`
-		Platforms struct {
-			Ethereum string `json:"ethereum"`
-			// Other platforms can be added here if needed
-		} `json:"platforms"`
-	}
+func (gt *GeckoToken) keys() []string {
+	keys := make([]string, 0)
 
-	// Unmarshal the JSON data into the auxiliary struct
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
+	for platform, contractAddress := range gt.Platforms {
+		if len(contractAddress) != walletcommon.HexAddressLength {
+			continue
+		}
+		chainID, ok := parsers.DefaultCoinGeckoChainsMapper[platform]
+		if !ok {
+			continue
+		}
+		key := types.TokenKey(chainID, gethcommon.HexToAddress(contractAddress))
+		keys = append(keys, key)
 	}
-
-	// Set the fields of GeckoToken from the auxiliary struct
-	gt.ID = aux.ID
-	gt.Symbol = aux.Symbol
-	gt.Name = aux.Name
-
-	// Check if "ethereum" key exists in the platforms map
-	if aux.Platforms.Ethereum != "" {
-		gt.EthPlatform = true
-	} else {
-		gt.EthPlatform = false
-	}
-	return nil
+	return keys
 }
 
-func (c *Client) FetchTokens(ctx context.Context) ([]GeckoToken, error) {
+func (c *Client) fetchTokens(ctx context.Context) ([]GeckoToken, error) {
 
 	params := netUrl.Values{}
 	params.Add("include_platform", "true")

@@ -330,31 +330,11 @@ func (s *Service) getDeps() FilterDependencies {
 	return FilterDependencies{
 		db: s.db,
 		tokenSymbol: func(t ac.Token) string {
-			info := s.tokenManager.LookupTokenIdentity(uint64(t.ChainID), t.Address, t.TokenType == ac.Native)
-			if info == nil {
+			info, err := s.tokenManager.GetTokenByChainAddress(uint64(t.ChainID), t.Address)
+			if err != nil {
 				return ""
 			}
 			return info.Symbol
-		},
-		tokenFromSymbol: func(chainID *w_common.ChainID, symbol string) *ac.Token {
-			var cID *uint64
-			if chainID != nil {
-				cID = new(uint64)
-				*cID = uint64(*chainID)
-			}
-			t, detectedNative := s.tokenManager.LookupToken(cID, symbol)
-			if t == nil {
-				return nil
-			}
-			tokenType := ac.Native
-			if !detectedNative {
-				tokenType = ac.Erc20
-			}
-			return &ac.Token{
-				TokenType: tokenType,
-				ChainID:   w_common.ChainID(t.ChainID),
-				Address:   t.Address,
-			}
 		},
 		currentTimestamp: func() int64 {
 			return time.Now().Unix()

@@ -55,10 +55,10 @@ class WalletService(Service):
     ):
         return self.rpc_request("getEthereumChains")
 
-    def get_token_list(
+    def get_all_token_lists(
         self,
     ):
-        return self.rpc_request("getTokenList")
+        return self.rpc_request("getAllTokenLists")
 
     def get_crypto_on_ramps(
         self,
@@ -70,16 +70,16 @@ class WalletService(Service):
     ):
         return self.rpc_request("getCachedCurrencyFormats")
 
-    def fetch_prices(self, symbols: list, currencies: list):
-        params = [symbols, currencies]
+    def fetch_prices(self, tokens_keys: list, currencies: list):
+        params = [tokens_keys, currencies]
         return self.rpc_request("fetchPrices", params)
 
-    def fetch_market_values(self, symbols: list, currency: str):
-        params = [symbols, currency]
+    def fetch_market_values(self, tokens_keys: list, currency: str):
+        params = [tokens_keys, currency]
         return self.rpc_request("fetchMarketValues", params)
 
-    def fetch_token_details(self, symbols: list):
-        params = [symbols]
+    def fetch_token_details(self, tokens_keys: list):
+        params = [tokens_keys]
         return self.rpc_request("fetchTokenDetails", params)
 
     def get_wallet_connect_active_sessions(self, timestamp: int):

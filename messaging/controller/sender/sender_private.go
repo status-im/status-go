@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
@@ -102,7 +104,7 @@ func (s *Sender) SendPrivate(ctx context.Context, params types.SendPrivateParams
 }
 
 func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*ecdsa.PublicKey, groupID []byte) error {
-	keyExMessageSpecs, err := s.stack.Encryption.GetKeyExMessageSpecs(groupID, s.identity, recipients, false)
+	keyExMessageSpecs, err := s.stack.Encryption.GetKeyExMessageSpecs(ctx, groupID, s.identity, recipients, false)
 	if err != nil {
 		return err
 	}
@@ -112,6 +114,14 @@ func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*e
 			zap.String("recipient", crypto.PubkeyToHex(recipients[i])),
 			zap.Stringer("groupID", cryptotypes.HexBytes(groupID)),
 		)
+
+		ctx, span := s.tracer.Start(ctx, "Sender.SendPrivateHashRatchetKeys",
+			oteltrace.WithAttributes(
+				otelattribute.String("groupID", cryptotypes.ToHex(groupID)),
+				otelattribute.String("recipient", crypto.PubkeyToHex(recipients[i])),
+			),
+		)
+		defer span.End()
 
 		payload, sharedSecretKey, err := s.processAndMarshalMessageSpec(spec)
 		if err != nil {
@@ -187,6 +197,9 @@ func (s *Sender) sendPrivate(ctx context.Context, logger *zap.Logger, params sen
 		return nil, nil, errors.Wrap(err, "failed to segment message")
 	}
 
+	ctx, span := s.tracer.Start(ctx, "Sender.sendPrivate")
+	defer span.End()
+
 	hashes := make([][]byte, 0, len(segments))
 	wakuMessages := make([]*wakutypes.NewMessage, len(segments))
 	for i, segment := range segments {
@@ -198,18 +211,25 @@ func (s *Sender) sendPrivate(ctx context.Context, logger *zap.Logger, params sen
 		wakuMessages[i] = wakuMessage
 		if params.sendOnPersonalTopic {
 			logger.Debug("sending on personal topic")
+			span.AddEvent("sending on personal topic")
 			hash, err = s.stack.Transport.SendPrivateOnPersonalTopic(ctx, wakuMessage, params.recipient)
 		} else if params.sharedSecretKey != nil {
 			logger.Debug("sending on shared secret topic")
+			span.AddEvent("sending on shared secret topic")
 			hash, err = s.stack.Transport.SendPrivateWithSharedSecret(ctx, wakuMessage, params.recipient, params.sharedSecretKey)
 		} else {
 			logger.Debug("sending on partitioned topic")
+			span.AddEvent("sending on partitioned topic")
 			hash, err = s.stack.Transport.SendPrivateWithPartitioned(ctx, wakuMessage, params.recipient)
 		}
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to send message")
 		}
 		hashes = append(hashes, hash)
+	}
+
+	if s.tracer.Enabled() {
+		linkSpanWithHashes(span, hashes)
 	}
 
 	return hashes, wakuMessages, nil

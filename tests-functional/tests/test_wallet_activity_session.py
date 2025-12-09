@@ -9,7 +9,7 @@ from clients.contract_deployers.snt import (
     SNTV2_ABI,
     SNT_TOKEN_CONTROLLER_ABI,
 )
-from resources.constants import DEPLOYER_ACCOUNT
+from resources.constants import DEPLOYER_ACCOUNT, ANVIL_NETWORK_ID, NATIVE_TOKEN_ADDRESS
 from resources.constants import user_1, user_2
 from utils import wallet_utils
 
@@ -32,10 +32,10 @@ class TestWalletActivitySession:
     @staticmethod
     def _token_list_to_token_overrides(token_list):
         token_overrides = []
-        for token_symbol, token_address in token_list.items():
+        for token_chain_id, token_address in token_list.items():
             token_overrides.append(
                 {
-                    "symbol": token_symbol,
+                    "chainId": token_chain_id,
                     "address": token_address,
                 }
             )
@@ -60,7 +60,8 @@ class TestWalletActivitySession:
         self.snt_address = snt_addresses["snt"]
         self.snt_controller_address = snt_addresses["controller"]
         self.communities_deployer = CommunitiesDeployer(foundry_client)
-        self.erc20_token_list = {"SNT": self.snt_address}
+        self.erc20_token_list = {ANVIL_NETWORK_ID: self.snt_address}
+
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
 
         # Create backend
@@ -74,6 +75,7 @@ class TestWalletActivitySession:
         uuid = str(uuid_lib.uuid4())
         amount_in = "0xde0b6b3a7640000"
 
+        native_token_key = wallet_utils.get_token_key(ANVIL_NETWORK_ID, NATIVE_TOKEN_ADDRESS)
         input_params = {
             "uuid": uuid,
             "sendType": 0,
@@ -81,11 +83,11 @@ class TestWalletActivitySession:
             "addrTo": user_2.address,
             "amountIn": amount_in,
             "amountOut": "0x0",
-            "tokenID": "ETH",
+            "tokenKey": native_token_key,
             "tokenIDIsOwnerToken": False,
-            "toTokenID": "",
-            "fromChainID": 31337,
-            "toChainID": 31337,
+            "toTokenKey": native_token_key,
+            "fromChainID": ANVIL_NETWORK_ID,
+            "toChainID": ANVIL_NETWORK_ID,
             "gasFeeMode": 1,
             # params for building tx from route
             "slippagePercentage": 0,

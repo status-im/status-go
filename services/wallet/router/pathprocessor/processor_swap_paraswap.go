@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum"
@@ -12,33 +13,22 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
-
-type SwapParaswapTxArgs struct {
-	wallettypes.SendTxArgs
-	ChainID            uint64  `json:"chainId"`
-	ChainIDTo          uint64  `json:"chainIdTo"`
-	TokenIDFrom        string  `json:"tokenIdFrom"`
-	TokenIDTo          string  `json:"tokenIdTo"`
-	SlippagePercentage float32 `json:"slippagePercentage"`
-}
 
 type SwapParaswapProcessor struct {
 	ethClientGetter rpc.EthClientGetter
 	paraswapClient  paraswap.ClientInterface
 	tokenManager    *walletToken.Manager
 	transactor      transactions.TransactorIface
-	priceRoute      sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Route]
-	transactions    sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Transaction]
+	priceRoute      sync.Map // [fromTokenKey-toTokenKey-amountIn, paraswap.Route]
+	transactions    sync.Map // [fromTokenKey-toTokenKey-amountIn, paraswap.Transaction]
 }
 
 const (
@@ -102,34 +92,23 @@ func (s *SwapParaswapProcessor) Clear() {
 }
 
 func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
-	if params.FromChain == nil || params.ToChain == nil {
-		return false, ErrNoChainSet
-	}
 	if params.FromToken == nil || params.ToToken == nil {
 		return false, ErrToAndFromTokensMustBeSet
 	}
 
-	if params.FromChain.ChainID != params.ToChain.ChainID {
+	if params.FromToken.ChainID != params.ToToken.ChainID {
 		return false, ErrFromAndToChainsMustBeSame
 	}
 
-	if params.FromToken.Symbol == params.ToToken.Symbol {
+	if strings.EqualFold(params.FromToken.Address.Hex(), params.ToToken.Address.Hex()) {
 		return false, ErrFromAndToTokensMustBeDifferent
 	}
 
-	chainID := params.FromChain.ChainID
+	chainID := params.FromToken.ChainID
 	partnerAddress, partnerFeePcnt := getPartnerAddressAndFeePcnt(chainID)
 	s.paraswapClient.SetChainID(chainID)
 	s.paraswapClient.SetPartnerAddress(partnerAddress)
 	s.paraswapClient.SetPartnerFeePcnt(partnerFeePcnt)
-
-	if !params.TestsMode {
-		fromToken := s.tokenManager.FindToken(params.FromChain, params.FromToken.Symbol)
-		params.FromToken = fromToken
-
-		toToken := s.tokenManager.FindToken(params.ToChain, params.ToToken.Symbol)
-		params.ToToken = toToken
-	}
 
 	return true, nil
 }
@@ -175,7 +154,7 @@ func (s *SwapParaswapProcessor) fetchAndStorePriceRoute(params ProcessorInputPar
 		return nil, createSwapParaswapErrorResponse(err)
 	}
 
-	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
+	key := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
 	s.storePriceRoute(key, &priceRoute)
 	return &priceRoute, nil
 }
@@ -183,7 +162,7 @@ func (s *SwapParaswapProcessor) fetchAndStorePriceRoute(params ProcessorInputPar
 func (s *SwapParaswapProcessor) fetchAndStoreTransaction(params ProcessorInputParams) (*paraswap.Transaction, error) {
 	slippageBP := uint(params.SlippagePercentage * 100) // convert to basis points
 
-	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
+	key := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
 	priceRoute, err := s.getPriceRoute(key)
 	if err != nil {
 		return nil, createSwapParaswapErrorResponse(err)
@@ -206,10 +185,8 @@ func (s *SwapParaswapProcessor) fetchAndStoreTransaction(params ProcessorInputPa
 
 func (s *SwapParaswapProcessor) fetchAndStoreTransactionFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*paraswap.Transaction, error) {
 	return s.fetchAndStoreTransaction(ProcessorInputParams{
-		FromChain:          &params.Network{ChainID: sendArgs.FromChainID},
-		ToChain:            &params.Network{ChainID: sendArgs.ToChainID},
-		FromToken:          &tokenTypes.Token{Symbol: sendArgs.FromTokenID},
-		ToToken:            &tokenTypes.Token{Symbol: sendArgs.ToTokenID},
+		FromToken:          sendArgs.FromToken,
+		ToToken:            sendArgs.ToToken,
 		AmountIn:           sendArgs.ValueIn.ToInt(),
 		FromAddr:           common.Address(sendArgs.From),
 		ToAddr:             common.Address(*sendArgs.To),
@@ -289,7 +266,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 		return 0, createENSRegisterProcessorErrorResponse(err)
 	}
 
-	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
+	ethClient, err := s.ethClientGetter.EthClient(params.FromToken.ChainID)
 	if err != nil {
 		return 0, createENSRegisterProcessorErrorResponse(err)
 	}
@@ -312,7 +289,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 }
 
 func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	key := pathProcessorCommon.MakeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID, sendArgs.ValueIn.ToInt())
+	key := pathProcessorCommon.MakeKey(sendArgs.FromToken.Key(), sendArgs.ToToken.Key(), sendArgs.ValueIn.ToInt())
 	tx, err := s.getTransaction(key)
 	if err != nil {
 		tx, err = s.fetchAndStoreTransactionFromSendTxArgs(sendArgs)
@@ -348,7 +325,7 @@ func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxA
 }
 
 func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
-	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
+	key := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
 	priceRoute, err := s.getPriceRoute(key)
 	if err != nil {
 		return nil, createSwapParaswapErrorResponse(err)

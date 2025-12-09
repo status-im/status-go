@@ -628,7 +628,7 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	// Push the backup into second instance
 
 	messageState := alice2.buildMessageState()
-	err = alice2.HandleSyncInstallationCommunity(messageState, syncCommunityMessages[0], nil)
+	err = alice2.HandleSyncInstallationCommunity(context.Background(), messageState, syncCommunityMessages[0], nil)
 
 	s.Require().NoError(err)
 	s.Require().Len(messageState.Response.Communities(), 1)

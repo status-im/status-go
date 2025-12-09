@@ -1,0 +1,62 @@
+services:
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    environment:
+      - cluster.name=jaeger-opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      # disable demo config & security plugin for local usage
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200" # OpenSearch HTTP API (optional, for Kibana/curl/etc.)
+    networks:
+      - jaeger-net
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:latest
+    depends_on:
+      - opensearch
+    ports:
+      - "5601:5601"
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    networks:
+      - jaeger-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP (optional)
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+      # use OpenSearch as storage via the Elasticsearch driver
+      SPAN_STORAGE_TYPE: "elasticsearch"
+      ES_SERVER_URLS: "http://opensearch:9200"
+
+      # for searching tags in OpenSearch
+      ES_TAGS_AS_FIELDS_ALL: "true"
+
+      # disable self-tracing to reduce noise
+      QUERY_SERVICE_ENABLE_TRACING: "false"
+
+    depends_on:
+      - opensearch
+    networks:
+      - jaeger-net
+
+networks:
+  jaeger-net:
+    driver: bridge

@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -129,6 +130,13 @@ func (m *Messenger) sendCurrentUserStatus(ctx context.Context) {
 func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, community *communities.Community) error {
 	logger := m.logger.Named("sendCurrentUserStatusToCommunity")
 
+	ctx, span := m.tracer.Start(ctx, "Messenger.sendCurrentUserStatusToCommunity",
+		oteltrace.WithAttributes(
+			otelattribute.String("communityID", community.IDString()),
+		),
+	)
+	defer span.End()
+
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
 		logger.Debug("m.settings.ShouldBroadcastUserStatus error", zap.Error(err))
@@ -161,6 +169,11 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 		StatusType: protobuf.StatusUpdate_StatusType(status.StatusType),
 		CustomText: status.CustomText,
 	}
+
+	span.SetAttributes(
+		otelattribute.String("statusType", statusUpdate.StatusType.String()),
+		otelattribute.String("customText", statusUpdate.CustomText),
+	)
 
 	encodedMessage, err := proto.Marshal(statusUpdate)
 	if err != nil {
@@ -243,7 +256,7 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	return m.sendUserStatus(ctx, *currStatus)
 }
 
-func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleStatusUpdate(ctx context.Context, state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *common.StatusMessage) error {
 	if err := ValidateStatusUpdate(message); err != nil {
 		return err
 	}

@@ -12,24 +12,20 @@ import (
 
 	"github.com/xeipuuv/gojsonschema"
 
-	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
+	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
 )
 
 const templateText = `package defaulttokenlists
 
 import (
 	"time"
-
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 )
 
-var {{ .TokenListName }} = fetcher.FetchedTokenList{
-	TokenList: fetcher.TokenList{
-		ID:        "{{ .TokenListIdentifier }}",
-		SourceURL: "{{ .TokenListSource }}",
-	},
-	Fetched: time.Unix({{ .FetchedTimestamp }}, 0),
-	JsonData: {{ .JsonData }},
+func init() {
+	{{ .TokenListName }}.ID = "{{ .TokenListIdentifier }}"
+	{{ .TokenListName }}.SourceURL = "{{ .TokenListSource }}"
+	{{ .TokenListName }}.Fetched = time.Unix({{ .FetchedTimestamp }}, 0)
+	{{ .TokenListName }}.JsonData = {{ .JsonData }}
 }
 `
 
@@ -39,6 +35,14 @@ type templateData struct {
 	TokenListSource     string
 	FetchedTimestamp    int64
 	JsonData            string
+}
+
+func formatBytes(data []byte) string {
+	var parts []string
+	for _, b := range data {
+		parts = append(parts, fmt.Sprintf("0x%02x", b))
+	}
+	return fmt.Sprintf("[]byte{%s}", strings.Join(parts, ", "))
 }
 
 func validateDocument(doc string, schemaURL string) (bool, error) {
@@ -93,12 +97,13 @@ func downloadTokens(client *http.Client, key string, source defaulttokenlists.To
 		}
 		return fmt.Sprintf("%s%s", strings.ToUpper(string(s[0])), s[1:])
 	}
+
 	data := templateData{
 		TokenListName:       capitalizedFirstLetter(fmt.Sprintf("%sTokenList", key)),
 		TokenListIdentifier: key,
 		TokenListSource:     source.SourceURL,
 		FetchedTimestamp:    time.Now().Unix(),
-		JsonData:            fmt.Sprintf("`%s`", body),
+		JsonData:            formatBytes(body),
 	}
 
 	tmpl := template.Must(template.New("tokenList").Parse(templateText))

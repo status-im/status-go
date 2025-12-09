@@ -38,8 +38,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/efp"
-	"github.com/status-im/status-go/services/wallet/token"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
@@ -79,11 +78,20 @@ func (api *API) GetLastWalletTokenUpdate() map[common.Address]int64 {
 }
 
 // GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
-// [chainID][account][token]balance
-func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addresses, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+// [chainID][account][tokenAddress]balance
+func (api *API) GetBalancesByChain(ctx context.Context, addresses []common.Address, tokenKeys []string) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	ret := make(map[uint64]map[common.Address]map[common.Address]*hexutil.Big)
 
-	for _, chainID := range chainIDs {
+	tokensPerChain := make(map[uint64][]common.Address)
+	for _, tokenKey := range tokenKeys {
+		token, err := api.s.tokenManager.GetTokenByKey(tokenKey)
+		if err != nil {
+			return nil, err
+		}
+		tokensPerChain[token.ChainID] = append(tokensPerChain[token.ChainID], token.Address)
+	}
+
+	for chainID, tokens := range tokensPerChain {
 		ret[chainID] = make(map[common.Address]map[common.Address]*hexutil.Big)
 		fetchResults, err := api.s.tokenBalancesFetcher.Fetch(ctx, chainID, tokens, addresses)
 		if err != nil {
@@ -109,7 +117,7 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 // The only outlier is the user-triggered refresh, which is handled in API method RestartWalletReloadTimer
 // This will be fully refactored soon to avoid the duplicate storage and simplify the API, for now we just use the tokenbalances Storage
 // and ignore the forceRefresh parameter.
-func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]tokenTypes.StorageToken, error) {
+func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]tokentypes.StorageToken, error) {
 	activeNetworks, err := api.s.rpcClient.GetNetworkManager().GetActiveNetworks()
 	if err != nil {
 		return nil, err
@@ -134,27 +142,47 @@ func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdpart
 	return api.s.decoder.Decode(data)
 }
 
-func (api *API) GetTokenList(ctx context.Context) (*token.ListWrapper, error) {
-	logutils.ZapLogger().Debug("call to get token list")
-	rst := api.s.tokenManager.GetList()
-	logutils.ZapLogger().Debug("result from token list", zap.Int("len", len(rst.Data)))
-	return rst, nil
+// GetAllTokenLists returns all token lists (including native, custom, community token lists).
+func (api *API) GetAllTokenLists(ctx context.Context) ([]*tokentypes.TokenList, error) {
+	return api.s.tokenManager.GetAllTokenLists()
 }
 
-func (api *API) GetTokensAvailableForBridgeOnChain(ctx context.Context, chainID uint64) []*tokenTypes.Token {
+// GetAllTokens returns all unique tokens.
+func (api *API) GetAllTokens(ctx context.Context) ([]*tokentypes.Token, error) {
+	return api.s.tokenManager.GetAllTokens()
+}
+
+// GetTokensOfInterestForActiveNetworksMode returns all unique tokens that are of interest for the current active networks mode (testnet or mainnet).
+func (api *API) GetTokensOfInterestForActiveNetworksMode(ctx context.Context) ([]*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokensOfInterestForActiveNetworksMode()
+}
+
+// GetTokensForActiveNetworksMode returns all unique tokens for the current active networks mode (testnet or mainnet).
+func (api *API) GetTokensForActiveNetworksMode(ctx context.Context) ([]*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokensForActiveNetworksMode()
+}
+
+// GetTokenByChainAddress returns a token that matches the given chain ID and address.
+func (api *API) GetTokenByChainAddress(chainID uint64, addr common.Address) (*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokenByChainAddress(chainID, addr)
+}
+
+// GetTokensByChain returns all tokens for a specific chain.
+func (api *API) GetTokensByChain(chainID uint64) ([]*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokensByChain(chainID)
+}
+
+// GetTokensByKeys returns tokens that match the given keys.
+func (api *API) GetTokensByKeys(keys []string) ([]*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokensByKeys(keys)
+}
+
+func (api *API) TokenAvailableForBridgingViaHop(ctx context.Context, chainID uint64, address common.Address) bool {
 	logutils.ZapLogger().Debug("call to get tokens available for bridge on chain")
-	return api.s.router.GetTokensAvailableForBridgeOnChain(chainID)
+	return api.s.router.TokenAvailableForBridgingViaHop(chainID, address)
 }
 
-// @deprecated
-func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*tokenTypes.Token, error) {
-	logutils.ZapLogger().Debug("call to get tokens")
-	rst, err := api.s.tokenManager.GetTokens(chainID)
-	logutils.ZapLogger().Debug("result from token store", zap.Int("len", len(rst)))
-	return rst, err
-}
-
-func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokenTypes.Token, error) {
+func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get discover token")
 	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)
 	return token, err
@@ -304,31 +332,34 @@ func (api *API) GetFlatEthereumChains(ctx context.Context) ([]*params.Network, e
 }
 
 // @deprecated
-func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
+// FetchPrices fetches prices for a given token keys and currencies. If no tokens are provided, all tokens of interest are fetched.
+func (api *API) FetchPrices(ctx context.Context, tokensKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	logutils.ZapLogger().Debug("call to FetchPrices")
-	return api.s.marketManager.FetchPrices(symbols, currencies)
+	return api.s.marketManager.FetchPrices(tokensKeys, currencies)
 }
 
 // @deprecated
-func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+// FetchTokenMarketValues fetches market values for a given token keys and currency. If no tokens are provided, all tokens of interest are fetched.
+func (api *API) FetchMarketValues(ctx context.Context, tokensKeys []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	logutils.ZapLogger().Debug("call to FetchMarketValues")
-	return api.s.marketManager.FetchTokenMarketValues(symbols, currency)
+	return api.s.marketManager.FetchTokenMarketValues(tokensKeys, currency)
 }
 
-func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+func (api *API) GetHourlyMarketValues(ctx context.Context, tokenKey string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	logutils.ZapLogger().Debug("call to GetHourlyMarketValues")
-	return api.s.marketManager.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
+	return api.s.marketManager.FetchHistoricalHourlyPrices(tokenKey, currency, limit, aggregate)
 }
 
-func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+func (api *API) GetDailyMarketValues(ctx context.Context, tokenKey string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	logutils.ZapLogger().Debug("call to GetDailyMarketValues")
-	return api.s.marketManager.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
+	return api.s.marketManager.FetchHistoricalDailyPrices(tokenKey, currency, limit, allData, aggregate)
 }
 
 // @deprecated
-func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]thirdparty.TokenDetails, error) {
+// FetchTokenDetails fetches token details for a given tokens. If no tokens are provided, all tokens of interest are fetched.
+func (api *API) FetchTokenDetails(ctx context.Context, tokensKeys []string) (map[string]thirdparty.TokenDetails, error) {
 	logutils.ZapLogger().Debug("call to FetchTokenDetails")
-	return api.s.marketManager.FetchTokenDetails(symbols)
+	return api.s.marketManager.FetchTokenDetails(tokensKeys)
 }
 
 // @deprecated we should remove it once clients fully switched to wallet router, `GetSuggestedRoutesAsync` should be used instead
@@ -618,12 +649,12 @@ func (api *API) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reques
 	return api.s.routeExecutionManager.ReevaluateRouterPath(ctx, pathTxIdentity)
 }
 
-func (api *API) GetCachedCurrencyFormats() (currency.FormatPerSymbol, error) {
+func (api *API) GetCachedCurrencyFormats() (currency.FormatPerKey, error) {
 	logutils.ZapLogger().Debug("call to GetCachedCurrencyFormats")
 	return api.s.currency.GetCachedCurrencyFormats()
 }
 
-func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
+func (api *API) FetchAllCurrencyFormats() (currency.FormatPerKey, error) {
 	logutils.ZapLogger().Debug("call to FetchAllCurrencyFormats")
 	return api.s.currency.FetchAllCurrencyFormats()
 }

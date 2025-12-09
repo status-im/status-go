@@ -136,6 +136,9 @@ func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params send
 		return nil, nil, errors.Wrap(err, "failed to segment message")
 	}
 
+	ctx, span := s.tracer.Start(ctx, "Sender.sendPublic")
+	defer span.End()
+
 	hashes := make([][]byte, 0, len(segments))
 	wakuMessages := make([]*wakutypes.NewMessage, len(segments))
 	for i, segment := range segments {
@@ -149,15 +152,21 @@ func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params send
 		wakuMessages[i] = wakuMessage
 		if params.communityPublicKey != nil {
 			logger.Debug("sending community public message")
+			span.AddEvent("sending community public message")
 			hash, err = s.stack.Transport.SendCommunityMessage(ctx, wakuMessage, params.communityPublicKey)
 		} else {
 			logger.Debug("sending public message")
+			span.AddEvent("sending public message")
 			hash, err = s.stack.Transport.SendPublic(ctx, wakuMessage, params.contentTopic)
 		}
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to send message")
 		}
 		hashes = append(hashes, hash)
+	}
+
+	if s.tracer.Enabled() {
+		linkSpanWithHashes(span, hashes)
 	}
 
 	return hashes, wakuMessages, nil

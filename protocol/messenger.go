@@ -17,6 +17,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
@@ -31,6 +33,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -106,6 +109,7 @@ type Messenger struct {
 	mentionsManager           *MentionManager
 	storeNodeRequestsManager  *StoreNodeRequestManager
 	logger                    *zap.Logger
+	tracer                    trace.Tracer
 
 	outputCSV bool
 	csvFile   *os.File
@@ -300,7 +304,7 @@ func NewMessenger(
 		pushNotificationClientConfig = &pushnotificationclient.Config{}
 	}
 
-	sender := common.NewMessageSender(identity, messaging, logger)
+	sender := common.NewMessageSender(identity, messaging, logger, c.tracer)
 
 	sqlitePersistence := newSQLitePersistence(database)
 	// Overriding until we handle different identities
@@ -343,6 +347,7 @@ func NewMessenger(
 	communitiesKeyDistributor := &CommunitiesKeyDistributorImpl{
 		messaging: messaging,
 		sender:    sender,
+		tracer:    c.tracer,
 	}
 
 	communitiesManager, err := communities.NewManager(
@@ -440,6 +445,7 @@ func NewMessenger(
 			database.Close,
 		},
 		logger:                           logger,
+		tracer:                           c.tracer,
 		savedAddressesManager:            savedAddressesManager,
 		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
 	}
@@ -805,8 +811,12 @@ func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvert
 // publishContactCode sends a public message wrapped in the encryption
 // layer, which will propagate our bundle
 func (m *Messenger) publishContactCode() error {
-	var payload []byte
 	m.logger.Debug("sending contact code")
+
+	ctx, span := m.tracer.Start(context.Background(), "Messenger.publishContactCode")
+	defer span.End()
+
+	var payload []byte
 	contactCodeAdvertisement, err := m.buildContactCodeAdvertisement()
 	if err != nil {
 		m.logger.Error("could not build contact code advertisement", zap.Error(err))
@@ -827,6 +837,10 @@ func (m *Messenger) publishContactCode() error {
 		m.logger.Debug("no attached chat identity")
 	}
 
+	span.SetAttributes(
+		otelattribute.Bool("chatIdentityAttached", contactCodeAdvertisement.ChatIdentity != nil),
+	)
+
 	payload, err = proto.Marshal(contactCodeAdvertisement)
 	if err != nil {
 		return err
@@ -839,7 +853,7 @@ func (m *Messenger) publishContactCode() error {
 		Payload:     payload,
 		Priority:    &messagingtypes.LowPriority,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	_, err = m.sender.SendPublic(ctx, contactCodeTopic, rawMessage)
@@ -1712,6 +1726,13 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		return rawMessage, errors.New("no chat found")
 	}
 
+	ctx, span := m.tracer.Start(ctx, "Messenger.dispatchMessage",
+		oteltrace.WithAttributes(
+			otelattribute.Int("chatType", int(chat.ChatType)),
+		),
+	)
+	defer span.End()
+
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
 		publicKey, err := chat.PublicKey()
@@ -1910,6 +1931,19 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 	message.DisplayName = displayName
 
+	ctx, span := m.tracer.Start(ctx, "Messenger.sendChatMessage",
+		oteltrace.WithAttributes(
+			otelattribute.Stringer("messageType", message.MessageType),
+			otelattribute.Stringer("contentType", message.ContentType),
+			otelattribute.String("from", message.From),
+			otelattribute.String("displayName", message.DisplayName),
+			otelattribute.String("chatId", message.ChatId),
+			otelattribute.String("clock", strconv.FormatUint(message.Clock, 10)),
+			otelattribute.String("timestamp", strconv.FormatUint(message.Timestamp, 10)),
+		),
+	)
+	defer span.End()
+
 	replacedText, err := m.mentionsManager.ReplaceWithPublicKey(message.ChatId, message.Text)
 	if err == nil {
 		message.Text = replacedText
@@ -2013,6 +2047,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return err
 		}
+
+		span.SetAttributes(
+			otelattribute.String("ID", message.ID),
+		)
 
 		err = chat.UpdateFromMessage(message, m.getTimesource())
 		if err != nil {
@@ -2472,7 +2510,7 @@ func (m *Messenger) saveEnsUsernameDetailProto(syncMessage *protobuf.SyncEnsUser
 	return ud, nil
 }
 
-func (m *Messenger) HandleSyncEnsUsernameDetail(state *ReceivedMessageState, syncMessage *protobuf.SyncEnsUsernameDetail, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncEnsUsernameDetail(ctx context.Context, state *ReceivedMessageState, syncMessage *protobuf.SyncEnsUsernameDetail, statusMessage *common.StatusMessage) error {
 	ud, err := m.saveEnsUsernameDetailProto(syncMessage)
 	if err != nil {
 		return err
@@ -2971,19 +3009,31 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.C
 
 					logger.Debug("Handling parsed message")
 
+					ctx, span := m.tracer.Start(trace.DeriveRemoteContext([]byte(messageID)), "Messenger.process"+msg.ApplicationLayer.Type.String(),
+						oteltrace.WithAttributes(
+							otelattribute.String("messageID", messageID),
+							otelattribute.Stringer("messageType", msg.ApplicationLayer.Type),
+							otelattribute.String("signer", crypto.PubkeyToHex(msg.ApplicationLayer.SigPubKey)),
+						),
+					)
+					defer span.End()
+
 					switch msg.ApplicationLayer.Type {
 
 					case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
-						err = m.handleChatMessageProtobuf(messageState, msg.ApplicationLayer.Payload, msg, filter, true)
+						err = m.handleChatMessageProtobuf(ctx, messageState, msg.ApplicationLayer.Payload, msg, filter, true)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
+							span.RecordError(errors.Wrap(err, "failed to handle ChatMessage"))
 							continue
 						}
 
 					case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
-						err = m.handlePinMessageProtobuf(messageState, msg.ApplicationLayer.Payload, msg, filter, true)
+						err = m.handlePinMessageProtobuf(ctx, messageState, msg.ApplicationLayer.Payload, msg, filter, true)
 						if err != nil {
 							logger.Warn("failed to handle PinMessage", zap.Error(err))
+							span.RecordError(errors.Wrap(err, "failed to handle PinMessage"))
+							continue
 						}
 					}
 				}
@@ -3109,78 +3159,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 
 			statusMessages := common.NewStatusMessages(handleMessagesResponse.Messages)
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
-
 			for _, msg := range statusMessages {
-				logger := logger.With(zap.String("message-id", msg.ApplicationLayer.ID.String()))
-
-				publicKey := msg.SigPubKey()
-
-				m.handleInstallations(msg.EncryptionLayer.Installations)
-
-				senderID := contacts.ContactIDFromPublicKey(publicKey)
-				ownID := contacts.ContactIDFromPublicKey(m.IdentityPublicKey())
-				logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
-
-				if senderID == ownID {
-					// Skip own messages of certain types
-					if msg.ApplicationLayer.Type == protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT {
-						continue
-					}
-				}
-
-				contact, contactFound := messageState.AllContacts.Load(senderID)
-
-				// Check for messages from blocked users
-				if contactFound && contact.Blocked {
-					continue
-				}
-
-				// Don't process duplicates
-				messageID := types.EncodeHex(msg.ApplicationLayer.ID)
-				exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
+				err := m.processStatusMessage(shhMessage.Hash, messageState, msg, filter, fromArchive, logger)
 				if err != nil {
-					logger.Warn("failed to check message exists", zap.Error(err))
-				}
-				if exists && m.shouldSkipDuplicate(msg.ApplicationLayer.Type) {
-					logger.Debug("skipping duplicate", zap.String("messageID", messageID))
-					continue
-				}
-
-				if !contactFound {
-					c, err := contacts.BuildContact(senderID, publicKey)
-					if err != nil {
-						logger.Info("failed to build contact", zap.Error(err))
-						allMessagesProcessed = false
-						continue
-					}
-					contact = c
-					if msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY {
-						messageState.AllContacts.Store(senderID, contact)
-					}
-				}
-				messageState.CurrentMessageState = &CurrentMessageState{
-					MessageID:        messageID,
-					WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
-					Contact:          contact,
-					PublicKey:        publicKey,
-					StatusMessage:    msg,
-				}
-
-				if msg.ApplicationLayer.Payload != nil {
-
-					err := m.dispatchToHandler(messageState, msg.ApplicationLayer.Payload, msg, filter, fromArchive)
-					if err != nil {
-						allMessagesProcessed = false
-						logger.Warn("failed to process protobuf", zap.String("type", msg.ApplicationLayer.Type.String()), zap.Error(err))
-						if m.unhandledMessagesTracker != nil {
-							m.unhandledMessagesTracker(msg, err)
-						}
-						continue
-					}
-					logger.Debug("Handled parsed message")
-
-				} else {
-					logger.Debug("parsed message is nil")
+					allMessagesProcessed = false
 				}
 			}
 
@@ -3205,6 +3187,98 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 	}
 
 	return m.saveDataAndPrepareResponse(messageState)
+}
+
+func (m *Messenger) processStatusMessage(
+	hash []byte,
+	messageState *ReceivedMessageState,
+	msg *common.StatusMessage,
+	filter messagingtypes.ChatFilter,
+	fromArchive bool,
+	logger *zap.Logger) error {
+	messageID := types.EncodeHex(msg.ApplicationLayer.ID)
+
+	logger = logger.With(zap.String("message-id", messageID))
+	ctx, span := m.tracer.Start(trace.DeriveRemoteContext([]byte(messageID)), "Messenger.process_"+msg.ApplicationLayer.Type.String(),
+		oteltrace.WithAttributes(
+			otelattribute.String("hash", types.EncodeHex(hash)),
+			otelattribute.String("messageID", messageID),
+			otelattribute.Stringer("messageType", msg.ApplicationLayer.Type),
+			otelattribute.String("signer", crypto.PubkeyToHex(msg.ApplicationLayer.SigPubKey)),
+		),
+	)
+	defer span.End()
+
+	publicKey := msg.SigPubKey()
+
+	m.handleInstallations(msg.EncryptionLayer.Installations)
+
+	senderID := contacts.ContactIDFromPublicKey(publicKey)
+	ownID := contacts.ContactIDFromPublicKey(m.IdentityPublicKey())
+	logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
+
+	if senderID == ownID {
+		// Skip own messages of certain types
+		if msg.ApplicationLayer.Type == protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT {
+			return nil
+		}
+	}
+
+	contact, contactFound := messageState.AllContacts.Load(senderID)
+
+	// Check for messages from blocked users
+	if contactFound && contact.Blocked {
+		return nil
+	}
+
+	// Don't process duplicates
+	exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
+	if err != nil {
+		logger.Warn("failed to check message exists", zap.Error(err))
+	}
+	if exists && m.shouldSkipDuplicate(msg.ApplicationLayer.Type) {
+		logger.Debug("skipping duplicate", zap.String("messageID", messageID))
+		return nil
+	}
+
+	if !contactFound {
+		c, err := contacts.BuildContact(senderID, publicKey)
+		if err != nil {
+			err = errors.Wrap(err, "failed to build contact")
+			span.RecordError(err)
+			return err
+		}
+		contact = c
+		if msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY {
+			messageState.AllContacts.Store(senderID, contact)
+		}
+	}
+	messageState.CurrentMessageState = &CurrentMessageState{
+		MessageID:        messageID,
+		WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
+		Contact:          contact,
+		PublicKey:        publicKey,
+		StatusMessage:    msg,
+	}
+
+	if msg.ApplicationLayer.Payload != nil {
+		err := m.dispatchToHandler(ctx, messageState, msg.ApplicationLayer.Payload, msg, filter, fromArchive)
+		if err != nil {
+			logger.Warn("failed to process protobuf", zap.String("type", msg.ApplicationLayer.Type.String()), zap.Error(err))
+			if m.unhandledMessagesTracker != nil {
+				m.unhandledMessagesTracker(msg, err)
+			}
+			err = errors.Wrap(err, "failed to process protobuf")
+			span.RecordError(err)
+			return err
+		}
+		logger.Debug("Handled parsed message")
+	} else {
+		logger.Debug("parsed message is nil")
+		span.AddEvent("app layer message payload is nil")
+	}
+
+	return nil
 }
 
 func (m *Messenger) markDeliveredMessages(acks []cryptotypes.HexBytes) {
@@ -4476,7 +4550,7 @@ func ToVerificationRequest(message *protobuf.SyncVerificationRequest) *verificat
 	}
 }
 
-func (m *Messenger) HandleSyncVerificationRequest(state *ReceivedMessageState, message *protobuf.SyncVerificationRequest, statusMessage *common.StatusMessage) error {
+func (m *Messenger) HandleSyncVerificationRequest(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncVerificationRequest, statusMessage *common.StatusMessage) error {
 	verificationRequest := ToVerificationRequest(message)
 
 	err := m.verificationDatabase.SaveVerificationRequest(verificationRequest)

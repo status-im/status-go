@@ -1,11 +1,5 @@
 package tokentypes
 
-import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
-)
-
 type TokenMarketValues struct {
 	MarketCap       float64 `json:"marketCap"`
 	HighDay         float64 `json:"highDay"`
@@ -16,12 +10,4 @@ type TokenMarketValues struct {
 	Change24hour    float64 `json:"change24hour"`
 	Price           float64 `json:"price"`
 	HasError        bool    `json:"hasError"`
-}
-
-type ChainBalance struct {
-	RawBalance string         `json:"rawBalance"`
-	Balance    *big.Float     `json:"balance"`
-	Address    common.Address `json:"address"`
-	ChainID    uint64         `json:"chainId"`
-	HasError   bool           `json:"hasError"`
 }
