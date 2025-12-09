@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: wakuorg/nwaku:v0.38.1
+    image: quay.io/wakuorg/nwaku-pr:3939
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -25,7 +25,8 @@ services:
       "--shard=64",
       "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
       "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
-      "--tcp-port=60001"
+      "--tcp-port=60001",
+      "--num-shards-in-network=65"
     ]
     depends_on:
       - store
@@ -34,7 +35,7 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: wakuorg/nwaku:v0.38.1
+    image: quay.io/wakuorg/nwaku-pr:3939
     # Publish the nwaku REST API (incl. Store API) on an ephemeral host port so
     # tests on the host can query it without colliding on shared CI hosts.
     # The actual host port is discovered at runtime via the Docker API
@@ -65,7 +66,8 @@ services:
       "--store=true",
       "--store-message-db-url=sqlite:////tmp/waku-store.sqlite3",
       "--store-message-retention-policy=time:86400",
-      "--tcp-port=60002"
+      "--tcp-port=60002",
+      "--num-shards-in-network=65"
     ]
     healthcheck:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
@@ -90,4 +92,3 @@ services:
 
 volumes:
   wakufleetconfig:
-
