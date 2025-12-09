@@ -1080,10 +1080,6 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
-func (api *PublicAPI) SubscribeToPubsubTopic(topic string) error {
-	return api.service.messenger.SubscribeToPubsubTopic(topic)
-}
-
 func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
 	maddr, err := multiaddr.NewMultiaddr(address)
 	if err != nil {
