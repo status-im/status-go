@@ -201,12 +201,15 @@ class Foundry:
         result = self.container.exec_run(generate_cmd)
         return result
 
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
     def get_erc20_balance(self, token_address, owner_address):
         if not self.container:
             raise Exception("Container not found")
 
         balance_cmd = f"cast call {token_address} 'balanceOf(address)' {owner_address} --rpc-url http://anvil:8545"
         result = self.container.exec_run(balance_cmd)
+        if result.exit_code != 0:
+            raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
         return result
 
     def check_contract_exists(self, address: str) -> bool:
