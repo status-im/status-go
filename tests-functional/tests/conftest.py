@@ -198,47 +198,6 @@ def snt_addresses(foundry_client):
         return data
 
 
-# @pytest.fixture(scope="session")
-# def snt_addresses(foundry_client):
-#     logger = logging.getLogger(__name__)
-#     addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "snt_addresses.json")
-#     f = open(addresses_file, "a+")
-#     try:
-#         fcntl.flock(f, fcntl.LOCK_EX)
-#         f.seek(0)
-#
-#         try:
-#             data = json.load(f)
-#             if (
-#                 data is not None
-#                 and foundry_client.check_contract_exists(data["snt"])
-#                 and foundry_client.check_contract_exists(data["controller"])
-#             ):
-#                 logger.info("Using existing SNT deployment addresses")
-#                 return data
-#             else:
-#                 logger.warning("Existing SNT addresses invalid (no code), will redeploy")
-#         except (json.JSONDecodeError, KeyError) as e:
-#             logger.warning(f"Failed to load/parse existing addresses: {e}, will redeploy")
-#         # Deploy new
-#         logger.info("Deploying new SNT token...")
-#         deployer = SNTDeployer(foundry_client)
-#         data = {
-#             "snt": deployer.snt_contract_address,
-#             "controller": deployer.snt_token_controller_address,
-#         }
-#         f.seek(0)
-#         f.truncate(0)
-#         json.dump(data, f, indent=2)
-#         f.flush()
-#         os.fsync(f.fileno())
-#         logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
-#         return data
-#     finally:
-#         fcntl.flock(f, fcntl.LOCK_UN)
-#         f.close()
-
-
 @pytest.fixture(scope="function")
 def snt_token_overrides(snt_addresses):
     return [{"symbol": "SNT", "address": snt_addresses["snt"]}]
