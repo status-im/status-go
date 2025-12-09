@@ -45,8 +45,14 @@ BASE_COMMIT=${1:-origin/${BASE_BRANCH}}
 
 MIGRATION_DIRS=( \
   "protocol/migrations/sqlite" \
+  "protocol/pushnotificationclient/migrations/migrations/sqlite" \
+  "protocol/pushnotificationserver/migrations/migrations/sqlite" \
   "appdatabase/migrations/sql" \
-  "protocol/encryption/migrations/sqlite" \
+  "messaging/common/migrations/sqlite" \
+  "messaging/waku/migrations/migrations/sqlite" \
+  "messaging/layers/encryption/migrations/migrations/sqlite" \
+  "messaging/layers/transport/migrations/migrations/sqlite" \
+  "services/newsfeed/migrations/migrations/sqlite" \
   "walletdatabase/migrations/sql" \
 )
 
