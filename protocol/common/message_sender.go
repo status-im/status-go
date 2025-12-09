@@ -24,7 +24,7 @@ import (
 
 var ErrModifiedRawMessage = errors.New("modified rawMessage")
 
-const sdsForCommunitiesEnabled = true
+const sdsForCommunitiesEnabled = false
 
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey

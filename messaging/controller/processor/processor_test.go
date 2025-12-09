@@ -355,3 +355,31 @@ func (s *ProcessorSuite) TestGetEphemeralKey() {
 
 	s.Require().True(keyMap[crypto.PubkeyToHex(&key.PublicKey)])
 }
+
+func (s *ProcessorSuite) TestSDSWrappedMessages() {
+	payload := []byte("hello")
+	communityID := []byte("community123")
+
+	wrappedPayload, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, communityID)
+	s.Require().NoError(err)
+	s.Require().True(len(wrappedPayload) > 0)
+
+	receivedMsg := types.Message{
+		EncryptionLayer: types.EncryptionLayer{
+			Payload: []byte("encrypted-data"),
+		},
+	}
+
+	err = s.processor.processSDSLayer(&receivedMsg)
+	s.Require().NoError(err)
+	s.Require().Equal(payload, receivedMsg.EncryptionLayer.Payload)
+
+	receivedMsg2 := types.Message{
+		EncryptionLayer: types.EncryptionLayer{
+			Payload: []byte("another-encrypted-data"),
+		},
+	}
+	err = s.processor.processSDSLayer(&receivedMsg2)
+	s.Require().NoError(err)
+	s.Require().Equal(wrappedPayload, receivedMsg2.EncryptionLayer.Payload)
+}
