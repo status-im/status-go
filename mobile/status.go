@@ -814,31 +814,6 @@ func makeJSONResponse(err error) string {
 	return string(outBytes)
 }
 
-// Deprecated: Use ConnectionChangeV2 instead.
-func ConnectionChange(typ string, expensive int) {
-	call(connectionChange, typ, expensive)
-}
-
-// connectionChange handles network state changes as reported
-// by ReactNative (see https://facebook.github.io/react-native/docs/netinfo.html)
-func connectionChange(typ string, expensive int) {
-	statusBackend.ConnectionChange(typ, expensive == 1)
-}
-
-func ConnectionChangeV2(requestJSON string) string {
-	return callWithResponse(connectionChangeV2, requestJSON)
-}
-
-func connectionChangeV2(requestJSON string) string {
-	var request requests.ConnectionChange
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	statusBackend.ConnectionChange(request.Type, request.Expensive)
-	return makeJSONResponse(nil)
-}
-
 // Deprecated: Use AppStateChangeV2 instead.
 func AppStateChange(state string) {
 	call(appStateChange, state)

@@ -1,7 +1,6 @@
 package messaging
 
 import (
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -30,8 +29,4 @@ func (a *API) Publisher() *pubsub.Publisher {
 // GetCurrentTime satisfies the common.TimeSource interface.
 func (a *API) GetCurrentTime() uint64 {
 	return a.core.stack.Transport.GetCurrentTime()
-}
-
-func (a *API) ConnectionChanged(state connection.State) {
-	a.core.connectionChanged(state)
 }

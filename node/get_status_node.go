@@ -21,7 +21,6 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	common2 "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/ipfs"
@@ -481,12 +480,6 @@ func (n *StatusNode) Stop() error {
 // IsRunning confirm that node is running.
 func (n *StatusNode) IsRunning() bool {
 	return n.running.Load()
-}
-
-func (n *StatusNode) ConnectionChanged(state connection.State) {
-	if n.wakuV2ExtSrvc != nil {
-		n.wakuV2ExtSrvc.ConnectionChanged(state)
-	}
 }
 
 func (n *StatusNode) CallInProcessRPC(inputJSON string) string {

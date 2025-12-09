@@ -13,7 +13,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -589,10 +588,6 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 }
 
 func (m *Messenger) canSyncWithStoreNodes() (bool, error) {
-	if m.connectionState.IsExpensive() {
-		return m.settings.CanSyncOnMobileNetwork()
-	}
-
 	return true, nil
 }
 
@@ -764,11 +759,6 @@ func (m *Messenger) SetPinnedMailservers(mailservers map[string]string) error {
 
 func (m *Messenger) RemoveFilters(filters []*messagingtypes.ChatFilter) error {
 	return m.messaging.RemoveFilters(filters)
-}
-
-func (m *Messenger) ConnectionChanged(state connection.State) {
-	m.messaging.ConnectionChanged(state)
-	m.connectionState = state
 }
 
 func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32, error) {

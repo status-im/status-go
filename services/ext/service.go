@@ -21,7 +21,6 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
@@ -385,12 +384,6 @@ func buildMessengerOptions(
 	}))
 
 	return options, nil
-}
-
-func (s *Service) ConnectionChanged(state connection.State) {
-	if s.messenger != nil {
-		s.messenger.ConnectionChanged(state)
-	}
 }
 
 func (s *Service) Messenger() *protocol.Messenger {
