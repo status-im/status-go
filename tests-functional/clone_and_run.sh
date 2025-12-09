@@ -11,8 +11,10 @@ cd /app
 
 rm -rf $GITHUB_REPO
 
-git clone --recursive https://github.com/$GITHUB_ORG/$GITHUB_REPO.git $GITHUB_REPO
+git clone https://github.com/$GITHUB_ORG/$GITHUB_REPO
 cd $GITHUB_REPO
+git submodule deinit --force .
+git submodule update --init --recursive
 
 forge build
 forge script $SMART_CONTRACT_DIR/$SMART_CONTRACT_FILENAME --fork-url=$ETH_RPC_URL --private-key=$PRIVATE_KEY --sender=$SENDER_ADDRESS --broadcast
