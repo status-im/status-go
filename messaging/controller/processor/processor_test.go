@@ -366,7 +366,7 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 
 	receivedMsg := types.Message{
 		EncryptionLayer: types.EncryptionLayer{
-			Payload: []byte("encrypted-data"),
+			Payload: wrappedPayload,
 		},
 	}
 
@@ -374,12 +374,13 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	s.Require().NoError(err)
 	s.Require().Equal(payload, receivedMsg.EncryptionLayer.Payload)
 
+	anotherPayload := []byte("another-message")
 	receivedMsg2 := types.Message{
 		EncryptionLayer: types.EncryptionLayer{
-			Payload: []byte("another-encrypted-data"),
+			Payload: anotherPayload,
 		},
 	}
 	err = s.processor.processSDSLayer(&receivedMsg2)
 	s.Require().NoError(err)
-	s.Require().Equal(wrappedPayload, receivedMsg2.EncryptionLayer.Payload)
+	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
 }
