@@ -66,7 +66,7 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 
 func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) map[string]images.IdentityImage {
 	keyUID := m.IdentityPublicKeyString()
-	iis := images.SampleIdentityImages()
+	iis := testutils.SampleIdentityImages()
 
 	err := m.multiAccounts.StoreIdentityImages(keyUID, iis, false)
 	s.Require().NoError(err)

@@ -1764,7 +1764,7 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 }
 
 func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, error) {
-	file, err := os.Open("../_assets/tests/test.jpg")
+	file, err := os.Open("common/testdata/test.jpg")
 	if err != nil {
 		return nil, err
 	}
