@@ -826,3 +826,8 @@ func (api *API) UnsubscribeFromLeaderboard() error {
 	logutils.ZapLogger().Debug("call to UnsubscribeFromLeaderboard")
 	return api.s.leaderboardService.UnsubscribeFromLeaderboard()
 }
+
+func (api *API) RefetchTxHistory() error {
+	logutils.ZapLogger().Debug("call to RefetchTxHistory")
+	return api.s.activityFetcherService.RefetchTxHistory()
+}
