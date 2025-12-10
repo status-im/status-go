@@ -941,7 +941,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 	keyUID := "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84" // #nosec G101
 
-	srcFolder := "../static/test-0.132.0-account/"
+	srcFolder := "testdata/test-0.132.0-account/"
 
 	tmpdir := t.TempDir()
 	copyDir(srcFolder, tmpdir, t)
@@ -950,7 +950,7 @@ func TestLoginAndMigrationsStillWorkWithExistingDesktopUser(t *testing.T) {
 	err := os.MkdirAll(keystoreDir, 0700)
 	require.NoError(t, err)
 
-	srcKeystoreFolder := "../static/test-0.132.0-account/keystore/"
+	srcKeystoreFolder := "testdata/test-0.132.0-account/keystore/"
 	copyDir(srcKeystoreFolder, keystoreDir, t)
 
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
