@@ -308,9 +308,9 @@ status-go-deps:
 
 statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-c-bindings:
-	@## cmd/library/README.md explains the magic incantation behind this
+	@## tools/generate-cbindings/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
-	go run -mod=mod cmd/library/*.go > $(STATUS_GO_BINDINGS_PATH)/main.go
+	go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
