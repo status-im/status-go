@@ -3,8 +3,8 @@
 set -e
 set -o pipefail
 
-CHECK_MIGRATIONS="_assets/scripts/migration_check.sh"
-CHECK_COMMITS="_assets/scripts/commit_check.sh"
+CHECK_MIGRATIONS="scripts/migration_check.sh"
+CHECK_COMMITS="scripts/commit_check.sh"
 
 "${CHECK_MIGRATIONS}" "$@"
 "${CHECK_COMMITS}" "$@"

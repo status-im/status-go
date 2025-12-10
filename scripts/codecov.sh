@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "${GIT_ROOT}/_assets/scripts/colors.sh"
+source "${GIT_ROOT}/scripts/colors.sh"
 
 report_to_codecov() {
   # https://go.dev/blog/integration-test-coverage
