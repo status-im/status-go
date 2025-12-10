@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sqlite"
 )
 
 func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {

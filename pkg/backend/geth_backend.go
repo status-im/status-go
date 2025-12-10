@@ -39,6 +39,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiacccommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/metrics"
@@ -63,7 +64,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
 )
 

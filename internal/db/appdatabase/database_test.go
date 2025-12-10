@@ -15,13 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrations"
+	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -101,7 +101,7 @@ const (
 
 func TestMigrateWalletJsonBlobs(t *testing.T) {
 	openDB := func() (*sql.DB, error) {
-		return sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+		return sqlite2.OpenDB(sqlite2.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
 	}
 	db, err := openDB()
 	require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	err = insertTestTransaction(9, uniswapV3TxTestData, uniswapV3ReceiptTestData, uniswapV3LogTestData, false)
 	require.NoError(t, err)
 
-	failMigrationSteps := []*sqlite.PostStep{
+	failMigrationSteps := []*sqlite2.PostStep{
 		{
 			Version: customSteps[1].Version,
 			CustomMigration: func(sqlTx *sql.Tx) error {
@@ -283,11 +283,11 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 			require.True(t, gasLimit.Valid)
 			require.Equal(t, tt.Gas(), uint64(gasLimit.Int64))
 			require.True(t, gasPriceClamped64.Valid)
-			require.Equal(t, *sqlite.BigIntToClampedInt64(tt.GasPrice()), gasPriceClamped64.Int64)
+			require.Equal(t, *sqlite2.BigIntToClampedInt64(tt.GasPrice()), gasPriceClamped64.Int64)
 			require.True(t, gasTipCapClamped64.Valid)
-			require.Equal(t, *sqlite.BigIntToClampedInt64(tt.GasTipCap()), gasTipCapClamped64.Int64)
+			require.Equal(t, *sqlite2.BigIntToClampedInt64(tt.GasTipCap()), gasTipCapClamped64.Int64)
 			require.True(t, gasFeeCapClamped64.Valid)
-			require.Equal(t, *sqlite.BigIntToClampedInt64(tt.GasFeeCap()), gasFeeCapClamped64.Int64)
+			require.Equal(t, *sqlite2.BigIntToClampedInt64(tt.GasFeeCap()), gasFeeCapClamped64.Int64)
 			require.True(t, accountNonce.Valid)
 			require.Equal(t, tt.Nonce(), uint64(accountNonce.Int64))
 			require.True(t, size.Valid)
@@ -295,14 +295,14 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 
 			if expectedEntryType == w_common.EthTransfer {
 				require.True(t, amount128Hex.Valid)
-				require.Equal(t, *sqlite.BigIntToPadded128BitsStr(tt.Value()), amount128Hex.String)
+				require.Equal(t, *sqlite2.BigIntToPadded128BitsStr(tt.Value()), amount128Hex.String)
 				require.True(t, isTokenIDNull)
 			} else {
 				actualEntryType, expectedTokenAddress, _, _ := w_common.ExtractTokenTransferData(expectedEntryType, tl, tt)
 				if actualEntryType == w_common.Erc20Transfer {
 					expectedFrom, expectedTo, expectedValue := w_common.ParseErc20TransferLog(tl)
 					require.True(t, amount128Hex.Valid)
-					require.Equal(t, *sqlite.BigIntToPadded128BitsStr(expectedValue), amount128Hex.String)
+					require.Equal(t, *sqlite2.BigIntToPadded128BitsStr(expectedValue), amount128Hex.String)
 					require.True(t, isTokenIDNull)
 					require.Equal(t, *expectedTokenAddress, *tokenAddress)
 					require.Equal(t, expectedFrom, *txFrom)
@@ -310,7 +310,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 				} else if actualEntryType == w_common.Erc721Transfer {
 					expectedFrom, expectedTo, expectedTokenID := w_common.ParseErc721TransferLog(tl)
 					require.True(t, amount128Hex.Valid)
-					require.Equal(t, *sqlite.BigIntToPadded128BitsStr(big.NewInt(1)), amount128Hex.String)
+					require.Equal(t, *sqlite2.BigIntToPadded128BitsStr(big.NewInt(1)), amount128Hex.String)
 					require.False(t, isTokenIDNull)
 					require.Equal(t, expectedTokenID, expectedTokenID)
 					require.Equal(t, *expectedTokenAddress, *tokenAddress)

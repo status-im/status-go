@@ -3,8 +3,8 @@ package walletdatabase
 import (
 	"database/sql"
 
+	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/db/walletdatabase/migrations"
-	"github.com/status-im/status-go/sqlite"
 )
 
 type DbInitializer struct {
@@ -14,7 +14,7 @@ func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int
 	return InitializeDB(path, password, kdfIterationsNumber)
 }
 
-var walletCustomSteps = []*sqlite.PostStep{}
+var walletCustomSteps = []*sqlite2.PostStep{}
 
 func doMigration(db *sql.DB) error {
 	// Run all the new migrations
@@ -23,7 +23,7 @@ func doMigration(db *sql.DB) error {
 
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
-	db, err := sqlite.OpenDB(path, password, kdfIterationsNumber)
+	db, err := sqlite2.OpenDB(path, password, kdfIterationsNumber)
 	if err != nil {
 		return nil, err
 	}

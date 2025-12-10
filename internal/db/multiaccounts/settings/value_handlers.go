@@ -6,9 +6,9 @@ import (
 
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/errors"
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/sqlite"
 )
 
 func StringFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {

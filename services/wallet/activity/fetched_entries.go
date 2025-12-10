@@ -11,12 +11,12 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/logutils"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
-	"github.com/status-im/status-go/sqlite"
 )
 
 // getFetchedEntriesByIDs fetches Alchemy transaction details by IDs

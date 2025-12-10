@@ -6,8 +6,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/sqlite"
 )
 
 type CollectionDataStorage interface {

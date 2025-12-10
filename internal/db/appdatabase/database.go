@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
+	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,12 +19,11 @@ import (
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/sqlite"
 )
 
 const nodeCfgMigrationDate = 1640111208
 
-var customSteps = []*sqlite.PostStep{
+var customSteps = []*sqlite2.PostStep{
 	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
 	{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
@@ -39,7 +39,7 @@ func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int
 }
 
 func doMigration(db *sql.DB) error {
-	lastMigration, migrationTableExists, err := sqlite.GetLastMigrationVersion(db, sqlite.StatusMigrationTableName())
+	lastMigration, migrationTableExists, err := sqlite2.GetLastMigrationVersion(db, sqlite2.StatusMigrationTableName())
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func doMigration(db *sql.DB) error {
 
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
-	db, err := sqlite.OpenDB(path, password, kdfIterationsNumber)
+	db, err := sqlite2.OpenDB(path, password, kdfIterationsNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func migrateEnsUsernames(sqlTx *sql.Tx) error {
 }
 
 func MigrateV3ToV4(v3Path string, v4Path string, password string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
-	return sqlite.MigrateV3ToV4(v3Path, v4Path, password, kdfIterationsNumber, onStart, onEnd)
+	return sqlite2.MigrateV3ToV4(v3Path, v4Path, password, kdfIterationsNumber, onStart, onEnd)
 }
 
 const (
@@ -260,9 +260,9 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 			l := &types.Log{}
 
 			// Scan row data into the transaction and receipt objects
-			nullableTx := sqlite.JSONBlob{Data: tx}
-			nullableR := sqlite.JSONBlob{Data: r}
-			nullableL := sqlite.JSONBlob{Data: l}
+			nullableTx := sqlite2.JSONBlob{Data: tx}
+			nullableR := sqlite2.JSONBlob{Data: r}
+			nullableL := sqlite2.JSONBlob{Data: l}
 			err = rows.Scan(&hash, &address, &chainID, &nullableTx, &nullableR, &nullableL, &entryType)
 			if err != nil {
 				rows.Close()
@@ -288,10 +288,10 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 			if nullableTx.Valid {
 				correctType, tokenID, value, tokenAddress := extractToken(entryType, tx, l, nullableL.Valid)
 
-				gasPrice := sqlite.BigIntToClampedInt64(tx.GasPrice())
-				gasTipCap := sqlite.BigIntToClampedInt64(tx.GasTipCap())
-				gasFeeCap := sqlite.BigIntToClampedInt64(tx.GasFeeCap())
-				valueStr := sqlite.BigIntToPadded128BitsStr(value)
+				gasPrice := sqlite2.BigIntToClampedInt64(tx.GasPrice())
+				gasTipCap := sqlite2.BigIntToClampedInt64(tx.GasTipCap())
+				gasFeeCap := sqlite2.BigIntToClampedInt64(tx.GasFeeCap())
+				valueStr := sqlite2.BigIntToPadded128BitsStr(value)
 
 				currentRow = append(currentRow, tx.Type(), tx.Protected(), tx.Gas(), gasPrice, gasTipCap, gasFeeCap, valueStr, tx.Nonce(), int64(tx.Size()), tokenAddress, (*bigint.SQLBigIntBytes)(tokenID), correctType)
 			} else {
@@ -392,8 +392,8 @@ func migrateWalletTransferFromToAddresses(sqlTx *sql.Tx) error {
 			l := &types.Log{}
 
 			// Scan row data into the transaction and receipt objects
-			nullableTx := sqlite.JSONBlob{Data: tx}
-			nullableL := sqlite.JSONBlob{Data: l}
+			nullableTx := sqlite2.JSONBlob{Data: tx}
+			nullableL := sqlite2.JSONBlob{Data: l}
 			err = rows.Scan(&hash, &address, &sender, &chainID, &nullableTx, &nullableL, &entryType)
 			if err != nil {
 				rows.Close()

@@ -9,9 +9,9 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/migrations"
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/sqlite"
 )
 
 type ColorHash [][2]int
