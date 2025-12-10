@@ -45,7 +45,7 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, communityID []byte) ([]b
 
 	r.logger.Debug("original payload wrapped with SDS",
 		zap.String("channelId", cryptotypes.EncodeHex(communityID)),
-		zap.Int("payload-length", len(payload)),
+		zap.Int("payloadLength", len(payload)),
 		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
 	)
 	sdsWrappedPayload, err := r.SDSManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
