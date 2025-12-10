@@ -312,10 +312,13 @@ statusgo-c-bindings:
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
 	go run -mod=mod cmd/library/*.go > $(STATUS_GO_BINDINGS_PATH)/main.go
 
-statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
-statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as static library for current platform
+statusgo-library: statusgo-library-build ##@cross-compile Build status-go as static library for current platform
+
+# This target is kept separate and has no dependencies to be used in Nix builds
+statusgo-library-build: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+statusgo-library-build: STATUS_GO_LIBRARY_OUT ?= build/bin
+statusgo-library-build: statusgo-c-bindings $(LIBWAKU) $(LIBSDS)
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
@@ -551,3 +554,6 @@ pytest-lint:
 generate-db: build/bin/generate-db
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
 	./build/bin/generate-db -out-dir build/db
+
+env:
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
