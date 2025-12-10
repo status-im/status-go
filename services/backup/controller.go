@@ -16,7 +16,7 @@ import (
 
 //go:generate go tool mockgen -package=mock_backup_controller -source controller.go -destination=mock/mock_backup_controller.go
 
-type BackupConfig struct {
+type Config struct {
 	PrivateKey       []byte
 	FileNameProvider FilenameProvider
 	BackupEnabled    bool
@@ -27,13 +27,13 @@ type FilenameProvider interface {
 	GetBackupFilename() (string, error)
 }
 
-type BackupProvider interface {
+type Provider interface {
 	ExportBackup() ([]byte, error)
 	ImportBackup(data []byte) error
 }
 
 type Controller struct {
-	config BackupConfig
+	config Config
 	core   *core
 	logger *zap.Logger
 	quit   chan struct{}
@@ -41,11 +41,11 @@ type Controller struct {
 	wg     *sync.WaitGroup
 }
 
-type BackUpCompletedEvent struct {
+type CompletedEvent struct {
 	FileName string
 }
 
-func (b BackUpCompletedEvent) MarshalJSON() ([]byte, error) {
+func (b CompletedEvent) MarshalJSON() ([]byte, error) {
 	responseItem := struct {
 		FileName string `json:"fileName,omitempty"`
 	}{
@@ -54,7 +54,7 @@ func (b BackUpCompletedEvent) MarshalJSON() ([]byte, error) {
 	return json.Marshal(responseItem)
 }
 
-func NewController(config BackupConfig, logger *zap.Logger) (*Controller, error) {
+func NewController(config Config, logger *zap.Logger) (*Controller, error) {
 	if len(config.PrivateKey) == 0 {
 		return nil, errors.New("private key must be provided")
 	}
@@ -71,7 +71,7 @@ func NewController(config BackupConfig, logger *zap.Logger) (*Controller, error)
 	}, nil
 }
 
-func (c *Controller) Register(componentName string, provider BackupProvider) {
+func (c *Controller) Register(componentName string, provider Provider) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -137,7 +137,7 @@ func (c *Controller) PerformBackup() (string, error) {
 		return "", err
 	}
 
-	signal.SendLocalBackUpCompleted(BackUpCompletedEvent{
+	signal.SendLocalBackUpCompleted(CompletedEvent{
 		FileName: fileName,
 	})
 

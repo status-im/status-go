@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	mock_backup_controller "github.com/status-im/status-go/node/backup/mock"
+	mock_backup_controller "github.com/status-im/status-go/services/backup/mock"
 )
 
 type Foo struct {
@@ -63,7 +63,7 @@ func TestController(t *testing.T) {
 	filenameProvider := mock_backup_controller.NewMockFilenameProvider(ctrl)
 	filenameProvider.EXPECT().GetBackupFilename().Return(filename, nil).AnyTimes()
 
-	controller, err := NewController(BackupConfig{
+	controller, err := NewController(Config{
 		FileNameProvider: filenameProvider,
 		PrivateKey:       []byte("0123456789abcdef0123456789abcdef"),
 	}, logger)

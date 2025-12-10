@@ -26,7 +26,6 @@ import (
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/node/backup"
 	rpc2 "github.com/status-im/status-go/node/rpc"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -34,6 +33,7 @@ import (
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
+	"github.com/status-im/status-go/services/backup"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
@@ -247,7 +247,7 @@ func (n *StatusNode) StartLocalBackup() error {
 
 	privateKey := chatAccount.PrivateKey()
 
-	n.localBackup, err = backup.NewController(backup.BackupConfig{
+	n.localBackup, err = backup.NewController(backup.Config{
 		PrivateKey:       crypto.Keccak256(crypto.FromECDSA(privateKey)),
 		FileNameProvider: n,
 		BackupEnabled:    true,
