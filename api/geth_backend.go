@@ -72,8 +72,6 @@ var (
 	ErrDBNotAvailable = errors.New("DB is unavailable")
 )
 
-var _ StatusBackend = (*GethStatusBackend)(nil)
-
 type LoginParams struct {
 	ChatAddress  types.Address          `json:"chatAddress"`
 	Password     string                 `json:"password"`
