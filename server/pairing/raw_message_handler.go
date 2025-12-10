@@ -18,10 +18,10 @@ import (
 )
 
 type SyncRawMessageHandler struct {
-	backend *api.GethStatusBackend
+	backend *api.StatusBackend
 }
 
-func NewSyncRawMessageHandler(backend *api.GethStatusBackend) *SyncRawMessageHandler {
+func NewSyncRawMessageHandler(backend *api.StatusBackend) *SyncRawMessageHandler {
 	return &SyncRawMessageHandler{backend: backend}
 }
 

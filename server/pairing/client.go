@@ -196,7 +196,7 @@ type SenderClient struct {
 }
 
 // NewSenderClient returns a fully qualified SenderClient created with the incoming parameters
-func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config *SenderClientConfig) (*SenderClient, error) {
+func NewSenderClient(backend *api.StatusBackend, c *ConnectionParams, config *SenderClientConfig) (*SenderClient, error) {
 	logger := logutils.ZapLogger().Named("SenderClient")
 	pe := NewPayloadEncryptor(c.aesKey)
 
@@ -308,7 +308,7 @@ func (c *SenderClient) receiveInstallationData() error {
 }
 
 // setupSendingClient creates a new SenderClient after parsing string inputs
-func setupSendingClient(backend *api.GethStatusBackend, cs string, conf *SenderClientConfig) (*SenderClient, error) {
+func setupSendingClient(backend *api.StatusBackend, cs string, conf *SenderClientConfig) (*SenderClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
@@ -326,7 +326,7 @@ func setupSendingClient(backend *api.GethStatusBackend, cs string, conf *SenderC
 }
 
 // StartUpSendingClient creates a SenderClient and triggers all `send` calls in sequence to the ReceiverServer
-func StartUpSendingClient(backend *api.GethStatusBackend, cs string, conf *SenderClientConfig) error {
+func StartUpSendingClient(backend *api.StatusBackend, cs string, conf *SenderClientConfig) error {
 	c, err := setupSendingClient(backend, cs, conf)
 	if err != nil {
 		return err
@@ -365,7 +365,7 @@ type ReceiverClient struct {
 }
 
 // NewReceiverClient returns a fully qualified ReceiverClient created with the incoming parameters
-func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *ReceiverClientConfig) (*ReceiverClient, error) {
+func NewReceiverClient(backend *api.StatusBackend, c *ConnectionParams, config *ReceiverClientConfig) (*ReceiverClient, error) {
 	logger := logutils.ZapLogger().Named("ReceiverClient")
 
 	bc, err := NewBaseClient(c, logger)
@@ -506,7 +506,7 @@ func (c *ReceiverClient) sendInstallationData() error {
 }
 
 // setupReceivingClient creates a new ReceiverClient after parsing string inputs
-func setupReceivingClient(backend *api.GethStatusBackend, cs string, conf *ReceiverClientConfig) (*ReceiverClient, error) {
+func setupReceivingClient(backend *api.StatusBackend, cs string, conf *ReceiverClientConfig) (*ReceiverClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
@@ -534,7 +534,7 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs string, conf *Recei
 }
 
 // StartUpReceivingClient creates a ReceiverClient and triggers all `receive` calls in sequence to the SenderServer
-func StartUpReceivingClient(backend *api.GethStatusBackend, cs string, conf *ReceiverClientConfig) error {
+func StartUpReceivingClient(backend *api.StatusBackend, cs string, conf *ReceiverClientConfig) error {
 	c, err := setupReceivingClient(backend, cs, conf)
 	if err != nil {
 		return err
@@ -577,7 +577,7 @@ type KeystoreFilesReceiverClient struct {
 	keystoreFilesReceiver PayloadReceiver
 }
 
-func NewKeystoreFilesReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *KeystoreFilesReceiverClientConfig) (*KeystoreFilesReceiverClient, error) {
+func NewKeystoreFilesReceiverClient(backend *api.StatusBackend, c *ConnectionParams, config *KeystoreFilesReceiverClientConfig) (*KeystoreFilesReceiverClient, error) {
 	logger := logutils.ZapLogger().Named("ReceiverClient")
 	bc, err := NewBaseClient(c, logger)
 	if err != nil {
@@ -638,7 +638,7 @@ func (c *KeystoreFilesReceiverClient) receiveKeystoreFilesData() error {
 }
 
 // setupKeystoreFilesReceivingClient creates a new ReceiverClient after parsing string inputs
-func setupKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs string, conf *KeystoreFilesReceiverClientConfig) (*KeystoreFilesReceiverClient, error) {
+func setupKeystoreFilesReceivingClient(backend *api.StatusBackend, cs string, conf *KeystoreFilesReceiverClientConfig) (*KeystoreFilesReceiverClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
@@ -654,7 +654,7 @@ func setupKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs string
 }
 
 // StartUpKeystoreFilesReceivingClient creates a KeystoreFilesReceiverClient and triggers all `receive` calls in sequence to the KeystoreFilesSenderServer
-func StartUpKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs string, conf *KeystoreFilesReceiverClientConfig) error {
+func StartUpKeystoreFilesReceivingClient(backend *api.StatusBackend, cs string, conf *KeystoreFilesReceiverClientConfig) error {
 	c, err := setupKeystoreFilesReceivingClient(backend, cs, conf)
 	if err != nil {
 		return err

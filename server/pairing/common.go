@@ -177,7 +177,7 @@ func validateReceivedKeystoreFiles(expectedKeys []string, keys map[string][]byte
 	return validateKeys(keys, password)
 }
 
-func validateKeystoreFilesConfig(backend *api.GethStatusBackend, conf interface{}) error {
+func validateKeystoreFilesConfig(backend *api.StatusBackend, conf interface{}) error {
 	var (
 		loggedInKeyUID string
 		password       string

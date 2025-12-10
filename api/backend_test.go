@@ -71,12 +71,12 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 	}, nil
 }
 
-func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, func() error, error) {
+func setupGethStatusBackend() (*StatusBackend, func() error, func() error, func() error, error) {
 	db, stop1, err := setupTestDB()
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -332,7 +332,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 }
 
 func TestAppStateChange(t *testing.T) {
-	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
 
 	var testCases = []struct {
 		name          string
@@ -364,7 +364,7 @@ func TestAppStateChange(t *testing.T) {
 }
 
 func TestCallRPCWithStoppedNode(t *testing.T) {
-	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
 
 	resp := backend.CallInProcessRPC(
 		`{"jsonrpc":"2.0","method":"appgeneral_version","params":[],"id":1}`,
@@ -910,7 +910,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig, keyUID string) {
 	username := "TestUser"
 	passwd := "0xC888C9CE9E098D5864D3DED6EBCC140A12142263BACE3A23A36F9905F12BD64A" // #nosec G101
 
-	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	b := NewStatusBackend(testutils.MustCreateTestLogger())
 
 	b.UpdateRootDataDir(conf.RootDataDir)
 
@@ -1203,7 +1203,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 	tmpdir := t.TempDir()
 
-	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	b := NewStatusBackend(testutils.MustCreateTestLogger())
 
 	// Creating an account with test networks enabled
 	createAccountRequest1 := &requests.CreateAccount{
@@ -1248,7 +1248,7 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 func TestRestoreAccountAndLogin(t *testing.T) {
 	tmpdir := t.TempDir()
 
-	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
 
 	// Test case 1: Valid restore account request
 	restoreRequest := &requests.RestoreAccount{
@@ -1281,7 +1281,7 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 	tmpdir := t.TempDir()
 
-	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
 
 	// Test case: Valid restore account request without DisplayName
 	restoreRequest := &requests.RestoreAccount{
@@ -1301,7 +1301,7 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 
 func TestAcceptTerms(t *testing.T) {
 	tmpdir := t.TempDir()
-	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	b := NewStatusBackend(testutils.MustCreateTestLogger())
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
@@ -1463,7 +1463,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
 	require.NoError(t, err)
 
 	backend.UpdateRootDataDir(conf.RootDataDir)

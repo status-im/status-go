@@ -63,7 +63,7 @@ func (s *SyncDeviceSuite) SetupTest() {
 	s.tmpdir = s.T().TempDir()
 }
 
-func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
+func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.StatusBackend {
 	err := os.MkdirAll(tmpdir, 0755) // making sure the dir is created
 	s.Require().NoError(err)
 
@@ -101,8 +101,8 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 	return backend
 }
 
-func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *api.GethStatusBackend {
-	backend := api.NewGethStatusBackend(s.logger)
+func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *api.StatusBackend {
+	backend := api.NewStatusBackend(s.logger)
 	backend.UpdateRootDataDir(tmpdir)
 	return backend
 }

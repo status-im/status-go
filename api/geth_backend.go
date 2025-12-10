@@ -79,8 +79,8 @@ type LoginParams struct {
 	MultiAccount *multiaccounts.Account `json:"multiAccount"`
 }
 
-// GethStatusBackend implements the Status.im service over go-ethereum
-type GethStatusBackend struct {
+// StatusBackend implements the Status.im service over go-ethereum
+type StatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
 	rootDataDir string
@@ -106,10 +106,10 @@ type GethStatusBackend struct {
 	shutdownTasks []func() error
 }
 
-// NewGethStatusBackend create a new GethStatusBackend instance
-func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
-	logger = logger.Named("GethStatusBackend")
-	backend := &GethStatusBackend{
+// NewStatusBackend create a new StatusBackend instance
+func NewStatusBackend(logger *zap.Logger) *StatusBackend {
+	logger = logger.Named("StatusBackend")
+	backend := &StatusBackend{
 		logger:            logger,
 		preLoginLogConfig: logutils.NewPreLoginLogConfig(),
 		shutdownTasks:     []func() error{},
@@ -131,11 +131,11 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 	return backend
 }
 
-func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
+func (b *StatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 	return b.preLoginLogConfig
 }
 
-func (b *GethStatusBackend) initialize() (err error) {
+func (b *StatusBackend) initialize() (err error) {
 	accountsManager, err := accsmanagement.NewAccountsManager(b.logger)
 	if err != nil {
 		b.logger.Error("failed to create new *AccountsManager instance", zap.Error(err))
@@ -159,31 +159,31 @@ func (b *GethStatusBackend) initialize() (err error) {
 }
 
 // StatusNode returns reference to node manager
-func (b *GethStatusBackend) StatusNode() *node.StatusNode {
+func (b *StatusBackend) StatusNode() *node.StatusNode {
 	return b.statusNode
 }
 
 // AccountsManager returns reference to accounts manager
-func (b *GethStatusBackend) AccountsManager() *accsmanagement.AccountsManager {
+func (b *StatusBackend) AccountsManager() *accsmanagement.AccountsManager {
 	return b.accountsManager
 }
 
 // Transactor returns reference to a status transactor
-func (b *GethStatusBackend) Transactor() *transactions.Transactor {
+func (b *StatusBackend) Transactor() *transactions.Transactor {
 	return b.transactor
 }
 
-func (b *GethStatusBackend) MessageSigner() communities.MessageSigner {
+func (b *StatusBackend) MessageSigner() communities.MessageSigner {
 	return b.signer
 }
 
 // IsNodeRunning confirm that node is running
-func (b *GethStatusBackend) IsNodeRunning() bool {
+func (b *StatusBackend) IsNodeRunning() bool {
 	return b.statusNode.IsRunning()
 }
 
 // StartNode start Status node, fails if node is already started
-func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
+func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if err := b.startNode(config); err != nil {
@@ -194,18 +194,18 @@ func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 	return nil
 }
 
-func (b *GethStatusBackend) UpdateRootDataDir(datadir string) {
+func (b *StatusBackend) UpdateRootDataDir(datadir string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.rootDataDir = datadir
 	b.accountsManager.SetRootDataDir(datadir)
 }
 
-func (b *GethStatusBackend) GetMultiaccountDB() *multiaccounts.Database {
+func (b *StatusBackend) GetMultiaccountDB() *multiaccounts.Database {
 	return b.multiaccountsDB
 }
 
-func (b *GethStatusBackend) OpenAccounts(thirdpartyServicesEnabled bool) error {
+func (b *StatusBackend) OpenAccounts(thirdpartyServicesEnabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB != nil {
@@ -238,7 +238,7 @@ func (b *GethStatusBackend) OpenAccounts(thirdpartyServicesEnabled bool) error {
 	return nil
 }
 
-func (b *GethStatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInfo, error) {
+func (b *StatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInfo, error) {
 	if b.centralizedMetrics == nil {
 		return nil, errors.New("centralized metrics not initialized")
 	}
@@ -246,7 +246,7 @@ func (b *GethStatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.Metric
 	return b.centralizedMetrics.Info()
 }
 
-func (b *GethStatusBackend) ToggleCentralizedMetrics(isEnabled bool) error {
+func (b *StatusBackend) ToggleCentralizedMetrics(isEnabled bool) error {
 	if b.centralizedMetrics == nil {
 		return errors.New("centralized metrics nil")
 	}
@@ -254,7 +254,7 @@ func (b *GethStatusBackend) ToggleCentralizedMetrics(isEnabled bool) error {
 	return b.centralizedMetrics.ToggleEnabled(isEnabled)
 }
 
-func (b *GethStatusBackend) AddCentralizedMetric(metric centralizedmetricscommon.Metric) error {
+func (b *StatusBackend) AddCentralizedMetric(metric centralizedmetricscommon.Metric) error {
 	if b.centralizedMetrics == nil {
 		return errors.New("centralized metrics nil")
 	}
@@ -262,7 +262,7 @@ func (b *GethStatusBackend) AddCentralizedMetric(metric centralizedmetricscommon
 
 }
 
-func (b *GethStatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
+func (b *StatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB == nil {
@@ -271,7 +271,7 @@ func (b *GethStatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	return b.multiaccountsDB.GetAccounts()
 }
 
-func (b *GethStatusBackend) AcceptTerms() error {
+func (b *StatusBackend) AcceptTerms() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB == nil {
@@ -289,7 +289,7 @@ func (b *GethStatusBackend) AcceptTerms() error {
 	return b.multiaccountsDB.UpdateHasAcceptedTerms(accounts[0].KeyUID, true)
 }
 
-func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
+func (b *StatusBackend) StartPrometheusMetricsServer(address string) error {
 	if b.prometheusMetrics != nil {
 		return nil
 	}
@@ -298,7 +298,7 @@ func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
 	return nil
 }
 
-func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Account, error) {
+func (b *StatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Account, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB == nil {
@@ -319,7 +319,7 @@ func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Ac
 	return nil, fmt.Errorf("account with keyUID %s not found", gocommon.TruncateWithDot(keyUID))
 }
 
-func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
+func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB == nil {
@@ -328,7 +328,7 @@ func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
 	return b.multiaccountsDB.SaveAccount(account)
 }
 
-func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, password string) (string, error) {
+func (b *StatusBackend) runDBFileMigrations(account multiaccounts.Account, password string) (string, error) {
 	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
 	unsupportedPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
 	v3Path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
@@ -364,7 +364,7 @@ func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, p
 	return v4Path, nil
 }
 
-func (b *GethStatusBackend) ensureDBsOpened(account multiaccounts.Account, password string) (err error) {
+func (b *StatusBackend) ensureDBsOpened(account multiaccounts.Account, password string) (err error) {
 	// After wallet DB initial migration, the tables moved to wallet DB are removed from appDB
 	// so better migrate wallet DB first to avoid removal if wallet DB migration fails
 	if err = b.ensureWalletDBOpened(account, password); err != nil {
@@ -378,7 +378,7 @@ func (b *GethStatusBackend) ensureDBsOpened(account multiaccounts.Account, passw
 	return nil
 }
 
-func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
+func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.appDB != nil {
@@ -420,7 +420,7 @@ func fileExists(path string) bool {
 	return true
 }
 
-func (b *GethStatusBackend) walletDBExists(keyUID string) bool {
+func (b *StatusBackend) walletDBExists(keyUID string) bool {
 	path, err := b.getWalletDBPath(keyUID)
 	if err != nil {
 		return false
@@ -429,7 +429,7 @@ func (b *GethStatusBackend) walletDBExists(keyUID string) bool {
 	return fileExists(path)
 }
 
-func (b *GethStatusBackend) appDBExists(keyUID string) bool {
+func (b *StatusBackend) appDBExists(keyUID string) bool {
 	path, err := b.getAppDBPath(keyUID)
 	if err != nil {
 		return false
@@ -438,7 +438,7 @@ func (b *GethStatusBackend) appDBExists(keyUID string) bool {
 	return fileExists(path)
 }
 
-func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, password string) (err error) {
+func (b *StatusBackend) ensureWalletDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.walletDB != nil {
@@ -459,13 +459,13 @@ func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, 
 	return nil
 }
 
-func (b *GethStatusBackend) SetupLogSettings() error {
+func (b *StatusBackend) SetupLogSettings() error {
 	_ = logutils.ZapLogger().Sync()
 	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 // Deprecated: Use StartNodeWithAccount instead.
-func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
+func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
 		if err != nil {
@@ -492,7 +492,7 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 	return b.LoggedIn(acc.KeyUID, err)
 }
 
-func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
+func (b *StatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
 	if err := mergo.Merge(conf, n, mergo.WithOverride); err != nil {
 		return nil, err
 	}
@@ -506,7 +506,7 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 	return conf, nil
 }
 
-func (b *GethStatusBackend) updateAccountColorHashAndColorID(keyUID string, accountsDB *accounts.Database) (*multiaccounts.Account, error) {
+func (b *StatusBackend) updateAccountColorHashAndColorID(keyUID string, accountsDB *accounts.Database) (*multiaccounts.Account, error) {
 	multiAccount, err := b.getAccountByKeyUID(keyUID)
 	if err != nil {
 		return nil, err
@@ -530,11 +530,11 @@ func (b *GethStatusBackend) updateAccountColorHashAndColorID(keyUID string, acco
 	return multiAccount, nil
 }
 
-func (b *GethStatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login, thirdpartyServicesEnabled bool) {
+func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login, thirdpartyServicesEnabled bool) {
 	conf.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig, thirdpartyServicesEnabled)
 }
 
-func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
+func (b *StatusBackend) LoginAccount(request *requests.Login) error {
 	err := b.loginAccount(request)
 	if err != nil {
 		// Stop node for clean up
@@ -551,7 +551,7 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 	return nil
 }
 
-func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
+func (b *StatusBackend) loginAccount(request *requests.Login) error {
 	if err := request.Validate(); err != nil {
 		return err
 	}
@@ -681,7 +681,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 // UpdateNodeConfigFleet loads the fleet from the settings and updates the node configuration
 // If the fleet in settings is empty, or not supported anymore, it will be overridden with the default fleet.
 // In that case settings fleet value remain the same, only runtime node configuration is updated.
-func (b *GethStatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, password string, config *params.NodeConfig) error {
+func (b *StatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, password string, config *params.NodeConfig) error {
 	if config == nil {
 		return nil
 	}
@@ -714,7 +714,7 @@ func (b *GethStatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, pas
 }
 
 // Deprecated: Use loginAccount instead
-func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
+func (b *StatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
 	b.UpdateRootDataDir(b.rootDataDir)
 
 	err := b.ensureDBsOpened(acc, password)
@@ -777,11 +777,11 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	return nil
 }
 
-func (b *GethStatusBackend) accountsDB() (*accounts.Database, error) {
+func (b *StatusBackend) accountsDB() (*accounts.Database, error) {
 	return accounts.NewDB(b.appDB)
 }
 
-func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
+func (b *StatusBackend) GetSettings() (*settings.Settings, error) {
 	accountsDB, err := b.accountsDB()
 	if err != nil {
 		return nil, err
@@ -795,17 +795,17 @@ func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
 	return &s, nil
 }
 
-func (b *GethStatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
+func (b *StatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
 	db := ens.NewEnsDatabase(b.appDB)
 	removed := false
 	return db.GetEnsUsernames(&removed)
 }
 
-func (b *GethStatusBackend) Login(keyUID, password string) error {
+func (b *StatusBackend) Login(keyUID, password string) error {
 	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil, nil)
 }
 
-func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
+func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
 	err := b.startNodeWithAccount(acc, password, nodecfg, chatKey)
 	if err != nil {
 		// Stop node for clean up
@@ -818,7 +818,7 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 	return err
 }
 
-func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
+func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
 		signal.SendLoggedIn(nil, nil, nil, err)
 		return err
@@ -847,7 +847,7 @@ func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 	return nil
 }
 
-func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, password, directory string) error {
+func (b *StatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, password, directory string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.appDB != nil {
@@ -870,7 +870,7 @@ func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account,
 	return nil
 }
 
-func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account, password, databasePath string) error {
+func (b *StatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account, password, databasePath string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.appDB != nil {
@@ -890,7 +890,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 	return nil
 }
 
-func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword string) error {
+func (b *StatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword string) error {
 	err := b.accountsManager.ReEncryptKeyStoreDir(currentPassword, newPassword)
 	if err != nil {
 		return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
@@ -898,7 +898,7 @@ func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPass
 	return nil
 }
 
-func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
+func (b *StatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
 	acc, err := b.multiaccountsDB.GetAccount(keyUID)
 	if err != nil {
 		return err
@@ -975,7 +975,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) changeAppDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
+func (b *StatusBackend) changeAppDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
 	tmpDbPath, cleanup, err := b.createTempDBFile("v4.db")
 	if err != nil {
 		return err
@@ -1017,7 +1017,7 @@ func (b *GethStatusBackend) changeAppDBPassword(account *multiaccounts.Account, 
 	return nil
 }
 
-func (b *GethStatusBackend) changeWalletDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
+func (b *StatusBackend) changeWalletDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
 	tmpDbPath, cleanup, err := b.createTempDBFile("wallet.db")
 	if err != nil {
 		return err
@@ -1047,7 +1047,7 @@ func (b *GethStatusBackend) changeWalletDBPassword(account *multiaccounts.Accoun
 	return err
 }
 
-func (b *GethStatusBackend) createTempDBFile(pattern string) (tmpDbPath string, cleanup func(), err error) {
+func (b *StatusBackend) createTempDBFile(pattern string) (tmpDbPath string, cleanup func(), err error) {
 	if len(b.rootDataDir) == 0 {
 		err = errors.New("root datadir wasn't provided")
 		return
@@ -1097,7 +1097,7 @@ func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) 
 	return
 }
 
-func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, oldPassword string, newPassword string) error {
+func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, oldPassword string, newPassword string) error {
 	messenger := b.Messenger()
 	if messenger == nil {
 		return errors.New("cannot resolve messenger instance")
@@ -1180,7 +1180,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 }
 
 // CreateAccountAndLogin creates a new account and logs in with it.
-func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) (*multiaccounts.Account, error) {
+func (b *StatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) (*multiaccounts.Account, error) {
 	validation := &requests.CreateAccountValidation{
 		AllowEmptyDisplayName: true,
 	}
@@ -1202,7 +1202,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 }
 
 // RestoreAccountAndLogin restores an account and logs in with it.
-func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
+func (b *StatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
 	if err := request.Validate(false); err != nil {
 		return nil, err
 	}
@@ -1215,7 +1215,7 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 	)
 }
 
-func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
+func (b *StatusBackend) RestoreKeycardAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
 	if err := request.Validate(true); err != nil {
 		return nil, err
 	}
@@ -1228,7 +1228,7 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 	)
 }
 
-func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
+func (b *StatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
 	genAccount, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 	if err != nil {
 		return "", err
@@ -1239,7 +1239,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return accInfo.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator.Account, accInfo generator.GeneratedAccountInfo, err error) {
+func (b *StatusBackend) generateAccount(mnemonic string) (genAcc *generator.Account, accInfo generator.GeneratedAccountInfo, err error) {
 	finalMnemonic := mnemonic
 	if mnemonic == "" {
 		finalMnemonic, err = accscommon.CreateRandomMnemonicWithDefaultLength()
@@ -1257,7 +1257,7 @@ func (b *GethStatusBackend) generateAccount(mnemonic string) (genAcc *generator.
 	return
 }
 
-func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
+func (b *StatusBackend) generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
 	genDerivedAccounts, err = generator.DeriveChildrenFromAccount(genAcc, paths)
 	if err != nil {
 		return
@@ -1271,7 +1271,7 @@ func (b *GethStatusBackend) generateDerivedAddresses(genAcc *generator.Account, 
 	return
 }
 
-func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, keyUID string, customizationColorClock uint64) (*multiaccounts.Account, error) {
+func (b *StatusBackend) buildAccount(request *requests.CreateAccount, keyUID string, customizationColorClock uint64) (*multiaccounts.Account, error) {
 	err := b.OpenAccounts(request.ThirdpartyServicesEnabled)
 	if err != nil {
 		return nil, err
@@ -1322,7 +1322,7 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, keyUID
 	return acc, nil
 }
 
-func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
+func (b *StatusBackend) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
 	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
 	s, err := defaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
@@ -1349,7 +1349,7 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, mne
 	return s, nil
 }
 
-func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, keyUID string, installationID string) (*params.NodeConfig, error) {
+func (b *StatusBackend) prepareConfig(request *requests.CreateAccount, keyUID string, installationID string) (*params.NodeConfig, error) {
 	nodeConfig, err := DefaultNodeConfig(installationID, keyUID, request)
 	if err != nil {
 		return nil, err
@@ -1358,7 +1358,7 @@ func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, keyUI
 	return nodeConfig, nil
 }
 
-func (b *GethStatusBackend) prepareWalletAccount(request *requests.CreateAccount) *accsmanagementtypes.AccountCreationDetails {
+func (b *StatusBackend) prepareWalletAccount(request *requests.CreateAccount) *accsmanagementtypes.AccountCreationDetails {
 	return &accsmanagementtypes.AccountCreationDetails{
 		Path:    accscommon.PathDefaultWalletAccount,
 		Name:    walletAccountDefaultName,
@@ -1366,7 +1366,7 @@ func (b *GethStatusBackend) prepareWalletAccount(request *requests.CreateAccount
 	}
 }
 
-func (b *GethStatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID string, masterAddress string,
+func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID string, masterAddress string,
 	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
 	// set up keypair
 	keypair = &accsmanagementtypes.Keypair{
@@ -1407,7 +1407,7 @@ func (b *GethStatusBackend) prepareKeypair(request *requests.CreateAccount, keyU
 	return
 }
 
-func (b *GethStatusBackend) prepareForKeycard(request *requests.CreateAccount, multiAccount *multiaccounts.Account,
+func (b *StatusBackend) prepareForKeycard(request *requests.CreateAccount, multiAccount *multiaccounts.Account,
 	settings *settings.Settings, nodeConfig *params.NodeConfig) error {
 	if request.KeycardInstanceUID == "" {
 		return nil
@@ -1441,7 +1441,7 @@ func (b *GethStatusBackend) prepareForKeycard(request *requests.CreateAccount, m
 	return nil
 }
 
-func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {
+func (b *StatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {
 	messenger := b.Messenger()
 	if messenger == nil {
 		return errors.New("cannot resolve messenger instance")
@@ -1525,11 +1525,11 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	return b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword)
 }
 
-func (b *GethStatusBackend) VerifyProfilePassword(password string) (bool, error) {
+func (b *StatusBackend) VerifyProfilePassword(password string) (bool, error) {
 	return b.statusNode.AccountService().VerifyPassword(password)
 }
 
-func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
+func (b *StatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
 	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
 	if err != nil {
 		return err
@@ -1569,7 +1569,7 @@ func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey
 	return nil
 }
 
-func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
+func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	request *requests.CreateAccount,
 	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
@@ -1716,7 +1716,7 @@ func (b *GethStatusBackend) StartNodeWithChatKeyOrMnemonic(
 	return multiAccount, err
 }
 
-func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
+func (b *StatusBackend) StartNodeWithAccountAndInitialConfig(
 	multiAccount *multiaccounts.Account,
 	password string,
 	settings settings.Settings,
@@ -1748,7 +1748,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	return nil
 }
 
-func (b *GethStatusBackend) saveKeypairAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, keypair *accsmanagementtypes.Keypair) error {
+func (b *StatusBackend) saveKeypairAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, keypair *accsmanagementtypes.Keypair) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	accdb, err := accounts.NewDB(b.appDB)
@@ -1767,7 +1767,7 @@ func (b *GethStatusBackend) saveKeypairAndSettings(settings settings.Settings, n
 	return nil
 }
 
-func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {
+func (b *StatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -1806,7 +1806,7 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 	return nil
 }
 
-func (b *GethStatusBackend) saveNodeConfig(n *params.NodeConfig) error {
+func (b *StatusBackend) saveNodeConfig(n *params.NodeConfig) error {
 	err := nodecfg.SaveNodeConfig(b.appDB, n)
 	if err != nil {
 		return err
@@ -1814,11 +1814,11 @@ func (b *GethStatusBackend) saveNodeConfig(n *params.NodeConfig) error {
 	return nil
 }
 
-func (b *GethStatusBackend) GetNodeConfig() (*params.NodeConfig, error) {
+func (b *StatusBackend) GetNodeConfig() (*params.NodeConfig, error) {
 	return nodecfg.GetNodeConfigFromDB(b.appDB)
 }
 
-func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
+func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	b.logger.Info("status-go version details",
 		zap.String("version", version.Version()),
 		zap.String("commit", version.GitCommit()))
@@ -1877,13 +1877,13 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 }
 
 // StopNode stop Status node. Stopped node cannot be resumed.
-func (b *GethStatusBackend) StopNode() error {
+func (b *StatusBackend) StopNode() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.stopNode()
 }
 
-func (b *GethStatusBackend) stopNode() error {
+func (b *StatusBackend) stopNode() error {
 	if b.statusNode == nil || !b.IsNodeRunning() {
 		return nil
 	}
@@ -1902,7 +1902,7 @@ func (b *GethStatusBackend) stopNode() error {
 }
 
 // RestartNode restart running Status node, fails if node is not running
-func (b *GethStatusBackend) RestartNode() error {
+func (b *StatusBackend) RestartNode() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -1918,17 +1918,17 @@ func (b *GethStatusBackend) RestartNode() error {
 }
 
 // CallRPC executes public RPC requests on node's in-proc RPC server.
-func (b *GethStatusBackend) CallInProcessRPC(inputJSON string) string {
+func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
 	return b.statusNode.CallInProcessRPC(inputJSON)
 }
 
 // @deprecated
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *GethStatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
+func (b *StatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
 	return types.Hash{}, errors.New("method not supported")
 }
 
-func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
+func (b *StatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
@@ -1939,19 +1939,19 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 }
 
 // @deprecated
-func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types.Hash, err error) {
+func (b *StatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types.Hash, err error) {
 	return types.Hash{}, errors.New("method not supported")
 }
 
 // @deprecated
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.
-func (b *GethStatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error) {
+func (b *StatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error) {
 	return wallettypes.SendTxArgs{}, types.Hash{}, errors.New("method not supported")
 }
 
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
-func (b *GethStatusBackend) SignMessage(rpcParams personal.SignParams) (types.HexBytes, error) {
+func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (types.HexBytes, error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(rpcParams.Address, rpcParams.Password)
 	if err != nil {
 		return types.HexBytes{}, err
@@ -1961,12 +1961,12 @@ func (b *GethStatusBackend) SignMessage(rpcParams personal.SignParams) (types.He
 
 // Recover calls the personalAPI to return address associated with the private
 // key that was used to calculate the signature in the message
-func (b *GethStatusBackend) Recover(rpcParams personal.RecoverParams) (types.Address, error) {
+func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (types.Address, error) {
 	return b.signer.Recover(rpcParams)
 }
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
-func (b *GethStatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types.HexBytes, error) {
+func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types.HexBytes, error) {
 	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return types.HexBytes{}, err
@@ -1980,7 +1980,7 @@ func (b *GethStatusBackend) SignTypedData(typed typeddata.TypedData, address str
 }
 
 // SignTypedDataV4 accepts data and password. Gets verified account and signs typed data.
-func (b *GethStatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error) {
+func (b *StatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error) {
 	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return types.HexBytes{}, err
@@ -1994,7 +1994,7 @@ func (b *GethStatusBackend) SignTypedDataV4(typed signercore.TypedData, address 
 }
 
 // HashTypedData generates the hash of TypedData.
-func (b *GethStatusBackend) HashTypedData(typed typeddata.TypedData) (types.Hash, error) {
+func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (types.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.ValidateAndHash(typed, chain)
 	if err != nil {
@@ -2004,7 +2004,7 @@ func (b *GethStatusBackend) HashTypedData(typed typeddata.TypedData) (types.Hash
 }
 
 // HashTypedDataV4 generates the hash of TypedData.
-func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.Hash, error) {
+func (b *StatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.HashTypedDataV4(typed, chain)
 	if err != nil {
@@ -2013,13 +2013,13 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 	return types.Hash(hash), err
 }
 
-func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
+func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
 	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 }
 
 // AppStateChange handles app state changes (background/foreground).
 // state values: see https://facebook.github.io/react-native/docs/appstate.html
-func (b *GethStatusBackend) AppStateChange(state AppState) {
+func (b *StatusBackend) AppStateChange(state AppState) {
 	if !state.IsValid() {
 		b.logger.Warn("invalid app state, not reporting app state change", zap.Any("state", state))
 		return
@@ -2053,14 +2053,14 @@ func (b *GethStatusBackend) AppStateChange(state AppState) {
 	// and normal mode if the app is in foreground.
 }
 
-func (b *GethStatusBackend) StopLocalNotifications() error {
+func (b *StatusBackend) StopLocalNotifications() error {
 	if b.statusNode == nil {
 		return nil
 	}
 	return b.statusNode.StopLocalNotifications()
 }
 
-func (b *GethStatusBackend) StartLocalNotifications() error {
+func (b *StatusBackend) StartLocalNotifications() error {
 	if b.statusNode == nil {
 		return nil
 	}
@@ -2069,7 +2069,7 @@ func (b *GethStatusBackend) StartLocalNotifications() error {
 }
 
 // Logout clears whisper identities.
-func (b *GethStatusBackend) Logout() error {
+func (b *StatusBackend) Logout() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -2119,20 +2119,20 @@ func (b *GethStatusBackend) Logout() error {
 // This log is profile-independent and should be enabled by default,
 // including in release builds, to help diagnose login issues.
 // related issue: https://github.com/status-im/status-mobile/issues/21501
-func (b *GethStatusBackend) switchToPreLoginLog() error {
+func (b *StatusBackend) switchToPreLoginLog() error {
 	_ = logutils.ZapLogger().Sync()
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 // cleanupServices stops parts of services that aren't managed by a node and removes injected data from services.
-func (b *GethStatusBackend) cleanupServices() error {
+func (b *StatusBackend) cleanupServices() error {
 	if b.statusNode == nil {
 		return nil
 	}
 	return b.statusNode.Cleanup()
 }
 
-func (b *GethStatusBackend) closeDBs() error {
+func (b *StatusBackend) closeDBs() error {
 	err := b.closeWalletDB()
 	if err != nil {
 		return err
@@ -2140,7 +2140,7 @@ func (b *GethStatusBackend) closeDBs() error {
 	return b.closeAppDB()
 }
 
-func (b *GethStatusBackend) closeAppDB() error {
+func (b *StatusBackend) closeAppDB() error {
 	if b.appDB != nil {
 		err := b.appDB.Close()
 		if err != nil {
@@ -2152,7 +2152,7 @@ func (b *GethStatusBackend) closeAppDB() error {
 	return nil
 }
 
-func (b *GethStatusBackend) closeWalletDB() error {
+func (b *StatusBackend) closeWalletDB() error {
 	if b.walletDB != nil {
 		err := b.walletDB.Close()
 		if err != nil {
@@ -2166,7 +2166,7 @@ func (b *GethStatusBackend) closeWalletDB() error {
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
 // using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
-func (b *GethStatusBackend) SelectAccount(loginParams LoginParams, privateKey *ecdsa.PrivateKey) error {
+func (b *StatusBackend) SelectAccount(loginParams LoginParams, privateKey *ecdsa.PrivateKey) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -2190,17 +2190,17 @@ func (b *GethStatusBackend) SelectAccount(loginParams LoginParams, privateKey *e
 	return nil
 }
 
-func (b *GethStatusBackend) GetActiveAccount() (*multiaccounts.Account, error) {
+func (b *StatusBackend) GetActiveAccount() (*multiaccounts.Account, error) {
 	if b.account == nil {
-		return nil, errors.New("master key account is nil in the GethStatusBackend")
+		return nil, errors.New("master key account is nil in the StatusBackend")
 	}
 
 	return b.account, nil
 }
 
-func (b *GethStatusBackend) LocalPairingStarted() error {
+func (b *StatusBackend) LocalPairingStarted() error {
 	if b.account == nil {
-		return errors.New("master key account is nil in the GethStatusBackend")
+		return errors.New("master key account is nil in the StatusBackend")
 	}
 
 	accountDB, err := accounts.NewDB(b.appDB)
@@ -2211,7 +2211,7 @@ func (b *GethStatusBackend) LocalPairingStarted() error {
 	return accountDB.MnemonicWasShown()
 }
 
-func (b *GethStatusBackend) initProtocol() error {
+func (b *StatusBackend) initProtocol() error {
 	st := b.statusNode.WakuV2ExtService()
 	if st == nil {
 		return nil
@@ -2265,7 +2265,7 @@ func (b *GethStatusBackend) initProtocol() error {
 	return nil
 }
 
-func (b *GethStatusBackend) InstallationID() string {
+func (b *StatusBackend) InstallationID() string {
 	m := b.Messenger()
 	if m != nil {
 		return m.InstallationID()
@@ -2273,7 +2273,7 @@ func (b *GethStatusBackend) InstallationID() string {
 	return ""
 }
 
-func (b *GethStatusBackend) KeyUID() string {
+func (b *StatusBackend) KeyUID() string {
 	m := b.Messenger()
 	if m != nil {
 		return m.KeyUID()
@@ -2282,12 +2282,12 @@ func (b *GethStatusBackend) KeyUID() string {
 }
 
 // ExtractGroupMembershipSignatures extract signatures from tuples of content/signature
-func (b *GethStatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error) {
+func (b *StatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error) {
 	return crypto.ExtractSignatures(signaturePairs)
 }
 
 // SignGroupMembership signs a piece of data containing membership information
-func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) {
+func (b *StatusBackend) SignGroupMembership(content string) (string, error) {
 	selectedChatAccount, err := b.accountsManager.SelectedChatAccount()
 	if err != nil {
 		return "", err
@@ -2296,7 +2296,7 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 	return crypto.SignStringAsHex(content, selectedChatAccount.PrivateKey())
 }
 
-func (b *GethStatusBackend) Messenger() *protocol.Messenger {
+func (b *StatusBackend) Messenger() *protocol.Messenger {
 	statusNode := b.StatusNode()
 	if statusNode != nil {
 		accountService := statusNode.AccountService()
@@ -2308,7 +2308,7 @@ func (b *GethStatusBackend) Messenger() *protocol.Messenger {
 }
 
 // SignHash exposes vanilla ECDSA signing for signing a message for Swarm
-func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
+func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 	hash, err := hexutil.Decode(hexEncodedHash)
 	if err != nil {
 		return "", fmt.Errorf("SignHash: could not unmarshal the input: %v", err)
@@ -2328,7 +2328,7 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 	return hexEncodedSignature, nil
 }
 
-func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) error {
+func (b *StatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) error {
 	if b.appDB == nil {
 		return ErrDBNotAvailable
 	}
@@ -2351,7 +2351,7 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	return nil
 }
 
-func (b *GethStatusBackend) getAppDBPath(keyUID string) (string, error) {
+func (b *StatusBackend) getAppDBPath(keyUID string) (string, error) {
 	if len(b.rootDataDir) == 0 {
 		return "", errors.New("root datadir wasn't provided")
 	}
@@ -2359,7 +2359,7 @@ func (b *GethStatusBackend) getAppDBPath(keyUID string) (string, error) {
 	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID)), nil
 }
 
-func (b *GethStatusBackend) getWalletDBPath(keyUID string) (string, error) {
+func (b *StatusBackend) getWalletDBPath(keyUID string) (string, error) {
 	if len(b.rootDataDir) == 0 {
 		return "", errors.New("root datadir wasn't provided")
 	}
@@ -2367,29 +2367,29 @@ func (b *GethStatusBackend) getWalletDBPath(keyUID string) (string, error) {
 	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", keyUID)), nil
 }
 
-func (b *GethStatusBackend) SetSentryDSN(dsn string) {
+func (b *StatusBackend) SetSentryDSN(dsn string) {
 	b.sentryDSN = dsn
 }
 
-func (b *GethStatusBackend) EnablePanicReporting() error {
+func (b *StatusBackend) EnablePanicReporting() error {
 	return sentry.Init(
 		sentry.WithDSN(b.sentryDSN),
 		sentry.WithDefaultContext(),
 	)
 }
 
-func (b *GethStatusBackend) DisablePanicReporting() error {
+func (b *StatusBackend) DisablePanicReporting() error {
 	return sentry.Close()
 }
 
-func (b *GethStatusBackend) TogglePanicReporting(enabled bool) error {
+func (b *StatusBackend) TogglePanicReporting(enabled bool) error {
 	if enabled {
 		return b.EnablePanicReporting()
 	}
 	return b.DisablePanicReporting()
 }
 
-func (b *GethStatusBackend) SetProfileLogLevel(level string) error {
+func (b *StatusBackend) SetProfileLogLevel(level string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -2402,7 +2402,7 @@ func (b *GethStatusBackend) SetProfileLogLevel(level string) error {
 	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
-func (b *GethStatusBackend) SetLogNamespaces(namespaces string) error {
+func (b *StatusBackend) SetLogNamespaces(namespaces string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -2415,7 +2415,7 @@ func (b *GethStatusBackend) SetLogNamespaces(namespaces string) error {
 	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
-func (b *GethStatusBackend) SetProfileLogEnabled(enabled bool) error {
+func (b *StatusBackend) SetProfileLogEnabled(enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -2428,14 +2428,14 @@ func (b *GethStatusBackend) SetProfileLogEnabled(enabled bool) error {
 	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
-func (b *GethStatusBackend) SetPreLoginLogEnabled(enabled bool) error {
+func (b *StatusBackend) SetPreLoginLogEnabled(enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.preLoginLogConfig.SetEnabled(enabled)
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
-func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
+func (b *StatusBackend) SetPreLoginLogLevel(level string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if err := b.preLoginLogConfig.SetLevel(level); err != nil {
@@ -2444,7 +2444,7 @@ func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
 	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
-func (b *GethStatusBackend) wakuMetricsHandler() http.Handler {
+func (b *StatusBackend) wakuMetricsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if b.StatusNode() == nil {
 			b.logger.Error("failed to get waku metrics: StatusNode is nil")

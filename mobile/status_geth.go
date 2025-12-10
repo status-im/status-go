@@ -5,4 +5,4 @@ import (
 	"github.com/status-im/status-go/logutils"
 )
 
-var statusBackend = api.NewGethStatusBackend(logutils.ZapLogger())
+var statusBackend = api.NewStatusBackend(logutils.ZapLogger())
