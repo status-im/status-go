@@ -5,13 +5,14 @@ import (
 	"image"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	path = "../_assets/tests/"
+	path = "testdata/"
 )
 
 func TestDecode(t *testing.T) {
@@ -67,22 +68,23 @@ func TestDecode(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		img, err := Decode(path + c.Filepath)
+		t.Run(c.Filepath, func(t *testing.T) {
+			img, err := Decode(path + c.Filepath)
 
-		if c.Error {
-			require.Error(t, err)
-		} else {
-			require.NoError(t, err)
-		}
+			if c.Error {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 
-		if c.Nil {
-			require.Nil(t, img)
-			continue
-		} else {
+			if c.Nil {
+				require.Nil(t, img)
+				return
+			}
+
 			require.NotNil(t, img)
-		}
-
-		require.Exactly(t, c.Bounds, img.Bounds())
+			require.Exactly(t, c.Bounds, img.Bounds())
+		})
 	}
 }
 
@@ -96,7 +98,7 @@ func TestDecodeFromURL(t *testing.T) {
 		Bounds   image.Rectangle
 	}{
 		{
-			s.URL + "/2x1.png",
+			"2x1.png",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -104,7 +106,15 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			s.URL + "/1.jpg",
+			"elephant.jpg",
+			false,
+			image.Rectangle{
+				Min: image.Point{X: 0, Y: 0},
+				Max: image.Point{X: 80, Y: 80},
+			},
+		},
+		{
+			"1.gif",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -112,7 +122,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			s.URL + "/1.gif",
+			"1.webp",
 			false,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -120,15 +130,7 @@ func TestDecodeFromURL(t *testing.T) {
 			},
 		},
 		{
-			s.URL + "/1.webp",
-			false,
-			image.Rectangle{
-				Min: image.Point{X: 0, Y: 0},
-				Max: image.Point{X: 1, Y: 1},
-			},
-		},
-		{
-			s.URL + "/1.webp",
+			"1.webp",
 			true,
 			image.Rectangle{
 				Min: image.Point{X: 0, Y: 0},
@@ -138,15 +140,19 @@ func TestDecodeFromURL(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		img, err := DecodeFromURL(c.Filepath)
-
-		if c.Nil {
-			require.Nil(t, err)
-		} else {
+		t.Run(c.Filepath, func(t *testing.T) {
+			u, err := url.JoinPath(s.URL, c.Filepath)
 			require.NoError(t, err)
-			require.Exactly(t, c.Bounds, img.Bounds())
-		}
 
+			img, err := DecodeFromURL(u)
+
+			if c.Nil {
+				require.Nil(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Exactly(t, c.Bounds, img.Bounds())
+			}
+		})
 	}
 }
 

@@ -410,16 +410,19 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 }
 
 func (s *ManagerSuite) TestEditCommunity() {
+	image1Path := testutils.SaveFakeImage(s.T(), 8, 8)
+	image2Path := testutils.SaveFakeImage(s.T(), 8, 8)
+
 	//create community
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "status community description",
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Image:       "../../_assets/tests/elephant.jpg",
-		ImageAx:     10,
-		ImageAy:     10,
-		ImageBx:     70,
-		ImageBy:     70,
+		Image:       image1Path,
+		ImageAx:     1,
+		ImageAy:     1,
+		ImageBx:     7,
+		ImageBy:     7,
 	}
 
 	community, err := s.manager.CreateCommunity(createRequest, true)
@@ -431,11 +434,11 @@ func (s *ManagerSuite) TestEditCommunity() {
 		CreateCommunity: requests.CreateCommunity{
 			Name:        "statusEdited",
 			Description: "status community description edited",
-			Image:       "../../_assets/tests/status.png",
-			ImageAx:     40,
-			ImageAy:     40,
-			ImageBx:     200,
-			ImageBy:     200,
+			Image:       image2Path,
+			ImageAx:     4,
+			ImageAy:     4,
+			ImageBx:     8,
+			ImageBy:     8,
 		},
 	}
 

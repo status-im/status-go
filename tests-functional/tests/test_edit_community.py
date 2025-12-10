@@ -11,8 +11,8 @@ from utils.image_utils import ImageCropRect
 from clients.services.wakuext import CommunityPermissionsAccess
 
 
-ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "_assets", "tests")
-ELEPHANT = os.path.join(ASSETS_DIR, "elephant.jpg")
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "internal", "images", "testdata")
+ELEPHANT = os.path.join(ASSETS_DIR, "scripts")
 STATUS = os.path.join(ASSETS_DIR, "status.png")
 IMAGE_SIZES = ["large", "thumbnail"]
 

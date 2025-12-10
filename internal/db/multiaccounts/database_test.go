@@ -7,11 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
-
-	"github.com/stretchr/testify/require"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -129,7 +130,7 @@ var (
 )
 
 func seedTestDBWithIdentityImages(t *testing.T, db *Database, keyUID string) {
-	iis := images.SampleIdentityImages()
+	iis := testutils.SampleIdentityImages()
 	require.NoError(t, db.StoreIdentityImages(keyUID, iis, false))
 }
 
@@ -360,7 +361,7 @@ func TestDatabase_SaveAccountWithIdentityImages(t *testing.T) {
 		KeyUID:    keyUID,
 		ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
 		ColorID:   10,
-		Images:    images.SampleIdentityImages(),
+		Images:    testutils.SampleIdentityImages(),
 	}
 	require.NoError(t, db.SaveAccount(expected))
 
