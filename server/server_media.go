@@ -14,7 +14,7 @@ import (
 	errorspkg "github.com/pkg/errors"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts"
-	"github.com/status-im/status-go/ipfs"
+	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
