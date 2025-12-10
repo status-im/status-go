@@ -42,10 +42,10 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/node"
-	"github.com/status-im/status-go/node/adapters"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/backend/node"
+	adapters2 "github.com/status-im/status-go/pkg/backend/node/adapters"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
@@ -2258,9 +2258,9 @@ func (b *StatusBackend) initProtocol() error {
 	b.statusNode.ChatService(accDB).Init(messenger)
 	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 	b.statusNode.CommunityTokensService().Init(messenger)
-	b.statusNode.SharedUrlsService().SetDataProvider(adapters.NewSharedUrlsMessengerAdapter(messenger))
-	b.statusNode.NewsFeedService().SetActivityCenter(adapters.NewNewsFeedActivityCenterAdapter(messenger))
-	b.statusNode.LinkPreviewService().SetStatusDataProvider(adapters.NewLinkPreviewMessengerAdapter(messenger))
+	b.statusNode.SharedUrlsService().SetDataProvider(adapters2.NewSharedUrlsMessengerAdapter(messenger))
+	b.statusNode.NewsFeedService().SetActivityCenter(adapters2.NewNewsFeedActivityCenterAdapter(messenger))
+	b.statusNode.LinkPreviewService().SetStatusDataProvider(adapters2.NewLinkPreviewMessengerAdapter(messenger))
 
 	return nil
 }
