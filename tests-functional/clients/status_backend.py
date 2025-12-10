@@ -20,6 +20,7 @@ from clients.services.accounts import AccountService
 from clients.services.appgeneral import AppgeneralService
 from clients.services.connector import ConnectorService
 from clients.services.eth import EthService
+from clients.services.linkpreview import LinkPreviewService
 from clients.services.multiaccounts import MultiAccountsService
 from clients.services.newsfeed import NewsFeedService
 from clients.services.settings import SettingsService
@@ -104,6 +105,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.connector_service = ConnectorService(self)
         self.appgeneral_service = AppgeneralService(self)
         self.eth_service = EthService(self)
+        self.linkpreview_service = LinkPreviewService(self)
         self.expvar_client = ExpvarClient(self.base_url)
 
     def __del__(self):
