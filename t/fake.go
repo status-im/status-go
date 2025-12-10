@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"

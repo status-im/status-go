@@ -13,8 +13,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	userimage "github.com/status-im/status-go/images"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -186,7 +186,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	err = png.Encode(file, testImage)
 	s.Require().NoError(err)
 
-	groupImg := userimage.CroppedImage{
+	groupImg := images.CroppedImage{
 		ImagePath: tmpTestFilePath,
 		X:         1,
 		Y:         1,

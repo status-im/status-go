@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	mc "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/pkg/testutils"
 
 	"github.com/status-im/status-go/crypto"

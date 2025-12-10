@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
-	userimage "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -377,7 +377,7 @@ func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 	}
 
 	// Image
-	base64Image, err := userimage.GetPayloadDataURI(g.Image())
+	base64Image, err := images.GetPayloadDataURI(g.Image())
 	if err == nil {
 		c.Base64Image = base64Image
 	}
