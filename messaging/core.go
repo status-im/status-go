@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"

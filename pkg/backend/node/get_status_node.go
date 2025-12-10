@@ -22,6 +22,7 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	common2 "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/timesource"
