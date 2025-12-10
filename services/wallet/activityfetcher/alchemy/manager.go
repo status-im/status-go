@@ -64,3 +64,7 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, parameters 
 		NextCursor:     nextCursor,
 	}, nil
 }
+
+func (m *Manager) ClearAll(ctx context.Context) error {
+	return m.persistence.ClearAll(ctx)
+}
