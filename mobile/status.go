@@ -19,7 +19,6 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	abi_spec "github.com/status-im/status-go/abi-spec"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/keystore"
 	"github.com/status-im/status-go/centralizedmetrics"
@@ -28,6 +27,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	abi_spec "github.com/status-im/status-go/internal/abi-spec"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/logutils"
