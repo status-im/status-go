@@ -9,7 +9,7 @@ import (
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 )
 
-func initSDS(logger *zap.Logger) *sds.ReliabilityManager {
+func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
 	sds.SetLogger(logger)
 
 	reliabilityManager, err := sds.NewReliabilityManager()
