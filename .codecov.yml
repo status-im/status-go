@@ -10,7 +10,7 @@ codecov:
 ignore:
   - "_.*"
   - "scripts"
-  - "contracts"
+  - "internal/contracts"
   - "Makefile"
 
 coverage:

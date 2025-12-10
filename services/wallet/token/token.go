@@ -27,8 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/snt"
+	"github.com/status-im/status-go/internal/contracts"
+	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"

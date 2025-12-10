@@ -29,7 +29,7 @@ linters:
       - std-error-handling
       - legacy
     paths:
-    - contracts/
+    - internal/contracts/
     rules:
       - linters:
           - goconst

@@ -13,11 +13,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	communitytokens "github.com/status-im/status-go/contracts/community-tokens"
-	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
+	communitytokens "github.com/status-im/status-go/internal/contracts/community-tokens"
+	communitytokendeployer "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
+
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/errors"
+	communitytokendeployer2 "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -82,16 +84,16 @@ func convert33BytesPubKeyToEthAddress(pubKey string) (common.Address, error) {
 	return common.Address(crypto.PubkeyToAddress(*communityPubKey)), nil
 }
 
-func prepareDeploymentSignatureStruct(signature string, communityID string, addressFrom common.Address) (communitytokendeployer.CommunityTokenDeployerDeploymentSignature, error) {
+func prepareDeploymentSignatureStruct(signature string, communityID string, addressFrom common.Address) (communitytokendeployer2.CommunityTokenDeployerDeploymentSignature, error) {
 	r, s, v, err := decodeSignature(common.FromHex(signature))
 	if err != nil {
-		return communitytokendeployer.CommunityTokenDeployerDeploymentSignature{}, err
+		return communitytokendeployer2.CommunityTokenDeployerDeploymentSignature{}, err
 	}
 	communityEthAddress, err := convert33BytesPubKeyToEthAddress(communityID)
 	if err != nil {
-		return communitytokendeployer.CommunityTokenDeployerDeploymentSignature{}, err
+		return communitytokendeployer2.CommunityTokenDeployerDeploymentSignature{}, err
 	}
-	communitySignature := communitytokendeployer.CommunityTokenDeployerDeploymentSignature{
+	communitySignature := communitytokendeployer2.CommunityTokenDeployerDeploymentSignature{
 		V:        v,
 		R:        r,
 		S:        s,
@@ -102,18 +104,18 @@ func prepareDeploymentSignatureStruct(signature string, communityID string, addr
 }
 
 func (s *CommunityDeployOwnerTokenProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	deployerABI, err := abi.JSON(strings.NewReader(communitytokendeployer.CommunityTokenDeployerABI))
+	deployerABI, err := abi.JSON(strings.NewReader(communitytokendeployer2.CommunityTokenDeployerABI))
 	if err != nil {
 		return []byte{}, err
 	}
 
-	ownerTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
+	ownerTokenConfig := communitytokendeployer2.CommunityTokenDeployerTokenConfig{
 		Name:    params.CommunityParams.OwnerTokenParameters.Name,
 		Symbol:  params.CommunityParams.OwnerTokenParameters.Symbol,
 		BaseURI: params.CommunityParams.OwnerTokenParameters.TokenURI,
 	}
 
-	masterTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
+	masterTokenConfig := communitytokendeployer2.CommunityTokenDeployerTokenConfig{
 		Name:    params.CommunityParams.MasterTokenParameters.Name,
 		Symbol:  params.CommunityParams.MasterTokenParameters.Symbol,
 		BaseURI: params.CommunityParams.MasterTokenParameters.TokenURI,

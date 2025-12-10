@@ -12,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	communitytokens "github.com/status-im/status-go/contracts/community-tokens"
-	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
+	communitytokens "github.com/status-im/status-go/internal/contracts/community-tokens"
+	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

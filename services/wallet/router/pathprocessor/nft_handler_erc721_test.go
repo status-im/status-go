@@ -16,8 +16,8 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
-	"github.com/status-im/status-go/contracts/erc721"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/contracts/erc721"
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"

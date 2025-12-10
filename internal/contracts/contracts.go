@@ -4,13 +4,15 @@ package contracts
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/contracts/directory"
-	"github.com/status-im/status-go/contracts/ierc20"
-	"github.com/status-im/status-go/contracts/namewrapper"
-	"github.com/status-im/status-go/contracts/registrar"
-	"github.com/status-im/status-go/contracts/resolver"
-	"github.com/status-im/status-go/contracts/snt"
-	"github.com/status-im/status-go/contracts/stickers"
+	"github.com/status-im/status-go/internal/contracts/directory"
+	"github.com/status-im/status-go/internal/contracts/ierc20"
+	"github.com/status-im/status-go/internal/contracts/namewrapper"
+	"github.com/status-im/status-go/internal/contracts/registrar"
+	"github.com/status-im/status-go/internal/contracts/resolver"
+	"github.com/status-im/status-go/internal/contracts/snt"
+	"github.com/status-im/status-go/internal/contracts/stickers"
+
+	stickers2 "github.com/status-im/status-go/internal/contracts/stickers"
 	"github.com/status-im/status-go/rpc"
 )
 
@@ -104,7 +106,7 @@ func (c *ContractMaker) NewSNT(chainID uint64) (*snt.SNT, error) {
 }
 
 func (c *ContractMaker) NewStickerType(chainID uint64) (*stickers.StickerType, error) {
-	contractAddr, err := stickers.StickerTypeContractAddress(chainID)
+	contractAddr, err := stickers2.StickerTypeContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +123,7 @@ func (c *ContractMaker) NewStickerType(chainID uint64) (*stickers.StickerType, e
 }
 
 func (c *ContractMaker) NewStickerMarket(chainID uint64) (*stickers.StickerMarket, error) {
-	contractAddr, err := stickers.StickerMarketContractAddress(chainID)
+	contractAddr, err := stickers2.StickerMarketContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +140,7 @@ func (c *ContractMaker) NewStickerMarket(chainID uint64) (*stickers.StickerMarke
 }
 
 func (c *ContractMaker) NewStickerPack(chainID uint64) (*stickers.StickerPack, error) {
-	contractAddr, err := stickers.StickerPackContractAddress(chainID)
+	contractAddr, err := stickers2.StickerPackContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
