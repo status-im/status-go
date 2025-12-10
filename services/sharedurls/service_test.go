@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/api/multiformat"
+	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	mock_provider "github.com/status-im/status-go/services/sharedurls/mock"

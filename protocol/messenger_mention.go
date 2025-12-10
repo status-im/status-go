@@ -16,9 +16,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/contacts"
-
-	"github.com/status-im/status-go/api/multiformat"
 )
 
 const (

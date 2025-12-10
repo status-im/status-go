@@ -5,9 +5,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
