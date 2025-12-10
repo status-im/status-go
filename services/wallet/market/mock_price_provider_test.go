@@ -1,4 +1,4 @@
-package mock_market
+package market
 
 import (
 	"go.uber.org/mock/gomock"
