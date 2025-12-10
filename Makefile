@@ -452,7 +452,7 @@ test-unit: ##@tests Run unit and integration tests
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	./_assets/scripts/run_unit_tests.sh
 
-test-single:
+test-single: test-unit-prep
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go test -v $(PKG) -testify.m $(TEST)
 
