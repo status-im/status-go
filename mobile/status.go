@@ -22,7 +22,6 @@ import (
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/keystore"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/centralizedmetrics"
 	"github.com/status-im/status-go/centralizedmetrics/providers"
 	gocommon "github.com/status-im/status-go/common"
@@ -36,6 +35,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	api2 "github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol"
 	identityUtils "github.com/status-im/status-go/protocol/identity"
@@ -198,7 +198,7 @@ func initializeLogging(request *requests.InitializeApplication) error {
 	)
 
 	if request.APILoggingEnabled {
-		logRequestsFile := path.Join(request.LogDir, api.DefaultAPILogFile)
+		logRequestsFile := path.Join(request.LogDir, api2.DefaultAPILogFile)
 		err = requestlog.ConfigureAndEnableRequestLogging(logRequestsFile)
 		if err != nil {
 			return err
@@ -369,7 +369,7 @@ func login(accountData, password, configJSON string) error {
 		}
 	}
 
-	api.RunAsync(func() error {
+	api2.RunAsync(func() error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
@@ -434,7 +434,7 @@ func createAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	api.RunAsync(func() error {
+	api2.RunAsync(func() error {
 		logutils.ZapLogger().Debug("starting a node and creating config")
 		_, err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
@@ -472,7 +472,7 @@ func loginAccount(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	api.RunAsync(func() error {
+	api2.RunAsync(func() error {
 		err := statusBackend.LoginAccount(&request)
 		if err != nil {
 			logutils.ZapLogger().Error("loginAccount failed", zap.Error(err))
@@ -500,7 +500,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	api.RunAsync(func() error {
+	api2.RunAsync(func() error {
 		logutils.ZapLogger().Debug("starting a node and restoring account")
 
 		if request.Keycard != nil {
@@ -534,7 +534,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	api.RunAsync(func() error {
+	api2.RunAsync(func() error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {
@@ -791,7 +791,7 @@ func HashMessage(message string) string {
 //
 // This gives context to the signed message and prevents signing of transactions.
 func hashMessage(message string) string {
-	hash, err := api.HashMessage(message)
+	hash, err := api2.HashMessage(message)
 	code := codeUnknown
 	if c, ok := errToCodeMap[err]; ok {
 		code = c
@@ -821,7 +821,7 @@ func AppStateChange(state string) {
 
 // appStateChange handles app state changes (background/foreground).
 func appStateChange(state string) {
-	s, err := api.ParseAppState(state)
+	s, err := api2.ParseAppState(state)
 	if err != nil {
 		logutils.ZapLogger().Error("parse app state failed, ignoring", zap.Error(err))
 		return
@@ -1310,7 +1310,7 @@ func convertFleets(fleetsMap params.FleetsMap) map[string]map[string][]string {
 
 func fleets() string {
 	fleets := FleetDescription{
-		DefaultFleet: api.DefaultFleet,
+		DefaultFleet: api2.DefaultFleet,
 		Fleets:       convertFleets(params.GetSupportedFleets()),
 	}
 

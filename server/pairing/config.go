@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"net"
 
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
@@ -146,6 +146,6 @@ func NewReceiverServerConfig() *ReceiverServerConfig {
 func (c *ReceiverConfig) AbsoluteKeystorePath() string {
 	// Follow the same path as in InitKeyStoreDirWithAccount
 	// Keep keyUID empty as it's unknown yet
-	_, path := api.DefaultKeystorePath(c.CreateAccount.RootDataDir, "")
+	_, path := backend.DefaultKeystorePath(c.CreateAccount.RootDataDir, "")
 	return path
 }

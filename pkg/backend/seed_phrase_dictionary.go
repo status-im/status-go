@@ -1,4 +1,4 @@
-package api
+package backend
 
 var dictionary = []string{
 	"acid",

@@ -7,8 +7,8 @@ import (
 	"go.uber.org/zap"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/pkg/backend"
 )
 
 type PayloadMounter interface {
@@ -147,7 +147,7 @@ func (apl *AccountPayloadLoader) Load() error {
 
 // NewRawMessagePayloadMounter generates a new and initialised RawMessagePayload flavoured BasePayloadMounter
 // responsible for the whole lifecycle of an RawMessagePayload
-func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.StatusBackend, config *SenderConfig) *BasePayloadMounter {
+func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *backend.StatusBackend, config *SenderConfig) *BasePayloadMounter {
 	pe = pe.Renew()
 	payload := NewRawMessagesPayload()
 
@@ -165,7 +165,7 @@ type RawMessageLoader struct {
 	deviceType            string
 }
 
-func NewRawMessageLoader(backend *api.StatusBackend, payload *RawMessagesPayload, config *SenderConfig) *RawMessageLoader {
+func NewRawMessageLoader(backend *backend.StatusBackend, payload *RawMessagesPayload, config *SenderConfig) *RawMessageLoader {
 	return &RawMessageLoader{
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		payload:               payload,
@@ -190,7 +190,7 @@ func (r *RawMessageLoader) Load() (err error) {
 
 // NewInstallationPayloadMounter generates a new and initialised InstallationPayload flavoured BasePayloadMounter
 // responsible for the whole lifecycle of an InstallationPayload
-func NewInstallationPayloadMounter(pe *PayloadEncryptor, backend *api.StatusBackend, deviceType string) *BasePayloadMounter {
+func NewInstallationPayloadMounter(pe *PayloadEncryptor, backend *backend.StatusBackend, deviceType string) *BasePayloadMounter {
 	pe = pe.Renew()
 	payload := NewRawMessagesPayload()
 
@@ -207,7 +207,7 @@ type InstallationPayloadLoader struct {
 	deviceType            string
 }
 
-func NewInstallationPayloadLoader(backend *api.StatusBackend, payload *RawMessagesPayload, deviceType string) *InstallationPayloadLoader {
+func NewInstallationPayloadLoader(backend *backend.StatusBackend, payload *RawMessagesPayload, deviceType string) *InstallationPayloadLoader {
 	return &InstallationPayloadLoader{
 		payload:               payload,
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
@@ -237,7 +237,7 @@ func (r *InstallationPayloadLoader) Load() error {
 
 // NewPayloadMounters returns PayloadMounter s configured to handle local pairing transfers of:
 //   - AccountPayload, RawMessagePayload and InstallationPayload
-func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.StatusBackend, config *SenderConfig) (PayloadMounter, PayloadMounter, PayloadMounterReceiver, error) {
+func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *backend.StatusBackend, config *SenderConfig) (PayloadMounter, PayloadMounter, PayloadMounterReceiver, error) {
 	am, err := NewAccountPayloadMounter(pe, config, logger)
 	if err != nil {
 		return nil, nil, nil, err
@@ -253,7 +253,7 @@ func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.S
 |--------------------------------------------------------------------------
 */
 
-func NewKeystoreFilesPayloadMounter(backend *api.StatusBackend, pe *PayloadEncryptor, config *KeystoreFilesSenderConfig, logger *zap.Logger) (*BasePayloadMounter, error) {
+func NewKeystoreFilesPayloadMounter(backend *backend.StatusBackend, pe *PayloadEncryptor, config *KeystoreFilesSenderConfig, logger *zap.Logger) (*BasePayloadMounter, error) {
 	l := logger.Named("KeystoreFilesPayloadLoader")
 	l.Debug("fired", zap.Any("config", config))
 
@@ -281,7 +281,7 @@ type KeystoreFilesPayloadLoader struct {
 	keystoreFilesToTransfer []string
 }
 
-func NewKeystoreFilesPayloadLoader(backend *api.StatusBackend, p *AccountPayload, config *KeystoreFilesSenderConfig) (*KeystoreFilesPayloadLoader, error) {
+func NewKeystoreFilesPayloadLoader(backend *backend.StatusBackend, p *AccountPayload, config *KeystoreFilesSenderConfig) (*KeystoreFilesPayloadLoader, error) {
 	if config == nil {
 		return nil, fmt.Errorf("empty keystore files sender config")
 	}

@@ -9,8 +9,8 @@ import (
 	geth_common "github.com/ethereum/go-ethereum/common"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
 	alchemymanager "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
@@ -30,7 +30,7 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	require.NoError(t, err)
 
 	walletSecrets := t_common.GetWalletSecretsConfigFromEnv()
-	defaultNetworks := api.BuildDefaultNetworks(walletSecrets, true)
+	defaultNetworks := backend.BuildDefaultNetworks(walletSecrets, true)
 	networkManager := network.NewManager(appDB, nil)
 	err = networkManager.InitEmbeddedNetworks(defaultNetworks)
 	require.NoError(t, err)

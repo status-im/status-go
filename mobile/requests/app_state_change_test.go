@@ -5,15 +5,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/pkg/backend"
 )
 
 func TestAppStateChange(t *testing.T) {
 	t.Run("Valid States", func(t *testing.T) {
-		testCases := []api.AppState{
-			api.AppStateBackground,
-			api.AppStateForeground,
-			api.AppStateInactive,
+		testCases := []backend.AppState{
+			backend.AppStateBackground,
+			backend.AppStateForeground,
+			backend.AppStateInactive,
 		}
 
 		for _, state := range testCases {
@@ -24,7 +24,7 @@ func TestAppStateChange(t *testing.T) {
 	})
 
 	t.Run("Invalid State", func(t *testing.T) {
-		invalidStates := []api.AppState{"invalid-state", api.AppStateInvalid}
+		invalidStates := []backend.AppState{"invalid-state", backend.AppStateInvalid}
 
 		for _, state := range invalidStates {
 			req := AppStateChange{State: state}
