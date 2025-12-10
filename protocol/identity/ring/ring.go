@@ -9,7 +9,7 @@ import (
 
 	"github.com/fogleman/gg"
 
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 )
 
 type Theme int

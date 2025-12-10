@@ -26,12 +26,14 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
 	"github.com/status-im/status-go/pkg/security"
@@ -42,7 +44,6 @@ import (
 	walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {
@@ -797,7 +798,7 @@ func TestConvertAccount(t *testing.T) {
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
 
-	keycardSettings := settings.Settings{
+	keycardSettings := settings2.Settings{
 		KeycardInstanceUID: "0xdeadbeef",
 		KeycardPairedOn:    1,
 		KeycardPairing:     "pairing",
@@ -1105,7 +1106,7 @@ func TestSetFleet(t *testing.T) {
 
 	accountsDB, err := testContext.backend.accountsDB()
 	require.NoError(t, err)
-	err = accountsDB.SaveSettingField(settings.Fleet, params.FleetStatusProd)
+	err = accountsDB.SaveSettingField(settings2.Fleet, params.FleetStatusProd)
 	require.NoError(t, err)
 
 	savedSettings, err = testContext.backend.GetSettings()

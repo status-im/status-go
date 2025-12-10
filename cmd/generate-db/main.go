@@ -9,11 +9,11 @@ import (
 
 	"github.com/cockroachdb/errors"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/newsfeed"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (

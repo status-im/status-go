@@ -8,8 +8,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/accounts-management/types"
+	accounts2 "github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 )
 
@@ -61,9 +61,9 @@ func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Pre-condition - both sides have to know about keypairs migrated to a keycards
-	kp1, _, _, err := accounts.GetProfileKeypairForTest(true, true, true)
+	kp1, _, _, err := accounts2.GetProfileKeypairForTest(true, true, true)
 	s.Require().NoError(err)
-	kp2, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	kp2, _, _, err := accounts2.GetSeedImportedKeypair1ForTest()
 	s.Require().NoError(err)
 	// kp3, _, _, err := accounts.GetSeedImportedKeypair2ForTest()
 	// s.Require().NoError(err)
@@ -105,9 +105,9 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingNewKeycards() {
 	dbOnReceiver := s.other.settings
 
 	// Add key cards on sender
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
-	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2 := accounts2.GetKeycardForSeedImportedKeypair1ForTest()
 
 	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
 		Do(func(keycard *types.Keycard, password string, clock uint64) error {
@@ -132,23 +132,23 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingNewKeycards() {
 	senderKeycards, err := s.main.settings.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(senderKeycards))
-	s.Require().True(accounts.Contains(senderKeycards, keycard1, accounts.SameKeycards))
-	s.Require().True(accounts.Contains(senderKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(accounts2.Contains(senderKeycards, keycard1, accounts2.SameKeycards))
+	s.Require().True(accounts2.Contains(senderKeycards, keycard2, accounts2.SameKeycards))
 
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(syncedKeycards))
-	s.Require().True(accounts.Contains(syncedKeycards, keycard1, accounts.SameKeycards))
-	s.Require().True(accounts.Contains(syncedKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(accounts2.Contains(syncedKeycards, keycard1, accounts2.SameKeycards))
+	s.Require().True(accounts2.Contains(syncedKeycards, keycard2, accounts2.SameKeycards))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
-	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2 := accounts2.GetKeycardForSeedImportedKeypair1ForTest()
 
 	// Add keycard on sender
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -157,7 +157,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	senderKeycards, err := senderDb.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(senderKeycards))
-	s.Require().True(contains(senderKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(contains(senderKeycards, keycard1, accounts2.SameKeycards))
 
 	// Add the same keycard on receiver
 	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -166,7 +166,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard1, accounts2.SameKeycards))
 
 	s.accountsManagerMock.EXPECT().SaveOrUpdateKeycard(gomock.Any(), gomock.Any(), gomock.Any()).
 		Do(func(keycard *types.Keycard, password string, clock uint64) error {
@@ -190,21 +190,21 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	senderKeycards, err = senderDb.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(senderKeycards))
-	s.Require().True(contains(senderKeycards, keycard1, accounts.SameKeycards))
-	s.Require().True(contains(senderKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(contains(senderKeycards, keycard1, accounts2.SameKeycards))
+	s.Require().True(contains(senderKeycards, keycard2, accounts2.SameKeycards))
 
 	syncedKeycards, err = dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(syncedKeycards))
-	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
-	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard1, accounts2.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard2, accounts2.SameKeycards))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestRemovingAccountsFromKeycard() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
 	// Add keycard on sender
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -215,7 +215,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestRemovingAccountsFromKeycard() {
 	s.Require().NoError(err)
 
 	// Prepare expected keycard for comparison
-	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1 := accounts2.GetProfileKeycardForTest()
 	updatedKeycard1.AccountsAddresses = updatedKeycard1.AccountsAddresses[2:]
 
 	// Remove accounts from sender
@@ -235,19 +235,19 @@ func (s *MessengerSyncKeycardChangeSuite) TestRemovingAccountsFromKeycard() {
 	senderKeycards, err := senderDb.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(senderKeycards))
-	s.Require().True(contains(senderKeycards, updatedKeycard1, accounts.SameKeycards))
+	s.Require().True(contains(senderKeycards, updatedKeycard1, accounts2.SameKeycards))
 
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(contains(syncedKeycards, updatedKeycard1, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, updatedKeycard1, accounts2.SameKeycards))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestRemovingAllAccountsForKeyUID() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
 	// Add keycard on sender
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -284,7 +284,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestDeleteKeycard() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
 	// Add keycard on sender
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -310,12 +310,12 @@ func (s *MessengerSyncKeycardChangeSuite) TestDeleteKeycard() {
 
 	senderKeycard, err := senderDb.GetKeycardByKeycardUID(keycard1.KeycardUID)
 	s.Require().Error(err)
-	s.Require().True(err == accounts.ErrNoKeycardForPassedKeycardUID)
+	s.Require().True(err == accounts2.ErrNoKeycardForPassedKeycardUID)
 	s.Require().Nil(senderKeycard)
 
 	syncedKeycard, err := dbOnReceiver.GetKeycardByKeycardUID(keycard1.KeycardUID)
 	s.Require().Error(err)
-	s.Require().True(err == accounts.ErrNoKeycardForPassedKeycardUID)
+	s.Require().True(err == accounts2.ErrNoKeycardForPassedKeycardUID)
 	s.Require().Nil(syncedKeycard)
 }
 
@@ -323,7 +323,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardName() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
 	// Add keycard on sender
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -334,7 +334,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardName() {
 	s.Require().NoError(err)
 
 	// Prepare expected keycard for comparison
-	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1 := accounts2.GetProfileKeycardForTest()
 	updatedKeycard1.KeycardName = "New Keycard Name"
 
 	// Set new keycard name to sender
@@ -353,18 +353,18 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardName() {
 
 	senderKeycard, err := senderDb.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, senderKeycard))
 
 	syncedKeycard, err := dbOnReceiver.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, syncedKeycard))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardLocked() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
 	// Add keycard on sender
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -375,7 +375,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardLocked() {
 	s.Require().NoError(err)
 
 	// Prepare expected keycard for comparison
-	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1 := accounts2.GetProfileKeycardForTest()
 	updatedKeycard1.KeycardLocked = true
 
 	err = s.main.KeycardLocked(context.Background(), updatedKeycard1.KeycardUID)
@@ -393,18 +393,18 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardLocked() {
 
 	senderKeycard, err := senderDb.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, senderKeycard))
 
 	syncedKeycard, err := dbOnReceiver.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, syncedKeycard))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardUnlocked() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 	keycard1.KeycardLocked = true
 
 	// Add keycard on sender
@@ -416,7 +416,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardUnlocked() {
 	s.Require().NoError(err)
 
 	// Prepare expected keycard for comparison
-	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1 := accounts2.GetProfileKeycardForTest()
 	updatedKeycard1.KeycardLocked = false
 
 	err = s.main.KeycardUnlocked(context.Background(), updatedKeycard1.KeycardUID)
@@ -434,18 +434,18 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardUnlocked() {
 
 	senderKeycard, err := senderDb.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, senderKeycard))
 
 	syncedKeycard, err := dbOnReceiver.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, syncedKeycard))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestUpdatingKeycardUid() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
-	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1 := accounts2.GetProfileKeycardForTest()
 
 	// Add keycard on sender
 	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
@@ -456,7 +456,7 @@ func (s *MessengerSyncKeycardChangeSuite) TestUpdatingKeycardUid() {
 	s.Require().NoError(err)
 
 	// Prepare expected keycard for comparison
-	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1 := accounts2.GetProfileKeycardForTest()
 	updatedKeycard1.KeycardUID = "00000000000000000000000000000000"
 
 	// Update keycard uid on sender
@@ -475,9 +475,9 @@ func (s *MessengerSyncKeycardChangeSuite) TestUpdatingKeycardUid() {
 
 	senderKeycard, err := senderDb.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, senderKeycard))
 
 	syncedKeycard, err := dbOnReceiver.GetKeycardByKeycardUID(updatedKeycard1.KeycardUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycard))
+	s.Require().True(accounts2.SameKeycards(updatedKeycard1, syncedKeycard))
 }

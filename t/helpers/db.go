@@ -10,7 +10,7 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/sqlite"
 )
 

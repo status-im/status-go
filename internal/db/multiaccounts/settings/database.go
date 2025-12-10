@@ -11,8 +11,8 @@ import (
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
+	maErrors "github.com/status-im/status-go/internal/db/multiaccounts/errors"
 	"github.com/status-im/status-go/logutils"
-	maErrors "github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"

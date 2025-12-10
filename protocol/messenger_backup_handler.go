@@ -10,8 +10,8 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/errors"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/errors"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"

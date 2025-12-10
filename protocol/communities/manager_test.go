@@ -15,9 +15,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	userimages "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"

@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

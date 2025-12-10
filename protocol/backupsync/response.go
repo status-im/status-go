@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 )
 
 type BackedUpDataResponse struct {

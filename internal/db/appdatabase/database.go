@@ -7,13 +7,14 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/appdatabase/migrations"
-	"github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
+	"github.com/status-im/status-go/internal/db/appdatabase/migrations"
+
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"

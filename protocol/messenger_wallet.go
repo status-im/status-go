@@ -11,9 +11,9 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )

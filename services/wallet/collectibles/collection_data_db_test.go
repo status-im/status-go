@@ -6,12 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/stretchr/testify/require"
 )
 
 func setupCollectionDataDBTest(t *testing.T) (*CollectionDataDB, func()) {

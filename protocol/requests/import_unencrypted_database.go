@@ -1,6 +1,8 @@
 package requests
 
-import "github.com/status-im/status-go/multiaccounts"
+import (
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+)
 
 type ImportUnencryptedDatabase struct {
 	Account      multiaccounts.Account `json:"account"`

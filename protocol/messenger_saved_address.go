@@ -8,7 +8,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
+	multiAccCommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet"

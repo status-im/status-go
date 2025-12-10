@@ -9,10 +9,10 @@ import (
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
+	"github.com/status-im/status-go/internal/db/multiaccounts/common"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	notificationssettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_notifications"
+	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 )
@@ -60,7 +60,7 @@ type AccountsStorage interface {
 
 // Database sql wrapper for operations with browser objects.
 type Database struct {
-	settings.DatabaseSettingsManager
+	settings2.DatabaseSettingsManager
 	*notificationssettings.NotificationsSettings
 	*walletsettings.WalletSettings
 	db *sql.DB
@@ -72,7 +72,7 @@ func NewDB(db *sql.DB) (*Database, error) {
 		return nil, errDbPassedParameterIsNil
 	}
 
-	sDB, err := settings.MakeNewDB(db)
+	sDB, err := settings2.MakeNewDB(db)
 	if err != nil {
 		return nil, err
 	}

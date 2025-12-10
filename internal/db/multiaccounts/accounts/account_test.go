@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 
 	"github.com/stretchr/testify/require"
 )

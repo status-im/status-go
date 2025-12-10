@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/pkg/testutils"
 
 	"github.com/stretchr/testify/suite"

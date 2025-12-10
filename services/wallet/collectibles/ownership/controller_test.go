@@ -8,7 +8,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"
@@ -20,9 +23,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 
 	"github.com/stretchr/testify/require"
 

@@ -3,12 +3,12 @@ package storage_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/stretchr/testify/require"
 )
 
 func Test_PutRouteData(t *testing.T) {

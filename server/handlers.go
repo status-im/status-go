@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/protocol/protobuf"
 
 	"go.uber.org/zap"
@@ -21,7 +22,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/services/wallet/bigint"

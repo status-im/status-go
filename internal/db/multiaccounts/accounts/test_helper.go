@@ -5,7 +5,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 )
 
 const (

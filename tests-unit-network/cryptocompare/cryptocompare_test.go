@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/params"
 	mock_network "github.com/status-im/status-go/rpc/network/mock"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -13,9 +16,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 )

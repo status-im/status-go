@@ -27,7 +27,6 @@ import (
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/centralizedmetrics"
 	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
 	gocommon "github.com/status-im/status-go/common"
@@ -35,13 +34,15 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	multiacccommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
@@ -64,7 +65,6 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (
@@ -781,7 +781,7 @@ func (b *StatusBackend) accountsDB() (*accounts.Database, error) {
 	return accounts.NewDB(b.appDB)
 }
 
-func (b *StatusBackend) GetSettings() (*settings.Settings, error) {
+func (b *StatusBackend) GetSettings() (*settings2.Settings, error) {
 	accountsDB, err := b.accountsDB()
 	if err != nil {
 		return nil, err
@@ -1097,7 +1097,7 @@ func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) 
 	return
 }
 
-func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, oldPassword string, newPassword string) error {
+func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings2.Settings, keycardUID string, oldPassword string, newPassword string) error {
 	messenger := b.Messenger()
 	if messenger == nil {
 		return errors.New("cannot resolve messenger instance")
@@ -1126,27 +1126,27 @@ func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings.KeycardInstanceUID, s.KeycardInstanceUID)
+	err = accountDB.SaveSettingField(settings2.KeycardInstanceUID, s.KeycardInstanceUID)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPairedOn)
+	err = accountDB.SaveSettingField(settings2.KeycardPairedOn, s.KeycardPairedOn)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings.KeycardPairing, s.KeycardPairing)
+	err = accountDB.SaveSettingField(settings2.KeycardPairing, s.KeycardPairing)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings.Mnemonic, nil)
+	err = accountDB.SaveSettingField(settings2.Mnemonic, nil)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings.ProfileMigrationNeeded, false)
+	err = accountDB.SaveSettingField(settings2.ProfileMigrationNeeded, false)
 	if err != nil {
 		return err
 	}
@@ -1323,7 +1323,7 @@ func (b *StatusBackend) buildAccount(request *requests.CreateAccount, keyUID str
 }
 
 func (b *StatusBackend) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
+	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings2.Settings, error) {
 	s, err := defaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, err
@@ -1408,7 +1408,7 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 }
 
 func (b *StatusBackend) prepareForKeycard(request *requests.CreateAccount, multiAccount *multiaccounts.Account,
-	settings *settings.Settings, nodeConfig *params.NodeConfig) error {
+	settings *settings2.Settings, nodeConfig *params.NodeConfig) error {
 	if request.KeycardInstanceUID == "" {
 		return nil
 	}
@@ -1497,22 +1497,22 @@ func (b *StatusBackend) ConvertToRegularAccount(mnemonic string, currPassword st
 		return err
 	}
 
-	err = db.SaveSettingField(settings.KeycardInstanceUID, "")
+	err = db.SaveSettingField(settings2.KeycardInstanceUID, "")
 	if err != nil {
 		return err
 	}
 
-	err = db.SaveSettingField(settings.KeycardPairedOn, 0)
+	err = db.SaveSettingField(settings2.KeycardPairedOn, 0)
 	if err != nil {
 		return err
 	}
 
-	err = db.SaveSettingField(settings.KeycardPairing, "")
+	err = db.SaveSettingField(settings2.KeycardPairing, "")
 	if err != nil {
 		return err
 	}
 
-	err = db.SaveSettingField(settings.ProfileMigrationNeeded, false)
+	err = db.SaveSettingField(settings2.ProfileMigrationNeeded, false)
 	if err != nil {
 		return err
 	}
@@ -1719,7 +1719,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 func (b *StatusBackend) StartNodeWithAccountAndInitialConfig(
 	multiAccount *multiaccounts.Account,
 	password string,
-	settings settings.Settings,
+	settings settings2.Settings,
 	nodecfg *params.NodeConfig,
 	keypair *accsmanagementtypes.Keypair,
 	chatKey *ecdsa.PrivateKey,
@@ -1748,7 +1748,7 @@ func (b *StatusBackend) StartNodeWithAccountAndInitialConfig(
 	return nil
 }
 
-func (b *StatusBackend) saveKeypairAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, keypair *accsmanagementtypes.Keypair) error {
+func (b *StatusBackend) saveKeypairAndSettings(settings settings2.Settings, nodecfg *params.NodeConfig, keypair *accsmanagementtypes.Keypair) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	accdb, err := accounts.NewDB(b.appDB)

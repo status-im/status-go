@@ -13,9 +13,10 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/internal/contracts/snt"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/pkg/pubsub"
 	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/rpc"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 type addressTokenMap = map[common.Address]*tokentypes.Token

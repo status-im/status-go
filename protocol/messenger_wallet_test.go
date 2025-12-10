@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 
 	"github.com/stretchr/testify/suite"
 )

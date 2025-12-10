@@ -1,7 +1,7 @@
 package settings
 
 import (
-	"github.com/status-im/status-go/multiaccounts/errors"
+	"github.com/status-im/status-go/internal/db/multiaccounts/errors"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

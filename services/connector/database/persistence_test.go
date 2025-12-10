@@ -4,11 +4,11 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 var testDApp = DApp{

@@ -10,9 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 // MockFetcher implements DataFetcher interface for testing

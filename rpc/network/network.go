@@ -8,9 +8,9 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -101,7 +101,7 @@ func (nm *Manager) startSettingsChangeSubscription() {
 	if nm.accountsPublisher == nil {
 		return
 	}
-	ch, unsub := pubsub.Subscribe[settings.EventSettingChanged](nm.accountsPublisher, 1)
+	ch, unsub := pubsub.Subscribe[settings2.EventSettingChanged](nm.accountsPublisher, 1)
 	go func() {
 		defer common.LogOnPanic()
 		defer unsub()
@@ -113,7 +113,7 @@ func (nm *Manager) startSettingsChangeSubscription() {
 				if !ok {
 					return
 				}
-				if ev.Setting.Equals(settings.TestNetworksEnabled) {
+				if ev.Setting.Equals(settings2.TestNetworksEnabled) {
 					nm.onTestNetworksEnabledChanged()
 				}
 			}

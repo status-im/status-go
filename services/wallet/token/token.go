@@ -29,9 +29,9 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/contracts/snt"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
@@ -81,7 +81,7 @@ type ManagerInterface interface {
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
 	walletDB                   *sql.DB
-	settings                   *settings.Database
+	settings                   *settings2.Database
 	ethClientGetter            rpc.EthClientGetter
 	ContractMaker              *contracts.ContractMaker
 	networkManager             network.ManagerInterface
@@ -114,7 +114,7 @@ func NewTokenManager(
 ) (*Manager, error) {
 	maker := contracts.NewContractMaker(ethClientGetter)
 
-	settings, err := settings.MakeNewDB(appDB)
+	settings, err := settings2.MakeNewDB(appDB)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +606,7 @@ func (tm *Manager) CacheBalances(balances map[common.Address][]tokentypes.Storag
 }
 
 func (tm *Manager) setLastTokenListsRefreshTime(time time.Time) error {
-	return tm.settings.SaveSettingField(settings.LastTokensUpdate, time)
+	return tm.settings.SaveSettingField(settings2.LastTokensUpdate, time)
 }
 
 func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
