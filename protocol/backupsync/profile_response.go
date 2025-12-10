@@ -1,7 +1,7 @@
 package backupsync
 
 import (
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/services/ens"
 )

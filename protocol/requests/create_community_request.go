@@ -4,7 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 )

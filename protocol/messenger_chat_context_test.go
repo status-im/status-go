@@ -5,8 +5,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

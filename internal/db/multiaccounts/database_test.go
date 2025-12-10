@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/images"
 
 	"github.com/stretchr/testify/require"
 )

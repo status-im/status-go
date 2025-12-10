@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/testutils"
 )

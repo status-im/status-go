@@ -16,8 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto"
-	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
@@ -387,7 +387,7 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 		Name:        "with_banner",
 		Description: "community with banner ",
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Banner: userimages.CroppedImage{
+		Banner: images.CroppedImage{
 			ImagePath: tmpTestFilePath,
 			X:         1,
 			Y:         1,
@@ -404,7 +404,7 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)
 	s.Require().Equal(len(community.config.CommunityDescription.Identity.Images), 1)
-	testIdentityImage, isMapContainsKey := community.config.CommunityDescription.Identity.Images[userimages.BannerIdentityName]
+	testIdentityImage, isMapContainsKey := community.config.CommunityDescription.Identity.Images[images.BannerIdentityName]
 	s.Require().True(isMapContainsKey)
 	s.Require().Positive(len(testIdentityImage.Payload))
 }

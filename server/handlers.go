@@ -21,7 +21,7 @@ import (
 	eth_common "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/services/wallet/bigint"
