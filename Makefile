@@ -553,9 +553,9 @@ codecov-validate:
 pytest-lint:
 	$(MAKE) -C tests-functional lint
 
-generate-db: build/bin/generate-db
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
-	./build/bin/generate-db -out-dir build/db
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	go run tools/generate-db/main.go -out-dir build/db
 
 env:
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
