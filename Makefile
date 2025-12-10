@@ -427,9 +427,6 @@ prepare-release: clean-release
 clean-release:
 	rm -rf $(RELEASE_DIR)
 
-lint-fix:
-	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
-
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
@@ -481,6 +478,9 @@ lint-panics: generate
 lint: generate lint-panics
 lint:
 	golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
+
+lint-fix: generate
+	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
