@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/timesource"
-	adapters2 "github.com/status-im/status-go/pkg/backend/node/adapters"
+	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
 	"github.com/status-im/status-go/pkg/featureflags"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
@@ -321,7 +321,7 @@ func (b *StatusNode) sharedUrlsService() *sharedurls.Service {
 	if b.sharedUrlsSrvc == nil {
 		b.sharedUrlsSrvc = sharedurls.NewService(nil)
 		if extService := b.WakuV2ExtService(); extService != nil {
-			provider := adapters2.NewSharedUrlsMessengerAdapter(extService.Messenger())
+			provider := nodeadapters.NewSharedUrlsMessengerAdapter(extService.Messenger())
 			b.sharedUrlsSrvc.SetDataProvider(provider)
 		}
 	}
@@ -334,7 +334,7 @@ func (b *StatusNode) SharedUrlsService() *sharedurls.Service {
 
 func (b *StatusNode) linkPreviewService(accDB *accounts.Database) *linkpreview.Service {
 	if b.linkPreviewSrvc == nil {
-		settingsProvider := adapters2.NewLinkPreviewSettingsAdapter(accDB)
+		settingsProvider := nodeadapters.NewLinkPreviewSettingsAdapter(accDB)
 		b.linkPreviewSrvc = linkpreview.NewService(b.logger.Named("linkpreview"), settingsProvider, nil)
 	}
 	return b.linkPreviewSrvc
@@ -440,7 +440,7 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 		)
 
 		if wakuext := b.WakuV2ExtService(); wakuext != nil && wakuext.Messenger() != nil {
-			ac := adapters2.NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
+			ac := nodeadapters.NewNewsFeedActivityCenterAdapter(wakuext.Messenger())
 			b.newsfeedSrvc.SetActivityCenter(ac)
 		}
 	}
