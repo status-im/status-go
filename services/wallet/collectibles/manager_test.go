@@ -13,16 +13,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/circuitbreaker"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	mock_collectibles "github.com/status-im/status-go/services/wallet/collectibles/mock"
 	mock_ownership "github.com/status-im/status-go/services/wallet/collectibles/ownership/mock"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	mock_community "github.com/status-im/status-go/services/wallet/community/mock"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
+
+	"github.com/status-im/status-go/internal/circuitbreaker"
+	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 type CopyableMockChainClient struct {

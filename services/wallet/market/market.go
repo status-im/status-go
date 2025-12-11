@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/circuitbreaker"
+	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
