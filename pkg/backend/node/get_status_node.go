@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
 	rpc2 "github.com/status-im/status-go/pkg/backend/node/rpc"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -58,7 +59,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
-	"github.com/status-im/status-go/transactions"
 )
 
 // errors

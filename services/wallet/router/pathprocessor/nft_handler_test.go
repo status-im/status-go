@@ -13,11 +13,11 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/crypto/types"
+	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	mock_transactor "github.com/status-im/status-go/transactions/mock"
 )
 
 func TestBaseNFTHandler_Comprehensive(t *testing.T) {

@@ -29,6 +29,7 @@ import (
 	hopL2BaseBridge "github.com/status-im/status-go/internal/contracts/hop/l2Contracts/l2BaseBridge"
 	hopL2CctpImplementation "github.com/status-im/status-go/internal/contracts/hop/l2Contracts/l2CctpImplementation"
 	hopL2OptimismBridge "github.com/status-im/status-go/internal/contracts/hop/l2Contracts/l2OptimismBridge"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/network"
@@ -39,7 +40,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions"
 )
 
 type HopBridgeTxArgs struct {

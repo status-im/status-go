@@ -44,6 +44,7 @@ import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/metrics"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
@@ -65,7 +66,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 var (
