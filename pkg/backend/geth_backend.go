@@ -2259,7 +2259,9 @@ func (b *StatusBackend) initProtocol() error {
 	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 	b.statusNode.CommunityTokensService().Init(messenger)
 	b.statusNode.SharedUrlsService().SetDataProvider(nodeadapters.NewSharedUrlsMessengerAdapter(messenger))
-	b.statusNode.NewsFeedService().SetActivityCenter(nodeadapters.NewNewsFeedActivityCenterAdapter(messenger))
+	if b.statusNode.NewsFeedService() != nil {
+		b.statusNode.NewsFeedService().SetActivityCenter(nodeadapters.NewNewsFeedActivityCenterAdapter(messenger))
+	}
 	b.statusNode.LinkPreviewService().SetStatusDataProvider(nodeadapters.NewLinkPreviewMessengerAdapter(messenger))
 
 	return nil
