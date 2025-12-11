@@ -200,7 +200,14 @@ def snt_addresses(foundry_client):
 
 @pytest.fixture(scope="function")
 def snt_token_overrides(snt_addresses):
-    return [{"symbol": "SNT", "address": snt_addresses["snt"]}]
+    return [
+        {
+            "symbol": "SNT",
+            "name": "Status Network Token",
+            "address": snt_addresses["snt"],
+            "decimals": 18,
+        }
+    ]
 
 
 @pytest.fixture(scope="function", autouse=False)

@@ -261,6 +261,26 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data["multicallOverrides"] = {self.network_id: multicall_contract_address}
         return data
 
+    def _set_custom_tokens(self, data, kwargs):
+        token_overrides = kwargs.get("token_overrides", [])
+        if not token_overrides:
+            return data
+
+        tokens = []
+        for token in token_overrides:
+            tokens.append(
+                {
+                    "chainId": self.network_id,
+                    "address": token["address"],
+                    "symbol": token.get("symbol"),
+                    "name": token.get("name", token.get("symbol")),
+                    "decimals": token.get("decimals", 18),
+                }
+            )
+
+        data["customTokens"] = tokens
+        return data
+
     def extract_data(self, path: str):
         if self.container:
             return self.container.extract_data(path)
@@ -325,6 +345,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
         data = self._set_multicall_overrides(data, kwargs)
+        data = self._set_custom_tokens(data, kwargs)
         return data
 
     def create_account_and_login(self, password: str, **kwargs):

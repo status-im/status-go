@@ -8,6 +8,7 @@ import (
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
@@ -99,6 +100,7 @@ type WalletConfig struct {
 
 	MulticallOverrides map[uint64]common.Address `json:"multicallOverrides"` // map[chainID]multicall3 contract address
 
+	CustomTokens []*tokentypes.Token `json:"customTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
 }
 type WalletSecretsConfig struct {
 	PoktToken            security.SensitiveString `json:"poktToken"`
