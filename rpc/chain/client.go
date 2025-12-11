@@ -19,10 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/circuitbreaker"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/rpcstats"
 
