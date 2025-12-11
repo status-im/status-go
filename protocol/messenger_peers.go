@@ -36,8 +36,3 @@ func (m *Messenger) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 func (m *Messenger) ENR() (*enode.Node, error) {
 	return m.messaging.ENR()
 }
-
-// Subscribe to a pubsub topic
-func (m *Messenger) SubscribeToPubsubTopic(topic string) error {
-	return m.messaging.SubscribeToPubsubTopic(topic)
-}

@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/afex/hystrix-go/hystrix"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -33,7 +32,6 @@ import (
 	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
@@ -98,7 +96,6 @@ type GethStatusBackend struct {
 	account                  *multiaccounts.Account
 	accountsManager          *accsmanagement.AccountsManager
 	transactor               *transactions.Transactor
-	connectionState          connection.State
 	appState                 AppState
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	centralizedMetrics       *centralizedmetrics.MetricService
@@ -195,9 +192,6 @@ func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 		signal.SendNodeCrashed(err)
 		return err
 	}
-
-	// Set initial connection state
-	b.statusNode.ConnectionChanged(b.connectionState)
 
 	return nil
 }
@@ -2023,34 +2017,6 @@ func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.H
 
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
 	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
-}
-
-// ConnectionChange handles network state changes logic.
-func (b *GethStatusBackend) ConnectionChange(typ string, expensive bool) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	state := connection.State{
-		Type:      connection.NewType(typ),
-		Expensive: expensive,
-	}
-	if typ == connection.None {
-		state.Offline = true
-	}
-
-	b.logger.Info("Network state change", zap.Stringer("old", b.connectionState), zap.Stringer("new", state))
-
-	if b.connectionState.Offline && !state.Offline {
-		//  flush hystrix if we are going again online, since it doesn't behave
-		// well when offline
-		hystrix.Flush()
-	}
-
-	b.connectionState = state
-	b.statusNode.ConnectionChanged(state)
-
-	// logic of handling state changes here
-	// restart node? force peers reconnect? etc
 }
 
 // AppStateChange handles app state changes (background/foreground).

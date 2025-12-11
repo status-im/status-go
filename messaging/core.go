@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/connection"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/messaging/adapters"
@@ -45,8 +44,6 @@ type Core struct {
 
 	wg   sync.WaitGroup
 	quit chan struct{}
-
-	connectionState connection.State
 
 	wakumetrics *wakumetrics.Client
 }
@@ -197,21 +194,6 @@ func (c *Core) stop() error {
 	c.wg.Wait()
 
 	return nil
-}
-
-func (c *Core) connectionChanged(state connection.State) {
-	c.stack.Transport.ConnectionChanged(state)
-
-	if !c.connectionState.Offline && state.Offline {
-		c.controller.StopReliability()
-	}
-
-	if c.connectionState.Offline && !state.Offline {
-		err := c.controller.StartReliability()
-		if err != nil {
-			c.logger.Error("failed to start datasync", zap.Error(err))
-		}
-	}
 }
 
 type wakuParams struct {

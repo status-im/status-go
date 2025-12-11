@@ -39,10 +39,9 @@ func (m *Messenger) watchExpiredMessages() {
 }
 
 func (m *Messenger) resendExpiredMessages() error {
-	if m.connectionState.Offline {
-		return errors.New("offline")
+	if !m.Online() {
+		return errors.New("messenger is offline")
 	}
-
 	ids, err := m.persistence.ExpiredMessagesIDs(m.config.messageResendMaxCount)
 	if err != nil {
 		return errors.Wrapf(err, "Can't get expired reactions from db")

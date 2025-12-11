@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
 	"path"
 	"strings"
@@ -28,7 +27,6 @@ import (
 	"github.com/status-im/status-go/accounts-management/keystore"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -272,39 +270,6 @@ func TestBackendGettersConcurrently(t *testing.T) {
 	}()
 
 	wg.Wait()
-}
-
-func TestBackendConnectionChangesConcurrently(t *testing.T) {
-	connections := [...]string{connection.Wifi, connection.Cellular, connection.Unknown}
-	backend := NewGethStatusBackend(testutils.MustCreateTestLogger())
-
-	count := 3
-
-	var wg sync.WaitGroup
-
-	for i := 0; i < count; i++ {
-		wg.Add(1)
-		go func() {
-			connIdx := rand.Intn(len(connections)) // nolint: gosec
-			backend.ConnectionChange(connections[connIdx], false)
-			wg.Done()
-		}()
-	}
-
-	wg.Wait()
-}
-
-func TestBackendConnectionChangesToOffline(t *testing.T) {
-	b := NewGethStatusBackend(testutils.MustCreateTestLogger())
-
-	b.ConnectionChange(connection.None, false)
-	assert.True(t, b.connectionState.Offline)
-
-	b.ConnectionChange(connection.Wifi, false)
-	assert.False(t, b.connectionState.Offline)
-
-	b.ConnectionChange("unknown-state", false)
-	assert.False(t, b.connectionState.Offline)
 }
 
 func TestBackendCallRPCConcurrently(t *testing.T) {

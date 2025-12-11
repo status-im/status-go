@@ -27,7 +27,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -147,7 +146,6 @@ type Messenger struct {
 		once sync.Once
 	}
 
-	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
 	savedAddressesManager *wallet.SavedAddressesManager
@@ -493,10 +491,6 @@ func NewMessenger(
 }
 
 func (m *Messenger) processSentMessage(id string) error {
-	if m.connectionState.Offline {
-		return errors.New("Can't mark message as sent while offline")
-	}
-
 	rawMessage, err := m.persistence.RawMessageByID(id)
 	// If we have no raw message, we create a temporary one, so that
 	// the sent status is preserved
