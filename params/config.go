@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/security"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 // ----------
@@ -239,6 +240,8 @@ type WalletConfig struct {
 	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
 
 	MulticallOverrides map[uint64]common.Address `json:"MulticallOverrides"` // map[chainID]multicall3 contract address
+
+	CustomTokens []*tokentypes.Token `json:"CustomTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
 }
 
 type MarketDataProxyConfig struct {
@@ -259,12 +262,14 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 		TokensListsAutoRefreshInterval      int                       `json:"TokensListsAutoRefreshInterval"`
 		TokensListsAutoRefreshCheckInterval int                       `json:"TokensListsAutoRefreshCheckInterval"`
 		MulticallOverrides                  map[uint64]common.Address `json:"MulticallOverrides"`
+		CustomTokens                        []*tokentypes.Token       `json:"CustomTokens"`
 	}{
 		Enabled:                             wc.Enabled,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
 		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
 		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
 		MulticallOverrides:                  wc.MulticallOverrides,
+		CustomTokens:                        wc.CustomTokens,
 	})
 }
 
