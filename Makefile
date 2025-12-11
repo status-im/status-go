@@ -278,9 +278,17 @@ endif
 
 build-libsds: $(LIBSDS)
 
+
+## Target-specific architecture mapping for libsds Android build
+# Note: nim-sds uses 'amd64' for both x86 and x86_64
+build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
+	$(if $(filter arm,$(ARCH)),arm,\
+	$(if $(filter amd64,$(ARCH)),amd64,\
+	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
+	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
 build-libsds-android: clone-nim-sds
 	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=arm64 ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=/bin/bash
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=/bin/bash
 
 build-libsds-ios: clone-nim-sds
 	@echo "Building nim-sds for iOS" $(LIBSDS)
