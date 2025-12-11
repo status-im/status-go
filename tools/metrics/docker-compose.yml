@@ -1,7 +1,6 @@
 services:
   prometheus:
-    image: prom/prometheus:latest
-    container_name: status-prometheus
+    image: prom/prometheus:v3.8.0
     ports:
       - "9090:9090"
     volumes:
@@ -17,8 +16,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
+    image: grafana/grafana:12.3.0
     ports:
       - "3000:3000"
     volumes:
