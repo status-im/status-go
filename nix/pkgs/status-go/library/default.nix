@@ -26,7 +26,7 @@ in pkgs.buildGoModule {
       fakeGit
   ];
 
-  phases = ["unpackPhase" "configurePhase" "postPatch" "buildPhase"];
+  phases = ["unpackPhase" "configurePhase" "modPostBuild" "buildPhase"];
 
   # https://pkg.go.dev/net#hdr-Name_Resolution
   # https://github.com/status-im/status-mobile/issues/19736
@@ -40,7 +40,7 @@ in pkgs.buildGoModule {
 
   # Code generation should be run before buildPhase because buildGoModule
   # performs dependency inspection before buildPhase, and will fail if generated files are missing.
-  postPatch = ''
+  modPostBuild = ''
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
 
