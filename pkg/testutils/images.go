@@ -38,7 +38,7 @@ func SaveFakeImage(t *testing.T, width int, height int) string {
 	tempdir := t.TempDir()
 	payload := gofakeit.ImagePng(width, height)
 	imagePath := filepath.Join(tempdir, gofakeit.LetterN(5)+".jpg")
-	err := os.WriteFile(imagePath, payload, 0644)
+	err := os.WriteFile(imagePath, payload, 0600)
 	require.NoError(t, err)
 	return imagePath
 }
