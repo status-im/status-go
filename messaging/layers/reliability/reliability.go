@@ -30,7 +30,7 @@ type Reliability struct {
 	datasync              *datasync.DataSync
 	mvdsPersistence       mvdsnode.Persistence
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
-	SDSManager            *sds.ReliabilityManager
+	sdsManager            *sds.ReliabilityManager
 	logger                *zap.Logger
 }
 
@@ -40,7 +40,7 @@ func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.Pr
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		SDSManager:            newSdsReliabilityManager(logger.Named("sds")),
+		sdsManager:            newSdsReliabilityManager(logger.Named("sds")),
 		logger:                logger,
 	}
 }

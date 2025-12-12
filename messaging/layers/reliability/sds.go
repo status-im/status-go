@@ -48,7 +48,7 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, communityID []byte) ([]b
 		zap.Int("payloadLength", len(payload)),
 		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
 	)
-	sdsWrappedPayload, err := r.SDSManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
+	sdsWrappedPayload, err := r.sdsManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap a community message with SDS")
 	}
@@ -57,10 +57,10 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, communityID []byte) ([]b
 }
 
 func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {
-	unwrappedMessage, err := r.SDSManager.UnwrapReceivedMessage(wrappedPayload)
+	unwrappedMessage, err := r.sdsManager.UnwrapReceivedMessage(wrappedPayload)
 	if err != nil {
 		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
-		// return original payload since wrapping is not mandatory
+		// return original payload since wrapping is not mandatory for all kinds of messages
 		return wrappedPayload, nil
 	}
 
