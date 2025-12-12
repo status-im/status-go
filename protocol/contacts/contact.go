@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"

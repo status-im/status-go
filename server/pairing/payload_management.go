@@ -195,7 +195,7 @@ type InstallationPayloadMounterReceiver struct {
 	PayloadReceiver
 }
 
-func NewInstallationPayloadMounterReceiver(encryptor *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
+func NewInstallationPayloadMounterReceiver(encryptor *PayloadEncryptor, backend *backend.StatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
 	return &InstallationPayloadMounterReceiver{
 		NewInstallationPayloadMounter(encryptor, backend, deviceType),
 		NewInstallationPayloadReceiver(encryptor, backend, deviceType),

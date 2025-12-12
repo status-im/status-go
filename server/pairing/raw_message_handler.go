@@ -11,17 +11,17 @@ import (
 	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/messaging"
-	api2 "github.com/status-im/status-go/pkg/backend"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
 )
 
 type SyncRawMessageHandler struct {
-	backend *api.GethStatusBackend
+	backend *backend.StatusBackend
 }
 
-func NewSyncRawMessageHandler(backend *api.GethStatusBackend) *SyncRawMessageHandler {
+func NewSyncRawMessageHandler(backend *backend.StatusBackend) *SyncRawMessageHandler {
 	return &SyncRawMessageHandler{backend: backend}
 }
 
@@ -135,7 +135,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 
 	for _, acc := range rmp.profileKeypair.Accounts {
 		if acc.Chat {
-			err := api.EnrichMultiAccountByPublicKey(account, acc.PublicKey)
+			err := backend.EnrichMultiAccountByPublicKey(account, acc.PublicKey)
 			if err != nil {
 				return err
 			}
@@ -145,7 +145,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 
 	installationID := messaging.GenerateInstallationID()
 
-	nodeConfig, err := api.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
+	nodeConfig, err := backend.DefaultNodeConfig(installationID, account.KeyUID, createAccountRequest)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 	// Override some of received settings
 	rmp.setting.DeviceName = createAccountRequest.DeviceName
 	rmp.setting.InstallationID = installationID
-	rmp.setting.CurrentNetwork = api.DefaultCurrentNetwork
+	rmp.setting.CurrentNetwork = backend.DefaultCurrentNetwork
 
 	return s.backend.StartNodeWithAccountAndInitialConfig(
 		account,
