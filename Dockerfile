@@ -55,10 +55,6 @@ COPY --from=builder /go/src/github.com/status-im/nim-sds/build/libsds.so /usr/lo
 
 ENV LD_LIBRARY_PATH=/usr/local/lib/
 
-COPY _assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-# 30304 is used for Discovery v5
 EXPOSE 8080 8545 30303 30303/udp 30304/udp
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["--help"]
+
+CMD ["status-backend", "--help"]
