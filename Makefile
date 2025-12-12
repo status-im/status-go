@@ -312,13 +312,10 @@ statusgo-c-bindings:
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
 	go run -mod=mod cmd/library/*.go > $(STATUS_GO_BINDINGS_PATH)/main.go
 
+statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
-statusgo-library: statusgo-library-build ##@cross-compile Build status-go as static library for current platform
-
-# This target is kept separate and has no dependencies to be used in Nix builds
-statusgo-library-build: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-library-build: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-library-build: statusgo-c-bindings $(LIBWAKU) $(LIBSDS)
+statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
@@ -393,17 +390,22 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-generate-clean: DRY_RUN=false
-generate-clean: ##@generate Remove orphaned generated files
-	@./_assets/scripts/cleanup_generated_files.sh
+clean-generated: CLEANUP_GENERATED_FILES?=true
+clean-generated: CLEANUP_GENERATED_FILES_DRY_RUN?=false
+clean-generated: ##@generate Remove orphaned generated files
+	if [ "$(CLEANUP_GENERATED_FILES)" = "true" ]; then \
+		./_assets/scripts/cleanup_generated_files.sh; \
+	else \
+	  	echo "Skipping cleanup of generated files"; \
+	fi
 
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= go tool go-generate-fast
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
-generate: generate-clean
-generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
+generate: clean-generated
+generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
 generate-contracts:

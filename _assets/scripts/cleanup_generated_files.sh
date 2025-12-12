@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Removes all generated files. List of non-tracked generated files can be found in .gitignore.
 
-DRY_RUN="${DRY_RUN:-false}"
+DRY_RUN="${CLEANUP_GENERATED_FILES_DRY_RUN:-false}"
 CMD="rm -rf"
 if [[ "$DRY_RUN" == "true" ]]; then
     CMD="echo [DRY-RUN]"

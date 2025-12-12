@@ -26,7 +26,7 @@ in pkgs.buildGoModule {
       fakeGit
   ];
 
-  phases = ["unpackPhase" "configurePhase" "modPostBuild" "buildPhase"];
+  phases = ["unpackPhase" "configurePhase" "buildPhase"];
 
   # https://pkg.go.dev/net#hdr-Name_Resolution
   # https://github.com/status-im/status-mobile/issues/19736
@@ -40,7 +40,7 @@ in pkgs.buildGoModule {
 
   # Code generation should be run before buildPhase because buildGoModule
   # performs dependency inspection before buildPhase, and will fail if generated files are missing.
-  modPostBuild = ''
+  preBuild = ''
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
 
@@ -55,15 +55,18 @@ in pkgs.buildGoModule {
   # ld flags and netgo tag are necessary for integration tests to work on MacOS
   # https://github.com/status-im/status-mobile/issues/20135
   #
-  # Using `make statusgo-library-build` target ensures that code generation is not involved in this phase.
-  # Generation is manually invoked in postPatch phase, because in needs scripts,
-  # which are are not available at buildPhase (only .go files are present at this point).
+  # Also set CLEANUP_GENERATED_FILES_DRY_RUN=true to avoid running cleanup_generated_files.sh script,
+  # which is not available at this phase, because buildGoModule only copies Go files.
   buildPhase = ''
-    make statusgo-library-build \
+    # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
+    export HOME=$TMPDIR
+    make statusgo-library \
         NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \
         NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib" \
         STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
-        STATUS_GO_LIBRARY_OUT="$out"
+        STATUS_GO_LIBRARY_OUT="$out" \
+        CLEANUP_GENERATED_FILES=false \
+        GO_GENERATE_CMD='go generate'
     runHook postBuild
   '';
 }
