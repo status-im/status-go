@@ -115,6 +115,7 @@ require (
 )
 
 require (
+	github.com/logos-messaging/logos-messaging-go-bindings v0.0.0-20251212215600-de7d4cf3c9e4
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.26.0
@@ -317,7 +318,6 @@ require (
 	github.com/libp2p/go-netroute v0.2.2 // indirect
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.2 // indirect
-	github.com/logos-messaging/logos-messaging-go-bindings v0.0.0-20251212212702-9a9a9e5c88c8 // indirect
 	github.com/lufeee/execinquery v1.2.1 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
