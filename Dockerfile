@@ -49,17 +49,12 @@ RUN mkdir -p /static/configs
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/status-backend /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/push-notification-server /usr/local/bin/
-COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/scripts/scan_waku_fleet.py /usr/local/bin
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 COPY --from=builder /go/src/github.com/status-im/nim-sds/build/libsds.so /usr/local/lib/
 
 ENV LD_LIBRARY_PATH=/usr/local/lib/
 
-COPY _assets/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-# 30304 is used for Discovery v5
 EXPOSE 8080 8545 30303 30303/udp 30304/udp
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["--help"]
+
+CMD ["status-backend", "--help"]

@@ -60,13 +60,17 @@ class StatusGoContainer:
             "labels": {"com.docker.compose.project": docker_project_name},
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
-                "SCAN_WAKU_FLEET": self.get_waku_fleet_scan_command(),
             },
             "volumes": {
                 coverage_path: {
                     "bind": "/coverage/binary",
                     "mode": "rw",
-                }
+                },
+                # Named volume created by docker-compose.waku.yml for wakufleetconfig.json
+                f"{docker_project_name}_wakufleetconfig": {
+                    "bind": "/usr/status-user/config",
+                    "mode": "rw",
+                },
             },
             "extra_hosts": {
                 "host.docker.internal": "host-gateway",
@@ -91,24 +95,6 @@ class StatusGoContainer:
         StatusGoContainer.all_containers.append(self)
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
-
-    def get_waku_fleet_scan_command(self):
-        """Returns the command string for scanning Waku fleet and generating config"""
-
-        # Known node names from docker compose
-        bootstrap_nodes = "boot-1"
-        static_nodes = "boot-1"  # Add bootnode, otherwise metadata exchange doesn't happen, and Waku light mode doesn't work
-        store_nodes = "store"
-
-        return (
-            "python3 /usr/local/bin/scan_waku_fleet.py "
-            f"--fleet-name {Config.waku_fleet} "
-            f"--cluster-id 16 "  # Cluster ID matches docker-compose.waku.yml
-            f"--bootstrap-nodes {bootstrap_nodes} "
-            f"--store-nodes {store_nodes} "
-            f"--static-nodes {static_nodes} "
-            f"--output {Config.waku_fleets_config}"
-        )
 
     def __del__(self):
         self.stop()

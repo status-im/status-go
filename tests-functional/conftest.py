@@ -61,7 +61,7 @@ def pytest_addoption(parser):
         "--waku-fleets-config",
         action="store",
         help="Path to a local JSON file with Waku fleets configuration. Default value is a path to config in Docker to run 2 local waku nodes",
-        default="/usr/status-user/wakufleetconfig.json",
+        default="/usr/status-user/config/wakufleetconfig.json",
     )
     parser.addoption(
         "--waku-fleet",

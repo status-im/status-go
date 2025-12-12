@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY scripts/scan_waku_fleet.py /app/scan_waku_fleet.py
+
+ENTRYPOINT ["python", "/app/scan_waku_fleet.py"]

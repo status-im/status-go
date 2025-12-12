@@ -5,6 +5,7 @@ import json
 import sys
 import os
 import logging
+import time
 
 from urllib import request
 from typing import Dict, List, Optional, Tuple
@@ -46,10 +47,25 @@ def parse_args():
 def _fetch_debug_info(host: str) -> Optional[Dict]:
     url = f"http://{host}:8645/debug/v1/info"
     logging.info(f"Fetching debug info from Waku node {url}")
-    with request.urlopen(url, timeout=5.0) as resp:
-        assert resp.status == 200
-        data = resp.read()
-        return json.loads(data.decode("utf-8"))
+
+    attempts = 15
+    delay_seconds = 1.0
+
+    for attempt in range(1, attempts + 1):
+        try:
+            logging.info(f"Attempt {attempt}/{attempts} to fetch debug info from {url}")
+            with request.urlopen(url, timeout=5.0) as resp:
+                if resp.status != 200:
+                    logging.error(f"Unexpected status {resp.status} from {url}")
+                    continue
+                data = resp.read()
+                return json.loads(data.decode("utf-8"))
+        except Exception as e:  # noqa: BLE001
+            logging.error(f"Error fetching debug info from {url}: {e}")
+            if attempt < attempts:
+                time.sleep(delay_seconds)
+
+    return None
 
 
 def _first_dns_addr(listen_addrs: List[str]) -> Optional[str]:
