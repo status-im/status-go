@@ -30,7 +30,7 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	require.NoError(t, err)
 
 	walletSecrets := t_common.GetWalletSecretsConfigFromEnv()
-	defaultNetworks := api.BuildDefaultNetworks(walletSecrets, true)
+	defaultNetworks := backend.BuildDefaultNetworks(walletSecrets, true)
 	networkManager := network.NewManager(appDB, nil)
 	err = networkManager.InitEmbeddedNetworks(defaultNetworks)
 	require.NoError(t, err)

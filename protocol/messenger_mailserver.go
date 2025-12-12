@@ -15,7 +15,6 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"

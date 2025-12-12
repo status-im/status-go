@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
