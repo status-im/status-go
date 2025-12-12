@@ -55,3 +55,19 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, communityID []byte) ([]b
 
 	return sdsWrappedPayload, nil
 }
+
+func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {
+	unwrappedMessage, err := r.SDSManager.UnwrapReceivedMessage(wrappedPayload)
+	if err != nil {
+		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
+		// return original payload since wrapping is not mandatory
+		return wrappedPayload, nil
+	}
+
+	missingDeps := *unwrappedMessage.MissingDeps
+	if len(missingDeps) > 0 {
+		r.logger.Debug("missing deps with SDS", zap.Any("missing-deps", missingDeps))
+	}
+
+	return *unwrappedMessage.Message, nil
+}
