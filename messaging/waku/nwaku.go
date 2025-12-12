@@ -54,9 +54,9 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
-	"github.com/waku-org/waku-go-bindings/waku"
-	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
-	wakutimesource "github.com/waku-org/waku-go-bindings/waku/timesource"
+	"github.com/logos-messaging/logos-messaging-go-bindings/waku"
+	bindingscommon "github.com/logos-messaging/logos-messaging-go-bindings/waku/common"
+	wakutimesource "github.com/logos-messaging/logos-messaging-go-bindings/waku/timesource"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"

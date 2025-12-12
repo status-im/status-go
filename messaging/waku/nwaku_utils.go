@@ -5,7 +5,7 @@ package wakuv2
 
 // TODO-nwaku remove this entire file once go-waku is removed from status-go
 import (
-	bindings "github.com/waku-org/waku-go-bindings/waku/common"
+	bindings "github.com/logos-messaging/logos-messaging-go-bindings/waku/common"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
