@@ -313,13 +313,18 @@ func (m *Messenger) ImportBackup(data []byte) error {
 		&state,
 		&backup,
 	)
+	// Proceed to save data even if there were errors during handling because some data might have been handled successfully
+	response, err := m.saveDataAndPrepareResponse(&state)
+	if response != nil {
+		// Send response even if there were errors as some data might have been saved successfully
+		signal.SendNewMessages(response)
+	}
+	if err != nil {
+		errs = append(errs, err)
+	}
 	if len(errs) > 0 {
 		return errors.Join(errs...)
 	}
 
-	response, err := m.saveDataAndPrepareResponse(&state)
-
-	signal.SendNewMessages(response)
-
-	return err
+	return nil
 }
