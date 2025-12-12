@@ -19,8 +19,8 @@ import (
 
 	"github.com/status-im/status-go/circuitbreaker"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
-	"github.com/status-im/status-go/contracts/ierc1155"
+	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
+	"github.com/status-im/status-go/internal/contracts/ierc1155"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"

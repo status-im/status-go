@@ -13,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/resolver"
+	"github.com/status-im/status-go/internal/contracts"
+	"github.com/status-im/status-go/internal/contracts/resolver"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/contracts/snt"
+	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/pkg/pubsub"
 	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"

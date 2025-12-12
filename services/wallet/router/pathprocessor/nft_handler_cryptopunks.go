@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/contracts/cryptopunks"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/contracts/cryptopunks"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"

@@ -11,9 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/snt"
-	stickersContracts "github.com/status-im/status-go/contracts/stickers"
+	"github.com/status-im/status-go/internal/contracts"
+	"github.com/status-im/status-go/internal/contracts/snt"
+	stickersContracts "github.com/status-im/status-go/internal/contracts/stickers"
+
+	"github.com/status-im/status-go/internal/contracts/stickers"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
@@ -78,7 +80,7 @@ func (s *StickersBuyProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 		return []byte{}, createStickersBuyErrorResponse(err)
 	}
 
-	stickerMarketAddress, err := stickersContracts.StickerMarketContractAddress(params.FromChain.ChainID)
+	stickerMarketAddress, err := stickers.StickerMarketContractAddress(params.FromChain.ChainID)
 	if err != nil {
 		return []byte{}, createStickersBuyErrorResponse(err)
 	}
