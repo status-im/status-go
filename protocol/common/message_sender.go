@@ -24,8 +24,6 @@ import (
 
 var ErrModifiedRawMessage = errors.New("modified rawMessage")
 
-const sdsForCommunitiesEnabled = false
-
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey
 	messaging *messaging.API
@@ -165,15 +163,6 @@ func (s *MessageSender) SendPublic(
 		zap.Stringer("messageID", messageID),
 	)
 
-	if sdsForCommunitiesEnabled && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		logger.Debug("send public message with SDS", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.messaging.Reliability().WrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
-		}
-		wrappedMessage = sdsWrappedPayload
-	}
-
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(&rawMessage); err != nil {
 			return nil, err
@@ -196,13 +185,13 @@ func (s *MessageSender) SendPublic(
 	err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 		Sender:              &rawMessage.Sender.PublicKey,
 		Payload:             wrappedMessage,
-		MessageID:           messageID,
 		PubsubTopic:         rawMessage.PubsubTopic,
 		ContentTopic:        rawMessage.ContentTopic,
 		SkipEncryptionLayer: rawMessage.SkipEncryptionLayer,
 		Ephemeral:           rawMessage.Ephemeral,
 		Priority:            rawMessage.Priority,
 		HashRatchet:         hashRatchetParams,
+		CommunityID:         rawMessage.CommunityID,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send public message")
@@ -367,15 +356,6 @@ func (s *MessageSender) SendCommunity(
 		zap.String("sender", crypto.PubkeyToHex(&rawMessage.Sender.PublicKey)),
 	)
 
-	if sdsForCommunitiesEnabled && len(rawMessage.CommunityID) > 0 && rawMessage.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		logger.Debug("send community message with SDS", zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)))
-		sdsWrappedPayload, err := s.messaging.Reliability().WrapPayloadForSDS(wrappedMessage, rawMessage.CommunityID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap payload for SDS")
-		}
-		wrappedMessage = sdsWrappedPayload
-	}
-
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
 			return nil, err
@@ -408,10 +388,10 @@ func (s *MessageSender) SendCommunity(
 		err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 			Sender:       &rawMessage.Sender.PublicKey,
 			Payload:      wrappedMessage,
-			MessageID:    messageID,
 			PubsubTopic:  rawMessage.PubsubTopic,
 			ContentTopic: rawMessage.ContentTopic,
 			HashRatchet:  hashRatchetParams,
+			CommunityID:  rawMessage.CommunityID,
 		})
 
 	} else {
@@ -424,11 +404,11 @@ func (s *MessageSender) SendCommunity(
 		err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 			Sender:             &rawMessage.Sender.PublicKey,
 			Payload:            wrappedMessage,
-			MessageID:          messageID,
 			PubsubTopic:        rawMessage.PubsubTopic,
 			ContentTopic:       rawMessage.ContentTopic,
 			HashRatchet:        hashRatchetParams,
 			CommunityPublicKey: pubkey,
+			CommunityID:        rawMessage.CommunityID,
 		})
 	}
 

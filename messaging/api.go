@@ -1,7 +1,6 @@
 package messaging
 
 import (
-	"github.com/status-im/status-go/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -25,10 +24,6 @@ func (a *API) Stop() error {
 
 func (a *API) Publisher() *pubsub.Publisher {
 	return a.core.publisher
-}
-
-func (a *API) Reliability() *reliability.Reliability {
-	return a.core.stack.Reliability
 }
 
 // GetCurrentTime satisfies the common.TimeSource interface.

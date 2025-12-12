@@ -18,14 +18,13 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
+const sdsForCommunitiesEnabled = true
+
 func (s *Sender) SendPublic(ctx context.Context, params types.SendPublicParams) error {
-	messageID := params.MessageID
-	if len(messageID) == 0 {
-		messageID = types.MessageID(params.Sender, params.Payload)
-	}
+	messageID := types.MessageID(params.Sender, params.Payload)
 
 	logger := s.logger.Named("sendPublic").With(
-		zap.String("messageID", cryptotypes.EncodeHex(messageID)),
+		zap.Stringer("messageID", messageID),
 	)
 
 	if params.CommunityPublicKey != nil {
@@ -40,6 +39,15 @@ func (s *Sender) SendPublic(ctx context.Context, params types.SendPublicParams) 
 		zap.String("contentTopic", params.ContentTopic),
 		zap.Any("hashRatchet", params.HashRatchet),
 	)
+
+	if sdsForCommunitiesEnabled && len(params.CommunityID) > 0 {
+		logger.Debug("send public message with SDS", zap.String("communityID", cryptotypes.EncodeHex(params.CommunityID)))
+		sdsWrappedPayload, err := s.stack.Reliability.WrapPayloadForSDS(params.Payload, params.CommunityID)
+		if err != nil {
+			return errors.Wrap(err, "failed to wrap payload for SDS")
+		}
+		params.Payload = sdsWrappedPayload
+	}
 
 	var err error
 	var spec *encryption.ProtocolMessageSpec

@@ -5,7 +5,6 @@ import "crypto/ecdsa"
 type SendPublicParams struct {
 	Sender              *ecdsa.PublicKey
 	Payload             []byte
-	MessageID           []byte
 	PubsubTopic         string
 	ContentTopic        string
 	SkipEncryptionLayer bool
@@ -13,6 +12,7 @@ type SendPublicParams struct {
 	Priority            *MessagePriority
 	HashRatchet         *SendPublicHashRatchetParams
 	CommunityPublicKey  *ecdsa.PublicKey
+	CommunityID         []byte
 }
 
 type SendPublicHashRatchetParams struct {
