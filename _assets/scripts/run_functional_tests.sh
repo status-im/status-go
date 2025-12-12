@@ -55,6 +55,28 @@ fi
 echo -e "${GRN}Running status-go external dependencies${RST}"
 docker compose -p ${project_name} ${all_compose_files} up -d --build --remove-orphans
 
+# Wait for wakufleet-scanner to finish before running tests. If it fails,
+# there's no point in starting tests because wakufleetconfig.json will not
+# be available for status-backend.
+echo -e "${GRN}Waiting for wakufleet-scanner to complete${RST}"
+scanner_container_id=$(docker compose -p ${project_name} ${all_compose_files} ps -q wakufleet-scanner || true)
+
+if [[ -z "${scanner_container_id}" ]]; then
+  echo -e "${RED}wakufleet-scanner service container not found. Make sure docker-compose.waku.yml defines it correctly.${RST}"
+  exit 1
+fi
+
+scanner_exit_code=$(docker wait "${scanner_container_id}")
+
+if [[ "${scanner_exit_code}" -ne 0 ]]; then
+  echo -e "${RED}wakufleet-scanner failed with exit code ${scanner_exit_code}. See logs below:${RST}"
+  docker logs "${scanner_container_id}" || true
+  echo -e "${RED}Aborting functional tests because wakufleetconfig.json was not generated successfully.${RST}"
+  exit 1
+fi
+
+echo -e "${GRN}wakufleet-scanner completed successfully${RST}"
+
 # Set up virtual environment
 venv_path="${root_path}/.venv"
 

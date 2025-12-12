@@ -60,3 +60,24 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
+  wakufleet-scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile.waku-fleet-scanner
+    depends_on:
+      - boot-1
+      - store
+    volumes:
+      - wakufleetconfig:/fleet-config
+    command: [
+      "--fleet-name", "status-go.test",
+      "--cluster-id", "16",
+      "--bootstrap-nodes", "boot-1",
+      "--store-nodes", "store",
+      "--static-nodes", "boot-1",
+      "--output", "/fleet-config/wakufleetconfig.json"
+    ]
+
+volumes:
+  wakufleetconfig:
+

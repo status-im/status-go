@@ -49,7 +49,6 @@ RUN mkdir -p /static/configs
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/status-backend /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/push-notification-server /usr/local/bin/
-COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/scripts/scan_waku_fleet.py /usr/local/bin
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 COPY --from=builder /go/src/github.com/status-im/nim-sds/build/libsds.so /usr/local/lib/
