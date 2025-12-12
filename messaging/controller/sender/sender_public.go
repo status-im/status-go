@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-const sdsForCommunitiesEnabled = true
+const sdsForCommunitiesEnabled = false
 
 func (s *Sender) SendPublic(ctx context.Context, params types.SendPublicParams) error {
 	messageID := types.MessageID(params.Sender, params.Payload)
