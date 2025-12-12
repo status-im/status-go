@@ -68,7 +68,7 @@ class StatusGoContainer:
                 },
                 # Named volume created by docker-compose.waku.yml for wakufleetconfig.json
                 f"{docker_project_name}_wakufleetconfig": {
-                    "bind": "/usr/status-user",
+                    "bind": "/usr/status-user/config",
                     "mode": "rw",
                 },
             },
