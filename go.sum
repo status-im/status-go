@@ -1547,6 +1547,8 @@ github.com/libp2p/go-yamux/v4 v4.0.2/go.mod h1:C808cCRgOs1iBwY4S71T5oxgMxgLmqUw5
 github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20190605223551-bc2310a04743/go.mod h1:qklhhLq1aX+mtWk9cPHPzaBjWImj5ULL6C7HFJtXQMM=
 github.com/lightstep/lightstep-tracer-go v0.18.1/go.mod h1:jlF1pusYV4pidLvZ+XD0UBX0ZE6WURAspgAczcDHrL4=
 github.com/linuxkit/virtsock v0.0.0-20201010232012-f8cee7dfc7a3/go.mod h1:3r6x7q95whyfWQpmGZTu3gk3v2YkMi05HEzl7Tf7YEo=
+github.com/logos-messaging/logos-messaging-go-bindings v0.0.0-20251212212702-9a9a9e5c88c8 h1:MP7gsVyyY9mpRUayfA1TYfAS/6gROqzvah++Q2TyivE=
+github.com/logos-messaging/logos-messaging-go-bindings v0.0.0-20251212212702-9a9a9e5c88c8/go.mod h1:Xx5gcSL5nKeRaZ1iZI88KsoLtGJPKf0et5Ajc1rL68c=
 github.com/lucas-clemente/quic-go v0.7.1-0.20190401152353-907071221cf9/go.mod h1:PpMmPfPKO9nKJ/psF49ESTAGQSdfXxlg1otPbEB2nOw=
 github.com/lucas-clemente/quic-go v0.18.0/go.mod h1:yXttHsSNxQi8AWijC/vLP+OJczXqzHSOcJrM5ITUlCg=
 github.com/lucas-clemente/quic-go v0.19.3/go.mod h1:ADXpNbTQjq1hIzCpB+y/k5iz4n4z4IwqoLb94Kh5Hu8=
@@ -2423,8 +2425,6 @@ github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
 github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904 h1:V6nJsnNpSl822Z013bYzh9lXnTfwBdQHptIOd3AVwXc=
 github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904/go.mod h1:GW6bN8Ski1GCOb2f5JbKKstH70wlPen1h8f1nzSDfSI=
-github.com/waku-org/waku-go-bindings v0.0.0-20251202095947-63b01b7d0ca9 h1:x4SKQ8zceFNhSBG02yULii7m/bFtGDuqX5XuahpSTCo=
-github.com/waku-org/waku-go-bindings v0.0.0-20251202095947-63b01b7d0ca9/go.mod h1:v6ogkMCyQRUTazRyQR5LIouukY4/2bkjjHpnBKBxcAY=
 github.com/wealdtech/go-ens/v3 v3.6.0 h1:EAByZlHRQ3vxqzzwNi0GvEq1AjVozfWO4DMldHcoVg8=
 github.com/wealdtech/go-ens/v3 v3.6.0/go.mod h1:hcmMr9qPoEgVSEXU2Bwzrn/9NczTWZ1rE53jIlqUpzw=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=

@@ -12,8 +12,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/waku-org/waku-go-bindings/waku"
-	"github.com/waku-org/waku-go-bindings/waku/common"
+	"github.com/logos-messaging/logos-messaging-go-bindings/waku"
+	"github.com/logos-messaging/logos-messaging-go-bindings/waku/common"
 
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
