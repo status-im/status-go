@@ -13,9 +13,9 @@ import (
 	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/server"
 )
 
@@ -117,11 +117,11 @@ type SenderServer struct {
 	accountMounter      PayloadMounter
 	rawMessageMounter   PayloadMounter
 	installationMounter PayloadMounterReceiver
-	backend             *api.GethStatusBackend
+	backend             *backend.StatusBackend
 }
 
 // NewSenderServer returns a *SenderServer init from the given *SenderServerConfig
-func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig) (*SenderServer, error) {
+func NewSenderServer(backend *backend.StatusBackend, config *SenderServerConfig) (*SenderServer, error) {
 	logger := logutils.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
@@ -168,7 +168,7 @@ func (s *SenderServer) startSendingData() error {
 }
 
 // MakeFullSenderServer generates a fully configured and randomly seeded SenderServer
-func MakeFullSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig) (*SenderServer, error) {
+func MakeFullSenderServer(backend *backend.StatusBackend, config *SenderServerConfig) (*SenderServer, error) {
 	config.ServerConfig.InstallationID = backend.InstallationID()
 	config.ServerConfig.KeyUID = backend.KeyUID()
 	err := MakeServerConfig(config.ServerConfig)
@@ -182,7 +182,7 @@ func MakeFullSenderServer(backend *api.GethStatusBackend, config *SenderServerCo
 
 // StartUpSenderServer generates a SenderServer, starts the sending server
 // and returns the ConnectionParams string to allow a ReceiverClient to make a successful connection.
-func StartUpSenderServer(backend *api.GethStatusBackend, configJSON string) (string, error) {
+func StartUpSenderServer(backend *backend.StatusBackend, configJSON string) (string, error) {
 	conf := NewSenderServerConfig()
 	err := json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
@@ -229,11 +229,11 @@ type ReceiverServer struct {
 	accountReceiver      PayloadReceiver
 	rawMessageReceiver   PayloadReceiver
 	installationReceiver PayloadMounterReceiver
-	backend              *api.GethStatusBackend
+	backend              *backend.StatusBackend
 }
 
 // NewReceiverServer returns a *SenderServer init from the given *ReceiverServerConfig
-func NewReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
+func NewReceiverServer(backend *backend.StatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
 	logger := logutils.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
@@ -280,7 +280,7 @@ func (s *ReceiverServer) startReceivingData() error {
 }
 
 // MakeFullReceiverServer generates a fully configured and randomly seeded ReceiverServer
-func MakeFullReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
+func MakeFullReceiverServer(backend *backend.StatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
 	config.ServerConfig.InstallationID = backend.InstallationID()
 	config.ServerConfig.KeyUID = backend.KeyUID()
 
@@ -301,7 +301,7 @@ func MakeFullReceiverServer(backend *api.GethStatusBackend, config *ReceiverServ
 
 // StartUpReceiverServer generates a ReceiverServer, starts the sending server
 // and returns the ConnectionParams string to allow a SenderClient to make a successful connection.
-func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (string, error) {
+func StartUpReceiverServer(backend *backend.StatusBackend, configJSON string) (string, error) {
 	conf := NewReceiverServerConfig()
 	err := json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
@@ -344,10 +344,10 @@ func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (s
 type KeystoreFilesSenderServer struct {
 	*BaseServer
 	keystoreFilesMounter PayloadMounter
-	backend              *api.GethStatusBackend
+	backend              *backend.StatusBackend
 }
 
-func NewKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
+func NewKeystoreFilesSenderServer(backend *backend.StatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
 	logger := logutils.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
@@ -386,7 +386,7 @@ func (s *KeystoreFilesSenderServer) startSendingData() error {
 }
 
 // MakeFullSenderServer generates a fully configured and randomly seeded KeystoreFilesSenderServer
-func MakeKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
+func MakeKeystoreFilesSenderServer(backend *backend.StatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
 	config.ServerConfig.InstallationID = backend.InstallationID()
 	config.ServerConfig.KeyUID = backend.KeyUID()
 
@@ -400,7 +400,7 @@ func MakeKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *Keyst
 
 // StartUpKeystoreFilesSenderServer generates a KeystoreFilesSenderServer, starts the sending server
 // and returns the ConnectionParams string to allow a ReceiverClient to make a successful connection.
-func StartUpKeystoreFilesSenderServer(backend *api.GethStatusBackend, configJSON string) (string, error) {
+func StartUpKeystoreFilesSenderServer(backend *backend.StatusBackend, configJSON string) (string, error) {
 	conf := NewKeystoreFilesSenderServerConfig()
 	err := json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {

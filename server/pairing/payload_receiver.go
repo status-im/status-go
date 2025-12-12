@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
 )
@@ -176,7 +176,7 @@ func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == api.DefaultKeystoreRelativePath {
+	if lastDir == backend.DefaultKeystoreRelativePath {
 		if aps.multiaccount == nil || aps.multiaccount.KeyUID == "" {
 			return fmt.Errorf("no known Key UID")
 		}
@@ -227,7 +227,7 @@ func (aps *AccountPayloadStorer) storeMultiAccount() error {
 
 // NewRawMessagePayloadReceiver generates a new and initialised RawMessagesPayload flavoured BasePayloadReceiver
 // RawMessagePayloadReceiver is responsible for the whole receive and store cycle of a RawMessagesPayload
-func NewRawMessagePayloadReceiver(accountPayload *AccountPayload, e *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) *BasePayloadReceiver {
+func NewRawMessagePayloadReceiver(accountPayload *AccountPayload, e *PayloadEncryptor, backend *backend.StatusBackend, config *ReceiverConfig) *BasePayloadReceiver {
 	e = e.Renew()
 	payload := NewRawMessagesPayload()
 
@@ -244,7 +244,7 @@ type RawMessageStorer struct {
 	deviceType            string
 }
 
-func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPayload, accountPayload *AccountPayload, config *ReceiverConfig) *RawMessageStorer {
+func NewRawMessageStorer(backend *backend.StatusBackend, payload *RawMessagesPayload, accountPayload *AccountPayload, config *ReceiverConfig) *RawMessageStorer {
 	return &RawMessageStorer{
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		payload:               payload,
@@ -273,7 +273,7 @@ func (r *RawMessageStorer) Store() error {
 // NewInstallationPayloadReceiver generates a new and initialised InstallationPayload flavoured BasePayloadReceiver
 // InstallationPayloadReceiver is responsible for the whole receive and store cycle of a RawMessagesPayload specifically
 // for sending / requesting installation data from the Receiver device.
-func NewInstallationPayloadReceiver(e *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *BasePayloadReceiver {
+func NewInstallationPayloadReceiver(e *PayloadEncryptor, backend *backend.StatusBackend, deviceType string) *BasePayloadReceiver {
 	e = e.Renew()
 	payload := NewRawMessagesPayload()
 
@@ -286,10 +286,10 @@ type InstallationPayloadStorer struct {
 	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	deviceType            string
-	backend               *api.GethStatusBackend
+	backend               *backend.StatusBackend
 }
 
-func NewInstallationPayloadStorer(backend *api.GethStatusBackend, payload *RawMessagesPayload, deviceType string) *InstallationPayloadStorer {
+func NewInstallationPayloadStorer(backend *backend.StatusBackend, payload *RawMessagesPayload, deviceType string) *InstallationPayloadStorer {
 	return &InstallationPayloadStorer{
 		payload:               payload,
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
@@ -335,7 +335,7 @@ func (r *InstallationPayloadStorer) Store() error {
 |
 */
 
-func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) (PayloadReceiver, PayloadReceiver, PayloadMounterReceiver, error) {
+func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *backend.StatusBackend, config *ReceiverConfig) (PayloadReceiver, PayloadReceiver, PayloadMounterReceiver, error) {
 	// A new SHARED AccountPayload
 	p := new(AccountPayload)
 
@@ -354,7 +354,7 @@ func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *api.
 |--------------------------------------------------------------------------
 */
 
-func NewKeystoreFilesPayloadReceiver(backend *api.GethStatusBackend, e *PayloadEncryptor, config *KeystoreFilesReceiverConfig, logger *zap.Logger) (*BasePayloadReceiver, error) {
+func NewKeystoreFilesPayloadReceiver(backend *backend.StatusBackend, e *PayloadEncryptor, config *KeystoreFilesReceiverConfig, logger *zap.Logger) (*BasePayloadReceiver, error) {
 	l := logger.Named("KeystoreFilesPayloadManager")
 	l.Debug("fired", zap.Any("config", config))
 
@@ -383,10 +383,10 @@ type KeystoreFilesPayloadStorer struct {
 	loggedInKeyUID                 string
 	expectedKeypairsToImport       []string
 	expectedKeystoreFilesToReceive []string
-	backend                        *api.GethStatusBackend
+	backend                        *backend.StatusBackend
 }
 
-func NewKeystoreFilesPayloadStorer(backend *api.GethStatusBackend, p *AccountPayload, config *KeystoreFilesReceiverConfig) (*KeystoreFilesPayloadStorer, error) {
+func NewKeystoreFilesPayloadStorer(backend *backend.StatusBackend, p *AccountPayload, config *KeystoreFilesReceiverConfig) (*KeystoreFilesPayloadStorer, error) {
 	if config == nil {
 		return nil, fmt.Errorf("empty keystore files receiver config")
 	}
@@ -442,7 +442,7 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == api.DefaultKeystoreRelativePath {
+	if lastDir == backend.DefaultKeystoreRelativePath {
 		keyStorePath = filepath.Join(keyStorePath, kfps.loggedInKeyUID)
 		_, err := os.Stat(keyStorePath)
 		if os.IsNotExist(err) {

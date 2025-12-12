@@ -1,4 +1,4 @@
-package api
+package backend
 
 import (
 	"encoding/json"
@@ -43,7 +43,7 @@ func TestCreateAccountAndLogin(t *testing.T) {
 	var request requests.CreateAccount
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	require.NoError(t, err)
-	statusBackend := NewGethStatusBackend(testutils.MustCreateTestLogger())
+	statusBackend := NewStatusBackend(testutils.MustCreateTestLogger())
 	_, err = statusBackend.CreateAccountAndLogin(&request)
 	require.NoError(t, err)
 	t.Logf("TestCreateAccountAndLogin: create account user1 and login successfully")

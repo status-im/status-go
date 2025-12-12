@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/pkg/multiformat"
 )
 
 func GetSigner(chainID uint64, from types.Address, privateKey *ecdsa.PrivateKey) bind.SignerFn {

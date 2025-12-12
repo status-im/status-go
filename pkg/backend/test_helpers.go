@@ -1,4 +1,4 @@
-package api
+package backend
 
 import (
 	"encoding/json"
@@ -29,7 +29,7 @@ var (
 )
 
 type setupContext struct {
-	backend        *GethStatusBackend
+	backend        *StatusBackend
 	mnemonic       string
 	settings       settings.Settings
 	config         *params.NodeConfig
@@ -145,7 +145,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		}
 	}
 
-	data.backend = NewGethStatusBackend(testutils.MustCreateTestLogger())
+	data.backend = NewStatusBackend(testutils.MustCreateTestLogger())
 	data.backend.UpdateRootDataDir(tmpdir)
 
 	err = data.backend.OpenAccounts(true)

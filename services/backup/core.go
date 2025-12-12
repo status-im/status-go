@@ -10,18 +10,18 @@ import (
 )
 
 type core struct {
-	backupProviders map[string]BackupProvider
+	backupProviders map[string]Provider
 }
 
 func newCore() *core {
 	return &core{
-		backupProviders: make(map[string]BackupProvider),
+		backupProviders: make(map[string]Provider),
 	}
 }
 
 func (c *core) Register(
 	componentName string,
-	provider BackupProvider,
+	provider Provider,
 ) {
 	c.backupProviders[componentName] = provider
 }

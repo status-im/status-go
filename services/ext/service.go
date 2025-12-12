@@ -19,7 +19,6 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -31,6 +30,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
