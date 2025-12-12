@@ -8,11 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/rpc"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions"
 )
 
 //go:generate go tool mockgen -source=nft_handler.go -destination=nft_handler_mock_test.go -package=pathprocessor NFTHandler

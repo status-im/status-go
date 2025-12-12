@@ -19,6 +19,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
@@ -36,7 +37,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 // Collectibles service

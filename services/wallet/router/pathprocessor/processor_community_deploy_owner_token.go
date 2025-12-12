@@ -15,6 +15,7 @@ import (
 
 	communitytokens "github.com/status-im/status-go/internal/contracts/community-tokens"
 	communitytokendeployer "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
+	"github.com/status-im/status-go/internal/transactions"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -25,7 +26,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions"
 )
 
 type CommunityDeployOwnerTokenProcessor struct {

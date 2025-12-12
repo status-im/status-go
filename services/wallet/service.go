@@ -11,6 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
@@ -58,7 +59,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/transactions"
 )
 
 const (

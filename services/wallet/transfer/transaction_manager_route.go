@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -20,7 +21,6 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions"
 )
 
 func (tm *TransactionManager) ClearLocalRouterTransactionsData() {

@@ -12,6 +12,7 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/accounts-management/generator"
 	accstypes "github.com/status-im/status-go/accounts-management/types"
+	fake2 "github.com/status-im/status-go/internal/transactions/fake"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -32,8 +33,6 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions/fake"
-	mock_fake "github.com/status-im/status-go/transactions/fake"
 )
 
 func TestTransactorSuite(t *testing.T) {
@@ -45,7 +44,7 @@ type TransactorSuite struct {
 	server            *gethrpc.Server
 	client            *gethrpc.Client
 	txServiceMockCtrl *gomock.Controller
-	txServiceMock     *mock_fake.MockPublicTransactionPoolAPI
+	txServiceMock     *fake2.MockPublicTransactionPoolAPI
 	nodeConfig        *params.NodeConfig
 
 	manager *Transactor
@@ -54,7 +53,7 @@ type TransactorSuite struct {
 func (s *TransactorSuite) SetupTest() {
 	s.txServiceMockCtrl = gomock.NewController(s.T())
 
-	s.server, s.txServiceMock = fake.NewTestServer(s.txServiceMockCtrl)
+	s.server, s.txServiceMock = fake2.NewTestServer(s.txServiceMockCtrl)
 	s.client = gethrpc.DialInProc(s.server)
 
 	// expected by simulated backend
