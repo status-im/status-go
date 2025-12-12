@@ -14,7 +14,6 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
-	mock_market "github.com/status-im/status-go/services/wallet/market/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
@@ -104,7 +103,7 @@ var testTokensKeys = []string{
 func TestPrice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	priceProvider := mock_market.NewMockPriceProvider(ctrl)
+	priceProvider := NewMockPriceProvider(ctrl)
 	priceProvider.SetMockPrices(mockPrices)
 
 	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider}, &event.Feed{})
@@ -147,11 +146,11 @@ func TestPrice(t *testing.T) {
 func TestFetchPriceErrorFirstProvider(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	priceProvider := mock_market.NewMockPriceProvider(ctrl)
+	priceProvider := NewMockPriceProvider(ctrl)
 	priceProvider.SetMockPrices(mockPrices)
 
 	customErr := errors.New("error")
-	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
+	priceProviderWithError := NewMockPriceProviderWithError(ctrl, customErr)
 
 	currencies := []string{"USD", "EUR"}
 
