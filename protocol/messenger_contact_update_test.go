@@ -8,7 +8,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/deprecation"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/requests"
@@ -45,20 +44,9 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	// It should add the contact
 	s.Require().True(contact.Added())
 
-	if deprecation.ChatProfileDeprecated {
-		// It should a one to one chat
-		s.Require().Len(response.Chats(), 1)
-		s.Require().False(response.Chats()[0].Active)
-	} else {
-		// It should create a profile chat & a one to one chat
-		s.Require().Len(response.Chats(), 2)
-		chats := response.Chats()
-		if chats[0].ChatType == ChatTypeOneToOne {
-			s.Require().False(chats[0].Active)
-		} else {
-			s.Require().False(chats[1].Active)
-		}
-	}
+	// It should a one to one chat
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	//// It should a one to one chat
 	//s.Require().Len(response.Chats(), 1)
@@ -115,13 +103,8 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
 
-	if deprecation.ChatProfileDeprecated {
-		// It adds the one to one chat
-		s.Require().Len(response.Chats(), 1)
-	} else {
-		// It adds the profile chat and the one to one chat
-		s.Require().Len(response.Chats(), 2)
-	}
+	// It adds the one to one chat
+	s.Require().Len(response.Chats(), 1)
 
 	// It should add the contact
 	s.Require().True(contact.Added())
@@ -159,13 +142,8 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
 
-	if deprecation.ChatProfileDeprecated {
-		// It adds the one to one chat
-		s.Require().Len(response.Chats(), 1)
-	} else {
-		// It adds the profile chat and the one to one chat
-		s.Require().Len(response.Chats(), 2)
-	}
+	// It adds the one to one chat
+	s.Require().Len(response.Chats(), 1)
 
 	// It should add the contact
 	s.Require().True(contact.Added())

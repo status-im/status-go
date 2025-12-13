@@ -12,7 +12,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
@@ -40,7 +39,7 @@ const (
 	ChatTypeOneToOne ChatType = iota + 1
 	ChatTypePublic
 	ChatTypePrivateGroupChat
-	// Deprecated: CreateProfileChat shouldn't be used
+	// Deprecated: ChatTypeProfile shouldn't be used
 	// and is only left here in case profile chat feature is re-introduced.
 	ChatTypeProfile
 	// Deprecated: ChatTypeTimeline shouldn't be used
@@ -77,10 +76,6 @@ const (
 )
 
 const pkStringLength = 68
-
-// timelineChatID is a magic constant id for your own timeline
-// Deprecated: timeline chats are no more supported
-const timelineChatID = "@timeline70bd746ddcc12beb96b2c9d572d0784ab137ffc774f5383e50585a932080b57cca0484b259e61cecbaa33a4c98a300a"
 
 type Chat struct {
 	// ID is the id of the chat, for public chats it is the name e.g. status, for one-to-one
@@ -627,33 +622,6 @@ func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
 	}
 }
 
-// Deprecated: buildProfileChatID shouldn't be used
-// and is only left here in case profile chat feature is re-introduced.
-func buildProfileChatID(publicKeyString string) string {
-	return "@" + publicKeyString
-}
-
-// Deprecated: CreateProfileChat shouldn't be used
-// and is only left here in case profile chat feature is re-introduced.
-func CreateProfileChat(pubkey string, timesource common.TimeSource) *Chat {
-	// Return nil to prevent usage of deprecated function
-	if deprecation.ChatProfileDeprecated {
-		return nil
-	}
-
-	id := buildProfileChatID(pubkey)
-	return &Chat{
-		ID:        id,
-		Name:      id,
-		Active:    true,
-		Timestamp: int64(timesource.GetCurrentTime()),
-		Joined:    int64(timesource.GetCurrentTime()),
-		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
-		ChatType:  ChatTypeProfile,
-		Profile:   pubkey,
-	}
-}
-
 func CreateGroupChat(timesource common.TimeSource) Chat {
 	timestamp := timesource.GetCurrentTime()
 	synced := uint32(timestamp / 1000)
@@ -667,23 +635,6 @@ func CreateGroupChat(timesource common.TimeSource) Chat {
 		SyncedFrom:               synced,
 		ChatType:                 ChatTypePrivateGroupChat,
 		Highlight:                true,
-	}
-}
-
-// Deprecated: CreateTimelineChat shouldn't be used
-// and is only left here in case profile chat feature is re-introduced.
-func CreateTimelineChat(timesource common.TimeSource) *Chat {
-	// Return nil to prevent usage of deprecated function
-	if deprecation.ChatTimelineDeprecated {
-		return nil
-	}
-
-	return &Chat{
-		ID:        timelineChatID,
-		Name:      "#" + timelineChatID,
-		Timestamp: int64(timesource.GetCurrentTime()),
-		Active:    true,
-		ChatType:  ChatTypeTimeline,
 	}
 }
 

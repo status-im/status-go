@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/deprecation"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -236,70 +235,6 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 	response := &MessengerResponse{}
 
 	return m.createPublicChat(chatID, response)
-}
-
-// Deprecated: CreateProfileChat shouldn't be used
-// and is only left here in case profile chat feature is re-introduced.
-func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*MessengerResponse, error) {
-	// Return error to prevent usage of deprecated function
-	if deprecation.ChatProfileDeprecated {
-		return nil, errors.New("profile chats are deprecated")
-	}
-
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	publicKey, err := crypto.HexToPubkey(request.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	chat := m.buildProfileChat(request.ID)
-
-	chat.Active = true
-
-	// Save topics
-	_, err = m.Join(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check contact code
-	filter, err := m.messaging.JoinPrivateChat(publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// Store chat
-	m.allChats.Store(chat.ID, chat)
-
-	response := &MessengerResponse{}
-	response.AddChat(chat)
-
-	willSync, err := m.scheduleSyncChat(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	// We set the synced to, synced from to the default time
-	if !willSync {
-		if err := m.initChatSyncFields(chat); err != nil {
-			return nil, err
-		}
-	}
-
-	_, err = m.scheduleSyncFilters(messagingtypes.ChatFilters{filter})
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.saveChat(chat)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
 }
 
 func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*MessengerResponse, error) {
@@ -548,75 +483,6 @@ func (m *Messenger) Join(chat *Chat) (messagingtypes.ChatFilters, error) {
 	default:
 		return nil, errors.New("chat is neither public nor private")
 	}
-}
-
-// Deprecated: buildProfileChat shouldn't be used
-// and is only left here in case profile chat feature is re-introduced.
-func (m *Messenger) buildProfileChat(id string) *Chat {
-	// Return nil to prevent usage of deprecated function
-	if deprecation.ChatProfileDeprecated {
-		return nil
-	}
-
-	// Create the corresponding profile chat
-	profileChatID := buildProfileChatID(id)
-	profileChat, ok := m.allChats.Load(profileChatID)
-
-	if !ok {
-		profileChat = CreateProfileChat(id, m.getTimesource())
-	}
-
-	return profileChat
-
-}
-
-// Deprecated: ensureTimelineChat shouldn't be used
-// and is only left here in case profile chat feature is re-introduced.
-func (m *Messenger) ensureTimelineChat() error {
-	// Return error to prevent usage of deprecated function
-	if deprecation.ChatProfileDeprecated {
-		return errors.New("timeline chats are deprecated")
-	}
-
-	chat, err := m.persistence.Chat(timelineChatID)
-	if err != nil {
-		return err
-	}
-
-	if chat != nil {
-		return nil
-	}
-
-	chat = CreateTimelineChat(m.getTimesource())
-	m.allChats.Store(timelineChatID, chat)
-	return m.saveChat(chat)
-}
-
-// Deprecated: ensureMyOwnProfileChat shouldn't be used
-// and is only left here in case profile chat feature is re-introduced.
-func (m *Messenger) ensureMyOwnProfileChat() error {
-	// Return error to prevent usage of deprecated function
-	if deprecation.ChatProfileDeprecated {
-		return errors.New("profile chats are deprecated")
-	}
-
-	chatID := crypto.PubkeyToHex(&m.identity.PublicKey)
-	_, ok := m.allChats.Load(chatID)
-	if ok {
-		return nil
-	}
-
-	chat := m.buildProfileChat(chatID)
-
-	chat.Active = true
-
-	// Save topics
-	_, err := m.Join(chat)
-	if err != nil {
-		return err
-	}
-
-	return m.saveChat(chat)
 }
 
 func (m *Messenger) ClearHistory(request *requests.ClearHistory) (*MessengerResponse, error) {

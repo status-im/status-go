@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -41,7 +40,7 @@ func (s *MessengerMuteSuite) TestSetMute() {
 	s.NoError(error)
 
 	allChats := s.m.Chats()
-	s.Require().Len(allChats, deprecation.AddChatsCount(1))
+	s.Require().Len(allChats, 1)
 
 	var actualChat *Chat
 
@@ -87,7 +86,7 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 	s.Require().NoError(err)
 
 	allChats := s.m.Chats()
-	s.Require().Len(allChats, deprecation.AddChatsCount(1))
+	s.Require().Len(allChats, 1)
 
 	var actualChat *Chat
 
