@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
+	"github.com/status-im/status-go/common"
 	logutils2 "github.com/status-im/status-go/internal/logutils"
 	statusgo "github.com/status-im/status-go/mobile"
 	"github.com/status-im/status-go/pkg/sentry"
@@ -41,7 +42,10 @@ func main() {
 	defer sentry.Recover()
 
 	flag.Parse()
-	go handleInterrupts()
+	go func() {
+		defer common.LogOnPanic()
+		handleInterrupts()
+	}()
 
 	srv := server.NewServer(
 		logger.Named("server"),
