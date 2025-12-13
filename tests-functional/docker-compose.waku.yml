@@ -1,12 +1,13 @@
 services:
   boot-1:
-    image: wakuorg/nwaku:v0.36.0
+    image: wakuorg/nwaku:v0.37.1-beta
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
       "--discv5-enr-auto-update=True",
       "--discv5-udp-port=9000",
       "--cluster-id=16",
+      "--num-shards-in-network=65",
       # Docker DNS server
       "--dns-addrs-name-server=127.0.0.11",
       "--dns4-domain-name=boot-1",
@@ -33,13 +34,14 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: wakuorg/nwaku:v0.36.0
+    image: wakuorg/nwaku:v0.37.1-beta
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
       "--discv5-enr-auto-update=True",
       "--discv5-udp-port=9000",
       "--cluster-id=16",
+      "--num-shards-in-network=65",
       # Docker DNS server
       "--dns-addrs-name-server=127.0.0.11",
       "--dns4-domain-name=store",

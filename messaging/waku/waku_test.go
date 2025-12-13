@@ -163,8 +163,8 @@ func parseNodes(rec []string) []*enode.Node {
 //
 //	IP_ADDRESS=$(hostname -I | awk '{print $1}');
 //	docker run \
-//	 -p 60000:60000/tcp -p 9000:9000/udp -p 8645:8645/tcp harbor.status.im/wakuorg/nwaku:v0.36.0 \
-//	 --tcp-port=60000 --discv5-discovery=true --cluster-id=16 --pubsub-topic=/waku/2/rs/16/32 --pubsub-topic=/waku/2/rs/16/64 \
+//	 -p 60000:60000/tcp -p 9000:9000/udp -p 8645:8645/tcp harbor.status.im/wakuorg/nwaku:v0.37.1-beta \
+//	 --tcp-port=60000 --discv5-discovery=true --cluster-id=16 --num-shards-in-network=65 --pubsub-topic=/waku/2/rs/16/32 --pubsub-topic=/waku/2/rs/16/64 \
 //	 --nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=9000 --rest-address=0.0.0.0 --store
 
 func TestBasicWakuV2(t *testing.T) {
