@@ -11,11 +11,16 @@ import (
 	"github.com/status-im/status-go/internal/images"
 )
 
+var (
+	testJpegBytes = []byte{0xff, 0xd8, 0xff, 0xdb, 0x00, 0x84, 0x00, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x50}
+	testPngBytes  = []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48}
+)
+
 func SampleIdentityImages() []images.IdentityImage {
 	return []images.IdentityImage{
 		{
 			Name:         images.SmallDimName,
-			Payload:      gofakeit.ImageJpeg(80, 80),
+			Payload:      testJpegBytes,
 			Width:        80,
 			Height:       80,
 			FileSize:     256,
@@ -24,7 +29,7 @@ func SampleIdentityImages() []images.IdentityImage {
 		},
 		{
 			Name:         images.LargeDimName,
-			Payload:      gofakeit.ImagePng(300, 300),
+			Payload:      testPngBytes,
 			Width:        240,
 			Height:       300,
 			FileSize:     1024,
