@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/nodecfg"
+	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 )

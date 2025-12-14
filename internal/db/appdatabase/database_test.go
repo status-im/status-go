@@ -16,10 +16,10 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrations"
 	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/internal/nodecfg"
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
-	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"

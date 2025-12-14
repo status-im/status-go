@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/params"
-
-	"github.com/status-im/status-go/nodecfg"
 
 	"github.com/stretchr/testify/suite"
 )

@@ -13,7 +13,7 @@ import (
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_notifications"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/nodecfg"
+	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/params"
 )
 
