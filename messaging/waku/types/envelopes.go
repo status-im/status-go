@@ -2,7 +2,6 @@ package types
 
 import (
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 // Envelope represents a clear-text data packet to transmit through the Whisper
@@ -63,7 +62,7 @@ type EnvelopeEvent struct {
 	Topic TopicType
 	Hash  cryptotypes.Hash
 	Batch cryptotypes.Hash
-	Peer  types.EnodeID
+	Peer  EnodeID
 	Data  interface{}
 }
 

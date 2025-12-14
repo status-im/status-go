@@ -7,10 +7,10 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/layers/transport"
 	"github.com/status-im/status-go/messaging/types"
+	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
 type config struct {
@@ -28,7 +28,7 @@ func newConfig(options ...Options) *config {
 		logger: zap.NewNop(),
 		tracer: trace.NewNoopTracer(),
 		envelopesMonitorConfig: &transport.EnvelopesMonitorConfig{
-			IsMailserver: func(ethtypes.EnodeID) bool {
+			IsMailserver: func(wakutypes.EnodeID) bool {
 				return false
 			},
 		},

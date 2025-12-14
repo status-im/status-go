@@ -11,7 +11,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
@@ -31,7 +30,7 @@ type EnvelopesMonitorConfig struct {
 	EnvelopeEventsHandler            EnvelopeEventsHandler
 	MaxAttempts                      int
 	AwaitOnlyMailServerConfirmations bool
-	IsMailserver                     func(ethtypes.EnodeID) bool
+	IsMailserver                     func(wakutypes.EnodeID) bool
 	Logger                           *zap.Logger
 }
 
@@ -103,7 +102,7 @@ type EnvelopesMonitor struct {
 
 	wg           sync.WaitGroup
 	quit         chan struct{}
-	isMailserver func(peer ethtypes.EnodeID) bool
+	isMailserver func(peer wakutypes.EnodeID) bool
 
 	logger *zap.Logger
 }
