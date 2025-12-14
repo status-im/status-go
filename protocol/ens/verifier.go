@@ -1,19 +1,28 @@
 package ens
 
 import (
+	"bytes"
+	"context"
+	"crypto/elliptic"
 	"database/sql"
+	"encoding/hex"
+	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
+	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
+	"github.com/wealdtech/go-ens/v3"
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/timesource"
-
-	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
 )
+
+const contractQueryTimeout = 5000 * time.Millisecond
 
 type Verifier struct {
 	online          bool
@@ -103,7 +112,7 @@ func (v *Verifier) verifyLoop() {
 			if !v.online || v.rpcEndpoint == "" || v.contractAddress == "" {
 				continue
 			}
-			err := v.verify(v.rpcEndpoint, v.contractAddress)
+			err := v.verify(context.Background(), v.rpcEndpoint, v.contractAddress)
 			if err != nil {
 				v.logger.Error("verify loop failed", zap.Error(err))
 			}
@@ -128,20 +137,26 @@ func (v *Verifier) publish(records []*VerificationRecord) {
 			v.logger.Warn("ens subscription channel full, dropping message")
 		}
 	}
-
 }
 
-func (v *Verifier) ReverseResolve(address gethcommon.Address) (string, error) {
-	verifier := gethens.NewVerifier(v.logger)
-	return verifier.ReverseResolve(address, v.rpcEndpoint)
+func (v *Verifier) ReverseResolve(ctx context.Context, address gethcommon.Address) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, contractQueryTimeout)
+	defer cancel()
+
+	rpcClient, err := rpc.DialContext(ctx, v.rpcEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	ethClient := ethclient.NewClient(rpcClient)
+	return ens.ReverseResolve(ethClient, address)
 }
 
 // Verify verifies that a registered ENS name matches the expected public key
-func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
+func (v *Verifier) verify(ctx context.Context, rpcEndpoint, contractAddress string) error {
 	v.logger.Debug("verifying ENS Names")
-	verifier := gethens.NewVerifier(v.logger)
 
-	var ensDetails []enstypes.ENSDetails
+	var ensDetails []Details
 
 	// Now in seconds
 	now := v.timesource.Now().Unix()
@@ -154,18 +169,38 @@ func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
 
 	for _, r := range ensToBeVerified {
 		recordsMap[r.PublicKey] = r
-		ensDetails = append(ensDetails, enstypes.ENSDetails{
+		ensDetails = append(ensDetails, Details{
 			PublicKeyString: r.PublicKey[2:],
 			Name:            r.Name,
 		})
 		v.logger.Debug("verifying ens name", zap.Any("record", r))
 	}
 
-	ensResponse, err := verifier.CheckBatch(ensDetails, rpcEndpoint, contractAddress)
+	ctx, cancel := context.WithTimeout(ctx, contractQueryTimeout)
+	defer cancel()
+
+	ch := make(chan Response)
+	ensResponse := make(map[string]Response)
+
+	rpcClient, err := rpc.DialContext(ctx, rpcEndpoint)
 	if err != nil {
-		v.logger.Error("failed to check batch", zap.Error(err))
-		return err
+		return errors.Wrap(err, "failed to dial rpc endpoint")
 	}
+
+	ethClient := ethclient.NewClient(rpcClient)
+
+	for _, ensInfo := range ensDetails {
+		go func(info Details) {
+			defer gocommon.LogOnPanic()
+			ch <- v.verifyENSName(info, ethClient)
+		}(ensInfo)
+	}
+
+	for range ensDetails {
+		r := <-ch
+		ensResponse[r.PublicKeyString] = r
+	}
+	close(ch)
 
 	var records []*VerificationRecord
 
@@ -179,7 +214,7 @@ func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
 				record.VerificationRetries++
 			}
 		} else {
-			v.logger.Warn("Failed to resolve ens name",
+			v.logger.Warn("failed to resolve ens name",
 				zap.String("name", details.Name),
 				zap.String("publicKey", details.PublicKeyString),
 				zap.Error(details.Error),
@@ -202,4 +237,48 @@ func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
 	v.publish(records)
 
 	return nil
+}
+
+func (v *Verifier) verifyENSName(ensInfo Details, ethclient *ethclient.Client) Response {
+	publicKeyStr := ensInfo.PublicKeyString
+	ensName := ensInfo.Name
+	v.logger.Info("Resolving ENS name", zap.String("name", ensName), zap.String("publicKey", publicKeyStr))
+	response := Response{
+		Name:            ensName,
+		PublicKeyString: publicKeyStr,
+		VerifiedAt:      time.Now().Unix(),
+	}
+
+	expectedPubKeyBytes, err := hex.DecodeString(publicKeyStr)
+	if err != nil {
+		response.Error = err
+		return response
+	}
+
+	publicKey, err := crypto.UnmarshalPubkey(expectedPubKeyBytes)
+	if err != nil {
+		response.Error = err
+		return response
+	}
+
+	// Resolve ensName
+	resolver, err := ens.NewResolver(ethclient, ensName)
+	if err != nil {
+		v.logger.Error("error while creating ENS name resolver", zap.Error(err))
+		response.Error = err
+		return response
+	}
+	x, y, err := resolver.PubKey()
+	if err != nil {
+		v.logger.Error("error while resolving public key from ENS name", zap.Error(err))
+		response.Error = err
+		return response
+	}
+
+	// Assemble the bytes returned for the pubkey
+	pubKeyBytes := elliptic.Marshal(crypto.S256(), new(big.Int).SetBytes(x[:]), new(big.Int).SetBytes(y[:]))
+
+	response.PublicKey = publicKey
+	response.Verified = bytes.Equal(pubKeyBytes, expectedPubKeyBytes)
+	return response
 }
