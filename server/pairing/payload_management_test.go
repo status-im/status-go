@@ -20,12 +20,16 @@ import (
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server/servertest"
-	"github.com/status-im/status-go/t/utils"
+)
+
+const (
+	pk1fileName = "test-account1-status-chain.pk"
+	pk2fileName = "test-account2-status-chain.pk"
+	password    = "password"
+	keyUID      = "0x6b9a74f33316e02479c33ed23cf16e0408dca3e1b9ab8f361630859543eb0d46"
 )
 
 var (
-	password = "password"
-	keyUID   = "0x6b9a74f33316e02479c33ed23cf16e0408dca3e1b9ab8f361630859543eb0d46"
 	expected = multiaccounts.Account{
 		Name:          "cool account",
 		KeyUID:        keyUID,
@@ -75,12 +79,6 @@ func makeKeystore(t *testing.T) string {
 	return keyStoreDir
 }
 
-func initKeys(t *testing.T, keyStoreDir string) {
-	utils.Init()
-	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
-	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount2PKFile()))
-}
-
 func getFiles(t *testing.T, keyStorePath string) map[string][]byte {
 	keys := make(map[string][]byte)
 
@@ -118,8 +116,16 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 		db2td()
 	}
 
-	initKeys(pms.T(), keystore1)
-	err := db1.SaveAccount(expected)
+	err := os.MkdirAll(keystore1, 0777)
+	pms.Require().NoError(err)
+
+	err = os.Link(filepath.Join("testdata", pk1fileName), filepath.Join(keystore1, pk1fileName))
+	pms.Require().NoError(err)
+
+	err = os.Link(filepath.Join("testdata", pk2fileName), filepath.Join(keystore1, pk2fileName))
+	pms.Require().NoError(err)
+
+	err = db1.SaveAccount(expected)
 	pms.Require().NoError(err)
 
 	pms.config1 = &SenderConfig{
@@ -153,15 +159,15 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
 
 	// TEST PairingPayloadRepository 1 Load()
 	pms.Require().Len(ppr.keys, 2)
-	pms.Require().Len(ppr.keys[utils.GetAccount1PKFile()], 489)
-	pms.Require().Len(ppr.keys[utils.GetAccount2PKFile()], 489)
+	pms.Require().Len(ppr.keys[pk1fileName], 489)
+	pms.Require().Len(ppr.keys[pk2fileName], 489)
 
 	h1 := sha256.New()
-	h1.Write(ppr.keys[utils.GetAccount1PKFile()])
+	h1.Write(ppr.keys[pk1fileName])
 	pms.Require().Exactly(account1Hash, h1.Sum(nil))
 
 	h2 := sha256.New()
-	h2.Write(ppr.keys[utils.GetAccount2PKFile()])
+	h2.Write(ppr.keys[pk2fileName])
 	pms.Require().Exactly(account2Hash, h2.Sum(nil))
 
 	pms.Require().Exactly(expected.ColorHash, ppr.multiaccount.ColorHash)
@@ -237,15 +243,15 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	pms.Require().NoError(err)
 
 	pms.Require().Len(ppm2.keys, 2)
-	pms.Require().Len(ppm2.keys[utils.GetAccount1PKFile()], 489)
-	pms.Require().Len(ppm2.keys[utils.GetAccount2PKFile()], 489)
+	pms.Require().Len(ppm2.keys[pk1fileName], 489)
+	pms.Require().Len(ppm2.keys[pk2fileName], 489)
 
 	h1 := sha256.New()
-	h1.Write(ppm2.keys[utils.GetAccount1PKFile()])
+	h1.Write(ppm2.keys[pk1fileName])
 	pms.Require().Exactly(account1Hash, h1.Sum(nil))
 
 	h2 := sha256.New()
-	h2.Write(ppm2.keys[utils.GetAccount2PKFile()])
+	h2.Write(ppm2.keys[pk2fileName])
 	pms.Require().Exactly(account2Hash, h2.Sum(nil))
 
 	pms.Require().Exactly(expected.ColorHash, ppm2.multiaccount.ColorHash)
@@ -294,15 +300,15 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	keys := getFiles(pms.T(), filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID))
 
 	pms.Require().Len(keys, 2)
-	pms.Require().Len(keys[utils.GetAccount1PKFile()], 489)
-	pms.Require().Len(keys[utils.GetAccount2PKFile()], 489)
+	pms.Require().Len(keys[pk1fileName], 489)
+	pms.Require().Len(keys[pk2fileName], 489)
 
 	h1 := sha256.New()
-	h1.Write(keys[utils.GetAccount1PKFile()])
+	h1.Write(keys[pk1fileName])
 	pms.Require().Exactly(account1Hash, h1.Sum(nil))
 
 	h2 := sha256.New()
-	h2.Write(keys[utils.GetAccount2PKFile()])
+	h2.Write(keys[pk2fileName])
 	pms.Require().Exactly(account2Hash, h2.Sum(nil))
 
 	acc, err := pms.config2.DB.GetAccount(keyUID)

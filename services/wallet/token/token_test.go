@@ -2,7 +2,6 @@ package token
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -26,7 +25,6 @@ import (
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/t/utils"
 )
 
 type addressTokenMap = map[common.Address]*tokentypes.Token
@@ -284,13 +282,10 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 			Accounts: []common.Address{address},
 		})
 
-		require.NoError(t, utils.Eventually(func() error {
+		require.Eventually(t, func() bool {
 			tokenByAddress, err := manager.GetPreviouslyOwnedTokens()
-			if err == nil && len(tokenByAddress) == 0 {
-				return nil
-			}
-			return errors.New("Token not removed")
-		}, 100*time.Millisecond, 10*time.Millisecond))
+			return err == nil && len(tokenByAddress) == 0
+		}, 100*time.Millisecond, 10*time.Millisecond)
 	}()
 
 	group.Wait()
