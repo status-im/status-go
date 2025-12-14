@@ -233,7 +233,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         req_id = requests[0].get("id")
         logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
-        # Wait for request to join to be received
+        # Wait for request to join to get received
         owner_backend.wait_for_signal_predicate(
             SignalType.MESSAGES_NEW,
             lambda signal: (signal.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
