@@ -1,6 +1,6 @@
 package requests
 
-import "github.com/status-im/status-go/errors"
+import "github.com/status-im/status-go/internal/errors"
 
 var (
 	ErrInvalidSignatureDetails = &errors.ErrorResponse{Code: errors.ErrorCode("WT-004"), Details: "invalid signature details"}

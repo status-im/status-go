@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	s_errors "github.com/status-im/status-go/errors"
+	s_errors "github.com/status-im/status-go/internal/errors"
 
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 

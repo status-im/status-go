@@ -7,9 +7,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"

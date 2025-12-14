@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
