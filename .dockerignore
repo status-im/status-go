@@ -8,3 +8,4 @@ wnode-data
 _assets/ci
 Dockerfile
 **/*.test
+tests-functional/snt_addresses*
