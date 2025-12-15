@@ -59,6 +59,7 @@ pipeline {
     BRANCH =                          "${params.BRANCH}"
     FUNCTIONAL_TESTS_REPORT_CODECOV = "${params.FUNCTIONAL_TESTS_REPORT_CODECOV}"
     FUNCTIONAL_TESTS_LOG_LEVEL =      "${params.FUNCTIONAL_TESTS_LOG_LEVEL}"
+    FUNCTIONAL_TESTS_CONTAINER_PREFIX = "${env.BUILD_TAG}"
     USE_NWAKU = "${params.USE_NWAKU}"
     /* nwaku source directory */
     NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
@@ -103,7 +104,7 @@ pipeline {
     failure { script { github.notifyPR(false) } }
     cleanup {
       sh '''
-        docker ps -a --filter "name=status-go-func-tests-${BUILD_TAG}" -q | xargs -r docker rm -f
+        docker ps -a --filter "name=${FUNCTIONAL_TESTS_CONTAINER_PREFIX}" -q | xargs -r docker rm -f
       '''
       cleanWs()
       dir(env.WORKSPACE_TMP) { deleteDir() }
