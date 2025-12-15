@@ -6,7 +6,6 @@ from web3 import Web3
 
 from clients.contract_deployers.communities import CommunitiesDeployer
 from clients.contract_deployers.snt import (
-    SNTDeployer,
     SNTV2_ABI,
     SNT_TOKEN_CONTROLLER_ABI,
 )
@@ -43,10 +42,10 @@ class TestWalletActivitySession:
         return token_overrides
 
     def get_snt_contract(self):
-        return self.anvil_client.eth.contract(address=self.snt_deployer.snt_contract_address, abi=SNTV2_ABI)
+        return self.anvil_client.eth.contract(address=self.snt_address, abi=SNTV2_ABI)
 
     def get_snt_token_controller(self):
-        return self.anvil_client.eth.contract(address=self.snt_deployer.snt_token_controller_address, abi=SNT_TOKEN_CONTROLLER_ABI)
+        return self.anvil_client.eth.contract(address=self.snt_controller_address, abi=SNT_TOKEN_CONTROLLER_ABI)
 
     def mint_snt(self, address, amount):
         snt_controller = self.get_snt_token_controller()
@@ -54,13 +53,14 @@ class TestWalletActivitySession:
         self.anvil_client.eth.wait_for_transaction_receipt(tx_hash)
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile, anvil_client, foundry_client, multicall3_deployer):
+    def setup_backend(self, backend_recovered_profile, anvil_client, foundry_client, multicall3_deployer, snt_addresses):
         # Setup contracts and deployers
         self.anvil_client = anvil_client
         self.anvil_client.eth.default_account = Web3.to_checksum_address(DEPLOYER_ACCOUNT.address)
-        self.snt_deployer = SNTDeployer(foundry_client)
+        self.snt_address = snt_addresses["snt"]
+        self.snt_controller_address = snt_addresses["controller"]
         self.communities_deployer = CommunitiesDeployer(foundry_client)
-        self.erc20_token_list = {ANVIL_NETWORK_ID: self.snt_deployer.snt_contract_address}
+        self.erc20_token_list = {ANVIL_NETWORK_ID: self.snt_address}
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
 
         # Create backend

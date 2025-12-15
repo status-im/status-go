@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from enum import Enum
-from typing import TypedDict, Union
+from typing import TypedDict, Union, Optional
 
 from clients.rpc import RpcClient
 from clients.services.service import Service
@@ -86,6 +87,40 @@ class CommunityPermissionsAccess(Enum):
     UNKNOWN = 0
     AUTO_ACCEPT = 1
     MANUAL_ACCEPT = 3
+
+
+class CommunityTokenPermissionType(Enum):
+    BECOME_MEMBER = 1
+    BECOME_ADMIN = 2
+    BECOME_TOKEN_MASTER = 3
+    CAN_VIEW_CHANNEL = 4
+    CAN_VIEW_AND_POST_CHANNEL = 5
+
+
+class CommunityTokenType(Enum):
+    ERC20 = 1
+    ERC721 = 2
+    ENS = 3
+
+
+class CommunityTokenPrivilegesLevel(Enum):
+    OWNER_LEVEL = 1
+    MASTER_LEVEL = 2
+    COMMUNITY_LEVEL = 3
+
+
+class CommunityRoles(Enum):
+    ROLE_NONE = 0
+    ROLE_OWNER = 1
+    ROLE_ADMIN = 4
+    ROLE_TOKEN_MASTER = 5
+
+
+@dataclass
+class SignParams:
+    data: bytes
+    account: str
+    password: str
 
 
 class Error(Exception):
@@ -276,8 +311,27 @@ class WakuextService(Service):
         response = self.rpc_request("fetchCommunity", params)
         return response
 
-    def request_to_join_community(self, community_id, address="fakeaddress"):
-        params = [{"communityId": community_id, "addressesToReveal": [address], "airdropAddress": address}]
+    def request_to_join_community(
+        self,
+        community_id: str,
+        addresses_to_reveal: Optional[list[str]] = None,
+        signatures: Optional[list[str]] = None,
+    ):
+        # TODO: refactor tests to fully comply with signature:
+        # TODO: (self, community_id: str, addresses_to_reveal: list[str], signatures: list[str]):
+        # TODO: NON-FAKE addresses to reveal, and REAL signatures need to be provided
+        if addresses_to_reveal is None:
+            addresses_to_reveal = ["fakeaddress"]
+
+        params = [
+            {
+                "communityId": community_id,
+                "addressesToReveal": addresses_to_reveal,
+                "airdropAddress": addresses_to_reveal[0],
+                "signatures": signatures,
+            }
+        ]
+
         response = self.rpc_request("requestToJoinCommunity", params)
         return response
 
@@ -341,7 +395,7 @@ class WakuextService(Service):
         response = self.rpc_request("checkPermissionsToJoinCommunity", params)
         return response
 
-    def generate_joining_community_requests_for_signing(self, member_pub_key: str, community_id: str, addresses_to_reveal: list):
+    def generate_joining_community_requests_for_signing(self, member_pub_key: str, community_id: str, addresses_to_reveal: list[str]):
         params = [member_pub_key, community_id, addresses_to_reveal]
         response = self.rpc_request("generateJoiningCommunityRequestsForSigning", params)
         return response
@@ -769,4 +823,109 @@ class WakuextService(Service):
     def get_verification_request_sent_to(self, contact_id: str):
         params = [contact_id]
         response = self.rpc_request("getVerificationRequestSentTo", params)
+        return response
+
+    def save_community_token(self, token_data: dict):
+        params = [token_data]
+        response = self.rpc_request("saveCommunityToken", params)
+        return response
+
+    def add_community_token(self, community_id: str, chain_id: int, contract_address: str):
+        params = [community_id, chain_id, contract_address]
+        response = self.rpc_request("addCommunityToken", params)
+        return response
+
+    def create_history_archive_torrent_from_db(self, community_id: str, topics: list, start_date, end_date, partition_duration, encrypted: bool):
+        params = [
+            community_id,
+            topics,
+            start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),
+            end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),
+            partition_duration,
+            encrypted,
+        ]
+        response = self.rpc_request("createHistoryArchiveTorrentFromDB", params)
+        return response
+
+    def load_history_archive_index_from_file(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("loadHistoryArchiveIndexFromFile", params)
+        return response
+
+    def save_message_archive_id(self, community_id: str, archive_hash: str):
+        params = [community_id, archive_hash]
+        response = self.rpc_request("saveMessageArchiveID", params)
+        return response
+
+    def import_history_archives(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("importHistoryArchives", params)
+        return response
+
+    def backup_community(self, community_id: str, clock: int):
+        params = [community_id, clock]
+        response = self.rpc_request("backupCommunity", params)
+        return response
+
+    def handle_local_backup_communities(self, communities_data: dict):
+        params = [communities_data]
+        response = self.rpc_request("handleLocalBackupCommunities", params)
+        return response
+
+    def generate_hash_ratchet_key(self, group_id: str):
+        params = [group_id]
+        response = self.rpc_request("generateHashRatchetKey", params)
+        return response
+
+    def create_community_token_permission(
+        self, community_id: str, permission_type: CommunityTokenPermissionType, token_criteria: list, chat_ids: Optional[list] = None
+    ):
+        params = [
+            {
+                "communityId": community_id,
+                "type": permission_type.value,
+                "tokenCriteria": token_criteria,
+            }
+        ]
+        if chat_ids:
+            params[0]["chatIds"] = chat_ids
+        response = self.rpc_request("createCommunityTokenPermission", params)
+        return response
+
+    def edit_community_token_permission(
+        self,
+        permission_id: str,
+        community_id: str,
+        permission_type: CommunityTokenPermissionType,
+        token_criteria: list,
+        chat_ids: Optional[list] = None,
+    ):
+        params = [
+            {
+                "permissionId": permission_id,
+                "createCommunityTokenPermission": {
+                    "communityId": community_id,
+                    "type": permission_type.value,
+                    "tokenCriteria": token_criteria,
+                },
+            }
+        ]
+        if chat_ids:
+            params[0]["createCommunityTokenPermission"]["chatIds"] = chat_ids
+        response = self.rpc_request("editCommunityTokenPermission", params)
+        return response
+
+    def delete_community_token_permission(self, community_id: str, permission_id: str):
+        params = [
+            {
+                "communityId": community_id,
+                "permissionId": permission_id,
+            }
+        ]
+        response = self.rpc_request("deleteCommunityTokenPermission", params)
+        return response
+
+    def sign_data(self, sign_params: list[dict]):
+        params = [sign_params]
+        response = self.rpc_request("signData", params)
         return response

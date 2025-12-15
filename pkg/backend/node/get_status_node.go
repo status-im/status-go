@@ -403,6 +403,16 @@ func (n *StatusNode) createAndStartTokenManager() error {
 		return err
 	}
 
+	// check for possible custom tokens in the config
+	if len(n.config.WalletConfig.CustomTokens) > 0 {
+		for _, token := range n.config.WalletConfig.CustomTokens {
+			err := n.tokenManager.UpsertCustom(*token)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return n.tokenManager.Start(context.Background())
 }
 

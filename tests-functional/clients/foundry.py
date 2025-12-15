@@ -188,3 +188,35 @@ class Foundry:
                 return os.path.join(temp_dir, tar.getmembers()[0].name)
 
         return temp_dir
+
+    def generate_tokens(self, controller_address, to_address, token_amount, private_key):
+        if not self.container:
+            raise Exception("Container not found")
+
+        generate_cmd = (
+            f"cast send {controller_address} 'generateTokens(address,uint256)' "
+            f"{to_address} {token_amount} --rpc-url http://anvil:8545 "
+            f"--private-key {private_key}"
+        )
+        result = self.container.exec_run(generate_cmd)
+        return result
+
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    def get_erc20_balance(self, token_address, owner_address):
+        if not self.container:
+            raise Exception("Container not found")
+
+        balance_cmd = f"cast call {token_address} 'balanceOf(address)' {owner_address} --rpc-url http://anvil:8545"
+        result = self.container.exec_run(balance_cmd)
+        if result.exit_code != 0:
+            raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
+        return result
+
+    def check_contract_exists(self, address: str) -> bool:
+        if not self.container:
+            return False
+        result = self.container.exec_run(f"cast code {address} --rpc-url http://anvil:8545")
+        if result.exit_code != 0:
+            return False
+        code = result.output.decode().strip().lower()
+        return code != "0x"

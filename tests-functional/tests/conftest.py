@@ -2,10 +2,14 @@ import logging
 from uuid import uuid4
 
 import pytest
+from filelock import FileLock
 from requests import ReadTimeout
+import os
+import json
 
 from clients.anvil import Anvil
 from clients.contract_deployers.multicall3 import Multicall3Deployer
+from clients.contract_deployers.snt import SNTDeployer
 from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
 from resources.constants import USE_IPV6
@@ -158,3 +162,68 @@ def foundry_client():
 @pytest.fixture(scope="session")
 def multicall3_deployer(foundry_client):
     return Multicall3Deployer(foundry_client)
+
+
+@pytest.fixture(scope="session")
+def snt_addresses(foundry_client):
+    logger = logging.getLogger(__name__)
+    addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "snt_addresses.json")
+    lock_path = addresses_file + ".lock"  # Lock file next to JSON
+
+    with FileLock(lock_path, timeout=120):  # Acquire lock (120s timeout for deploy)
+        data = None
+        if os.path.exists(addresses_file):
+            try:
+                with open(addresses_file, "r") as f:
+                    data = json.load(f)
+                # Re-check contracts INSIDE lock (critical for races)
+                if foundry_client.check_contract_exists(data["snt"]) and foundry_client.check_contract_exists(data["controller"]):
+                    logger.info("Using existing SNT deployment addresses")
+                    return data
+                else:
+                    logger.warning("Existing SNT addresses invalid (no code), will redeploy")
+            except (json.JSONDecodeError, KeyError, IOError) as e:
+                logger.warning(f"Failed to load existing addresses: {e}, will redeploy")
+
+        # Deploy (now EXCLUSIVE due to lock)
+        logger.info("Deploying new SNT token...")
+        deployer = SNTDeployer(foundry_client)
+        data = {
+            "snt": deployer.snt_contract_address,
+            "controller": deployer.snt_token_controller_address,
+        }
+        with open(addresses_file, "w") as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
+        return data
+
+
+@pytest.fixture(scope="function")
+def snt_token_overrides(snt_addresses):
+    return [
+        {
+            "symbol": "SNT",
+            "name": "Status Network Token",
+            "address": snt_addresses["snt"],
+            "decimals": 18,
+        }
+    ]
+
+
+@pytest.fixture(scope="function", autouse=False)
+def owner_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+    return backend_new_profile(name="owner", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
+
+
+@pytest.fixture(scope="function", autouse=False)
+def member_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+    return backend_new_profile(name="member", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
+
+
+@pytest.fixture(scope="function", autouse=False)
+def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+    return backend_new_profile(
+        name="member_with_snt",
+        token_overrides=snt_token_overrides,
+        multicall_contract_address=multicall3_deployer.contract_address,
+    )
