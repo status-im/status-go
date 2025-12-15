@@ -60,7 +60,7 @@ class TestWalletActivitySession:
         self.snt_address = snt_addresses["snt"]
         self.snt_controller_address = snt_addresses["controller"]
         self.communities_deployer = CommunitiesDeployer(foundry_client)
-        self.erc20_token_list = {"SNT": self.snt_address}
+        self.erc20_token_list = {ANVIL_NETWORK_ID: self.snt_address}
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
 
         # Create backend
