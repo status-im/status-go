@@ -1128,6 +1128,10 @@ func (m *Messenger) SpectateCommunity(communityID types3.HexBytes) (*MessengerRe
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.SpectateCommunity(communityID)
+	if err == communities.ErrOrgAlreadySpectatedOrJoined {
+		// Nothing to do, return existing community data
+		return nil, nil
+	}
 	if err != nil {
 		logger.Debug("SpectateCommunity error", zap.Error(err))
 		return nil, err
@@ -3483,6 +3487,7 @@ func (m *Messenger) handleSyncInstallationCommunity(ctx context.Context, message
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
 	}
+
 	descriptionOutdated := err == communities.ErrInvalidCommunityDescriptionClockOutdated
 
 	if syncCommunity.Settings != nil {
@@ -3511,12 +3516,20 @@ func (m *Messenger) handleSyncInstallationCommunity(ctx context.Context, message
 	}
 
 	// if we are not waiting for approval, join or leave the community
-	if !pending && !descriptionOutdated {
+	// if the community is spectated, try to spectate it even if description is outdated (probably comes from backup restore)
+	if !pending && (!descriptionOutdated || syncCommunity.Spectated) {
 		var mr *MessengerResponse
 		if syncCommunity.Joined {
 			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id, false)
 			if err != nil && err != communities.ErrOrgAlreadyJoined {
 				logger.Debug("m.joinCommunity error", zap.Error(err))
+				return err
+			}
+		} else if syncCommunity.Spectated {
+			// Spectate community
+			mr, err = m.SpectateCommunity(syncCommunity.Id)
+			if err != nil {
+				logger.Debug("m.spectateCommunity error", zap.Error(err))
 				return err
 			}
 		} else {
@@ -3526,6 +3539,7 @@ func (m *Messenger) handleSyncInstallationCommunity(ctx context.Context, message
 				return err
 			}
 		}
+
 		if mr != nil {
 			err = messageState.Response.Merge(mr)
 			if err != nil {
