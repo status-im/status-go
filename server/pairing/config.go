@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 )

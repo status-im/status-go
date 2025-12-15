@@ -17,8 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/circuitbreaker"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/internal/contracts/ierc1155"
 	"github.com/status-im/status-go/logutils"

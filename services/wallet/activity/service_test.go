@@ -12,8 +12,12 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	mock_pendingtxtracker "github.com/status-im/status-go/services/wallet/pendingtxtracker/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -21,10 +25,6 @@ import (
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 const shouldNotWaitTimeout = 19999 * time.Second

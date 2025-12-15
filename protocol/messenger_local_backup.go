@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/communities"
 	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"

@@ -12,10 +12,10 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/sqlite"
 )
 
 const InvalidTimestamp = int64(-1)

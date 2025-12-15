@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 )

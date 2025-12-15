@@ -9,9 +9,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 )
 
 type Gif struct {

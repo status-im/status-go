@@ -10,8 +10,8 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
 )
 
 const kdfIterationsNumberForTests = 1
@@ -97,13 +97,13 @@ func NewTestDBInitializer(assetSource []*bindata.AssetSource) TestDBInitializer 
 }
 
 func (dbi TestDBInitializer) Initialize(dbPath string, password string, kdfIterations int) (*sql.DB, error) {
-	db, err := sqlite.OpenDB(dbPath, password, kdfIterations)
+	db, err := sqlite2.OpenDB(dbPath, password, kdfIterations)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, as := range dbi.assetSources {
-		err = sqlite.Migrate(db, as, sqlite.MigrateOptions{
+		err = sqlite2.Migrate(db, as, sqlite2.MigrateOptions{
 			MigrationTableName: "status_schema_migrations_" + fmt.Sprintf("%x", uuid.New()),
 		})
 		if err != nil {

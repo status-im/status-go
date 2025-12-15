@@ -32,15 +32,15 @@ import (
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/contracts"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/contacts"
 
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/ens"
@@ -1124,7 +1124,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 		return err
 	}
 
-	if s.ProfilePicturesShowTo == settings.ProfilePicturesShowToNone {
+	if s.ProfilePicturesShowTo == settings2.ProfilePicturesShowToNone {
 		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
 		return nil
 	}
@@ -1164,7 +1164,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 		return fmt.Errorf("unknown ChatIdentity context '%s'", context)
 	}
 
-	if s.ProfilePicturesShowTo == settings.ProfilePicturesShowToContactsOnly {
+	if s.ProfilePicturesShowTo == settings2.ProfilePicturesShowToContactsOnly {
 		err := EncryptIdentityImagesWithContactPubKeys(ci.Images, m)
 		if err != nil {
 			return err
@@ -4519,10 +4519,10 @@ func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*contacts
 	return c, nil
 }
 
-func (m *Messenger) getSettings() (settings.Settings, error) {
+func (m *Messenger) getSettings() (settings2.Settings, error) {
 	sDB, err := accounts.NewDB(m.database)
 	if err != nil {
-		return settings.Settings{}, err
+		return settings2.Settings{}, err
 	}
 	return sDB.GetSettings()
 }

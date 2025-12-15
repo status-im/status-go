@@ -8,8 +8,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"

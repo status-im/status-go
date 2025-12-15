@@ -10,11 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/stretchr/testify/require"
 )
 
 func ptr[T any](v T) *T {

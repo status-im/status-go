@@ -3,7 +3,7 @@ package colorhash
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity"
 )
 

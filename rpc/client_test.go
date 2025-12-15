@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"

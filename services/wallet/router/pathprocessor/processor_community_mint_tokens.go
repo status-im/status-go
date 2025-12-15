@@ -15,13 +15,13 @@ import (
 	communitytokens "github.com/status-im/status-go/internal/contracts/community-tokens"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions"
 )
 
 type CommunityMintTokensProcessor struct {

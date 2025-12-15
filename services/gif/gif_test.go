@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 )

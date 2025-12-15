@@ -18,10 +18,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/internal/connection"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 

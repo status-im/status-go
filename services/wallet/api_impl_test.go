@@ -13,8 +13,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -25,9 +28,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
-
-	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 )

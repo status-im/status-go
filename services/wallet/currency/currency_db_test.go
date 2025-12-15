@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 func setupTestCurrencyDB(t *testing.T) (*DB, func()) {

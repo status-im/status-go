@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"

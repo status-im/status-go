@@ -13,6 +13,7 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	mock_pendingtxtracker "github.com/status-im/status-go/services/wallet/pendingtxtracker/mock"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 type testState struct {

@@ -3,7 +3,7 @@ package chat
 import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol"
 )
 

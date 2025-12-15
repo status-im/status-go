@@ -11,8 +11,8 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/messaging"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -39,18 +39,18 @@ var (
 	DefaultFleet = params.FleetStatusProd
 )
 
-func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
+func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings2.Settings, error) {
 	chatKeyString := derivedAddresses[accscommon.PathEIP1581Chat].PublicKey
 
-	s := &settings.Settings{}
+	s := &settings2.Settings{}
 	logLevel := "INFO"
 	s.LogLevel = &logLevel
-	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToEveryone
-	s.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
+	s.ProfilePicturesShowTo = settings2.ProfilePicturesShowToEveryone
+	s.ProfilePicturesVisibility = settings2.ProfilePicturesVisibilityEveryone
 	s.KeyUID = keyUID
 	s.Address = types.HexToAddress(address)
 	s.WalletRootAddress = types.HexToAddress(derivedAddresses[accscommon.PathWalletRoot].Address)
-	s.URLUnfurlingMode = settings.URLUnfurlingAlwaysAsk
+	s.URLUnfurlingMode = settings2.URLUnfurlingAlwaysAsk
 
 	// Set the chat key and name
 	name, err := alias.GenerateFromPublicKeyString(chatKeyString)

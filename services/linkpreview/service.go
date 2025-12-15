@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/services/linkpreview/unfurlers"
 )
 

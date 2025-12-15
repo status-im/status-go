@@ -30,7 +30,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
-	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/testutils"
 )

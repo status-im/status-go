@@ -9,6 +9,7 @@ import (
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
 
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/messaging/common"
 	messagesendermigrations "github.com/status-im/status-go/messaging/common/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption"
@@ -18,7 +19,6 @@ import (
 	"github.com/status-im/status-go/messaging/layers/transport"
 	transportmigrations "github.com/status-im/status-go/messaging/layers/transport/migrations"
 	wakumigrations "github.com/status-im/status-go/messaging/waku/migrations"
-	"github.com/status-im/status-go/sqlite"
 )
 
 type migrationsMetadata struct {

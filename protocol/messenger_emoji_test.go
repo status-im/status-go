@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"

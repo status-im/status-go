@@ -1,0 +1,92 @@
+package settings
+
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/db/multiaccounts/errors"
+	"github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/protobuf"
+)
+
+func StringFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueString()
+}
+
+func BoolFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueBool()
+}
+
+func BytesFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueBytes()
+}
+
+func Int64FromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {
+	return ss.GetValueInt64()
+}
+
+func BoolHandler(value interface{}) (interface{}, error) {
+	_, ok := value.(bool)
+	if !ok {
+		return value, errors.ErrInvalidConfig
+	}
+
+	return value, nil
+}
+
+func Int64Handler(value interface{}) (interface{}, error) {
+	_, ok := value.(int64)
+	if !ok {
+		return value, errors.ErrInvalidConfig
+	}
+
+	return value, nil
+}
+
+func JSONBlobHandler(value interface{}) (interface{}, error) {
+	return &sqlite.JSONBlob{Data: value}, nil
+}
+
+func AddressHandler(value interface{}) (interface{}, error) {
+	str, ok := value.(string)
+	if ok {
+		value = types.HexToAddress(str)
+	} else {
+		return value, errors.ErrInvalidConfig
+	}
+	return value, nil
+}
+
+func NodeConfigHandler(value interface{}) (interface{}, error) {
+	jsonString, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeConfig := new(params.NodeConfig)
+	err = json.Unmarshal(jsonString, nodeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeConfig, nil
+}
+
+func Float64ToInt64Handler(value interface{}) (interface{}, error) {
+	floatValue, ok := value.(float64)
+	if !ok {
+		// Ignore if not float64
+		return value, nil
+	}
+	return int64(floatValue), nil
+}
+
+func TimeHandler(value interface{}) (interface{}, error) {
+	timeValue, ok := value.(time.Time)
+	if !ok {
+		return value, errors.ErrInvalidConfig
+	}
+	return timeValue, nil
+}

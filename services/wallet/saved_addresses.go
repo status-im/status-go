@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/constants"
-	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
+	multiAccCommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 )
 
 type savedAddressMeta struct {

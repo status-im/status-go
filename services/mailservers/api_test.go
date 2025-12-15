@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/internal/db/appdatabase"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"

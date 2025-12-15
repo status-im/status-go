@@ -6,13 +6,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 func TestKeycardPairingsFile(t *testing.T) {

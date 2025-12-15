@@ -14,9 +14,10 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/messaging"
@@ -28,7 +29,6 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (

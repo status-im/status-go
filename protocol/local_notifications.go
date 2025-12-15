@@ -7,7 +7,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"

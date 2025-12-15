@@ -11,9 +11,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/db/appdatabase"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"

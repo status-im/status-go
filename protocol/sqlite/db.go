@@ -9,8 +9,8 @@ import (
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/messaging"
-	"github.com/status-im/status-go/sqlite"
 )
 
 var migrationsTable = "status_protocol_go_" + sqlcipher.DefaultMigrationsTable

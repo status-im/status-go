@@ -17,11 +17,11 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/healthmanager"
+	abi_spec "github.com/status-im/status-go/internal/abi-spec"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"

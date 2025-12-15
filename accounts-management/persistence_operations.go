@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	multiaccscommon "github.com/status-im/status-go/multiaccounts/common"
+	multiaccscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 )
 
 // CreateKeypairFromMnemonicAndStore creates a keypair with provided `walletAccount` and optionally a chat account if

@@ -11,14 +11,15 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
@@ -29,7 +30,6 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 type testMessengerConfig struct {
@@ -40,7 +40,7 @@ type testMessengerConfig struct {
 	unhandledMessagesTracker *unhandledMessagesTracker
 	messagesOrderController  *MessagesOrderController
 
-	appSettings  *settings.Settings
+	appSettings  *settings2.Settings
 	nodeConfig   *params.NodeConfig
 	extraOptions []Option
 }
@@ -244,11 +244,11 @@ func (u *unhandledMessagesTracker) addMessage(msg *common.StatusMessage, err err
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
 }
 
-func newTestSettings() *settings.Settings {
-	return &settings.Settings{
+func newTestSettings() *settings2.Settings {
+	return &settings2.Settings{
 		DisplayName:               DefaultProfileDisplayName,
 		ProfilePicturesShowTo:     1,
 		ProfilePicturesVisibility: 1,
-		URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
+		URLUnfurlingMode:          settings2.URLUnfurlingAlwaysAsk,
 	}
 }

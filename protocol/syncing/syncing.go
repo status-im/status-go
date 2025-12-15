@@ -10,10 +10,10 @@ import (
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	maErrors "github.com/status-im/status-go/multiaccounts/errors"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	maErrors "github.com/status-im/status-go/internal/db/multiaccounts/errors"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -106,8 +106,8 @@ func HandleSyncWatchOnlyAccount(accountsDB *accounts.Database, message *protobuf
 }
 
 // extractSyncSetting parses incoming *protobuf.SyncSetting and stores the setting data if needed
-func ExtractAndSaveSyncSetting(accountsDB *accounts.Database, logger *zap.Logger, syncSetting *protobuf.SyncSetting) (*settings.SyncSettingField, error) {
-	sf, err := settings.GetFieldFromProtobufType(syncSetting.Type)
+func ExtractAndSaveSyncSetting(accountsDB *accounts.Database, logger *zap.Logger, syncSetting *protobuf.SyncSetting) (*settings2.SyncSettingField, error) {
+	sf, err := settings2.GetFieldFromProtobufType(syncSetting.Type)
 	if err != nil {
 		logger.Error(
 			"extractSyncSetting - settings.GetFieldFromProtobufType",
@@ -142,5 +142,5 @@ func ExtractAndSaveSyncSetting(accountsDB *accounts.Database, logger *zap.Logger
 		value = json.RawMessage(v)
 	}
 
-	return &settings.SyncSettingField{SettingField: sf, Value: value}, nil
+	return &settings2.SyncSettingField{SettingField: sf, Value: value}, nil
 }

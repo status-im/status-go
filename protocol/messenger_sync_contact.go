@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 )

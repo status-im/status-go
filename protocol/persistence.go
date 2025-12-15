@@ -16,8 +16,8 @@ import (
 
 	"github.com/status-im/status-go/images"
 	userimage "github.com/status-im/status-go/images"
+	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/logutils"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
 

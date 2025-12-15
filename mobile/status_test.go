@@ -8,8 +8,8 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/signal"
 )
 

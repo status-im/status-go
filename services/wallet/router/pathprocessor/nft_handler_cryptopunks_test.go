@@ -18,12 +18,12 @@ import (
 
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/contracts/cryptopunks"
+	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	mock_transactor "github.com/status-im/status-go/transactions/mock"
 )
 
 func TestCryptoPunksHandler_Comprehensive(t *testing.T) {

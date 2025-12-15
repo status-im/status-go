@@ -10,8 +10,9 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/appdatabase"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
@@ -19,7 +20,6 @@ import (
 	mock_chainutils "github.com/status-im/status-go/services/connector/chainutils/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 type testState struct {
@@ -61,11 +61,11 @@ func setupTests(t *testing.T) (state testState) {
 		NetworkID: 10,
 	}
 	networks := json.RawMessage("{}")
-	settingsObj := settings.Settings{
+	settingsObj := settings2.Settings{
 		Networks: &networks,
 	}
 
-	settDb, err := settings.MakeNewDB(state.db)
+	settDb, err := settings2.MakeNewDB(state.db)
 	require.NoError(t, err)
 	err = settDb.CreateSettings(settingsObj, config)
 	require.NoError(t, err)

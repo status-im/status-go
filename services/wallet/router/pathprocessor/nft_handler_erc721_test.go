@@ -18,13 +18,13 @@ import (
 
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/contracts/erc721"
+	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	mock_transactor "github.com/status-im/status-go/transactions/mock"
 )
 
 func TestERC721Handler_Comprehensive(t *testing.T) {

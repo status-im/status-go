@@ -10,9 +10,9 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	"github.com/status-im/status-go/internal/db/walletdatabase"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 func TestSaveTokens(t *testing.T) {

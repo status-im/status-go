@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity"
 )
 

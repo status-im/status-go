@@ -6,10 +6,10 @@ import (
 	sq "github.com/Masterminds/squirrel"
 
 	"github.com/status-im/status-go/crypto/types"
+	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/sqlite"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 )
@@ -59,9 +59,9 @@ func (db *DB) GetRouteDataByHash(chainID uint64, txHash types.Hash) (*wallettype
 	return db.GetRouteData(uuid)
 }
 
-func putRouteInputParams(creator sqlite.StatementCreator, p *requests.RouteInputParams) error {
+func putRouteInputParams(creator sqlite2.StatementCreator, p *requests.RouteInputParams) error {
 	q := sq.Replace("route_input_parameters").
-		SetMap(sq.Eq{"route_input_params_json": &sqlite.JSONBlob{Data: p}})
+		SetMap(sq.Eq{"route_input_params_json": &sqlite2.JSONBlob{Data: p}})
 
 	query, args, err := q.ToSql()
 	if err != nil {
@@ -79,7 +79,7 @@ func putRouteInputParams(creator sqlite.StatementCreator, p *requests.RouteInput
 	return err
 }
 
-func putPathsData(creator sqlite.StatementCreator, uuid string, d []*wallettypes.RouterTransactionDetails) error {
+func putPathsData(creator sqlite2.StatementCreator, uuid string, d []*wallettypes.RouterTransactionDetails) error {
 	for i, pathData := range d {
 		if err := putPathData(creator, uuid, i, pathData); err != nil {
 			return err
@@ -88,7 +88,7 @@ func putPathsData(creator sqlite.StatementCreator, uuid string, d []*wallettypes
 	return nil
 }
 
-func putPathData(creator sqlite.StatementCreator, uuid string, pathIdx int, d *wallettypes.RouterTransactionDetails) (err error) {
+func putPathData(creator sqlite2.StatementCreator, uuid string, pathIdx int, d *wallettypes.RouterTransactionDetails) (err error) {
 	err = putPath(creator, uuid, pathIdx, d.RouterPath)
 	if err != nil {
 		return
@@ -122,12 +122,12 @@ func putPathData(creator sqlite.StatementCreator, uuid string, pathIdx int, d *w
 }
 
 func putPath(
-	creator sqlite.StatementCreator,
+	creator sqlite2.StatementCreator,
 	uuid string,
 	pathIdx int,
 	p *routes.Path) error {
 	q := sq.Replace("route_paths").
-		SetMap(sq.Eq{"uuid": uuid, "path_idx": pathIdx, "path_json": &sqlite.JSONBlob{Data: p}})
+		SetMap(sq.Eq{"uuid": uuid, "path_idx": pathIdx, "path_json": &sqlite2.JSONBlob{Data: p}})
 
 	query, args, err := q.ToSql()
 	if err != nil {
@@ -146,7 +146,7 @@ func putPath(
 }
 
 func putPathTransaction(
-	creator sqlite.StatementCreator,
+	creator sqlite2.StatementCreator,
 	uuid string,
 	pathIdx int,
 	isApproval bool,
@@ -160,7 +160,7 @@ func putPathTransaction(
 			"is_approval":  isApproval,
 			"chain_id":     chainID,
 			"tx_hash":      txData.SentHash[:],
-			"tx_args_json": &sqlite.JSONBlob{Data: txData.TxArgs},
+			"tx_args_json": &sqlite2.JSONBlob{Data: txData.TxArgs},
 			"hash_to_sign": txData.HashToSign[:],
 			"sig":          txData.Signature,
 		})
@@ -182,7 +182,7 @@ func putPathTransaction(
 }
 
 func putSentTransaction(
-	creator sqlite.StatementCreator,
+	creator sqlite2.StatementCreator,
 	chainID uint64,
 	txHash types.Hash,
 	tx *ethTypes.Transaction,
@@ -191,7 +191,7 @@ func putSentTransaction(
 		SetMap(sq.Eq{
 			"chain_id": chainID,
 			"tx_hash":  txHash[:],
-			"tx_json":  &sqlite.JSONBlob{Data: tx},
+			"tx_json":  &sqlite2.JSONBlob{Data: tx},
 		})
 
 	query, args, err := q.ToSql()
@@ -210,7 +210,7 @@ func putSentTransaction(
 	return err
 }
 
-func getRouteData(creator sqlite.StatementCreator, uuid string) (*wallettypes.RouteData, error) {
+func getRouteData(creator sqlite2.StatementCreator, uuid string) (*wallettypes.RouteData, error) {
 	routeInputParams, err := getRouteInputParams(creator, uuid)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func getRouteData(creator sqlite.StatementCreator, uuid string) (*wallettypes.Ro
 	}, nil
 }
 
-func getRouteInputParams(creator sqlite.StatementCreator, uuid string) (*requests.RouteInputParams, error) {
+func getRouteInputParams(creator sqlite2.StatementCreator, uuid string) (*requests.RouteInputParams, error) {
 	var p requests.RouteInputParams
 	q := sq.Select("route_input_params_json").
 		From("route_input_parameters").
@@ -244,11 +244,11 @@ func getRouteInputParams(creator sqlite.StatementCreator, uuid string) (*request
 	}
 	defer stmt.Close()
 
-	err = stmt.QueryRow(args...).Scan(&sqlite.JSONBlob{Data: &p})
+	err = stmt.QueryRow(args...).Scan(&sqlite2.JSONBlob{Data: &p})
 	return &p, err
 }
 
-func getPathsData(creator sqlite.StatementCreator, uuid string) ([]*wallettypes.RouterTransactionDetails, error) {
+func getPathsData(creator sqlite2.StatementCreator, uuid string) ([]*wallettypes.RouterTransactionDetails, error) {
 	var pathsData []*wallettypes.RouterTransactionDetails
 
 	paths, err := getPaths(creator, uuid)
@@ -273,7 +273,7 @@ func getPathsData(creator sqlite.StatementCreator, uuid string) ([]*wallettypes.
 	return pathsData, nil
 }
 
-func getPaths(creator sqlite.StatementCreator, uuid string) ([]*routes.Path, error) {
+func getPaths(creator sqlite2.StatementCreator, uuid string) ([]*routes.Path, error) {
 	var paths []*routes.Path
 	q := sq.Select("path_json").
 		From("route_paths").
@@ -299,7 +299,7 @@ func getPaths(creator sqlite.StatementCreator, uuid string) ([]*routes.Path, err
 
 	for rows.Next() {
 		var p routes.Path
-		err = rows.Scan(&sqlite.JSONBlob{Data: &p})
+		err = rows.Scan(&sqlite2.JSONBlob{Data: &p})
 		if err != nil {
 			return nil, err
 		}
@@ -309,7 +309,7 @@ func getPaths(creator sqlite.StatementCreator, uuid string) ([]*routes.Path, err
 	return paths, nil
 }
 
-func getPathTransaction(creator sqlite.StatementCreator, uuid string, pathIdx int, isApproval bool) (*wallettypes.TransactionData, error) {
+func getPathTransaction(creator sqlite2.StatementCreator, uuid string, pathIdx int, isApproval bool) (*wallettypes.TransactionData, error) {
 	q := sq.Select("rpt.tx_args_json", "st.tx_json", "rpt.hash_to_sign", "rpt.sig", "rpt.tx_hash").
 		From("route_path_transactions rpt").
 		LeftJoin(`sent_transactions st ON
@@ -332,8 +332,8 @@ func getPathTransaction(creator sqlite.StatementCreator, uuid string, pathIdx in
 	var hashToSign []byte
 	var sentHash []byte
 	err = stmt.QueryRow(args...).Scan(
-		&sqlite.JSONBlob{Data: &tx.TxArgs},
-		&sqlite.JSONBlob{Data: &tx.Tx},
+		&sqlite2.JSONBlob{Data: &tx.TxArgs},
+		&sqlite2.JSONBlob{Data: &tx.Tx},
 		&hashToSign,
 		&tx.Signature,
 		&sentHash,
@@ -352,7 +352,7 @@ func getPathTransaction(creator sqlite.StatementCreator, uuid string, pathIdx in
 	return tx, nil
 }
 
-func getUuidForTxOnChain(creator sqlite.StatementCreator, chainID uint64, txHash types.Hash) (string, error) {
+func getUuidForTxOnChain(creator sqlite2.StatementCreator, chainID uint64, txHash types.Hash) (string, error) {
 	var uuid string
 	q := sq.Select("uuid").
 		From("route_path_transactions").

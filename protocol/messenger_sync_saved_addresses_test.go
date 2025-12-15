@@ -10,8 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/services/wallet"
 )
 

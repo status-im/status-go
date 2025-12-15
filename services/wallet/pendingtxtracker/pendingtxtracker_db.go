@@ -5,8 +5,8 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
+	"github.com/status-im/status-go/internal/db/sqlite"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
-	"github.com/status-im/status-go/sqlite"
 )
 
 type TrackedTx struct {

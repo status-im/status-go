@@ -6,6 +6,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/contacts"
 	ensservice "github.com/status-im/status-go/services/ens"
 
@@ -14,8 +16,6 @@ import (
 
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"

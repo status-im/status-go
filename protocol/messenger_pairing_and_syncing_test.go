@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
 )

@@ -6,14 +6,14 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/backend"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

@@ -10,6 +10,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
@@ -23,7 +25,6 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/backupsync"
@@ -58,7 +59,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/transactions"
 )
 
 const (

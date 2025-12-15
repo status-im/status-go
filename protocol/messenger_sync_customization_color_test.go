@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/multiaccounts/common"
 )
 
 func TestMessengerAccountCustomizationColor(t *testing.T) {

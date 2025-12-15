@@ -12,6 +12,10 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -27,10 +31,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -2410,7 +2410,7 @@ func (m *Messenger) HandleSyncSetting(ctx context.Context, messageState *Receive
 			if err := m.settings.DeleteMnemonic(); err != nil {
 				return err
 			}
-			messageState.Response.AddSetting(&settings.SyncSettingField{SettingField: settings.Mnemonic})
+			messageState.Response.AddSetting(&settings2.SyncSettingField{SettingField: settings2.Mnemonic})
 		}
 		return nil
 	}
@@ -2697,8 +2697,8 @@ func (m *Messenger) HandleChatIdentity(ctx context.Context, state *ReceivedMessa
 	}
 
 	contact := state.CurrentMessageState.Contact
-	viewFromContacts := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityContactsOnly
-	viewFromNoOne := s.ProfilePicturesVisibility == settings.ProfilePicturesVisibilityNone
+	viewFromContacts := s.ProfilePicturesVisibility == settings2.ProfilePicturesVisibilityContactsOnly
+	viewFromNoOne := s.ProfilePicturesVisibility == settings2.ProfilePicturesVisibilityNone
 
 	m.logger.Debug("settings found",
 		zap.Bool("viewFromContacts", viewFromContacts),
@@ -3168,12 +3168,12 @@ func (m *Messenger) handleProfileKeypairMigration(state *ReceivedMessageState, f
 
 	migrationNeeded := dbKeypair.MigratedToKeycard() && len(message.Keycards) == 0 || // `true` if profile keypair was migrated to the app on one of paired devices
 		!dbKeypair.MigratedToKeycard() && len(message.Keycards) > 0 // `true` if profile keypair was migrated to a Keycard on one of paired devices
-	err = m.settings.SaveSettingField(settings.ProfileMigrationNeeded, migrationNeeded)
+	err = m.settings.SaveSettingField(settings2.ProfileMigrationNeeded, migrationNeeded)
 	if err != nil {
 		return false, err
 	}
 
-	state.Response.AddSetting(&settings.SyncSettingField{SettingField: settings.ProfileMigrationNeeded, Value: migrationNeeded})
+	state.Response.AddSetting(&settings2.SyncSettingField{SettingField: settings2.ProfileMigrationNeeded, Value: migrationNeeded})
 
 	return migrationNeeded, nil
 }
