@@ -2,7 +2,6 @@ package linkpreview
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"net/url"
@@ -237,12 +236,6 @@ func (s *LinkPreviewsTestSuite) Test_GetLinks() {
 	}
 }
 
-func (s *LinkPreviewsTestSuite) readAsset(filename string) []byte {
-	b, err := ioutil.ReadFile("../../_assets/tests/" + filename)
-	s.Require().NoError(err)
-	return b
-}
-
 func (s *LinkPreviewsTestSuite) Test_GetFavicon() {
 	goodHTMLPNG := []byte(
 		`
@@ -473,9 +466,12 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 		},
 	}
 
+	imagePayload, err := os.ReadFile("testdata/IMG_1205.HEIC.jpg")
+	s.Require().NoError(err)
+
 	transport := StubTransport{}
 	// Use a larger image to verify Thumbnail.DataURI is compressed.
-	transport.AddURLMatcher(u, s.readAsset("IMG_1205.HEIC.jpg"), nil)
+	transport.AddURLMatcher(u, imagePayload, nil)
 	stubbedClient := http.Client{Transport: &transport}
 
 	response, err := UnfurlURLs([]string{u}, &stubbedClient, nil, s.logger)
