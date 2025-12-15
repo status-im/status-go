@@ -148,12 +148,12 @@ def login_paired_device(backend: StatusBackend, key_uid, password):
 @pytest.mark.rpc
 class TestLocalPairing(MessengerSteps):
 
-    def test_pairing_server_as_sender(self, backend_new_profile):
+    def test_pairing_server_as_sender(self, backend_new_profile, backend_factory):
         # Create users
         alice = backend_new_profile()
         bob = backend_new_profile()
 
-        bob_second_device = StatusBackend()
+        bob_second_device = backend_factory()
         bob_second_device.init_status_backend()
 
         # Make contacts before local pairing
@@ -229,11 +229,11 @@ class TestLocalPairing(MessengerSteps):
         assert messages_map[message_id2]["text"] == "hello bob"
         assert messages_map[message_id2]["clock"] == clock_2, "Message 2 clock is not right on paired device"
 
-    def test_pairing_server_as_receiver(self, backend_new_profile):
+    def test_pairing_server_as_receiver(self, backend_new_profile, backend_factory):
         # Create users
         alice = backend_new_profile()
         bob = backend_new_profile()
-        bob_second_device = StatusBackend()
+        bob_second_device = backend_factory()
         bob_second_device.init_status_backend()
 
         # Make contacts before local pairing
@@ -273,12 +273,12 @@ class TestLocalPairing(MessengerSteps):
         messages = bob_second_device.wakuext_service.chat_messages(sender_chat_id, limit=10)["messages"]
         assert messages is None, "Messages found on paired device wrongly"
 
-    def test_pairing_three_devices(self, backend_new_profile):
+    def test_pairing_three_devices(self, backend_new_profile, backend_factory):
         # Create users
         bob1 = backend_new_profile()
-        bob2 = StatusBackend()
+        bob2 = backend_factory()
         bob2.init_status_backend()
-        bob3 = StatusBackend()
+        bob3 = backend_factory()
         bob3.init_status_backend()
         user_accepted = backend_new_profile()
         user_pending = backend_new_profile()

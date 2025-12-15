@@ -103,7 +103,7 @@ pipeline {
     failure { script { github.notifyPR(false) } }
     cleanup {
       sh '''
-        docker ps -a --filter "name=status-go-func-tests-${BUILD_ID}" -q | xargs -r docker rm -f
+        docker ps -a --filter "name=status-go-func-tests-${BUILD_TAG}" -q | xargs -r docker rm -f
       '''
       cleanWs()
       dir(env.WORKSPACE_TMP) { deleteDir() }
