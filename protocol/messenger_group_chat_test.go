@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
-	userimage "github.com/status-im/status-go/images"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -265,7 +265,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 	groupChat := s.createGroupChat(admin, "test_group_chat", []string{crypto.PubkeyToHex(&member.identity.PublicKey)})
 	s.verifyGroupChatCreated(member, true)
 
-	response, err := admin.EditGroupChat(context.Background(), groupChat.ID, "test_admin_group", "#FF00FF", userimage.CroppedImage{})
+	response, err := admin.EditGroupChat(context.Background(), groupChat.ID, "test_admin_group", "#FF00FF", images.CroppedImage{})
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Equal("test_admin_group", response.Chats()[0].Name)
@@ -288,7 +288,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 	)
 	s.Require().NoError(err)
 
-	response, err = member.EditGroupChat(context.Background(), groupChat.ID, "test_member_group", "#F0F0F0", userimage.CroppedImage{})
+	response, err = member.EditGroupChat(context.Background(), groupChat.ID, "test_member_group", "#F0F0F0", images.CroppedImage{})
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Equal("test_member_group", response.Chats()[0].Name)

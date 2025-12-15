@@ -16,8 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto"
-	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
@@ -387,7 +387,7 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 		Name:        "with_banner",
 		Description: "community with banner ",
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Banner: userimages.CroppedImage{
+		Banner: images.CroppedImage{
 			ImagePath: tmpTestFilePath,
 			X:         1,
 			Y:         1,
@@ -404,22 +404,25 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)
 	s.Require().Equal(len(community.config.CommunityDescription.Identity.Images), 1)
-	testIdentityImage, isMapContainsKey := community.config.CommunityDescription.Identity.Images[userimages.BannerIdentityName]
+	testIdentityImage, isMapContainsKey := community.config.CommunityDescription.Identity.Images[images.BannerIdentityName]
 	s.Require().True(isMapContainsKey)
 	s.Require().Positive(len(testIdentityImage.Payload))
 }
 
 func (s *ManagerSuite) TestEditCommunity() {
+	image1Path := testutils.SaveFakeImage(s.T(), 8, 8)
+	image2Path := testutils.SaveFakeImage(s.T(), 8, 8)
+
 	//create community
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "status community description",
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-		Image:       "../../_assets/tests/elephant.jpg",
-		ImageAx:     10,
-		ImageAy:     10,
-		ImageBx:     70,
-		ImageBy:     70,
+		Image:       image1Path,
+		ImageAx:     1,
+		ImageAy:     1,
+		ImageBx:     7,
+		ImageBy:     7,
 	}
 
 	community, err := s.manager.CreateCommunity(createRequest, true)
@@ -431,11 +434,11 @@ func (s *ManagerSuite) TestEditCommunity() {
 		CreateCommunity: requests.CreateCommunity{
 			Name:        "statusEdited",
 			Description: "status community description edited",
-			Image:       "../../_assets/tests/status.png",
-			ImageAx:     40,
-			ImageAy:     40,
-			ImageBx:     200,
-			ImageBy:     200,
+			Image:       image2Path,
+			ImageAx:     4,
+			ImageAy:     4,
+			ImageBx:     8,
+			ImageBy:     8,
 		},
 	}
 

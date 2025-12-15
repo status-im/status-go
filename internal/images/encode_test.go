@@ -3,8 +3,11 @@ package images
 import (
 	"bytes"
 	"errors"
+	"os"
 	"testing"
 
+	"github.com/brianvoe/gofakeit/v7"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -112,28 +115,28 @@ func TestGetPayloadFromURI(t *testing.T) {
 }
 
 func TestIsSvg(t *testing.T) {
-	GoodSVG := []byte(`<svg width="300" height="130" xmlns="http://www.w3.org/2000/svg">
+	goodSVG := []byte(`<svg width="300" height="130" xmlns="http://www.w3.org/2000/svg">
 	  <rect width="200" height="100" x="10" y="10" rx="20" ry="20" fill="blue" />
 	  Sorry, your browser does not support inline SVG.  
 	</svg>`)
 
-	BadSVG := []byte(`<head>
+	badSVG := []byte(`<head>
 	<link rel="stylesheet" href="styles.css">
   </head>`)
 
-	require.Equal(t, IsSVG(BadSVG), false)
-	require.Equal(t, IsSVG(GoodSVG), true)
+	require.Equal(t, IsSVG(badSVG), false)
+	require.Equal(t, IsSVG(goodSVG), true)
 }
 
 func TestIsIco(t *testing.T) {
-	GoodICO, err := Asset("_assets/tests/wikipedia.ico")
+	goodICO, err := os.ReadFile("testdata/wikipedia.ico")
 	require.NoError(t, err)
 
-	GoodPNG, err := Asset("_assets/tests/qr/defaultQR.png")
+	goodPNG := gofakeit.ImagePng(32, 32)
 	require.NoError(t, err)
 
-	require.Equal(t, IsIco(GoodICO), true)
-	require.Equal(t, IsIco(GoodPNG), false)
-	require.Equal(t, IsPng(GoodPNG), true)
-	require.Equal(t, IsPng(GoodICO), false)
+	assert.True(t, IsIco(goodICO))
+	assert.False(t, IsIco(goodPNG))
+	assert.True(t, IsPng(goodPNG))
+	assert.False(t, IsPng(goodICO))
 }

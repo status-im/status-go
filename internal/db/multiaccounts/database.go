@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/migrations"
 	"github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 )

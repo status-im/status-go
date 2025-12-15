@@ -2,10 +2,10 @@ package linkpreview
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +14,9 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/linkpreview/unfurlers"
@@ -235,12 +236,6 @@ func (s *LinkPreviewsTestSuite) Test_GetLinks() {
 	}
 }
 
-func (s *LinkPreviewsTestSuite) readAsset(filename string) []byte {
-	b, err := ioutil.ReadFile("../../_assets/tests/" + filename)
-	s.Require().NoError(err)
-	return b
-}
-
 func (s *LinkPreviewsTestSuite) Test_GetFavicon() {
 	goodHTMLPNG := []byte(
 		`
@@ -329,7 +324,10 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 		`, expected.Title, expected.Description, thumbnailURL, favicon)),
 		nil,
 	)
-	transport.AddURLMatcher(thumbnailURL, s.readAsset("1.jpg"), nil)
+	thumbnail, err := os.ReadFile("testdata/1.jpg")
+	s.Require().NoError(err)
+
+	transport.AddURLMatcher(thumbnailURL, thumbnail, nil)
 	stubbedClient := http.Client{Transport: &transport}
 
 	response, err := UnfurlURLs([]string{u}, &stubbedClient, nil, s.logger)
@@ -468,9 +466,12 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 		},
 	}
 
+	imagePayload, err := os.ReadFile("testdata/IMG_1205.HEIC.jpg")
+	s.Require().NoError(err)
+
 	transport := StubTransport{}
 	// Use a larger image to verify Thumbnail.DataURI is compressed.
-	transport.AddURLMatcher(u, s.readAsset("IMG_1205.HEIC.jpg"), nil)
+	transport.AddURLMatcher(u, imagePayload, nil)
 	stubbedClient := http.Client{Transport: &transport}
 
 	response, err := UnfurlURLs([]string{u}, &stubbedClient, nil, s.logger)
@@ -544,9 +545,12 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 }
 
 func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
+	image1Path := testutils.SaveFakeImage(s.T(), 256, 256)
+	image2Path := testutils.SaveFakeImage(s.T(), 160, 90)
+
 	community := t.FakeCommunity(s.T(),
-		t.WithCommunityImage("../../_assets/tests/status.png", 0, 0, 256, 256),        // 256*256 px
-		t.WithCommunityBanner("../../_assets/tests/IMG_1205.HEIC.jpg", 0, 0, 160, 90), // 2282*3352 px
+		t.WithCommunityImage(image1Path, 0, 0, 256, 256), // 256*256 px
+		t.WithCommunityBanner(image2Path, 0, 0, 160, 90), // 2282*3352 px
 	)
 
 	communityImages := community.Images()

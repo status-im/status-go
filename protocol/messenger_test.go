@@ -16,8 +16,8 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -1764,7 +1764,7 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 }
 
 func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, error) {
-	file, err := os.Open("../_assets/tests/test.jpg")
+	file, err := os.Open("common/testdata/test.jpg")
 	if err != nil {
 		return nil, err
 	}

@@ -1,17 +1,18 @@
 import hashlib
 import os
 import tempfile
+from pathlib import Path
+
 import pytest
 import requests
 
+from clients.services.wakuext import CommunityPermissionsAccess
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
 from utils import fake
 from utils.image_utils import ImageCropRect
-from clients.services.wakuext import CommunityPermissionsAccess
 
-
-ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "_assets", "tests")
+ASSETS_DIR = Path(__file__).parent / "assets"
 ELEPHANT = os.path.join(ASSETS_DIR, "elephant.jpg")
 STATUS = os.path.join(ASSETS_DIR, "status.png")
 IMAGE_SIZES = ["large", "thumbnail"]

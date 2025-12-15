@@ -10,13 +10,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/status-im/status-go/images"
+	"github.com/brianvoe/gofakeit/v7"
+
+	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	mc "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/pkg/testutils"
-
-	"github.com/status-im/status-go/crypto"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
@@ -593,7 +594,7 @@ func (s *HandlersSuite) TestHandleAccountInitialsImpl() {
 	s.Require().Equal(expected, accounts[0])
 
 	w := httptest.NewRecorder()
-	f, err := filepath.Abs("../_assets/tests/UbuntuMono-Regular.ttf")
+	f, err := filepath.Abs("testdata/UbuntuMono-Regular.ttf")
 	s.Require().NoError(err)
 	p := ImageParams{
 		Ring:           true,
@@ -639,7 +640,17 @@ func (s *HandlersSuite) TestHandleAccountImagesImpl() {
 		ColorID:            10,
 		KDFIterations:      dbsetup.ReducedKDFIterationsNumber,
 		Timestamp:          1712856359,
-		Images:             images.SampleIdentityImageForQRCode(),
+		Images: []images.IdentityImage{
+			{
+				Name:         images.LargeDimName,
+				Payload:      gofakeit.ImagePng(32, 32),
+				Width:        240,
+				Height:       300,
+				FileSize:     1024,
+				ResizeTarget: 240,
+				Clock:        0,
+			},
+		},
 	}
 	s.Require().NoError(db.SaveAccount(expected))
 	accounts, err := db.GetAccounts()
@@ -648,7 +659,7 @@ func (s *HandlersSuite) TestHandleAccountImagesImpl() {
 	s.Require().Equal(expected, accounts[0])
 
 	w := httptest.NewRecorder()
-	f, err := filepath.Abs("../_assets/tests/UbuntuMono-Regular.ttf")
+	f, err := filepath.Abs("testdata/UbuntuMono-Regular.ttf")
 	s.Require().NoError(err)
 	p := ImageParams{
 		Ring:           true,

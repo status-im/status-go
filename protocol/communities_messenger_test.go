@@ -24,9 +24,9 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/testutils"
@@ -2186,18 +2186,6 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 		Name:        "status",
 		Description: "status community description",
 		Color:       "#FFFFFF",
-		Image:       "../_assets/tests/status.png",
-		ImageAx:     0,
-		ImageAy:     0,
-		ImageBx:     256,
-		ImageBy:     256,
-		Banner: images.CroppedImage{
-			ImagePath: "../_assets/tests/IMG_1205.HEIC.jpg",
-			X:         0,
-			Y:         0,
-			Width:     160,
-			Height:    90,
-		},
 	}
 
 	response, err := s.owner.CreateCommunity(description, true)

@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -664,6 +665,14 @@ func (s *CommunitySuite) TestHandleCommunityDescriptionWithImageChange() {
 	signer := &key.PublicKey
 
 	org := s.buildCommunity(signer)
+
+	payload := gofakeit.ImagePng(10, 10)
+	org.config.CommunityDescription.Identity.Images[images.SmallDimName] = &protobuf.IdentityImage{
+		Payload:     []byte(""),
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: images.GetProtobufImageFormat(payload),
+	}
+
 	org.Join()
 	changes, err := org.UpdateCommunityDescription(s.changedImageCommunityDescription(org), []byte{0x01}, nil)
 	s.Require().NoError(err)
@@ -904,15 +913,6 @@ func (s *CommunitySuite) buildCommunityDescription() *protobuf.CommunityDescript
 	desc.Clock = 1
 	desc.Identity = &protobuf.ChatIdentity{}
 	desc.Identity.Images = make(map[string]*protobuf.IdentityImage)
-	imgs, err := images.GenerateIdentityImages("../../_assets/tests/status.png", 0, 0, 0, 0)
-	s.Require().NoError(err)
-	for _, image := range imgs {
-		desc.Identity.Images[image.Name] = &protobuf.IdentityImage{
-			Payload:     []byte(""),
-			SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
-			ImageFormat: images.GetProtobufImageFormat(image.Payload),
-		}
-	}
 	desc.Members = make(map[string]*protobuf.CommunityMember)
 	desc.Members[s.member1Key] = &protobuf.CommunityMember{}
 	desc.Members[s.member2Key] = &protobuf.CommunityMember{}
@@ -1020,14 +1020,12 @@ func (s *CommunitySuite) removedChatCommunityDescription(org *Community) *protob
 func (s *CommunitySuite) changedImageCommunityDescription(org *Community) *protobuf.CommunityDescription {
 	description := proto.Clone(org.config.CommunityDescription).(*protobuf.CommunityDescription)
 	description.Clock++
-	imgs, err := images.GenerateIdentityImages("../../_assets/tests/elephant.jpg", 0, 0, 5, 5)
-	s.Require().NoError(err)
-	for _, image := range imgs {
-		description.Identity.Images[image.Name] = &protobuf.IdentityImage{
-			Payload:     image.Payload,
-			SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
-			ImageFormat: images.GetProtobufImageFormat(image.Payload),
-		}
+
+	payload := gofakeit.ImagePng(10, 10)
+	description.Identity.Images[images.SmallDimName] = &protobuf.IdentityImage{
+		Payload:     payload,
+		SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageFormat: images.GetProtobufImageFormat(payload),
 	}
 
 	return description

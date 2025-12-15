@@ -6,9 +6,10 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/pkg/testutils"
 )
 
 func TestMessengerContacts(t *testing.T) {
@@ -35,7 +36,7 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 	displayName := "DisplayName_1"
 	bio := "Bio_1"
 	ensName := "EnsName_1.eth"
-	identityImages := images.SampleIdentityImages()
+	identityImages := testutils.SampleIdentityImages()
 
 	identityImagesMap := make(map[string]images.IdentityImage)
 	for _, img := range identityImages {

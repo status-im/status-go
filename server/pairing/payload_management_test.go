@@ -15,9 +15,9 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/pkg/backend"
+	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server/servertest"
 	"github.com/status-im/status-go/t/utils"
@@ -31,7 +31,7 @@ var (
 		KeyUID:        keyUID,
 		ColorHash:     multiaccounts.ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
 		ColorID:       10,
-		Images:        images.SampleIdentityImages(),
+		Images:        testutils.SampleIdentityImages(),
 		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
 	}
 	account1Hash = []byte{0x8f, 0xba, 0x35, 0x1, 0x2b, 0x9d, 0xad, 0xf0, 0x2d, 0x3c, 0x4d, 0x6, 0xb5, 0x22, 0x2, 0x47, 0xd4, 0x1c, 0xf4, 0x31, 0x2f, 0xb, 0x5b, 0x27, 0x5d, 0x43, 0x97, 0x58, 0x2d, 0xf0, 0xe1, 0xbe}

@@ -21,7 +21,7 @@ import (
 	eth_common "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -458,7 +458,6 @@ func (s *MediaServer) handleAccountImages(w http.ResponseWriter, r *http.Request
 func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, parsed ImageParams) {
 	var name = parsed.FullName
 	var accColorHash multiaccounts.ColorHash
-	var account *multiaccounts.Account
 
 	if parsed.Ring && parsed.RingWidth == 0 {
 		logger.Error("handleAccountInitialsImpl: no ringWidth.")
@@ -481,7 +480,9 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	payload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
 
 	if err != nil {
-		logger.Error("handleAccountInitialsImpl: failed to generate initials image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("name", account.Name), zap.Error(err))
+		logger.Error("handleAccountInitialsImpl: failed to generate initials image.",
+			zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)),
+			zap.Error(err))
 		return
 	}
 

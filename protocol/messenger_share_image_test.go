@@ -25,7 +25,7 @@ type MessengerShareMessageSuite struct {
 }
 
 func buildImageMessage(s *MessengerShareMessageSuite, chat Chat) *common.Message {
-	file, err := os.Open("../_assets/tests/test.jpg")
+	file, err := os.Open("common/testdata/test.jpg")
 	s.Require().NoError(err)
 	defer file.Close()
 

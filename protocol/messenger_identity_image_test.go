@@ -14,9 +14,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -66,7 +66,7 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 
 func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) map[string]images.IdentityImage {
 	keyUID := m.IdentityPublicKeyString()
-	iis := images.SampleIdentityImages()
+	iis := testutils.SampleIdentityImages()
 
 	err := m.multiAccounts.StoreIdentityImages(keyUID, iis, false)
 	s.Require().NoError(err)

@@ -14,9 +14,8 @@ import (
 
 	"github.com/mat/besticon/besticon"
 
-	"github.com/status-im/status-go/images"
-	userimage "github.com/status-im/status-go/images"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -147,7 +146,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 
 	var imagePayload []byte
 	if len(chat.Base64Image) > 0 {
-		imagePayload, err = userimage.GetPayloadFromURI(chat.Base64Image)
+		imagePayload, err = images.GetPayloadFromURI(chat.Base64Image)
 		if err != nil {
 			return err
 		}
@@ -376,7 +375,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 		}
 
 		if imagePayload != nil {
-			base64Image, err := userimage.GetPayloadDataURI(imagePayload)
+			base64Image, err := images.GetPayloadDataURI(imagePayload)
 			if err == nil {
 				chat.Base64Image = base64Image
 			}
@@ -538,7 +537,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		}
 
 		if imagePayload != nil {
-			base64Image, err := userimage.GetPayloadDataURI(imagePayload)
+			base64Image, err := images.GetPayloadDataURI(imagePayload)
 			if err == nil {
 				chat.Base64Image = base64Image
 			}
