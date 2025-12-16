@@ -14,8 +14,8 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/t/helpers"
 )
 

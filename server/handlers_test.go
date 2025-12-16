@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	mc "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"

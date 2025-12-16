@@ -10,8 +10,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
-	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/t/helpers"
 )
 

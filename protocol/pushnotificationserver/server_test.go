@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"

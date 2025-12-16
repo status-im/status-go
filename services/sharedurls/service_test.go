@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/pkg/multiformat"
-	"github.com/status-im/status-go/pkg/testutils/fake"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"

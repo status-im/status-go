@@ -11,8 +11,8 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/pkg/testutils"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 )
 

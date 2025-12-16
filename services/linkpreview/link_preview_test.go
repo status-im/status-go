@@ -16,8 +16,8 @@ import (
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/pkg/testutils"
-	"github.com/status-im/status-go/pkg/testutils/fake"
+	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/linkpreview/unfurlers"

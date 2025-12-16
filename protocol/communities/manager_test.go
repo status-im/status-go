@@ -18,10 +18,10 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/images"
+	testutils2 "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/testutils"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -57,7 +57,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	logger := testutils.MustCreateTestLogger()
+	logger := testutils2.MustCreateTestLogger()
 
 	m, err := NewManager(key, "", db, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
@@ -410,8 +410,8 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 }
 
 func (s *ManagerSuite) TestEditCommunity() {
-	image1Path := testutils.SaveFakeImage(s.T(), 8, 8)
-	image2Path := testutils.SaveFakeImage(s.T(), 8, 8)
+	image1Path := testutils2.SaveFakeImage(s.T(), 8, 8)
+	image2Path := testutils2.SaveFakeImage(s.T(), 8, 8)
 
 	//create community
 	createRequest := &requests.CreateCommunity{

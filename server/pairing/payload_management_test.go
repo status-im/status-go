@@ -16,8 +16,8 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/backend"
-	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server/servertest"
 )

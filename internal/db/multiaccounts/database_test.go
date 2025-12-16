@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {

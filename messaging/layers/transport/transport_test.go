@@ -6,8 +6,8 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/transport/migrations"
-	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/t/helpers"
 )
 
