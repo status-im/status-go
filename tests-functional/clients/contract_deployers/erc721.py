@@ -7,13 +7,14 @@ import io
 
 class ERC721Deployer:
 
-    def __init__(self, foundry: Foundry):
+    def __init__(self, foundry: Foundry, total_supply: int = 10):
+        constructor_args = [total_supply]
         erc721_tar = self._create_erc721_tar()
         self.mock_erc721_address = foundry.put_and_deploy(
             data=erc721_tar,
             contract_path="MockERC721.sol",
             contract_name="MockERC721",
-            constructor_args=[],
+            constructor_args=constructor_args,
             private_key=DEPLOYER_ACCOUNT.private_key,
             sender_address=DEPLOYER_ACCOUNT.address,
         )

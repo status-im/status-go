@@ -119,7 +119,8 @@ class Foundry:
             --broadcast"""
         constructor_args = kwargs.get("constructor_args")
         if constructor_args:
-            cmd += f" --constructor-args {constructor_args}"
+            args_str = " ".join(map(str, constructor_args))
+            cmd += f" --constructor-args {args_str}"
 
         logging.info(f"Running command: {cmd}")
         exec_result = self.container.exec_run(
