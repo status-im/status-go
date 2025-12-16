@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/sds-go-bindings/sds"
 	_ "github.com/waku-org/sds-go-bindings/sds"
 
 	mvdsnode "github.com/status-im/mvds/node"
@@ -30,18 +29,15 @@ type Reliability struct {
 	datasync              *datasync.DataSync
 	mvdsPersistence       mvdsnode.Persistence
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
-	sdsManager            *sds.ReliabilityManager
 	logger                *zap.Logger
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, logger *zap.Logger) *Reliability {
-	logger = logger.Named("reliability")
 	return &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		sdsManager:            newSdsReliabilityManager(logger.Named("sds")),
-		logger:                logger,
+		logger:                logger.Named("reliability"),
 	}
 }
 
