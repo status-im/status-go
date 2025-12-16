@@ -1,15 +1,19 @@
 import logging
 import time
 from typing import Optional, List
+from uuid import uuid4
 
 import pytest
 
+from clients.contract_deployers.erc721 import ERC721Deployer
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from clients.signals import SignalType, WalletEventType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
+from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
 from utils import fake
+from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +32,10 @@ def request_to_join_with_signatures(backend: StatusBackend, community_id: str, a
 
     # Send request to join with addresses to reveal and signatures
     return backend.wakuext_service.request_to_join_community(community_id, addresses, signatures)
+
+
+def fake_address():
+    return "0x" + str(uuid4())[:8]
 
 
 @pytest.mark.rpc
@@ -103,6 +111,24 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert balance_result.exit_code == 0, "Balance check command failed"
         balance = int(balance_result.output.decode().strip(), 16)
         assert balance >= min_wei, f"Insufficient SNT balance: {balance}, expected at least 1 token"
+
+    def edit_community(self, owner_backend, community_id):
+        new_name = fake.community_name()
+        new_description = fake.community_description()
+        edit_resp = owner_backend.wakuext_service.edit_community(
+            community_id=community_id,
+            name=new_name,
+            description=new_description,
+        )
+        assert edit_resp is not None
+        return new_name, new_description
+
+    def check_member_community_updated(self, member_backend, community_id: str, expected_name: str, expected_description: str) -> bool:
+        member_communities = member_backend.wakuext_service.communities()
+        member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
+        return bool(
+            member_community and member_community.get("name") == expected_name and member_community.get("description") == expected_description
+        )
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
@@ -260,3 +286,100 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Owner should remain owner only, not changed by token reevaluation
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
+
+    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
+    def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client):
+        """Test that owner edits are visible before and after minting the owner token"""
+
+        # Deploy Mock ERC721 Owner Token
+        owner_accounts = owner_backend.accounts_service.get_accounts()
+        self.owner_address = owner_accounts[0]["address"]
+        self.nft_deployer = ERC721Deployer(foundry_client)
+        self.mock_erc721_address = self.nft_deployer.mock_erc721_address
+
+        # Mint NFT #1 to owner wallet (for owner verification)
+        mint_result = foundry_client.generate_token_erc721(self.mock_erc721_address, self.owner_address, 1, user_1.private_key)
+        assert mint_result.exit_code == 0, f"Failed to mint owner NFT: {mint_result.output.decode()}"
+        logger.info(f"Minted OwnerToken NFT #1 to {self.owner_address}")
+
+        # Owner creates a community
+        community_resp = owner_backend.wakuext_service.create_community(
+            name=fake.community_name(),
+            description=fake.community_description(),
+            membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
+        )
+        community_id = community_resp.get("communities", [{}])[0].get("id")
+
+        # Fetch community as member
+        response = self.fetch_community(member_backend, community_id)
+        assert response, "Community not found"
+
+        permissions_resp = member_backend.wakuext_service.check_permissions_to_join_community(community_id)
+        assert permissions_resp, "Failed to check permissions to join community"
+        assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
+
+        # Member with tokens requests to join community
+        join_resp = member_backend.wakuext_service.request_to_join_community(community_id, [fake_address()])
+        requests = join_resp.get("requestsToJoinCommunity", [])
+        assert requests, "No requests to join community"
+        assert len(requests) == 1, "Unexpected multiple requests to join community"
+
+        req_id = requests[0].get("id")
+        # Wait for member validation
+        owner_backend.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
+            == RequestToJoinState.RequestToJoinStatePending.value,
+        )
+
+        time.sleep(5)
+
+        accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
+        assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
+
+        # Verify member is in community
+        communities = owner_backend.wakuext_service.communities()
+        owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
+        assert owner_community is not None
+        assert member_backend.public_key in owner_community.get("members", {})
+
+        # When the Owner edits the community
+        new_name, new_description = self.edit_community(owner_backend, community_id)
+        logger.info(f"New name: {new_name}, new description2: {new_description}")
+
+        # Then the Member sees the updated community
+        retry_call(self.check_member_community_updated, member_backend, community_id, new_name, new_description)
+
+        # When the Owner mints the owner token
+        # Simulate minting owner token by saving and adding a community token with owner privileges
+        token_data = {
+            "tokenType": 2,  # ERC721
+            "communityId": community_id,
+            "address": self.mock_erc721_address,
+            "chainId": 31337,
+            "name": "Owner Token",
+            "supply": "1",
+            "symbol": "OT",
+            "privilegesLevel": 1,  # Owner level
+        }
+        owner_backend.wakuext_service.save_community_token(token_data)
+        owner_backend.wakuext_service.add_community_token(community_id, 31337, self.mock_erc721_address)
+
+        # And the Owner edits the community again
+        new_name2, new_description2 = self.edit_community(owner_backend, community_id)
+        logger.info(f"New name2: {new_name2}, new description2: {new_description2}")
+
+        # Then the Member sees the updated community
+        retry_call(self.check_member_community_updated, member_backend, community_id, new_name2, new_description2)
+
+        # When the Owner logouts and logs back in
+        owner_backend.logout()
+        owner_backend.login(owner_backend.key_uid, owner_backend.password)
+        owner_backend.wait_for_login()
+        owner_backend.wakuext_service.start_messenger()
+
+        # And the Owner edits the community again
+        new_name3, new_description3 = self.edit_community(owner_backend, community_id)
+
+        # Then the Member sees the updated community
+        retry_call(self.check_member_community_updated, member_backend, community_id, new_name3, new_description3)

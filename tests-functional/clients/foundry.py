@@ -220,3 +220,11 @@ class Foundry:
             return False
         code = result.output.decode().strip().lower()
         return code != "0x"
+
+    def generate_token_erc721(self, erc721_address, to_address, token_id, private_key):
+        if not self.container:
+            raise Exception("Container not found")
+        generate_cmd = (
+            f'cast send {erc721_address} "mint(address,uint256)" {to_address} {token_id} ' f"--rpc-url http://anvil:8545 --private-key {private_key}"
+        )
+        return self.container.exec_run(["/bin/sh", "-c", generate_cmd])
