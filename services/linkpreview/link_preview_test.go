@@ -17,12 +17,12 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/pkg/testutils/fake"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/linkpreview/unfurlers"
 	mock_unfurlers "github.com/status-im/status-go/services/linkpreview/unfurlers/mock"
 	"github.com/status-im/status-go/services/sharedurls"
-	"github.com/status-im/status-go/t"
 )
 
 const (
@@ -492,8 +492,8 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 }
 
 func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
-	publicKey := t.FakePublicKey(s.T())
-	c := t.FakeContact(s.T(), publicKey)
+	publicKey := fake.PublicKey(s.T())
+	c := fake.Contact(s.T(), publicKey)
 
 	payload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
@@ -514,7 +514,7 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	// Provider a different contact with the same ID
 	// This is required to test that URL-decoded data is not used in the preview.
 	// TODO: Also replace image
-	c2 := t.FakeContact(s.T(), publicKey)
+	c2 := fake.Contact(s.T(), publicKey)
 	c2.Images = map[string]images.IdentityImage{
 		images.SmallDimName: icon,
 	}
@@ -548,9 +548,9 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 	image1Path := testutils.SaveFakeImage(s.T(), 256, 256)
 	image2Path := testutils.SaveFakeImage(s.T(), 160, 90)
 
-	community := t.FakeCommunity(s.T(),
-		t.WithCommunityImage(image1Path, 0, 0, 256, 256), // 256*256 px
-		t.WithCommunityBanner(image2Path, 0, 0, 160, 90), // 2282*3352 px
+	community := fake.Community(s.T(),
+		fake.WithCommunityImage(image1Path, 0, 0, 256, 256), // 256*256 px
+		fake.WithCommunityBanner(image2Path, 0, 0, 160, 90), // 2282*3352 px
 	)
 
 	communityImages := community.Images()

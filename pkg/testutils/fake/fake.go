@@ -1,4 +1,4 @@
-package t
+package fake
 
 import (
 	"crypto/ecdsa"
@@ -16,20 +16,20 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 )
 
-func FakePrivateKey(t *testing.T) *ecdsa.PrivateKey {
+func PrivateKey(t *testing.T) *ecdsa.PrivateKey {
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	return privateKey
 }
 
-func FakePublicKey(t *testing.T) *ecdsa.PublicKey {
-	pk := FakePrivateKey(t)
+func PublicKey(t *testing.T) *ecdsa.PublicKey {
+	pk := PrivateKey(t)
 	return &pk.PublicKey
 }
 
-func FakeContact(t *testing.T, key *ecdsa.PublicKey) *contacts.Contact {
+func Contact(t *testing.T, key *ecdsa.PublicKey) *contacts.Contact {
 	if key == nil {
-		key = FakePublicKey(t)
+		key = PublicKey(t)
 	}
 
 	var contact *contacts.Contact
@@ -49,15 +49,15 @@ func (t *timeSourceStub) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
 }
 
-func FakeCommunity(t *testing.T, options ...FakeCommunityOption) *communities.Community {
+func Community(t *testing.T, options ...CommunityOption) *communities.Community {
 	timeSource := timeSourceStub{}
 
 	var config communities.Config
 	err := gofakeit.Struct(&config)
 	require.NoError(t, err)
 
-	memberKey := FakePrivateKey(t)
-	key := FakePrivateKey(t)
+	memberKey := PrivateKey(t)
+	key := PrivateKey(t)
 
 	config.ID = &key.PublicKey
 	config.PrivateKey = key
@@ -89,9 +89,9 @@ func FakeCommunity(t *testing.T, options ...FakeCommunityOption) *communities.Co
 	return community
 }
 
-type FakeCommunityOption func(*requests.CreateCommunity)
+type CommunityOption func(*requests.CreateCommunity)
 
-func WithCommunityImage(path string, ax, ay, bx, by int) FakeCommunityOption {
+func WithCommunityImage(path string, ax, ay, bx, by int) CommunityOption {
 	return func(request *requests.CreateCommunity) {
 		request.Image = path
 		request.ImageAx = ax
@@ -101,7 +101,7 @@ func WithCommunityImage(path string, ax, ay, bx, by int) FakeCommunityOption {
 	}
 }
 
-func WithCommunityBanner(path string, x, y, width, height int) FakeCommunityOption {
+func WithCommunityBanner(path string, x, y, width, height int) CommunityOption {
 	return func(request *requests.CreateCommunity) {
 		request.Banner = images.CroppedImage{
 			ImagePath: path,

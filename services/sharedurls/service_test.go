@@ -9,12 +9,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/pkg/multiformat"
+	"github.com/status-im/status-go/pkg/testutils/fake"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	mock_provider "github.com/status-im/status-go/services/sharedurls/mock"
-	"github.com/status-im/status-go/t"
-
-	"github.com/status-im/status-go/protocol/communities"
 )
 
 const (
@@ -72,13 +71,13 @@ func (s *ShareUrlsSuite) addFakeChannel(community *communities.Community) (*comm
 }
 
 func (s *ShareUrlsSuite) fakeContact() *contacts.Contact {
-	contact := t.FakeContact(s.T(), nil)
+	contact := fake.Contact(s.T(), nil)
 	contact.ENSVerified = true
 	return contact
 }
 
 func (s *ShareUrlsSuite) fakeCommunity() *communities.Community {
-	return t.FakeCommunity(s.T())
+	return fake.Community(s.T())
 }
 
 func (s *ShareUrlsSuite) verifyCommunityURL(url string, community *communities.Community, channel *protobuf.CommunityChat) {
