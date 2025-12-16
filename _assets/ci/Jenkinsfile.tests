@@ -169,7 +169,7 @@ pipeline {
             ]) {
               nix.develop('make test-unit V=1', pure: false)
             }
-            archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
+            archiveArtifacts('report_*.xml, test_*.log, test-coverage.html, exit_code_*.txt')
           }
         }
       } }
@@ -186,7 +186,7 @@ pipeline {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
         if (!isPRJob()) {
-          archiveArtifacts('report_*.xml, test_*.log, test-coverage.html, test-coverage.out')
+          archiveArtifacts('report_*.xml, test_*.log, test-coverage.html, test-coverage.out, exit_code_*.txt')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
           def rerunReports = findFiles(glob: 'report_rerun_fails_*.txt')
