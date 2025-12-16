@@ -167,6 +167,11 @@ func (r *Processor) processMessage(m *types.ReceivedMessage) (*processMessageRes
 		}
 	}
 
+	err = r.processSDSLayer(responseMessage)
+	if err != nil {
+		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
+	}
+
 	messages, ackedMessageIDs, err := r.processReliabilityLayer(responseMessage, logger)
 	if err == nil {
 		span.AddEvent("reliability layer processed")
@@ -319,6 +324,20 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *types.Message
 	}
 
 	return err
+}
+
+func (r *Processor) processSDSLayer(msg *types.Message) error {
+	if len(msg.EncryptionLayer.Payload) <= 0 {
+		return nil
+	}
+
+	unwrappedPayload, err := r.stack.Reliability.UnwrapPayloadFromSDS(msg.EncryptionLayer.Payload)
+	if err != nil {
+		return err
+	}
+
+	msg.EncryptionLayer.Payload = unwrappedPayload
+	return nil
 }
 
 func (r *Processor) ProcessSharedSecrets(secrets []*sharedsecret.Secret) error {

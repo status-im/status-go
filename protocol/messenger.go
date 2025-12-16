@@ -1787,6 +1787,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		}
 
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
+		rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
+		if err != nil {
+			return rawMessage, err
+		}
 		isCommunityEncrypted, err := m.communitiesManager.IsEncrypted(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
@@ -1802,11 +1806,6 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 				return rawMessage, err
 			}
 		} else {
-			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
-			if err != nil {
-				return rawMessage, err
-			}
-
 			if isChannelEncrypted {
 				rawMessage.HashRatchetGroupID = []byte(chat.ID)
 			} else {
