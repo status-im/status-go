@@ -19,11 +19,13 @@ coverage:
       unit-tests:
         target: auto
         threshold: 10%
+        if_not_found: failure
         flags:
           - unit
       functional-tests:
         threshold: 10%
         target: auto
+        if_not_found: failure
         flags:
           - functional
     patch:
