@@ -2050,12 +2050,16 @@ func TestPaymentRequestMessages(t *testing.T) {
 			Symbol:   "ETH",
 			Receiver: "0x123",
 			ChainId:  1,
+			TokenKey: "1-0x0000000000000000000000000000000000000000",
+			LogoUri:  "https://example.com/eth-logo.png",
 		},
 		{
 			Amount:   "1.124",
 			Symbol:   "DAI",
 			Receiver: "0x124",
 			ChainId:  11,
+			TokenKey: "11-0x0000000000000000000000000000000000000001",
+			LogoUri:  "https://example.com/dai-logo.png",
 		},
 	}
 
