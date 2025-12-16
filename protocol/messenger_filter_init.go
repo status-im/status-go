@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/deprecation"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 )
@@ -137,10 +136,6 @@ func (m *Messenger) processChats(wg *sync.WaitGroup, filtersCh chan<- messagingt
 
 	filtersCh <- filters
 	publicKeysCh <- publicKeys
-
-	if err := m.processDeprecatedChats(); err != nil {
-		errCh <- err
-	}
 }
 
 func (m *Messenger) validateChats(chats []*Chat) []*Chat {
@@ -260,20 +255,6 @@ func (m *Messenger) processPrivateGroupChat(chat *Chat) ([]*ecdsa.PublicKey, err
 func (m *Messenger) processDeprecatedChats() error {
 	// Timeline and profile chats are deprecated.
 	// This code can be removed after some reasonable time.
-
-	// upsert timeline chat
-	if !deprecation.ChatProfileDeprecated {
-		if err := m.ensureTimelineChat(); err != nil {
-			return err
-		}
-	}
-
-	// upsert profile chat
-	if !deprecation.ChatTimelineDeprecated {
-		if err := m.ensureMyOwnProfileChat(); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }
