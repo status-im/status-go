@@ -15,3 +15,7 @@ class PushNotificationServer:
         self.container.start_health_monitoring()
 
         assert self.data_dir != ""
+
+    def shutdown(self):
+        if self.container:
+            self.container.shutdown()

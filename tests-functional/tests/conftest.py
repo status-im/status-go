@@ -1,11 +1,11 @@
+import json
 import logging
+import os
 from uuid import uuid4
 
 import pytest
 from filelock import FileLock
 from requests import ReadTimeout
-import os
-import json
 
 from clients.anvil import Anvil
 from clients.contract_deployers.multicall3 import Multicall3Deployer
@@ -64,7 +64,7 @@ def backend_factory(request):
     node = getattr(request, "node", None)
     test_name = getattr(node, "name", f"test-{uuid4()}")
 
-    def factory(name, **kwargs) -> StatusBackend:
+    def factory(name="", **kwargs) -> StatusBackend:
         """
         Create a single backend with the given name.
 
