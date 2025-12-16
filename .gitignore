@@ -117,3 +117,6 @@ pkg/sentry/SENTRY_PRODUCTION
 
 go.work
 go.work.sum
+
+# SNT deployment cache files
+tests-functional/snt_addresses.json*
