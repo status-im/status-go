@@ -2,8 +2,8 @@
 set -o pipefail
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
-source "${GIT_ROOT}/_assets/scripts/colors.sh"
-source "${GIT_ROOT}/_assets/scripts/codecov.sh"
+source "${GIT_ROOT}/scripts/colors.sh"
+source "${GIT_ROOT}/scripts/codecov.sh"
 
 if [[ $UNIT_TEST_RERUN_FAILS == 'true' ]]; then
   GOTESTSUM_EXTRAFLAGS="${GOTESTSUM_EXTRAFLAGS} --rerun-fails"
@@ -62,7 +62,7 @@ run_test_for_packages() {
     gotestsum_flags="${gotestsum_flags} --junitfile=${report_file} --rerun-fails-report=${rerun_report_file}"
   fi
 
-  # Prepare env variables for `test-with-coverage.sh`
+  # Prepare env variables for `test_with_coverage.sh`
   export TEST_WITH_COVERAGE_PACKAGES="${packages}"
   export TEST_WITH_COVERAGE_COUNT="${count}"
   export TEST_WITH_COVERAGE_REPORTS_DIR="$(mktemp -d)"
@@ -72,7 +72,7 @@ run_test_for_packages() {
 
   # Run tests
   gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
-    ./_assets/scripts/test-with-coverage.sh \
+    ./scripts/test_with_coverage.sh \
     ${GOTEST_EXTRAFLAGS} \
     -timeout "${timeout}" \
     -tags "${BUILD_TAGS}" | \
@@ -186,7 +186,7 @@ if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
     if [[ "${exit_code}" -ne 0 ]]; then
       echo -e "${GRN}Generating test stats${RST}, exit code: ${exit_code}"
       mkdir -p "${GIT_ROOT}/reports"
-      "${GIT_ROOT}/_assets/scripts/test_stats.py" | tee "${GIT_ROOT}/reports/test_stats.txt"
+      "${GIT_ROOT}/scripts/test_stats.py" | tee "${GIT_ROOT}/reports/test_stats.txt"
       exit ${exit_code}
     fi
   done

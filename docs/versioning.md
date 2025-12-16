@@ -29,7 +29,7 @@ Version numbers are formatted as `vX.Y.Z` (e.g., `v10.26.0`).
 ## Tagging Versions
 
 1. We use `git` tags to track the version of the library
-2. Run `./_assets/scripts/version.sh` to get the current version
+2. Run `./scripts/version.sh` to get the current version
 3. To create a new version tag:
    - Run `make tag-version` to create a tag for `HEAD`, or
    - Run `make tag-version TARGET_COMMIT={hash}` to create a tag for a specific hash
@@ -63,7 +63,7 @@ Additionally, we have removed generated files from the main repository ([PR #587
 For rare cases where status-go needs to be used as an importable Go module (e.g., by projects such as [matterbridge](https://github.com/status-im/matterbridge)), we provide a workaround:
 
 1. **Create a `generated/{version}` branch:**
-   - Use the script `_assets/scripts/branch_version_generated.sh` to automate the process of creating a branch with generated files
+   - Use the script `scripts/branch_version_generated.sh` to automate the process of creating a branch with generated files
    - This script:
      - Checks out a branch named `generated/{version}` based on the latest tag
      - Un-gitignores generated files

@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-source _assets/scripts/colors.sh
+source scripts/colors.sh
 
 parse_commits() {
 
