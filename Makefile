@@ -539,7 +539,7 @@ migration-wallet:
 install-git-hooks: SHELL := /bin/sh
 install-git-hooks:
 	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
-		$(GIT_ROOT)/_assets/hooks/* $(GIT_ROOT)/.git/hooks
+		$(GIT_ROOT)/githooks/* $(GIT_ROOT)/.git/hooks
 
 -include install-git-hooks
 .PHONY: install-git-hooks
