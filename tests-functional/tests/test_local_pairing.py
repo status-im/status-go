@@ -173,6 +173,9 @@ class TestLocalPairing(MessengerSteps):
         self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id2, clock_2 = message["id"], message["clock"]
 
+        response = bob.wakuext_service.send_emoji_reaction(alice.public_key, message_id2, "1f642")  # 🙂
+        assert response["emojiReactions"][0]["emoji"] == "1f642", "Failed to add emoji reaction to message"
+
         # Wait for the message to be delivered
         bob.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
@@ -228,6 +231,11 @@ class TestLocalPairing(MessengerSteps):
         assert message_id2 in messages_map, "Message 2 sent before pairing not found on paired device"
         assert messages_map[message_id2]["text"] == "hello bob"
         assert messages_map[message_id2]["clock"] == clock_2, "Message 2 clock is not right on paired device"
+
+        # Validate emoji reactions restored on the new client
+        result = bob_second_device.wakuext_service.emoji_reactions_by_chat_id_message_id(alice.public_key, message_id2)
+        assert result is not None, "Emoji reactions for group chat not restored"
+        assert len(result) == 1 and result[0].get("emoji") == "1f642", "Message emoji reaction was not restored correctly"
 
     def test_pairing_server_as_receiver(self, backend_new_profile, backend_factory):
         # Create users
