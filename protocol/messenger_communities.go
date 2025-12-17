@@ -1275,29 +1275,36 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 		return nil, err
 	}
 
-	containsAddress := func(addresses []string, targetAddress string) bool {
-		for _, address := range addresses {
-			if types.HexToAddress(address) == types.HexToAddress(targetAddress) {
-				return true
-			}
-		}
-		return false
+	if len(addressesToReveal) == 0 {
+		return nil, errors.New("no addresses to reveal")
+	}
+
+	walletAccountsMap := make(map[string]*accsmanagementtypes.Account, len(walletAccounts))
+	for _, walletAccount := range walletAccounts {
+		addressHex := strings.ToLower(walletAccount.Address.Hex())
+		walletAccountsMap[addressHex] = walletAccount
 	}
 
 	msgsToSign := make([]personal.SignParams, 0)
-	for _, walletAccount := range walletAccounts {
-		if walletAccount.Chat || walletAccount.Type == accsmanagementtypes.AccountTypeWatch {
-			continue
+	for _, address := range addressesToReveal {
+		walletAccount, ok := walletAccountsMap[strings.ToLower(address)]
+		if !ok {
+			return nil, fmt.Errorf("address %s not found in wallet", address)
 		}
 
-		if len(addressesToReveal) > 0 && !containsAddress(addressesToReveal, walletAccount.Address.Hex()) {
-			continue
+		if walletAccount.Chat {
+			return nil, fmt.Errorf("address %s is a chat account", address)
+		}
+
+		if walletAccount.Type == accsmanagementtypes.AccountTypeWatch {
+			return nil, fmt.Errorf("address %s is a watch account", address)
 		}
 
 		requestID := []byte{}
 		if !isEdit {
 			requestID = communities.CalculateRequestID(memberPubKey, communityID)
 		}
+
 		msgsToSign = append(msgsToSign, personal.SignParams{
 			Data:    types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestID)),
 			Address: walletAccount.Address.Hex(),
@@ -1366,7 +1373,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	// TODO: Because of changes that need to be done in tests, calling this function and providing `request` without `AddressesToReveal`
 	//       is not an error, but it should be.
 	logger := m.logger.Named("RequestToJoinCommunity")
-	logger.Debug("Addresses to reveal", zap.Any("Addresses:", request.AddressesToReveal))
+	logger.Debug("addresses to reveal", zap.Strings("addresses", request.AddressesToReveal))
 
 	ctx, span := m.tracer.Start(context.Background(), "Messenger.RequestToJoinCommunity")
 	defer span.End()
@@ -1386,7 +1393,10 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, communities.ErrAlreadyJoined
 	}
 
-	requestToJoin := m.communitiesManager.CreateRequestToJoin(request, m.account.GetCustomizationColor())
+	requestToJoin, err := m.communitiesManager.CreateRequestToJoin(request, m.account.GetCustomizationColor())
+	if err != nil {
+		return nil, err
+	}
 
 	if len(request.AddressesToReveal) > 0 {
 		revealedAddresses := make([]gethcommon.Address, 0)

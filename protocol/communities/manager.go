@@ -3942,7 +3942,7 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 	return community, requestToJoin, nil
 }
 
-func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, customizationColor multiaccountscommon.CustomizationColor) *RequestToJoin {
+func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, customizationColor multiaccountscommon.CustomizationColor) (*RequestToJoin, error) {
 	clock := uint64(time.Now().Unix())
 	requestToJoin := &RequestToJoin{
 		PublicKey:            crypto.PubkeyToHex(&m.identity.PublicKey),
@@ -3958,21 +3958,20 @@ func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, 
 
 	requestToJoin.CalculateID()
 
-	addSignature := len(request.Signatures) == len(request.AddressesToReveal)
+	if len(request.Signatures) != len(request.AddressesToReveal) {
+		return nil, errors.New("number of signatures does not match number of addresses to reveal")
+	}
+
 	for i := range request.AddressesToReveal {
 		revealedAcc := &protobuf.RevealedAccount{
 			Address:          request.AddressesToReveal[i],
+			Signature:        request.Signatures[i],
 			IsAirdropAddress: types.HexToAddress(request.AddressesToReveal[i]) == types.HexToAddress(request.AirdropAddress),
 		}
-
-		if addSignature {
-			revealedAcc.Signature = request.Signatures[i]
-		}
-
 		requestToJoin.RevealedAccounts = append(requestToJoin.RevealedAccounts, revealedAcc)
 	}
 
-	return requestToJoin
+	return requestToJoin, nil
 }
 
 func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {

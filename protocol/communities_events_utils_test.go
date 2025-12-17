@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -426,8 +426,8 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 
 	joinOnRequestCommunity(s, community.ID(), base.GetControlNode(), base.GetEventSender(), password, accounts)
 
-	accounts = accountsTestData[base.GetEventSender().IdentityPublicKeyString()]
-	password = accountsPasswords[base.GetEventSender().IdentityPublicKeyString()]
+	accounts = accountsTestData[base.GetMember().IdentityPublicKeyString()]
+	password = accountsPasswords[base.GetMember().IdentityPublicKeyString()]
 
 	joinOnRequestCommunity(s, community.ID(), base.GetControlNode(), base.GetMember(), password, accounts)
 

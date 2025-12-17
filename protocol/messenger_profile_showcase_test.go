@@ -36,7 +36,7 @@ type TestMessengerProfileShowcase struct {
 
 func (s *TestMessengerProfileShowcase) SetupTest() {
 	s.CommunitiesMessengerTestSuiteBase.SetupTest()
-	s.m = s.newMessenger("", []string{})
+	s.m = s.newMessenger(alicePassword, []string{aliceAddress1})
 	_, err := s.m.Start()
 	s.Require().NoError(err)
 }
@@ -765,7 +765,12 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGrantUpdate() {
 	grantInvokesProfileDispatchIntervalBackup := grantInvokesProfileDispatchInterval
 	grantInvokesProfileDispatchInterval = 1 * time.Millisecond
+
+	//s.m = s.newMessenger(alicePassword, []string{aliceAddress1})
 	alice := s.m
+	//_, err := alice.Start()
+	//s.Require().NoError(err)
+	//defer TearDownMessenger(&s.Suite, alice)
 
 	// Set Display name to pass shouldPublishChatIdentity check
 	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
@@ -803,7 +808,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	advertiseCommunityTo(&s.Suite, community, owner, bob)
 
 	alice.communitiesManager.PermissionChecker = &testPermissionChecker{}
-	joinCommunity(&s.Suite, community.ID(), owner, alice, aliceAccountAddress, []string{aliceAddress1})
+	joinCommunity(&s.Suite, community.ID(), owner, alice, alicePassword, []string{aliceAddress1})
 
 	joinedCommunities, err := alice.communitiesManager.Joined()
 	s.Require().NoError(err)

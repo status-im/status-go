@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -205,8 +205,8 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
 
-	s.joinCommunity(community, s.alice, alicePassword, []string{})
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2})
+	s.joinCommunity(community, s.bob, bobPassword, []string{bobAddress})
 
 	community, err := s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
@@ -436,7 +436,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestSharedAddressesReturn
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 
-	s.joinCommunity(community, s.alice, alicePassword, []string{})
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2})
 
 	revealedAccounts, err := s.alice.GetRevealedAccounts(community.ID(), crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().NoError(err)

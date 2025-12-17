@@ -26,10 +26,6 @@ func (s *MessengerActivityCenterMessageSuite) advertiseCommunityTo(community *co
 	advertiseCommunityTo(&s.Suite, community, owner, user)
 }
 
-func (s *MessengerActivityCenterMessageSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
-	joinCommunity(&s.Suite, community.ID(), owner, user, accountPassword, []string{commonAccountAddress})
-}
-
 type MessengerActivityCenterMessageSuite struct {
 	CommunitiesMessengerTestSuiteBase
 	m *Messenger // main instance of Messenger
@@ -115,7 +111,7 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 
 	// Alice joins the community
 	s.advertiseCommunityTo(community, bob, alice)
-	s.joinCommunity(community, bob, alice)
+	joinCommunity(&s.Suite, community.ID(), bob, alice, accountPassword, []string{aliceAccountAddress})
 
 	// alice sends a community message
 	inputMessage := common.NewMessage()
@@ -162,7 +158,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 
 	// Alice joins the community
 	s.advertiseCommunityTo(community, bob, alice)
-	s.joinCommunity(community, bob, alice)
+	joinCommunity(&s.Suite, community.ID(), bob, alice, accountPassword, []string{aliceAccountAddress})
 
 	// Alice sends a community message
 	inputMessage := common.NewMessage()
@@ -237,7 +233,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 
 	// Alice joins the community
 	s.advertiseCommunityTo(community, bob, alice)
-	s.joinCommunity(community, bob, alice)
+	joinCommunity(&s.Suite, community.ID(), bob, alice, accountPassword, []string{aliceAccountAddress})
 
 	// Bob mutes the community
 	time, err := bob.MuteAllCommunityChats(&requests.MuteCommunity{
@@ -287,7 +283,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotificat
 
 	// Alice joins the community
 	s.advertiseCommunityTo(community, bob, alice)
-	s.joinCommunity(community, bob, alice)
+	joinCommunity(&s.Suite, community.ID(), bob, alice, accountPassword, []string{aliceAccountAddress})
 
 	// Mark community overview notification read
 	err := alice.DismissActivityCenterNotificationsByCommunity(context.Background(), &requests.DismissCommunityNotifications{CommunityID: community.ID()})
@@ -310,7 +306,7 @@ func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMention
 
 	// Alice joins the community
 	s.advertiseCommunityTo(community, bob, alice)
-	s.joinCommunity(community, bob, alice)
+	joinCommunity(&s.Suite, community.ID(), bob, alice, accountPassword, []string{aliceAccountAddress})
 
 	// Bob sends a mention message
 	mentionMessage := common.NewMessage()
@@ -495,7 +491,7 @@ func (s *MessengerActivityCenterMessageSuite) TestAliceDoesNotReceiveCommunityNo
 
 	// Alice joins the community
 	s.advertiseCommunityTo(community, bob, alice)
-	s.joinCommunity(community, bob, alice)
+	joinCommunity(&s.Suite, community.ID(), bob, alice, accountPassword, []string{aliceAccountAddress})
 
 	// Bob sends an another mention message
 	mentionMessage = common.NewMessage()
