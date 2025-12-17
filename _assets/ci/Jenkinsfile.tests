@@ -225,7 +225,7 @@ pipeline {
   } // post
 } // pipeline
 
-def isNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
+def isNightlyJob() { return true }
 
 def isDevelopJob() { env.JOB_BASE_NAME == 'tests-develop' }
 
