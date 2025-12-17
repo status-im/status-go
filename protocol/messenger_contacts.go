@@ -182,7 +182,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 		return nil, err
 	}
 
-	err = m.syncContactRequestDecision(ctx, request.ID.String(), "", true, m.dispatchMessage)
+	err = m.syncContactRequestDecision(ctx, request.ID.String(), request.ContactID, true, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +190,8 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 	return response, nil
 }
 
-func (m *Messenger) declineContactRequest(requestID, contactID string, fromSyncing bool) (*MessengerResponse, error) {
+func (m *Messenger) declineContactRequest(requestID, contactID string) (*MessengerResponse, error) {
 	m.logger.Info("declineContactRequest")
-
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	if err != nil {
 		return nil, err
@@ -213,20 +212,18 @@ func (m *Messenger) declineContactRequest(requestID, contactID string, fromSynci
 		response.AddMessage(contactRequest)
 	}
 
-	if !fromSyncing {
-		_, clock, err := m.getOneToOneAndNextClock(contact)
-		if err != nil {
-			return nil, err
-		}
-
-		contact.DismissContactRequest(clock)
-		err = m.persistence.SaveContact(contact, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		response.AddContact(contact)
+	_, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return nil, err
 	}
+
+	contact.DismissContactRequest(clock)
+	err = m.persistence.SaveContact(contact, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddContact(contact)
 
 	// update notification with the correct status
 	notification, err := m.persistence.GetActivityCenterNotificationByID(types2.FromHex(contactRequest.ID))
@@ -255,12 +252,12 @@ func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests
 		return nil, err
 	}
 
-	response, err := m.declineContactRequest(request.ID.String(), request.ContactID, false)
+	response, err := m.declineContactRequest(request.ID.String(), request.ContactID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.syncContactRequestDecision(ctx, request.ID.String(), "", false, m.dispatchMessage)
+	err = m.syncContactRequestDecision(ctx, request.ID.String(), request.ContactID, false, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}

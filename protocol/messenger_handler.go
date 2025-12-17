@@ -3446,7 +3446,7 @@ func (m *Messenger) HandleSyncContactRequestDecision(ctx context.Context, state 
 	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
 		response, err = m.updateAcceptedContactRequest(nil, message.RequestId, message.ContactId, true)
 	} else {
-		response, err = m.declineContactRequest(message.RequestId, message.ContactId, true)
+		response, err = m.declineContactRequest(message.RequestId, message.ContactId)
 	}
 	if err != nil {
 		return err
