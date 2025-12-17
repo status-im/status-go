@@ -11,10 +11,10 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	rpc2 "github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/backend"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/network"
 	alchemymanager "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -35,18 +35,18 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	err = networkManager.InitEmbeddedNetworks(defaultNetworks)
 	require.NoError(t, err)
 
-	config := rpc.ClientConfig{
+	config := rpc2.ClientConfig{
 		Networks: defaultNetworks,
 		DB:       appDB,
 	}
-	rpcClient, err := rpc.NewClient(config)
+	rpcClient, err := rpc2.NewClient(config)
 	require.NoError(t, err)
 
 	ctx := context.Background()
 	rpcClient.Start(ctx)
 	t.Cleanup(func() { rpcClient.Stop() })
 
-	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
+	alchemyEthClientGetter := rpc2.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
 
 	alchemyClient := alchemy.NewClient(alchemyEthClientGetter)
 	alchemyPersistence := alchemy.NewPersistence(walletDB)

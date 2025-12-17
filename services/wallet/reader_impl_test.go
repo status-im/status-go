@@ -18,8 +18,8 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock/storage"

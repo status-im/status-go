@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"

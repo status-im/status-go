@@ -2,14 +2,15 @@ package communitytokens
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/internal/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/internal/contracts/community-tokens/registry"
+	"github.com/status-im/status-go/internal/rpc"
 
 	"github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/mastertoken"
-	"github.com/status-im/status-go/rpc"
 )
 
 type CommunityTokensContractMaker struct {

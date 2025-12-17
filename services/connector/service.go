@@ -13,7 +13,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/services/connector/chainutils"
 )
 

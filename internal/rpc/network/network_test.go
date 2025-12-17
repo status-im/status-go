@@ -7,13 +7,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/rpc/network"
+	"github.com/status-im/status-go/internal/rpc/network/db"
+	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/rpc/network/db"
-	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/services/wallet/common"
 )
 

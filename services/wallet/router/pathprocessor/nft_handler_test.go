@@ -13,8 +13,8 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	types2 "github.com/status-im/status-go/internal/crypto/types"
+	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/wallettypes"

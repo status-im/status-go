@@ -23,21 +23,21 @@ import (
 	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	ethclient2 "github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/rpcstats"
 
 	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 )
 
 type ClientInterface interface {
-	ethclient.EthClientInterface
+	ethclient2.EthClientInterface
 	NetworkID() uint64
-	GetProviderClient(provider string) ethclient.EthClientInterface
+	GetProviderClient(provider string) ethclient2.EthClientInterface
 }
 
 type ClientWithFallback struct {
 	ChainID                uint64
-	ethClients             []ethclient.RPSLimitedEthClientInterface
+	ethClients             []ethclient2.RPSLimitedEthClientInterface
 	circuitbreaker         *circuitbreaker.CircuitBreaker
 	providersHealthManager *healthmanager.ProvidersHealthManager
 
@@ -66,7 +66,7 @@ var propagateErrors = []error{
 	bind.ErrNoCode,
 }
 
-func NewClient(ethClients []ethclient.RPSLimitedEthClientInterface, chainID uint64, providersHealthManager *healthmanager.ProvidersHealthManager) *ClientWithFallback {
+func NewClient(ethClients []ethclient2.RPSLimitedEthClientInterface, chainID uint64, providersHealthManager *healthmanager.ProvidersHealthManager) *ClientWithFallback {
 	cbConfig := circuitbreaker.Config{
 		Timeout:               20000,
 		MaxConcurrentRequests: 100,
@@ -170,14 +170,14 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 
 type MakeCallFunctor struct {
 	MethodName string
-	Func       func(client ethclient.EthClientInterface) (interface{}, error)
+	Func       func(client ethclient2.EthClientInterface) (interface{}, error)
 }
 
 func (c *ClientWithFallback) EthGetBlockByHashWithFullTxs(ctx context.Context, hash common.Hash) (*sdkethclient.BlockWithFullTxs, error) {
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_GetBlockByHashWithFullTxs",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.EthGetBlockByHashWithFullTxs(ctx, hash)
 			},
 		},
@@ -193,7 +193,7 @@ func (c *ClientWithFallback) EthGetBlockByNumberWithFullTxs(ctx context.Context,
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_EthGetBlockByNumberWithFullTxs",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.EthGetBlockByNumberWithFullTxs(ctx, number)
 			},
 		},
@@ -209,7 +209,7 @@ func (c *ClientWithFallback) BlockNumber(ctx context.Context) (uint64, error) {
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BlockNumber",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.BlockNumber(ctx)
 			},
 		},
@@ -225,7 +225,7 @@ func (c *ClientWithFallback) HeaderByNumber(ctx context.Context, number *big.Int
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_HeaderByNumber",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.HeaderByNumber(ctx, number)
 			},
 		},
@@ -241,7 +241,7 @@ func (c *ClientWithFallback) EthGetBlockByHashWithTxHashes(ctx context.Context, 
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_HeaderByHash",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.EthGetBlockByHashWithTxHashes(ctx, hash)
 			},
 		},
@@ -257,7 +257,7 @@ func (c *ClientWithFallback) EthGetBlockByNumberWithTxHashes(ctx context.Context
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_HeaderByNumber",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.EthGetBlockByNumberWithTxHashes(ctx, number)
 			},
 		},
@@ -273,7 +273,7 @@ func (c *ClientWithFallback) EthGetTransactionByHash(ctx context.Context, hash c
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_TransactionByHash",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				tx, err := client.EthGetTransactionByHash(ctx, hash)
 				return []any{tx}, err
 			},
@@ -291,7 +291,7 @@ func (c *ClientWithFallback) EthGetTransactionReceipt(ctx context.Context, txHas
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_GetTransactionReceipt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.EthGetTransactionReceipt(ctx, txHash)
 			},
 		},
@@ -307,7 +307,7 @@ func (c *ClientWithFallback) SyncProgress(ctx context.Context) (*ethereum.SyncPr
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SyncProgress",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.SyncProgress(ctx)
 			},
 		},
@@ -327,7 +327,7 @@ func (c *ClientWithFallback) BalanceAt(ctx context.Context, account common.Addre
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BalanceAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.BalanceAt(ctx, account, blockNumber)
 			},
 		},
@@ -343,7 +343,7 @@ func (c *ClientWithFallback) StorageAt(ctx context.Context, account common.Addre
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_StorageAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.StorageAt(ctx, account, key, blockNumber)
 			},
 		},
@@ -359,7 +359,7 @@ func (c *ClientWithFallback) CodeAt(ctx context.Context, account common.Address,
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_CodeAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.CodeAt(ctx, account, blockNumber)
 			},
 		},
@@ -375,7 +375,7 @@ func (c *ClientWithFallback) NonceAt(ctx context.Context, account common.Address
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_NonceAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.NonceAt(ctx, account, blockNumber)
 			},
 		},
@@ -389,7 +389,7 @@ func (c *ClientWithFallback) NonceAt(ctx context.Context, account common.Address
 
 func (c *ClientWithFallback) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
 	// Override providers name to use a separate circuit for this command as it more often fails due to rate limiting
-	ethClients := make([]ethclient.RPSLimitedEthClientInterface, len(c.ethClients))
+	ethClients := make([]ethclient2.RPSLimitedEthClientInterface, len(c.ethClients))
 	for i, client := range c.ethClients {
 		ethClients[i] = client.CopyWithCircuitName(client.GetCircuitName() + "_FilterLogs")
 	}
@@ -397,7 +397,7 @@ func (c *ClientWithFallback) FilterLogs(ctx context.Context, q ethereum.FilterQu
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_FilterLogs",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.FilterLogs(ctx, q)
 			},
 		},
@@ -417,7 +417,7 @@ func (c *ClientWithFallback) SubscribeFilterLogs(ctx context.Context, q ethereum
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SubscribeFilterLogs",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.SubscribeFilterLogs(ctx, q, ch)
 			},
 		},
@@ -433,7 +433,7 @@ func (c *ClientWithFallback) PendingBalanceAt(ctx context.Context, account commo
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingBalanceAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.PendingBalanceAt(ctx, account)
 			},
 		},
@@ -449,7 +449,7 @@ func (c *ClientWithFallback) PendingStorageAt(ctx context.Context, account commo
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingStorageAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.PendingStorageAt(ctx, account, key)
 			},
 		},
@@ -465,7 +465,7 @@ func (c *ClientWithFallback) PendingCodeAt(ctx context.Context, account common.A
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingCodeAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.PendingCodeAt(ctx, account)
 			},
 		},
@@ -481,7 +481,7 @@ func (c *ClientWithFallback) PendingNonceAt(ctx context.Context, account common.
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingNonceAt",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.PendingNonceAt(ctx, account)
 			},
 		},
@@ -497,7 +497,7 @@ func (c *ClientWithFallback) PendingTransactionCount(ctx context.Context) (uint,
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingTransactionCount",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.PendingTransactionCount(ctx)
 			},
 		},
@@ -513,7 +513,7 @@ func (c *ClientWithFallback) CallContract(ctx context.Context, msg ethereum.Call
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_CallContract",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.CallContract(ctx, msg, blockNumber)
 			},
 		},
@@ -529,7 +529,7 @@ func (c *ClientWithFallback) PendingCallContract(ctx context.Context, msg ethere
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_PendingCallContract",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.PendingCallContract(ctx, msg)
 			},
 		},
@@ -545,7 +545,7 @@ func (c *ClientWithFallback) SuggestGasPrice(ctx context.Context) (*big.Int, err
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SuggestGasPrice",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.SuggestGasPrice(ctx)
 			},
 		},
@@ -561,7 +561,7 @@ func (c *ClientWithFallback) SuggestGasTipCap(ctx context.Context) (*big.Int, er
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SuggestGasTipCap",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.SuggestGasTipCap(ctx)
 			},
 		},
@@ -577,7 +577,7 @@ func (c *ClientWithFallback) FeeHistory(ctx context.Context, blockCount uint64, 
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_FeeHistory",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
 			},
 		},
@@ -593,7 +593,7 @@ func (c *ClientWithFallback) EstimateGas(ctx context.Context, msg ethereum.CallM
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_EstimateGas",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.EstimateGas(ctx, msg)
 			},
 		},
@@ -609,7 +609,7 @@ func (c *ClientWithFallback) LineaEstimateGas(ctx context.Context, msg ethereum.
 	res, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "linea_estimateGas",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return client.LineaEstimateGas(ctx, msg)
 			},
 		},
@@ -625,7 +625,7 @@ func (c *ClientWithFallback) SendTransaction(ctx context.Context, tx *types.Tran
 	_, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_SendTransaction",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return nil, client.SendTransaction(ctx, tx)
 			},
 		},
@@ -637,7 +637,7 @@ func (c *ClientWithFallback) CallContext(ctx context.Context, result interface{}
 	_, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_CallContext",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return nil, client.CallContext(ctx, result, method, args...)
 			},
 		},
@@ -649,7 +649,7 @@ func (c *ClientWithFallback) BatchCallContext(ctx context.Context, b []rpc.Batch
 	_, err := c.makeCall(
 		ctx, MakeCallFunctor{
 			MethodName: "eth_BatchCallContext",
-			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+			Func: func(client ethclient2.EthClientInterface) (interface{}, error) {
 				return nil, client.BatchCallContext(ctx, b)
 			},
 		},
@@ -671,7 +671,7 @@ func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus, met
 }
 
 // Returns provider instance with a specific provider name
-func (c *ClientWithFallback) GetProviderClient(provider string) ethclient.EthClientInterface {
+func (c *ClientWithFallback) GetProviderClient(provider string) ethclient2.EthClientInterface {
 	for _, client := range c.ethClients {
 		if client.GetProviderName() == provider {
 			return client

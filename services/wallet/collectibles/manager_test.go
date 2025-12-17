@@ -13,8 +13,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
+	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	mock_collectibles "github.com/status-im/status-go/services/wallet/collectibles/mock"
 	mock_ownership "github.com/status-im/status-go/services/wallet/collectibles/ownership/mock"
 	mock_community "github.com/status-im/status-go/services/wallet/community/mock"

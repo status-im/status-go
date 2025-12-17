@@ -12,7 +12,8 @@ import (
 
 	healthmanager2 "github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
-	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
+	ethclient2 "github.com/status-im/status-go/internal/rpc/chain/ethclient"
+	mockEthclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -20,8 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"go.uber.org/mock/gomock"
-
-	"github.com/status-im/status-go/rpc/chain/ethclient"
 )
 
 type BlockchainHealthSuite struct {
@@ -54,12 +53,12 @@ func (s *BlockchainHealthSuite) setupClients(chainIDs []uint64) {
 		mockEthClient.EXPECT().GetProviderName().AnyTimes().Return(fmt.Sprintf("test_client_chain_%d_provider", chainID))
 		mockEthClient.EXPECT().GetCircuitName().AnyTimes().Return(fmt.Sprintf("test_client_chain_%d_circuit", chainID))
 		mockEthClient.EXPECT().GetLimiter().AnyTimes().Return(nil)
-		mockEthClient.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient.EthClientInterface) (interface{}, error)) (interface{}, error) {
+		mockEthClient.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient2.EthClientInterface) (interface{}, error)) (interface{}, error) {
 			return f(mockEthClient)
 		}).AnyTimes()
 
 		phm := healthmanager2.NewProvidersHealthManager(chainID)
-		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
+		client := NewClient([]ethclient2.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
 
 		err := s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)
 		require.NoError(s.T(), err)

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/status-im/status-go/internal/healthmanager/provider_errors"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 )
 
 func TestNewRpcProviderStatus(t *testing.T) {

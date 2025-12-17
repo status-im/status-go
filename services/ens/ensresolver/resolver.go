@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/contracts/resolver"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/internal/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 

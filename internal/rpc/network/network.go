@@ -11,11 +11,10 @@ import (
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
+	db2 "github.com/status-im/status-go/internal/rpc/network/db"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
-
-	persistence "github.com/status-im/status-go/rpc/network/db"
 )
 
 //go:generate go tool mockgen -package=mock -source=network.go -destination=mock/network.go
@@ -54,7 +53,7 @@ type CombinedNetwork struct {
 type Manager struct {
 	db                 *sql.DB
 	accountsDB         *accounts.Database
-	networkPersistence persistence.NetworksPersistenceInterface
+	networkPersistence db2.NetworksPersistenceInterface
 	embeddedNetworks   []params.Network
 
 	accountsPublisher *pubsub.Publisher
@@ -77,7 +76,7 @@ func NewManager(db *sql.DB, accountsPublisher *pubsub.Publisher) *Manager {
 	return &Manager{
 		db:                 db,
 		accountsDB:         accountsDB,
-		networkPersistence: persistence.NewNetworksPersistence(db),
+		networkPersistence: db2.NewNetworksPersistence(db),
 		accountsPublisher:  accountsPublisher,
 		networksPublisher:  pubsub.NewPublisher(),
 		logger:             logger,
@@ -147,9 +146,9 @@ func (nm *Manager) InitEmbeddedNetworks(embeddedNetworks []params.Network) error
 	nm.embeddedNetworks = embeddedNetworks
 
 	// Begin a transaction
-	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+	return db2.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
 		// Create temporary persistence instances with the transaction
-		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
+		txNetworksPersistence := db2.NewNetworksPersistence(tx)
 
 		currentNetworks, err := txNetworksPersistence.GetAllNetworks()
 		if err != nil {
@@ -220,8 +219,8 @@ func (nm *Manager) Upsert(network *params.Network) error {
 	network.IsActive = false
 	network.IsDeactivatable = true
 
-	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
-		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
+	return db2.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+		txNetworksPersistence := db2.NewNetworksPersistence(tx)
 		err := txNetworksPersistence.UpsertNetwork(nm.networkWithoutEmbeddedProviders(network))
 		if err != nil {
 			return errors.CreateErrorResponseFromError(fmt.Errorf("failed to upsert network: %w", err))
@@ -232,8 +231,8 @@ func (nm *Manager) Upsert(network *params.Network) error {
 
 // Delete removes a network by ChainID, wrapped in a transaction.
 func (nm *Manager) Delete(chainID uint64) error {
-	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
-		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
+	return db2.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+		txNetworksPersistence := db2.NewNetworksPersistence(tx)
 		err := txNetworksPersistence.DeleteNetwork(chainID)
 		if err != nil {
 			return errors.CreateErrorResponseFromError(fmt.Errorf("failed to delete network: %w", err))

@@ -19,6 +19,7 @@ import (
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	messaging2 "github.com/status-im/status-go/pkg/messaging"
@@ -26,7 +27,6 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet/token"
 )

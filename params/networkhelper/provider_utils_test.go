@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/rpc/network/testutil"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 

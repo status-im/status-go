@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 )
 
 // RPSLimitedEthClientInterface extends EthClientInterface with additional

@@ -1,6 +1,8 @@
 package rpc
 
-import "github.com/status-im/status-go/rpc/chain/ethclient"
+import (
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
+)
 
 type ProviderChainClientGetter struct {
 	provider string

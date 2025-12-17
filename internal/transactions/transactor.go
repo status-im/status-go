@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"

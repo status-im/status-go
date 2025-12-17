@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	types2 "github.com/status-im/status-go/internal/crypto/types"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

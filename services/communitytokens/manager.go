@@ -17,10 +17,10 @@ import (
 	communityownertokenregistry "github.com/status-im/status-go/internal/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/rpc"
 
 	communitytokendeployer2 "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/requests"
 )
