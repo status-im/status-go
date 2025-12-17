@@ -2285,8 +2285,6 @@ github.com/status-im/go-wallet-sdk v0.0.0-20251128124044-df18aa5cfd60 h1:h3Yzafo
 github.com/status-im/go-wallet-sdk v0.0.0-20251128124044-df18aa5cfd60/go.mod h1:6zJF+lF5y88viQAtALL4FrPcZYR8dAeR/kNOPXwlY/o=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4/go.mod h1:hmpnZzkzSZJbFYWAUkrPV8I36x7mdYiPhPqnALP4fKA=
-github.com/status-im/goroutine-defer-guard v0.3.0 h1:NcTYRVOV8UNyNKFdew9VxVv8v641j/v3LZM3sRU8CTI=
-github.com/status-im/goroutine-defer-guard v0.3.0/go.mod h1:HwUfqi1wF8tg8OEEEYKlJuJwsgNNlu5Kq5SzE1DNe3k=
 github.com/status-im/goroutine-defer-guard v0.3.1 h1:cZhcJ3gO6OgMYBOfEaAAUZaZgKZeSzMlGNEjMyejuRo=
 github.com/status-im/goroutine-defer-guard v0.3.1/go.mod h1:HwUfqi1wF8tg8OEEEYKlJuJwsgNNlu5Kq5SzE1DNe3k=
 github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d h1:0jQiaymp0t7XwC45c08/cYpjFDxFSMTE6VznZ03Jktg=
