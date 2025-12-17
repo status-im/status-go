@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	testutils2 "github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
@@ -63,7 +64,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 		highClock = 10
 	)
 
-	iis := testutils2.SampleIdentityImages()
+	iis := fake.IdentityImages()
 	for i := range iis {
 		iis[i].Clock = highClock
 	}
@@ -100,7 +101,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	for i := range iis {
 		iis[i].Clock = lowClock
 	}
-	iis2 := testutils2.SampleIdentityImages()
+	iis2 := fake.IdentityImages()
 	for i := range iis2 {
 		iis2[i].Name = fmt.Sprintf("newimg%d", i)
 		iis2[i].Clock = highClock

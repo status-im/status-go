@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/images"
 	testutils2 "github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
@@ -410,8 +411,10 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 }
 
 func (s *ManagerSuite) TestEditCommunity() {
-	image1Path := testutils2.SaveFakeImage(s.T(), 8, 8)
-	image2Path := testutils2.SaveFakeImage(s.T(), 8, 8)
+	image1Path, err := fake.SaveImage(s.T().TempDir(), 8, 8)
+	s.Require().NoError(err)
+	image2Path, err := fake.SaveImage(s.T().TempDir(), 8, 8)
+	s.Require().NoError(err)
 
 	//create community
 	createRequest := &requests.CreateCommunity{

@@ -10,15 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/linkpreview/unfurlers"
 	mock_unfurlers "github.com/status-im/status-go/services/linkpreview/unfurlers/mock"
@@ -492,8 +493,15 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 }
 
 func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
-	publicKey := fake.PublicKey(s.T())
-	c := fake.Contact(s.T(), publicKey)
+	//publicKey := fake.PublicKey(s.T())
+	//c := fake.Contact(s.T(), publicKey)
+
+	var c contacts.Contact
+	err := gofakeit.Struct(&c)
+	s.Require().NoError(err)
+
+	publicKey, err := c.PublicKey()
+	s.Require().NoError(err)
 
 	payload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
@@ -508,19 +516,22 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	}
 
 	// Generate a shared URL
-	u, err := sharedurls.ShareUserURLWithData(c)
+	u, err := sharedurls.ShareUserURLWithData(&c)
 	s.Require().NoError(err)
 
 	// Provider a different contact with the same ID
 	// This is required to test that URL-decoded data is not used in the preview.
-	// TODO: Also replace image
-	c2 := fake.Contact(s.T(), publicKey)
+	c2 := contacts.Contact{}
+	err = gofakeit.Struct(&c2)
+	s.Require().NoError(err)
+
+	c2.ID = contacts.ContactIDFromPublicKey(publicKey)
 	c2.Images = map[string]images.IdentityImage{
 		images.SmallDimName: icon,
 	}
 
 	dataProvider := mock_unfurlers.NewMockStatusDataProvider(s.ctrl)
-	dataProvider.EXPECT().GetContactByID(gomock.Eq(c2.ID)).Return(c2, nil).Times(1)
+	dataProvider.EXPECT().GetContactByID(gomock.Eq(c2.ID)).Return(&c2, nil).Times(1)
 
 	r, err := UnfurlURLs([]string{u}, nil, dataProvider, s.logger)
 	s.Require().NoError(err)
@@ -545,13 +556,9 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 }
 
 func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
-	image1Path := testutils.SaveFakeImage(s.T(), 256, 256)
-	image2Path := testutils.SaveFakeImage(s.T(), 160, 90)
-
-	community := fake.Community(s.T(),
-		fake.WithCommunityImage(image1Path, 0, 0, 256, 256), // 256*256 px
-		fake.WithCommunityBanner(image2Path, 0, 0, 160, 90), // 2282*3352 px
-	)
+	var community communities.Community
+	err := gofakeit.Struct(&community)
+	s.Require().NoError(err)
 
 	communityImages := community.Images()
 	s.Require().Len(communityImages, 3)
@@ -573,13 +580,13 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 	s.Require().NoError(err)
 
 	// Create shared URL
-	u, err := sharedurls.ShareCommunityURLWithData(community)
+	u, err := sharedurls.ShareCommunityURLWithData(&community)
 	s.Require().NoError(err)
 
 	// Instantiate provider
 	dataProvider := mock_unfurlers.NewMockStatusDataProvider(s.ctrl)
 	dataProvider.EXPECT().FetchCommunity(gomock.Eq(community.IDString())).
-		Return(community, nil).Times(1)
+		Return(&community, nil).Times(1)
 
 	// Unfurl community shared URL
 	r, err := UnfurlURLs([]string{u}, nil, dataProvider, s.logger)

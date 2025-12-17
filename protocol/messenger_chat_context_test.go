@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -24,7 +24,7 @@ func isImageWithNamePresent(imgs map[string]*protobuf.IdentityImage, name string
 func (s *MessengerSuite) retrieveIdentityImages(alice, bob *Messenger, chat *Chat) map[string]*protobuf.IdentityImage {
 	s.Require().NoError(alice.settings.SaveSettingField(settings.DisplayName, "alice"))
 
-	identityImages := testutils.SampleIdentityImages()
+	identityImages := fake.IdentityImages()
 	identityImagesMap := make(map[string]images.IdentityImage)
 	for _, img := range identityImages {
 		img.KeyUID = s.m.account.KeyUID

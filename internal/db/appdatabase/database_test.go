@@ -118,11 +118,11 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that transfers table has no status column
-	exists, err := helpers.ColumnExists(db, "transfers", "status")
+	exists, err := columnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.False(t, exists)
 
-	exists, err = helpers.ColumnExists(db, "transfers", "status")
+	exists, err = columnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.False(t, exists)
 
@@ -199,7 +199,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	err = migrations.MigrateTo(db, failMigrationSteps, customSteps[1].Version)
 	require.Error(t, err)
 
-	exists, err = helpers.ColumnExists(db, "transfers", "status")
+	exists, err = columnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.False(t, exists)
 
@@ -208,7 +208,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that the migration was run and transfers table has now status column
-	exists, err = helpers.ColumnExists(db, "transfers", "status")
+	exists, err = columnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -217,7 +217,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that the migration was run and transfers table has now txFrom column
-	exists, err = helpers.ColumnExists(db, "transfers", "tx_from_address")
+	exists, err = columnExists(db, "transfers", "tx_from_address")
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -480,4 +480,35 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.Error(t, err)
 
 	db.Close()
+}
+
+func columnExists(db *sql.DB, tableName string, columnName string) (bool, error) {
+	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	var cid int
+	var name string
+	var dataType string
+	var notNull bool
+	var dFLTValue sql.NullString
+	var pk int
+
+	for rows.Next() {
+		err := rows.Scan(&cid, &name, &dataType, &notNull, &dFLTValue, &pk)
+		if err != nil {
+			return false, err
+		}
+		if name == columnName {
+			return true, nil
+		}
+	}
+
+	if rows.Err() != nil {
+		return false, rows.Err()
+	}
+
+	return false, nil
 }

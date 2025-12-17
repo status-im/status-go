@@ -18,6 +18,7 @@ import (
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
 	testutils2 "github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -66,7 +67,7 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 
 func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) map[string]images.IdentityImage {
 	keyUID := m.IdentityPublicKeyString()
-	iis := testutils2.SampleIdentityImages()
+	iis := fake.IdentityImages()
 
 	err := m.multiAccounts.StoreIdentityImages(keyUID, iis, false)
 	s.Require().NoError(err)
