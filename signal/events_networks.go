@@ -1,7 +1,7 @@
 package signal
 
 import (
-	"github.com/status-im/status-go/healthmanager"
+	"github.com/status-im/status-go/internal/healthmanager"
 )
 
 const (
