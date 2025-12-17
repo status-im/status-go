@@ -555,10 +555,15 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
 }
 
-func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
-	var community communities.Community
-	err := gofakeit.Struct(&community)
+func (s *LinkPreviewsTestSuite) fakeCommunity() *communities.Community {
+	faker := gofakeit.New(0)
+	v, err := (&communities.Community{}).Fake(faker)
 	s.Require().NoError(err)
+	return v.(*communities.Community)
+}
+
+func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
+	community := s.fakeCommunity()
 
 	communityImages := community.Images()
 	s.Require().Len(communityImages, 3)
@@ -580,13 +585,13 @@ func (s *LinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 	s.Require().NoError(err)
 
 	// Create shared URL
-	u, err := sharedurls.ShareCommunityURLWithData(&community)
+	u, err := sharedurls.ShareCommunityURLWithData(community)
 	s.Require().NoError(err)
 
 	// Instantiate provider
 	dataProvider := mock_unfurlers.NewMockStatusDataProvider(s.ctrl)
 	dataProvider.EXPECT().FetchCommunity(gomock.Eq(community.IDString())).
-		Return(&community, nil).Times(1)
+		Return(community, nil).Times(1)
 
 	// Unfurl community shared URL
 	r, err := UnfurlURLs([]string{u}, nil, dataProvider, s.logger)
