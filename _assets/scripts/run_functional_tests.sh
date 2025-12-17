@@ -30,7 +30,7 @@ mkdir -p "${test_results_path}"
 mkdir -p "${logs_path}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"
-identifier=${BUILD_TAG:-"status-go-func-tests-$(git rev-parse --short HEAD)"}
+identifier=${FUNCTIONAL_TESTS_CONTAINER_PREFIX:-"status-go-func-tests-$(git rev-parse --short HEAD)"}
 project_name="${identifier,,}"
 image_name="statusgo-${identifier,,}"
 

@@ -112,10 +112,6 @@ func (api *PublicAPI) CreatePublicChat(parent context.Context, request *requests
 	return api.service.messenger.CreatePublicChat(request)
 }
 
-func (api *PublicAPI) CreateProfileChat(parent context.Context, request *requests.CreateProfileChat) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateProfileChat(request)
-}
-
 func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.Chats()
 }

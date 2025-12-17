@@ -10,7 +10,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/deprecation"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/messaging"
@@ -1630,7 +1629,7 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().Equal(contacts2.ContactRequestStateReceived, respContact.ContactRequestRemoteState)
 
 	// Check chats list
-	s.Require().Len(alice2.Chats(), deprecation.AddChatsCount(2))
+	s.Require().Len(alice2.Chats(), 2)
 }
 
 func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, alice2 *Messenger, bob *Messenger) {
@@ -1661,7 +1660,7 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 	s.Require().Equal(respContact.ContactRequestRemoteState, contacts2.ContactRequestStateNone)
 
 	// Check chats list
-	s.Require().Len(alice2.Chats(), deprecation.AddChatsCount(2))
+	s.Require().Len(alice2.Chats(), 2)
 }
 
 func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {

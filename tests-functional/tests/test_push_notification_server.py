@@ -34,8 +34,7 @@ def push_notification_server(gorush_stub):
     """
     server = PushNotificationServer(gorush_port=gorush_stub.server.server_port)
     yield server, gorush_stub
-    if server.container:
-        server.container.stop()
+    server.shutdown()
 
 
 def expect_push_notification(gorush, sender, receiver):

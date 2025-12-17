@@ -308,9 +308,9 @@ status-go-deps:
 
 statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-c-bindings:
-	@## cmd/library/README.md explains the magic incantation behind this
+	@## tools/generate-cbindings/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
-	go run -mod=mod cmd/library/*.go > $(STATUS_GO_BINDINGS_PATH)/main.go
+	go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
@@ -553,9 +553,9 @@ codecov-validate:
 pytest-lint:
 	$(MAKE) -C tests-functional lint
 
-generate-db: build/bin/generate-db
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
-	./build/bin/generate-db -out-dir build/db
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	go run tools/generate-db/main.go -out-dir build/db
 
 env:
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \

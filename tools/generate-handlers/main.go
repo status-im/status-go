@@ -1,4 +1,4 @@
-//go:generate go run generate_handlers.go
+//go:generate go run main.go
 
 package main
 
@@ -30,7 +30,7 @@ type MethodInfo struct {
 func main() {
 	inputFile := "../../protocol/protobuf/application_metadata_message.proto"
 	outputFile := "../../protocol/messenger_handlers.go"
-	templateFile := "./generate_handlers_template.txt"
+	templateFile := "./template.txt"
 	enumName := "Type"
 
 	// Load the protobuf file
