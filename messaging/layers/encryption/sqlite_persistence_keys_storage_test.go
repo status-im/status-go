@@ -7,8 +7,8 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 var (
@@ -31,7 +31,7 @@ type SQLLitePersistenceKeysStorageTestSuite struct {
 }
 
 func (s *SQLLitePersistenceKeysStorageTestSuite) SetupTest() {
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

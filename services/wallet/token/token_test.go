@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/pubsub"
 	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/rpc"
@@ -23,18 +24,16 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type addressTokenMap = map[common.Address]*tokentypes.Token
 type storeMap = map[uint64]addressTokenMap
 
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
-	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	return &Manager{
@@ -52,13 +51,13 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 }
 
 func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	err = protocolsqlite.Migrate(appDB)
 	require.NoError(t, err)
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	accountsDB, err := accounts.NewDB(appDB)

@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 const (
@@ -51,7 +50,7 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 	for i := 0; i < n; i++ {
 		installationID := fmt.Sprintf("%s%d", user, i+1)
 
-		db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+		db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 			{
 				Names:     migrations.AssetNames(),
 				AssetFunc: migrations.Asset,

@@ -16,11 +16,11 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestTableUserMessagesAllFieldsCount(t *testing.T) {
@@ -982,7 +982,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 }
 
 func openTestDB() (*sql.DB, error) {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}

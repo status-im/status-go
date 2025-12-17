@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type testMessengerConfig struct {
@@ -91,11 +90,11 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 	if err != nil {
 		return nil, err
 	}
-	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}
-	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}

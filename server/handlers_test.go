@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestHandlersSuite(t *testing.T) {
@@ -43,7 +42,7 @@ type HandlersSuite struct {
 }
 
 func (s *HandlersSuite) SetupTest() {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
 
 	err = sqlite.Migrate(db)

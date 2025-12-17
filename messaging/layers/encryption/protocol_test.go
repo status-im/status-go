@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestProtocolServiceTestSuite(t *testing.T) {
@@ -31,7 +30,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 
 	s.logger = testutils.MustCreateTestLogger()
 
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,
@@ -46,7 +45,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		trace.NewNoopTracer(),
 	)
 
-	db, err = helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err = testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

@@ -42,15 +42,14 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {
-	return helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "tests")
+	return testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "tests")
 }
 
 func setupTestWalletDB() (*sql.DB, func() error, error) {
-	return helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "tests")
+	return testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "tests")
 }
 
 func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {

@@ -15,6 +15,10 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/golang/protobuf/proto"
+	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/images"
@@ -32,11 +36,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/t/helpers"
-
-	"github.com/golang/protobuf/proto"
-	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
-	"github.com/stretchr/testify/suite"
 )
 
 func TestManagerSuite(t *testing.T) {
@@ -50,7 +49,7 @@ type ManagerSuite struct {
 }
 
 func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *ArchiveManager) {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils2.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.Require().NoError(err, "protocol migrate")
@@ -211,7 +210,7 @@ func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chain
 }
 
 func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenBalanceManager) {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils2.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.NoError(err, "protocol migrate")

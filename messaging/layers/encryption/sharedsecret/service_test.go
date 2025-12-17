@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestServiceTestSuite(t *testing.T) {
@@ -27,7 +26,7 @@ type SharedSecretTestSuite struct {
 func (s *SharedSecretTestSuite) SetupTest() {
 	s.logger = testutils.MustCreateTestLogger()
 
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

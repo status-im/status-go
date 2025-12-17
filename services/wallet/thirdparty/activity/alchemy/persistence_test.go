@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func ptr[T any](v T) *T {
@@ -70,7 +70,7 @@ func TestSaveTransfers(t *testing.T) {
 	}
 	fmt.Println("transfer:", transfers[0])
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	defer walletDB.Close()
 

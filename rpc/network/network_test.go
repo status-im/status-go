@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
@@ -14,7 +15,6 @@ import (
 	"github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type NetworkManagerTestSuite struct {
@@ -26,7 +26,7 @@ type NetworkManagerTestSuite struct {
 
 func (s *NetworkManagerTestSuite) SetupTest() {
 
-	testDb, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "wallet-network-tests")
+	testDb, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "wallet-network-tests")
 	s.Require().NoError(err)
 	s.db = testDb
 	s.cleanup = func() { s.Require().NoError(cleanup()) }

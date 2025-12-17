@@ -8,8 +8,8 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 )
 
 func setupTestDB(t *testing.T) (*WalletSettings, func()) {
-	db, stop, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-wallet-tests-")
+	db, stop, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-wallet-tests-")
 	require.NoError(t, err)
 	settDb, err := settings2.MakeNewDB(db)
 	require.NoError(t, err)

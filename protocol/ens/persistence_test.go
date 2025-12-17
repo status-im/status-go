@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestGetENSToBeVerified(t *testing.T) {
@@ -15,7 +15,7 @@ func TestGetENSToBeVerified(t *testing.T) {
 	name := "test.eth"
 	updatedName := "test2.eth"
 
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	err = sqlite.Migrate(db)
 	require.NoError(t, err)

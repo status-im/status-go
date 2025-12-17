@@ -9,13 +9,13 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestSaveRawMessage(t *testing.T) {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	require.NoError(t, sqlite.Migrate(db))
 	p := NewRawMessagesPersistence(db)
@@ -46,7 +46,7 @@ func TestSaveRawMessage(t *testing.T) {
 }
 
 func TestUpdateRawMessageSent(t *testing.T) {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	require.NoError(t, sqlite.Migrate(db))
 	p := NewRawMessagesPersistence(db)
@@ -72,7 +72,7 @@ func TestUpdateRawMessageSent(t *testing.T) {
 }
 
 func TestUpdateRawMessageLastSent(t *testing.T) {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	require.NoError(t, sqlite.Migrate(db))
 	p := NewRawMessagesPersistence(db)

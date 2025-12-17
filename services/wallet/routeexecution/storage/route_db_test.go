@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func Test_PutRouteData(t *testing.T) {
@@ -20,7 +20,7 @@ func Test_PutRouteData(t *testing.T) {
 		createDBTestData("USDTSendTx", getUSDTSendTxDBTestData(), getUSDTSendTxDBTestData()),
 	}
 
-	walletDB, closeFn, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "routeexecution-tests")
+	walletDB, closeFn, err := testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "routeexecution-tests")
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, closeFn())

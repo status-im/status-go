@@ -17,17 +17,17 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase/migrations"
 	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/nodecfg"
+	"github.com/status-im/status-go/internal/testutils"
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func Test_GetDBFilename(t *testing.T) {
 	// Test with a temp file instance
-	db, stop, err := helpers.SetupTestSQLDB(DbInitializer{}, "test")
+	db, stop, err := testutils.SetupTestSQLDB(DbInitializer{}, "test")
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, stop())
@@ -38,7 +38,7 @@ func Test_GetDBFilename(t *testing.T) {
 	require.True(t, len(fn) > 0)
 
 	// Test with in memory instance
-	mdb, err := helpers.SetupTestMemorySQLDB(DbInitializer{})
+	mdb, err := testutils.SetupTestMemorySQLDB(DbInitializer{})
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, mdb.Close())

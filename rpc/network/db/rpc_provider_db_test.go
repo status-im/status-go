@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type RpcProviderPersistenceTestSuite struct {
@@ -29,7 +29,7 @@ func (s *RpcProviderPersistenceTestSuite) SetupTest() {
 }
 
 func setupTestNetworkDB(t *testing.T) *sql.DB {
-	testDb, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "rpc-providers-tests")
+	testDb, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "rpc-providers-tests")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, cleanup()) })
 	return testDb

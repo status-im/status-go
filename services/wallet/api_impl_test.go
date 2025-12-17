@@ -15,9 +15,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -27,13 +30,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/token"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock"
-	"github.com/status-im/status-go/t/helpers"
-
-	"go.uber.org/mock/gomock"
 )
 
 func TestAPI_GetAddressDetails(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	defer appDB.Close()
 
@@ -41,7 +41,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	require.NoError(t, err)
 	defer accountsDb.Close()
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	defer db.Close()
 

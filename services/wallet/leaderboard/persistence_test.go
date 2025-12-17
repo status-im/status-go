@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/walletdatabase"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 type MarketDataPersistenceTestSuite struct {
@@ -19,7 +19,7 @@ type MarketDataPersistenceTestSuite struct {
 }
 
 func (s *MarketDataPersistenceTestSuite) SetupTest() {
-	memDb, cleanup, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "market-data-tests")
+	memDb, cleanup, err := testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "market-data-tests")
 	s.Require().NoError(err)
 	s.db = memDb
 	s.cleanup = cleanup

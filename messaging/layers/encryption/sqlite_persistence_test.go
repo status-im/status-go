@@ -9,9 +9,9 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption/multidevice"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestSQLLitePersistenceTestSuite(t *testing.T) {
@@ -24,7 +24,7 @@ type SQLLitePersistenceTestSuite struct {
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

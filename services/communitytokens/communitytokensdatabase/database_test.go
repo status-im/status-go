@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestDatabaseSuite(t *testing.T) {
@@ -82,7 +82,7 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 func (s *DatabaseSuite) SetupTest() {
 	s.db = nil
 
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 
 	err = sqlite.Migrate(db)
