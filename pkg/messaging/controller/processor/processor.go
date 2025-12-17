@@ -20,7 +20,7 @@ import (
 	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -81,7 +81,7 @@ func (r *Processor) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 	return key, nil
 }
 
-func (r *Processor) ProcessMessage(msg *types2.ReceivedMessage) (*types2.HandleMessageResponse, error) {
+func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (*messagingtypes.HandleMessageResponse, error) {
 	response, err := r.processMessage(msg)
 	if response == nil || err != nil {
 		return nil, err
@@ -97,25 +97,25 @@ func (r *Processor) ProcessMessage(msg *types2.ReceivedMessage) (*types2.HandleM
 		response.ackedMessageIDs = append(response.ackedMessageIDs, queuedMessagesResponse.ackedMessageIDs...)
 	}
 
-	return &types2.HandleMessageResponse{
+	return &messagingtypes.HandleMessageResponse{
 		Messages:        response.messages,
 		AckedMessageIDs: response.ackedMessageIDs,
 	}, nil
 }
 
 type processMessageResponse struct {
-	messages        []*types2.Message
+	messages        []*messagingtypes.Message
 	ackedMessageIDs []types.HexBytes
 }
 
-func (r *Processor) processMessage(m *types2.ReceivedMessage) (*processMessageResponse, error) {
+func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processMessageResponse, error) {
 	logger := r.logger.With(zap.Stringer("hash", types.HexBytes(m.Hash)))
 	logger.Debug("processing received message")
 
-	responseMessage := &types2.Message{}
+	responseMessage := &messagingtypes.Message{}
 
 	response := &processMessageResponse{
-		messages:        []*types2.Message{responseMessage},
+		messages:        []*messagingtypes.Message{responseMessage},
 		ackedMessageIDs: []types.HexBytes{},
 	}
 
@@ -166,6 +166,11 @@ func (r *Processor) processMessage(m *types2.ReceivedMessage) (*processMessageRe
 		}
 	}
 
+	err = r.processSDSLayer(responseMessage)
+	if err != nil {
+		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
+	}
+
 	messages, ackedMessageIDs, err := r.processReliabilityLayer(responseMessage, logger)
 	if err == nil {
 		span.AddEvent("reliability layer processed")
@@ -179,9 +184,9 @@ func (r *Processor) processMessage(m *types2.ReceivedMessage) (*processMessageRe
 	return response, nil
 }
 
-func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*types2.HashRatchetInfo) (*processMessageResponse, error) {
+func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagingtypes.HashRatchetInfo) (*processMessageResponse, error) {
 	response := &processMessageResponse{
-		messages:        []*types2.Message{},
+		messages:        []*messagingtypes.Message{},
 		ackedMessageIDs: []types.HexBytes{},
 	}
 
@@ -217,7 +222,7 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*types2.
 	return response, nil
 }
 
-func processTransportLayer(m *types2.Message, receivedMessage *types2.ReceivedMessage) error {
+func processTransportLayer(m *messagingtypes.Message, receivedMessage *messagingtypes.ReceivedMessage) error {
 	publicKey, err := crypto.UnmarshalPubkey(receivedMessage.Sig)
 	if err != nil {
 		return errors.Wrap(err, "failed to get signature")
@@ -239,7 +244,7 @@ func processTransportLayer(m *types2.Message, receivedMessage *types2.ReceivedMe
 	return nil
 }
 
-func (r *Processor) processSegmentationLayer(m *types2.Message) error {
+func (r *Processor) processSegmentationLayer(m *messagingtypes.Message) error {
 	reconstructedPayload, transportIDs, err := r.stack.Segmentation.Reconstruct(
 		m.TransportLayer.Payload,
 		m.TransportLayer.SigPubKey,
@@ -264,7 +269,7 @@ func (r *Processor) processSegmentationLayer(m *types2.Message) error {
 	return err
 }
 
-func (r *Processor) processEncryptionLayer(ctx context.Context, m *types2.Message, logger *zap.Logger) error {
+func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtypes.Message, logger *zap.Logger) error {
 	logger = logger.Named("processEncryptionLayer")
 
 	ctx, span := r.tracer.Start(ctx, "Processor.processEncryptionLayer")
@@ -320,9 +325,23 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *types2.Messag
 	return err
 }
 
+func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
+	if len(msg.EncryptionLayer.Payload) <= 0 {
+		return nil
+	}
+
+	unwrappedPayload, err := r.stack.Reliability.UnwrapPayloadFromSDS(msg.EncryptionLayer.Payload)
+	if err != nil {
+		return err
+	}
+
+	msg.EncryptionLayer.Payload = unwrappedPayload
+	return nil
+}
+
 func (r *Processor) ProcessSharedSecrets(secrets []*sharedsecret.Secret) error {
 	for _, secret := range secrets {
-		_, err := r.stack.Transport.ProcessNegotiatedSecret(types2.NegotiatedSecret{
+		_, err := r.stack.Transport.ProcessNegotiatedSecret(messagingtypes.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		})
@@ -333,7 +352,7 @@ func (r *Processor) ProcessSharedSecrets(secrets []*sharedsecret.Secret) error {
 	return nil
 }
 
-func (r *Processor) processReliabilityLayer(m *types2.Message, logger *zap.Logger) ([]*types2.Message, []types.HexBytes, error) {
+func (r *Processor) processReliabilityLayer(m *messagingtypes.Message, logger *zap.Logger) ([]*messagingtypes.Message, []types.HexBytes, error) {
 	if !r.stack.Reliability.Started() {
 		return nil, nil, errReliabilityNotStarted
 	}
@@ -346,7 +365,7 @@ func (r *Processor) processReliabilityLayer(m *types2.Message, logger *zap.Logge
 		return nil, nil, err
 	}
 
-	var statusMessages []*types2.Message
+	var statusMessages []*messagingtypes.Message
 	for _, ds := range datasyncMessage.Messages {
 		message, err := m.Clone()
 		if err != nil {
