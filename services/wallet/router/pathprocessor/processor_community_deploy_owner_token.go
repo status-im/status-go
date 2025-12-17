@@ -15,10 +15,10 @@ import (
 
 	communitytokens "github.com/status-im/status-go/internal/contracts/community-tokens"
 	communitytokendeployer "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
+	crypto2 "github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/transactions"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	communitytokendeployer2 "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/logutils"
@@ -59,10 +59,10 @@ func (s *CommunityDeployOwnerTokenProcessor) CalculateFees(params ProcessorInput
 }
 
 func decodeSignature(sig []byte) (r [32]byte, s [32]byte, v uint8, err error) {
-	if len(sig) != crypto.SignatureLength {
+	if len(sig) != crypto2.SignatureLength {
 		err = &errors.ErrorResponse{
 			Code:    ErrIncorrectSignatureFormat.Code,
-			Details: fmt.Sprintf(ErrIncorrectSignatureFormat.Details, len(sig), crypto.SignatureLength),
+			Details: fmt.Sprintf(ErrIncorrectSignatureFormat.Details, len(sig), crypto2.SignatureLength),
 		}
 		return [32]byte{}, [32]byte{}, 0, err
 	}
@@ -77,11 +77,11 @@ func convert33BytesPubKeyToEthAddress(pubKey string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-	communityPubKey, err := crypto.DecompressPubkey(decoded)
+	communityPubKey, err := crypto2.DecompressPubkey(decoded)
 	if err != nil {
 		return common.Address{}, err
 	}
-	return common.Address(crypto.PubkeyToAddress(*communityPubKey)), nil
+	return common.Address(crypto2.PubkeyToAddress(*communityPubKey)), nil
 }
 
 func prepareDeploymentSignatureStruct(signature string, communityID string, addressFrom common.Address) (communitytokendeployer2.CommunityTokenDeployerDeploymentSignature, error) {

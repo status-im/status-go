@@ -29,10 +29,10 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/centralizedmetrics"
 	centralizedmetricscommon "github.com/status-im/status-go/internal/centralizedmetrics/common"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
@@ -73,9 +73,9 @@ var (
 )
 
 type LoginParams struct {
-	ChatAddress  types.Address          `json:"chatAddress"`
+	ChatAddress  types2.Address         `json:"chatAddress"`
 	Password     string                 `json:"password"`
-	MainAccount  types.Address          `json:"mainAccount"` // TODO: remove this field
+	MainAccount  types2.Address         `json:"mainAccount"` // TODO: remove this field
 	MultiAccount *multiaccounts.Account `json:"multiAccount"`
 }
 
@@ -1380,9 +1380,9 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 	// add chat account
 	chatDerivedAccount := derivedAddresses[accscommon.PathEIP1581Chat]
 	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
-		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
+		PublicKey: types2.Hex2Bytes(chatDerivedAccount.PublicKey),
 		KeyUID:    keypair.KeyUID,
-		Address:   types.HexToAddress(chatDerivedAccount.Address),
+		Address:   types2.HexToAddress(chatDerivedAccount.Address),
 		Chat:      true,
 		Path:      accscommon.PathEIP1581Chat,
 		Position:  -1, // When creating a new account, the chat account should have position -1, cause it doesn't participate
@@ -1392,9 +1392,9 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 	// add wallet account
 	walletDerivedAccount := derivedAddresses[accscommon.PathDefaultWalletAccount]
 	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
-		PublicKey:          types.Hex2Bytes(walletDerivedAccount.PublicKey),
+		PublicKey:          types2.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:             keypair.KeyUID,
-		Address:            types.HexToAddress(walletDerivedAccount.Address),
+		Address:            types2.HexToAddress(walletDerivedAccount.Address),
 		ColorID:            multiacccommon.CustomizationColor(request.CustomizationColor),
 		Wallet:             true,
 		Path:               accscommon.PathDefaultWalletAccount,
@@ -1552,7 +1552,7 @@ func (b *StatusBackend) VerifyDatabasePassword(keyUID string, password string) e
 	return nil
 }
 
-func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey types.HexBytes) error {
+func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey types2.HexBytes) error {
 	pk := string(chatPublicKey.Bytes())
 	colorHash, err := colorhash.GenerateFor(pk)
 	if err != nil {
@@ -1583,7 +1583,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		keyUID                  string
 		masterAddress           string
 		chatPrivateKey          *ecdsa.PrivateKey // set only for keycard account
-		chatPublicKey           types.HexBytes
+		chatPublicKey           types2.HexBytes
 		customizationColorClock uint64 // not sure if we need this customizationColorClock at all since the desktop app doesn't use it
 		derivedAddresses        = map[string]generator.AccountInfo{
 			accscommon.PathWalletRoot:           {},
@@ -1649,11 +1649,11 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		}
 
 		chatPrivateKey = genChatAccount.PrivateKey()
-		chatPublicKey = types.Hex2Bytes(genChatAccount.PublicKeyHex())
+		chatPublicKey = types2.Hex2Bytes(genChatAccount.PublicKeyHex())
 
 		request.Password = derivedAddresses[accscommon.PathEIP1581Encryption].PublicKey
 	} else {
-		chatPublicKey = types.Hex2Bytes(derivedAddresses[accscommon.PathEIP1581Chat].PublicKey)
+		chatPublicKey = types2.Hex2Bytes(derivedAddresses[accscommon.PathEIP1581Chat].PublicKey)
 	}
 
 	settings, err := b.prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount)
@@ -1924,11 +1924,11 @@ func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
 
 // @deprecated
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
-	return types.Hash{}, errors.New("method not supported")
+func (b *StatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types2.Hash, err error) {
+	return types2.Hash{}, errors.New("method not supported")
 }
 
-func (b *StatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
+func (b *StatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types2.Hash, err error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
@@ -1939,82 +1939,82 @@ func (b *StatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wall
 }
 
 // @deprecated
-func (b *StatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types.Hash, err error) {
-	return types.Hash{}, errors.New("method not supported")
+func (b *StatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types2.Hash, err error) {
+	return types2.Hash{}, errors.New("method not supported")
 }
 
 // @deprecated
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.
-func (b *StatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error) {
-	return wallettypes.SendTxArgs{}, types.Hash{}, errors.New("method not supported")
+func (b *StatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types2.Hash, error) {
+	return wallettypes.SendTxArgs{}, types2.Hash{}, errors.New("method not supported")
 }
 
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
-func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (types.HexBytes, error) {
+func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (types2.HexBytes, error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(rpcParams.Address, rpcParams.Password)
 	if err != nil {
-		return types.HexBytes{}, err
+		return types2.HexBytes{}, err
 	}
 	return b.signer.Sign(rpcParams, verifiedAccount)
 }
 
 // Recover calls the personalAPI to return address associated with the private
 // key that was used to calculate the signature in the message
-func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (types.Address, error) {
+func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (types2.Address, error) {
 	return b.signer.Recover(rpcParams)
 }
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
-func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types.HexBytes, error) {
+func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types2.HexBytes, error) {
 	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
-		return types.HexBytes{}, err
+		return types2.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	sig, err := typeddata.Sign(typed, acc.PrivateKey(), chain)
 	if err != nil {
-		return types.HexBytes{}, err
+		return types2.HexBytes{}, err
 	}
 	return sig, err
 }
 
 // SignTypedDataV4 accepts data and password. Gets verified account and signs typed data.
-func (b *StatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error) {
+func (b *StatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types2.HexBytes, error) {
 	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
-		return types.HexBytes{}, err
+		return types2.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	sig, err := typeddata.SignTypedDataV4(typed, acc.PrivateKey(), chain)
 	if err != nil {
-		return types.HexBytes{}, err
+		return types2.HexBytes{}, err
 	}
-	return types.HexBytes(sig), err
+	return types2.HexBytes(sig), err
 }
 
 // HashTypedData generates the hash of TypedData.
-func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (types.Hash, error) {
+func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (types2.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.ValidateAndHash(typed, chain)
 	if err != nil {
-		return types.Hash{}, err
+		return types2.Hash{}, err
 	}
-	return types.Hash(hash), err
+	return types2.Hash(hash), err
 }
 
 // HashTypedDataV4 generates the hash of TypedData.
-func (b *StatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.Hash, error) {
+func (b *StatusBackend) HashTypedDataV4(typed signercore.TypedData) (types2.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.HashTypedDataV4(typed, chain)
 	if err != nil {
-		return types.Hash{}, err
+		return types2.Hash{}, err
 	}
-	return types.Hash(hash), err
+	return types2.Hash(hash), err
 }
 
 func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
-	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
+	return b.accountsManager.GetVerifiedWalletAccount(types2.HexToAddress(address), password)
 }
 
 // AppStateChange handles app state changes (background/foreground).
@@ -2326,7 +2326,7 @@ func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 		return "", fmt.Errorf("SignHash: could not sign the hash: %v", err)
 	}
 
-	hexEncodedSignature := types.EncodeHex(signature)
+	hexEncodedSignature := types2.EncodeHex(signature)
 	return hexEncodedSignature, nil
 }
 

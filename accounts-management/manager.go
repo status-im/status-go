@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
 	gocommon "github.com/status-im/status-go/common"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // AccountsManager represents the default account manager implementation

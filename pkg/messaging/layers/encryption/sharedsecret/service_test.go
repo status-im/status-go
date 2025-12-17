@@ -8,7 +8,7 @@ import (
 
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
 )

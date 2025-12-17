@@ -15,8 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
-
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/logutils"
 
 	ac "github.com/status-im/status-go/services/wallet/activity/common"

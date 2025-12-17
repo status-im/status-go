@@ -18,9 +18,9 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/connection"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -234,7 +234,7 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 
 		ids := make([]string, len(msgs))
 		for i := range msgs {
-			id := cryptotypes.EncodeHex(msgs[i].Hash)
+			id := types2.EncodeHex(msgs[i].Hash)
 			ids[i] = id
 		}
 
@@ -246,11 +246,11 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 
 		for i := range msgs {
 			// Exclude anything that is a cache hit
-			if !hits[cryptotypes.EncodeHex(msgs[i].Hash)] {
+			if !hits[types2.EncodeHex(msgs[i].Hash)] {
 				result[*filter] = append(result[*filter], msgs[i])
-				logger.Debug("message not cached", zap.String("hash", cryptotypes.EncodeHex(msgs[i].Hash)))
+				logger.Debug("message not cached", zap.String("hash", types2.EncodeHex(msgs[i].Hash)))
 			} else {
-				logger.Debug("message cached", zap.String("hash", cryptotypes.EncodeHex(msgs[i].Hash)))
+				logger.Debug("message cached", zap.String("hash", types2.EncodeHex(msgs[i].Hash)))
 				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msgs[i].Hash))
 			}
 		}
@@ -383,9 +383,9 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 		return
 	}
 
-	envelopeHashes := make([]cryptotypes.Hash, len(hashes))
+	envelopeHashes := make([]types2.Hash, len(hashes))
 	for i, hash := range hashes {
-		envelopeHashes[i] = cryptotypes.BytesToHash(hash)
+		envelopeHashes[i] = types2.BytesToHash(hash)
 	}
 
 	err := t.envelopesMonitor.Add(identifiers, envelopeHashes, newMessages)
@@ -482,7 +482,7 @@ func (t *Transport) ClearProcessedMessageIDsCache() error {
 }
 
 func PubkeyToHex(key *ecdsa.PublicKey) string {
-	return cryptotypes.EncodeHex(crypto.FromECDSAPub(key))
+	return types2.EncodeHex(crypto.FromECDSAPub(key))
 }
 
 func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {

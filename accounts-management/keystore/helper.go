@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/accounts-management/keystore/internal/geth"
 	"github.com/status-im/status-go/accounts-management/types"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // This function is exposed from here just to be used for validating transferred keystore files while local pairing.

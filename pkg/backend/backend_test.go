@@ -26,8 +26,8 @@ import (
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/keystore"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
@@ -471,7 +471,7 @@ func TestHashTypedData(t *testing.T) {
 
 	hash, err := backend.HashTypedData(typed)
 	require.NoError(t, err)
-	assert.NotEqual(t, types.Hash{}, hash)
+	assert.NotEqual(t, types2.Hash{}, hash)
 }
 
 func TestBackendGetVerifiedAccount(t *testing.T) {
@@ -496,7 +496,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	t.Run("PasswordDoesntMatch", func(t *testing.T) {
 		pkey, err := gethcrypto.GenerateKey()
 		require.NoError(t, err)
-		privateKeyHex := types.EncodeHex(gethcrypto.FromECDSA(pkey))
+		privateKeyHex := types2.EncodeHex(gethcrypto.FromECDSA(pkey))
 		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
 
 		_, err = testContext.backend.AccountsManager().CreateKeypairFromPrivateKeyAndStore(privateKeyHex, testPassword, "private key keypair", &accsmanagementtypes.AccountCreationDetails{
@@ -574,10 +574,10 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		pkey, err := crypto.GenerateKey()
 		require.NoError(t, err)
-		privateKeyHex := types.EncodeHex(crypto.FromECDSA(pkey))
+		privateKeyHex := types2.EncodeHex(crypto.FromECDSA(pkey))
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
 		keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&pkey.PublicKey))
-		keyUID := types.EncodeHex(keyUIDHex[:])
+		keyUID := types2.EncodeHex(keyUIDHex[:])
 
 		db, err := accounts.NewDB(testContext.backend.appDB)
 		require.NoError(t, err)
@@ -769,7 +769,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NotNil(t, serverMessenger)
 
 	// Ensure all created accounts are in the keystore and can be loaded
-	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
+	masterAddress := types2.HexToAddress(testContext.profileKeypair.DerivedFrom)
 	ok, err := testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -969,7 +969,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 		require.NoError(t, testContext.backend.StopNode())
 	}()
 
-	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
+	masterAddress := types2.HexToAddress(testContext.profileKeypair.DerivedFrom)
 	ok, err := testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
 	require.NoError(t, err)
 	require.True(t, ok)

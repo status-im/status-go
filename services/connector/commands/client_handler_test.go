@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 
 	"github.com/stretchr/testify/assert"

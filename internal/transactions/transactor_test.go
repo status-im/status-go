@@ -12,6 +12,8 @@ import (
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	"github.com/status-im/status-go/accounts-management/generator"
 	accstypes "github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	fake2 "github.com/status-im/status-go/internal/transactions/fake"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -29,8 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
@@ -331,8 +331,8 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	})
 }
 
-func fakeAddress() *types.Address {
-	var address types.Address
+func fakeAddress() *types2.Address {
+	var address types2.Address
 	gofakeit.Slice(&address)
 	return &address
 }
@@ -341,8 +341,8 @@ func (s *TransactorSuite) TestArgsValidation() {
 	args := wallettypes.SendTxArgs{
 		From:  *fakeAddress(),
 		To:    fakeAddress(),
-		Data:  types.HexBytes([]byte{0x01, 0x02}),
-		Input: types.HexBytes([]byte{0x02, 0x01}),
+		Data:  types2.HexBytes([]byte{0x01, 0x02}),
+		Input: types2.HexBytes([]byte{0x02, 0x01}),
 	}
 	s.False(args.Valid())
 	selectedAccount := generator.NewAccount(nil, nil)

@@ -3,9 +3,9 @@ package keystore
 import (
 	"testing"
 
-	"github.com/status-im/status-go/crypto/types"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 func TestAddressToAccount(t *testing.T) {

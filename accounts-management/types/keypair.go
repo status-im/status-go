@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -58,14 +58,14 @@ type AccountCreationDetails struct {
 }
 
 type Account struct {
-	Address               types.Address             `json:"address"`
+	Address               types2.Address            `json:"address"`
 	KeyUID                string                    `json:"key-uid"`
 	Wallet                bool                      `json:"wallet"`
 	AddressWasNotShown    bool                      `json:"address-was-not-shown,omitempty"`
 	Chat                  bool                      `json:"chat"`
 	Type                  AccountType               `json:"type,omitempty"`
 	Path                  string                    `json:"path,omitempty"`
-	PublicKey             types.HexBytes            `json:"public-key,omitempty"`
+	PublicKey             types2.HexBytes           `json:"public-key,omitempty"`
 	Name                  string                    `json:"name"`
 	Emoji                 string                    `json:"emoji"`
 	ColorID               common.CustomizationColor `json:"colorId,omitempty"`
@@ -80,11 +80,11 @@ type Account struct {
 }
 
 type Keycard struct {
-	KeycardUID        string          `json:"keycard-uid"`
-	KeycardName       string          `json:"keycard-name"`
-	KeycardLocked     bool            `json:"keycard-locked"`
-	AccountsAddresses []types.Address `json:"accounts-addresses"`
-	KeyUID            string          `json:"key-uid"`
+	KeycardUID        string           `json:"keycard-uid"`
+	KeycardName       string           `json:"keycard-name"`
+	KeycardLocked     bool             `json:"keycard-locked"`
+	AccountsAddresses []types2.Address `json:"accounts-addresses"`
+	KeyUID            string           `json:"key-uid"`
 	Position          uint64
 }
 
@@ -100,14 +100,14 @@ func (a *Account) IsWalletAccountReadyForTransaction() bool {
 
 func (a *Account) MarshalJSON() ([]byte, error) {
 	item := struct {
-		Address               types.Address             `json:"address"`
+		Address               types2.Address            `json:"address"`
 		MixedcaseAddress      string                    `json:"mixedcase-address"`
 		KeyUID                string                    `json:"key-uid"`
 		Wallet                bool                      `json:"wallet"`
 		Chat                  bool                      `json:"chat"`
 		Type                  AccountType               `json:"type"`
 		Path                  string                    `json:"path"`
-		PublicKey             types.HexBytes            `json:"public-key"`
+		PublicKey             types2.HexBytes           `json:"public-key"`
 		Name                  string                    `json:"name"`
 		Emoji                 string                    `json:"emoji"`
 		ColorID               common.CustomizationColor `json:"colorId"`
@@ -289,6 +289,6 @@ func (kp *Keycard) FromSyncKeycard(kc *protobuf.SyncKeycard) {
 	kp.Position = kc.Position
 
 	for _, addr := range kc.Addresses {
-		kp.AccountsAddresses = append(kp.AccountsAddresses, types.BytesToAddress(addr))
+		kp.AccountsAddresses = append(kp.AccountsAddresses, types2.BytesToAddress(addr))
 	}
 }

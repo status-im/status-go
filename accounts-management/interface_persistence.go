@@ -4,7 +4,7 @@ package accountsmanagement
 
 import (
 	"github.com/status-im/status-go/accounts-management/types"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 type Persistence interface {

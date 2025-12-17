@@ -22,11 +22,11 @@ import (
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/keystore"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	abi_spec "github.com/status-im/status-go/internal/abi-spec"
 	"github.com/status-im/status-go/internal/centralizedmetrics"
 	"github.com/status-im/status-go/internal/centralizedmetrics/providers"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
@@ -771,7 +771,7 @@ func hashTransaction(txArgsJSON string) string {
 
 	result := struct {
 		Transaction wallettypes.SendTxArgs `json:"transaction"`
-		Hash        types.Hash             `json:"hash"`
+		Hash        types2.Hash            `json:"hash"`
 	}{
 		Transaction: newTxArgs,
 		Hash:        hash,
@@ -999,7 +999,7 @@ func DecompressPublicKey(key string) string {
 
 // decompressPublicKey decompresses 33-byte compressed format to uncompressed 65-byte format.
 func decompressPublicKey(key string) string {
-	decoded, err := types.DecodeHex(key)
+	decoded, err := types2.DecodeHex(key)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -1011,7 +1011,7 @@ func decompressPublicKey(key string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return types.EncodeHex(crypto.FromECDSAPub(pubKey))
+	return types2.EncodeHex(crypto.FromECDSAPub(pubKey))
 }
 
 func CompressPublicKey(key string) string {
@@ -1024,7 +1024,7 @@ func compressPublicKey(key string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return types.EncodeHex(crypto.CompressPubkey(pubKey))
+	return types2.EncodeHex(crypto.CompressPubkey(pubKey))
 }
 
 func SerializeLegacyKey(key string) string {

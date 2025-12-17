@@ -85,8 +85,8 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	gocommon "github.com/status-im/status-go/common"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/connection"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
 	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"

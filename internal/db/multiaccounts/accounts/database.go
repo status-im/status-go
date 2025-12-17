@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_notifications"
@@ -53,9 +53,9 @@ const (
 // TODO: implement clean full interface. This might require refactoring Database methods
 type AccountsStorage interface {
 	GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypair, error)
-	GetAccountByAddress(address types.Address) (*accsmanagementtypes.Account, error)
-	AddressExists(address types.Address) (bool, error)
-	GetWalletAddresses() ([]types.Address, error)
+	GetAccountByAddress(address types2.Address) (*accsmanagementtypes.Account, error)
+	AddressExists(address types2.Address) (bool, error)
+	GetWalletAddresses() ([]types2.Address, error)
 }
 
 // Database sql wrapper for operations with browser objects.
@@ -167,7 +167,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*accsmanagementtypes.Keypair,
 		}
 		// check keypair accounts fields
 		if accAddress.Valid {
-			acc.Address = types.BytesToAddress([]byte(accAddress.String))
+			acc.Address = types2.BytesToAddress([]byte(accAddress.String))
 		}
 		if accKeyUID.Valid {
 			acc.KeyUID = accKeyUID.String
@@ -215,7 +215,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*accsmanagementtypes.Keypair,
 			acc.AddressWasNotShown = accAddressWasNotShown.Bool
 		}
 		if lth := len(pubkey); lth > 0 {
-			acc.PublicKey = make(types.HexBytes, lth)
+			acc.PublicKey = make(types2.HexBytes, lth)
 			copy(acc.PublicKey, pubkey)
 		}
 		if accRemoved.Valid {
@@ -370,7 +370,7 @@ func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string, includeRemoved
 // If `includeRemoved` is true and `address` is not zero address, then accounts which match the `address` will be returned (regardless how they are flagged).
 // If `includeRemoved` is false and `address` is zero address, then all accounts which are not flagged as removed will be returned.
 // If `includeRemoved` is true and `address` is zero address, then all accounts will be returned (regardless how they are flagged).
-func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemoved bool) ([]*accsmanagementtypes.Account, error) {
+func (db *Database) getAccounts(tx *sql.Tx, address types2.Address, includeRemoved bool) ([]*accsmanagementtypes.Account, error) {
 	var (
 		rows  *sql.Rows
 		err   error
@@ -453,7 +453,7 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemove
 	return allAccounts, nil
 }
 
-func (db *Database) getAccountByAddress(tx *sql.Tx, address types.Address) (*accsmanagementtypes.Account, error) {
+func (db *Database) getAccountByAddress(tx *sql.Tx, address types2.Address) (*accsmanagementtypes.Account, error) {
 	accounts, err := db.getAccounts(tx, address, false)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -466,7 +466,7 @@ func (db *Database) getAccountByAddress(tx *sql.Tx, address types.Address) (*acc
 	return accounts[0], nil
 }
 
-func (db *Database) markAccountRemoved(tx *sql.Tx, address types.Address, clock uint64) error {
+func (db *Database) markAccountRemoved(tx *sql.Tx, address types2.Address, clock uint64) error {
 	if tx == nil {
 		return errDbTransactionIsNil
 	}
@@ -557,22 +557,22 @@ func (db *Database) GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keyp
 
 // Returns active accounts (excluding removed).
 func (db *Database) GetActiveAccounts() ([]*accsmanagementtypes.Account, error) {
-	return db.getAccounts(nil, types.Address{}, false)
+	return db.getAccounts(nil, types2.Address{}, false)
 }
 
 // Returns all accounts (including removed).
 func (db *Database) GetAllAccounts() ([]*accsmanagementtypes.Account, error) {
-	return db.getAccounts(nil, types.Address{}, true)
+	return db.getAccounts(nil, types2.Address{}, true)
 }
 
 // Returns account if it is not marked as removed.
-func (db *Database) GetAccountByAddress(address types.Address) (*accsmanagementtypes.Account, error) {
+func (db *Database) GetAccountByAddress(address types2.Address) (*accsmanagementtypes.Account, error) {
 	return db.getAccountByAddress(nil, address)
 }
 
 // Returns active watch only accounts (excluding removed).
 func (db *Database) GetActiveWatchOnlyAccounts() (res []*accsmanagementtypes.Account, err error) {
-	accounts, err := db.getAccounts(nil, types.Address{}, false)
+	accounts, err := db.getAccounts(nil, types2.Address{}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +586,7 @@ func (db *Database) GetActiveWatchOnlyAccounts() (res []*accsmanagementtypes.Acc
 
 // Returns all watch only accounts (including removed).
 func (db *Database) GetAllWatchOnlyAccounts() (res []*accsmanagementtypes.Account, err error) {
-	accounts, err := db.getAccounts(nil, types.Address{}, true)
+	accounts, err := db.getAccounts(nil, types2.Address{}, true)
 	if err != nil {
 		return nil, err
 	}
@@ -628,7 +628,7 @@ func (db *Database) RemoveKeypair(keyUID string, clock uint64) error {
 	return db.markKeypairRemoved(tx, keyUID, clock)
 }
 
-func (db *Database) RemoveAccount(address types.Address, clock uint64) error {
+func (db *Database) RemoveAccount(address types2.Address, clock uint64) error {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -984,7 +984,7 @@ func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64, 
 	return nil
 }
 
-func (db *Database) GetWalletAddress() (rst types.Address, err error) {
+func (db *Database) GetWalletAddress() (rst types2.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM keypairs_accounts WHERE wallet = 1").Scan(&rst)
 	return
 }
@@ -1004,7 +1004,7 @@ func (db *Database) GetProfileKeypair() (*accsmanagementtypes.Keypair, error) {
 	panic("no profile keypair among known keypairs")
 }
 
-func (db *Database) GetWalletAddresses() (rst []types.Address, err error) {
+func (db *Database) GetWalletAddresses() (rst []types2.Address, err error) {
 	rows, err := db.db.Query("SELECT address FROM keypairs_accounts WHERE chat = 0 AND removed = 0 ORDER BY created_at")
 	if err != nil {
 		return nil, err
@@ -1012,7 +1012,7 @@ func (db *Database) GetWalletAddresses() (rst []types.Address, err error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		addr := types.Address{}
+		addr := types2.Address{}
 		err = rows.Scan(&addr)
 		if err != nil {
 			return nil, err
@@ -1027,12 +1027,12 @@ func (db *Database) GetWalletAddresses() (rst []types.Address, err error) {
 	return rst, nil
 }
 
-func (db *Database) GetChatAddress() (rst types.Address, err error) {
+func (db *Database) GetChatAddress() (rst types2.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM keypairs_accounts WHERE chat = 1").Scan(&rst)
 	return
 }
 
-func (db *Database) GetAddresses() (rst []types.Address, err error) {
+func (db *Database) GetAddresses() (rst []types2.Address, err error) {
 	rows, err := db.db.Query("SELECT address FROM keypairs_accounts WHERE removed = 0 ORDER BY created_at")
 	if err != nil {
 		return nil, err
@@ -1040,7 +1040,7 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		addr := types.Address{}
+		addr := types2.Address{}
 		err = rows.Scan(&addr)
 		if err != nil {
 			return nil, err
@@ -1073,13 +1073,13 @@ func (db *Database) KeypairExists(keyUID string) (exists bool, err error) {
 }
 
 // AddressExists returns true if given address is stored in database.
-func (db *Database) AddressExists(address types.Address) (exists bool, err error) {
+func (db *Database) AddressExists(address types2.Address) (exists bool, err error) {
 	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ? AND removed = 0)", address).Scan(&exists)
 	return exists, err
 }
 
 // GetPath returns true if account with given address was recently key and doesn't have a key yet
-func (db *Database) GetPath(address types.Address) (path string, err error) {
+func (db *Database) GetPath(address types2.Address) (path string, err error) {
 	err = db.db.QueryRow("SELECT path FROM keypairs_accounts WHERE address = ? AND removed = 0", address).Scan(&path)
 	return path, err
 }
@@ -1133,13 +1133,13 @@ func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64, update
 	return nil
 }
 
-func (db *Database) MarkAccountFullyOperable(address types.Address) (err error) {
+func (db *Database) MarkAccountFullyOperable(address types2.Address) (err error) {
 	_, err = db.db.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, accsmanagementtypes.AccountFullyOperable, address)
 	return err
 }
 
 // This function should not update the clock, cause it marks a keypair locally.
-func (db *Database) SetKeypairSyncedFrom(address types.Address, operable accsmanagementtypes.AccountOperable) (err error) {
+func (db *Database) SetKeypairSyncedFrom(address types2.Address, operable accsmanagementtypes.AccountOperable) (err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -1206,7 +1206,7 @@ func (db *Database) ResolveAccountsPositions(clock uint64) (err error) {
 	}()
 
 	// returns all accounts ordered by position
-	dbAccounts, err := db.getAccounts(tx, types.Address{}, false)
+	dbAccounts, err := db.getAccounts(tx, types2.Address{}, false)
 	if err != nil {
 		return err
 	}
@@ -1247,7 +1247,7 @@ func (db *Database) SetWalletAccountsPositions(accounts []*accsmanagementtypes.A
 		_ = tx.Rollback()
 	}()
 
-	dbAccounts, err := db.getAccounts(tx, types.Address{}, false)
+	dbAccounts, err := db.getAccounts(tx, types2.Address{}, false)
 	if err != nil {
 		return err
 	}
@@ -1394,7 +1394,7 @@ func (db *Database) CheckAndDeleteExpiredKeypairsAndAccounts(time uint64) error 
 	}
 
 	// Check accounts (keypair related and watch only as well)
-	dbAccounts, err := db.getAccounts(tx, types.Address{}, true)
+	dbAccounts, err := db.getAccounts(tx, types2.Address{}, true)
 	if err != nil {
 		return err
 	}
@@ -1423,7 +1423,7 @@ func (db *Database) CheckAndDeleteExpiredKeypairsAndAccounts(time uint64) error 
 	return nil
 }
 
-func (db *Database) AddressWasShown(address types.Address) error {
+func (db *Database) AddressWasShown(address types2.Address) error {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err

@@ -17,8 +17,8 @@ import (
 	"github.com/status-im/status-go/accounts-management/keystore"
 	mock_persistence "github.com/status-im/status-go/accounts-management/mock"
 	"github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
 
 	customerrors "github.com/status-im/status-go/accounts-management/errors"
@@ -127,7 +127,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			accManager.setKeystore(nil)
 		}
 
-		ok, err := accManager.VerifyAccountPassword(cryptotypes.HexToAddress(testCase.address), testCase.password)
+		ok, err := accManager.VerifyAccountPassword(types2.HexToAddress(testCase.address), testCase.password)
 		if testCase.expectedError != nil && err != nil {
 			if !errors.Is(err, testCase.expectedError) {
 				var accountsErr *customerrors.AccountsError
@@ -201,10 +201,10 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	).Times(1)
 
 	// Set the chat account, this will create a new keystore
-	err = accManager.SetChatAccount(cryptotypes.HexToAddress(account3.ChatAddress), account3.Password, nil)
+	err = accManager.SetChatAccount(types2.HexToAddress(account3.ChatAddress), account3.Password, nil)
 	require.NoError(t, err)
 
-	address := cryptotypes.HexToAddress(account3.ChatAddress)
+	address := types2.HexToAddress(account3.ChatAddress)
 	ok, err := accManager.VerifyAccountPassword(address, account3.Password)
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -224,9 +224,9 @@ type ManagerTestSuite struct {
 
 type testAccount struct {
 	password      string
-	walletAddress cryptotypes.Address
+	walletAddress types2.Address
 	walletPubKey  string
-	chatAddress   cryptotypes.Address
+	chatAddress   types2.Address
 	chatPubKey    string
 	mnemonic      string
 	masterAccount *generator.Account
@@ -305,7 +305,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 		if kpAcc.Chat {
 			chatAccountOk = kpAcc.Path == common.PathEIP1581Chat &&
 				kpAcc.Address == s.chatAddress &&
-				bytes.Equal(kpAcc.PublicKey, cryptotypes.Hex2Bytes(s.chatPubKey)) &&
+				bytes.Equal(kpAcc.PublicKey, types2.Hex2Bytes(s.chatPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
 				!kpAcc.Removed &&
 				kpAcc.Clock == 0 &&
@@ -317,7 +317,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 		if kpAcc.Wallet {
 			walletAccountOk = kpAcc.Path == common.PathDefaultWalletAccount &&
 				kpAcc.Address == s.walletAddress &&
-				bytes.Equal(kpAcc.PublicKey, cryptotypes.Hex2Bytes(s.walletPubKey)) &&
+				bytes.Equal(kpAcc.PublicKey, types2.Hex2Bytes(s.walletPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
 				!kpAcc.Removed &&
 				kpAcc.Clock == 0 &&
@@ -342,14 +342,14 @@ func (s *ManagerTestSuite) TestSetChatAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongAddress() {
-	s.testSetChatAccount(cryptotypes.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrKeystoreFileMissing)
+	s.testSetChatAccount(types2.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongPassword() {
 	s.testSetChatAccount(s.testAccount.chatAddress, "wrong", keystore.ErrIncorrectPasswordProvided)
 }
 
-func (s *ManagerTestSuite) testSetChatAccount(chat cryptotypes.Address, password string, expErr error) {
+func (s *ManagerTestSuite) testSetChatAccount(chat types2.Address, password string, expErr error) {
 	s.createAndStoreProfileKeypair()
 	s.accManager.setChatAccountAndProfileKeyUID(nil, "") // clear the chat account set by `createAndStoreProfileKeypair`
 
@@ -458,7 +458,7 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NoError(err)
 	s.Len(accs, 3)
 
-	checkAccount := func(address cryptotypes.Address) bool {
+	checkAccount := func(address types2.Address) bool {
 		return address == s.chatAddress || address == s.walletAddress || address == s.masterAccount.Address()
 	}
 	s.True(checkAccount(accs[0]))
@@ -471,14 +471,14 @@ func (s *ManagerTestSuite) TestAddressToAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongAddress() {
-	s.testAddressToAccount(cryptotypes.HexToAddress("0x0001"), s.password, keystore.ErrKeystoreFileMissing)
+	s.testAddressToAccount(types2.HexToAddress("0x0001"), s.password, keystore.ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongPassword() {
 	s.testAddressToAccount(s.walletAddress, "wrong", keystore.ErrIncorrectPasswordProvided)
 }
 
-func (s *ManagerTestSuite) testAddressToAccount(wallet cryptotypes.Address, password string, expErr error) {
+func (s *ManagerTestSuite) testAddressToAccount(wallet types2.Address, password string, expErr error) {
 	s.createAndStoreProfileKeypair()
 
 	key, err := s.accManager.LoadAccount(wallet, password)
@@ -528,11 +528,11 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 	}
 
 	for _, acc := range accountsToCheck {
-		account, err := s.accManager.LoadAccount(cryptotypes.HexToAddress(acc), testPassword)
+		account, err := s.accManager.LoadAccount(types2.HexToAddress(acc), testPassword)
 		s.Require().Error(err)
 		s.Require().Nil(account)
 
-		account, err = s.accManager.LoadAccount(cryptotypes.HexToAddress(acc), newTestPassword)
+		account, err = s.accManager.LoadAccount(types2.HexToAddress(acc), newTestPassword)
 		s.Require().NoError(err)
 		s.Require().NotNil(account)
 	}
@@ -652,7 +652,7 @@ func (s *ManagerTestSuite) TestCleanKeystoreFiles() {
 						KeycardUID:    "keycard-uid",
 						KeycardName:   "keycard-name",
 						KeycardLocked: false,
-						AccountsAddresses: []cryptotypes.Address{
+						AccountsAddresses: []types2.Address{
 							keypair.Accounts[0].Address,
 							keypair.Accounts[1].Address,
 						},

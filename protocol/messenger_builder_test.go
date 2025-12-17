@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"

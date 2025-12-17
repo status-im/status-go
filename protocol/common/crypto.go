@@ -13,7 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 )
 
 const (

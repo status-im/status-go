@@ -11,8 +11,8 @@ import (
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 
 	"github.com/status-im/status-go/accounts-management/keystore/internal/geth"
-	"github.com/status-im/status-go/crypto"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // Adapter implements the KeyStore interface using go-ethereum

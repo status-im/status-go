@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // GethCryptoProvider implements the CryptoProvider interface using go-ethereum
@@ -45,9 +45,9 @@ func (g *GethCryptoProvider) FromECDSAPub(pub *ecdsa.PublicKey) []byte {
 	return crypto.FromECDSAPub(pub)
 }
 
-func (g *GethCryptoProvider) PubkeyToAddress(p ecdsa.PublicKey) types.Address {
+func (g *GethCryptoProvider) PubkeyToAddress(p ecdsa.PublicKey) types2.Address {
 	address := crypto.PubkeyToAddress(p)
-	return types.Address(address)
+	return types2.Address(address)
 }
 
 func (g *GethCryptoProvider) Keccak256(data ...[]byte) []byte {
@@ -66,8 +66,8 @@ func (g *GethCryptoProvider) TextAndHash(data []byte) ([]byte, string) {
 	return accounts.TextAndHash(data)
 }
 
-func (g *GethCryptoProvider) Keccak256Hash(data ...[]byte) (h types.Hash) {
-	return types.Hash(crypto.Keccak256Hash(data...))
+func (g *GethCryptoProvider) Keccak256Hash(data ...[]byte) (h types2.Hash) {
+	return types2.Hash(crypto.Keccak256Hash(data...))
 }
 
 func (g *GethCryptoProvider) Sign(digestHash []byte, prv *ecdsa.PrivateKey) (sig []byte, err error) {
@@ -82,8 +82,8 @@ func (g *GethCryptoProvider) UnmarshalPubkey(pub []byte) (*ecdsa.PublicKey, erro
 	return crypto.UnmarshalPubkey(pub)
 }
 
-func (g *GethCryptoProvider) CreateAddress(b types.Address, nonce uint64) types.Address {
-	return types.Address(crypto.CreateAddress(common.Address(b), nonce))
+func (g *GethCryptoProvider) CreateAddress(b types2.Address, nonce uint64) types2.Address {
+	return types2.Address(crypto.CreateAddress(common.Address(b), nonce))
 }
 
 func (g *GethCryptoProvider) DecompressPubkey(pubkey []byte) (*ecdsa.PublicKey, error) {

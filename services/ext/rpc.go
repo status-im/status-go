@@ -6,8 +6,8 @@ package ext
 import (
 	"crypto/ecdsa"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 // SendPublicMessageRPC represents the RPC payload for the SendPublicMessage RPC method

@@ -20,8 +20,8 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingevents "github.com/status-im/status-go/pkg/messaging/events"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"

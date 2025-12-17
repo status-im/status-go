@@ -1,6 +1,8 @@
 package types
 
-import cryptotypes "github.com/status-im/status-go/crypto/types"
+import (
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+)
 
 type PublicKeyData struct {
 	CompressedKey string   `json:"compressedKey"`

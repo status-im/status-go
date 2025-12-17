@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -63,9 +63,9 @@ func TestSpecificHandlers_BuildTransactionV2(t *testing.T) {
 	testTx := ethTypes.NewTransaction(1, common.HexToAddress("0x1234"), big.NewInt(0), 21000, big.NewInt(1000000000), []byte{})
 
 	sendArgs := &wallettypes.SendTxArgs{
-		FromChainID: walletCommon.EthereumMainnet, From: types.HexToAddress("0x1234567890123456789012345678901234567890"),
-		To: &types.Address{}, Gas: (*hexutil.Uint64)(new(uint64)), GasPrice: (*hexutil.Big)(big.NewInt(1000000000)),
-		Value: (*hexutil.Big)(big.NewInt(0)), Data: types.HexBytes("test_data"),
+		FromChainID: walletCommon.EthereumMainnet, From: types2.HexToAddress("0x1234567890123456789012345678901234567890"),
+		To: &types2.Address{}, Gas: (*hexutil.Uint64)(new(uint64)), GasPrice: (*hexutil.Big)(big.NewInt(1000000000)),
+		Value: (*hexutil.Big)(big.NewInt(0)), Data: types2.HexBytes("test_data"),
 	}
 
 	// Test CryptoKitties handler

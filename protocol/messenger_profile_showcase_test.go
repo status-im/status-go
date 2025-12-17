@@ -10,8 +10,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/common"
@@ -49,7 +49,7 @@ func (s *TestMessengerProfileShowcase) TearDownTest() {
 func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) {
 	messageText := "hello!"
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -76,7 +76,7 @@ func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) 
 	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
 
 	// Accept contact request, receiver side
-	_, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID)})
+	_, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types2.Hex2Bytes(contactRequests[0].ID)})
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -95,7 +95,7 @@ func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) 
 }
 
 func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger) {
-	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	challenge := "Want to see what I'm hiding in my profile showcase?"
 
 	_, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
@@ -128,7 +128,7 @@ func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger
 	)
 	s.Require().NoError(err)
 
-	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
+	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types2.FromHex(verificationRequestID)})
 	s.Require().NoError(err)
 
 	s.Require().Len(resp.Messages(), 1)
@@ -380,14 +380,14 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 
 	// Save wallet accounts to pass the validation
 	acc1 := &accsmanagementtypes.Account{
-		Address: types.HexToAddress(request.Accounts[0].Address),
+		Address: types2.HexToAddress(request.Accounts[0].Address),
 		Type:    accsmanagementtypes.AccountTypeGenerated,
 		Name:    "Test Account 1",
 		ColorID: "",
 		Emoji:   "emoji",
 	}
 	acc2 := &accsmanagementtypes.Account{
-		Address: types.HexToAddress(request.Accounts[1].Address),
+		Address: types2.HexToAddress(request.Accounts[1].Address),
 		Type:    accsmanagementtypes.AccountTypeSeed,
 		Name:    "Test Account 2",
 		ColorID: "",
@@ -439,7 +439,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.mutualContact(verifiedContact)
 	s.verifiedContact(verifiedContact)
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	contactID := types2.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	// Get summarised profile data for mutual contact
 	_, err = WaitOnMessengerResponse(
 		mutualContact,
@@ -589,7 +589,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	}, false)
 	s.Require().NoError(err)
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	contactID := types2.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
 	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
@@ -660,7 +660,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	}, false)
 	s.Require().NoError(err)
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	contactID := types2.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
 	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
@@ -733,7 +733,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 	s.Require().NoError(err)
 
 	// 5) Bob gets the community from Alice's profile showcase and tries to validate community's membership with expired grant
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	contactID := types2.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
 	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
@@ -829,7 +829,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	s.Require().NoError(err)
 
 	// 5) Bob gets the community from Alice's profile showcase and validates community's membership with grant
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	contactID := types2.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
 	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {

@@ -12,14 +12,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types3 "github.com/status-im/status-go/internal/crypto/types"
 	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 var (
-	testHash   = types.Hash{0x01}
-	testHashes = []types.Hash{testHash}
+	testHash   = types3.Hash{0x01}
+	testHashes = []types3.Hash{testHash}
 	testIDs    = [][]byte{[]byte("id")}
 )
 
@@ -32,9 +32,9 @@ func (h *envelopeEventsHandlerMock) EnvelopeSent(identifiers [][]byte) {
 }
 func (h *envelopeEventsHandlerMock) EnvelopeExpired([][]byte, error) {
 }
-func (h *envelopeEventsHandlerMock) MailServerRequestCompleted(types.Hash, types.Hash, []byte, error) {
+func (h *envelopeEventsHandlerMock) MailServerRequestCompleted(types3.Hash, types3.Hash, []byte, error) {
 }
-func (h *envelopeEventsHandlerMock) MailServerRequestExpired(types.Hash) {
+func (h *envelopeEventsHandlerMock) MailServerRequestExpired(types3.Hash) {
 }
 
 type EnvelopesMonitorSuite struct {
@@ -88,7 +88,7 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePostedOutOfOrder() {
 }
 
 func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
-	testBatch := types.Hash{1}
+	testBatch := types3.Hash{1}
 	pkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	node := enode.NewV4(&pkey.PublicKey, nil, 0, 0)
@@ -151,7 +151,7 @@ func (s *EnvelopesMonitorSuite) TestReceived() {
 
 func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 	messageIDs := [][]byte{[]byte("id1"), []byte("id2")}
-	hashes := []types.Hash{{0x01}, {0x02}, {0x03}}
+	hashes := []types3.Hash{{0x01}, {0x02}, {0x03}}
 	messages := []*types2.NewMessage{{}, {}, {}}
 
 	err := s.monitor.Add(messageIDs, hashes, messages)
@@ -196,7 +196,7 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 
 func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 	messageIDs := [][]byte{[]byte("id1"), []byte("id2")}
-	hashes := []types.Hash{{0x01}, {0x02}, {0x03}}
+	hashes := []types3.Hash{{0x01}, {0x02}, {0x03}}
 	messages := []*types2.NewMessage{{}, {}, {}}
 
 	err := s.monitor.Add(messageIDs, hashes, messages)
@@ -222,7 +222,7 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 }
 
 func (s *EnvelopesMonitorSuite) TestMultipleHashes_Failure() {
-	err := s.monitor.Add(testIDs, []types.Hash{{0x01}, {0x02}}, []*types2.NewMessage{{}})
+	err := s.monitor.Add(testIDs, []types3.Hash{{0x01}, {0x02}}, []*types2.NewMessage{{}})
 	s.Require().Error(err)
 }
 
@@ -248,7 +248,7 @@ func (m *mockWakuAPI) Post(ctx context.Context, msg types2.NewMessage) ([]byte, 
 	return []byte{0x01}, nil
 }
 
-func (m *mockWakuAPI) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
+func (m *mockWakuAPI) AddPrivateKey(ctx context.Context, privateKey types3.HexBytes) (string, error) {
 	return "", nil
 }
 func (m *mockWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {

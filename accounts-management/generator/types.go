@@ -9,8 +9,8 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 )
 
 type Account struct {
@@ -38,7 +38,7 @@ func (a *Account) PrivateKey() *ecdsa.PrivateKey {
 }
 
 func (a *Account) PrivateKeyHex() string {
-	return types.EncodeHex(crypto.FromECDSA(a.privateKey))
+	return types2.EncodeHex(crypto.FromECDSA(a.privateKey))
 }
 
 func (a *Account) PublicKey() *ecdsa.PublicKey {
@@ -49,12 +49,12 @@ func (a *Account) PublicKeyHex() string {
 	if a.privateKey == nil {
 		return ""
 	}
-	return types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	return types2.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 }
 
-func (a *Account) Address() types.Address {
+func (a *Account) Address() types2.Address {
 	if a.privateKey == nil {
-		return types.Address{}
+		return types2.Address{}
 	}
 	return crypto.PubkeyToAddress(a.privateKey.PublicKey)
 }
@@ -68,15 +68,15 @@ func (a *Account) KeyUID() string {
 		return ""
 	}
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
-	return types.EncodeHex(keyUID[:])
+	return types2.EncodeHex(keyUID[:])
 }
 
 func (a *Account) ToAccountInfo() AccountInfo {
 	if a.privateKey == nil {
 		return AccountInfo{}
 	}
-	privateKeyHex := types.EncodeHex(crypto.FromECDSA(a.privateKey))
-	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	privateKeyHex := types2.EncodeHex(crypto.FromECDSA(a.privateKey))
+	publicKeyHex := types2.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
 	return AccountInfo{
@@ -92,7 +92,7 @@ func (a *Account) ToIdentifiedAccountInfo() IdentifiedAccountInfo {
 	}
 	info := a.ToAccountInfo()
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
-	keyUIDHex := types.EncodeHex(keyUID[:])
+	keyUIDHex := types2.EncodeHex(keyUID[:])
 	return IdentifiedAccountInfo{
 		AccountInfo: info,
 		KeyUID:      keyUIDHex,

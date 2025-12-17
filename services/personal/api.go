@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 )
 
 var (
@@ -23,16 +23,16 @@ func NewAPI(s *Service) *PublicAPI {
 }
 
 // Recover is an implementation of `personal_ecRecover` or `web3.personal.ecRecover` API
-func (api *PublicAPI) Recover(rpcParams RecoverParams) (addr types.Address, err error) {
+func (api *PublicAPI) Recover(rpcParams RecoverParams) (addr types2.Address, err error) {
 	return api.s.Recover(rpcParams)
 }
 
 // CanRecover is an implementation of `personal_ecRecover` or `web3.personal.ecRecover` API
-func (api *PublicAPI) CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error) {
+func (api *PublicAPI) CanRecover(rpcParams RecoverParams, revealedAddress types2.Address) (bool, error) {
 	return api.s.CanRecover(rpcParams, revealedAddress)
 }
 
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
-func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *generator.Account) (result types.HexBytes, err error) {
+func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *generator.Account) (result types2.HexBytes, err error) {
 	return api.s.Sign(rpcParams, verifiedAccount)
 }

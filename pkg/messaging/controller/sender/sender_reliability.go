@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -29,7 +29,7 @@ func (s *Sender) scheduleReliableSend(recipient *ecdsa.PublicKey, message []byte
 }
 
 func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) error {
-	messageIDs := make([]cryptotypes.HexBytes, 0, len(messages))
+	messageIDs := make([]types2.HexBytes, 0, len(messages))
 	for _, msgPayload := range messages {
 		messageIDs = append(messageIDs, types.MessageID(&s.identity.PublicKey, msgPayload))
 	}
@@ -59,7 +59,7 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 	}
 
 	logger.Debug("sent-message",
-		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
+		zap.Strings("hashes", types2.EncodeHexes(hashes)),
 	)
 
 	byteMessageIDs := make([][]byte, len(messageIDs))

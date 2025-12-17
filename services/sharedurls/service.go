@@ -10,8 +10,8 @@ import (
 	"github.com/pkg/errors"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -98,18 +98,18 @@ func decodeCommunityID(serialisedPublicKey string) (string, error) {
 		return "", err
 	}
 
-	return types.EncodeHex(crypto.CompressPubkey(communityID)), nil
+	return types2.EncodeHex(crypto.CompressPubkey(communityID)), nil
 }
 
-func serializePublicKey(compressedKey types.HexBytes) (string, error) {
+func serializePublicKey(compressedKey types2.HexBytes) (string, error) {
 	return utils.SerializePublicKey(compressedKey)
 }
 
-func deserializePublicKey(compressedKey string) (types.HexBytes, error) {
+func deserializePublicKey(compressedKey string) (types2.HexBytes, error) {
 	return utils.DeserializePublicKey(compressedKey)
 }
 
-func (s *Service) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
+func (s *Service) ShareCommunityURLWithChatKey(communityID types2.HexBytes) (string, error) {
 	shortKey, err := serializePublicKey(communityID)
 	if err != nil {
 		return "", err
@@ -167,7 +167,7 @@ func prepareEncodedCommunityData(community *communities.Community) (string, stri
 	return encodedData, shortKey, nil
 }
 
-func (s *Service) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
+func (s *Service) ShareCommunityURLWithData(communityID types2.HexBytes) (string, error) {
 	community, err := s.provider.GetCommunityByID(communityID)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get community")
@@ -226,12 +226,12 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 			MembersCount: communityProto.MembersCount,
 			Color:        communityProto.Color,
 			TagIndices:   tagIndices,
-			CommunityID:  types.EncodeHex(communityID),
+			CommunityID:  types2.EncodeHex(communityID),
 		},
 	}, nil
 }
 
-func (s *Service) ShareCommunityChannelURLWithChatKey(communityID types.HexBytes, channelID string) (string, error) {
+func (s *Service) ShareCommunityChannelURLWithChatKey(communityID types2.HexBytes, channelID string) (string, error) {
 	if len(communityID) == 0 {
 		return "", errInvalidCommunityID
 	}
@@ -323,7 +323,7 @@ func (s *Service) prepareEncodedCommunityChannelData(community *communities.Comm
 	return encodedData, shortKey, nil
 }
 
-func (s *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, channelID string) (string, error) {
+func (s *Service) ShareCommunityChannelURLWithData(communityID types2.HexBytes, channelID string) (string, error) {
 	if len(communityID) == 0 {
 		return "", errInvalidCommunityID
 	}
@@ -392,7 +392,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 			MembersCount: channelProto.Community.MembersCount,
 			Color:        channelProto.Community.Color,
 			TagIndices:   tagIndices,
-			CommunityID:  types.EncodeHex(communityID),
+			CommunityID:  types2.EncodeHex(communityID),
 		},
 		Channel: &CommunityChannelURLData{
 			Emoji:       channelProto.Emoji,

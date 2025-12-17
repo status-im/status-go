@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 )
 
 const SignatureLength = 64 + 1 // 64 bytes ECDSA signature + 1 byte recovery id
@@ -27,7 +27,7 @@ type CryptoProvider interface {
 	FromECDSAPub(pub *ecdsa.PublicKey) []byte
 
 	// PubkeyToAddress derives an Ethereum address from a public key
-	PubkeyToAddress(p ecdsa.PublicKey) types.Address
+	PubkeyToAddress(p ecdsa.PublicKey) types2.Address
 
 	// Keccak256 computes the Keccak256 hash of the concatenated data
 	Keccak256(data ...[]byte) []byte
@@ -58,7 +58,7 @@ type CryptoProvider interface {
 
 	// Keccak256Hash calculates and returns the Keccak256 hash of the input data,
 	// converting it to an internal Hash data structure.
-	Keccak256Hash(data ...[]byte) (h types.Hash)
+	Keccak256Hash(data ...[]byte) (h types2.Hash)
 
 	// Sign calculates an ECDSA signature.
 	//
@@ -77,7 +77,7 @@ type CryptoProvider interface {
 	UnmarshalPubkey(pub []byte) (*ecdsa.PublicKey, error)
 
 	// CreateAddress creates an ethereum address given the bytes and the nonce
-	CreateAddress(b types.Address, nonce uint64) types.Address
+	CreateAddress(b types2.Address, nonce uint64) types2.Address
 
 	// DecompressPubkey decompresses a public key from the 33-byte compressed format.
 	DecompressPubkey(pubkey []byte) (*ecdsa.PublicKey, error)

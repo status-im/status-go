@@ -7,7 +7,7 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // Key represents a cryptographic key with both private key and extended key

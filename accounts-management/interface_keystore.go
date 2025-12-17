@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/status-im/status-go/accounts-management/keystore"
-	cryptoypes "github.com/status-im/status-go/crypto/types"
+	cryptoypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 type KeyStore interface {

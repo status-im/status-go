@@ -17,8 +17,8 @@ import (
 
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -159,7 +159,7 @@ func (c *CollectiblesServiceMock) SetSignerPubkeyForCommunity(communityID []byte
 	if c.Signers == nil {
 		c.Signers = make(map[string]string)
 	}
-	c.Signers[types.EncodeHex(communityID)] = signerPubKey
+	c.Signers[types2.EncodeHex(communityID)] = signerPubKey
 }
 
 func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, contractAddress string) (*communities.CollectibleContractData, error) {
@@ -260,9 +260,9 @@ func defaultTestCommunitiesMessengerNodeConfig() *params.NodeConfig {
 func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 	networks := json.RawMessage("{}")
 	return &settings.Settings{
-		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
+		Address:                   types2.HexToAddress("0x1122334455667788990011223344556677889900"),
 		CurrentNetwork:            "mainnet_rpc",
-		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
+		DappsAddress:              types2.HexToAddress("0x1122334455667788990011223344556677889900"),
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
 		KeyUID:                    "0x1122334455667788990011223344556677889900",
 		Name:                      "Test",
@@ -278,7 +278,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 		UseMailservers:            false,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
-		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
+		WalletRootAddress:         types2.HexToAddress("0x1122334455667788990011223344556677889900")}
 }
 
 func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMessagingEnvironment, config testCommunitiesMessengerConfig) *Messenger {
@@ -343,7 +343,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 	for _, walletAddress := range config.walletAddresses {
 		kp, _, _, err := accounts.GetProfileKeypairForTest(false, true, false)
 		s.Require().NoError(err)
-		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
+		kp.Accounts[0].Address = types2.HexToAddress(walletAddress)
 		err = messenger.settings.SaveOrUpdateKeypair(kp)
 		s.Require().NoError(err)
 	}
@@ -456,7 +456,7 @@ func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owne
 	s.Require().NoError(err)
 }
 
-func createRequestToJoinCommunity(s *suite.Suite, communityID types.HexBytes, user *Messenger, password string, addresses []string) *requests.RequestToJoinCommunity {
+func createRequestToJoinCommunity(s *suite.Suite, communityID types2.HexBytes, user *Messenger, password string, addresses []string) *requests.RequestToJoinCommunity {
 	airdropAddress := ""
 	if len(addresses) > 0 {
 		airdropAddress = addresses[0]
@@ -483,7 +483,7 @@ func createRequestToJoinCommunity(s *suite.Suite, communityID types.HexBytes, us
 		}
 		for i := range signingParams {
 			request.AddressesToReveal[i] = signingParams[i].Address
-			request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
+			request.Signatures = append(request.Signatures, types2.FromHex(signatures[i]))
 		}
 		if updateAddresses {
 			request.AirdropAddress = request.AddressesToReveal[0]
@@ -493,7 +493,7 @@ func createRequestToJoinCommunity(s *suite.Suite, communityID types.HexBytes, us
 	return request
 }
 
-func joinCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Messenger, user *Messenger, password string, addresses []string) {
+func joinCommunity(s *suite.Suite, communityID types2.HexBytes, controlNode *Messenger, user *Messenger, password string, addresses []string) {
 	requestToJoin := createRequestToJoinCommunity(s, communityID, user, password, addresses)
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
@@ -521,7 +521,7 @@ func joinCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Mess
 	s.Require().NoError(err)
 }
 
-func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) types.HexBytes {
+func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) types2.HexBytes {
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -542,7 +542,7 @@ func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messen
 	return requestToJoin.ID
 }
 
-func joinOnRequestCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Messenger, user *Messenger, password string, addresses []string) {
+func joinOnRequestCommunity(s *suite.Suite, communityID types2.HexBytes, controlNode *Messenger, user *Messenger, password string, addresses []string) {
 	s.Require().NotEmpty(password)
 	s.Require().NotEmpty(addresses)
 	s.Require().NotEmpty(communityID)

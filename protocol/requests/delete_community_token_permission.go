@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 var ErrDeleteCommunityTokenPermissionInvalidCommunityID = errors.New("delete community token permission needs a valid community id ")

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol"
 )

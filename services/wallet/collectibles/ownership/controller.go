@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"

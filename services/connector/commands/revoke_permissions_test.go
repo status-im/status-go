@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 )
@@ -40,7 +40,7 @@ func TestRevokePermissionsSucceeded(t *testing.T) {
 	state, close := setupCommand(t, Method_RevokePermissions)
 	t.Cleanup(close)
 
-	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	dAppPermissionRevoked := false
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {

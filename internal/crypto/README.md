@@ -33,7 +33,7 @@ crypto/
 ### Basic Usage
 
 ```go
-import "github.com/status-im/status-go/crypto"
+import "github.com/status-im/status-go/internal/crypto"
 
 // Generate a new private key
 privateKey, err := crypto.GenerateKey()
@@ -58,8 +58,8 @@ if err != nil {
 
 ```go
 import (
-    "github.com/status-im/status-go/crypto"
-    cryptotypes "github.com/status-im/status-go/crypto/types"
+    "github.com/status-im/status-go/internal/crypto"
+    cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // Create address from hex string
@@ -145,7 +145,7 @@ type CryptoProvider interface {
 ### Setting Custom Provider
 
 ```go
-import "github.com/status-im/status-go/crypto"
+import "github.com/status-im/status-go/internal/crypto"
 
 // Create custom provider
 customProvider := &MyCryptoProvider{}
@@ -189,7 +189,7 @@ func (h Hash) IsZero() bool
 The package provides structured error handling:
 
 ```go
-import "github.com/status-im/status-go/crypto/types"
+import "github.com/status-im/status-go/internal/crypto/types"
 
 // Check for specific error types
 if err != nil {
@@ -216,8 +216,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/status-im/status-go/crypto"
-    cryptotypes "github.com/status-im/status-go/crypto/types"
+    "github.com/status-im/status-go/internal/crypto"
+    cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 func main() {
@@ -244,7 +244,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/status-im/status-go/crypto"
+    "github.com/status-im/status-go/internal/crypto"
 )
 
 func main() {

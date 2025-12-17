@@ -9,8 +9,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

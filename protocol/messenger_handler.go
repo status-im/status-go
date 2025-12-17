@@ -12,6 +12,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/crypto"
+	types3 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
@@ -29,8 +31,6 @@ import (
 	"github.com/google/uuid"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -119,7 +119,7 @@ func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *Re
 				GroupChatInvitation: &protobuf.GroupChatInvitation{
 					ChatId: message.ChatID,
 				},
-				From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+				From: types3.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 			}
 
 			groupChatInvitation, err = m.persistence.InvitationByID(groupChatInvitation.ID())
@@ -289,7 +289,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		notificationType = ActivityCenterNotificationTypeNewPrivateGroupChat
 	}
 	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(chat.ID),
+		ID:          types3.FromHex(chat.ID),
 		Name:        chat.Name,
 		Message:     message,
 		Type:        notificationType,
@@ -339,7 +339,7 @@ func (m *Messenger) createContactRequestForContactUpdate(contact *contacts.Conta
 func (m *Messenger) createIncomingContactRequestNotification(contact *contacts.Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
 	if contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
 		// Pull one from the db if there
-		notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
+		notification, err := m.persistence.GetActivityCenterNotificationByID(types3.FromHex(contactRequest.ID))
 		if err != nil {
 			return err
 		}
@@ -366,7 +366,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *contacts.C
 	}
 
 	notification := &ActivityCenterNotification{
-		ID:        types.FromHex(contactRequest.ID),
+		ID:        types3.FromHex(contactRequest.ID),
 		Name:      contact.PrimaryName(),
 		Message:   contactRequest,
 		Type:      ActivityCenterNotificationTypeContactRequest,
@@ -1009,7 +1009,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 			// Device 1 processes this, but device 2 doesn't due to an error `ErrRecordNotFound` from `m.persistence.MessageByID(contactRequestID)`.
 			// The correct notification ID on device 2 should be defaultContactRequestID(contact.ID).
 			// Thus, we must sync the accepted decision to device 2.
-			err = m.syncActivityCenterAcceptedByIDs(context.TODO(), []types.HexBytes{types.FromHex(defaultContactRequestID(contact.ID))}, m.GetCurrentTimeInMillis())
+			err = m.syncActivityCenterAcceptedByIDs(context.TODO(), []types3.HexBytes{types3.FromHex(defaultContactRequestID(contact.ID))}, m.GetCurrentTimeInMillis())
 			if err != nil {
 				m.logger.Warn("could not sync activity center notification as accepted", zap.Error(err))
 			}
@@ -1086,7 +1086,7 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 	state.Response.AddChat(chat)
 
 	notification := &ActivityCenterNotification{
-		ID:        types.FromHex(uuid.New().String()),
+		ID:        types3.FromHex(uuid.New().String()),
 		Type:      ActivityCenterNotificationTypeContactRemoved,
 		Name:      contact.PrimaryName(),
 		Author:    contact.ID,
@@ -1246,7 +1246,7 @@ func (m *Messenger) HandleSyncPairInstallation(ctx context.Context, state *Recei
 }
 
 func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, magnetlink string, clock uint64) error {
-	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
+	id := types3.HexBytes(crypto.CompressPubkey(communityPubKey))
 
 	community, err := m.communitiesManager.GetByID(id)
 	if err != nil && err != communities.ErrOrgNotFound {
@@ -1287,7 +1287,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			m.archiveManager.UnseedHistoryArchiveTorrent(id)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
-			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
+			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types3.HexBytes) {
 				defer gocommon.LogOnPanic()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
@@ -1320,7 +1320,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 	return nil
 }
 
-func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetlink string, cancel chan struct{}) {
+func (m *Messenger) downloadAndImportHistoryArchives(id types3.HexBytes, magnetlink string, cancel chan struct{}) {
 	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
 	if err != nil {
 		logMsg := "failed to download history archive data"
@@ -1357,11 +1357,11 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 	err = m.importHistoryArchives(id, cancel)
 	if err != nil {
 		m.logger.Error("failed to import history archives", zap.Error(err))
-		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types3.EncodeHex(id))
 		return
 	}
 
-	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types3.EncodeHex(id))
 }
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
@@ -1436,7 +1436,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(ctx context.Context, stat
 		notification.UpdatedAt = updatedAt
 		// we shouldn't sync deleted notification here,
 		// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
-		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), updatedAt)
+		err = m.persistence.DeleteActivityCenterNotificationByID(types3.FromHex(requestToJoin.ID.String()), updatedAt)
 		if err != nil {
 			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
 			return err
@@ -1477,7 +1477,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 
 		// Activity Center notification, new for pending state
 		notification := &ActivityCenterNotification{
-			ID:               types.FromHex(requestToJoin.ID.String()),
+			ID:               types3.FromHex(requestToJoin.ID.String()),
 			Type:             ActivityCenterNotificationTypeCommunityMembershipRequest,
 			Timestamp:        m.getTimesource().GetCurrentTime(),
 			Author:           contact.ID,
@@ -1897,7 +1897,7 @@ func (m *Messenger) handleDeleteMessage(ctx context.Context, state *ReceivedMess
 		state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
 		state.Response.AddNotification(DeletedMessageNotification(messageToDelete.ID, chat))
 		state.Response.AddActivityCenterNotification(&ActivityCenterNotification{
-			ID:      types.FromHex(messageToDelete.ID),
+			ID:      types3.FromHex(messageToDelete.ID),
 			Deleted: true,
 		})
 
@@ -2091,7 +2091,7 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 	}
 
 	if chat.ChatType == ChatTypeCommunityChat {
-		communityID, err := types.DecodeHex(chat.CommunityID)
+		communityID, err := types3.DecodeHex(chat.CommunityID)
 		if err != nil {
 			return err
 		}
@@ -2274,7 +2274,7 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 			receivedMessage.CommunityID = description.ID
 		} else {
 			// Backward compatibility
-			receivedMessage.CommunityID = types.EncodeHex(crypto.CompressPubkey(signer))
+			receivedMessage.CommunityID = types3.EncodeHex(crypto.CompressPubkey(signer))
 		}
 	}
 
@@ -2653,7 +2653,7 @@ func (m *Messenger) HandleGroupChatInvitation(ctx context.Context, state *Receiv
 	//From is the PK of author of invitation request
 	if groupChatInvitation.State == protobuf.GroupChatInvitation_REJECTED {
 		//rejected so From is the current user who received this rejection
-		groupChatInvitation.From = types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
+		groupChatInvitation.From = types3.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
 	} else {
 		//invitation request, so From is the author of message
 		groupChatInvitation.From = state.CurrentMessageState.Contact.ID
@@ -2980,7 +2980,7 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount,
 	}
 
 	accountsOperability := accsmanagementtypes.AccountNonOperable
-	dbAccount, err := m.settings.GetAccountByAddress(types.BytesToAddress(syncAcc.Address))
+	dbAccount, err := m.settings.GetAccountByAddress(types3.BytesToAddress(syncAcc.Address))
 	if err != nil && err != accounts.ErrDbAccountNotFound {
 		return accountsOperability, err
 	}
@@ -3128,7 +3128,7 @@ func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPo
 	var accs []*accsmanagementtypes.Account
 	for _, sAcc := range message.Accounts {
 		acc := &accsmanagementtypes.Account{
-			Address:  types.BytesToAddress(sAcc.Address),
+			Address:  types3.BytesToAddress(sAcc.Address),
 			KeyUID:   sAcc.KeyUid,
 			Position: sAcc.Position,
 		}
@@ -3197,7 +3197,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		Removed:                 message.Removed,
 	}
 
-	oldAddresses := make(map[types.Address]bool)
+	oldAddresses := make(map[types3.Address]bool)
 
 	if dbKeypair != nil {
 		if dbKeypair.Clock >= kp.Clock {
@@ -3587,7 +3587,7 @@ func (m *Messenger) addNewKeypairAddedOnPairedDeviceACNotification(keyUID string
 	}
 
 	notification := &ActivityCenterNotification{
-		ID:        types.FromHex(uuid.New().String()),
+		ID:        types3.FromHex(uuid.New().String()),
 		Type:      ActivityCenterNotificationTypeNewKeypairAddedToPairedDevice,
 		Timestamp: m.getTimesource().GetCurrentTime(),
 		Read:      false,

@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	"github.com/status-im/status-go/accounts-management/types"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	multiaccscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 )
 
@@ -174,7 +174,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 	chatDerivedAccount, ok := derivedAccounts[common.PathEIP1581Chat]
 	if ok {
 		keypair.Accounts = append(keypair.Accounts, &types.Account{
-			PublicKey:          cryptotypes.Hex2Bytes(chatDerivedAccount.PublicKeyHex()),
+			PublicKey:          types2.Hex2Bytes(chatDerivedAccount.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            chatDerivedAccount.Address(),
 			Chat:               profile,
@@ -194,7 +194,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 	walletDerivedAccount, ok := derivedAccounts[walletAccount.Path]
 	if ok {
 		keypair.Accounts = append(keypair.Accounts, &types.Account{
-			PublicKey:          cryptotypes.Hex2Bytes(walletDerivedAccount.PublicKeyHex()),
+			PublicKey:          types2.Hex2Bytes(walletDerivedAccount.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            walletDerivedAccount.Address(),
 			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
@@ -212,7 +212,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 		keypair.DerivedFrom = ""
 
 		keypair.Accounts = append(keypair.Accounts, &types.Account{
-			PublicKey:          cryptotypes.Hex2Bytes(account.PublicKeyHex()),
+			PublicKey:          types2.Hex2Bytes(account.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            account.Address(),
 			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
@@ -348,7 +348,7 @@ func (m *AccountsManager) MakePrivateKeyKeypairFullyOperable(privateKey string, 
 	return kp.KeyUID, m.persistence.MarkKeypairFullyOperable(kp.KeyUID, clock, true)
 }
 
-func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password string) (addresses []cryptotypes.Address, err error) {
+func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password string) (addresses []types2.Address, err error) {
 	if password == "" {
 		return nil, ErrNoPasswordProvided
 	}
@@ -374,7 +374,7 @@ func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password str
 			if acc.Operable != types.AccountPartiallyOperable {
 				continue
 			}
-			_, err = m.deriveChildAccountForPathAndStore(cryptotypes.HexToAddress(kp.DerivedFrom), acc.Path, password)
+			_, err = m.deriveChildAccountForPathAndStore(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return
 			}
@@ -428,7 +428,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 				}
 			}
 
-			childAccount, err := m.deriveChildAccountForPath(cryptotypes.HexToAddress(kp.DerivedFrom), acc.Path, password)
+			childAccount, err := m.deriveChildAccountForPath(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return err
 			}
@@ -448,7 +448,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 
 	if !kp.MigratedToKeycard() {
 		for _, acc := range accounts {
-			_, err := m.deriveChildAccountForPathAndStore(cryptotypes.HexToAddress(kp.DerivedFrom), acc.Path, password)
+			_, err := m.deriveChildAccountForPathAndStore(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return err
 			}
@@ -490,7 +490,7 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 	}
 
 	if !profileKeypair.MigratedToKeycard() {
-		_, err = m.loadAccountInternally(cryptotypes.HexToAddress(profileKeypair.DerivedFrom), password)
+		_, err = m.loadAccountInternally(types2.HexToAddress(profileKeypair.DerivedFrom), password)
 		if err != nil {
 			return "", ErrWrongPasswordProvided(err)
 		}
@@ -548,7 +548,7 @@ func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, password s
 	return nil
 }
 
-func (m *AccountsManager) DeleteAccount(address cryptotypes.Address, password string, clock uint64) (account *types.Account, err error) {
+func (m *AccountsManager) DeleteAccount(address types2.Address, password string, clock uint64) (account *types.Account, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

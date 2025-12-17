@@ -3,7 +3,7 @@ package personal
 import (
 	"errors"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 // SignParams required to sign messages

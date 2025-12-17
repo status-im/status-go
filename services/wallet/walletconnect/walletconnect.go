@@ -17,7 +17,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/typeddata"

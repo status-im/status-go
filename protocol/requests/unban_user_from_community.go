@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 var ErrUnbanUserFromCommunityInvalidCommunityID = errors.New("unban-user-from-community: invalid community id")

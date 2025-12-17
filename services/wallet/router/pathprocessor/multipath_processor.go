@@ -3,7 +3,7 @@ package pathprocessor
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
@@ -32,7 +32,7 @@ func (t *MultipathProcessorTxArgs) Value() *big.Int {
 	return walletCommon.ZeroBigIntValue()
 }
 
-func (t *MultipathProcessorTxArgs) From() types.Address {
+func (t *MultipathProcessorTxArgs) From() types2.Address {
 	if t.TransferTx != nil && t.TransferTx.To != nil {
 		return t.TransferTx.From
 	} else if t.HopTx != nil {
@@ -43,33 +43,33 @@ func (t *MultipathProcessorTxArgs) From() types.Address {
 		return t.ERC1155TransferTx.From
 	}
 
-	return types.HexToAddress("0x0")
+	return types2.HexToAddress("0x0")
 }
 
-func (t *MultipathProcessorTxArgs) To() types.Address {
+func (t *MultipathProcessorTxArgs) To() types2.Address {
 	if t.TransferTx != nil && t.TransferTx.To != nil {
 		return *t.TransferTx.To
 	} else if t.HopTx != nil {
-		return types.Address(t.HopTx.Recipient)
+		return types2.Address(t.HopTx.Recipient)
 	} else if t.ERC721TransferTx != nil {
-		return types.Address(t.ERC721TransferTx.Recipient)
+		return types2.Address(t.ERC721TransferTx.Recipient)
 	} else if t.ERC1155TransferTx != nil {
-		return types.Address(t.ERC1155TransferTx.Recipient)
+		return types2.Address(t.ERC1155TransferTx.Recipient)
 	}
 
-	return types.HexToAddress("0x0")
+	return types2.HexToAddress("0x0")
 }
 
-func (t *MultipathProcessorTxArgs) Data() types.HexBytes {
+func (t *MultipathProcessorTxArgs) Data() types2.HexBytes {
 	if t.TransferTx != nil && t.TransferTx.To != nil {
 		return t.TransferTx.Data
 	} else if t.HopTx != nil {
-		return types.HexBytes("")
+		return types2.HexBytes("")
 	} else if t.ERC721TransferTx != nil {
-		return types.HexBytes("")
+		return types2.HexBytes("")
 	} else if t.ERC1155TransferTx != nil {
-		return types.HexBytes("")
+		return types2.HexBytes("")
 	}
 
-	return types.HexBytes("")
+	return types2.HexBytes("")
 }

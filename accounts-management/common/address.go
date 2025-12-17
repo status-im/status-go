@@ -1,8 +1,8 @@
 package common
 
 import (
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 func CreateAddress() (address, pubKey, privKey string, err error) {

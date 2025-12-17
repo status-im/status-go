@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
@@ -48,14 +48,14 @@ type RPCCommand interface {
 }
 
 type RequestAccountsAcceptedArgs struct {
-	RequestID string        `json:"requestId"`
-	Account   types.Address `json:"account"`
-	ChainID   uint64        `json:"chainId"`
+	RequestID string         `json:"requestId"`
+	Account   types2.Address `json:"account"`
+	ChainID   uint64         `json:"chainId"`
 }
 
 type SendTransactionAcceptedArgs struct {
-	RequestID string     `json:"requestId"`
-	Hash      types.Hash `json:"hash"`
+	RequestID string      `json:"requestId"`
+	Hash      types2.Hash `json:"hash"`
 }
 
 type SignAcceptedArgs struct {
@@ -73,18 +73,18 @@ type RecallDAppPermissionsArgs struct {
 }
 
 type ChangeAccountArgs struct {
-	URL      string        `json:"url"`
-	Account  types.Address `json:"account"`
-	ClientID string        `json:"clientId"`
+	URL      string         `json:"url"`
+	Account  types2.Address `json:"account"`
+	ClientID string         `json:"clientId"`
 }
 
 type ClientSideHandlerInterface interface {
-	RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error)
+	RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types2.Address, uint64, error)
 	RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error
 	RequestAccountsRejected(args RejectedArgs) error
 	RecallDAppPermissions(args RecallDAppPermissionsArgs) error
 
-	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *wallettypes.SendTxArgs) (types.Hash, error)
+	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *wallettypes.SendTxArgs) (types2.Hash, error)
 	SendTransactionAccepted(args SendTransactionAcceptedArgs) error
 	SendTransactionRejected(args RejectedArgs) error
 
@@ -122,7 +122,7 @@ func (c *ChangeAccountArgs) Validate() error {
 	if c.ClientID == "" || c.URL == "" {
 		return ErrEmptyRPCParams
 	}
-	if c.Account == types.ZeroAddress() {
+	if c.Account == types2.ZeroAddress() {
 		return ErrEmptyRPCParams
 	}
 	return nil

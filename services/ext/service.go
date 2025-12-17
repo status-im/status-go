@@ -20,8 +20,8 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/images"
@@ -59,8 +59,8 @@ const providerID = "community"
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(types.Hash, types.Hash, []byte, error)
-	MailServerRequestExpired(types.Hash)
+	MailServerRequestCompleted(types2.Hash, types2.Hash, []byte, error)
+	MailServerRequestExpired(types2.Hash)
 }
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
@@ -413,7 +413,7 @@ func tokenURIToCommunityID(tokenURI string) string {
 		return ""
 	}
 
-	communityID := types.EncodeHex(crypto.CompressPubkey(pubKey))
+	communityID := types2.EncodeHex(crypto.CompressPubkey(pubKey))
 
 	return communityID
 }

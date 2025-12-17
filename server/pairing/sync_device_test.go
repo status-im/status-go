@@ -17,7 +17,7 @@ import (
 	accsmanagementcommon "github.com/status-im/status-go/accounts-management/common"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	testutils2 "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/backend"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"

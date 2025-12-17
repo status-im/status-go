@@ -11,8 +11,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -548,7 +548,7 @@ func deleteCommunityCategory(base CommunityEventsTestsInterface, communityID str
 
 func reorderCategory(base CommunityEventsTestsInterface, reorderRequest *requests.ReorderCommunityCategories) {
 	checkCategoryReorder := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(reorderRequest.CommunityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(reorderRequest.CommunityID))
 		if err != nil {
 			return err
 		}
@@ -576,7 +576,7 @@ func reorderCategory(base CommunityEventsTestsInterface, reorderRequest *request
 
 func reorderChannel(base CommunityEventsTestsInterface, reorderRequest *requests.ReorderCommunityChat) {
 	checkChannelReorder := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(reorderRequest.CommunityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(reorderRequest.CommunityID))
 		if err != nil {
 			return err
 		}
@@ -606,9 +606,9 @@ func reorderChannel(base CommunityEventsTestsInterface, reorderRequest *requests
 	checkClientsReceivedAdminEvent(base, checkChannelReorder)
 }
 
-func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, pubkey string) {
+func kickMember(base CommunityEventsTestsInterface, communityID types2.HexBytes, pubkey string) {
 	checkKicked := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(communityID))
 		if err != nil {
 			return err
 		}
@@ -633,14 +633,14 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 	s.Require().NoError(err)
 
 	// 1. event sender should get pending state for kicked member
-	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+	modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(communityID))
 	s.Require().NoError(err)
 	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
 	s.Require().Equal(communities.CommunityMemberKickPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
 
 	// 2. wait for event as a sender
 	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(communityID))
 		if err != nil {
 			return err
 		}
@@ -658,7 +658,7 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 
 	// 3. wait for event as the community member and check we are still until control node gets it
 	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(communityID))
 		if err != nil {
 			return err
 		}
@@ -689,7 +689,7 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 	communityStr := banRequest.CommunityID.String()
 
 	checkBanned := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(banRequest.CommunityID))
 		if err != nil {
 			return err
 		}
@@ -726,14 +726,14 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 	s.Require().NoError(err)
 
 	// 1. event sender should get pending state for ban member
-	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+	modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(banRequest.CommunityID))
 	s.Require().NoError(err)
 	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
 	s.Require().Equal(communities.CommunityMemberBanPending, modifiedCommmunity.PendingAndBannedMembers()[bannedPK])
 
 	verifier := "event sender"
 	verifyPendingState := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(banRequest.CommunityID))
 		if err != nil {
 			return err
 		}
@@ -792,7 +792,7 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 	pubkey := crypto.PubkeyToHex(&base.GetMember().identity.PublicKey)
 
 	checkUnbanned := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(unbanRequest.CommunityID))
 		if err != nil {
 			return err
 		}
@@ -814,13 +814,13 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 	s.Require().NoError(err)
 
 	// 1. event sender should get pending state for unban member
-	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+	modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(unbanRequest.CommunityID))
 	s.Require().NoError(err)
 	s.Require().Equal(communities.CommunityMemberUnbanPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
 
 	// 2. wait for event as a sender
 	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(unbanRequest.CommunityID))
 		if err != nil {
 			return err
 		}
@@ -834,7 +834,7 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 
 	// 3. wait for event as the community member and check we are still until control node gets it
 	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+		modifiedCommmunity, err := getModifiedCommunity(response, types2.EncodeHex(unbanRequest.CommunityID))
 		if err != nil {
 			return err
 		}
@@ -2147,7 +2147,7 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 	waitAndCheckRequestsToJoin(s, base.GetEventSender(), expectedLength, community.ID(), false)
 }
 
-func waitAndCheckRequestsToJoin(s *suite.Suite, user *Messenger, expectedLength int, communityID types.HexBytes, checkRevealedAddresses bool) {
+func waitAndCheckRequestsToJoin(s *suite.Suite, user *Messenger, expectedLength int, communityID types2.HexBytes, checkRevealedAddresses bool) {
 	_, err := WaitOnMessengerResponse(
 		user,
 		func(r *MessengerResponse) bool {
@@ -2464,7 +2464,7 @@ func testBanMemberWithDeletingAllMessages(base CommunityEventsTestsInterface, co
 	banMember(base, banRequest)
 }
 
-func testSendRequestToJoin(base CommunityEventsTestsInterface, user *Messenger, communityID types.HexBytes) types.HexBytes {
+func testSendRequestToJoin(base CommunityEventsTestsInterface, user *Messenger, communityID types2.HexBytes) types2.HexBytes {
 	s := base.GetSuite()
 	userPk := user.IdentityPublicKeyString()
 	userPassword := base.GetAccountsPasswords()[userPk]

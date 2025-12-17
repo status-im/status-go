@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 var ErrAcceptLatestContactRequestForContactInvalidID = errors.New("accept-latest-contact-request-for-contact: invalid id")
