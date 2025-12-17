@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestPersistenceSuite(t *testing.T) {
@@ -22,7 +22,7 @@ type PersistenceSuite struct {
 }
 
 func (s *PersistenceSuite) SetupTest() {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
 	err = sqlite.Migrate(db)
 	s.Require().NoError(err)

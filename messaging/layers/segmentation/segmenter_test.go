@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/segmentation/migrations"
 	"github.com/status-im/status-go/messaging/layers/segmentation/protobuf"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestMessageSegmentationSuite(t *testing.T) {
@@ -34,7 +34,7 @@ func (s *MessageSegmentationSuite) SetupSuite() {
 }
 
 func (s *MessageSegmentationSuite) SetupTest() {
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

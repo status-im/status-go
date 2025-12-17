@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
@@ -18,15 +19,14 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
-	"github.com/status-im/status-go/t/helpers"
 	t_common "github.com/status-im/status-go/tests-unit-network/common"
 )
 
 func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	walletSecrets := t_common.GetWalletSecretsConfigFromEnv()

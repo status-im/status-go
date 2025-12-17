@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/common/migrations"
 	"github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestConfirmations(t *testing.T) {
@@ -25,7 +25,7 @@ func TestConfirmations(t *testing.T) {
 	publicKey2 := []byte("pk-2")
 	publicKey3 := []byte("pk-3")
 
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,
@@ -94,7 +94,7 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	publicKey2 := []byte("pk-2")
 	publicKey3 := []byte("pk-3")
 
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,
@@ -136,7 +136,7 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 }
 
 func TestSaveHashRatchetMessage(t *testing.T) {
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,
@@ -177,7 +177,7 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 }
 
 func TestDeleteHashRatchetMessage(t *testing.T) {
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

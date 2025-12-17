@@ -19,9 +19,9 @@ import (
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type testMessengerConfig struct {
@@ -91,11 +90,11 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 	if err != nil {
 		return nil, err
 	}
-	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}
-	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/brianvoe/gofakeit/v7"
+	"github.com/pkg/errors"
+
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
@@ -567,4 +570,25 @@ func (c *Contact) ContactRequestPropagatedState() *protobuf.ContactRequestPropag
 		RemoteClock: c.ContactRequestRemoteClock,
 		RemoteState: uint64(c.ContactRequestRemoteState),
 	}
+}
+
+type contactFakeWrapper Contact
+
+func (c *Contact) Fake(faker *gofakeit.Faker) (any, error) {
+	// Use a dummy wrapper to prevent recursion
+	var contactWrapper contactFakeWrapper
+	err := faker.Struct(&contactWrapper)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate fake contact")
+	}
+
+	contact := (*Contact)(&contactWrapper)
+
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate fake contact")
+	}
+
+	contact.ID = ContactIDFromPublicKey(&privateKey.PublicKey)
+	return *contact, nil
 }

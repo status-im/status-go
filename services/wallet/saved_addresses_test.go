@@ -11,7 +11,7 @@ import (
 
 	multiAccCommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 )
 
 func setupTestSavedAddressesDB(t *testing.T) (*SavedAddressesManager, func()) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	return &SavedAddressesManager{db}, func() {

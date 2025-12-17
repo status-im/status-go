@@ -18,6 +18,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/common"
 	commonmigrations "github.com/status-im/status-go/messaging/common/migrations"
 	"github.com/status-im/status-go/messaging/layers/encryption"
@@ -29,7 +30,6 @@ import (
 	transportmigrations "github.com/status-im/status-go/messaging/layers/transport/migrations"
 	"github.com/status-im/status-go/messaging/types"
 	wakuv2 "github.com/status-im/status-go/messaging/waku"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestProcessorSuite(t *testing.T) {
@@ -55,7 +55,7 @@ func (s *ProcessorSuite) SetupTest() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     transportmigrations.AssetNames(),
 			AssetFunc: transportmigrations.Asset,
@@ -190,7 +190,7 @@ func (s *ProcessorSuite) TestProcessMessageDatasyncEncrypted() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	senderDatabase, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     encryptionmigrations.AssetNames(),
 			AssetFunc: encryptionmigrations.Asset,
@@ -236,7 +236,7 @@ func (s *ProcessorSuite) TestHandleOutOfOrderHashRatchet() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	senderDatabase, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     encryptionmigrations.AssetNames(),
 			AssetFunc: encryptionmigrations.Asset,

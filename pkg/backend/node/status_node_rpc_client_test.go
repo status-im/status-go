@@ -14,9 +14,8 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/testutils"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type TestServiceAPI struct{}
@@ -26,12 +25,12 @@ func (api *TestServiceAPI) SomeMethod(_ context.Context) (string, error) {
 }
 
 func setupTestDBs() (appDB *sql.DB, walletDB *sql.DB, closeFn func() error, err error) {
-	appDB, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, err = testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to setup app db: %w", err)
 	}
 
-	walletDB, err = helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err = testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to setup wallet db: %w", err)
 	}

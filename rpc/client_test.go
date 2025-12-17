@@ -16,17 +16,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/t/helpers"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "rpc-network-tests")
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "rpc-network-tests")
 	require.NoError(t, err)
 	return db, func() { require.NoError(t, cleanup()) }
 }

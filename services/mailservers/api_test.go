@@ -6,13 +6,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) *Database {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "maliservers-tests-")
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "maliservers-tests-")
 	require.NoError(t, err)
 	err = sqlite.Migrate(db) // migrate default
 	require.NoError(t, err)

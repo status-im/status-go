@@ -10,11 +10,11 @@ import (
 
 	"github.com/status-im/status-go/internal/centralizedmetrics/common"
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 func openTestDB() (*sql.DB, error) {
-	db, err := helpers.SetupTestMemorySQLAccountsDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLAccountsDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}

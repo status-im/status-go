@@ -15,8 +15,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/messaging/layers/encryption/migrations"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 var cleartext = []byte("hello")
@@ -38,7 +38,7 @@ type EncryptionServiceTestSuite struct {
 func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 	var err error
 
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,
@@ -55,7 +55,7 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		trace.NewNoopTracer(),
 	)
 
-	db, err = helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err = testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

@@ -17,7 +17,8 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/pkg/testutils"
+	testutils2 "github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -66,7 +67,7 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 
 func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) map[string]images.IdentityImage {
 	keyUID := m.IdentityPublicKeyString()
-	iis := testutils.SampleIdentityImages()
+	iis := fake.IdentityImages()
 
 	err := m.multiAccounts.StoreIdentityImages(keyUID, iis, false)
 	s.Require().NoError(err)
@@ -193,7 +194,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 		b.MaxElapsedTime = 2 * time.Second
 	}
 
-	err = testutils.RetryWithBackOff(func() error {
+	err = testutils2.RetryWithBackOff(func() error {
 
 		response, err = s.alice.RetrieveAll()
 		if err != nil {
@@ -364,7 +365,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		b.MaxElapsedTime = 2 * time.Second
 	}
 
-	err = testutils.RetryWithBackOff(func() error {
+	err = testutils2.RetryWithBackOff(func() error {
 		response, err := bob.RetrieveAll()
 		if err != nil {
 			return err

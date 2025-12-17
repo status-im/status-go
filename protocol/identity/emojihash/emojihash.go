@@ -1,14 +1,10 @@
 package emojihash
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"math/big"
-	"strings"
 
 	"github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/static"
 )
 
 const (
@@ -16,16 +12,8 @@ const (
 	emojiHashLen     = 14
 )
 
-var emojisAlphabet []string
-
 func GenerateFor(pubkey string) ([]string, error) {
-	if len(emojisAlphabet) == 0 {
-		alphabet, err := loadAlphabet()
-		if err != nil {
-			return nil, err
-		}
-		emojisAlphabet = *alphabet
-	}
+	loadAlphabet()
 
 	compressedKey, err := identity.ToCompressedKey(pubkey)
 	if err != nil {
@@ -38,28 +26,6 @@ func GenerateFor(pubkey string) ([]string, error) {
 	}
 
 	return toEmojiHash(new(big.Int).SetBytes(slices[1]), emojiHashLen, &emojisAlphabet)
-}
-
-func loadAlphabet() (*[]string, error) {
-	data, err := static.Asset("emojis.txt")
-	if err != nil {
-		return nil, err
-	}
-
-	alphabet := make([]string, 0, emojiAlphabetLen)
-
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		alphabet = append(alphabet, strings.Replace(scanner.Text(), "\n", "", -1))
-	}
-
-	// current alphabet contains more emojis than needed, just in case some emojis needs to be removed
-	// make sure only necessary part is loaded
-	if len(alphabet) > emojiAlphabetLen {
-		alphabet = alphabet[:emojiAlphabetLen]
-	}
-
-	return &alphabet, nil
 }
 
 func toEmojiHash(value *big.Int, hashLen int, alphabet *[]string) (hash []string, err error) {

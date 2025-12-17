@@ -1,4 +1,4 @@
-package helpers
+package testutils
 
 import (
 	"database/sql"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
-	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/internal/db/sqlite"
 )
 
 const kdfIterationsNumberForTests = 1
@@ -55,37 +55,6 @@ func SetupTestMemorySQLAccountsDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, 
 	return db.DB(), nil
 }
 
-func ColumnExists(db *sql.DB, tableName string, columnName string) (bool, error) {
-	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
-	if err != nil {
-		return false, err
-	}
-	defer rows.Close()
-
-	var cid int
-	var name string
-	var dataType string
-	var notNull bool
-	var dFLTValue sql.NullString
-	var pk int
-
-	for rows.Next() {
-		err := rows.Scan(&cid, &name, &dataType, &notNull, &dFLTValue, &pk)
-		if err != nil {
-			return false, err
-		}
-		if name == columnName {
-			return true, nil
-		}
-	}
-
-	if rows.Err() != nil {
-		return false, rows.Err()
-	}
-
-	return false, nil
-}
-
 type TestDBInitializer struct {
 	assetSources []*bindata.AssetSource
 }
@@ -97,13 +66,13 @@ func NewTestDBInitializer(assetSource []*bindata.AssetSource) TestDBInitializer 
 }
 
 func (dbi TestDBInitializer) Initialize(dbPath string, password string, kdfIterations int) (*sql.DB, error) {
-	db, err := sqlite2.OpenDB(dbPath, password, kdfIterations)
+	db, err := sqlite.OpenDB(dbPath, password, kdfIterations)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, as := range dbi.assetSources {
-		err = sqlite2.Migrate(db, as, sqlite2.MigrateOptions{
+		err = sqlite.Migrate(db, as, sqlite.MigrateOptions{
 			MigrationTableName: "status_schema_migrations_" + fmt.Sprintf("%x", uuid.New()),
 		})
 		if err != nil {

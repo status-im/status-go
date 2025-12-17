@@ -8,8 +8,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	testutils2 "github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/pkg/testutils"
 )
 
 func TestMessengerSyncProfilePictureSuite(t *testing.T) {
@@ -63,14 +64,14 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 		highClock = 10
 	)
 
-	iis := testutils.SampleIdentityImages()
+	iis := fake.IdentityImages()
 	for i := range iis {
 		iis[i].Clock = highClock
 	}
 	s.Require().NoError(s.m.multiAccounts.StoreIdentityImages(keyUID, iis, true))
 
 	// Wait for the message to reach its destination
-	err = testutils.RetryWithBackOff(func() error {
+	err = testutils2.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -100,7 +101,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	for i := range iis {
 		iis[i].Clock = lowClock
 	}
-	iis2 := testutils.SampleIdentityImages()
+	iis2 := fake.IdentityImages()
 	for i := range iis2 {
 		iis2[i].Name = fmt.Sprintf("newimg%d", i)
 		iis2[i].Clock = highClock
@@ -108,7 +109,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	iis = append(iis, iis2...)
 	s.Require().NoError(s.m.multiAccounts.StoreIdentityImages(keyUID, iis, true))
 
-	err = testutils.RetryWithBackOff(func() error {
+	err = testutils2.RetryWithBackOff(func() error {
 		response, err = theirMessenger.RetrieveAll()
 		if err != nil {
 			return err

@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/nodecfg"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
-	db, cleanup, err := helpers.SetupTestSQLDB(DbInitializer{}, "settings-tests-")
+	db, cleanup, err := testutils.SetupTestSQLDB(DbInitializer{}, "settings-tests-")
 	require.NoError(t, err)
 
 	t.Cleanup(func() { require.NoError(t, cleanup()) })

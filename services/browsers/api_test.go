@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "browsers-tests")
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "browsers-tests")
 	require.NoError(t, err)
 	return NewDB(db), func() { require.NoError(t, cleanup()) }
 }

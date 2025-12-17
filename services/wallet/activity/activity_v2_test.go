@@ -20,6 +20,7 @@ import (
 
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -31,7 +32,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 const (
@@ -67,7 +67,7 @@ var (
 
 // setupTestDB creates an in-memory SQLite database for testing
 func setupTestDB(t *testing.T) (*sql.DB, func()) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	return db, func() {

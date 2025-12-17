@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type NetworksPersistenceTestSuite struct {
@@ -24,7 +24,7 @@ type NetworksPersistenceTestSuite struct {
 }
 
 func (s *NetworksPersistenceTestSuite) SetupTest() {
-	memDb, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "networks-tests")
+	memDb, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "networks-tests")
 	s.Require().NoError(err)
 	s.db = memDb
 	s.cleanup = cleanup

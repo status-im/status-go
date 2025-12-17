@@ -1,12 +1,10 @@
-package testutils
+package fake
 
 import (
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
-	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/images"
 )
@@ -16,7 +14,7 @@ var (
 	testPngBytes  = []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48}
 )
 
-func SampleIdentityImages() []images.IdentityImage {
+func IdentityImages() []images.IdentityImage {
 	return []images.IdentityImage{
 		{
 			Name:         images.SmallDimName,
@@ -39,11 +37,12 @@ func SampleIdentityImages() []images.IdentityImage {
 	}
 }
 
-func SaveFakeImage(t *testing.T, width int, height int) string {
-	tempdir := t.TempDir()
+func SaveImage(dir string, width int, height int) (string, error) {
 	payload := gofakeit.ImagePng(width, height)
-	imagePath := filepath.Join(tempdir, gofakeit.LetterN(5)+".jpg")
+	imagePath := filepath.Join(dir, gofakeit.LetterN(5)+".jpg")
 	err := os.WriteFile(imagePath, payload, 0600)
-	require.NoError(t, err)
-	return imagePath
+	if err != nil {
+		return "", err
+	}
+	return imagePath, nil
 }

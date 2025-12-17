@@ -13,12 +13,12 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	db, stop, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-tests-")
+	db, stop, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-tests-")
 	require.NoError(t, err)
 	d, err := NewDB(db)
 	require.NoError(t, err)
