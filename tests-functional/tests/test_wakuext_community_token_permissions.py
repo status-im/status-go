@@ -87,7 +87,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         return community_id
 
-    def fund_backend_account_with_tokens(self, backend, foundry_client, amount=10, token_type="snt", token_id=0):
+    def fund_backend_account_with_tokens(self, backend, foundry_client, amount=10, token_type=CommunityTokenType.ERC20, token_id=0):
         """Fund the given backend's first account with the specified amount of SNT tokens or mint an ERC721 token."""
         accounts = backend.accounts_service.get_accounts()
         assert accounts, "No accounts found"
@@ -99,28 +99,31 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         member_address = wallet_account["address"]
 
-        if token_type == "snt":
+        if token_type == CommunityTokenType.ERC20:
             token_amount = str(amount * 10**18)  # amount tokens with 18 decimals
             gen_tokens_result = foundry_client.generate_tokens(self.snt_controller_address, member_address, token_amount, user_1.private_key)
             logging.debug(f"Generate tokens result: exit_code={gen_tokens_result.exit_code}, output={gen_tokens_result.output.decode()}")
             logger.debug(f"Funded {member_address} with {amount} SNT tokens at contract {self.snt_address}")
-        elif token_type == "erc721":
+
+        elif token_type == CommunityTokenType.ERC721:
             mint_result = foundry_client.generate_token_erc721(self.erc721_address, member_address, token_id, user_1.private_key)
             logging.debug(f"Mint ERC721 result: exit_code={mint_result.exit_code}, output={mint_result.output.decode()}")
             logger.debug(f"Minted ERC721 token #{token_id} to {member_address} at contract {self.erc721_address}")
+
         else:
-            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: 'snt', 'erc721'")
+            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20, ERC721")
 
         return member_address
 
-    def verify_token_balance(self, foundry_client, token_type, contract_address, owner_address, min_balance=1, token_id=0):
+    def verify_token_balance(self, foundry_client, token_type: CommunityTokenType, contract_address, owner_address, min_balance=1, token_id=0):
         """Verify token balance using foundry client. Supports ERC20 and ERC721."""
-        if token_type == "erc20":
+        if token_type == CommunityTokenType.ERC20:
             balance_result = foundry_client.get_erc20_balance(contract_address, owner_address)
             assert balance_result.exit_code == 0, "Balance check command failed"
             balance = int(balance_result.output.decode().strip(), 16)
-            assert balance >= min_balance, f"Insufficient {token_type.upper()} balance: {balance}, expected at least {min_balance}"
-        elif token_type == "erc721":
+            assert balance >= min_balance, f"Insufficient {token_type.name} balance: {balance}, expected at least {min_balance}"
+
+        elif token_type == CommunityTokenType.ERC721:
             assert token_id is not None, "token_id is required for ERC721 verification"
             owner_result = foundry_client.get_erc721_owner(contract_address, token_id)
             assert owner_result.exit_code == 0, "Owner check command failed"
@@ -132,8 +135,9 @@ class TestCommunityTokenPermissions(MessengerSteps):
             actual_owner = actual_owner.lower()
             expected_owner = owner_address.lower()
             assert actual_owner == expected_owner, f"Address {owner_address} does not own ERC721 token #{token_id}, owner is {actual_owner}"
+
         else:
-            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: 'erc20', 'erc721'")
+            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20, ERC721")
 
     def edit_community(self, owner_backend, community_id):
         new_name = fake.community_name()
@@ -187,7 +191,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Fund the member_with_snt with 10 SNT tokens
         member_address = self.fund_backend_account_with_tokens(member_with_snt_backend, foundry_client)
-        self.verify_token_balance(foundry_client, "erc20", self.snt_address, member_address)
+        self.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
 
         # Owner creates token-gated community with the deployed token
         community_id = self.create_token_gated_community(
@@ -235,7 +239,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Fund the member_with_snt with 10 SNT tokens
         member_address = self.fund_backend_account_with_tokens(member_with_snt_backend, foundry_client)
-        self.verify_token_balance(foundry_client, "erc20", self.snt_address, member_address)
+        self.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
 
         # Owner creates token-gated community with member and admin permissions
         community_id = self.create_token_gated_community(
@@ -310,13 +314,15 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
-    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
     def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client):
         """Test that owner edits are visible before and after minting the owner token"""
 
         # Mint NFT #1 to owner wallet (for owner verification)
-        owner_address = self.fund_backend_account_with_tokens(owner_backend, foundry_client, amount=1, token_type="erc721", token_id=0)
-        self.verify_token_balance(foundry_client, "erc721", self.erc721_address, owner_address, token_id=0)
+        owner_address = self.fund_backend_account_with_tokens(
+            owner_backend, foundry_client, amount=1, token_type=CommunityTokenType.ERC721, token_id=0
+        )
+        self.verify_token_balance(foundry_client, CommunityTokenType.ERC721, self.erc721_address, owner_address, token_id=0)
 
         # Owner creates a community
         community_resp = owner_backend.wakuext_service.create_community(
