@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/services/wallet"
 )
 

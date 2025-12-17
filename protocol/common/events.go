@@ -3,7 +3,7 @@ package common
 import (
 	"crypto/ecdsa"
 
-	messagingevents "github.com/status-im/status-go/messaging/events"
+	messagingevents "github.com/status-im/status-go/pkg/messaging/events"
 )
 
 type MessageEvent struct {

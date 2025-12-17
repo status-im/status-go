@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 func (m *Messenger) dispatchToHandler(ctx context.Context, messageState *ReceivedMessageState, protoBytes []byte, msg *common.StatusMessage, filter messagingtypes.ChatFilter, fromArchive bool) error {

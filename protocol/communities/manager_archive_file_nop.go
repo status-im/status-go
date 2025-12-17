@@ -8,17 +8,17 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type ArchiveFileManagerNop struct{}
 
-func (amm *ArchiveFileManagerNop) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types2.ReceivedMessage, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 	return nil, nil
 }
 
-func (amm *ArchiveFileManagerNop) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 	return nil, nil
 }
 

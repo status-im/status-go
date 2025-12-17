@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
-	"github.com/status-im/status-go/messaging"
+	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )

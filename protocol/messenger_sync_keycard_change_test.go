@@ -9,7 +9,7 @@ import (
 
 	"github.com/status-im/status-go/accounts-management/types"
 	accounts2 "github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	mock_protocol_accounts_manager "github.com/status-im/status-go/protocol/mock"
 )
 

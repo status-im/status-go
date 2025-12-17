@@ -27,9 +27,9 @@ import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
+	messaging2 "github.com/status-im/status-go/pkg/messaging"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
@@ -65,7 +65,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
-	messaging       *messaging.API
+	messaging       *messaging2.API
 	messenger       *protocol.Messenger
 	cancelMessenger chan struct{}
 	rpcClient       *rpc.Client
@@ -170,8 +170,8 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		tracer = trace.NewTracer(otel.Tracer(name))
 	}
 
-	messaging, err := messaging.NewCore(
-		messaging.CoreParams{
+	messaging, err := messaging2.NewCore(
+		messaging2.CoreParams{
 			Identity:       params.Identity,
 			NodeKey:        nodeKey,
 			WakuConfig:     s.config.WakuV2Config,
@@ -179,13 +179,13 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 			InstallationID: s.config.ShhextConfig.InstallationID,
 			TimeSource:     params.TimeSource,
 		},
-		messaging.WithSQLitePersistence(params.AppDB),
-		messaging.WithLogger(s.logger),
-		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),
-		messaging.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),
-		messaging.WithPeerStatsHandler(signal.SendPeerStats),
-		messaging.WithMetrics(params.MetricsEnabled),
-		messaging.WithTracer(tracer),
+		messaging2.WithSQLitePersistence(params.AppDB),
+		messaging2.WithLogger(s.logger),
+		messaging2.WithEnvelopeEventsConfig(envelopeEventsConfig),
+		messaging2.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),
+		messaging2.WithPeerStatsHandler(signal.SendPeerStats),
+		messaging2.WithMetrics(params.MetricsEnabled),
+		messaging2.WithTracer(tracer),
 	)
 	if err != nil {
 		return err

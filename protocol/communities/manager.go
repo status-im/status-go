@@ -35,9 +35,9 @@ import (
 	cryptotypes "github.com/status-im/status-go/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/messaging"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/ens"
@@ -183,8 +183,8 @@ type HistoryArchiveDownloadTaskInfo struct {
 }
 
 type ArchiveFileService interface {
-	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types2.ReceivedMessage, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
 	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
 	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
@@ -201,10 +201,10 @@ type ArchiveService interface {
 	StartTorrentClient() error
 	Stop() error
 	IsReady() bool
-	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)
-	GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error)
+	GetCommunityChatsFilters(communityID types.HexBytes) (types2.ChatFilters, error)
+	GetCommunityChatsTopics(communityID types.HexBytes) ([]types2.ContentTopic, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
-	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
+	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
 	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
 	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
 	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
@@ -2188,7 +2188,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	return r, nil
 }
 
-func (m *Manager) NewHashRatchetKeys(keys []*messagingtypes.HashRatchetInfo) error {
+func (m *Manager) NewHashRatchetKeys(keys []*types2.HashRatchetInfo) error {
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
 
@@ -4196,15 +4196,15 @@ func (m *Manager) GetOwnedCommunitiesUniversalChatIDs() (map[string]bool, error)
 	return chatIDs, nil
 }
 
-func (m *Manager) StoreWakuMessage(message *messagingtypes.ReceivedMessage) error {
+func (m *Manager) StoreWakuMessage(message *types2.ReceivedMessage) error {
 	return m.persistence.SaveWakuMessage(message)
 }
 
-func (m *Manager) StoreWakuMessages(messages []*messagingtypes.ReceivedMessage) error {
+func (m *Manager) StoreWakuMessages(messages []*types2.ReceivedMessage) error {
 	return m.persistence.SaveWakuMessages(messages)
 }
 
-func (m *Manager) GetLatestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
+func (m *Manager) GetLatestWakuMessageTimestamp(topics []types2.ContentTopic) (uint64, error) {
 	return m.persistence.GetLatestWakuMessageTimestamp(topics)
 }
 
@@ -5054,7 +5054,7 @@ func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*Dec
 	}
 
 	decryptedPayload, err := m.messaging.DecryptWithHashRatchet(keyID, uint32(seqNo), d)
-	if err == messagingtypes.ErrNoRatchetKey {
+	if err == types2.ErrNoRatchetKey {
 		return &DecryptCommunityResponse{
 			KeyID: keyID,
 		}, err

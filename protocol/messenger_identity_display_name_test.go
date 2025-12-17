@@ -10,7 +10,7 @@ import (
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/testutils"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 const testDisplayName = "My New Display Name"

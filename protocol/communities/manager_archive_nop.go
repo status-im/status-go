@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 type ArchiveManagerNop struct {
@@ -41,11 +41,11 @@ func (tmm *ArchiveManagerNop) IsReady() bool {
 	return false
 }
 
-func (tmm *ArchiveManagerNop) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {
+func (tmm *ArchiveManagerNop) GetCommunityChatsFilters(communityID types.HexBytes) (types2.ChatFilters, error) {
 	return nil, nil
 }
 
-func (tmm *ArchiveManagerNop) GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error) {
+func (tmm *ArchiveManagerNop) GetCommunityChatsTopics(communityID types.HexBytes) ([]types2.ContentTopic, error) {
 	return nil, nil
 }
 
@@ -53,7 +53,7 @@ func (tmm *ArchiveManagerNop) GetHistoryArchivePartitionStartTimestamp(community
 	return 0, nil
 }
 
-func (tmm *ArchiveManagerNop) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
+func (tmm *ArchiveManagerNop) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	return nil
 }
 

@@ -15,7 +15,7 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -869,7 +869,7 @@ func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error 
 	return err
 }
 
-func (p *Persistence) SaveWakuMessages(messages []*messagingtypes.ReceivedMessage) (err error) {
+func (p *Persistence) SaveWakuMessages(messages []*types2.ReceivedMessage) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
@@ -905,7 +905,7 @@ func (p *Persistence) SaveWakuMessages(messages []*messagingtypes.ReceivedMessag
 	return
 }
 
-func (p *Persistence) SaveWakuMessage(message *messagingtypes.ReceivedMessage) error {
+func (p *Persistence) SaveWakuMessage(message *types2.ReceivedMessage) error {
 	_, err := p.db.Exec(`INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash, third_party_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		message.Sig,
 		message.Timestamp,
@@ -918,7 +918,7 @@ func (p *Persistence) SaveWakuMessage(message *messagingtypes.ReceivedMessage) e
 	return err
 }
 
-func wakuMessageTimestampQuery(topics []messagingtypes.ContentTopic) string {
+func wakuMessageTimestampQuery(topics []types2.ContentTopic) string {
 	query := " FROM waku_messages WHERE "
 	for i, topic := range topics {
 		query += `topic = "` + topic.String() + `"`
@@ -929,7 +929,7 @@ func wakuMessageTimestampQuery(topics []messagingtypes.ContentTopic) string {
 	return query
 }
 
-func (p *Persistence) GetOldestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
+func (p *Persistence) GetOldestWakuMessageTimestamp(topics []types2.ContentTopic) (uint64, error) {
 	var timestamp sql.NullInt64
 	query := "SELECT MIN(timestamp)"
 	query += wakuMessageTimestampQuery(topics)
@@ -937,7 +937,7 @@ func (p *Persistence) GetOldestWakuMessageTimestamp(topics []messagingtypes.Cont
 	return uint64(timestamp.Int64), err
 }
 
-func (p *Persistence) GetLatestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
+func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types2.ContentTopic) (uint64, error) {
 	var timestamp sql.NullInt64
 	query := "SELECT MAX(timestamp)"
 	query += wakuMessageTimestampQuery(topics)
@@ -945,7 +945,7 @@ func (p *Persistence) GetLatestWakuMessageTimestamp(topics []messagingtypes.Cont
 	return uint64(timestamp.Int64), err
 }
 
-func (p *Persistence) GetWakuMessagesByFilterTopic(topics []messagingtypes.ContentTopic, from uint64, to uint64) ([]messagingtypes.ReceivedMessage, error) {
+func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types2.ContentTopic, from uint64, to uint64) ([]types2.ReceivedMessage, error) {
 
 	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND (" //nolint: gosec
 
@@ -962,17 +962,17 @@ func (p *Persistence) GetWakuMessagesByFilterTopic(topics []messagingtypes.Conte
 		return nil, err
 	}
 	defer rows.Close()
-	messages := []messagingtypes.ReceivedMessage{}
+	messages := []types2.ReceivedMessage{}
 
 	for rows.Next() {
-		msg := messagingtypes.ReceivedMessage{}
+		msg := types2.ReceivedMessage{}
 		var topicStr string
 		var hashStr string
 		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr, &msg.ThirdPartyID)
 		if err != nil {
 			return nil, err
 		}
-		msg.Topic = messagingtypes.StringToContentTopic(topicStr)
+		msg.Topic = types2.StringToContentTopic(topicStr)
 		msg.Hash = types.Hex2Bytes(hashStr)
 		messages = append(messages, msg)
 	}
@@ -1815,7 +1815,7 @@ func (p *Persistence) UpsertAppliedCommunityEvents(communityID types.HexBytes, p
 	return err
 }
 
-func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*messagingtypes.HashRatchetInfo) error {
+func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*types2.HashRatchetInfo) error {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err

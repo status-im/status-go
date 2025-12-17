@@ -20,8 +20,8 @@ import (
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
+	messaging2 "github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
@@ -120,8 +120,8 @@ func main() {
 		os.Exit(exitCodeDBMigrationFailed)
 	}
 
-	messaging, err := messaging.NewCore(
-		messaging.CoreParams{
+	messaging, err := messaging2.NewCore(
+		messaging2.CoreParams{
 			Identity: privateKey,
 			NodeKey:  nil,
 			WakuConfig: params.WakuV2Config{
@@ -141,8 +141,8 @@ func main() {
 			InstallationID: installationID,
 			TimeSource:     timesource.DefaultService(),
 		},
-		messaging.WithLogger(logger.Named("messaging")),
-		messaging.WithSQLitePersistence(db),
+		messaging2.WithLogger(logger.Named("messaging")),
+		messaging2.WithSQLitePersistence(db),
 	)
 	if err != nil {
 		os.Exit(exitCodeCreateMessengerFailed)

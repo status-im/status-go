@@ -12,8 +12,8 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/messaging"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -1356,11 +1356,11 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 		PublicKey: &contactKey.PublicKey,
 		MessageID: "0xa",
 		StatusMessage: &common.StatusMessage{
-			Message: messagingtypes.Message{
-				TransportLayer: messagingtypes.TransportLayer{
-					Message: &messagingtypes.ReceivedMessage{Timestamp: 1},
+			Message: types2.Message{
+				TransportLayer: types2.TransportLayer{
+					Message: &types2.ReceivedMessage{Timestamp: 1},
 				},
-				EncryptionLayer: messagingtypes.EncryptionLayer{},
+				EncryptionLayer: types2.EncryptionLayer{},
 			},
 			ApplicationLayer: common.ApplicationLayer{
 				ID: []byte("test-id"),

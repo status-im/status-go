@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 func TestStoreNode_UnmarshalJSON(t *testing.T) {

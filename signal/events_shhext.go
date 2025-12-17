@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 const (
@@ -124,7 +124,7 @@ type Filter struct {
 	// Identity is the public key of the other recipient for non-public chats
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
-	Topic messagingtypes.ContentTopic `json:"topic"`
+	Topic types2.ContentTopic `json:"topic"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -220,7 +220,7 @@ func LocalMessageBackupDone() {
 	send(EventLocalMessageBackupDone, interface{}(nil))
 }
 
-func sendStoreNodeSignal(ms *messagingtypes.StoreNode, event string) {
+func sendStoreNodeSignal(ms *types2.StoreNode, event string) {
 	msSignal := StoreNodeSignal{}
 	if ms != nil {
 		msSignal.Address = ms.Addr
@@ -229,11 +229,11 @@ func sendStoreNodeSignal(ms *messagingtypes.StoreNode, event string) {
 	send(event, msSignal)
 }
 
-func SendStoreNodeAvailable(ms *messagingtypes.StoreNode) {
+func SendStoreNodeAvailable(ms *types2.StoreNode) {
 	sendStoreNodeSignal(ms, EventMailserverAvailable)
 }
 
-func SendStoreNodeChanged(ms *messagingtypes.StoreNode) {
+func SendStoreNodeChanged(ms *types2.StoreNode) {
 	sendStoreNodeSignal(ms, EventMailserverChanged)
 }
 

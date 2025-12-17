@@ -21,14 +21,14 @@ jobs:
       - name: Run messaging import check
         run: |
           echo "Finding all Go files outside the messaging directory..."
-          files=$(find . -type f -name '*.go' ! -path './messaging/*')
+          files=$(find . -type f -name '*.go' ! -path './pkg/messaging/*')
 
-          echo "Checking for invalid imports of github.com/status-im/status-go/messaging/*..."
+          echo "Checking for invalid imports of github.com/status-im/status-go/pkg/messaging/*..."
           for file in $files; do
-            if grep -qE '"github.com/status-im/status-go/messaging/(?!types|events).+"' "$file"; then
-              echo "Error: File $file imports github.com/status-im/status-go/messaging/* (except types and events) which is not allowed."
+            if grep -qE '"github.com/status-im/status-go/pkg/messaging/(?!types|events).+"' "$file"; then
+              echo "Error: File $file imports github.com/status-im/status-go/pkg/messaging/* (except types and events) which is not allowed."
               exit 1
             fi
           done
 
-          echo "No invalid github.com/status-im/status-go/messaging/* imports found."
+          echo "No invalid github.com/status-im/status-go/pkg/messaging/* imports found."

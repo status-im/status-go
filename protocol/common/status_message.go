@@ -5,7 +5,7 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
