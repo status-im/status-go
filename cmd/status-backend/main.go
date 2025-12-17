@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
-	"github.com/status-im/status-go/logutils"
+	logutils2 "github.com/status-im/status-go/internal/logutils"
 	statusgo "github.com/status-im/status-go/mobile"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
@@ -22,15 +22,15 @@ var (
 )
 
 func init() {
-	logSettings := logutils.LogSettings{
+	logSettings := logutils2.LogSettings{
 		Enabled: true,
 		Level:   "INFO",
 	}
-	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
+	if err := logutils2.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		panic(err)
 	}
 
-	logger = logutils.ZapLogger()
+	logger = logutils2.ZapLogger()
 }
 
 func main() {

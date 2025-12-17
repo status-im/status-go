@@ -30,9 +30,9 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/logutils/callog"
-	"github.com/status-im/status-go/logutils/requestlog"
+	logutils2 "github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/logutils/callog"
+	"github.com/status-im/status-go/internal/logutils/requestlog"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend"
@@ -52,11 +52,11 @@ import (
 )
 
 func call(fn any, params ...any) any {
-	return callog.Call(logutils.ZapLogger(), requestlog.GetRequestLogger(), fn, params...)
+	return callog.Call(logutils2.ZapLogger(), requestlog.GetRequestLogger(), fn, params...)
 }
 
 func callWithResponse(fn any, params ...any) string {
-	return callog.CallWithResponse(logutils.ZapLogger(), requestlog.GetRequestLogger(), fn, params...)
+	return callog.CallWithResponse(logutils2.ZapLogger(), requestlog.GetRequestLogger(), fn, params...)
 }
 
 type InitializeApplicationResponse struct {
@@ -67,7 +67,7 @@ type InitializeApplicationResponse struct {
 func InitializeApplication(requestJSON string) string {
 	// NOTE: InitializeApplication is logs the call on its own rather than using `callWithResponse`,
 	//       because the API logging is enabled during this exact call.
-	defer callog.Recover(logutils.ZapLogger())
+	defer callog.Recover(logutils2.ZapLogger())
 
 	startTime := time.Now()
 	response := initializeApplication(requestJSON)
@@ -187,12 +187,12 @@ func initializeLogging(request *requests.InitializeApplication) error {
 	preLoginLog.SetLogDir(request.LogDir)
 
 	logSettings := preLoginLog.ConvertToLogSettings()
-	err = logutils.OverrideRootLoggerWithConfig(logSettings)
+	err = logutils2.OverrideRootLoggerWithConfig(logSettings)
 	if err != nil {
 		return err
 	}
 
-	logutils.ZapLogger().Info("logging initialised",
+	logutils2.ZapLogger().Info("logging initialised",
 		zap.Any("logSettings", logSettings),
 		zap.Bool("APILoggingEnabled", request.APILoggingEnabled),
 	)
@@ -211,7 +211,7 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		if err != nil {
 			return err
 		}
-		logutils.ZapLogger().Info("metrics prometheus server started", zap.String("address", request.MetricsAddress))
+		logutils2.ZapLogger().Info("metrics prometheus server started", zap.String("address", request.MetricsAddress))
 	}
 
 	return nil
@@ -370,19 +370,19 @@ func login(accountData, password, configJSON string) error {
 	}
 
 	backend.RunAsync(func() error {
-		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
+		logutils2.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
+			logutils2.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return statusBackend.LoggedIn(account.KeyUID, err)
 		}
 
 		err = statusBackend.StartNodeWithAccount(account, password, &conf, nil)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
+			logutils2.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
-		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
+		logutils2.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
 		return nil
 	})
 
@@ -435,13 +435,13 @@ func createAccountAndLogin(requestJSON string) string {
 	}
 
 	backend.RunAsync(func() error {
-		logutils.ZapLogger().Debug("starting a node and creating config")
+		logutils2.ZapLogger().Debug("starting a node and creating config")
 		_, err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to create account", zap.Error(err))
+			logutils2.ZapLogger().Error("failed to create account", zap.Error(err))
 			return statusBackend.LoggedIn("", err)
 		}
-		logutils.ZapLogger().Debug("started a node, and created account")
+		logutils2.ZapLogger().Debug("started a node, and created account")
 		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
@@ -475,10 +475,10 @@ func loginAccount(requestJSON string) string {
 	backend.RunAsync(func() error {
 		err := statusBackend.LoginAccount(&request)
 		if err != nil {
-			logutils.ZapLogger().Error("loginAccount failed", zap.Error(err))
+			logutils2.ZapLogger().Error("loginAccount failed", zap.Error(err))
 			return err
 		}
-		logutils.ZapLogger().Debug("loginAccount started node")
+		logutils2.ZapLogger().Debug("loginAccount started node")
 		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
@@ -501,7 +501,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 	}
 
 	backend.RunAsync(func() error {
-		logutils.ZapLogger().Debug("starting a node and restoring account")
+		logutils2.ZapLogger().Debug("starting a node and restoring account")
 
 		if request.Keycard != nil {
 			_, err = statusBackend.RestoreKeycardAccountAndLogin(&request)
@@ -510,10 +510,10 @@ func restoreAccountAndLogin(requestJSON string) string {
 		}
 
 		if err != nil {
-			logutils.ZapLogger().Error("failed to restore account", zap.Error(err))
+			logutils2.ZapLogger().Error("failed to restore account", zap.Error(err))
 			return statusBackend.LoggedIn("", err)
 		}
-		logutils.ZapLogger().Debug("started a node, and restored account")
+		logutils2.ZapLogger().Debug("started a node, and restored account")
 		return statusBackend.SetupLogSettings()
 	})
 
@@ -535,13 +535,13 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 		return makeJSONResponse(err)
 	}
 	backend.RunAsync(func() error {
-		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
+		logutils2.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
+			logutils2.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
-		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
+		logutils2.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -802,7 +802,7 @@ func hashMessage(message string) string {
 func makeJSONResponse(err error) string {
 	errString := ""
 	if err != nil {
-		logutils.ZapLogger().Error("error in makeJSONResponse", zap.Error(err))
+		logutils2.ZapLogger().Error("error in makeJSONResponse", zap.Error(err))
 		errString = err.Error()
 	}
 
@@ -823,7 +823,7 @@ func AppStateChange(state string) {
 func appStateChange(state string) {
 	s, err := backend.ParseAppState(state)
 	if err != nil {
-		logutils.ZapLogger().Error("parse app state failed, ignoring", zap.Error(err))
+		logutils2.ZapLogger().Error("parse app state failed, ignoring", zap.Error(err))
 		return
 	}
 	statusBackend.AppStateChange(s)
@@ -1701,7 +1701,7 @@ func IsAddress(address string) string {
 func isAddress(address string) string {
 	valid, err := abi_spec.IsAddress(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
+		logutils2.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)

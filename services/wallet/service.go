@@ -11,6 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
@@ -24,7 +25,6 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/backupsync"

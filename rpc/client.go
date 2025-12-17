@@ -14,7 +14,7 @@ import (
 
 	appCommon "github.com/status-im/status-go/common"
 	healthmanager2 "github.com/status-im/status-go/internal/healthmanager"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/version"

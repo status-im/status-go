@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 const InMemoryPath = ":memory:"

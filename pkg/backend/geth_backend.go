@@ -42,10 +42,10 @@ import (
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	logutils2 "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/transactions"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
 	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
@@ -101,7 +101,7 @@ type StatusBackend struct {
 	sentryDSN                string
 
 	logger            *zap.Logger
-	preLoginLogConfig *logutils.PreLoginLogConfig
+	preLoginLogConfig *logutils2.PreLoginLogConfig
 
 	shutdownTasks []func() error
 }
@@ -111,7 +111,7 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 	logger = logger.Named("StatusBackend")
 	backend := &StatusBackend{
 		logger:            logger,
-		preLoginLogConfig: logutils.NewPreLoginLogConfig(),
+		preLoginLogConfig: logutils2.NewPreLoginLogConfig(),
 		shutdownTasks:     []func() error{},
 	}
 	if err := backend.initialize(); err != nil {
@@ -131,7 +131,7 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 	return backend
 }
 
-func (b *StatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
+func (b *StatusBackend) PreLoginLog() *logutils2.PreLoginLogConfig {
 	return b.preLoginLogConfig
 }
 
@@ -460,8 +460,8 @@ func (b *StatusBackend) ensureWalletDBOpened(account multiaccounts.Account, pass
 }
 
 func (b *StatusBackend) SetupLogSettings() error {
-	_ = logutils.ZapLogger().Sync()
-	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	_ = logutils2.ZapLogger().Sync()
+	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 // Deprecated: Use StartNodeWithAccount instead.
@@ -2120,8 +2120,8 @@ func (b *StatusBackend) Logout() error {
 // including in release builds, to help diagnose login issues.
 // related issue: https://github.com/status-im/status-mobile/issues/21501
 func (b *StatusBackend) switchToPreLoginLog() error {
-	_ = logutils.ZapLogger().Sync()
-	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+	_ = logutils2.ZapLogger().Sync()
+	return logutils2.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 // cleanupServices stops parts of services that aren't managed by a node and removes injected data from services.
@@ -2401,7 +2401,7 @@ func (b *StatusBackend) SetProfileLogLevel(level string) error {
 	}
 	b.config.LogLevel = level
 
-	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 func (b *StatusBackend) SetLogNamespaces(namespaces string) error {
@@ -2414,7 +2414,7 @@ func (b *StatusBackend) SetLogNamespaces(namespaces string) error {
 	}
 	b.config.LogNamespaces = namespaces
 
-	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 func (b *StatusBackend) SetProfileLogEnabled(enabled bool) error {
@@ -2427,14 +2427,14 @@ func (b *StatusBackend) SetProfileLogEnabled(enabled bool) error {
 	}
 	b.config.LogEnabled = enabled
 
-	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 func (b *StatusBackend) SetPreLoginLogEnabled(enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.preLoginLogConfig.SetEnabled(enabled)
-	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+	return logutils2.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 func (b *StatusBackend) SetPreLoginLogLevel(level string) error {
@@ -2443,7 +2443,7 @@ func (b *StatusBackend) SetPreLoginLogLevel(level string) error {
 	if err := b.preLoginLogConfig.SetLevel(level); err != nil {
 		return err
 	}
-	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+	return logutils2.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 func (b *StatusBackend) wakuMetricsHandler() http.Handler {

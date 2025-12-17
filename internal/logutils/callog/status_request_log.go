@@ -11,8 +11,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/logutils/requestlog"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/logutils/requestlog"
 	"github.com/status-im/status-go/pkg/sentry"
 )
 

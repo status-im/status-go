@@ -31,7 +31,7 @@ import (
 	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"

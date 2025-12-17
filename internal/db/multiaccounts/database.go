@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/migrations"
 	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

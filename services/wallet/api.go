@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/healthmanager"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/typeddata"

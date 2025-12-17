@@ -18,8 +18,8 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	logutils2 "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	messaging2 "github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/sentry"
@@ -62,15 +62,15 @@ const (
 
 func init() {
 	flag.Parse()
-	logSettings := logutils.LogSettings{
+	logSettings := logutils2.LogSettings{
 		Enabled: true,
 		Level:   *logLevel,
 	}
-	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
+	if err := logutils2.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		panic(err)
 	}
 
-	logger = logutils.ZapLogger()
+	logger = logutils2.ZapLogger()
 }
 
 func main() {

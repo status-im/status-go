@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/browsers"

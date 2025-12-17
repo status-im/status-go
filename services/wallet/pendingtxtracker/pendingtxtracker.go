@@ -16,7 +16,7 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"

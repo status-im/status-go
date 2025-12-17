@@ -61,8 +61,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/logutils"
 	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"
 	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
 

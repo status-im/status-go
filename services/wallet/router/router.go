@@ -13,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/internal/errors"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/transactions"
-	"github.com/status-im/status-go/logutils"
 	communityToken "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 

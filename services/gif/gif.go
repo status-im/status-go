@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 type Gif struct {

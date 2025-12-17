@@ -16,7 +16,7 @@ import (
 
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
 

@@ -18,7 +18,7 @@ import (
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/walletevent"

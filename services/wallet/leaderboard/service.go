@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )

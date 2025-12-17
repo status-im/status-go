@@ -26,7 +26,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/pubsub"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"

@@ -10,16 +10,15 @@ extern void SetEventCallback(void *cb);
 import "C"
 import (
 	"encoding/json"
+	"sync"
 	"time"
 	"unsafe"
 
-	"sync"
-
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/logutils/callog"
-	"github.com/status-im/status-go/logutils/requestlog"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/logutils/callog"
+	"github.com/status-im/status-go/internal/logutils/requestlog"
 )
 
 // MobileSignalHandler is a simple callback function that gets called when any signal is received

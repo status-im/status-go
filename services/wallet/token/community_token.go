@@ -18,7 +18,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/assets"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"

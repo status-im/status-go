@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/internal/contracts/ierc1155"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
