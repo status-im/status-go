@@ -7,9 +7,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
-	"github.com/status-im/status-go/centralizedmetrics/providers"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/centralizedmetrics/common"
+	"github.com/status-im/status-go/internal/centralizedmetrics/providers"
 )
 
 const defaultPollInterval = 10 * time.Second

@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
+	"github.com/status-im/status-go/internal/centralizedmetrics/common"
 )
 
 var (
