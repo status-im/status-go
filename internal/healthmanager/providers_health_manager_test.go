@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/healthmanager/aggregator"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/internal/healthmanager/aggregator"
+	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
 )
 
 type ProvidersHealthManagerSuite struct {

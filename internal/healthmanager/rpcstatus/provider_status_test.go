@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/healthmanager/provider_errors"
+	"github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 )
 

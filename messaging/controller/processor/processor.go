@@ -13,7 +13,6 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/adapters"
 	"github.com/status-im/status-go/messaging/common"
@@ -323,7 +322,7 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *types.Message
 
 func (r *Processor) ProcessSharedSecrets(secrets []*sharedsecret.Secret) error {
 	for _, secret := range secrets {
-		_, err := r.stack.Transport.ProcessNegotiatedSecret(ethtypes.NegotiatedSecret{
+		_, err := r.stack.Transport.ProcessNegotiatedSecret(types.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		})

@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
+	"github.com/status-im/status-go/internal/centralizedmetrics/common"
 	"github.com/status-im/status-go/pkg/testutils"
 )
 

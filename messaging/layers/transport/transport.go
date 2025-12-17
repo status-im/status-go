@@ -20,8 +20,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/internal/connection"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	wakutypes "github.com/status-im/status-go/messaging/waku/types"
 )
 
@@ -177,7 +177,7 @@ func (t *Transport) ResetFilters(ctx context.Context) error {
 	return t.filters.Reset(ctx)
 }
 
-func (t *Transport) ProcessNegotiatedSecret(secret ethtypes.NegotiatedSecret) (*Filter, error) {
+func (t *Transport) ProcessNegotiatedSecret(secret messagingtypes.NegotiatedSecret) (*Filter, error) {
 	filter, err := t.filters.LoadNegotiated(secret)
 	if err != nil {
 		return nil, err
@@ -285,7 +285,7 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadNegotiated(ethtypes.NegotiatedSecret{
+	filter, err := t.filters.LoadNegotiated(messagingtypes.NegotiatedSecret{
 		PublicKey: publicKey,
 		Key:       secret,
 	})

@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
 	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrations"
 
-	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )

@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/errors"
 )
 
 // Abbreviation `WR` for the error code stands for Wallet Router

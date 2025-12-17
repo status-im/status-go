@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/status-im/status-go/healthmanager/provider_errors"
+	provider_errors2 "github.com/status-im/status-go/internal/healthmanager/provider_errors"
 )
 
 // StatusType represents the possible status values for a provider.
@@ -71,7 +71,7 @@ func NewRpcProviderStatus(res RpcProviderCallStatus) ProviderStatus {
 		TotalDuration: res.Timestamp.Sub(res.StartTime),
 	}
 
-	if res.Err == nil || provider_errors.IsNonCriticalRpcError(res.Err) || provider_errors.IsNonCriticalProviderError(res.Err) {
+	if res.Err == nil || provider_errors2.IsNonCriticalRpcError(res.Err) || provider_errors2.IsNonCriticalProviderError(res.Err) {
 		status.LastSuccessAt = res.Timestamp
 		status.Status = StatusUp
 	} else {
@@ -79,7 +79,7 @@ func NewRpcProviderStatus(res RpcProviderCallStatus) ProviderStatus {
 		status.LastError = res.Err
 		status.Status = StatusDown
 		status.TotalErrorCount = 1
-		if provider_errors.IsTimeoutErr(res.Err) {
+		if provider_errors2.IsTimeoutErr(res.Err) {
 			status.TotalTimeoutCount = 1
 		}
 	}

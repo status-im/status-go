@@ -11,7 +11,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
+	"github.com/status-im/status-go/internal/centralizedmetrics/common"
 )
 
 const AppsflyerBaseURL = "https://api3.appsflyer.com"

@@ -10,11 +10,11 @@ import (
 	"go.uber.org/zap"
 
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/messaging/common"
 	"github.com/status-im/status-go/messaging/controller/utils"
 	"github.com/status-im/status-go/messaging/layers/encryption"
+	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -50,7 +50,7 @@ func (s *Sender) processAndMarshalMessageSpec(spec *encryption.ProtocolMessageSp
 	// The shared secret needs to be handle before we send a message
 	// otherwise the topic might not be set up before we receive a message
 	if spec.SharedSecret != nil {
-		_, err := s.stack.Transport.ProcessNegotiatedSecret(ethtypes.NegotiatedSecret{
+		_, err := s.stack.Transport.ProcessNegotiatedSecret(messagingtypes.NegotiatedSecret{
 			PublicKey: spec.SharedSecret.Identity,
 			Key:       spec.SharedSecret.Key,
 		})

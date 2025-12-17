@@ -21,12 +21,6 @@ func (e *ErrorResponse) Error() string {
 	return string(errorJSON)
 }
 
-// IsErrorResponse determines if an error is an ErrorResponse.
-func IsErrorResponse(err error) bool {
-	_, ok := err.(*ErrorResponse)
-	return ok
-}
-
 // ErrorCodeFromError returns the ErrorCode from an error.
 func ErrorCodeFromError(err error) ErrorCode {
 	if err == nil {

@@ -9,9 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/constants"
 	multiAccCommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 )
+
+const MaxNumberOfSavedAddresses = 20
 
 type savedAddressMeta struct {
 	UpdateClock uint64 // wall clock used to deconflict concurrent updates
@@ -132,7 +133,7 @@ func (sam *SavedAddressesManager) RemainingCapacityForSavedAddresses(testnetMode
 	if err != nil {
 		return 0, err
 	}
-	remainingCapacity := constants.MaxNumberOfSavedAddresses - len(savedAddress)
+	remainingCapacity := MaxNumberOfSavedAddresses - len(savedAddress)
 	if remainingCapacity <= 0 {
 		return 0, errors.New("no more save addresses can be added")
 	}
