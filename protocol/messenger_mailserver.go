@@ -15,11 +15,10 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"
-
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
 const (
@@ -114,7 +113,7 @@ func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error)
 	}
 }
 
-func (m *Messenger) scheduleSyncFilters(filters messagingtypes.ChatFilters) (bool, error) {
+func (m *Messenger) scheduleSyncFilters(filters types2.ChatFilters) (bool, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		m.logger.Error("failed to get shouldSync", zap.Error(err))
@@ -159,12 +158,12 @@ func (m *Messenger) calculateMailserverTimeBounds(duration time.Duration) (time.
 	return from, to
 }
 
-func (m *Messenger) filtersForChat(chatID string) (messagingtypes.ChatFilters, error) {
+func (m *Messenger) filtersForChat(chatID string) (types2.ChatFilters, error) {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
-	var filters []*messagingtypes.ChatFilter
+	var filters []*types2.ChatFilter
 
 	if chat.OneToOne() {
 		// We sync our own topic and any eventual negotiated
@@ -185,19 +184,19 @@ func (m *Messenger) filtersForChat(chatID string) (messagingtypes.ChatFilters, e
 		if filter == nil {
 			return nil, ErrNoFiltersForChat
 		}
-		filters = []*messagingtypes.ChatFilter{filter}
+		filters = []*types2.ChatFilter{filter}
 	}
 
 	return filters, nil
 }
 
-func (m *Messenger) topicsForChat(chatID string) (string, []messagingtypes.ContentTopic, error) {
+func (m *Messenger) topicsForChat(chatID string) (string, []types2.ContentTopic, error) {
 	filters, err := m.filtersForChat(chatID)
 	if err != nil {
 		return "", nil, err
 	}
 
-	var contentTopics []messagingtypes.ContentTopic
+	var contentTopics []types2.ContentTopic
 
 	for _, filter := range filters {
 		contentTopics = append(contentTopics, filter.ContentTopic())
@@ -235,7 +234,7 @@ func (m *Messenger) capToDefaultSyncPeriod(period uint32) (uint32, error) {
 	return period - tolerance, nil
 }
 
-func (m *Messenger) updateFiltersPriority(filters messagingtypes.ChatFilters) error {
+func (m *Messenger) updateFiltersPriority(filters types2.ChatFilters) error {
 	for _, filter := range filters {
 		chatID := filter.ChatID()
 		chat := m.Chat(chatID)
@@ -250,7 +249,7 @@ func (m *Messenger) updateFiltersPriority(filters messagingtypes.ChatFilters) er
 	return nil
 }
 
-func (m *Messenger) resetFiltersPriority(filters messagingtypes.ChatFilters) error {
+func (m *Messenger) resetFiltersPriority(filters types2.ChatFilters) error {
 	for _, filter := range filters {
 		err := m.messaging.UpdateFilterPriority(filter.ChatID(), 0)
 		if err != nil {
@@ -349,7 +348,7 @@ func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
 
-func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtypes.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
+func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -369,7 +368,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 		topicsData[fmt.Sprintf("%s-%s", topic.PubsubTopic, topic.ContentTopic)] = topic
 	}
 
-	batches := make(map[string]map[int]messagingtypes.StoreNodeBatch)
+	batches := make(map[string]map[int]types2.StoreNodeBatch)
 
 	to := m.calculateMailserverTo()
 	var syncedTopics []mailservers.MailserverTopic
@@ -391,7 +390,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 		return nil, err
 	}
 
-	contentTopicsPerPubsubTopic := make(map[string]map[string]*messagingtypes.ChatFilter)
+	contentTopicsPerPubsubTopic := make(map[string]map[string]*types2.ChatFilter)
 	for _, filter := range filters {
 		if !filter.IsListening() || filter.IsEphemeral() {
 			continue
@@ -399,7 +398,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 
 		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic()]
 		if !ok {
-			contentTopics = make(map[string]*messagingtypes.ChatFilter)
+			contentTopics = make(map[string]*types2.ChatFilter)
 		}
 		contentTopics[filter.ContentTopic().String()] = filter
 		contentTopicsPerPubsubTopic[filter.PubsubTopic()] = contentTopics
@@ -407,7 +406,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
 		if _, ok := batches[pubsubTopic]; !ok {
-			batches[pubsubTopic] = make(map[int]messagingtypes.StoreNodeBatch)
+			batches[pubsubTopic] = make(map[int]types2.StoreNodeBatch)
 		}
 
 		for _, filter := range contentTopics {
@@ -466,7 +465,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 						return nil, err
 					}
 				}
-				batch = messagingtypes.StoreNodeBatch{From: time.Unix(int64(from), 0), To: to}
+				batch = types2.StoreNodeBatch{From: time.Unix(int64(from), 0), To: to}
 			}
 
 			batch.ChatIDs = append(batch.ChatIDs, chatID)
@@ -547,7 +546,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messagingtyp
 	return response, nil
 }
 
-func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters messagingtypes.ChatFilters) (*MessengerResponse, error) {
+func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters types2.ChatFilters) (*MessengerResponse, error) {
 	return m.syncFiltersFrom(peerInfo, filters, 0)
 }
 
@@ -591,7 +590,7 @@ func (m *Messenger) canSyncWithStoreNodes() (bool, error) {
 	return true, nil
 }
 
-func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch messagingtypes.StoreNodeBatch) error {
+func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -603,7 +602,7 @@ func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch messagi
 	return m.messaging.ProcessMailserverBatch(m.ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
 }
 
-func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch messagingtypes.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
+func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -642,7 +641,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			return nil, err
 		}
 
-		batch := messagingtypes.StoreNodeBatch{
+		batch := types2.StoreNodeBatch{
 			ChatIDs:     []string{chatID},
 			To:          time.Unix(int64(chat.SyncedFrom), 0),
 			From:        time.Unix(int64(chat.SyncedFrom-defaultSyncPeriod), 0),
@@ -710,7 +709,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		}
 	}
 
-	batch := messagingtypes.StoreNodeBatch{
+	batch := types2.StoreNodeBatch{
 		ChatIDs:     []string{chatID},
 		To:          time.Unix(int64(highestTo), 0),
 		From:        time.Unix(int64(lowestFrom), 0),
@@ -757,7 +756,7 @@ func (m *Messenger) SetPinnedMailservers(mailservers map[string]string) error {
 	return nil
 }
 
-func (m *Messenger) RemoveFilters(filters []*messagingtypes.ChatFilter) error {
+func (m *Messenger) RemoveFilters(filters []*types2.ChatFilter) error {
 	return m.messaging.RemoveFilters(filters)
 }
 
@@ -785,7 +784,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 			return nil, nil
 		}
 
-		batch := messagingtypes.StoreNodeBatch{
+		batch := types2.StoreNodeBatch{
 			ChatIDs:     []string{chatID},
 			From:        from,
 			To:          to,

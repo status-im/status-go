@@ -28,8 +28,8 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/messaging"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -2404,7 +2404,7 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 	s.Len(tcs, 0, "Must have 0 communities")
 
 	// Pair devices
-	metadata := &messagingtypes.InstallationMetadata{
+	metadata := &types2.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}
@@ -2720,7 +2720,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 // makes a request to join a community
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	// Set Alice's installation metadata
-	aim := &messagingtypes.InstallationMetadata{
+	aim := &types2.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -2948,7 +2948,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	// Set Alice's installation metadata
-	aim := &messagingtypes.InstallationMetadata{
+	aim := &types2.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -3678,12 +3678,12 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	)
 	s.Require().NoError(err)
 
-	message := &messagingtypes.ReceivedMessage{}
+	message := &types2.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&s.owner.identity.PublicKey)
 	message.Payload = wrappedPayload
 
 	filter := s.alice.messaging.ChatFilterByChatID(community.UniversalChatID())
-	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
+	importedMessages := make(map[types2.ChatFilter][]*types2.ReceivedMessage, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
 

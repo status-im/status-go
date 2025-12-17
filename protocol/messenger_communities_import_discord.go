@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/images"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -190,7 +190,7 @@ func (m *Messenger) createPinMessageFromDiscordMessage(message *common.Message, 
 	}
 
 	pinMessageToSave := &common.PinMessage{
-		ID:               types.EncodeHex(messagingtypes.MessageID(&community.PrivateKey().PublicKey, wrappedPayload)),
+		ID:               types.EncodeHex(types2.MessageID(&community.PrivateKey().PublicKey, wrappedPayload)),
 		PinMessage:       &pinMessage,
 		LocalChatID:      channelID,
 		From:             message.From,
@@ -1389,7 +1389,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 						}
 
 						pinMessageToSave := common.PinMessage{
-							ID:               types.EncodeHex(messagingtypes.MessageID(&communityPubKey, wrappedPayload)),
+							ID:               types.EncodeHex(types2.MessageID(&communityPubKey, wrappedPayload)),
 							PinMessage:       &pinMessage,
 							LocalChatID:      processedChannelIds[channel.Channel.ID],
 							From:             messageToSave.From,
@@ -1794,7 +1794,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		}
 
 		// Init the community filter so we can receive messages on the community
-		_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
+		_, err = m.InitCommunityFilters(types2.CommunitiesToInitialize{{
 			PrivKey: discordCommunity.PrivateKey(),
 		}})
 		if err != nil {

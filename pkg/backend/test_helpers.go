@@ -13,8 +13,8 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/protocol/requests"
 
 	"github.com/stretchr/testify/require"

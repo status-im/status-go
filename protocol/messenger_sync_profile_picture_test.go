@@ -10,7 +10,7 @@ import (
 
 	testutils2 "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/testutils/fake"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 func TestMessengerSyncProfilePictureSuite(t *testing.T) {

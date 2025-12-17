@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 func (m *Messenger) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {

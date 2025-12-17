@@ -8,6 +8,7 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
+	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	ensservice "github.com/status-im/status-go/services/ens"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 
 	"github.com/status-im/status-go/internal/images"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -46,7 +46,7 @@ type MessengerResponse struct {
 	Contacts                      []*contacts.Contact
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
-	StoreNodes                    []messagingtypes.StoreNode
+	StoreNodes                    []types.StoreNode
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
@@ -63,7 +63,7 @@ type MessengerResponse struct {
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
-	installations                    map[string]*messagingtypes.Installation
+	installations                    map[string]*types.Installation
 	notifications                    map[string]*localnotifications.Notification
 	requestsToJoinCommunity          map[string]*communities.RequestToJoin
 	chats                            map[string]*Chat
@@ -99,13 +99,13 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DeletedMessages         map[string][]string                 `json:"deletedMessages,omitempty"`
 		Messages                []*common.Message                   `json:"messages,omitempty"`
 		Contacts                []*contacts.Contact                 `json:"contacts,omitempty"`
-		Installations           []*messagingtypes.Installation      `json:"installations,omitempty"`
+		Installations           []*types.Installation               `json:"installations,omitempty"`
 		PinMessages             []*common.PinMessage                `json:"pinMessages,omitempty"`
 		EmojiReactions          []*EmojiReaction                    `json:"emojiReactions,omitempty"`
 		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
 		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
-		StoreNodes              []messagingtypes.StoreNode          `json:"mailservers,omitempty"`
+		StoreNodes              []types.StoreNode                   `json:"mailservers,omitempty"`
 		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
 		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`
 		VerificationRequests    []*verification.Request             `json:"verificationRequests,omitempty"`
@@ -190,8 +190,8 @@ func (r *MessengerResponse) Chats() []*Chat {
 	return chats
 }
 
-func (r *MessengerResponse) Installations() []*messagingtypes.Installation {
-	var is []*messagingtypes.Installation
+func (r *MessengerResponse) Installations() []*types.Installation {
+	var is []*types.Installation
 	for _, i := range r.installations {
 		is = append(is, i)
 	}
@@ -795,14 +795,14 @@ func (r *MessengerResponse) AddContacts(contacts []*contacts.Contact) {
 	}
 }
 
-func (r *MessengerResponse) AddInstallation(i *messagingtypes.Installation) {
+func (r *MessengerResponse) AddInstallation(i *types.Installation) {
 	if len(r.installations) == 0 {
-		r.installations = make(map[string]*messagingtypes.Installation)
+		r.installations = make(map[string]*types.Installation)
 	}
 	r.installations[i.UniqueKey()] = i
 }
 
-func (r *MessengerResponse) AddInstallations(installations []*messagingtypes.Installation) {
+func (r *MessengerResponse) AddInstallations(installations []*types.Installation) {
 	for idx := range installations {
 		r.AddInstallation(installations[idx])
 	}

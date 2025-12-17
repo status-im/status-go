@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/messaging"
+	"github.com/status-im/status-go/pkg/messaging"
 )
 
 const DefaultProfileDisplayName = ""

@@ -16,6 +16,7 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -38,8 +39,6 @@ import (
 	"github.com/status-im/status-go/protocol/syncing"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
-
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
 var (
@@ -1231,7 +1230,7 @@ func (m *Messenger) HandleSyncPairInstallation(ctx context.Context, state *Recei
 		return errors.New("installation not found")
 	}
 
-	metadata := &messagingtypes.InstallationMetadata{
+	metadata := &types2.InstallationMetadata{
 		Name:       message.Name,
 		DeviceType: message.DeviceType,
 	}
@@ -1367,15 +1366,15 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
 
-	messagesToHandle := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage)
+	messagesToHandle := make(map[types2.ChatFilter][]*types2.ReceivedMessage)
 
 	for _, message := range archiveMessages {
 		filter := m.messaging.ChatFilterByTopic(message.Topic)
 		if filter != nil {
-			shhMessage := &messagingtypes.ReceivedMessage{
+			shhMessage := &types2.ReceivedMessage{
 				Sig:          message.Sig,
 				Timestamp:    uint32(message.Timestamp),
-				Topic:        messagingtypes.BytesToContentTopic(message.Topic),
+				Topic:        types2.BytesToContentTopic(message.Topic),
 				Payload:      message.Payload,
 				Padding:      message.Padding,
 				Hash:         message.Hash,
@@ -1385,8 +1384,8 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		}
 	}
 
-	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
-	otherMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
+	importedMessages := make(map[types2.ChatFilter][]*types2.ReceivedMessage, 0)
+	otherMessages := make(map[types2.ChatFilter][]*types2.ReceivedMessage, 0)
 
 	for filter, messages := range messagesToHandle {
 		for _, message := range messages {
