@@ -3,8 +3,8 @@ package statusgo
 import (
 	"encoding/json"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/accounts-management/keystore"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 

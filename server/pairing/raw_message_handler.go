@@ -8,7 +8,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/messaging"

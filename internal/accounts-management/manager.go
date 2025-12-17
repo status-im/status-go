@@ -7,10 +7,10 @@ import (
 
 	"go.uber.org/zap"
 
-	accsmanagementerrors "github.com/status-im/status-go/accounts-management/errors"
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/keystore"
 	gocommon "github.com/status-im/status-go/common"
+	accsmanagementerrors "github.com/status-im/status-go/internal/accounts-management/errors"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 

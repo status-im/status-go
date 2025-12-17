@@ -8,7 +8,7 @@ import (
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/pkg/errors"
 
-	accscommon "github.com/status-im/status-go/accounts-management/common"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"

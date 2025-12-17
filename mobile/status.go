@@ -19,10 +19,10 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/keystore"
 	gocommon "github.com/status-im/status-go/common"
 	abi_spec "github.com/status-im/status-go/internal/abi-spec"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	"github.com/status-im/status-go/internal/centralizedmetrics"
 	"github.com/status-im/status-go/internal/centralizedmetrics/providers"
 	"github.com/status-im/status-go/internal/crypto"

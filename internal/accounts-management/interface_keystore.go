@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	"github.com/status-im/status-go/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	cryptoypes "github.com/status-im/status-go/internal/crypto/types"
 )
 

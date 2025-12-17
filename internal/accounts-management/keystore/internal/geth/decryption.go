@@ -20,7 +20,7 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
 )
 

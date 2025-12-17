@@ -1,8 +1,8 @@
 package common
 
 import (
-	"github.com/status-im/status-go/accounts-management/keystore"
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 )
 
 // This function is exposed from here just to be used for validating transferred keystore files while local pairing.

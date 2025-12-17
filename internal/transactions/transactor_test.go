@@ -9,9 +9,9 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/accounts-management/generator"
-	accstypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc/chain"
@@ -220,7 +220,7 @@ func (s *TransactorSuite) TestGasValues() {
 	}
 }
 
-func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *accstypes.SelectedExtKey) {
+func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *types.SelectedExtKey) {
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&testNonce, nil)
 
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
@@ -237,9 +237,9 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	address2 := fakeAddress()
 
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &accstypes.SelectedExtKey{
+	selectedAccount := &types.SelectedExtKey{
 		Address:    *address1,
-		AccountKey: &accstypes.Key{PrivateKey: key},
+		AccountKey: &types.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID

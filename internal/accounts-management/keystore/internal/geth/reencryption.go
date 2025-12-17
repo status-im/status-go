@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 )
 
 func reEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {

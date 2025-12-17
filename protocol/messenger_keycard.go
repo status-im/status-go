@@ -3,7 +3,7 @@ package protocol
 import (
 	"context"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/protobuf"

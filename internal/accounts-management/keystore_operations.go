@@ -8,9 +8,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/keystore"
-	"github.com/status-im/status-go/accounts-management/types"
+	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	keystore2 "github.com/status-im/status-go/internal/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
@@ -32,15 +32,15 @@ func (m *AccountsManager) ReloadKeystore() error {
 }
 
 // StoreKeystoreFilesForMnemonic stores the keystore files for an account created from a given mnemonic and for all derived accounts from given paths
-func (m *AccountsManager) StoreKeystoreFilesForMnemonic(mnemonic string, password string, paths []string) (account *generator.Account, derivedAccounts map[string]*generator.Account, err error) {
+func (m *AccountsManager) StoreKeystoreFilesForMnemonic(mnemonic string, password string, paths []string) (account *generator2.Account, derivedAccounts map[string]*generator2.Account, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	return m.storeKeystoreFilesForMnemonicInternally(mnemonic, password, paths)
 }
 
-func (m *AccountsManager) storeKeystoreFilesForMnemonicInternally(mnemonic string, password string, paths []string) (account *generator.Account, derivedAccounts map[string]*generator.Account, err error) {
-	account, derivedAccounts, err = generator.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, "")
+func (m *AccountsManager) storeKeystoreFilesForMnemonicInternally(mnemonic string, password string, paths []string) (account *generator2.Account, derivedAccounts map[string]*generator2.Account, err error) {
+	account, derivedAccounts, err = generator2.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, "")
 	if err != nil {
 		return
 	}
@@ -54,16 +54,16 @@ func (m *AccountsManager) storeKeystoreFilesForMnemonicInternally(mnemonic strin
 }
 
 // StoreKeystoreFilesForPrivateKey stores the keystore file for an account created from a given private key
-func (m *AccountsManager) StoreKeystoreFilesForPrivateKey(privateKey string, password string) (account *generator.Account, err error) {
+func (m *AccountsManager) StoreKeystoreFilesForPrivateKey(privateKey string, password string) (account *generator2.Account, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	return m.storeKeystoreFilesForPrivateKeyInternally(privateKey, password)
 }
 
-func (m *AccountsManager) storeKeystoreFilesForPrivateKeyInternally(privateKey string, password string) (account *generator.Account, err error) {
+func (m *AccountsManager) storeKeystoreFilesForPrivateKeyInternally(privateKey string, password string) (account *generator2.Account, err error) {
 
-	account, err = generator.CreateAccountFromPrivateKey(privateKey)
+	account, err = generator2.CreateAccountFromPrivateKey(privateKey)
 	if err != nil {
 		return
 	}
@@ -76,7 +76,7 @@ func (m *AccountsManager) storeKeystoreFilesForPrivateKeyInternally(privateKey s
 	return
 }
 
-func (m *AccountsManager) storeKeystoreFilesForAccounts(account *generator.Account, derivedAccounts map[string]*generator.Account, password string) (err error) {
+func (m *AccountsManager) storeKeystoreFilesForAccounts(account *generator2.Account, derivedAccounts map[string]*generator2.Account, password string) (err error) {
 	err = m.storeToKeystore(account, password)
 	if err != nil {
 		return
@@ -95,7 +95,7 @@ func (m *AccountsManager) storeKeystoreFilesForAccounts(account *generator.Accou
 	return
 }
 
-func (m *AccountsManager) storeToKeystore(acc *generator.Account, password string) (err error) {
+func (m *AccountsManager) storeToKeystore(acc *generator2.Account, password string) (err error) {
 	if m.keystore == nil {
 		return ErrKeystoreMissing
 	}
@@ -127,7 +127,7 @@ func (m *AccountsManager) createKeystore(keyUID string) (KeyStore, error) {
 		}
 	}
 
-	return keystore.NewGethKeystoreAdapter(absoluteKeystorePath)
+	return keystore2.NewGethKeystoreAdapter(absoluteKeystorePath)
 }
 
 // deleteAccountFromKeystoreIfExists deletes an account from the keystore if it exists, if not returns no error
@@ -138,7 +138,7 @@ func (m *AccountsManager) deleteAccountFromKeystoreIfExists(address cryptotypes.
 	}
 	m.logger.Info("deleting account", zap.String("address", address.Hex()))
 	err := m.keystore.Delete(address, password)
-	if errors.Is(err, keystore.ErrKeystoreFileMissing) {
+	if errors.Is(err, keystore2.ErrKeystoreFileMissing) {
 		return nil
 	}
 	return err
@@ -318,7 +318,7 @@ func (m *AccountsManager) ReEncryptKeyStoreDir(oldPass, newPass string) error {
 	return m.keystore.ReEncryptKeyStoreDir(oldPass, newPass)
 }
 
-func (m *AccountsManager) generatePartialAccountKey(address cryptotypes.Address, password string) (*generator.Account, error) {
+func (m *AccountsManager) generatePartialAccountKey(address cryptotypes.Address, password string) (*generator2.Account, error) {
 	if m.persistence == nil {
 		return nil, ErrPersistenceMissing
 	}
@@ -342,16 +342,16 @@ func (m *AccountsManager) generatePartialAccountKey(address cryptotypes.Address,
 	return m.deriveChildAccountForPathAndStore(rootAddress, path, password)
 }
 
-func (m *AccountsManager) deriveChildAccountForPath(deriveFrom cryptotypes.Address, path string, password string) (*generator.Account, error) {
+func (m *AccountsManager) deriveChildAccountForPath(deriveFrom cryptotypes.Address, path string, password string) (*generator2.Account, error) {
 	account, err := m.loadAccountInternally(deriveFrom, password)
 	if err != nil {
 		return nil, err
 	}
 
-	return generator.DeriveChildFromAccount(account, path)
+	return generator2.DeriveChildFromAccount(account, path)
 }
 
-func (m *AccountsManager) deriveChildAccountForPathAndStore(deriveFrom cryptotypes.Address, path string, password string) (*generator.Account, error) {
+func (m *AccountsManager) deriveChildAccountForPathAndStore(deriveFrom cryptotypes.Address, path string, password string) (*generator2.Account, error) {
 	childAccount, err := m.deriveChildAccountForPath(deriveFrom, path, password)
 	if err != nil {
 		return nil, err

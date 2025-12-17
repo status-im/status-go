@@ -3,7 +3,7 @@ package accountsmanagement
 //go:generate go tool mockgen -package=mock_persistence -source=interface_persistence.go -destination=./mock/persistence.go
 
 import (
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 

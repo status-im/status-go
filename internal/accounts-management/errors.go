@@ -1,6 +1,8 @@
 package accountsmanagement
 
-import "github.com/status-im/status-go/accounts-management/errors"
+import (
+	"github.com/status-im/status-go/internal/accounts-management/errors"
+)
 
 const (
 	ErrorCategorySystem     errors.ErrorCategory = "system"

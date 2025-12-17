@@ -3,7 +3,7 @@ package personal
 import (
 	"errors"
 
-	"github.com/status-im/status-go/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 )
 

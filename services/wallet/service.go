@@ -10,6 +10,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
 	rpc2 "github.com/status-im/status-go/internal/rpc"
@@ -24,8 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/backupsync"

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	customerrors "github.com/status-im/status-go/accounts-management/errors"
-
 	"github.com/stretchr/testify/assert"
+
+	customerrors "github.com/status-im/status-go/internal/accounts-management/errors"
 )
 
 func TestDecodePath(t *testing.T) {

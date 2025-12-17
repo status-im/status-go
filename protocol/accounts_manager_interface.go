@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 

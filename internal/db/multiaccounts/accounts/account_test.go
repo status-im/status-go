@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 
 	"github.com/stretchr/testify/require"

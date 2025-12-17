@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	"github.com/status-im/status-go/services/wallet/wallettypes"

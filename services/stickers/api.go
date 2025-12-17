@@ -13,9 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/contracts/stickers"
 	"github.com/status-im/status-go/internal/crypto/types"

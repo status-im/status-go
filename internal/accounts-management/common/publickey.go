@@ -3,7 +3,7 @@ package common
 import (
 	"reflect"
 
-	"github.com/status-im/status-go/accounts-management/types"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
 )

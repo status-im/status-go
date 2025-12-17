@@ -12,16 +12,15 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/keystore"
-	mock_persistence "github.com/status-im/status-go/accounts-management/mock"
-	"github.com/status-im/status-go/accounts-management/types"
+	common2 "github.com/status-im/status-go/internal/accounts-management/common"
+	customerrors "github.com/status-im/status-go/internal/accounts-management/errors"
+	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
+	mock_persistence "github.com/status-im/status-go/internal/accounts-management/mock"
+	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
-
-	customerrors "github.com/status-im/status-go/accounts-management/errors"
 )
 
 const testPassword = "test-password"
@@ -229,7 +228,7 @@ type testAccount struct {
 	chatAddress   types2.Address
 	chatPubKey    string
 	mnemonic      string
-	masterAccount *generator.Account
+	masterAccount *generator2.Account
 }
 
 // SetupTest is used here for reinitializing the mock before every
@@ -249,19 +248,19 @@ func (s *ManagerTestSuite) SetupTest() {
 	s.accManager.SetRootDataDir(s.rootDataDir)
 
 	// Initial test - create test account
-	mnemonic, err := common.CreateRandomMnemonicWithDefaultLength()
+	mnemonic, err := common2.CreateRandomMnemonicWithDefaultLength()
 	s.Require().NoError(err)
 
-	paths := []string{common.PathEIP1581Chat, common.PathDefaultWalletAccount}
-	genAcc, derivedAccounts, err := generator.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, "")
+	paths := []string{common2.PathEIP1581Chat, common2.PathDefaultWalletAccount}
+	genAcc, derivedAccounts, err := generator2.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, "")
 	s.Require().NoError(err)
 
 	s.testAccount = testAccount{
 		testPassword,
-		derivedAccounts[common.PathDefaultWalletAccount].Address(),
-		derivedAccounts[common.PathDefaultWalletAccount].PublicKeyHex(),
-		derivedAccounts[common.PathEIP1581Chat].Address(),
-		derivedAccounts[common.PathEIP1581Chat].PublicKeyHex(),
+		derivedAccounts[common2.PathDefaultWalletAccount].Address(),
+		derivedAccounts[common2.PathDefaultWalletAccount].PublicKeyHex(),
+		derivedAccounts[common2.PathEIP1581Chat].Address(),
+		derivedAccounts[common2.PathEIP1581Chat].PublicKeyHex(),
 		mnemonic,
 		genAcc,
 	}
@@ -288,7 +287,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 	).Times(1)
 
 	walletAccount := &types.AccountCreationDetails{
-		Path: common.PathDefaultWalletAccount,
+		Path: common2.PathDefaultWalletAccount,
 	}
 
 	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(s.mnemonic, s.password, "kp-name", walletAccount, true, 0)
@@ -303,7 +302,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 	walletAccountOk := false
 	for _, kpAcc := range keypair.Accounts {
 		if kpAcc.Chat {
-			chatAccountOk = kpAcc.Path == common.PathEIP1581Chat &&
+			chatAccountOk = kpAcc.Path == common2.PathEIP1581Chat &&
 				kpAcc.Address == s.chatAddress &&
 				bytes.Equal(kpAcc.PublicKey, types2.Hex2Bytes(s.chatPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
@@ -315,7 +314,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 				kpAcc.Operable == types.AccountFullyOperable
 		}
 		if kpAcc.Wallet {
-			walletAccountOk = kpAcc.Path == common.PathDefaultWalletAccount &&
+			walletAccountOk = kpAcc.Path == common2.PathDefaultWalletAccount &&
 				kpAcc.Address == s.walletAddress &&
 				bytes.Equal(kpAcc.PublicKey, types2.Hex2Bytes(s.walletPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
@@ -397,7 +396,7 @@ func (s *ManagerTestSuite) TestSetChatAccountForExistingProfile() {
 	s.createAndStoreProfileKeypair()
 	s.accManager.setChatAccountAndProfileKeyUID(nil, "") // clear the chat account set by `createAndStoreProfileKeypair`
 
-	genAcc, err := generator.CreateAccountFromMnemonic(s.mnemonic, "")
+	genAcc, err := generator2.CreateAccountFromMnemonic(s.mnemonic, "")
 	s.Require().NoError(err)
 
 	s.persistence.EXPECT().GetProfileKeypair().Return(
