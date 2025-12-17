@@ -140,8 +140,8 @@ class WakuextService(Service):
         response = self.rpc_request("sendContactRequest", params)
         return response
 
-    def accept_contact_request(self, request_id: str):
-        params = [{"id": request_id}]
+    def accept_contact_request(self, request_id: str, contact_id: str):
+        params = [{"id": request_id, "contactID": contact_id}]
         response = self.rpc_request("acceptContactRequest", params)
         return response
 
@@ -150,8 +150,8 @@ class WakuextService(Service):
         response = self.rpc_request("acceptLatestContactRequestForContact", params)
         return response
 
-    def decline_contact_request(self, request_id: str):
-        params = [{"id": request_id}]
+    def decline_contact_request(self, request_id: str, contact_id: str):
+        params = [{"id": request_id, "contactID": contact_id}]
         response = self.rpc_request("declineContactRequest", params)
         return response
 
