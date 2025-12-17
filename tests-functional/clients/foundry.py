@@ -213,6 +213,17 @@ class Foundry:
             raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
         return result
 
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    def get_erc721_owner(self, token_address, token_id):
+        if not self.container:
+            raise Exception("Container not found")
+
+        owner_cmd = f"cast call {token_address} 'ownerOf(uint256)' {token_id} --rpc-url http://anvil:8545"
+        result = self.container.exec_run(owner_cmd)
+        if result.exit_code != 0:
+            raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
+        return result
+
     def check_contract_exists(self, address: str) -> bool:
         if not self.container:
             return False

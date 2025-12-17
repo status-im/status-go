@@ -10,10 +10,13 @@ from requests import ReadTimeout
 from clients.anvil import Anvil
 from clients.contract_deployers.multicall3 import Multicall3Deployer
 from clients.contract_deployers.snt import SNTDeployer
+from clients.contract_deployers.erc721 import ERC721Deployer
 from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
 from resources.constants import USE_IPV6
 from utils import fake
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -166,7 +169,6 @@ def multicall3_deployer(foundry_client):
 
 @pytest.fixture(scope="session")
 def snt_addresses(foundry_client):
-    logger = logging.getLogger(__name__)
     addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "snt_addresses.json")
     lock_path = addresses_file + ".lock"  # Lock file next to JSON
 
@@ -195,6 +197,25 @@ def snt_addresses(foundry_client):
         with open(addresses_file, "w") as f:
             json.dump(data, f, indent=2)
         logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
+        return data
+
+
+@pytest.fixture(scope="session")
+def erc721_addresses(foundry_client):
+
+    addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "erc721_addresses.json")
+    lock_path = addresses_file + ".lock"  # Lock file next to JSON
+
+    with FileLock(lock_path, timeout=120):  # Acquire lock (120s timeout for deploy)
+        # Always deploy a new ERC721 contract at session start
+        logger.info("Deploying new ERC721 token...")
+        deployer = ERC721Deployer(foundry_client)
+        data = {
+            "erc721": deployer.mock_erc721_address,
+        }
+        with open(addresses_file, "w") as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"New ERC721 deployed: token={data['erc721']}")
         return data
 
 
