@@ -20,10 +20,6 @@ class TestCommunityChats(MessengerSteps):
         return backend_new_profile("member")
 
     @pytest.fixture()
-    def fake_address(self):
-        return "0x" + str(uuid4())[:8]
-
-    @pytest.fixture()
     def community_id(self, creator, member):
         cid = self.create_community(creator)
         self.join_community(member=member, admin=creator)

@@ -1,4 +1,5 @@
 import random
+from uuid import uuid4
 
 from faker import Faker
 
@@ -44,3 +45,7 @@ def community_channel_identity() -> dict:
         "color": color(),
         "description": community_description(),
     }
+
+
+def address() -> str:
+    return "0x" + str(uuid4())[:8]

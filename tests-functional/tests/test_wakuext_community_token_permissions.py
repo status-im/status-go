@@ -1,7 +1,6 @@
 import logging
 import time
 from typing import Optional, List
-from uuid import uuid4
 
 import pytest
 
@@ -31,10 +30,6 @@ def request_to_join_with_signatures(backend: StatusBackend, community_id: str, a
 
     # Send request to join with addresses to reveal and signatures
     return backend.wakuext_service.request_to_join_community(community_id, addresses, signatures)
-
-
-def fake_address():
-    return "0x" + str(uuid4())[:8]
 
 
 @pytest.mark.rpc
@@ -341,7 +336,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
         # Member with tokens requests to join community
-        join_resp = member_backend.wakuext_service.request_to_join_community(community_id, [fake_address()])
+        join_resp = member_backend.wakuext_service.request_to_join_community(community_id, [fake.address()])
         requests = join_resp.get("requestsToJoinCommunity", [])
         assert requests, "No requests to join community"
         assert len(requests) == 1, "Unexpected multiple requests to join community"

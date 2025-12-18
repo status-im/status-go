@@ -27,11 +27,7 @@ class TestContactVerification(MessengerSteps):
         self.make_contacts(sender=creator, receiver=m)
         return m
 
-    @pytest.fixture()
-    def fake_address(self):
-        return "0x" + str(uuid4())[:8]
-
-    def test_send_and_accept_contact_verification_request(self, creator, member, fake_address):
+    def test_send_and_accept_contact_verification_request(self, creator, member):
         challenge = f"verify-accept_{uuid4()}"
         send_resp = creator.wakuext_service.send_contact_verification_request(member.public_key, challenge)
         assert send_resp.get("messages")[0].get("contentType") == MessageContentType.IDENTITY_VERIFICATION.value
@@ -73,7 +69,7 @@ class TestContactVerification(MessengerSteps):
         get_latest_request_resp_after = member.wakuext_service.get_latest_verification_request_from(creator.public_key)
         assert get_latest_request_resp_after == get_received_resp_after[0]
 
-    def test_send_and_decline_contact_verification_request(self, creator, member, fake_address):
+    def test_send_and_decline_contact_verification_request(self, creator, member):
         challenge = f"verify-decline-{uuid4()}"
         creator.wakuext_service.send_contact_verification_request(member.public_key, challenge)
 
@@ -97,7 +93,7 @@ class TestContactVerification(MessengerSteps):
         assert get_received_resp_after[0].get("response") == ""
         assert get_received_resp_after[0].get("verification_status") == ContactVerificationState.ContactVerificationStateDeclined.value
 
-    def test_send_and_cancel_contact_verification_request(self, creator, member, fake_address):
+    def test_send_and_cancel_contact_verification_request(self, creator, member):
         challenge = f"verify-cancel-{uuid4()}"
         creator.wakuext_service.send_contact_verification_request(member.public_key, challenge)
 
