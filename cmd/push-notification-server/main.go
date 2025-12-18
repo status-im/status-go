@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
@@ -210,6 +211,7 @@ func main() {
 	messenger.StartRetrieveMessagesLoop(300*time.Millisecond, cancelMessenger)
 
 	go func() {
+		defer common.LogOnPanic()
 		select {
 		case <-cancelMessenger:
 			return
