@@ -327,8 +327,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
-        time.sleep(2)
-
         # Fetch community as member
         response = self.fetch_community(member_backend, community_id)
         assert response, "Community not found"
