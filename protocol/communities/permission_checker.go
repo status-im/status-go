@@ -59,7 +59,7 @@ func (p *DefaultPermissionChecker) getOwnedENS(addresses []gethcommon.Address) (
 		return ownedENS, nil
 	}
 	for _, address := range addresses {
-		name, err := p.ensVerifier.ReverseResolve(address)
+		name, err := p.ensVerifier.ReverseResolve(context.Background(), address)
 		if err != nil && err.Error() != "not a resolver" {
 			return ownedENS, err
 		}

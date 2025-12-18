@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/internal/testutils/fake"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -130,7 +130,7 @@ var (
 )
 
 func seedTestDBWithIdentityImages(t *testing.T, db *Database, keyUID string) {
-	iis := testutils.SampleIdentityImages()
+	iis := fake.IdentityImages()
 	require.NoError(t, db.StoreIdentityImages(keyUID, iis, false))
 }
 
@@ -361,7 +361,7 @@ func TestDatabase_SaveAccountWithIdentityImages(t *testing.T) {
 		KeyUID:    keyUID,
 		ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
 		ColorID:   10,
-		Images:    testutils.SampleIdentityImages(),
+		Images:    fake.IdentityImages(),
 	}
 	require.NoError(t, db.SaveAccount(expected))
 

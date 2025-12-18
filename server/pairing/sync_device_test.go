@@ -18,9 +18,9 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	testutils2 "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/backend"
-	"github.com/status-im/status-go/pkg/testutils"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
@@ -58,7 +58,7 @@ type SyncDeviceSuite struct {
 }
 
 func (s *SyncDeviceSuite) SetupTest() {
-	s.logger = testutils.MustCreateTestLogger()
+	s.logger = testutils2.MustCreateTestLogger()
 	s.password = "password"
 	s.tmpdir = s.T().TempDir()
 }
@@ -347,7 +347,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
 
 	// Wait for sync messages to be received on client
-	err = testutils.RetryWithBackOff(func() error {
+	err = testutils2.RetryWithBackOff(func() error {
 		response, err := clientMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -404,7 +404,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client
-	err = testutils.RetryWithBackOff(func() error {
+	err = testutils2.RetryWithBackOff(func() error {
 		response, err := clientMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -454,7 +454,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client
-	err = testutils.RetryWithBackOff(func() error {
+	err = testutils2.RetryWithBackOff(func() error {
 		response, err := clientMessenger.RetrieveAll()
 		if err != nil {
 			return err

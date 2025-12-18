@@ -10,8 +10,11 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc/network"
@@ -22,9 +25,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/t/helpers"
-
-	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
@@ -52,7 +52,7 @@ func TestControllerMultipleAccountsAddedEvent(t *testing.T) {
 	}, nil).AnyTimes()
 	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	emptyCollectiblesContainer := &thirdparty.CollectibleOwnershipContainer{
@@ -137,7 +137,7 @@ func TestControllerMultiStandardBalanceEvents(t *testing.T) {
 	}, nil).AnyTimes()
 	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	ownershipDB := ownership.NewOwnershipDB(walletDB)
@@ -346,7 +346,7 @@ func TestControllerNetworkEventsWatcher(t *testing.T) {
 	chain2 := &params.Network{ChainID: 2, IsActive: true}
 	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	emptyCollectiblesContainer := &thirdparty.CollectibleOwnershipContainer{
@@ -463,7 +463,7 @@ func TestControllerTriggerLoad(t *testing.T) {
 	}, nil).AnyTimes()
 	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	// Create a realistic collectibles container with actual data for TriggerLoad test
@@ -617,7 +617,7 @@ func TestControllerAccountsEvents(t *testing.T) {
 		{ChainID: 1, IsActive: true},
 	}, nil).AnyTimes()
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	emptyCollectiblesContainer := &thirdparty.CollectibleOwnershipContainer{
@@ -737,7 +737,7 @@ func TestControllerPeriodicalLoads(t *testing.T) {
 	}, nil).AnyTimes()
 	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
 
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	emptyCollectiblesContainer := &thirdparty.CollectibleOwnershipContainer{

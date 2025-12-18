@@ -9,13 +9,18 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+)
+
+const (
+	MaxNumberOfAccounts          = 20
+	MaxNumberOfKeypairs          = 5 // including the profile keypair
+	MaxNumberOfWatchOnlyAccounts = 3
 )
 
 var (
@@ -736,7 +741,7 @@ func (m *Messenger) RemainingAccountCapacity() (int, error) {
 	if len(accounts) > 0 {
 		numOfAccountsWithoutChatAccount = len(accounts) - 1
 	}
-	remainingCapacity := constants.MaxNumberOfAccounts - numOfAccountsWithoutChatAccount
+	remainingCapacity := MaxNumberOfAccounts - numOfAccountsWithoutChatAccount
 	if remainingCapacity <= 0 {
 		return 0, errors.New("no more accounts can be added")
 	}
@@ -749,7 +754,7 @@ func (m *Messenger) RemainingKeypairCapacity() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	remainingCapacity := constants.MaxNumberOfKeypairs - len(keypairs)
+	remainingCapacity := MaxNumberOfKeypairs - len(keypairs)
 	if remainingCapacity <= 0 {
 		return 0, errors.New("no more keypairs can be added")
 	}
@@ -762,7 +767,7 @@ func (m *Messenger) RemainingWatchOnlyAccountCapacity() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	remainingCapacity := constants.MaxNumberOfWatchOnlyAccounts - len(accounts)
+	remainingCapacity := MaxNumberOfWatchOnlyAccounts - len(accounts)
 	if remainingCapacity <= 0 {
 		return 0, errors.New("no more watch-only accounts can be added")
 	}

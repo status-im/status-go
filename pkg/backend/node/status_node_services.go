@@ -51,6 +51,19 @@ var (
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 )
 
+func (b *StatusNode) ThirdpartyServicesEnabled() (bool, error) {
+	accDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		b.logger.Error("failed to create accounts db", zap.Error(err))
+		return true, err
+	}
+	enabled, err := accDB.ThirdpartyServicesEnabled()
+	if err != nil {
+		return true, err
+	}
+	return enabled, nil
+}
+
 func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
@@ -110,7 +123,9 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 	services = append(services, lns)
 
-	services = append(services, b.NewsFeedService())
+	if b.NewsFeedService() != nil {
+		services = append(services, b.NewsFeedService())
+	}
 	services = append(services, b.sharedUrlsService())
 	services = append(services, b.linkPreviewService(accDB))
 
@@ -412,10 +427,15 @@ func (b *StatusNode) personalService() *personal.Service {
 
 func (b *StatusNode) TimeSource() timesource.Provider {
 	if b.timeSourceSrvc == nil {
-		if privateMode {
-			b.timeSourceSrvc = timesource.LocalService()
-		} else {
+		thirdpartyServicesEnabled, err := b.ThirdpartyServicesEnabled()
+		if err != nil {
+			b.logger.Error("failed to get if thirdparty services enabled", zap.Error(err))
+		}
+
+		if thirdpartyServicesEnabled {
 			b.timeSourceSrvc = timesource.DefaultService()
+		} else {
+			b.timeSourceSrvc = timesource.LocalService()
 		}
 	}
 	return b.timeSourceSrvc
@@ -426,7 +446,13 @@ func (b *StatusNode) timeSourceNow() func() time.Time {
 }
 
 func (b *StatusNode) NewsFeedService() *newsfeed.Service {
-	if !featureflags.EnableNewsFeed {
+	thirdpartyServicesEnabled, err := b.ThirdpartyServicesEnabled()
+	if err != nil {
+		b.logger.Error("failed to get if thirdparty services are enabled", zap.Error(err))
+		return nil
+	}
+
+	if !featureflags.EnableNewsFeed || !thirdpartyServicesEnabled {
 		return nil
 	}
 

@@ -10,11 +10,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/newsfeed/migrations"
 	mock_newsfeed "github.com/status-im/status-go/services/newsfeed/mock"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type MessengerNewsFeedSuite struct {
@@ -30,7 +29,7 @@ func (s *MessengerNewsFeedSuite) SetupTest() {
 	s.ac = mock_newsfeed.NewMockActivityCenter(ctrl)
 
 	// Setup storage
-	db, err := helpers.SetupTestMemorySQLDB(helpers.NewTestDBInitializer([]*bindata.AssetSource{
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{
 			Names:     migrations.AssetNames(),
 			AssetFunc: migrations.Asset,

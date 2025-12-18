@@ -11,12 +11,12 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestSaveTokens(t *testing.T) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -120,7 +120,7 @@ func TestSaveTokens(t *testing.T) {
 }
 
 func TestGetCachedBalancesByChain(t *testing.T) {
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	persistence := balanceStorage{walletDB: walletDB}

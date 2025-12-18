@@ -1,7 +1,7 @@
 package network
 
 import (
-	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/errors"
 )
 
 // Abbreviation `NET` for the error code stands for Networks

@@ -4,17 +4,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v6"
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/pkg/multiformat"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	mock_provider "github.com/status-im/status-go/services/sharedurls/mock"
-	"github.com/status-im/status-go/t"
-
-	"github.com/status-im/status-go/protocol/communities"
 )
 
 const (
@@ -72,13 +70,18 @@ func (s *ShareUrlsSuite) addFakeChannel(community *communities.Community) (*comm
 }
 
 func (s *ShareUrlsSuite) fakeContact() *contacts.Contact {
-	contact := t.FakeContact(s.T(), nil)
+	var contact contacts.Contact
+	err := gofakeit.Struct(&contact)
+	s.Require().NoError(err)
 	contact.ENSVerified = true
-	return contact
+	return &contact
 }
 
 func (s *ShareUrlsSuite) fakeCommunity() *communities.Community {
-	return t.FakeCommunity(s.T())
+	faker := gofakeit.New(0)
+	v, err := (&communities.Community{}).Fake(faker)
+	s.Require().NoError(err)
+	return v.(*communities.Community)
 }
 
 func (s *ShareUrlsSuite) verifyCommunityURL(url string, community *communities.Community, channel *protobuf.CommunityChat) {

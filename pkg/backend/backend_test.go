@@ -33,24 +33,23 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {
-	return helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "tests")
+	return testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "tests")
 }
 
 func setupTestWalletDB() (*sql.DB, func() error, error) {
-	return helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "tests")
+	return testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "tests")
 }
 
 func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {

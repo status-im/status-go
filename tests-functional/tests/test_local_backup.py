@@ -136,6 +136,24 @@ class TestLocalBackup:
         assert chats is not None, "One-to-one chat was not created (None)"
         assert len(chats) == 1, "One-to-one chat was not created (empty)"
 
+        # Send messages and add emoji reactions to validate backup/restore of reactions
+        group_msg_text = "backup emoji group"
+        one_msg_text = "backup emoji one"
+        send_response = backend_client.wakuext_service.send_group_chat_message(group_chat_id, group_msg_text)
+        assert send_response is not None, "Failed to send group message"
+        group_msg_id = send_response.get("messages", [])[0].get("id", "")
+        assert group_msg_id != "", "Failed to get group message ID"
+        send_response = backend_client.wakuext_service.send_one_to_one_message(test_one_to_one_chat_id, one_msg_text)
+        assert send_response is not None, "Failed to send one-to-one message"
+        one_msg_id = send_response.get("messages", [])[0].get("id", "")
+        assert one_msg_id != "", "Failed to get one-to-one message ID"
+
+        # Add emoji reactions (hex emoji codes)
+        response = backend_client.wakuext_service.send_emoji_reaction(group_chat_id, group_msg_id, "1f642")  # 🙂
+        assert response["emojiReactions"][0]["emoji"] == "1f642", "Failed to add emoji reaction to group message"
+        response = backend_client.wakuext_service.send_emoji_reaction(test_one_to_one_chat_id, one_msg_id, "2764")  # ❤
+        assert response["emojiReactions"][0]["emoji"] == "2764", "Failed to add emoji reaction to one-to-one message"
+
         # Validate settings on the first backend client
         result = backend_client.settings_service.get_settings()
         assert result is not None, "Settings were not set"
@@ -197,8 +215,33 @@ class TestLocalBackup:
         with pytest.raises(ApiResponseError, match=re.escape("backup path is not set")):
             backend_client.api_request_json("PerformLocalBackup", "")
 
+        # Validate emoji reactions before backup
+        result = backend_client.wakuext_service.emoji_reactions_by_chat_id_message_id(group_chat_id, group_msg_id)
+        assert result is not None, "Group chat emoji reactions not found"
+        assert all(
+            (
+                len(result) == 1,
+                result[0]["chatId"] == group_chat_id,
+                result[0]["messageId"] == group_msg_id,
+                result[0]["emoji"] == "1f642",
+            )
+        )
+        result = backend_client.wakuext_service.emoji_reactions_by_chat_id_message_id(test_one_to_one_chat_id, one_msg_id)
+        assert result is not None, "One-to-one chat emoji reactions not found"
+        assert all(
+            (
+                len(result) == 1,
+                result[0]["chatId"] == test_one_to_one_chat_id,
+                result[0]["messageId"] == one_msg_id,
+                result[0]["emoji"] == "2764",
+            )
+        )
+
         # Change the backup path (Docker restricts access to a lot of folders)
         backend_client.settings_service.save_setting("backup-path", "/usr/status-user/backups")
+
+        # Enable message sync on local backups
+        backend_client.settings_service.save_setting("messages-backup-enabled?", True)
 
         # Perform the backup
         response = backend_client.api_request_json("PerformLocalBackup", "")
@@ -287,6 +330,15 @@ class TestLocalBackup:
                 one_on_one_chat_recovered = True
         assert group_chat_recovered, "Group chat was not restored correctly"
         assert one_on_one_chat_recovered, "One-to-one chat was not restored correctly"
+
+        # Validate emoji reactions restored on the new client
+        result = backend_client2.wakuext_service.emoji_reactions_by_chat_id_message_id(group_chat_id, group_msg_id)
+        assert result is not None, "Emoji reactions for group chat not restored"
+        assert len(result) == 1 and result[0].get("emoji") == "1f642", "Group message emoji reaction was not restored correctly"
+
+        result = backend_client2.wakuext_service.emoji_reactions_by_chat_id_message_id(test_one_to_one_chat_id, one_msg_id)
+        assert result is not None, "Emoji reactions for one-to-one chat not restored"
+        assert len(result) == 1 and result[0].get("emoji") == "2764", "One-to-one message emoji reaction was not restored correctly"
 
     def test_local_backup_backwards_compatibility(self, backend_factory):
         backend_client = backend_factory()

@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/accounts-management/types"
 	"github.com/status-im/status-go/crypto"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 
 	customerrors "github.com/status-im/status-go/accounts-management/errors"
 )

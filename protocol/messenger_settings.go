@@ -3,8 +3,8 @@ package protocol
 import (
 	"context"
 
+	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/protocol/requests"
 )
 

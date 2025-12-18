@@ -14,13 +14,13 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	mock_pendingtxtracker "github.com/status-im/status-go/services/wallet/pendingtxtracker/mock"
 
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type testState struct {
@@ -35,7 +35,7 @@ type testState struct {
 
 // setupTestTransactionDB will use the default pending check interval if checkInterval is nil
 func setupTestTransactionDB(t *testing.T, checkInterval *time.Duration) testState {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	ctrl := gomock.NewController(t)

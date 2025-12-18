@@ -9,20 +9,20 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestKeycardPairingsFile(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	accountsDb, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	accountsPublisher := pubsub.NewPublisher()

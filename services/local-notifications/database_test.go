@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 func setupAppTestDb(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "local-notifications-tests-")
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "local-notifications-tests-")
 	require.NoError(t, err)
 	return db, func() { require.NoError(t, cleanup()) }
 }

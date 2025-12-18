@@ -8,17 +8,21 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"os"
 	"slices"
 	"sync"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/golang/protobuf/proto"
+	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
@@ -2671,4 +2675,80 @@ func CommunityDescriptionTokenOwnerChainID(description *protobuf.CommunityDescri
 
 func HasTokenOwnership(description *protobuf.CommunityDescription) bool {
 	return uint64(0) != CommunityDescriptionTokenOwnerChainID(description)
+}
+
+type timeSourceStub struct {
+}
+
+func (t *timeSourceStub) GetCurrentTime() uint64 {
+	return uint64(time.Now().Unix())
+}
+
+func (c *Community) Fake(f *gofakeit.Faker) (any, error) {
+	timeSource := timeSourceStub{}
+
+	var config Config
+	err := f.Struct(&config)
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to generate fake community config")
+	}
+
+	memberKey, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to generate fake community member key")
+	}
+
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to generate fake community private key")
+	}
+
+	config.ID = &key.PublicKey
+	config.PrivateKey = key
+	config.ControlNode = &key.PublicKey
+	config.Logger = zap.NewNop()
+	config.MemberIdentity = memberKey
+	config.ControlDevice = true
+
+	request := requests.CreateCommunity{}
+	err = f.Struct(&request)
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to generate fake community request")
+	}
+
+	// Image has to be real, otherwise the request doesn't pass validation
+	request.Image = ""
+	request.Banner.ImagePath = ""
+
+	image1Path, err := fake.SaveImage(os.TempDir(), 256, 256)
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to generate fake community image")
+	}
+
+	image2Path, err := fake.SaveImage(os.TempDir(), 160, 90)
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to generate fake community banner")
+	}
+
+	request.Image = image1Path
+	request.ImageAx = 0
+	request.ImageAy = 0
+	request.ImageBx = 256
+	request.ImageBy = 256
+
+	request.Banner = images.CroppedImage{
+		ImagePath: image2Path,
+		X:         0,
+		Y:         0,
+		Width:     160,
+		Height:    90,
+	}
+
+	config.CommunityDescription, err = request.ToCommunityDescription()
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "failed to generate fake community description")
+	}
+
+	community, err := New(config, &timeSource, nil, nil)
+	return community, err
 }

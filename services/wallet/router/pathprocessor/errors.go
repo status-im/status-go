@@ -3,7 +3,7 @@ package pathprocessor
 import (
 	"context"
 
-	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/errors"
 
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 )

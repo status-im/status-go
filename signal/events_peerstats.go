@@ -1,6 +1,8 @@
 package signal
 
-import messagingtypes "github.com/status-im/status-go/messaging/types"
+import (
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+)
 
 const (
 	// EventPeerStats is sent when peer is added or removed.

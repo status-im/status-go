@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	status_common "github.com/status-im/status-go/common"
-	statusErrors "github.com/status-im/status-go/errors"
+	statusErrors "github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"

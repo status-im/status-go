@@ -48,10 +48,10 @@ MIGRATION_DIRS=( \
   "protocol/pushnotificationclient/migrations/migrations/sqlite" \
   "protocol/pushnotificationserver/migrations/migrations/sqlite" \
   "appdatabase/migrations/sql" \
-  "messaging/common/migrations/sqlite" \
-  "messaging/waku/migrations/migrations/sqlite" \
-  "messaging/layers/encryption/migrations/migrations/sqlite" \
-  "messaging/layers/transport/migrations/migrations/sqlite" \
+  "pkg/messaging/common/migrations/sqlite" \
+  "pkg/messaging/waku/migrations/migrations/sqlite" \
+  "pkg/messaging/layers/encryption/migrations/migrations/sqlite" \
+  "pkg/messaging/layers/transport/migrations/migrations/sqlite" \
   "services/newsfeed/migrations/migrations/sqlite" \
   "walletdatabase/migrations/sql" \
 )

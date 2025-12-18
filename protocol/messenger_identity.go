@@ -9,7 +9,7 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/server"
 )
 

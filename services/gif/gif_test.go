@@ -10,12 +10,12 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupSQLTestDb(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "local-notifications-tests-")
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "local-notifications-tests-")
 	require.NoError(t, err)
 	return db, func() { require.NoError(t, cleanup()) }
 }

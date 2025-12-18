@@ -91,6 +91,18 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	_, err = bob1.SendChatMessage(ctx, inputMessage)
 	s.Require().NoError(err)
 
+	// React to the first text message with an emoji and then retract it
+	respEmoji, err := bob1.SendEmojiReaction(context.Background(), chatID, inputMessage.ID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "1f601")
+	s.Require().NoError(err)
+	s.Require().Len(respEmoji.EmojiReactions(), 1)
+	firstEmojiID := respEmoji.EmojiReactions()[0].ID()
+
+	// Retract the emoji reaction
+	respRetract, err := bob1.SendEmojiReactionRetraction(context.Background(), firstEmojiID)
+	s.Require().NoError(err)
+	s.Require().Len(respRetract.EmojiReactions(), 1)
+	s.Require().True(respRetract.EmojiReactions()[0].Retracted)
+
 	// Pin message
 	pinMessage := common.NewPinMessage()
 	pinMessage.ChatId = chatID
@@ -133,6 +145,11 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 
 	_, err = bob1.SendChatMessage(ctx, imageMessage)
 	s.Require().NoError(err)
+
+	// React to the image message with an emoji (no retraction)
+	respImageEmoji, err := bob1.SendEmojiReaction(context.Background(), chatID, imageMessage.ID, protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE, "1fae0")
+	s.Require().NoError(err)
+	s.Require().Len(respImageEmoji.EmojiReactions(), 1)
 
 	// Send sticker on community
 	stickerMessage := common.NewMessage()
@@ -341,6 +358,13 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().True(ok)
 	s.Require().Equal(int64(protobuf.ChatMessage_IMAGE), imageMsg.ContentType)
 
+	// Emoji reactions: the first text message had a reaction retracted, so none should be present
+	s.Require().Len(textMsg.EmojiReactions, 0)
+
+	// The image message has one non-retracted emoji reaction
+	s.Require().Len(imageMsg.EmojiReactions, 1)
+	s.Require().Equal("1fae0", imageMsg.EmojiReactions[0].Emoji)
+
 	stickerMsg, ok := messageMap["some sticker"]
 	s.Require().True(ok)
 	s.Require().Equal(int64(protobuf.ChatMessage_STICKER), stickerMsg.ContentType)
@@ -366,5 +390,4 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().NoError(err)
 	s.Require().Len(pinnedMessages, 1)
 	s.Require().Equal(bob2.selfContact.ID, pinnedMessages[0].PinnedBy)
-
 }

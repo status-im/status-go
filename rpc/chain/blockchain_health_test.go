@@ -10,8 +10,8 @@ import (
 
 	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 
-	"github.com/status-im/status-go/healthmanager"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	healthmanager2 "github.com/status-im/status-go/internal/healthmanager"
+	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
 	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
 
 	"github.com/stretchr/testify/require"
@@ -26,16 +26,16 @@ import (
 
 type BlockchainHealthSuite struct {
 	suite.Suite
-	blockchainHealthManager *healthmanager.BlockchainHealthManager
-	mockProviders           map[uint64]*healthmanager.ProvidersHealthManager
+	blockchainHealthManager *healthmanager2.BlockchainHealthManager
+	mockProviders           map[uint64]*healthmanager2.ProvidersHealthManager
 	mockEthClients          map[uint64]*mockEthclient.MockRPSLimitedEthClientInterface
 	clients                 map[uint64]*ClientWithFallback
 	mockCtrl                *gomock.Controller
 }
 
 func (s *BlockchainHealthSuite) SetupTest() {
-	s.blockchainHealthManager = healthmanager.NewBlockchainHealthManager()
-	s.mockProviders = make(map[uint64]*healthmanager.ProvidersHealthManager)
+	s.blockchainHealthManager = healthmanager2.NewBlockchainHealthManager()
+	s.mockProviders = make(map[uint64]*healthmanager2.ProvidersHealthManager)
 	s.mockEthClients = make(map[uint64]*mockEthclient.MockRPSLimitedEthClientInterface)
 	s.clients = make(map[uint64]*ClientWithFallback)
 	s.mockCtrl = gomock.NewController(s.T())
@@ -58,7 +58,7 @@ func (s *BlockchainHealthSuite) setupClients(chainIDs []uint64) {
 			return f(mockEthClient)
 		}).AnyTimes()
 
-		phm := healthmanager.NewProvidersHealthManager(chainID)
+		phm := healthmanager2.NewProvidersHealthManager(chainID)
 		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
 
 		err := s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)

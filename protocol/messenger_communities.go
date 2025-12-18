@@ -29,7 +29,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -148,12 +148,12 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 		CommunityID:         org.ID(),
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
 		PubsubTopic:         org.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
-		Priority:            &messagingtypes.HighPriority,
+		Priority:            &types2.HighPriority,
 	}
 	if org.Encrypted() {
 		members := org.GetMemberPubkeys()
 		// Ensure encryption keys are attached to CommunityDescription to avoid timing issues
-		rawMessage.CommunityKeyExMsgType = messagingtypes.KeyExMsgReuse
+		rawMessage.CommunityKeyExMsgType = types2.KeyExMsgReuse
 		rawMessage.HashRatchetGroupID = org.ID()
 		rawMessage.Recipients = members
 	}
@@ -186,7 +186,7 @@ func (m *Messenger) publishCommunityEvents(community *communities.Community, msg
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
-		Priority:            &messagingtypes.LowPriority,
+		Priority:            &types2.LowPriority,
 	}
 
 	// TODO: resend in case of failure?
@@ -348,7 +348,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					Sender:              community.PrivateKey(),
 					SkipEncryptionLayer: true,
 					MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED,
-					PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+					PubsubTopic:         types2.DefaultNonProtectedPubsubTopic(),
 				}
 
 				_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
@@ -676,7 +676,7 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE,
-		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         types2.DefaultNonProtectedPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
 		ResendMethod:        common.ResendMethodSendPrivate,
 		Recipients:          []*ecdsa.PublicKey{signer},
@@ -764,7 +764,7 @@ func (m *Messenger) publishGroupGrantMessage(community *communities.Community, t
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_UPDATE_GRANT,
 		PubsubTopic:         community.PubsubTopic(),
-		Priority:            &messagingtypes.LowPriority,
+		Priority:            &types2.LowPriority,
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
@@ -956,7 +956,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 	if community.IsControlNode() {
 		// Init the community filter so we can receive messages on the community
 
-		communityFilters, err := m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
+		communityFilters, err := m.InitCommunityFilters(types2.CommunitiesToInitialize{{
 			PrivKey: community.PrivateKey(),
 		}})
 
@@ -1445,8 +1445,8 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		ResendType:          common.ResendTypeRawMessage,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
-		Priority:            &messagingtypes.HighPriority,
+		PubsubTopic:         types2.DefaultNonProtectedPubsubTopic(),
+		Priority:            &types2.HighPriority,
 	}
 
 	_, err = m.SendMessageToControlNode(ctx, community, rawMessage)
@@ -1830,9 +1830,9 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         types2.DefaultNonProtectedPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
-		Priority:            &messagingtypes.HighPriority,
+		Priority:            &types2.HighPriority,
 	}
 
 	_, err = m.SendMessageToControlNode(ctx, community, &rawMessage)
@@ -1983,11 +1983,11 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			CommunityID:         community.ID(),
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
-			PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+			PubsubTopic:         types2.DefaultNonProtectedPubsubTopic(),
 			ResendType:          common.ResendTypeRawMessage,
 			ResendMethod:        common.ResendMethodSendPrivate,
 			Recipients:          []*ecdsa.PublicKey{pk},
-			Priority:            &messagingtypes.HighPriority,
+			Priority:            &types2.HighPriority,
 		}
 
 		// Non-tokenized community treat community public key as the control node,
@@ -2002,7 +2002,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 
 		if community.Encrypted() {
 			rawMessage.HashRatchetGroupID = community.ID()
-			rawMessage.CommunityKeyExMsgType = messagingtypes.KeyExMsgReuse
+			rawMessage.CommunityKeyExMsgType = types2.KeyExMsgReuse
 		}
 
 		_, err = m.sender.SendPrivate(ctx, pk, rawMessage)
@@ -2196,7 +2196,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
 			PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
 			ResendType:          common.ResendTypeRawMessage,
-			Priority:            &messagingtypes.HighPriority,
+			Priority:            &types2.HighPriority,
 		}
 
 		_, err = m.SendMessageToControlNode(ctx, community, &rawMessage)
@@ -2418,26 +2418,26 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	return response, nil
 }
 
-func (m *Messenger) InitCommunityFilters(c messagingtypes.CommunitiesToInitialize) (messagingtypes.ChatFilters, error) {
+func (m *Messenger) InitCommunityFilters(c types2.CommunitiesToInitialize) (types2.ChatFilters, error) {
 	return m.messaging.InitCommunities(c)
 }
 
-func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.ChatsToInitialize {
+func (m *Messenger) DefaultFilters(o *communities.Community) types2.ChatsToInitialize {
 	cID := o.IDString()
 	uncompressedPubKey := crypto.PubkeyToHex(o.PublicKey())[2:]
 	memberUpdateChannelID := o.MemberUpdateChannelID()
 
 	communityPubsubTopic := o.PubsubTopic()
 
-	chats := messagingtypes.ChatsToInitialize{
+	chats := types2.ChatsToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
-		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic(), IsCommunity: true},
-		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic(), IsCommunity: true},
+		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultNonProtectedPubsubTopic(), IsCommunity: true},
+		{ChatID: uncompressedPubKey, PubsubTopic: types2.GlobalCommunityContentPubsubTopic(), IsCommunity: true},
 	}
 	if communityPubsubTopic == "" {
-		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: cID, PubsubTopic: messagingtypes.GlobalCommunityControlPubsubTopic(), IsCommunity: true})
-		chats = append(chats, &messagingtypes.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: messagingtypes.GlobalCommunityContentPubsubTopic(), IsCommunity: true})
+		chats = append(chats, &types2.ChatToInitialize{ChatID: cID, PubsubTopic: types2.GlobalCommunityControlPubsubTopic(), IsCommunity: true})
+		chats = append(chats, &types2.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: types2.GlobalCommunityContentPubsubTopic(), IsCommunity: true})
 	}
 	return chats
 }
@@ -2464,7 +2464,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
+	_, err = m.InitCommunityFilters(types2.CommunitiesToInitialize{{
 		PrivKey: community.PrivateKey(),
 	}})
 	if err != nil {
@@ -2514,7 +2514,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	defaultFilters := m.DefaultFilters(community)
-	publicFiltersToInit := make(messagingtypes.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
+	publicFiltersToInit := make(types2.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
 
 	publicFiltersToInit = append(publicFiltersToInit, defaultFilters...)
 	for _, filter := range defaultFilters {
@@ -2529,7 +2529,7 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters(messagingtypes.CommunitiesToInitialize{{
+	_, err = m.InitCommunityFilters(types2.CommunitiesToInitialize{{
 		PrivKey: community.PrivateKey(),
 	}})
 	if err != nil {
@@ -3590,7 +3590,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
-			topics := []messagingtypes.ContentTopic{}
+			topics := []types2.ContentTopic{}
 
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic())
@@ -3815,7 +3815,7 @@ importMessageArchivesLoop:
 
 			archiveMessages, err := m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
 			if err != nil {
-				if errors.Is(err, messagingtypes.ErrHashRatchetGroupIDNotFound) {
+				if errors.Is(err, types2.ErrHashRatchetGroupIDNotFound) {
 					// In case we're missing hash ratchet keys, best we can do is
 					// to wait for them to be received and try import again.
 					delayImport = true
@@ -3889,7 +3889,7 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_MAGNETLINK,
 		SkipGroupMessageWrap: true,
 		PubsubTopic:          community.PubsubTopic(),
-		Priority:             &messagingtypes.LowPriority,
+		Priority:             &types2.LowPriority,
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), chatID, rawMessage)
@@ -4035,8 +4035,8 @@ func (m *Messenger) generateSystemPinnedMessage(pinMessage *common.PinMessage, c
 	return systemMessage, nil
 }
 
-func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, c *communities.Community) ([]*messagingtypes.ReceivedMessage, error) {
-	wakuMessages := make([]*messagingtypes.ReceivedMessage, 0)
+func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, c *communities.Community) ([]*types2.ReceivedMessage, error) {
+	wakuMessages := make([]*types2.ReceivedMessage, 0)
 	for _, msg := range pinMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
@@ -4053,7 +4053,7 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 		}
 
 		hash := crypto.Keccak256Hash(append([]byte(c.IDString()), wrappedPayload...))
-		wakuMessage := &messagingtypes.ReceivedMessage{
+		wakuMessage := &types2.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
 			Topic:        filter.ContentTopic(),
@@ -4068,8 +4068,8 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 	return wakuMessages, nil
 }
 
-func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*messagingtypes.ReceivedMessage, error) {
-	wakuMessages := make([]*messagingtypes.ReceivedMessage, 0)
+func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c *communities.Community) ([]*types2.ReceivedMessage, error) {
+	wakuMessages := make([]*types2.ReceivedMessage, 0)
 	for _, msg := range chatMessages {
 
 		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
@@ -4087,7 +4087,7 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 		}
 
 		hash := crypto.Keccak256Hash([]byte(msg.ID))
-		wakuMessage := &messagingtypes.ReceivedMessage{
+		wakuMessage := &types2.ReceivedMessage{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
 			Topic:        filter.ContentTopic(),

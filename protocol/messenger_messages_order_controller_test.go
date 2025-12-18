@@ -4,8 +4,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/messaging/types"
 )
 
 type messagesOrderType int
@@ -58,7 +58,7 @@ func (m *MessagesOrderController) Stop() {
 	})
 }
 
-func (m *MessagesOrderController) newMessagesIterator(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator {
+func (m *MessagesOrderController) newMessagesIterator(chatWithMessages map[types.ChatFilter][]*types.ReceivedMessage) MessagesIterator {
 	switch m.order {
 	case messagesOrderAsPosted, messagesOrderReversed:
 		return &messagesIterator{chatWithMessages: m.sort(chatWithMessages, m.order)}
@@ -76,7 +76,7 @@ func buildIndexMap(messages [][]byte) map[string]int {
 	return indexMap
 }
 
-func (m *MessagesOrderController) sort(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, order messagesOrderType) []*chatWithMessage {
+func (m *MessagesOrderController) sort(chatWithMessages map[types.ChatFilter][]*types.ReceivedMessage, order messagesOrderType) []*chatWithMessage {
 	allMessages := make([]*chatWithMessage, 0)
 	for chat, messages := range chatWithMessages {
 		for _, message := range messages {
@@ -106,8 +106,8 @@ func (m *MessagesOrderController) sort(chatWithMessages map[messagingtypes.ChatF
 }
 
 type chatWithMessage struct {
-	chat    messagingtypes.ChatFilter
-	message *messagingtypes.ReceivedMessage
+	chat    types.ChatFilter
+	message *types.ReceivedMessage
 }
 
 type messagesIterator struct {
@@ -119,12 +119,12 @@ func (it *messagesIterator) HasNext() bool {
 	return it.currentIndex < len(it.chatWithMessages)
 }
 
-func (it *messagesIterator) Next() (messagingtypes.ChatFilter, []*messagingtypes.ReceivedMessage) {
+func (it *messagesIterator) Next() (types.ChatFilter, []*types.ReceivedMessage) {
 	if it.HasNext() {
 		m := it.chatWithMessages[it.currentIndex]
 		it.currentIndex++
-		return m.chat, []*messagingtypes.ReceivedMessage{m.message}
+		return m.chat, []*types.ReceivedMessage{m.message}
 	}
 
-	return messagingtypes.ChatFilter{}, nil
+	return types.ChatFilter{}, nil
 }

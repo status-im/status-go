@@ -14,12 +14,12 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/internal/testutils"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestPersistenceSuite(t *testing.T) {
@@ -36,7 +36,7 @@ type PersistenceSuite struct {
 func (s *PersistenceSuite) SetupTest() {
 	s.db = nil
 
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 
 	err = sqlite.Migrate(db)

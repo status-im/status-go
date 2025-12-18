@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 type MailserverTopic struct {

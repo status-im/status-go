@@ -18,13 +18,13 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	mock_pendingtxtracker "github.com/status-im/status-go/services/wallet/pendingtxtracker/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 const shouldNotWaitTimeout = 19999 * time.Second
@@ -63,10 +63,10 @@ type testState struct {
 }
 
 func setupTestService(tb testing.TB) (state testState) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(tb, err)
 
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(tb, err)
 	accountsDB, err := accounts.NewDB(appDB)
 	require.NoError(tb, err)

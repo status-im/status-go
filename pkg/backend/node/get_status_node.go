@@ -66,9 +66,6 @@ var (
 	ErrNoRunningNode = errors.New("there is no running node")
 )
 
-// FIXME: This is temporal and will be replaced with the actual setting
-const privateMode = false
-
 // StatusNode abstracts contained geth node and provides helper methods to
 // interact with it.
 type StatusNode struct {

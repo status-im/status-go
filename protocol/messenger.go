@@ -37,8 +37,8 @@ import (
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messaging2 "github.com/status-im/status-go/pkg/messaging"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -95,7 +95,7 @@ type Messenger struct {
 	config                    *config
 	identity                  *ecdsa.PrivateKey
 	signer                    communities.MessageSigner
-	messaging                 *messaging.API
+	messaging                 *messaging2.API
 	sender                    *common.MessageSender
 	persistence               *sqlitePersistence
 	ensVerifier               *ens.Verifier
@@ -168,11 +168,11 @@ type Messenger struct {
 	unhandledMessagesTracker func(*common.StatusMessage, error)
 
 	// enables control over chat messages iteration
-	retrievedMessagesIteratorFactory func(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) MessagesIterator
+	retrievedMessagesIteratorFactory func(map[types2.ChatFilter][]*types2.ReceivedMessage) MessagesIterator
 }
 
 type EnvelopeEventsInterceptor struct {
-	EnvelopeEventsHandler messagingtypes.EnvelopeEventsHandler
+	EnvelopeEventsHandler types2.EnvelopeEventsHandler
 	Messenger             *Messenger
 }
 
@@ -257,7 +257,7 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	messaging *messaging.API,
+	messaging *messaging2.API,
 	installationID string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -726,7 +726,7 @@ func (m *Messenger) cleanTopics() error {
 	if m.mailserversDatabase == nil {
 		return nil
 	}
-	var filters messagingtypes.ChatFilters
+	var filters types2.ChatFilters
 	for _, f := range m.messaging.ChatFilters() {
 		if f.IsListening() && !f.IsEphemeral() {
 			filters = append(filters, f)
@@ -840,12 +840,12 @@ func (m *Messenger) publishContactCode() error {
 		return err
 	}
 
-	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
+	contactCodeTopic := messaging2.ContactCodeTopic(&m.identity.PublicKey)
 	rawMessage := common.RawMessage{
 		LocalChatID: contactCodeTopic,
 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT,
 		Payload:     payload,
-		Priority:    &messagingtypes.LowPriority,
+		Priority:    &types2.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -875,7 +875,7 @@ func (m *Messenger) publishContactCode() error {
 // contactCodeAdvertisement attaches a protobuf.ChatIdentity to the given protobuf.ContactCodeAdvertisement,
 // if the `shouldPublish` conditions are met
 func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
-	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
+	contactCodeTopic := messaging2.ContactCodeTopic(&m.identity.PublicKey)
 	shouldPublish, err := m.shouldPublishChatIdentity(contactCodeTopic)
 	if err != nil {
 		return err
@@ -952,7 +952,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		LocalChatID: chat.ID,
 		MessageType: protobuf.ApplicationMetadataMessage_CHAT_IDENTITY,
 		Payload:     payload,
-		Priority:    &messagingtypes.LowPriority,
+		Priority:    &types2.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -1175,7 +1175,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 }
 
 // handleInstallations adds the installations in the installations map
-func (m *Messenger) handleInstallations(installations []*messagingtypes.Installation) {
+func (m *Messenger) handleInstallations(installations []*types2.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contacts.ContactIDFromPublicKey(&m.identity.PublicKey) {
 			if _, ok := m.allInstallations.Load(installation.ID); !ok {
@@ -1187,7 +1187,7 @@ func (m *Messenger) handleInstallations(installations []*messagingtypes.Installa
 }
 
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
-func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *messagingtypes.EncryptionSubscriptions) {
+func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *types2.EncryptionSubscriptions) {
 	go func() {
 		defer gocommon.LogOnPanic()
 		for {
@@ -1283,7 +1283,7 @@ func (m *Messenger) watchConnectionChange() {
 		m.handleConnectionChange(state)
 	}
 
-	subscribedConnectionStatus := func(subscription messagingtypes.ConnectionStatusSubscription) {
+	subscribedConnectionStatus := func(subscription types2.ConnectionStatusSubscription) {
 		defer gocommon.LogOnPanic()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
@@ -1659,7 +1659,7 @@ func (m *Messenger) hasPairedDevices() bool {
 	}
 
 	var count int
-	m.allInstallations.Range(func(installationID string, installation *messagingtypes.Installation) (shouldContinue bool) {
+	m.allInstallations.Range(func(installationID string, installation *types2.Installation) (shouldContinue bool) {
 		if installation.Enabled {
 			count++
 		}
@@ -2688,7 +2688,7 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	localnotifications.PushMessages(notifications)
 }
 
-func (m *Messenger) GetStats() messagingtypes.TransportStats {
+func (m *Messenger) GetStats() types2.TransportStats {
 	return m.messaging.GetStats()
 }
 
@@ -2905,7 +2905,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 	}
 }
 
-func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic messagingtypes.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
+func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic types2.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
 	if !m.outputCSV {
 		return
 	}
@@ -2937,7 +2937,7 @@ func (m *Messenger) shouldSkipDuplicate(messageType protobuf.ApplicationMetadata
 	return true
 }
 
-func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage) error {
+func (m *Messenger) handleImportedMessages(messagesToHandle map[types2.ChatFilter][]*types2.ReceivedMessage) error {
 
 	messageState := m.buildMessageState()
 
@@ -3091,7 +3091,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[messagingtypes.C
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilter][]*types2.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()
@@ -3143,7 +3143,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[messagingtypes.
 				continue
 			}
 
-			m.messaging.MetricsPushReceivedMessages(messagingtypes.ReceivedMessages{
+			m.messaging.MetricsPushReceivedMessages(types2.ReceivedMessages{
 				Filter:     filter,
 				SHHMessage: shhMessage,
 				Messages:   handleMessagesResponse.Messages,
@@ -3187,7 +3187,7 @@ func (m *Messenger) processStatusMessage(
 	hash []byte,
 	messageState *ReceivedMessageState,
 	msg *common.StatusMessage,
-	filter messagingtypes.ChatFilter,
+	filter types2.ChatFilter,
 	fromArchive bool,
 	logger *zap.Logger) error {
 	messageID := types.EncodeHex(msg.ApplicationLayer.ID)
@@ -4680,6 +4680,6 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 	return m.persistence.FindStatusMessageIDForBridgeMessageID(bridgeMessageID)
 }
 
-func (m *Messenger) Messaging() *messaging.API {
+func (m *Messenger) Messaging() *messaging2.API {
 	return m.messaging
 }

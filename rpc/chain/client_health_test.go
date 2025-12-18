@@ -16,8 +16,8 @@ import (
 
 	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 
-	healthManager "github.com/status-im/status-go/healthmanager"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	healthManager "github.com/status-im/status-go/internal/healthmanager"
+	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 

@@ -6,13 +6,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) *Database {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "maliservers-tests-")
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "maliservers-tests-")
 	require.NoError(t, err)
 	err = sqlite.Migrate(db) // migrate default
 	require.NoError(t, err)
@@ -26,9 +26,9 @@ func TestTopic(t *testing.T) {
 	const topicA = "0x61000000"
 	const topicD = "0x64000000"
 	topics := []MailserverTopic{
-		{PubsubTopic: messagingtypes.DefaultShardPubsubTopic(), ContentTopic: topicA, LastRequest: 1},
-		{PubsubTopic: messagingtypes.DefaultShardPubsubTopic(), ContentTopic: "0x6200000", LastRequest: 2},
-		{PubsubTopic: messagingtypes.DefaultShardPubsubTopic(), ContentTopic: "0x6300000", LastRequest: 3},
+		{PubsubTopic: types.DefaultShardPubsubTopic(), ContentTopic: topicA, LastRequest: 1},
+		{PubsubTopic: types.DefaultShardPubsubTopic(), ContentTopic: "0x6200000", LastRequest: 2},
+		{PubsubTopic: types.DefaultShardPubsubTopic(), ContentTopic: "0x6300000", LastRequest: 3},
 	}
 
 	require.NoError(t, db.AddTopics(topics))
@@ -37,21 +37,21 @@ func TestTopic(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, topics, 3)
 
-	filters := messagingtypes.ChatFilters{
+	filters := types.ChatFilters{
 		// Existing topic, is not updated
-		messagingtypes.NewChatFilter(
-			&messagingtypes.ChatFilterConfig{
-				PubsubTopic:  messagingtypes.DefaultShardPubsubTopic(),
-				ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x61}),
+		types.NewChatFilter(
+			&types.ChatFilterConfig{
+				PubsubTopic:  types.DefaultShardPubsubTopic(),
+				ContentTopic: types.BytesToContentTopic([]byte{0x61}),
 			},
 		),
 		// Non existing topic is not inserted
-		messagingtypes.NewChatFilter(
-			&messagingtypes.ChatFilterConfig{
+		types.NewChatFilter(
+			&types.ChatFilterConfig{
 				Discovery:    true,
 				Negotiated:   true,
-				PubsubTopic:  messagingtypes.DefaultShardPubsubTopic(),
-				ContentTopic: messagingtypes.BytesToContentTopic([]byte{0x64}),
+				PubsubTopic:  types.DefaultShardPubsubTopic(),
+				ContentTopic: types.BytesToContentTopic([]byte{0x64}),
 			},
 		),
 	}

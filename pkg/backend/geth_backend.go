@@ -27,12 +27,12 @@ import (
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/centralizedmetrics"
-	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/centralizedmetrics"
+	centralizedmetricscommon "github.com/status-im/status-go/internal/centralizedmetrics/common"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
@@ -43,9 +43,9 @@ import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/metrics"
+	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
 	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
@@ -2259,7 +2259,9 @@ func (b *StatusBackend) initProtocol() error {
 	b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 	b.statusNode.CommunityTokensService().Init(messenger)
 	b.statusNode.SharedUrlsService().SetDataProvider(nodeadapters.NewSharedUrlsMessengerAdapter(messenger))
-	b.statusNode.NewsFeedService().SetActivityCenter(nodeadapters.NewNewsFeedActivityCenterAdapter(messenger))
+	if b.statusNode.NewsFeedService() != nil {
+		b.statusNode.NewsFeedService().SetActivityCenter(nodeadapters.NewNewsFeedActivityCenterAdapter(messenger))
+	}
 	b.statusNode.LinkPreviewService().SetStatusDataProvider(nodeadapters.NewLinkPreviewMessengerAdapter(messenger))
 
 	return nil

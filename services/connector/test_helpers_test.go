@@ -13,13 +13,13 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/rpc/network"
 	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
 	mock_chainutils "github.com/status-im/status-go/services/connector/chainutils/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 type testState struct {
@@ -34,7 +34,7 @@ type testState struct {
 }
 
 func createDB(t *testing.T) *sql.DB {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "browser-connect-tests-")
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "browser-connect-tests-")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, cleanup())
@@ -43,7 +43,7 @@ func createDB(t *testing.T) *sql.DB {
 }
 
 func createWalletDB(t *testing.T) (db *sql.DB) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())

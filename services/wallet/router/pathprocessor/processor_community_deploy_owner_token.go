@@ -19,8 +19,8 @@ import (
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/errors"
 	communitytokendeployer2 "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
+	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

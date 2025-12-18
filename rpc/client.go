@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	appCommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/healthmanager"
+	healthmanager2 "github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -69,7 +69,7 @@ type Client struct {
 
 	networkManager *network.Manager
 
-	healthMgr          *healthmanager.BlockchainHealthManager
+	healthMgr          *healthmanager2.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
 	accountsPublisher  *pubsub.Publisher
 	signalsTransmitter *SignalsTransmitter
@@ -109,7 +109,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
-		healthMgr:          healthmanager.NewBlockchainHealthManager(),
+		healthMgr:          healthmanager2.NewBlockchainHealthManager(),
 		accountsPublisher:  config.AccountsPublisher,
 		signalsTransmitter: NewSignalsTransmitter(networkManager.GetPublisher()),
 	}
@@ -180,7 +180,7 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 	}
 }
 
-func (c *Client) GetHealthManagerFullStatus() healthmanager.BlockchainFullStatus {
+func (c *Client) GetHealthManagerFullStatus() healthmanager2.BlockchainFullStatus {
 	return c.healthMgr.GetFullStatus()
 }
 
@@ -212,7 +212,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		return nil, fmt.Errorf("could not find any enabled RPC providers for chain: %d", chainID)
 	}
 
-	phm := healthmanager.NewProvidersHealthManager(chainID)
+	phm := healthmanager2.NewProvidersHealthManager(chainID)
 	err := c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
 	if err != nil {
 		return nil, fmt.Errorf("register providers health manager: %s", err)

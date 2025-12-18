@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"

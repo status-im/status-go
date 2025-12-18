@@ -11,6 +11,7 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/logutils"
+	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/personal"
@@ -34,8 +35,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
-
-	messagingtypes "github.com/status-im/status-go/messaging/types"
 )
 
 // PublicAPI extends whisper public API.
@@ -182,7 +181,7 @@ func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*contacts
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats messagingtypes.ChatFilters) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats types2.ChatFilters) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 
@@ -198,12 +197,12 @@ func (api *PublicAPI) DisableInstallation(installationID string) error {
 }
 
 // GetOurInstallations returns all the installations available given an identity
-func (api *PublicAPI) GetOurInstallations() []*messagingtypes.Installation {
+func (api *PublicAPI) GetOurInstallations() []*types2.Installation {
 	return api.service.messenger.Installations()
 }
 
 // SetInstallationMetadata sets the metadata for our own installation
-func (api *PublicAPI) SetInstallationMetadata(installationID string, data *messagingtypes.InstallationMetadata) error {
+func (api *PublicAPI) SetInstallationMetadata(installationID string, data *types2.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
@@ -1108,7 +1107,7 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(pID)
 }
 
-func (api *PublicAPI) Peers() messagingtypes.PeerStats {
+func (api *PublicAPI) Peers() types2.PeerStats {
 	return api.service.messenger.Peers()
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/internal/enr"
 	"github.com/status-im/status-go/internal/multiaddr"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 // Define available fleets.

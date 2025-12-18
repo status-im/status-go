@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/t/helpers"
 )
 
 // MockFetcher implements DataFetcher interface for testing
@@ -45,7 +45,7 @@ func (f *MockFetcher) Stop()                     {}
 func (f *MockFetcher) StartRefreshLoops()        {}
 
 func setupTestWalletDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "wallet-tests")
+	db, cleanup, err := testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "wallet-tests")
 	require.NoError(t, err)
 	return db, func() { require.NoError(t, cleanup()) }
 }

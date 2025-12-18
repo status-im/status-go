@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 
 	"gopkg.in/go-playground/validator.v9"
