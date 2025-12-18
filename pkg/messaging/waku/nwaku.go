@@ -362,14 +362,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	}
 }
 
-func (w *Waku) GetStats() types2.StatsSummary {
-	stats := w.bandwidthCounter.GetBandwidthTotals()
-	return types2.StatsSummary{
-		UploadRate:   uint64(stats.RateOut),
-		DownloadRate: uint64(stats.RateIn),
-	}
-}
-
 func (w *Waku) GetPubsubTopic(topic string) string {
 	if topic == "" {
 		topic = w.cfg.DefaultShardPubsubTopic
@@ -508,23 +500,6 @@ func (w *Waku) NewKeyPair() (string, error) {
 	}
 	w.privateKeys[id] = key
 	return id, nil
-}
-
-// DeleteKeyPair deletes the specified key if it exists.
-func (w *Waku) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, common2.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.privateKeys[deterministicID] != nil {
-		delete(w.privateKeys, deterministicID)
-		return true
-	}
-	return false
 }
 
 // AddKeyPair imports a asymmetric private key and returns it identifier.
@@ -1295,14 +1270,6 @@ func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
 	return nil
 }
 
-func (w *Waku) StartDiscV5() error {
-	return w.node.StartDiscV5()
-}
-
-func (w *Waku) StopDiscV5() error {
-	return w.node.StopDiscV5()
-}
-
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 
 	networkChange := false
@@ -1525,10 +1492,6 @@ func (w *Waku) ProcessMailserverBatch(
 	}
 
 	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
-}
-
-func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
-	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
 }
 
 func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {

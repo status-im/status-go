@@ -136,7 +136,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types2.NewMessage) ([]by
 
 	// Set key that is used to sign the message
 	if len(req.SigID) > 0 {
-		privKey, err := api.w.GetPrivateKey(req.SigID)
+		privKey, err := api.w.getPrivateKey(req.SigID)
 		if err != nil {
 			return nil, err
 		}
@@ -266,7 +266,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types2.Criteria) (*
 
 	// listen for messages that are encrypted with the given public key
 	if pubKeyGiven {
-		filter.KeyAsym, err = api.w.GetPrivateKey(crit.PrivateKeyID)
+		filter.KeyAsym, err = api.w.getPrivateKey(crit.PrivateKeyID)
 		if err != nil || filter.KeyAsym == nil {
 			return nil, ErrInvalidPublicKey
 		}
@@ -406,7 +406,7 @@ func (api *PublicWakuAPI) NewMessageFilter(req types2.Criteria) (string, error) 
 	}
 
 	if asymKeyGiven {
-		if keyAsym, err = api.w.GetPrivateKey(req.PrivateKeyID); err != nil {
+		if keyAsym, err = api.w.getPrivateKey(req.PrivateKeyID); err != nil {
 			return "", err
 		}
 	}

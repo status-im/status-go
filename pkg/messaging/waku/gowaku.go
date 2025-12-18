@@ -566,14 +566,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
-func (w *Waku) GetStats() types2.StatsSummary {
-	stats := w.bandwidthCounter.GetBandwidthTotals()
-	return types2.StatsSummary{
-		UploadRate:   uint64(stats.RateOut),
-		DownloadRate: uint64(stats.RateIn),
-	}
-}
-
 func (w *Waku) runPeerExchangeLoop() {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
@@ -729,23 +721,6 @@ func (w *Waku) NewKeyPair() (string, error) {
 	return id, nil
 }
 
-// DeleteKeyPair deletes the specified key if it exists.
-func (w *Waku) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, common2.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.privateKeys[deterministicID] != nil {
-		delete(w.privateKeys, deterministicID)
-		return true
-	}
-	return false
-}
-
 // AddKeyPair imports a asymmetric private key and returns it identifier.
 func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common2.KeyIDSize)
@@ -804,7 +779,7 @@ func (w *Waku) HasKeyPair(id string) bool {
 }
 
 // GetPrivateKey retrieves the private key of the specified identity.
-func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
+func (w *Waku) getPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 	deterministicID, err := toDeterministicID(id, common2.KeyIDSize)
 	if err != nil {
 		return nil, err
@@ -976,10 +951,6 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 // GetFilter returns the filter by id.
 func (w *Waku) getFilter(id string) *common2.Filter {
 	return w.filters.Get(id)
-}
-
-func (w *Waku) GetFilter(id string) types2.Filter {
-	return w.getFilter(id)
 }
 
 // Unsubscribe removes an installed message handler.
@@ -1591,23 +1562,6 @@ func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
 	return nil
 }
 
-func (w *Waku) StartDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	return w.node.DiscV5().Start(w.ctx)
-}
-
-func (w *Waku) StopDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	w.node.DiscV5().Stop()
-	return nil
-}
-
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 	//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
 	if (state.Offline && len(w.node.Host().Network().Peers()) > 0) ||
@@ -1940,10 +1894,6 @@ func (w *Waku) ProcessMailserverBatch(
 	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
-func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
-	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
-}
-
 func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
 	return w.StorenodeCycle.PerformStorenodeTask(fn, opts...)
 }
@@ -1987,7 +1937,7 @@ func (w *Waku) Subscribe(opts *types2.SubscriptionOptions) (string, error) {
 		}
 	}
 	if opts.PrivateKeyID != "" {
-		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
+		keyAsym, err = w.getPrivateKey(opts.PrivateKeyID)
 		if err != nil {
 			return "", err
 		}

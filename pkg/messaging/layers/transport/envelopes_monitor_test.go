@@ -251,9 +251,6 @@ func (m *mockWakuAPI) Post(ctx context.Context, msg types2.NewMessage) ([]byte, 
 func (m *mockWakuAPI) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
 	return "", nil
 }
-func (m *mockWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
-	return false, nil
-}
 func (m *mockWakuAPI) NewMessageFilter(req types2.Criteria) (string, error) {
 	return "", nil
 }

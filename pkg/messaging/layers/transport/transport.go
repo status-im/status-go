@@ -204,10 +204,6 @@ func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) 
 	return filters, nil
 }
 
-func (t *Transport) GetStats() types.StatsSummary {
-	return t.waku.GetStats()
-}
-
 func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 	result := make(map[Filter][]*types.Message)
 	logger := t.logger.With(zap.String("site", "retrieveRawAll"))
@@ -559,10 +555,6 @@ func (t *Transport) OnStorenodeAvailable() <-chan peer.ID {
 
 func (t *Transport) WaitForAvailableStoreNode(ctx context.Context) bool {
 	return t.waku.WaitForAvailableStoreNode(ctx)
-}
-
-func (t *Transport) IsStorenodeAvailable(peerID peer.ID) bool {
-	return t.waku.IsStorenodeAvailable(peerID)
 }
 
 func (t *Transport) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {

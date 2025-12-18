@@ -29,7 +29,6 @@ type RawFilter struct {
 
 type FiltersService interface {
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	DeleteKeyPair(keyID string) bool
 
 	AddSymKeyDirect(key []byte) (string, error)
 	AddSymKeyFromPassword(password string) (string, error)

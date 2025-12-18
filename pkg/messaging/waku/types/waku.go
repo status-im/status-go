@@ -101,57 +101,28 @@ type Waku interface {
 	Start() error
 	Stop() error
 
-	// Waku protocol version
-	Version() uint
-
-	// PeerID returns node's PeerID
 	PeerID() peer.ID
-
-	// PeerCount
 	PeerCount() int
 
-	StartDiscV5() error
-
-	StopDiscV5() error
+	MaxMessageSize() uint32
 
 	SubscribeToPubsubTopic(topic string) error
-
 	UnsubscribeFromPubsubTopic(topic string) error
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
 	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
 
-	// MinPow returns the PoW value required by this node.
-	MinPow() float64
-	// BloomFilter returns the aggregated bloom filter for all the topics of interest.
-	// The nodes are required to send only messages that match the advertised bloom filter.
-	// If a message does not match the bloom, it will tantamount to spam, and the peer will
-	// be disconnected.
-	BloomFilter() []byte
-
-	// GetCurrentTime returns current time.
 	GetCurrentTime() uint64
-
-	// GetPrivateKey retrieves the private key of the specified identity.
-	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
-	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	// DeleteKeyPair deletes the key with the specified ID if it exists.
-	DeleteKeyPair(keyID string) bool
 	AddSymKeyDirect(key []byte) (string, error)
 	AddSymKeyFromPassword(password string) (string, error)
 	DeleteSymKey(id string) bool
 	GetSymKey(id string) ([]byte, error)
-	MaxMessageSize() uint32
-
-	GetStats() StatsSummary
-
 	Subscribe(opts *SubscriptionOptions) (string, error)
-	GetFilter(id string) Filter
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 
@@ -194,9 +165,6 @@ type Waku interface {
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
 	) error
-
-	// IsStorenodeAvailable is used to determine whether a storenode is available or not
-	IsStorenodeAvailable(peerID peer.ID) bool
 
 	PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error
 
