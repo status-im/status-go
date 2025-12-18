@@ -354,7 +354,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             == RequestToJoinState.RequestToJoinStatePending.value,
         )
 
-        time.sleep(5)
+        time.sleep(2)
 
         accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
         assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
