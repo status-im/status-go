@@ -20,8 +20,10 @@ import (
 // watchExpiredMessages regularly checks for expired emojis and invoke their resending
 func (m *Messenger) watchExpiredMessages() {
 	m.logger.Debug("watching expired messages")
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-time.After(time.Second):
