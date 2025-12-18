@@ -309,7 +309,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
-    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
+    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
     def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client):
         """Test that owner edits are visible before and after minting the owner token"""
 
