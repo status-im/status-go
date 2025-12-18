@@ -335,7 +335,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
-        # Member with tokens requests to join community
+        # Member requests to join community
         join_resp = member_backend.wakuext_service.request_to_join_community(community_id, [fake.address()])
         requests = join_resp.get("requestsToJoinCommunity", [])
         assert requests, "No requests to join community"
