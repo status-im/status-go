@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/waku-org/sds-go-bindings/sds"
-	_ "github.com/waku-org/sds-go-bindings/sds"
 
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsproto "github.com/status-im/mvds/protobuf"
