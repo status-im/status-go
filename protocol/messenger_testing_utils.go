@@ -220,13 +220,6 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 	s.Require().True(ok)
 }
 
-func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, ctx context.Context) {
-	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-	available := m.messaging.WaitForAvailableStoreNode(ctx)
-	s.Require().True(available)
-}
-
 func TearDownMessenger(t *testing.T, m *Messenger) {
 	if m == nil {
 		return
@@ -259,27 +252,6 @@ func randomString(length int, runes []rune) string {
 
 func RandomLettersString(length int) string {
 	return randomString(length, letterRunes)
-}
-
-func RandomColor() string {
-	return "#" + randomString(6, hexRunes)
-}
-
-func RandomCommunityTags(count int) []string {
-	availableTagsCount := requests.AvailableTagsCount()
-
-	if count > availableTagsCount {
-		count = availableTagsCount
-	}
-
-	//source := mathRand.New(mathRand.NewSource(time.Now().UnixNano()))
-	indices := mathRand.Perm(availableTagsCount)
-	shuffled := make([]string, count)
-	for i := 0; i < count; i++ {
-		shuffled[i] = requests.TagByIndex(uint32(indices[i]))
-	}
-
-	return shuffled
 }
 
 func RandomBytes(length int) []byte {
