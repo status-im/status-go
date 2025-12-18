@@ -317,7 +317,7 @@ func (m *Messenger) processActivityCenterNotifications(notifications []*Activity
 	response := &MessengerResponse{}
 	var chats []*Chat
 	for _, notification := range notifications {
-		if notification.ChatID != "" {
+		if notification.ChatID != "" && notification.Accepted {
 			chat, ok := m.allChats.Load(notification.ChatID)
 			if !ok {
 				// This should not really happen, but ignore just in case it was deleted in the meantime
