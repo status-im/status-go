@@ -309,7 +309,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
+    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
     def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client):
         """Test that owner edits are visible before and after minting the owner token"""
 
@@ -320,12 +320,14 @@ class TestCommunityTokenPermissions(MessengerSteps):
         self.verify_token_balance(foundry_client, CommunityTokenType.ERC721, self.erc721_address, owner_address, token_id=0)
 
         # Owner creates a community
-        community_resp = owner_backend.wakuext_service.create_community(
-            name=fake.community_name(),
-            description=fake.community_description(),
+        community_id = self.create_token_gated_community(
+            owner_backend,
+            permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
+            token_criteria=[],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
-        community_id = community_resp.get("communities", [{}])[0].get("id")
+
+        time.sleep(2)
 
         # Fetch community as member
         response = self.fetch_community(member_backend, community_id)
