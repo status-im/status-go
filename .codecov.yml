@@ -18,12 +18,12 @@ coverage:
     project:
       unit-tests:
         target: auto
-        threshold: 10%
+        threshold: 5%
         if_not_found: failure
         flags:
           - unit
       functional-tests:
-        threshold: 10%
+        threshold: 5%
         target: auto
         if_not_found: failure
         flags:
