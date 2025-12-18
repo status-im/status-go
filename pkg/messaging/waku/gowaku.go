@@ -77,7 +77,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
@@ -358,13 +357,6 @@ func (w *Waku) SubscribeToConnStatusChanges() (*types2.ConnStatusSubscription, e
 	subscription := types2.NewConnStatusSubscription()
 	w.connStatusSubscriptions[subscription.ID] = subscription
 	return subscription, nil
-}
-
-func (w *Waku) GetNodeENRString() (string, error) {
-	if w.node == nil {
-		return "", errors.New("node not initialized")
-	}
-	return w.node.ENR().String(), nil
 }
 
 func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, useOnlyDnsDiscCache bool) ([]*enode.Node, error) {
@@ -1567,10 +1559,6 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types2.PeerList, error) {
 	}, nil
 }
 
-func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return w.node.ListenAddresses(), nil
-}
-
 func (w *Waku) ENR() (*enode.Node, error) {
 	enr := w.node.ENR()
 	if enr == nil {
@@ -1579,7 +1567,6 @@ func (w *Waku) ENR() (*enode.Node, error) {
 
 	return enr, nil
 }
-
 func (w *Waku) SubscribeToPubsubTopic(topic string) error {
 	topic = w.GetPubsubTopic(topic)
 
@@ -1806,20 +1793,6 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
-}
-
-func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer([]multiaddr.Multiaddr{address}, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
-	if err != nil {
-		return "", err
-	}
-	return peerID, nil
-}
-
-func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-	defer cancel()
-	return w.node.DialPeerWithMultiAddress(ctx, address)
 }
 
 func (w *Waku) DialPeerByID(peerID peer.ID) error {

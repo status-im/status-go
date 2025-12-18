@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
@@ -17,8 +15,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
-
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -1075,50 +1071,6 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
-func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
-	maddr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return "", err
-	}
-	return api.service.messenger.AddRelayPeer(maddr)
-}
-
-func (api *PublicAPI) DialPeer(address string) error {
-	maddr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return err
-	}
-	return api.service.messenger.DialPeer(maddr)
-}
-
-func (api *PublicAPI) DialPeerByID(peerID string) error {
-	pID, err := peer.Decode(peerID)
-	if err != nil {
-		return err
-	}
-	return api.service.messenger.DialPeerByID(pID)
-}
-
-func (api *PublicAPI) DropPeer(peerID string) error {
-	pID, err := peer.Decode(peerID)
-	if err != nil {
-		return err
-	}
-	return api.service.messenger.DropPeer(pID)
-}
-
-func (api *PublicAPI) Peers() types2.PeerStats {
-	return api.service.messenger.Peers()
-}
-
-func (api *PublicAPI) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return api.service.messenger.ListenAddresses()
-}
-
-func (api *PublicAPI) Enr() (*enode.Node, error) {
-	return api.service.messenger.ENR()
-}
-
 func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings2.ProfilePicturesShowToType) error {
 	err := api.service.accountsDB.SaveSettingField(settings2.ProfilePicturesShowTo, showTo)
 	if err != nil {
@@ -1416,8 +1368,4 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
-}
-
-func (api *PublicAPI) PeerID() string {
-	return api.service.messaging.PeerID().String()
 }

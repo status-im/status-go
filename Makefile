@@ -511,7 +511,7 @@ vendor-hash:
 	echo "Replaced vendorHash $${CURRENT_VENDOR_HASH} with $${NEW_VENDOR_HASH}"
 
 
-migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
+migration: DEFAULT_MIGRATION_PATH := internal/db/appdatabase/migrations/sql
 migration:
 	touch $(DEFAULT_MIGRATION_PATH)/$$(date '+%s')_$(D).up.sql
 

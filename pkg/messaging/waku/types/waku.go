@@ -15,7 +15,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/internal/connection"
 )
@@ -105,16 +104,11 @@ type Waku interface {
 	// Waku protocol version
 	Version() uint
 
+	// PeerID returns node's PeerID
+	PeerID() peer.ID
+
 	// PeerCount
 	PeerCount() int
-
-	ListenAddresses() ([]multiaddr.Multiaddr, error)
-
-	RelayPeersByTopic(topic string) (*PeerList, error)
-
-	ENR() (*enode.Node, error)
-
-	Peers() PeerStats
 
 	StartDiscV5() error
 
@@ -123,14 +117,6 @@ type Waku interface {
 	SubscribeToPubsubTopic(topic string) error
 
 	UnsubscribeFromPubsubTopic(topic string) error
-
-	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
-
-	DialPeer(address multiaddr.Multiaddr) error
-
-	DialPeerByID(peerID peer.ID) error
-
-	DropPeer(peerID peer.ID) error
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
@@ -180,9 +166,6 @@ type Waku interface {
 
 	// ConfirmMessageDelivered updates a message has been delivered in waku
 	ConfirmMessageDelivered(hash []common.Hash)
-
-	// PeerID returns node's PeerID
-	PeerID() peer.ID
 
 	// GetActiveStorenode returns the peer AddrInfo of the currently active storenode. It will be empty if no storenode is active
 	GetActiveStorenode() peer.AddrInfo

@@ -620,8 +620,6 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 		b.config.WakuV2Config.Nameserver = request.WakuV2Nameserver
 	}
 
-	b.config.ShhextConfig.BandwidthStatsEnabled = request.BandwidthStatsEnabled
-
 	accountSettings, err := b.GetSettings()
 	if err != nil {
 		return errors.Wrap(err, "failed to load accountSettings")

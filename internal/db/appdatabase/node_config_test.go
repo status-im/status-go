@@ -50,7 +50,6 @@ func randomNodeConfig() *params.NodeConfig {
 			InstallationID:           randomString(),
 			MailServerConfirmations:  randomBool(),
 			VerifyENSContractAddress: randomString(),
-			BandwidthStatsEnabled:    randomBool(),
 		},
 		WakuV2Config: params.WakuV2Config{
 			LightClient: randomBool(),

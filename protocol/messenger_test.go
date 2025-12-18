@@ -1924,8 +1924,3 @@ func getTimeWithAllowedFutureDrift() uint64 {
 	currentTime := timesource.GetCurrentTimeInMillis()
 	return currentTime + MaxWhisperFutureDriftMs/2
 }
-
-func (s *MessengerSuite) TestStats() {
-	stats := s.m.GetStats()
-	s.Require().NotNil(stats)
-}

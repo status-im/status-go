@@ -322,9 +322,6 @@ type ShhextConfig struct {
 
 	// PushNotificationsServers is the default-status run push notification servers
 	PushNotificationsServers []*ecdsa.PublicKey
-
-	// BandwidthStatsEnabled indicates if a signal is going to be emitted to indicate the upload and download rate
-	BandwidthStatsEnabled bool
 }
 
 // TorrentConfig provides configuration for the BitTorrent client used for message history archives.

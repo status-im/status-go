@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
@@ -15,7 +14,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
@@ -451,10 +449,6 @@ func (t *Transport) PeerCount() int {
 	return t.waku.PeerCount()
 }
 
-func (t *Transport) Peers() types.PeerStats {
-	return t.waku.Peers()
-}
-
 // ConfirmMessagesProcessed marks the messages as processed in the cache so
 // they won't be passed to the next layer anymore
 func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
@@ -483,30 +477,6 @@ func (t *Transport) ClearProcessedMessageIDsCache() error {
 
 func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return cryptotypes.EncodeHex(crypto.FromECDSAPub(key))
-}
-
-func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return t.waku.ListenAddresses()
-}
-
-func (t *Transport) ENR() (*enode.Node, error) {
-	return t.waku.ENR()
-}
-
-func (t *Transport) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return t.waku.AddRelayPeer(address)
-}
-
-func (t *Transport) DialPeer(address multiaddr.Multiaddr) error {
-	return t.waku.DialPeer(address)
-}
-
-func (t *Transport) DialPeerByID(peerID peer.ID) error {
-	return t.waku.DialPeerByID(peerID)
-}
-
-func (t *Transport) DropPeer(peerID peer.ID) error {
-	return t.waku.DropPeer(peerID)
 }
 
 func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {

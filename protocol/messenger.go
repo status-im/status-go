@@ -782,7 +782,7 @@ func (m *Messenger) Online() bool {
 		return m.config.onlineChecker()
 	}
 
-	return m.messaging.PeerCount() > 0
+	return m.messaging.Online()
 }
 
 func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
@@ -2686,10 +2686,6 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	response.ClearNotifications()
 	signal.SendNewMessages(response)
 	localnotifications.PushMessages(notifications)
-}
-
-func (m *Messenger) GetStats() types2.TransportStats {
-	return m.messaging.GetStats()
 }
 
 type CurrentMessageState struct {

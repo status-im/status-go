@@ -19,10 +19,9 @@ type Login struct {
 
 	// Deprecated: KdfIterations will be automatically fetched from the multiaccounts db.
 	// For now the automation is done when KdfIterations is 0. In future this field will be completely ignored.
-	KdfIterations         int    `json:"kdfIterations"`
-	RuntimeLogLevel       string `json:"runtimeLogLevel"`
-	WakuV2Nameserver      string `json:"wakuV2Nameserver"`
-	BandwidthStatsEnabled bool   `json:"bandwidthStatsEnabled"`
+	KdfIterations    int    `json:"kdfIterations"`
+	RuntimeLogLevel  string `json:"runtimeLogLevel"`
+	WakuV2Nameserver string `json:"wakuV2Nameserver"`
 
 	KeycardWhisperPrivateKey string `json:"keycardWhisperPrivateKey"`
 

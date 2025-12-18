@@ -60,10 +60,10 @@ func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO shhext_config (
 		pfs_enabled, installation_id, mailserver_confirmations,
-		verify_ens_contract_address, bandwidth_stats_enabled, synthetic_id
+		verify_ens_contract_address, synthetic_id
 	) VALUES (?, ?, ?, ?, ?, 'id')`,
 		c.ShhextConfig.PFSEnabled, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations,
-		c.ShhextConfig.VerifyENSContractAddress, c.ShhextConfig.BandwidthStatsEnabled)
+		c.ShhextConfig.VerifyENSContractAddress)
 	if err != nil {
 		return err
 	}
@@ -258,12 +258,10 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 
 	err = tx.QueryRow(`
 	SELECT pfs_enabled, installation_id, mailserver_confirmations,
-	verify_ens_contract_address,
-	bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
+	verify_ens_contract_address FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations,
 		&nodecfg.ShhextConfig.VerifyENSContractAddress,
-		&nodecfg.ShhextConfig.BandwidthStatsEnabled,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err

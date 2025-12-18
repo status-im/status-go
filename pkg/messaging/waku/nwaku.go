@@ -249,25 +249,25 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	}
 
 	waku := &Waku{
-		node:                        wakunode,
-		cfg:                         cfg,
-		privateKeys:                 make(map[string]*ecdsa.PrivateKey),
-		symKeys:                     make(map[string][]byte),
-		envelopeCache:               newTTLCache(),
-		msgQueue:                    make(chan *common2.ReceivedMessage, messageQueueLimit),
-		topicHealthStatusChan:       make(chan peermanager.TopicHealthStatus, 100),
-		connectionNotifChan:         make(chan node.PeerConnection, 20),
-		connStatusSubscriptions:     make(map[string]*types2.ConnStatusSubscription),
-		ctx:                         ctx,
-		cancel:                      cancel,
-		wg:                          sync.WaitGroup{},
-		dnsAddressCache:             make(map[string][]dnsdisc.DiscoveredNode),
-		dnsAddressCacheLock:         &sync.RWMutex{},
-		dnsDiscAsyncRetrievedSignal: make(chan struct{}),
-		storeMsgIDs:                 make(map[gethcommon.Hash]bool),
-		timesource:                  wakuTimeSource,
-		storeMsgIDsMu:               sync.RWMutex{},
-		logger:                      logger,
+		node:                            wakunode,
+		cfg:                             cfg,
+		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
+		symKeys:                         make(map[string][]byte),
+		envelopeCache:                   newTTLCache(),
+		msgQueue:                        make(chan *common2.ReceivedMessage, messageQueueLimit),
+		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
+		connectionNotifChan:             make(chan node.PeerConnection, 20),
+		connStatusSubscriptions:         make(map[string]*types2.ConnStatusSubscription),
+		ctx:                             ctx,
+		cancel:                          cancel,
+		wg:                              sync.WaitGroup{},
+		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
+		dnsAddressCacheLock:             &sync.RWMutex{},
+		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
+		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
+		timesource:                      wakuTimeSource,
+		storeMsgIDsMu:                   sync.RWMutex{},
+		logger:                          logger,
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
@@ -1383,18 +1383,6 @@ func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }
 
-func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	// TODO-nwaku
-	/*
-		peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
-		if err != nil {
-			return "", err
-		}
-		return peerID, nil
-	*/
-	return "", nil
-}
-
 func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
 	// Using WakuConnect so it matches the go-waku's behavior and terminology
 	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
@@ -1406,10 +1394,6 @@ func (w *Waku) DialPeerByID(peerID peer.ID) error {
 	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
 	defer cancel()
 	return w.node.DialPeerByID(ctx, peerID, relay.WakuRelayID_v200)
-}
-
-func (w *Waku) DropPeer(peerID peer.ID) error {
-	return w.node.DisconnectPeerByID(peerID)
 }
 
 func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {

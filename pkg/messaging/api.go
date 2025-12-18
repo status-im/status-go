@@ -30,3 +30,7 @@ func (a *API) Publisher() *pubsub.Publisher {
 func (a *API) GetCurrentTime() uint64 {
 	return a.core.stack.Transport.GetCurrentTime()
 }
+
+func (a *API) Online() bool {
+	return a.core.stack.Transport.PeerCount() > 0
+}

@@ -19,7 +19,6 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	accsmanagement "github.com/status-im/status-go/accounts-management"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
@@ -240,27 +239,7 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	}
 	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
 
-	if s.config.ShhextConfig.BandwidthStatsEnabled {
-		go s.retrieveStats(5*time.Second, s.cancelMessenger)
-	}
-
 	return response, nil
-}
-
-func (s *Service) retrieveStats(tick time.Duration, cancel <-chan struct{}) {
-	defer gocommon.LogOnPanic()
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			response := s.messenger.GetStats()
-			PublisherSignalHandler{}.Stats(response)
-		case <-cancel:
-			return
-		}
-	}
 }
 
 func (s *Service) EnableInstallation(installationID string) error {
