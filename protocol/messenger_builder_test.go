@@ -60,6 +60,7 @@ func (tmc *testMessengerConfig) complete() error {
 	if tmc.logger == nil {
 		logger := testutils.MustCreateTestLogger()
 		tmc.logger = logger.Named(tmc.name)
+		logger.Debug("created test logger", zap.String("name", tmc.name))
 	}
 
 	if tmc.appSettings == nil {
