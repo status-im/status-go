@@ -15,18 +15,18 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -277,7 +277,7 @@ func (s *Service) handleSetSignerPubKey(status string, toAddress common.Address,
 	}
 
 	if status == ac.Success {
-		_, err := s.Messenger.PromoteSelfToControlNode(types.FromHex(communityToken.CommunityID))
+		_, err := s.Messenger.PromoteSelfToControlNode(types2.FromHex(communityToken.CommunityID))
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +374,7 @@ func (s *Service) GetSignerPubKey(ctx context.Context, chainID uint64, contractA
 		return "", err
 	}
 
-	return types.ToHex(signerPubKey), nil
+	return types2.ToHex(signerPubKey), nil
 }
 
 func (s *Service) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
@@ -591,7 +591,7 @@ func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chai
 }
 
 func (s *Service) publishTokenActionToPrivilegedMembers(communityID string, chainID uint64, contractAddress string, actionType protobuf.CommunityTokenAction_ActionType) error {
-	decodedCommunityID, err := types.DecodeHex(communityID)
+	decodedCommunityID, err := types2.DecodeHex(communityID)
 	if err != nil {
 		return err
 	}

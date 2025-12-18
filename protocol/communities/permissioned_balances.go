@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"

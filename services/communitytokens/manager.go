@@ -15,12 +15,12 @@ import (
 	communitytokendeployer "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/internal/contracts/community-tokens/registry"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/rpc"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	communitytokendeployer2 "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/requests"
 )
@@ -105,7 +105,7 @@ func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (
 }
 
 func convert33BytesPubKeyToEthAddress(pubKey string) (common.Address, error) {
-	decoded, err := types.DecodeHex(pubKey)
+	decoded, err := types2.DecodeHex(pubKey)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -117,7 +117,7 @@ func convert33BytesPubKeyToEthAddress(pubKey string) (common.Address, error) {
 }
 
 // Simpler version of hashing typed structured data alternative to typedStructuredDataHash. Keeping this for reference.
-func customTypedStructuredDataHash(domainSeparator []byte, signatureTypedHash []byte, signer string, deployer string) types.Hash {
+func customTypedStructuredDataHash(domainSeparator []byte, signatureTypedHash []byte, signer string, deployer string) types2.Hash {
 	// every field should be 32 bytes, eth address is 20 bytes so padding should be added
 	emptyOffset := [12]byte{}
 	hashedEncoded := crypto.Keccak256Hash(signatureTypedHash, emptyOffset[:], common.HexToAddress(signer).Bytes(),
@@ -128,7 +128,7 @@ func customTypedStructuredDataHash(domainSeparator []byte, signatureTypedHash []
 
 // Returns a typed structured hash according to https://eips.ethereum.org/EIPS/eip-712
 // Domain separator from smart contract is used.
-func typedStructuredDataHash(domainSeparator []byte, signer string, addressFrom string, deployerContractAddress string, chainID uint64) (types.Hash, error) {
+func typedStructuredDataHash(domainSeparator []byte, signer string, addressFrom string, deployerContractAddress string, chainID uint64) (types2.Hash, error) {
 	myTypedData := apitypes.TypedData{
 		Types: apitypes.Types{
 			"Deploy": []apitypes.Type{
@@ -159,7 +159,7 @@ func typedStructuredDataHash(domainSeparator []byte, signer string, addressFrom 
 
 	typedDataHash, err := myTypedData.HashStruct(myTypedData.PrimaryType, myTypedData.Message)
 	if err != nil {
-		return types.Hash{}, err
+		return types2.Hash{}, err
 	}
 	rawData := []byte(fmt.Sprintf("\x19\x01%s%s", domainSeparator, string(typedDataHash)))
 	return crypto.Keccak256Hash(rawData), nil

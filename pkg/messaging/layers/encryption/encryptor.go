@@ -13,8 +13,8 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	crypto2 "github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/multidevice"
 )
@@ -118,7 +118,7 @@ func (s *encryptor) getDRSession(id []byte) (dr.Session, error) {
 		dr.WithMaxSkip(s.config.MaxSkip),
 		dr.WithMaxKeep(s.config.MaxKeep),
 		dr.WithMaxMessageKeysPerSession(s.config.MaxMessageKeysPerSession),
-		dr.WithCrypto(crypto.EthereumCrypto{}),
+		dr.WithCrypto(crypto2.EthereumCrypto{}),
 	)
 }
 
@@ -157,7 +157,7 @@ func (s *encryptor) ConfirmMessageProcessed(messageID []byte) error {
 
 // CreateBundle retrieves or creates an X3DH bundle given a private key
 func (s *encryptor) CreateBundle(privateKey *ecdsa.PrivateKey, installations []*multidevice.Installation) (*Bundle, error) {
-	ourIdentityKeyC := crypto.CompressPubkey(&privateKey.PublicKey)
+	ourIdentityKeyC := crypto2.CompressPubkey(&privateKey.PublicKey)
 
 	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC, installations)
 	if err != nil {
@@ -207,7 +207,7 @@ func (s *encryptor) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, theirIde
 		return nil, errSessionNotFound
 	}
 
-	signedPreKey, err := crypto.ToECDSA(bundlePrivateKey)
+	signedPreKey, err := crypto2.ToECDSA(bundlePrivateKey)
 	if err != nil {
 		s.logger.Error("could not convert to ecdsa", zap.Error(err))
 		return nil, err
@@ -246,8 +246,8 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 
 	ctx, span := s.tracer.Start(ctx, "Encryptor.DecryptPayload",
 		oteltrace.WithAttributes(
-			otelattribute.String("myIdentityKey", crypto.PubkeyToHex(&myIdentityKey.PublicKey)),
-			otelattribute.String("theirIdentityKey", crypto.PubkeyToHex(theirIdentityKey)),
+			otelattribute.String("myIdentityKey", crypto2.PubkeyToHex(&myIdentityKey.PublicKey)),
+			otelattribute.String("theirIdentityKey", crypto2.PubkeyToHex(theirIdentityKey)),
 			otelattribute.String("myInstallationID", s.config.InstallationID),
 			otelattribute.String("theirInstallationID", theirInstallationID),
 		),
@@ -272,7 +272,7 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 
 	if x3dhHeader := msg.GetX3DHHeader(); x3dhHeader != nil {
 		bundleID := x3dhHeader.GetId()
-		theirEphemeralKey, err := crypto.DecompressPubkey(x3dhHeader.GetKey())
+		theirEphemeralKey, err := crypto2.DecompressPubkey(x3dhHeader.GetKey())
 
 		if err != nil {
 			return nil, err
@@ -283,7 +283,7 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 			return nil, err
 		}
 
-		theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
+		theirIdentityKeyC := crypto2.CompressPubkey(theirIdentityKey)
 		err = s.persistence.AddRatchetInfo(symmetricKey, theirIdentityKeyC, bundleID, nil, theirInstallationID)
 		if err != nil {
 			return nil, err
@@ -300,7 +300,7 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 			Ciphertext: msg.GetPayload(),
 		}
 
-		theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
+		theirIdentityKeyC := crypto2.CompressPubkey(theirIdentityKey)
 
 		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC, theirInstallationID)
 		if err != nil {
@@ -330,11 +330,11 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 
 	// Try DH
 	if header := msg.GetDHHeader(); header != nil {
-		decompressedKey, err := crypto.DecompressPubkey(header.GetKey())
+		decompressedKey, err := crypto2.DecompressPubkey(header.GetKey())
 		if err != nil {
 			return nil, err
 		}
-		return crypto.DecryptWithDH(myIdentityKey, decompressedKey, payload)
+		return crypto2.DecryptWithDH(myIdentityKey, decompressedKey, payload)
 	}
 
 	// Try Hash Ratchet
@@ -359,7 +359,7 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 	return nil, errors.New("no key specified")
 }
 
-func (s *encryptor) createNewSession(drInfo *RatchetInfo, sk []byte, keyPair crypto.DHPair) (dr.Session, error) {
+func (s *encryptor) createNewSession(drInfo *RatchetInfo, sk []byte, keyPair crypto2.DHPair) (dr.Session, error) {
 	var err error
 	var session dr.Session
 
@@ -373,7 +373,7 @@ func (s *encryptor) createNewSession(drInfo *RatchetInfo, sk []byte, keyPair cry
 			dr.WithMaxSkip(s.config.MaxSkip),
 			dr.WithMaxKeep(s.config.MaxKeep),
 			dr.WithMaxMessageKeysPerSession(s.config.MaxMessageKeysPerSession),
-			dr.WithCrypto(crypto.EthereumCrypto{}))
+			dr.WithCrypto(crypto2.EthereumCrypto{}))
 	} else {
 		session, err = dr.NewWithRemoteKey(
 			drInfo.ID,
@@ -384,7 +384,7 @@ func (s *encryptor) createNewSession(drInfo *RatchetInfo, sk []byte, keyPair cry
 			dr.WithMaxSkip(s.config.MaxSkip),
 			dr.WithMaxKeep(s.config.MaxKeep),
 			dr.WithMaxMessageKeysPerSession(s.config.MaxMessageKeysPerSession),
-			dr.WithCrypto(crypto.EthereumCrypto{}))
+			dr.WithCrypto(crypto2.EthereumCrypto{}))
 	}
 
 	return session, err
@@ -395,7 +395,7 @@ func (s *encryptor) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *Ra
 
 	var session dr.Session
 
-	keyPair := crypto.DHPair{
+	keyPair := crypto2.DHPair{
 		PrvKey: drInfo.PrivateKey,
 		PubKey: drInfo.PublicKey,
 	}
@@ -435,7 +435,7 @@ func (s *encryptor) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *Ra
 
 	var session dr.Session
 
-	keyPair := crypto.DHPair{
+	keyPair := crypto2.DHPair{
 		PrvKey: drInfo.PrivateKey,
 		PubKey: drInfo.PublicKey,
 	}
@@ -466,14 +466,14 @@ func (s *encryptor) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []b
 		return nil, err
 	}
 
-	encryptedPayload, err := crypto.EncryptSymmetric(symmetricKey, payload)
+	encryptedPayload, err := crypto2.EncryptSymmetric(symmetricKey, payload)
 	if err != nil {
 		return nil, err
 	}
 
 	return &EncryptedMessageProtocol{
 		DHHeader: &DHHeader{
-			Key: crypto.CompressPubkey(ourEphemeralKey),
+			Key: crypto2.CompressPubkey(ourEphemeralKey),
 		},
 		Payload: encryptedPayload,
 	}, nil
@@ -499,7 +499,7 @@ func (s *encryptor) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, installat
 func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*EncryptedMessageProtocol, []*multidevice.Installation, error) {
 	logger := s.logger.With(
 		zap.String("site", "EncryptPayload"),
-		zap.String("their-identity-key", types.EncodeHex(crypto.FromECDSAPub(theirIdentityKey))))
+		zap.String("their-identity-key", types.EncodeHex(crypto2.FromECDSAPub(theirIdentityKey))))
 
 	// Which installations we are sending the message to
 	var targetedInstallations []*multidevice.Installation
@@ -514,7 +514,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 		return encryptedPayload, targetedInstallations, err
 	}
 
-	theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
+	theirIdentityKeyC := crypto2.CompressPubkey(theirIdentityKey)
 	response := make(map[string]*EncryptedMessageProtocol)
 
 	for _, installation := range installations {
@@ -578,8 +578,8 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 		if err != nil {
 			return nil, nil, err
 		}
-		theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
-		ourEphemeralKeyC := crypto.CompressPubkey(ourEphemeralKey)
+		theirIdentityKeyC := crypto2.CompressPubkey(theirIdentityKey)
+		ourEphemeralKeyC := crypto2.CompressPubkey(ourEphemeralKey)
 
 		err = s.persistence.AddRatchetInfo(sharedKey, theirIdentityKeyC, theirSignedPreKey, ourEphemeralKeyC, installationID)
 		if err != nil {
@@ -700,8 +700,8 @@ func (s *encryptor) EncryptWithHR(ratchet *HashRatchetKeyCompatibility, payload 
 		dbHash = hrCache.Hash
 	}
 
-	hash := crypto.Keccak256Hash(dbHash)
-	encryptedPayload, err := crypto.EncryptSymmetric(hash.Bytes(), payload)
+	hash := crypto2.Keccak256Hash(dbHash)
+	encryptedPayload, err := crypto2.EncryptSymmetric(hash.Bytes(), payload)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -760,7 +760,7 @@ func (s *encryptor) DecryptWithHR(ctx context.Context, ratchet *HashRatchetKeyCo
 			return nil, ErrHashRatchetSeqNoTooHigh
 		}
 		for i := hrCache.SeqNo; i < seqNo; i++ {
-			hash = crypto.Keccak256Hash(hash).Bytes()
+			hash = crypto2.Keccak256Hash(hash).Bytes()
 			err := s.persistence.SaveHashRatchetKeyHash(ratchet, hash, i+1)
 			if err != nil {
 				return nil, err
@@ -768,7 +768,7 @@ func (s *encryptor) DecryptWithHR(ctx context.Context, ratchet *HashRatchetKeyCo
 		}
 	}
 
-	decryptedPayload, err := crypto.DecryptSymmetric(hash, payload)
+	decryptedPayload, err := crypto2.DecryptSymmetric(hash, payload)
 
 	if err != nil {
 		s.logger.Error("failed to decrypt hash", zap.Error(err))

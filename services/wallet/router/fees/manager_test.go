@@ -10,8 +10,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
+	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 
 	geth "github.com/ethereum/go-ethereum"

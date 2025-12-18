@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 	xdraw "golang.org/x/image/draw"
 
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 type Circle struct {

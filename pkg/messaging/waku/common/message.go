@@ -9,10 +9,10 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
 
-	"github.com/status-im/status-go/logutils"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 // MessageType represents where this message comes from

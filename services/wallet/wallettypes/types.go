@@ -6,14 +6,13 @@ import (
 	"errors"
 	"math/big"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/crypto/types"
-
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
@@ -50,8 +49,8 @@ type GasCalculator interface {
 type SendTxArgs struct {
 	Version SendTxArgsVersion `json:"version"`
 
-	From                 types.Address   `json:"from"`
-	To                   *types.Address  `json:"to"`
+	From                 types2.Address  `json:"from"`
+	To                   *types2.Address `json:"to"`
 	Gas                  *hexutil.Uint64 `json:"gas"`
 	GasPrice             *hexutil.Big    `json:"gasPrice"`
 	Value                *hexutil.Big    `json:"value"`
@@ -61,8 +60,8 @@ type SendTxArgs struct {
 	// We keep both "input" and "data" for backward compatibility.
 	// "input" is a preferred field.
 	// see `vendor/github.com/ethereum/go-ethereum/internal/ethapi/api.go:1107`
-	Input types.HexBytes `json:"input"`
-	Data  types.HexBytes `json:"data"`
+	Input types2.HexBytes `json:"input"`
+	Data  types2.HexBytes `json:"data"`
 
 	// additional data - version SendTxArgsVersion1
 	FromChainID        uint64            `json:"fromChainID"`
@@ -71,7 +70,7 @@ type SendTxArgs struct {
 	ValueOut           *hexutil.Big      `json:"valueOut"`
 	FromToken          *tokentypes.Token `json:"fromToken"`
 	ToToken            *tokentypes.Token `json:"toToken"`
-	ToContractAddress  types.Address     `json:"toContractAddress"` // represents address of the contract that needs to be used in order to send assets, like ERC721 or ERC1155 tx
+	ToContractAddress  types2.Address    `json:"toContractAddress"` // represents address of the contract that needs to be used in order to send assets, like ERC721 or ERC1155 tx
 	SlippagePercentage float32           `json:"slippagePercentage"`
 }
 
@@ -92,7 +91,7 @@ func (args SendTxArgs) IsDynamicFeeTx() bool {
 }
 
 // GetInput returns either Input or Data field's value dependent on what is filled.
-func (args SendTxArgs) GetInput() types.HexBytes {
+func (args SendTxArgs) GetInput() types2.HexBytes {
 	if !isNilOrEmpty(args.Input) {
 		return args.Input
 	}
@@ -147,6 +146,6 @@ func (args SendTxArgs) ToTransactOpts(signerFn bind.SignerFn) *bind.TransactOpts
 	}
 }
 
-func isNilOrEmpty(bytes types.HexBytes) bool {
+func isNilOrEmpty(bytes types2.HexBytes) bool {
 	return len(bytes) == 0
 }

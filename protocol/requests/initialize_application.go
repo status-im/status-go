@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 var (

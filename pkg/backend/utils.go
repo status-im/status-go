@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 )
 
 // RunAsync runs the specified function asynchronously.

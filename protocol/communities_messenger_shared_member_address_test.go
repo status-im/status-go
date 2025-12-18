@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -90,7 +90,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) joinCommunity(community *
 	joinCommunity(&s.Suite, community.ID(), s.owner, user, password, addresses)
 }
 
-func (s *MessengerCommunitiesSharedMemberAddressSuite) checkRevealedAccounts(communityID types.HexBytes, user *Messenger, expectedAccounts []*protobuf.RevealedAccount) {
+func (s *MessengerCommunitiesSharedMemberAddressSuite) checkRevealedAccounts(communityID types2.HexBytes, user *Messenger, expectedAccounts []*protobuf.RevealedAccount) {
 	revealedAccounts, err := user.communitiesManager.GetRevealedAddresses(communityID, s.alice.IdentityPublicKeyString())
 	s.Require().NoError(err)
 	s.Require().Equal(revealedAccounts, expectedAccounts)
@@ -119,13 +119,13 @@ func createTokenMasterTokenCriteria() *protobuf.TokenCriteria {
 	}
 }
 
-func (s *MessengerCommunitiesSharedMemberAddressSuite) createEditSharedAddressesRequest(communityID types.HexBytes) *requests.EditSharedAddresses {
+func (s *MessengerCommunitiesSharedMemberAddressSuite) createEditSharedAddressesRequest(communityID types2.HexBytes) *requests.EditSharedAddresses {
 	request := &requests.EditSharedAddresses{CommunityID: communityID, AddressesToReveal: []string{aliceAddress2}, AirdropAddress: aliceAddress2}
 
 	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(crypto.PubkeyToHex(&s.alice.identity.PublicKey), communityID, request.AddressesToReveal)
 	s.Require().NoError(err)
 
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
+	passwdHash := types2.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
 	for i := range signingParams {
 		signingParams[i].Password = passwdHash
 	}
@@ -138,7 +138,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) createEditSharedAddresses
 	}
 	for i := range signingParams {
 		request.AddressesToReveal[i] = signingParams[i].Address
-		request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
+		request.Signatures = append(request.Signatures, types2.FromHex(signatures[i]))
 	}
 	if updateAddresses {
 		request.AirdropAddress = request.AddressesToReveal[0]
@@ -179,7 +179,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) joinOnRequestCommunityAsT
 	s.Require().True(userCommunity.IsTokenMaster())
 }
 
-func (s *MessengerCommunitiesSharedMemberAddressSuite) waitForRevealedAddresses(receiver *Messenger, communityID types.HexBytes, expectedAccounts []*protobuf.RevealedAccount) {
+func (s *MessengerCommunitiesSharedMemberAddressSuite) waitForRevealedAddresses(receiver *Messenger, communityID types2.HexBytes, expectedAccounts []*protobuf.RevealedAccount) {
 	_, err := WaitOnMessengerResponse(receiver, func(r *MessengerResponse) bool {
 		revealedAccounts, err := receiver.communitiesManager.GetRevealedAddresses(communityID, s.alice.IdentityPublicKeyString())
 		if err != nil {

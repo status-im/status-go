@@ -13,8 +13,8 @@ import (
 	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	logutils2 "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/server"
 )
@@ -85,9 +85,9 @@ func MakeServerConfig(config *ServerConfig) error {
 	}
 
 	now := timesource.GetCurrentTime()
-	logutils.ZapLogger().Debug("pairing server generate cert",
-		logutils.UnixTimeMs("system time", time.Now()),
-		logutils.UnixTimeMs("timesource time", now),
+	logutils2.ZapLogger().Debug("pairing server generate cert",
+		logutils2.UnixTimeMs("system time", time.Now()),
+		logutils2.UnixTimeMs("timesource time", now),
 	)
 	tlsCert, _, err := GenerateCertFromKey(tlsKey, now, ips, []string{})
 	if err != nil {
@@ -122,7 +122,7 @@ type SenderServer struct {
 
 // NewSenderServer returns a *SenderServer init from the given *SenderServerConfig
 func NewSenderServer(backend *backend.StatusBackend, config *SenderServerConfig) (*SenderServer, error) {
-	logger := logutils.ZapLogger().Named("SenderServer")
+	logger := logutils2.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
 	bs, err := NewBaseServer(logger, e, config.ServerConfig)
@@ -234,7 +234,7 @@ type ReceiverServer struct {
 
 // NewReceiverServer returns a *SenderServer init from the given *ReceiverServerConfig
 func NewReceiverServer(backend *backend.StatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
-	logger := logutils.ZapLogger().Named("SenderServer")
+	logger := logutils2.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
 	bs, err := NewBaseServer(logger, e, config.ServerConfig)
@@ -348,7 +348,7 @@ type KeystoreFilesSenderServer struct {
 }
 
 func NewKeystoreFilesSenderServer(backend *backend.StatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
-	logger := logutils.ZapLogger().Named("SenderServer")
+	logger := logutils2.ZapLogger().Named("SenderServer")
 	e := NewPayloadEncryptor(config.ServerConfig.EK)
 
 	bs, err := NewBaseServer(logger, e, config.ServerConfig)

@@ -18,8 +18,8 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
-	"github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/protobuf"

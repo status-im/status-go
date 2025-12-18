@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/pkg/backend"
 )

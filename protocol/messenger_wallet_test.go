@@ -3,7 +3,7 @@ package protocol
 import (
 	"testing"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 
 	"github.com/stretchr/testify/suite"

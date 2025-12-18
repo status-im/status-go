@@ -9,14 +9,16 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/accounts-management/generator"
-	accstypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/rpc/chain"
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
+	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
+	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	fake2 "github.com/status-im/status-go/internal/transactions/fake"
-	"github.com/status-im/status-go/rpc/chain"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -29,8 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
@@ -220,7 +220,7 @@ func (s *TransactorSuite) TestGasValues() {
 	}
 }
 
-func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *accstypes.SelectedExtKey) {
+func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *types.SelectedExtKey) {
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&testNonce, nil)
 
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
@@ -237,9 +237,9 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	address2 := fakeAddress()
 
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &accstypes.SelectedExtKey{
+	selectedAccount := &types.SelectedExtKey{
 		Address:    *address1,
-		AccountKey: &accstypes.Key{PrivateKey: key},
+		AccountKey: &types.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID
@@ -331,8 +331,8 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	})
 }
 
-func fakeAddress() *types.Address {
-	var address types.Address
+func fakeAddress() *types2.Address {
+	var address types2.Address
 	gofakeit.Slice(&address)
 	return &address
 }
@@ -341,8 +341,8 @@ func (s *TransactorSuite) TestArgsValidation() {
 	args := wallettypes.SendTxArgs{
 		From:  *fakeAddress(),
 		To:    fakeAddress(),
-		Data:  types.HexBytes([]byte{0x01, 0x02}),
-		Input: types.HexBytes([]byte{0x02, 0x01}),
+		Data:  types2.HexBytes([]byte{0x01, 0x02}),
+		Input: types2.HexBytes([]byte{0x02, 0x01}),
 	}
 	s.False(args.Valid())
 	selectedAccount := generator.NewAccount(nil, nil)

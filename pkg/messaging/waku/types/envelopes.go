@@ -1,7 +1,7 @@
 package types
 
 import (
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // Envelope represents a clear-text data packet to transmit through the Whisper

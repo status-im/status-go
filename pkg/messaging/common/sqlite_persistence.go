@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 )
 

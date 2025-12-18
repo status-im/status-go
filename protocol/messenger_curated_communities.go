@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/services/wallet/common"
 )

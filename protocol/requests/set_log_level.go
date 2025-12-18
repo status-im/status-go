@@ -1,7 +1,7 @@
 package requests
 
 import (
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 type SetLogLevel struct {

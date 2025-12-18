@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 var ErrRetractContactRequestInvalidContactID = errors.New("retract-contact-request: invalid id")

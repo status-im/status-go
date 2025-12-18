@@ -7,7 +7,7 @@ import (
 
 	pkgerrors "github.com/pkg/errors"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/enr"
 	"github.com/status-im/status-go/internal/multiaddr"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"

@@ -18,14 +18,15 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
 	messaging2 "github.com/status-im/status-go/pkg/messaging"
@@ -39,7 +40,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
@@ -59,8 +59,8 @@ const providerID = "community"
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(types.Hash, types.Hash, []byte, error)
-	MailServerRequestExpired(types.Hash)
+	MailServerRequestCompleted(types2.Hash, types2.Hash, []byte, error)
+	MailServerRequestExpired(types2.Hash)
 }
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
@@ -413,7 +413,7 @@ func tokenURIToCommunityID(tokenURI string) string {
 		return ""
 	}
 
-	communityID := types.EncodeHex(crypto.CompressPubkey(pubKey))
+	communityID := types2.EncodeHex(crypto.CompressPubkey(pubKey))
 
 	return communityID
 }

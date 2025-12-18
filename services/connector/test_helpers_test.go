@@ -13,11 +13,11 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/rpc/network"
+	network_testutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/rpc/network"
-	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
 	mock_chainutils "github.com/status-im/status-go/services/connector/chainutils/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )

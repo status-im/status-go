@@ -6,8 +6,8 @@ import (
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )

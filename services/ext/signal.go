@@ -1,7 +1,7 @@
 package ext
 
 import (
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/backupsync"

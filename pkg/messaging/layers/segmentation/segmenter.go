@@ -12,7 +12,7 @@ import (
 	"github.com/klauspost/reedsolomon"
 	"go.uber.org/zap"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation/protobuf"
 )
 

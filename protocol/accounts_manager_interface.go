@@ -1,9 +1,9 @@
 package protocol
 
 import (
-	"github.com/status-im/status-go/accounts-management/generator"
-	"github.com/status-im/status-go/accounts-management/types"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 //go:generate go tool mockgen -package=mock_protocol_accounts_manager -source=accounts_manager_interface.go -destination=mock/messenger_accounts_manager.go

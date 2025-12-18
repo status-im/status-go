@@ -12,7 +12,7 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/internal/rpc"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
 )

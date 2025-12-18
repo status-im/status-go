@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/pkg/messaging/types"

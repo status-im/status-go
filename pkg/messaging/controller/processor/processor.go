@@ -11,8 +11,8 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	adapters2 "github.com/status-im/status-go/pkg/messaging/adapters"
 	common2 "github.com/status-im/status-go/pkg/messaging/common"
@@ -105,18 +105,18 @@ func (r *Processor) ProcessMessage(msg *types2.ReceivedMessage) (*types2.HandleM
 
 type processMessageResponse struct {
 	messages        []*types2.Message
-	ackedMessageIDs []cryptotypes.HexBytes
+	ackedMessageIDs []types.HexBytes
 }
 
 func (r *Processor) processMessage(m *types2.ReceivedMessage) (*processMessageResponse, error) {
-	logger := r.logger.With(zap.Stringer("hash", cryptotypes.HexBytes(m.Hash)))
+	logger := r.logger.With(zap.Stringer("hash", types.HexBytes(m.Hash)))
 	logger.Debug("processing received message")
 
 	responseMessage := &types2.Message{}
 
 	response := &processMessageResponse{
 		messages:        []*types2.Message{responseMessage},
-		ackedMessageIDs: []cryptotypes.HexBytes{},
+		ackedMessageIDs: []types.HexBytes{},
 	}
 
 	err := processTransportLayer(responseMessage, m)
@@ -141,8 +141,8 @@ func (r *Processor) processMessage(m *types2.ReceivedMessage) (*processMessageRe
 
 	ctx, span := r.tracer.Start(trace.DeriveRemoteContext(utils.MergeByteSlices(hashes)), "Processor.processMessage",
 		oteltrace.WithAttributes(
-			otelattribute.String("hash", cryptotypes.EncodeHex(m.Hash)),
-			otelattribute.StringSlice("hashes", cryptotypes.EncodeHexes(hashes)),
+			otelattribute.String("hash", types.EncodeHex(m.Hash)),
+			otelattribute.StringSlice("hashes", types.EncodeHexes(hashes)),
 		),
 	)
 	defer span.End()
@@ -155,7 +155,7 @@ func (r *Processor) processMessage(m *types2.ReceivedMessage) (*processMessageRe
 		if err == encryption2.ErrHashRatchetGroupIDNotFound && len(responseMessage.EncryptionLayer.HashRatchetInfo) == 1 {
 			info := responseMessage.EncryptionLayer.HashRatchetInfo[0]
 			span.AddEvent("hash ratchet with group id not found yet", oteltrace.WithAttributes(
-				otelattribute.String("groupID", cryptotypes.ToHex(info.GroupID)),
+				otelattribute.String("groupID", types.ToHex(info.GroupID)),
 			))
 			return nil, r.hashRatchetStorage.SaveMessage(info.GroupID, info.KeyID, m)
 		} else {
@@ -182,7 +182,7 @@ func (r *Processor) processMessage(m *types2.ReceivedMessage) (*processMessageRe
 func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*types2.HashRatchetInfo) (*processMessageResponse, error) {
 	response := &processMessageResponse{
 		messages:        []*types2.Message{},
-		ackedMessageIDs: []cryptotypes.HexBytes{},
+		ackedMessageIDs: []types.HexBytes{},
 	}
 
 	for _, hashRatchetInfo := range hashRatchetInfos {
@@ -193,7 +193,7 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*types2.
 
 		var processedIds [][]byte
 		for _, message := range messages {
-			logger := r.logger.With(zap.String("hash", cryptotypes.EncodeHex(message.Hash)))
+			logger := r.logger.With(zap.String("hash", types.EncodeHex(message.Hash)))
 			logger.Debug("processing queued hash ratchet message")
 
 			r, err := r.processMessage(message)
@@ -333,7 +333,7 @@ func (r *Processor) ProcessSharedSecrets(secrets []*sharedsecret.Secret) error {
 	return nil
 }
 
-func (r *Processor) processReliabilityLayer(m *types2.Message, logger *zap.Logger) ([]*types2.Message, []cryptotypes.HexBytes, error) {
+func (r *Processor) processReliabilityLayer(m *types2.Message, logger *zap.Logger) ([]*types2.Message, []types.HexBytes, error) {
 	if !r.stack.Reliability.Started() {
 		return nil, nil, errReliabilityNotStarted
 	}
@@ -356,7 +356,7 @@ func (r *Processor) processReliabilityLayer(m *types2.Message, logger *zap.Logge
 		statusMessages = append(statusMessages, message)
 	}
 
-	ackedMessageIDs := make([]cryptotypes.HexBytes, 0, len(datasyncMessage.Acks))
+	ackedMessageIDs := make([]types.HexBytes, 0, len(datasyncMessage.Acks))
 	for _, ack := range datasyncMessage.Acks {
 		messageID, err := r.messageConfirmationStorage.MarkAsConfirmed(ack, true)
 		if err != nil {

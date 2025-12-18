@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/internal/rpc/network"
 )
 
 var (

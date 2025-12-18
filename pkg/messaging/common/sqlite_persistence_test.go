@@ -6,7 +6,7 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/require"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging/common/migrations"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"

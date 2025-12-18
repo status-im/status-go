@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 )
 

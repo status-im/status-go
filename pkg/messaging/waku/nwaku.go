@@ -59,10 +59,10 @@ import (
 	wakutimesource "github.com/waku-org/waku-go-bindings/waku/timesource"
 
 	gocommon "github.com/status-im/status-go/common"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/connection"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/logutils"
 	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"
 	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
 
@@ -249,25 +249,25 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	}
 
 	waku := &Waku{
-		node:                        wakunode,
-		cfg:                         cfg,
-		privateKeys:                 make(map[string]*ecdsa.PrivateKey),
-		symKeys:                     make(map[string][]byte),
-		envelopeCache:               newTTLCache(),
-		msgQueue:                    make(chan *common2.ReceivedMessage, messageQueueLimit),
-		topicHealthStatusChan:       make(chan peermanager.TopicHealthStatus, 100),
-		connectionNotifChan:         make(chan node.PeerConnection, 20),
-		connStatusSubscriptions:     make(map[string]*types2.ConnStatusSubscription),
-		ctx:                         ctx,
-		cancel:                      cancel,
-		wg:                          sync.WaitGroup{},
-		dnsAddressCache:             make(map[string][]dnsdisc.DiscoveredNode),
-		dnsAddressCacheLock:         &sync.RWMutex{},
-		dnsDiscAsyncRetrievedSignal: make(chan struct{}),
-		storeMsgIDs:                 make(map[gethcommon.Hash]bool),
-		timesource:                  wakuTimeSource,
-		storeMsgIDsMu:               sync.RWMutex{},
-		logger:                      logger,
+		node:                            wakunode,
+		cfg:                             cfg,
+		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
+		symKeys:                         make(map[string][]byte),
+		envelopeCache:                   newTTLCache(),
+		msgQueue:                        make(chan *common2.ReceivedMessage, messageQueueLimit),
+		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
+		connectionNotifChan:             make(chan node.PeerConnection, 20),
+		connStatusSubscriptions:         make(map[string]*types2.ConnStatusSubscription),
+		ctx:                             ctx,
+		cancel:                          cancel,
+		wg:                              sync.WaitGroup{},
+		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
+		dnsAddressCacheLock:             &sync.RWMutex{},
+		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
+		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
+		timesource:                      wakuTimeSource,
+		storeMsgIDsMu:                   sync.RWMutex{},
+		logger:                          logger,
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,

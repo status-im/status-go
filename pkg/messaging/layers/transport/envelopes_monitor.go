@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -38,8 +38,8 @@ type EnvelopesMonitorConfig struct {
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(cryptotypes.Hash, cryptotypes.Hash, []byte, error)
-	MailServerRequestExpired(cryptotypes.Hash)
+	MailServerRequestCompleted(types2.Hash, types2.Hash, []byte, error)
+	MailServerRequestExpired(types2.Hash)
 }
 
 // NewEnvelopesMonitor returns a pointer to an instance of the EnvelopesMonitor.
@@ -65,18 +65,18 @@ func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *Envelopes
 		logger:                           logger.With(zap.Namespace("EnvelopesMonitor")),
 
 		// key is envelope hash (event.Hash)
-		envelopes: map[cryptotypes.Hash]*monitoredEnvelope{},
+		envelopes: map[types2.Hash]*monitoredEnvelope{},
 
 		// key is hash of the batch (event.Batch)
-		batches: map[cryptotypes.Hash]map[cryptotypes.Hash]struct{}{},
+		batches: map[types2.Hash]map[types2.Hash]struct{}{},
 
 		// key is stringified message identifier
-		messageEnvelopeHashes: make(map[string][]cryptotypes.Hash),
+		messageEnvelopeHashes: make(map[string][]types2.Hash),
 	}
 }
 
 type monitoredEnvelope struct {
-	envelopeHashID  cryptotypes.Hash
+	envelopeHashID  types2.Hash
 	state           EnvelopeState
 	attempts        int
 	message         *types.NewMessage
@@ -93,10 +93,10 @@ type EnvelopesMonitor struct {
 
 	mu sync.Mutex
 
-	envelopes             map[cryptotypes.Hash]*monitoredEnvelope
+	envelopes             map[types2.Hash]*monitoredEnvelope
 	retryQueue            []*monitoredEnvelope
-	batches               map[cryptotypes.Hash]map[cryptotypes.Hash]struct{}
-	messageEnvelopeHashes map[string][]cryptotypes.Hash
+	batches               map[types2.Hash]map[types2.Hash]struct{}
+	messageEnvelopeHashes map[string][]types2.Hash
 
 	awaitOnlyMailServerConfirmations bool
 
@@ -131,7 +131,7 @@ func (m *EnvelopesMonitor) Stop() {
 
 // Add hashes to a tracker.
 // Identifiers may be backed by multiple envelopes. It happens when message is split in segmentation layer.
-func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []cryptotypes.Hash, messages []*types.NewMessage) error {
+func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []types2.Hash, messages []*types.NewMessage) error {
 	if len(envelopeHashes) != len(messages) {
 		return errors.New("hashes don't match messages")
 	}
@@ -140,7 +140,7 @@ func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []cryptotypes
 	defer m.mu.Unlock()
 
 	for _, messageID := range messageIDs {
-		m.messageEnvelopeHashes[cryptotypes.HexBytes(messageID).String()] = envelopeHashes
+		m.messageEnvelopeHashes[types2.HexBytes(messageID).String()] = envelopeHashes
 	}
 
 	for i, envelopeHash := range envelopeHashes {
@@ -161,7 +161,7 @@ func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []cryptotypes
 	return nil
 }
 
-func (m *EnvelopesMonitor) GetState(hash cryptotypes.Hash) EnvelopeState {
+func (m *EnvelopesMonitor) GetState(hash types2.Hash) EnvelopeState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	envelope, exist := m.envelopes[hash]
@@ -213,7 +213,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	confirmationExpected := event.Batch != (cryptotypes.Hash{})
+	confirmationExpected := event.Batch != (types2.Hash{})
 
 	envelope, ok := m.envelopes[event.Hash]
 
@@ -231,7 +231,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
 	if confirmationExpected {
 		if _, ok := m.batches[event.Batch]; !ok {
-			m.batches[event.Batch] = map[cryptotypes.Hash]struct{}{}
+			m.batches[event.Batch] = map[types2.Hash]struct{}{}
 		}
 		m.batches[event.Batch][event.Hash] = struct{}{}
 		m.logger.Debug("waiting for a confirmation", zap.String("batch", event.Batch.String()))
@@ -260,7 +260,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
 	if event.Data != nil && !ok {
 		m.logger.Error("received unexpected data in the the confirmation event", zap.Any("data", event.Data))
 	}
-	failedEnvelopes := map[cryptotypes.Hash]struct{}{}
+	failedEnvelopes := map[types2.Hash]struct{}{}
 	for i := range envelopeErrors {
 		envelopeError := envelopeErrors[i]
 		_, exist := m.envelopes[envelopeError.Hash]
@@ -298,7 +298,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event types.EnvelopeEvent)
 
 // handleEnvelopeFailure is a common code path for processing envelopes failures. not thread safe, lock
 // must be used on a higher level.
-func (m *EnvelopesMonitor) handleEnvelopeFailure(hash cryptotypes.Hash, err error) {
+func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types2.Hash, err error) {
 	if envelope, ok := m.envelopes[hash]; ok {
 		m.clearMessageState(hash)
 		if envelope.state == EnvelopeSent {
@@ -362,7 +362,7 @@ func (m *EnvelopesMonitor) retryOnce() {
 				}
 			} else {
 				m.removeFromRetryQueue(envelope.envelopeHashID)
-				envelope.envelopeHashID = cryptotypes.BytesToHash(hex)
+				envelope.envelopeHashID = types2.BytesToHash(hex)
 			}
 			envelope.state = EnvelopePosted
 			envelope.attempts++
@@ -373,7 +373,7 @@ func (m *EnvelopesMonitor) retryOnce() {
 }
 
 // removeFromRetryQueue removes the specified envelope from the retry queue
-func (m *EnvelopesMonitor) removeFromRetryQueue(envelopeID cryptotypes.Hash) {
+func (m *EnvelopesMonitor) removeFromRetryQueue(envelopeID types2.Hash) {
 	var newRetryQueue []*monitoredEnvelope
 	for _, envelope := range m.retryQueue {
 		if envelope.envelopeHashID != envelopeID {
@@ -402,7 +402,7 @@ func (m *EnvelopesMonitor) processMessageIDs(messageIDs [][]byte) {
 	sentMessageIDs := make([][]byte, 0, len(messageIDs))
 
 	for _, messageID := range messageIDs {
-		hashes, ok := m.messageEnvelopeHashes[cryptotypes.HexBytes(messageID).String()]
+		hashes, ok := m.messageEnvelopeHashes[types2.HexBytes(messageID).String()]
 		if !ok {
 			continue
 		}
@@ -428,13 +428,13 @@ func (m *EnvelopesMonitor) processMessageIDs(messageIDs [][]byte) {
 
 // clearMessageState removes all message and envelope state.
 // not thread-safe, should be protected on a higher level.
-func (m *EnvelopesMonitor) clearMessageState(envelopeID cryptotypes.Hash) {
+func (m *EnvelopesMonitor) clearMessageState(envelopeID types2.Hash) {
 	envelope, ok := m.envelopes[envelopeID]
 	if !ok {
 		return
 	}
 	delete(m.envelopes, envelopeID)
 	for _, messageID := range envelope.messageIDs {
-		delete(m.messageEnvelopeHashes, cryptotypes.HexBytes(messageID).String())
+		delete(m.messageEnvelopeHashes, types2.HexBytes(messageID).String())
 	}
 }

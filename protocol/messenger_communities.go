@@ -22,11 +22,11 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types3 "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
@@ -94,7 +94,7 @@ func (r *FetchCommunityRequest) Validate() error {
 	if len(r.CommunityKey) <= 2 {
 		return fmt.Errorf("community key is too short")
 	}
-	if _, err := types.DecodeHex(r.CommunityKey); err != nil {
+	if _, err := types3.DecodeHex(r.CommunityKey); err != nil {
 		return fmt.Errorf("invalid community key")
 	}
 	return nil
@@ -108,7 +108,7 @@ func GetCommunityIDFromKey(communityKey string) string {
 	// Check if the key is a private key. strip the 0x at the start
 	if privateKey, err := crypto.HexToECDSA(communityKey[2:]); err == nil {
 		// It is a privateKey
-		return types.HexBytes(crypto.CompressPubkey(&privateKey.PublicKey)).String()
+		return types3.HexBytes(crypto.CompressPubkey(&privateKey.PublicKey)).String()
 	}
 
 	// Not a private key, use the public key
@@ -190,7 +190,7 @@ func (m *Messenger) publishCommunityEvents(community *communities.Community, msg
 	}
 
 	// TODO: resend in case of failure?
-	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(msg.CommunityID), rawMessage)
+	_, err = m.sender.SendPublic(context.Background(), types3.EncodeHex(msg.CommunityID), rawMessage)
 	return err
 }
 
@@ -994,7 +994,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 	return chats, nil
 }
 
-func (m *Messenger) initCommunitySettings(communityID types.HexBytes) (*communities.CommunitySettings, error) {
+func (m *Messenger) initCommunitySettings(communityID types3.HexBytes) (*communities.CommunitySettings, error) {
 	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(communityID)
 	if err != nil {
 		return nil, err
@@ -1015,7 +1015,7 @@ func (m *Messenger) initCommunitySettings(communityID types.HexBytes) (*communit
 	return communitySettings, nil
 }
 
-func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
+func (m *Messenger) JoinCommunity(ctx context.Context, communityID types3.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	mr, err := m.joinCommunity(ctx, communityID, forceJoin)
 	if err != nil {
 		return nil, err
@@ -1031,7 +1031,7 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	return mr, nil
 }
 
-func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
+func (m *Messenger) joinCommunity(ctx context.Context, communityID types3.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	logger := m.logger.Named("joinCommunity")
 	response := &MessengerResponse{}
 	community, _ := m.communitiesManager.GetByID(communityID)
@@ -1080,7 +1080,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	// Was applicant not a member and successfully joined?
 	if !isCommunityMember && community.Joined() {
 		joinedNotification := &localnotifications.Notification{
-			ID:       gethcommon.Hash(types.BytesToHash([]byte(`you-joined-` + communityID.String()))),
+			ID:       gethcommon.Hash(types3.BytesToHash([]byte(`you-joined-` + communityID.String()))),
 			Title:    community.Name(),
 			Message:  community.Name(),
 			BodyType: localnotifications.CategoryCommunityJoined,
@@ -1114,7 +1114,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	return response, nil
 }
 
-func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) SpectateCommunity(communityID types3.HexBytes) (*MessengerResponse, error) {
 	logger := m.logger.Named("SpectateCommunity")
 
 	response := &MessengerResponse{}
@@ -1269,7 +1269,7 @@ func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCateg
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string, isEdit bool) ([]personal.SignParams, error) {
+func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types3.HexBytes, addressesToReveal []string, isEdit bool) ([]personal.SignParams, error) {
 	walletAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
@@ -1277,7 +1277,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 
 	containsAddress := func(addresses []string, targetAddress string) bool {
 		for _, address := range addresses {
-			if types.HexToAddress(address) == types.HexToAddress(targetAddress) {
+			if types3.HexToAddress(address) == types3.HexToAddress(targetAddress) {
 				return true
 			}
 		}
@@ -1299,7 +1299,7 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 			requestID = communities.CalculateRequestID(memberPubKey, communityID)
 		}
 		msgsToSign = append(msgsToSign, personal.SignParams{
-			Data:    types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestID)),
+			Data:    types3.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestID)),
 			Address: walletAccount.Address.Hex(),
 		})
 	}
@@ -1307,14 +1307,14 @@ func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, com
 	return msgsToSign, nil
 }
 
-func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
+func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types3.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	if len(communityID) == 0 {
 		return nil, errors.New(ErrMissingCommunityID)
 	}
 	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, false)
 }
 
-func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
+func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types3.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, true)
 }
 
@@ -1328,7 +1328,7 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 			return nil, err
 		}
 
-		account, err := m.settings.GetAccountByAddress(types.HexToAddress(param.Address))
+		account, err := m.settings.GetAccountByAddress(types3.HexToAddress(param.Address))
 		if err != nil {
 			return nil, err
 		}
@@ -1346,7 +1346,7 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 			return nil, errors.New(ErrSigningJoinRequestForKeycardAccounts)
 		}
 
-		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(param.Address), param.Password)
+		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(types3.HexToAddress(param.Address), param.Password)
 		if err != nil {
 			return nil, err
 		}
@@ -1356,7 +1356,7 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 			return nil, err
 		}
 
-		signatures[i] = types.EncodeHex(signature)
+		signatures[i] = types3.EncodeHex(signature)
 	}
 
 	return signatures, nil
@@ -1522,7 +1522,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 
 	// Activity center notification
 	notification := &ActivityCenterNotification{
-		ID:               types.FromHex(requestToJoin.ID.String()),
+		ID:               types3.FromHex(requestToJoin.ID.String()),
 		Type:             ActivityCenterNotificationTypeCommunityRequest,
 		Timestamp:        m.getTimesource().GetCurrentTime(),
 		CommunityID:      community.IDString(),
@@ -1539,7 +1539,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	for _, account := range requestToJoin.RevealedAccounts {
-		err := m.settings.AddressWasShown(types.HexToAddress(account.Address))
+		err := m.settings.AddressWasShown(types3.HexToAddress(account.Address))
 		if err != nil {
 			return nil, err
 		}
@@ -1589,7 +1589,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 	for i := range request.AddressesToReveal {
 		revealedAcc := &protobuf.RevealedAccount{
 			Address:          request.AddressesToReveal[i],
-			IsAirdropAddress: types.HexToAddress(request.AddressesToReveal[i]) == types.HexToAddress(request.AirdropAddress),
+			IsAirdropAddress: types3.HexToAddress(request.AddressesToReveal[i]) == types3.HexToAddress(request.AirdropAddress),
 			Signature:        request.Signatures[i],
 		}
 
@@ -1693,11 +1693,11 @@ func (m *Messenger) PublishTokenActionToPrivilegedMembers(communityID []byte, ch
 	return nil
 }
 
-func (m *Messenger) GetRevealedAccounts(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
+func (m *Messenger) GetRevealedAccounts(communityID types3.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
 	return m.communitiesManager.GetRevealedAddresses(communityID, memberPk)
 }
 
-func (m *Messenger) GetRevealedAccountsForAllMembers(communityID types.HexBytes) (map[string][]*protobuf.RevealedAccount, error) {
+func (m *Messenger) GetRevealedAccountsForAllMembers(communityID types3.HexBytes) (map[string][]*protobuf.RevealedAccount, error) {
 	community, err := m.communitiesManager.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -1899,7 +1899,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 
 	if notification != nil {
 		notification.IncrementUpdatedAt(m.getTimesource())
-		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), notification.UpdatedAt)
+		err = m.persistence.DeleteActivityCenterNotificationByID(types3.FromHex(requestToJoin.ID.String()), notification.UpdatedAt)
 		if err != nil {
 			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
 			return nil, err
@@ -1907,7 +1907,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 
 		// set notification as deleted, so that the client will remove the activity center notification from UI
 		notification.Deleted = true
-		err = m.syncActivityCenterDeletedByIDs(ctx, []types.HexBytes{notification.ID}, notification.UpdatedAt)
+		err = m.syncActivityCenterDeletedByIDs(ctx, []types3.HexBytes{notification.ID}, notification.UpdatedAt)
 		if err != nil {
 			m.logger.Error("CancelRequestToJoinCommunity, failed to sync activity center notification as deleted", zap.Error(err))
 			return nil, err
@@ -2142,7 +2142,7 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 	return m.declineRequestToJoinCommunity(requestToJoin)
 }
 
-func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) LeaveCommunity(communityID types3.HexBytes) (*MessengerResponse, error) {
 	ctx, span := m.tracer.Start(context.Background(), "Messenger.LeaveCommunity")
 	defer span.End()
 
@@ -2212,7 +2212,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	return mr, nil
 }
 
-func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) leaveCommunity(communityID types3.HexBytes) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.LeaveCommunity(communityID)
@@ -2249,7 +2249,7 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	return response, nil
 }
 
-func (m *Messenger) kickedOutOfCommunity(communityID types.HexBytes, spectateMode bool) (*MessengerResponse, error) {
+func (m *Messenger) kickedOutOfCommunity(communityID types3.HexBytes, spectateMode bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.KickedOutOfCommunity(communityID, spectateMode)
@@ -2309,7 +2309,7 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Cont
 			if notification != nil {
 				// Delete activity centre notification for community admin
 				if notification.Type == ActivityCenterNotificationTypeCommunityMembershipRequest {
-					response2, err := m.MarkActivityCenterNotificationsDeleted(ctx, []types.HexBytes{notification.ID}, m.GetCurrentTimeInMillis(), true)
+					response2, err := m.MarkActivityCenterNotificationsDeleted(ctx, []types3.HexBytes{notification.ID}, m.GetCurrentTimeInMillis(), true)
 					if err != nil {
 						m.logger.Error("[CheckAndDeletePendingRequestToJoinCommunity] failed to mark notification as deleted", zap.Error(err))
 						return nil, err
@@ -2346,7 +2346,7 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Cont
 	return nil, nil
 }
 
-func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {
+func (m *Messenger) CreateCommunityChat(communityID types3.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	c.Identity.FirstMessageTimestamp = FirstMessageTimestampNoMessage
@@ -2377,7 +2377,7 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	return &response, nil
 }
 
-func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string, c *protobuf.CommunityChat) (*MessengerResponse, error) {
+func (m *Messenger) EditCommunityChat(communityID types3.HexBytes, chatID string, c *protobuf.CommunityChat) (*MessengerResponse, error) {
 	var response MessengerResponse
 	community, changes, err := m.communitiesManager.EditChat(communityID, chatID, c)
 	if err != nil {
@@ -2396,7 +2396,7 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 	return &response, m.saveChats(chats)
 }
 
-func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID string) (*MessengerResponse, error) {
+func (m *Messenger) DeleteCommunityChat(communityID types3.HexBytes, chatID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
 	community, _, err := m.communitiesManager.DeleteChat(communityID, chatID)
@@ -2738,7 +2738,7 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 	return response, nil
 }
 
-func (m *Messenger) RemovePrivateKey(id types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) RemovePrivateKey(id types3.HexBytes) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.RemovePrivateKey(id)
 	if err != nil {
 		return nil, err
@@ -2750,7 +2750,7 @@ func (m *Messenger) RemovePrivateKey(id types.HexBytes) (*MessengerResponse, err
 	return response, nil
 }
 
-func (m *Messenger) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
+func (m *Messenger) ExportCommunity(id types3.HexBytes) (*ecdsa.PrivateKey, error) {
 	return m.communitiesManager.ExportCommunity(id)
 }
 
@@ -2805,7 +2805,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 	return response, nil
 }
 
-func (m *Messenger) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {
+func (m *Messenger) GetCommunityByID(communityID types3.HexBytes) (*communities.Community, error) {
 	return m.communitiesManager.GetByID(communityID)
 }
 
@@ -2873,31 +2873,31 @@ func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, err
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
-func (m *Messenger) LatestRequestToJoinForCommunity(communityID types.HexBytes) (*communities.RequestToJoin, error) {
+func (m *Messenger) LatestRequestToJoinForCommunity(communityID types3.HexBytes) (*communities.RequestToJoin, error) {
 	return m.communitiesManager.GetCommunityRequestToJoinWithRevealedAddresses(m.myHexIdentity(), communityID)
 }
 
-func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (m *Messenger) PendingRequestsToJoinForCommunity(id types3.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForCommunity(id)
 }
 
-func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types3.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.DeclinedRequestsToJoinForCommunity(id)
 }
 
-func (m *Messenger) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (m *Messenger) CanceledRequestsToJoinForCommunity(id types3.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.CanceledRequestsToJoinForCommunity(id)
 }
 
-func (m *Messenger) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (m *Messenger) AcceptedRequestsToJoinForCommunity(id types3.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.AcceptedRequestsToJoinForCommunity(id)
 }
 
-func (m *Messenger) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (m *Messenger) AcceptedPendingRequestsToJoinForCommunity(id types3.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.AcceptedPendingRequestsToJoinForCommunity(id)
 }
 
-func (m *Messenger) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (m *Messenger) DeclinedPendingRequestsToJoinForCommunity(id types3.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.DeclinedPendingRequestsToJoinForCommunity(id)
 }
 
@@ -2905,7 +2905,7 @@ func (m *Messenger) AllNonApprovedCommunitiesRequestsToJoin() ([]*communities.Re
 	return m.communitiesManager.AllNonApprovedCommunitiesRequestsToJoin()
 }
 
-func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {
+func (m *Messenger) RemoveUserFromCommunity(id types3.HexBytes, pkString string) (*MessengerResponse, error) {
 	publicKey, err := crypto.HexToPubkey(pkString)
 	if err != nil {
 		return nil, err
@@ -3068,7 +3068,7 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		for _, r := range communityResponse.FailedToDecrypt {
 			if state.CurrentMessageState != nil && state.CurrentMessageState.StatusMessage != nil {
 				err := m.messaging.SaveHashRatchetMessage(r.GroupID, r.KeyID, state.CurrentMessageState.StatusMessage.TransportLayer.Message)
-				m.logger.Info("saving failed to decrypt community description", zap.String("hash", types.Bytes2Hex(state.CurrentMessageState.StatusMessage.TransportLayer.Message.Hash)))
+				m.logger.Info("saving failed to decrypt community description", zap.String("hash", types3.Bytes2Hex(state.CurrentMessageState.StatusMessage.TransportLayer.Message.Hash)))
 				if err != nil {
 					m.logger.Warn("failed to save waku message")
 				}
@@ -3687,7 +3687,7 @@ func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	}()
 }
 
-func (m *Messenger) checkIfIMemberOfCommunity(communityID types.HexBytes) error {
+func (m *Messenger) checkIfIMemberOfCommunity(communityID types3.HexBytes) error {
 	community, err := m.communitiesManager.GetByID(communityID)
 	if err != nil {
 		m.logger.Error("couldn't get community to import archives", zap.Error(err))
@@ -3702,7 +3702,7 @@ func (m *Messenger) checkIfIMemberOfCommunity(communityID types.HexBytes) error 
 	return nil
 }
 
-func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) error {
+func (m *Messenger) resumeHistoryArchivesImport(communityID types3.HexBytes) error {
 	archiveIDsToImport, err := m.archiveManager.GetMessageArchiveIDsToImport(communityID)
 	if err != nil {
 		return err
@@ -3742,7 +3742,7 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 		if err != nil {
 			m.logger.Error("failed to import history archives", zap.Error(err))
 		}
-		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(communityID))
+		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types3.EncodeHex(communityID))
 	}()
 	return nil
 }
@@ -3755,7 +3755,7 @@ func (m *Messenger) SlowdownArchivesImport() {
 	m.importRateLimiter.SetLimit(rate.Every(importSlowRate))
 }
 
-func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}) error {
+func (m *Messenger) importHistoryArchives(communityID types3.HexBytes, cancel chan struct{}) error {
 	importTicker := time.NewTicker(100 * time.Millisecond)
 	defer importTicker.Stop()
 
@@ -3825,7 +3825,7 @@ importMessageArchivesLoop:
 				continue
 			}
 
-			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(communityID))
+			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types3.EncodeHex(communityID))
 
 			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
 				if err := m.importRateLimiter.Wait(ctx); err != nil {
@@ -4207,7 +4207,7 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
 }
 
-func (m *Messenger) getSharedAddresses(communityID types.HexBytes, requestAddresses []string) ([]gethcommon.Address, error) {
+func (m *Messenger) getSharedAddresses(communityID types3.HexBytes, requestAddresses []string) ([]gethcommon.Address, error) {
 	addressesMap := make(map[string]struct{})
 
 	for _, v := range requestAddresses {
@@ -4270,7 +4270,7 @@ func (m *Messenger) CheckAllCommunityChannelsPermissions(request *requests.Check
 	return m.communitiesManager.CheckAllChannelsPermissions(request.CommunityID, addresses)
 }
 
-func (m *Messenger) GetCommunityCheckChannelPermissionResponses(communityID types.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {
+func (m *Messenger) GetCommunityCheckChannelPermissionResponses(communityID types3.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {
 	return m.communitiesManager.GetCheckChannelPermissionResponses(communityID)
 }
 
@@ -4400,7 +4400,7 @@ func (m *Messenger) rekeyCommunities(logger *zap.Logger) {
 	}
 }
 
-func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
+func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types3.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	community, err := m.communitiesManager.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -4464,11 +4464,11 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 	messageState.Response.CommunityChanges = nil
 }
 
-func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) PromoteSelfToControlNode(communityID types3.HexBytes) (*MessengerResponse, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
 
 	community, err := m.FetchCommunity(&FetchCommunityRequest{
-		CommunityKey:    types.EncodeHex(communityID),
+		CommunityKey:    types3.EncodeHex(communityID),
 		TryDatabase:     true,
 		WaitForResponse: true,
 	})
@@ -4522,7 +4522,7 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 	}
 	// Activity center notification
 	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(uuid.New().String()),
+		ID:          types3.FromHex(uuid.New().String()),
 		Type:        acType,
 		Timestamp:   m.getTimesource().GetCurrentTime(),
 		CommunityID: communityID,
@@ -4574,7 +4574,7 @@ func (m *Messenger) SendMessageToControlNode(ctx context.Context, community *com
 func (m *Messenger) AddActivityCenterNotificationToResponse(communityID string, acType ActivityCenterType, response *MessengerResponse) {
 	// Activity Center notification
 	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(uuid.New().String()),
+		ID:          types3.FromHex(uuid.New().String()),
 		Type:        acType,
 		Timestamp:   m.getTimesource().GetCurrentTime(),
 		CommunityID: communityID,
@@ -4598,7 +4598,7 @@ func (m *Messenger) leaveCommunityDueToKickOrBan(changes *communities.CommunityC
 
 	// Activity Center notification
 	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(uuid.New().String()),
+		ID:          types3.FromHex(uuid.New().String()),
 		Type:        acType,
 		Timestamp:   m.getTimesource().GetCurrentTime(),
 		CommunityID: changes.Community.IDString(),
@@ -4725,18 +4725,18 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(ctx context.Context, sta
 func (m *Messenger) leaveCommunityOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
 	response, err := m.kickedOutOfCommunity(community.ID(), true)
 	if err != nil {
-		m.logger.Error("member soft kick error", zap.String("communityID", gocommon.TruncateWithDot(types.EncodeHex(community.ID()))), zap.Error(err))
+		m.logger.Error("member soft kick error", zap.String("communityID", gocommon.TruncateWithDot(types3.EncodeHex(community.ID()))), zap.Error(err))
 	}
 
 	if err := messengerResponse.Merge(response); err != nil {
-		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", gocommon.TruncateWithDot(types.EncodeHex(community.ID()))), zap.Error(err))
+		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", gocommon.TruncateWithDot(types3.EncodeHex(community.ID()))), zap.Error(err))
 	}
 }
 
 func (m *Messenger) shareRevealedAccountsOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
 	requestToJoin, err := m.sendSharedAddressToControlNode(community.ControlNode(), community)
 	if err != nil {
-		m.logger.Error("share address to control node failed", zap.String("id", gocommon.TruncateWithDot(types.EncodeHex(community.ID()))), zap.Error(err))
+		m.logger.Error("share address to control node failed", zap.String("id", gocommon.TruncateWithDot(types3.EncodeHex(community.ID()))), zap.Error(err))
 
 		if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
 			m.AddActivityCenterNotificationToResponse(community.IDString(), ActivityCenterNotificationTypeShareAccounts, messengerResponse)

@@ -12,7 +12,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	mc "github.com/status-im/status-go/internal/db/multiaccounts/common"

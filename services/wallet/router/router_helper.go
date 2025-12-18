@@ -14,11 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/contracts"
 	gaspriceproxy "github.com/status-im/status-go/internal/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/internal/contracts/hop"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"

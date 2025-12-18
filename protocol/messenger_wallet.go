@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"

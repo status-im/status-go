@@ -1,6 +1,8 @@
 package types
 
-import "github.com/status-im/status-go/crypto/types"
+import (
+	"github.com/status-im/status-go/internal/crypto/types"
+)
 
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)

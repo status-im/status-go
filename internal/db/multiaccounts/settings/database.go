@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	maErrors "github.com/status-im/status-go/internal/db/multiaccounts/errors"
 	"github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/nodecfg"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 )
 

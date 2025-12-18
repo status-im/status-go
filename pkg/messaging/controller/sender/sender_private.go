@@ -10,8 +10,8 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -84,7 +84,7 @@ func (s *Sender) SendPrivate(ctx context.Context, params types2.SendPrivateParam
 	}
 
 	logger.Debug("sent-message",
-		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
+		zap.Strings("hashes", types.EncodeHexes(hashes)),
 	)
 
 	s.stack.Transport.Track(messageID, hashes, wakuMessages)
@@ -112,12 +112,12 @@ func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*e
 	for i, spec := range keyExMessageSpecs {
 		logger := s.logger.Named("sendPrivateHashRatchetKeys").With(
 			zap.String("recipient", crypto.PubkeyToHex(recipients[i])),
-			zap.Stringer("groupID", cryptotypes.HexBytes(groupID)),
+			zap.Stringer("groupID", types.HexBytes(groupID)),
 		)
 
 		ctx, span := s.tracer.Start(ctx, "Sender.SendPrivateHashRatchetKeys",
 			oteltrace.WithAttributes(
-				otelattribute.String("groupID", cryptotypes.ToHex(groupID)),
+				otelattribute.String("groupID", types.ToHex(groupID)),
 				otelattribute.String("recipient", crypto.PubkeyToHex(recipients[i])),
 			),
 		)
@@ -138,7 +138,7 @@ func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*e
 		}
 
 		logger.Debug("sent-message",
-			zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
+			zap.Strings("hashes", types.EncodeHexes(hashes)),
 		)
 	}
 

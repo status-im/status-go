@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"time"
 
-	accscommon "github.com/status-im/status-go/accounts-management/common"
-	"github.com/status-im/status-go/crypto/types"
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
