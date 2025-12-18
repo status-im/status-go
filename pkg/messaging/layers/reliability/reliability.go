@@ -96,6 +96,13 @@ func (r *Reliability) Stop() {
 		r.datasync.Stop()
 	}
 	r.datasync = nil
+	if r.sdsManager != nil {
+		err := r.sdsManager.Cleanup()
+		if err != nil {
+			r.logger.Error("failed to cleanup sds reliability manager", zap.Error(err))
+		}
+		r.sdsManager = nil
+	}
 }
 
 func (r *Reliability) Started() bool {
