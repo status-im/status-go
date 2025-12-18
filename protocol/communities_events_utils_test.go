@@ -1407,10 +1407,7 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 }
 
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	_, err := user.Start()
-
 	s := base.GetSuite()
-	s.Require().NoError(err)
 	defer TearDownMessenger(s.T(), user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
@@ -1419,7 +1416,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	requestID := testSendRequestToJoin(base, user, community.ID())
 
 	// event sender receives request to join
-	_, err = WaitOnMessengerResponse(
+	_, err := WaitOnMessengerResponse(
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
 			return checkRequestToJoinInResponse(r, user, communities.RequestToJoinStatePending, 0)

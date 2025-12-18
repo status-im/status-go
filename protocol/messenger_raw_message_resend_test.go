@@ -40,9 +40,6 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 		mockedBalances:  &s.mockedBalances,
 	})
 
-	_, err := s.aliceMessenger.Start()
-	s.Require().NoError(err)
-
 	s.bobMessenger = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name: "bob",
@@ -51,9 +48,6 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 		password:        bobPassword,
 		mockedBalances:  &s.mockedBalances,
 	})
-
-	_, err = s.bobMessenger.Start()
-	s.Require().NoError(err)
 
 	community, _ := createOnRequestCommunity(&s.Suite, s.aliceMessenger)
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.aliceMessenger, s.bobMessenger)

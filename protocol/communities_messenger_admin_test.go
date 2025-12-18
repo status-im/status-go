@@ -65,12 +65,6 @@ func (s *EventSenderCommunityEventsSuiteBase) SetupTest() {
 	s.owner = s.newMessenger("", []string{})
 	s.eventSender = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.eventSender.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
 }
 
 func (s *EventSenderCommunityEventsSuiteBase) newMessenger(password string, walletAddresses []string) *Messenger {
@@ -103,8 +97,6 @@ func (s *EventSenderCommunityEventsSuiteBase) TearDownTest() {
 func (s *EventSenderCommunityEventsSuiteBase) SetupAdditionalMessengers(messengers []*Messenger) {
 	for _, m := range messengers {
 		s.additionalEventSenders = append(s.additionalEventSenders, m)
-		_, err := m.Start()
-		s.Require().NoError(err)
 	}
 }
 

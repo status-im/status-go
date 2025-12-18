@@ -48,17 +48,8 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) SetupTest() {
 	s.resetMockedBalances()
 
 	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{})
-
 	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
-
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
-
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TearDownTest() {

@@ -63,13 +63,6 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
 
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
-
 	s.setMessengerDisplayName(s.owner, "Charlie")
 	s.setMessengerDisplayName(s.bob, "Bobby")
 	s.setMessengerDisplayName(s.alice, "Alice")
@@ -2411,9 +2404,6 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 	err = m2.SetInstallationMetadata(m2.installationID, metadata)
 	s.Require().NoError(err)
 
-	_, err = m2.Start()
-	s.Require().NoError(err)
-
 	return m2
 }
 
@@ -3574,9 +3564,6 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 func (s *MessengerCommunitiesSuite) TestCommunityMaxNumberOfMembers() {
 	john := s.newMessenger("johnPassword", []string{"0x0765400000000000000000000000000000000000"})
-	_, err := john.Start()
-	s.Require().NoError(err)
-
 	defer TearDownMessenger(s.T(), john)
 
 	// Bring back the original values
