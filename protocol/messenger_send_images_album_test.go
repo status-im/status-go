@@ -31,7 +31,7 @@ func (s *MessengerSendImagesAlbumSuite) SetupTest() {
 }
 
 func (s *MessengerSendImagesAlbumSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.m)
+	TearDownMessenger(s.T(), s.m)
 	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
@@ -47,7 +47,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err = theirMessenger.SaveChat(theirChat)
@@ -108,7 +108,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() 
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err = theirMessenger.SaveChat(theirChat)
@@ -161,7 +161,7 @@ func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommu
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	community, chat := createCommunity(&s.Suite, s.m)
 
@@ -212,7 +212,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err = theirMessenger.SaveChat(theirChat)
@@ -296,7 +296,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommu
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	community, chat := createCommunity(&s.Suite, s.m)
 

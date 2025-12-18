@@ -448,7 +448,7 @@ func (s *MessengerSuite) TestRetrieveOwnPublic() {
 // Retrieve their public message
 func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -490,7 +490,7 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 // Drop audio message in public group
 func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -515,7 +515,7 @@ func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
 
 func (s *MessengerSuite) TestDeletedAtClockValue() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -545,7 +545,7 @@ func (s *MessengerSuite) TestDeletedAtClockValue() {
 
 func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -623,7 +623,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 // Resend their public message, receive only once
 func (s *MessengerSuite) TestResendPublicMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -677,7 +677,7 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 // Test receiving a message on an existing private chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
@@ -718,7 +718,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 // Test receiving a message on an non-existing private chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(chat)
 	s.NoError(err)
@@ -755,7 +755,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 // Test receiving a message on an non-existing public chat
 func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := theirMessenger.SaveChat(chat)
 	s.NoError(err)
@@ -779,7 +779,7 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -846,7 +846,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 func (s *MessengerSuite) TestChangeNameGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -901,7 +901,7 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -1781,7 +1781,7 @@ func (t *testTimeSource) GetCurrentTime() uint64 {
 func (s *MessengerSuite) TestSendMessageMention() {
 	// Initialize Alice and Bob's messengers
 	alice, bob := s.m, s.newMessenger()
-	defer TearDownMessenger(&s.Suite, bob)
+	defer TearDownMessenger(s.T(), bob)
 
 	// Set display names for Bob and Alice
 	s.Require().NoError(bob.settings.SaveSettingField(settings.DisplayName, "bobby"))

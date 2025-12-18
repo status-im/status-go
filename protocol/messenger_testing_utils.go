@@ -227,7 +227,7 @@ func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, ctx context.Context
 	s.Require().True(available)
 }
 
-func TearDownMessenger(s *suite.Suite, m *Messenger) {
+func TearDownMessenger(t *testing.T, m *Messenger) {
 	if m == nil {
 		return
 	}

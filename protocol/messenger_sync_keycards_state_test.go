@@ -96,7 +96,7 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 }
 
 func (s *MessengerSyncKeycardsStateSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.other)
+	TearDownMessenger(s.T(), s.other)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

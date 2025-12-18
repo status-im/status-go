@@ -118,8 +118,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatCreation() {
 
 	for i, testCase := range testCases {
 		creator, member := s.newMessenger(), s.newMessenger()
-		defer TearDownMessenger(&s.Suite, creator)
-		defer TearDownMessenger(&s.Suite, member)
+		defer TearDownMessenger(s.T(), creator)
+		defer TearDownMessenger(s.T(), member)
 
 		members := []string{crypto.PubkeyToHex(&member.identity.PublicKey)}
 
@@ -180,9 +180,9 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 
 	for i, testCase := range testCases {
 		admin, inviter, member := s.newMessenger(), s.newMessenger(), s.newMessenger()
-		defer TearDownMessenger(&s.Suite, admin)
-		defer TearDownMessenger(&s.Suite, inviter)
-		defer TearDownMessenger(&s.Suite, member)
+		defer TearDownMessenger(s.T(), admin)
+		defer TearDownMessenger(s.T(), inviter)
+		defer TearDownMessenger(s.T(), member)
 
 		members := []string{crypto.PubkeyToHex(&member.identity.PublicKey)}
 
@@ -217,10 +217,10 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	admin, memberA, memberB, memberC := s.newMessenger(), s.newMessenger(), s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(&s.Suite, admin)
-	defer TearDownMessenger(&s.Suite, memberA)
-	defer TearDownMessenger(&s.Suite, memberB)
-	defer TearDownMessenger(&s.Suite, memberC)
+	defer TearDownMessenger(s.T(), admin)
+	defer TearDownMessenger(s.T(), memberA)
+	defer TearDownMessenger(s.T(), memberB)
+	defer TearDownMessenger(s.T(), memberC)
 
 	members := []string{crypto.PubkeyToHex(&memberA.identity.PublicKey), crypto.PubkeyToHex(&memberB.identity.PublicKey),
 		crypto.PubkeyToHex(&memberC.identity.PublicKey)}
@@ -257,8 +257,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 	admin, member := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(&s.Suite, admin)
-	defer TearDownMessenger(&s.Suite, member)
+	defer TearDownMessenger(s.T(), admin)
+	defer TearDownMessenger(s.T(), member)
 
 	s.makeMutualContacts(admin, member)
 
@@ -327,8 +327,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
 	admin, member := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(&s.Suite, admin)
-	defer TearDownMessenger(&s.Suite, member)
+	defer TearDownMessenger(s.T(), admin)
+	defer TearDownMessenger(s.T(), member)
 
 	s.makeMutualContacts(admin, member)
 
@@ -365,8 +365,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 	admin, member := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(&s.Suite, admin)
-	defer TearDownMessenger(&s.Suite, member)
+	defer TearDownMessenger(s.T(), admin)
+	defer TearDownMessenger(s.T(), member)
 
 	s.makeMutualContacts(admin, member)
 
@@ -411,8 +411,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 	admin, memberA := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(&s.Suite, admin)
-	defer TearDownMessenger(&s.Suite, memberA)
+	defer TearDownMessenger(s.T(), admin)
+	defer TearDownMessenger(s.T(), memberA)
 
 	members := []string{crypto.PubkeyToHex(&memberA.identity.PublicKey)}
 
@@ -455,9 +455,9 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
 	admin, memberA, memberB := s.newMessenger(), s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(&s.Suite, admin)
-	defer TearDownMessenger(&s.Suite, memberA)
-	defer TearDownMessenger(&s.Suite, memberB)
+	defer TearDownMessenger(s.T(), admin)
+	defer TearDownMessenger(s.T(), memberA)
+	defer TearDownMessenger(s.T(), memberB)
 
 	memberB.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
 	s.Require().NoError(admin.settings.SaveSettingField(settings.DisplayName, "admin"))

@@ -61,8 +61,8 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 }
 
 func (s *MessengerRawMessageResendTest) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.aliceMessenger)
-	TearDownMessenger(&s.Suite, s.bobMessenger)
+	TearDownMessenger(s.T(), s.aliceMessenger)
+	TearDownMessenger(s.T(), s.bobMessenger)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

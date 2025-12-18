@@ -39,9 +39,9 @@ func (s *MessengerDeleteMessagesSuite) SetupTest() {
 }
 
 func (s *MessengerDeleteMessagesSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.owner)
-	TearDownMessenger(&s.Suite, s.bob)
-	TearDownMessenger(&s.Suite, s.admin)
+	TearDownMessenger(s.T(), s.owner)
+	TearDownMessenger(s.T(), s.bob)
+	TearDownMessenger(s.T(), s.admin)
 	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 

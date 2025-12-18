@@ -27,7 +27,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	// Set ENS name
 	err := theirMessenger.settings.SaveSettingField(settings.PreferredName, theirName)
@@ -93,7 +93,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirMessenger.account.CustomizationColor = multiaccountscommon.CustomizationColorSky
 	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID, CustomizationColor: string(multiaccountscommon.CustomizationColorRed)})
@@ -128,7 +128,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	ensName := "blah.stateofus.eth"
 
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	s.Require().NoError(theirMessenger.ENSVerified(contactID, ensName))
 

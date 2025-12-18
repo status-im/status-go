@@ -73,7 +73,7 @@ func (tmc *testMessengerConfig) complete() error {
 	return nil
 }
 
-func newTestMessenger(messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete()
 	if err != nil {
 		return nil, err
@@ -201,21 +201,15 @@ func newTestMessenger(messagingEnv *messaging2.TestMessagingEnvironment, config 
 	return m, nil
 }
 
-func newRunningTestMessenger(messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
-	m, err := newTestMessenger(messagingEnv, config)
-	if err != nil {
-		return nil, err
-	}
+func newRunningTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+	m, err := newTestMessenger(t, messagingEnv, config)
+	require.NoError(t, err)
 
 	err = m.messaging.Start()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
 
 	_, err = m.Start()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
 
 	return m, nil
 }

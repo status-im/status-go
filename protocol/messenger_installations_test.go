@@ -36,7 +36,7 @@ type MessengerInstallationSuite struct {
 
 func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	theirMessenger := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
@@ -215,7 +215,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	// Create Alice for the 1-1 chat
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 
 	// Create 1-1 chat
 	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.getTimesource())
@@ -232,7 +232,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	// pair
 	theirMessenger := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 	err = theirMessenger.SaveChat(chat2)
 	s.Require().NoError(err)
 
@@ -353,9 +353,9 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	bob1 := s.m
 	bob2 := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, bob2)
+	defer TearDownMessenger(s.T(), bob2)
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 
 	err := bob2.SetInstallationMetadata(bob2.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
@@ -402,7 +402,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 
 func (s *MessengerInstallationSuite) TestInitInstallations() {
 	m := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, m)
+	defer TearDownMessenger(s.T(), m)
 
 	// m.InitInstallations is already called when we set-up the messenger for
 	// testing, thus this test has no act phase.

@@ -47,7 +47,7 @@ func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.bob)
+	TearDownMessenger(s.T(), s.bob)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 
@@ -266,9 +266,9 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	bob := s.newMessenger()
 
 	defer func() {
-		TearDownMessenger(&s.Suite, alice)
+		TearDownMessenger(s.T(), alice)
 		alice = nil
-		TearDownMessenger(&s.Suite, bob)
+		TearDownMessenger(s.T(), bob)
 		bob = nil
 	}()
 

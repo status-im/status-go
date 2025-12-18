@@ -88,7 +88,7 @@ func (s *MessengerMessagesTrackingSuite) SetupTest() {
 }
 
 func (s *MessengerMessagesTrackingSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.bob)
+	TearDownMessenger(s.T(), s.bob)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 
@@ -99,7 +99,7 @@ func (s *MessengerMessagesTrackingSuite) newMessenger() (*Messenger, *EnvelopeEv
 		MailServerConfirmations:    false,
 	}
 
-	messenger, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
+	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
 	s.Require().NoError(err)
 
 	interceptor := &EnvelopeEventsInterceptorMock{

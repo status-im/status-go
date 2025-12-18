@@ -88,12 +88,12 @@ func (s *EventSenderCommunityEventsSuiteBase) newMessenger(password string, wall
 }
 
 func (s *EventSenderCommunityEventsSuiteBase) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.owner)
-	TearDownMessenger(&s.Suite, s.eventSender)
-	TearDownMessenger(&s.Suite, s.alice)
+	TearDownMessenger(s.T(), s.owner)
+	TearDownMessenger(s.T(), s.eventSender)
+	TearDownMessenger(s.T(), s.alice)
 
 	for _, m := range s.additionalEventSenders {
-		TearDownMessenger(&s.Suite, m)
+		TearDownMessenger(s.T(), m)
 	}
 	s.additionalEventSenders = nil
 

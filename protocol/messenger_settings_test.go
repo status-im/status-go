@@ -28,7 +28,7 @@ func (s *MessengerSettingsSuite) SetupTest() {
 }
 
 func (s *MessengerSettingsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.m2)
+	TearDownMessenger(s.T(), s.m2)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

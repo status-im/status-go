@@ -76,9 +76,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 }
 
 func (s *MessengerCommunitiesSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.owner)
-	TearDownMessenger(&s.Suite, s.bob)
-	TearDownMessenger(&s.Suite, s.alice)
+	TearDownMessenger(s.T(), s.owner)
+	TearDownMessenger(s.T(), s.bob)
+	TearDownMessenger(s.T(), s.alice)
 	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
@@ -2420,7 +2420,7 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+	defer TearDownMessenger(s.T(), alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2474,7 +2474,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+	defer TearDownMessenger(s.T(), alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2565,7 +2565,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+	defer TearDownMessenger(s.T(), alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2646,7 +2646,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 	// Create new device
 	ownersOtherDevice := s.createOtherDevice(s.owner)
-	defer TearDownMessenger(&s.Suite, ownersOtherDevice)
+	defer TearDownMessenger(s.T(), ownersOtherDevice)
 
 	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
 
@@ -2729,7 +2729,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+	defer TearDownMessenger(s.T(), alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -2930,7 +2930,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 	s.advertiseCommunityTo(community, s.owner, s.alice)
 
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+	defer TearDownMessenger(s.T(), alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2957,7 +2957,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+	defer TearDownMessenger(s.T(), alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -3069,7 +3069,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
 
 	// New device is created & paired
 	ownersOtherDevice := s.createOtherDevice(s.owner)
-	defer TearDownMessenger(&s.Suite, ownersOtherDevice)
+	defer TearDownMessenger(s.T(), ownersOtherDevice)
 
 	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
 	PairDevices(&s.Suite, s.owner, ownersOtherDevice)
@@ -3127,7 +3127,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_OutdatedDescription() {
 
 	// Create another device
 	aliceOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, aliceOtherDevice)
+	defer TearDownMessenger(s.T(), aliceOtherDevice)
 
 	// Make other device receive community
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, aliceOtherDevice)
@@ -3167,7 +3167,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_LeftCommunity() {
 
 	// Create another device
 	aliceOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, aliceOtherDevice)
+	defer TearDownMessenger(s.T(), aliceOtherDevice)
 
 	// Create sync message
 	syncCommunityMsg, err := s.alice.buildSyncInstallationCommunity(response.Communities()[0], 1)
@@ -3577,7 +3577,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityMaxNumberOfMembers() {
 	_, err := john.Start()
 	s.Require().NoError(err)
 
-	defer TearDownMessenger(&s.Suite, john)
+	defer TearDownMessenger(s.T(), john)
 
 	// Bring back the original values
 	defer communities.SetMaxNbMembers(5000)

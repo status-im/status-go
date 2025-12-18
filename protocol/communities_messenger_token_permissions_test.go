@@ -175,9 +175,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.owner)
-	TearDownMessenger(&s.Suite, s.bob)
-	TearDownMessenger(&s.Suite, s.alice)
+	TearDownMessenger(s.T(), s.owner)
+	TearDownMessenger(s.T(), s.bob)
+	TearDownMessenger(s.T(), s.alice)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

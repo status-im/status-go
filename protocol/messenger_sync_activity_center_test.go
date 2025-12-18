@@ -48,8 +48,8 @@ func (s *MessengerSyncActivityCenterSuite) SetupTest() {
 }
 
 func (s *MessengerSyncActivityCenterSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.m2)
-	TearDownMessenger(&s.Suite, s.m)
+	TearDownMessenger(s.T(), s.m2)
+	TearDownMessenger(s.T(), s.m)
 	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 

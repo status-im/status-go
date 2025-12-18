@@ -82,7 +82,7 @@ func (s *MessengerPushNotificationSuite) SetupTest() {
 }
 
 func (s *MessengerPushNotificationSuite) newMessenger() *Messenger {
-	messenger, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithPushNotifications()}})
+	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
 	return messenger
 }
@@ -100,7 +100,7 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer() (*Messenger
 
 	server := pushnotificationserver.New(serverConfig)
 
-	messenger, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: privateKey, extraOptions: []Option{WithPushNotificationServer(server)}})
+	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{privateKey: privateKey, extraOptions: []Option{WithPushNotificationServer(server)}})
 	s.Require().NoError(err)
 
 	serverPersistence := pushnotificationserver.NewSQLitePersistence(messenger.database)
@@ -112,15 +112,15 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer() (*Messenger
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bob1 := s.m
-	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
+	bob2, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, bob2)
+	defer TearDownMessenger(s.T(), bob2)
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
@@ -295,10 +295,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	bob := s.m
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -432,13 +432,13 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	bob := s.m
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 	// another contact to invalidate the token
 	frank := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, frank)
+	defer TearDownMessenger(s.T(), frank)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
@@ -654,10 +654,10 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	bob1 := s.m
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
@@ -711,10 +711,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	bob := s.m
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
@@ -848,10 +848,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	bob := s.m
 
 	messenger, server := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
@@ -975,15 +975,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevices() {
 
 	bob1 := s.m
-	bob2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
+	bob2, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, bob2)
+	defer TearDownMessenger(s.T(), bob2)
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
@@ -1159,10 +1159,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 	bob := s.m
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(&s.Suite, messenger)
+	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
+	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}

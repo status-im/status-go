@@ -328,7 +328,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 
 	config.extraOptions = append(config.extraOptions, options...)
 
-	messenger, err := newTestMessenger(messagingEnv, config.testMessengerConfig)
+	messenger, err := newTestMessenger(s.T(), messagingEnv, config.testMessengerConfig)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)

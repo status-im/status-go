@@ -28,7 +28,7 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 
 	// pair
 	theirMessenger := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",

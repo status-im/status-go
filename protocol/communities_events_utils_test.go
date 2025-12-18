@@ -1411,7 +1411,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
+	defer TearDownMessenger(s.T(), user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 

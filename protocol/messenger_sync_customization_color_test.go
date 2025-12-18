@@ -30,7 +30,7 @@ func (s *MessengerSyncAccountCustomizationColorSuite) SetupTest() {
 }
 
 func (s *MessengerSyncAccountCustomizationColorSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice2)
+	TearDownMessenger(s.T(), s.alice2)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

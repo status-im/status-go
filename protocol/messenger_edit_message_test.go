@@ -24,7 +24,7 @@ type MessengerEditMessageSuite struct {
 
 func (s *MessengerEditMessageSuite) TestEditMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -93,7 +93,7 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 
 func (s *MessengerEditMessageSuite) TestEditImageMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -175,7 +175,7 @@ func (s *MessengerEditMessageSuite) TestEditImageMessage() {
 
 func (s *MessengerEditMessageSuite) TestEditBridgeMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -248,7 +248,7 @@ func (s *MessengerEditMessageSuite) TestEditBridgeMessage() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -349,7 +349,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -406,7 +406,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 // Test editing a message on an existing private group chat
 func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
 	s.NoError(err)
@@ -489,7 +489,7 @@ func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -594,7 +594,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 
 func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
+	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)

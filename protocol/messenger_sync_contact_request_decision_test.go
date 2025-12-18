@@ -38,7 +38,7 @@ func (s *MessengerSyncContactRequestDecisionSuite) TearDownTest() {
 
 func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest() {
 	userB := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, userB)
+	defer TearDownMessenger(s.T(), userB)
 
 	numM1DispatchedAcceptContactRequest := 0
 	numM2DispatchedAcceptContactRequest := 0

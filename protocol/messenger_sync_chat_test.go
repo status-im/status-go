@@ -32,7 +32,7 @@ func (s *MessengerSyncChatSuite) SetupTest() {
 }
 
 func (s *MessengerSyncChatSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice2)
+	TearDownMessenger(s.T(), s.alice2)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 
@@ -119,7 +119,7 @@ func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
 	s.Require().NoError(err)
 
 	otherMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, otherMessenger)
+	defer TearDownMessenger(s.T(), otherMessenger)
 
 	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
