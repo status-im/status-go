@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -72,22 +73,30 @@ func main() {
 func downloadTokens(client *http.Client, key string, source defaulttokenlists.TokensSource) {
 	response, err := client.Get(source.SourceURL)
 	if err != nil {
-		fmt.Printf("Failed to fetch tokens: %v\n", err)
+		fmt.Printf("[%s] failed to fetch tokens: %v\n", key, err)
 		return
 	}
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		fmt.Printf("Failed to read tokens: %v\n", err)
+		fmt.Printf("[%s] failed to read tokens: %v\n", key, err)
 		return
 	}
 
-	if source.Schema != "" {
+	// check if body is valid json
+	var jsonData map[string]interface{}
+	err = json.Unmarshal(body, &jsonData)
+	if err != nil {
+		fmt.Printf("ERR: [%s] failed to unmarshal body: %v\n", key, err)
+		body = []byte{}
+	}
+
+	if source.Schema != "" && len(body) > 0 {
 		_, err = validateDocument(string(body), source.Schema)
 		if err != nil {
-			fmt.Printf("Failed to validate token list against schema: %v\n", err)
-			return
+			fmt.Printf("ERR: [%s] failed to validate token list against schema: %v\n", key, err)
+			body = []byte{}
 		}
 	}
 
@@ -111,7 +120,7 @@ func downloadTokens(client *http.Client, key string, source defaulttokenlists.To
 	// Create the output Go file
 	file, err := os.Create(source.OutputFile)
 	if err != nil {
-		fmt.Printf("Failed to create go file: %v\n", err)
+		fmt.Printf("ERR: [%s] failed to create go file: %v\n", key, err)
 		return
 	}
 	defer file.Close()
@@ -119,7 +128,13 @@ func downloadTokens(client *http.Client, key string, source defaulttokenlists.To
 	// Execute the template with the tokens data and write the result to the file
 	err = tmpl.Execute(file, data)
 	if err != nil {
-		fmt.Printf("Failed to write file: %v\n", err)
+		fmt.Printf("ERR: [%s] failed to write file: %v\n", key, err)
 		return
+	}
+
+	if len(body) > 0 {
+		fmt.Printf("INFO: [%s] downloaded tokens successfully\n", key)
+	} else {
+		fmt.Printf("WARN: [%s] stored with empty token list\n", key)
 	}
 }

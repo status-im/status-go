@@ -132,24 +132,15 @@ func (s SendType) IsAvailableFor(chainID uint64) bool {
 			walletCommon.ArbitrumMainnet: true,
 			walletCommon.BaseMainnet:     true,
 			walletCommon.BSCMainnet:      true,
+			walletCommon.LineaMainnet:    true,
 		}
 		_, ok := swapAllowedNetworks[chainID]
 		return ok
 	}
 
+	// Return true for Bridge as a real check is performed when AvailableFor for path processor is called
 	if s == Bridge {
-		bridgeAllowedNetworks := map[uint64]bool{
-			walletCommon.EthereumMainnet: true,
-			walletCommon.EthereumSepolia: true,
-			walletCommon.OptimismMainnet: true,
-			walletCommon.OptimismSepolia: true,
-			walletCommon.ArbitrumMainnet: true,
-			walletCommon.ArbitrumSepolia: true,
-			walletCommon.BaseMainnet:     true,
-			walletCommon.BaseSepolia:     true,
-		}
-		_, ok := bridgeAllowedNetworks[chainID]
-		return ok
+		return true
 	}
 
 	if s.IsEnsTransfer() || s.IsStickersTransfer() {
