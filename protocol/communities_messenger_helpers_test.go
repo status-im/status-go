@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
