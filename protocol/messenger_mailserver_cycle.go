@@ -113,6 +113,7 @@ func (m *Messenger) Storenodes() ([]peer.AddrInfo, error) {
 
 func (m *Messenger) checkForStorenodeCycleSignals() {
 	defer gocommon.LogOnPanic()
+	defer m.shutdownWaitGroup.Done()
 
 	changed := m.messaging.OnStorenodeChanged()
 	notWorking := m.messaging.OnStorenodeNotWorking()
@@ -136,6 +137,8 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 
 	for {
 		select {
+		case <-m.quit:
+			return
 		case <-m.ctx.Done():
 			return
 		case <-notWorking:

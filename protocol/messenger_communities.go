@@ -224,8 +224,10 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case sub, more := <-c:
@@ -380,8 +382,10 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		recentlyPublishedOrgs[community.IDString()] = community.CreateDeepCopy()
 	}
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case sub, more := <-c:
@@ -503,8 +507,10 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	// We check every 5 minutes if we need to update
 	ticker := time.NewTicker(5 * time.Minute)
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -822,8 +828,10 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 
 	ticker := time.NewTicker(grantUpdateInterval)
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -4334,8 +4342,12 @@ func (m *Messenger) startCommunityRekeyLoop() {
 	}
 
 	ticker := time.NewTicker(d)
+	defer ticker.Stop()
+
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -4785,8 +4797,10 @@ func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Commun
 func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-time.After(5 * time.Minute):

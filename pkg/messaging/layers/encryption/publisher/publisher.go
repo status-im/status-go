@@ -3,6 +3,7 @@ package publisher
 import (
 	"crypto/ecdsa"
 	"errors"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -30,6 +31,7 @@ type Publisher struct {
 	logger      *zap.Logger
 	notifyCh    chan struct{}
 	quit        chan struct{}
+	quitWg      sync.WaitGroup
 }
 
 func New(logger *zap.Logger) *Publisher {
@@ -51,7 +53,12 @@ func (p *Publisher) Start() <-chan struct{} {
 	p.notifyCh = make(chan struct{}, 100)
 	p.quit = make(chan struct{})
 
-	go p.tickerLoop()
+	p.quitWg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		p.quitWg.Done()
+		p.tickerLoop()
+	}()
 
 	return p.notifyCh
 }
@@ -70,34 +77,30 @@ func (p *Publisher) Stop() {
 	default:
 		close(p.quit)
 	}
+	p.quitWg.Wait()
 }
 
 func (p *Publisher) tickerLoop() {
-	defer gocommon.LogOnPanic()
 	ticker := time.NewTicker(tickerInterval * time.Second)
+	logger := p.logger.With(zap.String("site", "tickerLoop"))
 
-	go func() {
-		defer gocommon.LogOnPanic()
-		logger := p.logger.With(zap.String("site", "tickerLoop"))
-
-		for {
-			select {
-			case <-ticker.C:
-				err := p.notify()
-				switch err {
-				case errNotEnoughTimePassed:
-					logger.Debug("not enough time passed")
-				case nil:
-					// skip
-				default:
-					logger.Error("error while sending a contact code", zap.Error(err))
-				}
-			case <-p.quit:
-				ticker.Stop()
-				return
+	for {
+		select {
+		case <-ticker.C:
+			err := p.notify()
+			switch err {
+			case errNotEnoughTimePassed:
+				logger.Debug("not enough time passed")
+			case nil:
+				// skip
+			default:
+				logger.Error("error while sending a contact code", zap.Error(err))
 			}
+		case <-p.quit:
+			ticker.Stop()
+			return
 		}
-	}()
+	}
 }
 
 func (p *Publisher) notify() error {
