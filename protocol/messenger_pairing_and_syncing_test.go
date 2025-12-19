@@ -82,7 +82,6 @@ func (m *stubEnableInstallationAndPair) Validate() error {
 func (s *MessengerPairingSuite) TestNewInstallationReceivedIsNotCreated() {
 	alice1 := s.m
 	alice2 := s.anotherMessenger()
-	defer TearDownMessenger(s.T(), alice2)
 
 	mockRequest := &stubEnableInstallationAndPair{installationID: alice1.installationID}
 	_, err := alice2.EnableInstallationAndPair(mockRequest)
@@ -113,8 +112,6 @@ func (s *MessengerPairingSuite) TestNewInstallationCreatedIsNotDeleted() {
 	alice1 := s.m
 	alice2 := s.anotherMessenger()
 	alice3 := s.anotherMessenger()
-	defer TearDownMessenger(s.T(), alice2)
-	defer TearDownMessenger(s.T(), alice3)
 
 	// prepare AC NewInstallationCreated for alice2
 	_, err := alice2.EnableInstallationAndPair(&requests.EnableInstallationAndPair{InstallationID: alice1.installationID})
@@ -179,7 +176,6 @@ func (s *MessengerPairingSuite) expectInstallationReceived(m *Messenger, install
 func (s *MessengerPairingSuite) TestMessengerSyncFallback() {
 	alice1 := s.m
 	alice2 := s.anotherMessenger()
-	defer TearDownMessenger(s.T(), alice2)
 
 	alice1ProfileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
 	s.Require().NoError(err)

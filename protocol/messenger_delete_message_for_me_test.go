@@ -27,11 +27,6 @@ func (s *MessengerDeleteMessageForMeSuite) SetupTest() {
 	s.m2 = s.anotherMessenger()
 }
 
-func (s *MessengerDeleteMessageForMeSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.m2)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerDeleteMessageForMeSuite) Pair() {
 	err := s.m2.SetInstallationMetadata(s.m2.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "alice2",
@@ -72,7 +67,6 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().NoError(err)
 
 	otherMessenger := s.newMessenger()
-	defer TearDownMessenger(s.T(), otherMessenger)
 
 	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
@@ -168,12 +162,8 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 }
 
 func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSide() {
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
-
 	bob := s.newMessenger()
-	defer TearDownMessenger(s.T(), bob)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.getTimesource())
 	err := alice.SaveChat(theirChat)

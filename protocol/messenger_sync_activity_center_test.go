@@ -39,12 +39,6 @@ func (s *MessengerSyncActivityCenterSuite) SetupTest() {
 	PairDevices(&s.Suite, s.m, s.m2)
 }
 
-func (s *MessengerSyncActivityCenterSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.m2)
-	TearDownMessenger(s.T(), s.m)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
-}
-
 func (s *MessengerSyncActivityCenterSuite) createAndSaveNotification(m *Messenger, t ActivityCenterType, read bool) types.HexBytes {
 	now := uint64(time.Now().Unix())
 	id := types.HexBytes{0x01}

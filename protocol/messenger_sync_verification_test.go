@@ -36,7 +36,6 @@ func (s *MessengerSyncVerificationRequests) TestSyncVerificationRequests() {
 
 	// pair
 	theirMessenger := s.anotherMessenger()
-	defer TearDownMessenger(s.T(), theirMessenger)
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
@@ -98,8 +97,6 @@ func (s *MessengerSyncVerificationRequests) TestSyncTrust() {
 
 	// pair
 	theirMessenger := s.anotherMessenger()
-	defer TearDownMessenger(s.T(), theirMessenger)
-
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",

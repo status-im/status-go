@@ -54,11 +54,6 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 	s.Require().NoError(err)
 }
 
-func (s *MessengerSyncSavedAddressesSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.other)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 // Helpers duplicate of wallet test. Could not import it from saved_addresses_test.go
 
 func contains[T comparable](container []T, element T, isEqual func(T, T) bool) bool {

@@ -28,11 +28,6 @@ func (s *MessengerSendImagesAlbumSuite) SetupTest() {
 	s.m = s.newMessenger("", []string{})
 }
 
-func (s *MessengerSendImagesAlbumSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.m)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
-}
-
 func (s *MessengerSendImagesAlbumSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
 	advertiseCommunityTo(&s.Suite, community, s.m, user)
 }
@@ -43,7 +38,6 @@ func (s *MessengerSendImagesAlbumSuite) joinCommunity(community *communities.Com
 
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
-	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -102,7 +96,6 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
-	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -153,7 +146,6 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() 
 // This test makes sure that if you get a mention with an image ina  community, it sends it correctly and has a notif
 func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommunitySend() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
-	defer TearDownMessenger(s.T(), theirMessenger)
 
 	community, chat := createCommunity(&s.Suite, s.m)
 
@@ -202,7 +194,6 @@ func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommu
 
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
-	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -284,7 +275,6 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 // This test makes sure that if you get a mention with an album of images in a community, it sends it correctly and has correct AC notif with album
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommunitySend() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
-	defer TearDownMessenger(s.T(), theirMessenger)
 
 	community, chat := createCommunity(&s.Suite, s.m)
 

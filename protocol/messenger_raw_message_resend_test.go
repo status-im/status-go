@@ -54,12 +54,6 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 	joinOnRequestCommunity(&s.Suite, community.ID(), s.aliceMessenger, s.bobMessenger, bobPassword, []string{bobAddress})
 }
 
-func (s *MessengerRawMessageResendTest) TearDownTest() {
-	TearDownMessenger(s.T(), s.aliceMessenger)
-	TearDownMessenger(s.T(), s.bobMessenger)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerRawMessageResendTest) waitForMessageSent(messageID string) {
 	err := testutils.RetryWithBackOff(func() error {
 		rawMessage, err := s.bobMessenger.RawMessageByID(messageID)

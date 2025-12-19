@@ -26,13 +26,6 @@ func (s *MessengerBaseTestSuite) SetupTest() {
 	s.privateKey = s.m.identity
 }
 
-func (s *MessengerBaseTestSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.m)
-	if s.messagingEnv != nil {
-		s.Require().NoError(s.messagingEnv.TearDown())
-	}
-}
-
 func (s *MessengerBaseTestSuite) newMessenger() *Messenger {
 	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{})
 	s.Require().NoError(err)

@@ -118,9 +118,6 @@ func (s *MessengerGroupChatSuite) TestGroupChatCreation() {
 
 	for i, testCase := range testCases {
 		creator, member := s.newMessenger(), s.newMessenger()
-		defer TearDownMessenger(s.T(), creator)
-		defer TearDownMessenger(s.T(), member)
-
 		members := []string{crypto.PubkeyToHex(&member.identity.PublicKey)}
 
 		if testCase.creatorAddedMemberAsContact {
@@ -179,48 +176,42 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersAddition() {
 	}
 
 	for i, testCase := range testCases {
-		admin, inviter, member := s.newMessenger(), s.newMessenger(), s.newMessenger()
-		defer TearDownMessenger(s.T(), admin)
-		defer TearDownMessenger(s.T(), inviter)
-		defer TearDownMessenger(s.T(), member)
+		s.Run(testCase.name, func() {
+			admin, inviter, member := s.newMessenger(), s.newMessenger(), s.newMessenger()
+			members := []string{crypto.PubkeyToHex(&member.identity.PublicKey)}
 
-		members := []string{crypto.PubkeyToHex(&member.identity.PublicKey)}
-
-		if testCase.inviterAddedMemberAsContact {
-			s.makeContact(inviter, member)
-		}
-		if testCase.memberAddedInviterAsContact {
-			s.makeContact(member, inviter)
-		}
-
-		for j, inviterIsAlsoGroupCreator := range []bool{true, false} {
-			var groupChat *Chat
-			if inviterIsAlsoGroupCreator {
-				groupChat = s.createEmptyGroupChat(inviter, fmt.Sprintf("test_group_chat_%d_%d", i, j))
-			} else {
-				s.makeContact(admin, inviter)
-				groupChat = s.createGroupChat(admin, fmt.Sprintf("test_group_chat_%d_%d", i, j), []string{crypto.PubkeyToHex(&inviter.identity.PublicKey)})
-				err := inviter.SaveChat(groupChat)
-				s.Require().NoError(err)
-			}
-
-			_, err := inviter.AddMembersToGroupChat(context.Background(), groupChat.ID, members)
 			if testCase.inviterAddedMemberAsContact {
-				s.Require().NoError(err)
-				s.verifyGroupChatCreated(member, testCase.expectedAddedMemberChatActive)
-			} else {
-				s.Require().EqualError(err, "group-chat: can't add members who are not mutual contacts")
+				s.makeContact(inviter, member)
 			}
-		}
+			if testCase.memberAddedInviterAsContact {
+				s.makeContact(member, inviter)
+			}
+
+			for j, inviterIsAlsoGroupCreator := range []bool{true, false} {
+				var groupChat *Chat
+				if inviterIsAlsoGroupCreator {
+					groupChat = s.createEmptyGroupChat(inviter, fmt.Sprintf("test_group_chat_%d_%d", i, j))
+				} else {
+					s.makeContact(admin, inviter)
+					groupChat = s.createGroupChat(admin, fmt.Sprintf("test_group_chat_%d_%d", i, j), []string{crypto.PubkeyToHex(&inviter.identity.PublicKey)})
+					err := inviter.SaveChat(groupChat)
+					s.Require().NoError(err)
+				}
+
+				_, err := inviter.AddMembersToGroupChat(context.Background(), groupChat.ID, members)
+				if testCase.inviterAddedMemberAsContact {
+					s.Require().NoError(err)
+					s.verifyGroupChatCreated(member, testCase.expectedAddedMemberChatActive)
+				} else {
+					s.Require().EqualError(err, "group-chat: can't add members who are not mutual contacts")
+				}
+			}
+		})
 	}
 }
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 	admin, memberA, memberB, memberC := s.newMessenger(), s.newMessenger(), s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(s.T(), admin)
-	defer TearDownMessenger(s.T(), memberA)
-	defer TearDownMessenger(s.T(), memberB)
-	defer TearDownMessenger(s.T(), memberC)
 
 	members := []string{crypto.PubkeyToHex(&memberA.identity.PublicKey), crypto.PubkeyToHex(&memberB.identity.PublicKey),
 		crypto.PubkeyToHex(&memberC.identity.PublicKey)}
@@ -257,8 +248,6 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemoval() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 	admin, member := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(s.T(), admin)
-	defer TearDownMessenger(s.T(), member)
 
 	s.makeMutualContacts(admin, member)
 
@@ -327,8 +316,6 @@ func (s *MessengerGroupChatSuite) TestGroupChatEdit() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
 	admin, member := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(s.T(), admin)
-	defer TearDownMessenger(s.T(), member)
 
 	s.makeMutualContacts(admin, member)
 
@@ -365,8 +352,6 @@ func (s *MessengerGroupChatSuite) TestGroupChatDeleteMemberMessage() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 	admin, member := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(s.T(), admin)
-	defer TearDownMessenger(s.T(), member)
 
 	s.makeMutualContacts(admin, member)
 
@@ -411,8 +396,6 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 	admin, memberA := s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(s.T(), admin)
-	defer TearDownMessenger(s.T(), memberA)
 
 	members := []string{crypto.PubkeyToHex(&memberA.identity.PublicKey)}
 
@@ -455,9 +438,6 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 
 func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
 	admin, memberA, memberB := s.newMessenger(), s.newMessenger(), s.newMessenger()
-	defer TearDownMessenger(s.T(), admin)
-	defer TearDownMessenger(s.T(), memberA)
-	defer TearDownMessenger(s.T(), memberB)
 
 	memberB.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
 	s.Require().NoError(admin.settings.SaveSettingField(settings.DisplayName, "admin"))

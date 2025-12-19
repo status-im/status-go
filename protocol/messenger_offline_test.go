@@ -52,13 +52,6 @@ func (s *MessengerOfflineSuite) SetupTest() {
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
 }
 
-func (s *MessengerOfflineSuite) TearDownTest() {
-	s.Require().NoError(s.owner.Shutdown())
-	s.Require().NoError(s.bob.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerOfflineSuite) newMessenger(password string, accounts []string) *Messenger {
 	return newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{

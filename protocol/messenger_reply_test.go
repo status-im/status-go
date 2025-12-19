@@ -22,7 +22,6 @@ func (s *MessengerReplySuite) TestReceiveReply() {
 	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
 	bob := s.newMessenger()
-	defer TearDownMessenger(s.T(), bob)
 
 	chatID := statusChatID
 

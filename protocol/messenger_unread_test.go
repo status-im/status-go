@@ -287,7 +287,6 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadInOneChatDoesNotImpactOtherChats
 
 func (s *MessengerSuite) TestMarkMessageWithNotificationAsUnreadInCommunityChatSetsNotificationAsUnread() {
 	other := s.newMessenger()
-	defer TearDownMessenger(s.T(), other)
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,

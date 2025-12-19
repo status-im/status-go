@@ -29,8 +29,6 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
 	bob := s.newMessenger()
-	defer TearDownMessenger(s.T(), bob)
-
 	chatID := statusChatID
 
 	chat := CreatePublicChat(chatID, alice.getTimesource())
@@ -110,7 +108,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	bob := s.m
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
+
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
 
@@ -185,7 +183,6 @@ func (s *MessengerEmojiSuite) TestMaxEmojiReactionsPerMessage() {
 	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
 	bob := s.newMessenger()
-	defer TearDownMessenger(s.T(), bob)
 
 	chatID := statusChatID
 

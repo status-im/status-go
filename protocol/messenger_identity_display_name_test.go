@@ -95,7 +95,6 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 
 	// Create new device and add main account to
 	alicesOtherDevice := s.anotherMessenger()
-	defer TearDownMessenger(s.T(), alicesOtherDevice)
 
 	// Store only chat and default wallet account on other device
 	profileKpOtherDevice, _, _, err := accounts.GetProfileKeypairForTest(true, true, false)

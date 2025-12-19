@@ -46,11 +46,6 @@ func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
 	s.setupMultiAccount(s.alice)
 }
 
-func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.bob)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 	name, err := m.settings.DisplayName()
 	s.Require().NoError(err)
@@ -264,13 +259,6 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	// Generate Alice Messenger
 	alice := s.newMessenger()
 	bob := s.newMessenger()
-
-	defer func() {
-		TearDownMessenger(s.T(), alice)
-		alice = nil
-		TearDownMessenger(s.T(), bob)
-		bob = nil
-	}()
 
 	// Setup MultiAccount for Alice Messenger
 	s.setupMultiAccount(alice)

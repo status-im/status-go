@@ -28,7 +28,6 @@ type CommunityEventsTestsInterface interface {
 	GetMember() *Messenger
 	GetSuite() *suite.Suite
 	GetCollectiblesServiceMock() *CollectiblesServiceMock
-	SetupAdditionalMessengers([]*Messenger)
 	GetAccountsTestData() map[string][]string
 	GetAccountsPasswords() map[string]string
 }
@@ -406,8 +405,6 @@ func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Co
 }
 
 func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.CommunityMember_Roles, additionalEventSenders []*Messenger) *communities.Community {
-	base.SetupAdditionalMessengers(additionalEventSenders)
-
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	s := base.GetSuite()
 	s.Require().NoError(err, "eventSender.communitiesManager.All")
@@ -1408,7 +1405,6 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
 	s := base.GetSuite()
-	defer TearDownMessenger(s.T(), user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 

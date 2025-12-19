@@ -87,11 +87,6 @@ func (s *MessengerMessagesTrackingSuite) SetupTest() {
 	s.alice, s.aliceInterceptor = s.newMessenger()
 }
 
-func (s *MessengerMessagesTrackingSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.bob)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerMessagesTrackingSuite) newMessenger() (*Messenger, *EnvelopeEventsInterceptorMock) {
 	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
 		EnvelopeEventsHandler:      EnvelopeSignalHandlerMock{},

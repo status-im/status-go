@@ -22,8 +22,6 @@ type EventSenderCommunityEventsSuiteBase struct {
 	owner       *Messenger
 	eventSender *Messenger
 	alice       *Messenger
-
-	additionalEventSenders []*Messenger
 }
 
 type AdminCommunityEventsSuite struct {
@@ -79,25 +77,6 @@ func (s *EventSenderCommunityEventsSuiteBase) newMessenger(password string, wall
 		privateKey:   privateKey,
 		extraOptions: []Option{WithCommunityManagerOptions(communityManagerOptions)},
 	}, password, walletAddresses)
-}
-
-func (s *EventSenderCommunityEventsSuiteBase) TearDownTest() {
-	TearDownMessenger(s.T(), s.owner)
-	TearDownMessenger(s.T(), s.eventSender)
-	TearDownMessenger(s.T(), s.alice)
-
-	for _, m := range s.additionalEventSenders {
-		TearDownMessenger(s.T(), m)
-	}
-	s.additionalEventSenders = nil
-
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
-}
-
-func (s *EventSenderCommunityEventsSuiteBase) SetupAdditionalMessengers(messengers []*Messenger) {
-	for _, m := range messengers {
-		s.additionalEventSenders = append(s.additionalEventSenders, m)
-	}
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminEditCommunityDescription() {
@@ -156,7 +135,6 @@ func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinResponseSh
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
 }
@@ -166,7 +144,6 @@ func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoin() {
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoin(s, community, user)
 }
@@ -176,7 +153,6 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinResponseSh
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
 }
@@ -186,7 +162,6 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testRejectMemberRequestToJoin(s, community, user)
 }
@@ -313,15 +288,12 @@ func (s *AdminCommunityEventsSuite) TestJoinedAdminReceiveRequestsToJoinWithoutR
 	// set up additional user that will join to the community as TokenMaster
 	newPrivilegedUser := s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 
-	s.SetupAdditionalMessengers([]*Messenger{bob, newPrivilegedUser})
-
 	testJoinedPrivilegedMemberReceiveRequestsToJoin(s, community, bob, newPrivilegedUser, protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
 func (s *AdminCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedAccountsAfterGettingAdminRole() {
 	// set up additional user (bob) that will send request to join
 	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
-	s.SetupAdditionalMessengers([]*Messenger{bob})
 	testMemberReceiveRequestsToJoinAfterGettingNewRole(s, bob, protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
@@ -330,7 +302,6 @@ func (s *AdminCommunityEventsSuite) TestAdminAcceptsRequestToJoinAfterMemberLeav
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 	testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(s, community, user)
 }
 

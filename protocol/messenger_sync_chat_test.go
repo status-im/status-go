@@ -31,11 +31,6 @@ func (s *MessengerSyncChatSuite) SetupTest() {
 	s.alice2 = s.anotherMessenger()
 }
 
-func (s *MessengerSyncChatSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.alice2)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerSyncChatSuite) Pair() {
 	err := s.alice2.SetInstallationMetadata(s.alice2.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "alice2",
@@ -119,7 +114,6 @@ func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
 	s.Require().NoError(err)
 
 	otherMessenger := s.newMessenger()
-	defer TearDownMessenger(s.T(), otherMessenger)
 
 	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)

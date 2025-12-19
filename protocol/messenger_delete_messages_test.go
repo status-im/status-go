@@ -31,13 +31,6 @@ func (s *MessengerDeleteMessagesSuite) SetupTest() {
 	s.admin = s.newMessenger(alicePassword, []string{aliceAddress1})
 }
 
-func (s *MessengerDeleteMessagesSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.owner)
-	TearDownMessenger(s.T(), s.bob)
-	TearDownMessenger(s.T(), s.admin)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
-}
-
 func (s *MessengerDeleteMessagesSuite) sendMessageAndCheckDelivery(sender *Messenger, text string, chatID string) *common.Message {
 	ctx := context.Background()
 	messageToSend := common.NewMessage()

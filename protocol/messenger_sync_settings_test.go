@@ -103,11 +103,6 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 	prepAliceMessengersForPairing(&s.Suite, s.alice, s.alice2)
 }
 
-func (s *MessengerSyncSettingsSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.alice2)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	// Set Alice's installation metadata
 	aim := &messagingtypes.InstallationMetadata{

@@ -167,13 +167,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.owner)
-	TearDownMessenger(s.T(), s.bob)
-	TearDownMessenger(s.T(), s.alice)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),

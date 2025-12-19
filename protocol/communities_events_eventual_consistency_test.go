@@ -56,7 +56,6 @@ func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, 
 }
 
 func (s *CommunityEventsEventualConsistencySuite) TearDownTest() {
-	s.EventSenderCommunityEventsSuiteBase.TearDownTest()
 	s.messagesOrderController.Stop()
 }
 
@@ -73,7 +72,6 @@ func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []r
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, user)
 

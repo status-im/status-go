@@ -114,13 +114,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bob1 := s.m
 	bob2, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
-	defer TearDownMessenger(s.T(), bob2)
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
 
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
@@ -291,14 +288,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactOnly() {
-
 	bob := s.m
-
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
+
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -428,17 +421,11 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
-
 	bob := s.m
-
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
 	// another contact to invalidate the token
 	frank := s.newMessenger()
-	defer TearDownMessenger(s.T(), frank)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
@@ -650,14 +637,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 }
 
 func (s *MessengerPushNotificationSuite) TestContactCode() {
-
 	bob1 := s.m
-
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
@@ -707,14 +689,9 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
-
 	bob := s.m
-
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
@@ -844,14 +821,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityRequest() {
-
 	bob := s.m
-
 	messenger, server := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
@@ -977,13 +949,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	bob1 := s.m
 	bob2, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{privateKey: s.m.identity, extraOptions: []Option{WithPushNotifications()}})
 	s.Require().NoError(err)
-	defer TearDownMessenger(s.T(), bob2)
 
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
@@ -1155,14 +1123,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
-
 	bob := s.m
-
 	messenger, _ := s.newPushNotificationServer()
-	defer TearDownMessenger(s.T(), messenger)
-
 	alice := s.newMessenger()
-	defer TearDownMessenger(s.T(), alice)
 
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}

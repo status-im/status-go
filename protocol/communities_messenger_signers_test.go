@@ -40,13 +40,6 @@ func (s *MessengerCommunitiesSignersSuite) SetupTest() {
 	s.alice = s.newMessenger(accountPassword, []string{aliceAddress1})
 }
 
-func (s *MessengerCommunitiesSignersSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.john)
-	TearDownMessenger(s.T(), s.bob)
-	TearDownMessenger(s.T(), s.alice)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
-}
-
 func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletAddresses []string) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
@@ -596,7 +589,6 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	})
 
 	s.Require().NoError(err)
-	defer TearDownMessenger(s.T(), alice2)
 
 	// Create communities backup
 

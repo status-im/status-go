@@ -32,13 +32,6 @@ func (s *MessengerDeleteMessageForEveryoneSuite) SetupTest() {
 	s.moderator = s.newMessenger(aliceAccountAddress, []string{aliceAddress1})
 }
 
-func (s *MessengerDeleteMessageForEveryoneSuite) TearDownTest() {
-	TearDownMessenger(s.T(), s.admin)
-	TearDownMessenger(s.T(), s.bob)
-	TearDownMessenger(s.T(), s.moderator)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
-}
-
 func (s *MessengerDeleteMessageForEveryoneSuite) testSendAndDeleteMessage(messageToSend *common.Message, shouldError bool) {
 	ctx := context.Background()
 	sendResponse, err := s.bob.SendChatMessage(ctx, messageToSend)

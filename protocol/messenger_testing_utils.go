@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"math/big"
-	mathRand "math/rand"
 	"sync"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -218,19 +216,6 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 	wg.Wait()
 
 	s.Require().True(ok)
-}
-
-func TearDownMessenger(t *testing.T, m *Messenger) {
-	if m == nil {
-		return
-	}
-	s.Require().NoError(m.Shutdown())
-	if m.database != nil {
-		s.Require().NoError(m.database.Close())
-	}
-	if m.multiAccounts != nil {
-		s.Require().NoError(m.multiAccounts.Close())
-	}
 }
 
 func randomInt(length int) int {
