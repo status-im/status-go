@@ -46,7 +46,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
@@ -105,7 +105,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() 
 	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
@@ -172,7 +172,7 @@ func (s *MessengerSendImagesAlbumSuite) TestSingleImageMessageWithMentionInCommu
 		album = append(album, outgoingMessage)
 	}
 
-	err = s.m.SaveChat(chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err := s.m.SendChatMessages(context.Background(), album)
 	s.NoError(err)
@@ -205,7 +205,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 	defer TearDownMessenger(s.T(), theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
-	err = theirMessenger.SaveChat(theirChat)
+	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
@@ -303,7 +303,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommu
 		album = append(album, outgoingMessage)
 	}
 
-	err = s.m.SaveChat(chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err := s.m.SendChatMessages(context.Background(), album)
 	s.NoError(err)
