@@ -357,8 +357,17 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 
 	err = messenger.messaging.Start()
 	s.Require().NoError(err)
+	s.T().Cleanup(func() {
+		err := messenger.messaging.Stop()
+		s.Assert().NoError(err)
+	})
+
 	_, err = messenger.Start()
 	s.Require().NoError(err)
+	s.T().Cleanup(func() {
+		err := messenger.Shutdown()
+		s.Assert().NoError(err)
+	})
 
 	return messenger
 }

@@ -3,10 +3,13 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
@@ -91,14 +94,28 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 	if err != nil {
 		return nil, err
 	}
+	t.Cleanup(func() {
+		err = madb.Close()
+		assert.NoError(t, err)
+	})
+
 	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}
+	t.Cleanup(func() {
+		err = walletDb.Close()
+		assert.NoError(t, err)
+	})
+
 	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}
+	t.Cleanup(func() {
+		err = appDb.Close()
+		assert.NoError(t, err)
+	})
 
 	err = sqlite.Migrate(appDb)
 	if err != nil {
@@ -208,9 +225,17 @@ func newRunningTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagin
 
 	err = m.messaging.Start()
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		err = m.messaging.Stop()
+		assert.NoError(t, err)
+	})
 
 	_, err = m.Start()
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		err := m.Shutdown()
+		assert.NoError(t, err)
+	})
 
 	return m, nil
 }

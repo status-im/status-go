@@ -14,7 +14,9 @@ func (s *MessengerBaseTestSuite) setupMessaging() {
 	var err error
 	s.messagingEnv, err = messaging.NewTestMessagingEnvironment()
 	s.Require().NoError(err)
-	s.Require().NoError(s.messagingEnv.Setup())
+
+	err = s.messagingEnv.Setup(s.T())
+	s.Require().NoError(err)
 }
 
 func (s *MessengerBaseTestSuite) SetupTest() {
