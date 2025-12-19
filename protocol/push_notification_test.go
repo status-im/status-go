@@ -107,6 +107,10 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer() (*Messenger
 	err = server.Start(serverPersistence, messenger.Messaging())
 	s.Require().NoError(err)
 
+	s.T().Cleanup(func() {
+		server.Stop()
+	})
+
 	return messenger, server
 }
 

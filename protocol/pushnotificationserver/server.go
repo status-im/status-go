@@ -101,6 +101,11 @@ func (s *Server) Start(persistence Persistence, messaging *messaging.API) error 
 	return nil
 }
 
+func (s *Server) Stop() {
+	s.config.Logger.Info("stopping push notification server")
+	s.sender.Stop()
+}
+
 // HandlePushNotificationRegistration builds a response for the registration and sends it back to the user
 func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) error {
 	response := s.buildPushNotificationRegistrationResponse(publicKey, payload)
