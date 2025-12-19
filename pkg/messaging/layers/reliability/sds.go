@@ -10,9 +10,7 @@ import (
 )
 
 func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
-	sds.SetLogger(logger)
-
-	reliabilityManager, err := sds.NewReliabilityManager()
+	reliabilityManager, err := sds.NewReliabilityManager(logger)
 	if err != nil {
 		logger.Error("failed to create ReliabilityManager", zap.Error(err))
 		return nil
