@@ -32,7 +32,7 @@ func (s *MessengerSyncContactRequestDecisionSuite) SetupTest() {
 }
 
 func (s *MessengerSyncContactRequestDecisionSuite) TearDownTest() {
-	s.Require().NoError(s.m2.Shutdown())
+	TearDownMessenger(&s.Suite, s.m2)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

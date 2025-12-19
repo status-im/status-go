@@ -60,9 +60,9 @@ func (s *MessengerOfflineSuite) SetupTest() {
 }
 
 func (s *MessengerOfflineSuite) TearDownTest() {
-	s.Require().NoError(s.owner.Shutdown())
-	s.Require().NoError(s.bob.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
+	TearDownMessenger(&s.Suite, s.owner)
+	TearDownMessenger(&s.Suite, s.bob)
+	TearDownMessenger(&s.Suite, s.alice)
 	s.MessengerBaseTestSuite.TearDownTest()
 }
 

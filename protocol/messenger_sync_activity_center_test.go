@@ -125,7 +125,7 @@ func (s *MessengerSyncActivityCenterSuite) testSyncCommunityRequestDecision(acti
 
 	userB := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	defer func() {
-		s.Require().NoError(userB.Shutdown())
+		TearDownMessenger(&s.Suite, userB)
 	}()
 
 	_, err := userB.Start()

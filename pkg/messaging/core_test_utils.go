@@ -16,8 +16,6 @@ type TestMessagingEnvironment struct {
 	// To enable communication between multiple messaging core instances in tests,
 	// share a single Waku instance across them.
 	waku *testWakuWrapper
-
-	cores []*Core
 }
 
 func NewTestMessagingEnvironment() (*TestMessagingEnvironment, error) {
@@ -27,8 +25,7 @@ func NewTestMessagingEnvironment() (*TestMessagingEnvironment, error) {
 	}
 
 	return &TestMessagingEnvironment{
-		waku:  waku,
-		cores: make([]*Core, 0),
+		waku: waku,
 	}, nil
 }
 
@@ -37,13 +34,6 @@ func (f *TestMessagingEnvironment) Setup() error {
 }
 
 func (f *TestMessagingEnvironment) TearDown() error {
-	for _, core := range f.cores {
-		if err := core.stop(); err != nil {
-			return err
-		}
-	}
-	f.cores = make([]*Core, 0)
-
 	return f.waku.Waku.Stop()
 }
 
@@ -52,7 +42,6 @@ func (f *TestMessagingEnvironment) NewTestCore(params CoreParams, options ...Opt
 	if err != nil {
 		return nil, err
 	}
-	f.cores = append(f.cores, core)
 	return core, nil
 }
 

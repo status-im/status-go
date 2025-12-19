@@ -232,6 +232,7 @@ func TearDownMessenger(s *suite.Suite, m *Messenger) {
 		return
 	}
 	s.Require().NoError(m.Shutdown())
+	s.Require().NoError(m.Messaging().Stop())
 	if m.database != nil {
 		s.Require().NoError(m.database.Close())
 	}
