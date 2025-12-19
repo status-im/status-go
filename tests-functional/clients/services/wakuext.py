@@ -155,7 +155,14 @@ class WakuextService(Service):
         return response
 
     def add_contact(self, contact_id: str, displayName: str):
-        params = [{"id": contact_id, "nickname": "fake_nickname", "displayName": displayName, "ensName": ""}]
+        params = [
+            {
+                "id": contact_id,
+                "nickname": "fake_nickname",
+                "displayName": displayName,
+                "ensName": "",
+            }
+        ]
         response = self.rpc_request("addContact", params)
         return response
 
@@ -231,6 +238,7 @@ class WakuextService(Service):
         membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
         image="",
         image_rect=ImageCropRect(),
+        history_archive_support_enabled=False,
     ):
         params = {
             "membership": membership.value,
@@ -242,6 +250,7 @@ class WakuextService(Service):
             "imageAy": image_rect.ay,
             "imageBx": image_rect.bx,
             "imageBy": image_rect.by,
+            "historyArchiveSupportEnabled": history_archive_support_enabled,
         }
         response = self.rpc_request("createCommunity", [params])
         return response
@@ -272,12 +281,24 @@ class WakuextService(Service):
         return response
 
     def fetch_community(self, community_key):
-        params = [{"communityKey": community_key, "waitForResponse": True, "tryDatabase": True}]
+        params = [
+            {
+                "communityKey": community_key,
+                "waitForResponse": True,
+                "tryDatabase": True,
+            }
+        ]
         response = self.rpc_request("fetchCommunity", params)
         return response
 
     def request_to_join_community(self, community_id, address="fakeaddress"):
-        params = [{"communityId": community_id, "addressesToReveal": [address], "airdropAddress": address}]
+        params = [
+            {
+                "communityId": community_id,
+                "addressesToReveal": [address],
+                "airdropAddress": address,
+            }
+        ]
         response = self.rpc_request("requestToJoinCommunity", params)
         return response
 
@@ -351,7 +372,13 @@ class WakuextService(Service):
         response = self.rpc_request("generateEditCommunityRequestsForSigning", params)
         return response
 
-    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value, responseTo: str = ""):
+    def send_chat_message(
+        self,
+        chat_id,
+        message,
+        content_type=MessageContentType.TEXT_PLAIN.value,
+        responseTo: str = "",
+    ):
         params = [
             {
                 "chatId": chat_id,
@@ -364,7 +391,16 @@ class WakuextService(Service):
         return response
 
     def send_chat_messages(self, messages: list[SendChatMessagePayload]):
-        params = [[{"chatId": m["chat_id"], "text": m["text"], "contentType": m["content_type"]} for m in messages]]
+        params = [
+            [
+                {
+                    "chatId": m["chat_id"],
+                    "text": m["text"],
+                    "contentType": m["content_type"],
+                }
+                for m in messages
+            ]
+        ]
         response = self.rpc_request("sendChatMessages", params)
         return response
 
@@ -404,7 +440,11 @@ class WakuextService(Service):
         return response
 
     def all_messages_from_chats_and_communities_which_match_term(
-        self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
+        self,
+        community_ids: list[str],
+        chat_ids: list[str],
+        searchTerm: str,
+        caseSensitive: bool,
     ):
         params = [community_ids, chat_ids, searchTerm, caseSensitive]
         response = self.rpc_request("allMessagesFromChatsAndCommunitiesWhichMatchTerm", params)
@@ -540,7 +580,12 @@ class WakuextService(Service):
         response = self.rpc_request("createOneToOneChat", params)
         return response
 
-    def register_for_push_notifications(self, device_token: str, apnTopic: str, tokenType: PushNotificationRegistrationTokenType):
+    def register_for_push_notifications(
+        self,
+        device_token: str,
+        apnTopic: str,
+        tokenType: PushNotificationRegistrationTokenType,
+    ):
         params = [device_token, apnTopic, tokenType.value]
         response = self.rpc_request("registerForPushNotifications", params)
         return response
@@ -564,7 +609,9 @@ class WakuextService(Service):
         return response
 
     def activity_center_notifications_count(
-        self, activity_types: list = list(ActivityCenterNotificationType), read_type: Union[ActivityCenterQueryParamsRead, None] = None
+        self,
+        activity_types: list = list(ActivityCenterNotificationType),
+        read_type: Union[ActivityCenterQueryParamsRead, None] = None,
     ):
         params = [{"activityTypes": activity_types, "readType": read_type}]
         response = self.rpc_request("activityCenterNotificationsCount", params)
@@ -649,7 +696,15 @@ class WakuextService(Service):
         response = self.rpc_request("getSavedAddressesPerMode", params)
         return response
 
-    def upsert_saved_address(self, address: str, name: str, color_id: str = "", ens: str = "", chain_short_names: str = "", is_test: bool = False):
+    def upsert_saved_address(
+        self,
+        address: str,
+        name: str,
+        color_id: str = "",
+        ens: str = "",
+        chain_short_names: str = "",
+        is_test: bool = False,
+    ):
         params = [
             {
                 "address": address,
@@ -769,4 +824,52 @@ class WakuextService(Service):
     def get_verification_request_sent_to(self, contact_id: str):
         params = [contact_id]
         response = self.rpc_request("getVerificationRequestSentTo", params)
+        return response
+
+    def has_community_archive(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("hasCommunityArchive", params)
+        return response
+
+    def set_archive_distribution_preference(self, preference: str):
+        params = [{"preference": preference}]
+        response = self.rpc_request("setArchiveDistributionPreference", params)
+        return response
+
+    def connect(self, peerId: str, addrs: list = []):
+        params = [peerId, addrs]
+        response = self.rpc_request("connect", params)
+        return response
+
+    def debug(self):
+        params = []
+        response = self.rpc_request("debug", params)
+        return response
+
+    def get_downloaded_message_archive_ids(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getDownloadedMessageArchiveIDs", params)
+        return response
+
+    def get_message_archive_ids_to_import(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getMessageArchiveIDsToImport", params)
+        return response
+
+    def update_message_archive_interval(self, duration_seconds: int):
+        params = [duration_seconds]
+        response = self.rpc_request("updateMessageArchiveInterval", params)
+        return response
+
+    def enable_community_history_archive_protocol(self):
+        return self.rpc_request("enableCommunityHistoryArchiveProtocol")
+
+    def enable_codex_community_history_archive_protocol(self, codex_overrides=None):
+        params = []
+        if codex_overrides:
+            params = [{k: str(v) for k, v in codex_overrides.items()}]
+        return self.rpc_request("enableCodexCommunityHistoryArchiveProtocol", params)
+
+    def disable_community_history_archive_protocol(self):
+        response = self.rpc_request("disableCommunityHistoryArchiveProtocol")
         return response
