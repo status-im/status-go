@@ -154,3 +154,8 @@ func (p *Persistence) GetLastFetchedBlockAndTimestamp(ctx context.Context, chain
 
 	return &lastFetchedBlock, &lastFetchedTimestamp, nil
 }
+
+func (p *Persistence) ClearAll(ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, "DELETE FROM fetched_alchemy_transfers")
+	return err
+}

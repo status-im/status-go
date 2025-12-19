@@ -23,6 +23,7 @@ type ManagerIface interface {
 	IsChainSupported(chainID uint64) bool
 	FetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address, currentBlock uint64) (thirdparty.ActivityEntryContainer, error)
 	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address gethcommon.Address) (*gethrpc.BlockNumber, *time.Time, error)
+	ClearAll(ctx context.Context) error
 }
 
 type Manager struct {
@@ -103,4 +104,8 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, account get
 		zap.Duration("duration", duration))
 
 	return activity, nil
+}
+
+func (m *Manager) ClearAll(ctx context.Context) error {
+	return m.fetcher.ClearAll(ctx)
 }

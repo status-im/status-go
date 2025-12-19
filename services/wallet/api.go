@@ -885,3 +885,8 @@ func (api *API) GetFollowingStats(ctx context.Context, userAddress common.Addres
 
 	return api.s.followingManager.FetchFollowingStats(ctx, userAddress)
 }
+
+func (api *API) RefetchTxHistory() error {
+	logutils.ZapLogger().Debug("call to RefetchTxHistory")
+	return api.s.activityFetcherService.RefetchTxHistory()
+}

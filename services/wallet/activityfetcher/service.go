@@ -460,3 +460,17 @@ func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account get
 		return
 	}
 }
+
+func (s *Service) RefetchTxHistory() error {
+	s.logger.Info("Refetching tx history")
+
+	err := s.activityFetcherManager.ClearAll(context.Background())
+	if err != nil {
+		return err
+	}
+
+	// Trigger a refetch
+	s.triggerRefetch(true)
+
+	return nil
+}
