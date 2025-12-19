@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
-	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
@@ -243,7 +243,7 @@ func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]
 	if err != nil {
 		return []byte{}, createSwapParaswapErrorResponse(err)
 	}
-	return types.Hex2Bytes(tx.Data), nil
+	return types2.Hex2Bytes(tx.Data), nil
 }
 
 func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
@@ -313,13 +313,13 @@ func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxA
 	}
 
 	sendArgs.FromChainID = tx.ChainID
-	toAddr := types.HexToAddress(tx.To)
-	sendArgs.From = types.HexToAddress(tx.From)
+	toAddr := types2.HexToAddress(tx.To)
+	sendArgs.From = types2.HexToAddress(tx.From)
 	sendArgs.To = &toAddr
 	sendArgs.Value = (*hexutil.Big)(value)
 	sendArgs.Gas = (*hexutil.Uint64)(&gas)
 	sendArgs.GasPrice = (*hexutil.Big)(gasPrice)
-	sendArgs.Data = types.Hex2Bytes(tx.Data)
+	sendArgs.Data = types2.Hex2Bytes(tx.Data)
 
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }

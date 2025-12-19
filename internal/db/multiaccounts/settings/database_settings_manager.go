@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/params"
 )
 

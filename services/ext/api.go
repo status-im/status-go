@@ -8,9 +8,11 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/browsers"
@@ -22,8 +24,6 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"

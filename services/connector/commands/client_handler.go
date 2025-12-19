@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/status-im/status-go/crypto/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
@@ -71,9 +71,9 @@ func (c *ClientSideHandler) clearRequestRunning() {
 	atomic.StoreInt32(&c.isRequestRunning, 0)
 }
 
-func (c *ClientSideHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error) {
+func (c *ClientSideHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types2.Address, uint64, error) {
 	if !c.setRequestRunning() {
-		return types.Address{}, 0, ErrAnotherConnectorOperationIsAwaitingFor
+		return types2.Address{}, 0, ErrAnotherConnectorOperationIsAwaitingFor
 	}
 	defer c.clearRequestRunning()
 
@@ -94,11 +94,11 @@ func (c *ClientSideHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp
 			case Rejected:
 				response := msg.Data.(RejectedArgs)
 				if response.RequestID == requestID {
-					return types.Address{}, 0, ErrRequestAccountsRejectedByUser
+					return types2.Address{}, 0, ErrRequestAccountsRejectedByUser
 				}
 			}
 		case <-timeout:
-			return types.Address{}, 0, ErrWalletResponseTimeout
+			return types2.Address{}, 0, ErrWalletResponseTimeout
 		}
 	}
 }
@@ -149,15 +149,15 @@ func (c *ClientSideHandler) RecallDAppPermissions(args RecallDAppPermissionsArgs
 	return nil
 }
 
-func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *wallettypes.SendTxArgs) (types.Hash, error) {
+func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *wallettypes.SendTxArgs) (types2.Hash, error) {
 	if !c.setRequestRunning() {
-		return types.Hash{}, ErrAnotherConnectorOperationIsAwaitingFor
+		return types2.Hash{}, ErrAnotherConnectorOperationIsAwaitingFor
 	}
 	defer c.clearRequestRunning()
 
 	txArgsJson, err := json.Marshal(txArgs)
 	if err != nil {
-		return types.Hash{}, fmt.Errorf("failed to marshal txArgs: %v", err)
+		return types2.Hash{}, fmt.Errorf("failed to marshal txArgs: %v", err)
 	}
 
 	requestID := c.generateRequestID(dApp)
@@ -177,11 +177,11 @@ func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, ch
 			case Rejected:
 				response := msg.Data.(RejectedArgs)
 				if response.RequestID == requestID {
-					return types.Hash{}, ErrSendTransactionRejectedByUser
+					return types2.Hash{}, ErrSendTransactionRejectedByUser
 				}
 			}
 		case <-timeout:
-			return types.Hash{}, ErrWalletResponseTimeout
+			return types2.Hash{}, ErrWalletResponseTimeout
 		}
 	}
 }

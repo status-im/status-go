@@ -1,7 +1,7 @@
 package requests
 
 import (
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/backend"
 
 	"go.uber.org/zap"

@@ -13,8 +13,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/crypto/types"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -26,8 +26,8 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	t.Skip("Broken by PR-6882, must fix")
 	state := setupTests(t)
 
-	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
-	expectedHash := types.BytesToHash(types.FromHex("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"))
+	accountAddress := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	expectedHash := types2.BytesToHash(types2.FromHex("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"))
 	expectedSignature := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 
 	dAppPermissionRevoked := false
@@ -147,7 +147,7 @@ func TestForwardedRPCs(t *testing.T) {
 
 	ethClientMock := mock_client.NewMockClientInterface(state.mockCtrl)
 
-	sharedAccount := types.BytesToAddress(types.FromHex("0x3d0ab2a774b74bb1d36f97700315adf962c69fct"))
+	sharedAccount := types2.BytesToAddress(types2.FromHex("0x3d0ab2a774b74bb1d36f97700315adf962c69fct"))
 
 	testDAppData := signal.ConnectorDApp{
 		URL:     "https://app.test.org",
@@ -191,7 +191,7 @@ func TestForwardedRPCs(t *testing.T) {
 func TestRequestAccountsAfterPermissionsRevokeTest(t *testing.T) {
 	state := setupTests(t)
 
-	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	accountAddress := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	dAppPermissionRevoked := false
 	dAppPermissionGranted := false
 

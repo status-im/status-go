@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"

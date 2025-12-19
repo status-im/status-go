@@ -16,10 +16,10 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
-	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/contracts/cryptopunks"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -83,17 +83,17 @@ func TestCryptoPunksHandler_WithMocks(t *testing.T) {
 	// Test BuildTransactionV2
 	buildArgs := &wallettypes.SendTxArgs{
 		FromChainID: walletCommon.EthereumMainnet,
-		From:        cryptotypes.HexToAddress("0x1234567890123456789012345678901234567890"),
-		To:          &cryptotypes.Address{},
+		From:        types2.HexToAddress("0x1234567890123456789012345678901234567890"),
+		To:          &types2.Address{},
 		Gas:         (*hexutil.Uint64)(new(uint64)),
 		GasPrice:    (*hexutil.Big)(big.NewInt(1000000000)),
 		Value:       (*hexutil.Big)(big.NewInt(0)),
-		Data:        cryptotypes.HexBytes("test_data"),
+		Data:        types2.HexBytes("test_data"),
 	}
 
 	mockTransactor.EXPECT().ValidateAndBuildTransaction(walletCommon.EthereumMainnet, gomock.Any(), int64(-1)).DoAndReturn(
 		func(chainID uint64, args wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-			expectedAddress := cryptotypes.Address(CryptoPunksContractID.Address)
+			expectedAddress := types2.Address(CryptoPunksContractID.Address)
 			assert.Equal(t, &expectedAddress, args.To)
 			return testTx, uint64(1), nil
 		})

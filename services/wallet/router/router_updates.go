@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 

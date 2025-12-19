@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 type Command func(context.Context) error

@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/mvds/state"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 )
 
 func PublicKeyToPeerID(k ecdsa.PublicKey) state.PeerID {

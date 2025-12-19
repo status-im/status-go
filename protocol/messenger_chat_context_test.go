@@ -3,8 +3,8 @@ package protocol
 import (
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/testutils/fake"

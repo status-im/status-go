@@ -9,10 +9,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -92,7 +92,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		WhisperTimestamp: timestamp,
 		LocalChatID:      contactID,
 		Seen:             true,
-		ID:               types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d%d", from, to, updateType, clock)))),
+		ID:               types2.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d%d", from, to, updateType, clock)))),
 	}
 
 	return message, nil
@@ -205,7 +205,7 @@ func (m *Messenger) declineContactRequest(requestID, contactID string, fromSynci
 	}
 
 	// update notification with the correct status
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(requestID))
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types2.FromHex(requestID))
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		return nil, errors.New("no chat found for accepted contact request")
 	}
 
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types2.FromHex(contactRequest.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +595,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 
 func (m *Messenger) generateOutgoingContactRequestNotification(contact *contacts.Contact, contactRequest *common.Message) *ActivityCenterNotification {
 	return &ActivityCenterNotification{
-		ID:        types.FromHex(contactRequest.ID),
+		ID:        types2.FromHex(contactRequest.ID),
 		Type:      ActivityCenterNotificationTypeContactRequest,
 		Name:      contact.PrimaryName(),
 		Author:    m.myHexIdentity(),
@@ -1176,7 +1176,7 @@ func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, re
 		return nil, err
 	}
 
-	return m.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+	return m.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types2.Hex2Bytes(contactRequestID)})
 }
 
 func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, request *requests.DismissLatestContactRequestForContact) (*MessengerResponse, error) {
@@ -1189,7 +1189,7 @@ func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, r
 		return nil, err
 	}
 
-	return m.DeclineContactRequest(ctx, &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+	return m.DeclineContactRequest(ctx, &requests.DeclineContactRequest{ID: types2.Hex2Bytes(contactRequestID)})
 }
 
 func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {
@@ -1197,7 +1197,7 @@ func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.
 }
 
 func defaultContactRequestID(contactID string) string {
-	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
+	return "0x" + types2.Bytes2Hex(append(types2.Hex2Bytes(contactID), 0x20))
 }
 
 func defaultContactRequestText() string {

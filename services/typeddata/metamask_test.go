@@ -12,7 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 func TestTypedDataSuite(t *testing.T) {

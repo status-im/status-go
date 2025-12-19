@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/status-im/status-go/accounts-management/generator"
+	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
 )
 
 // MultiAccountImportPrivateKeyParams are the params sent to MultiAccountImportPrivateKey.
@@ -27,7 +27,7 @@ func CreateAccountFromPrivateKey(paramsJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	generatedAccount, err := generator.CreateAccountFromPrivateKey(p.PrivateKey)
+	generatedAccount, err := generator2.CreateAccountFromPrivateKey(p.PrivateKey)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -54,24 +54,24 @@ func CreateAccountFromMnemonicAndDeriveAccountsForPaths(paramsJSON string) strin
 	// remove any duplicate whitespaces
 	mnemonicPhraseNoExtraSpaces := strings.Join(strings.Fields(p.MnemonicPhrase), " ")
 
-	generatedAccount, err := generator.CreateAccountFromMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
+	generatedAccount, err := generator2.CreateAccountFromMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	derivedAccounts, err := generator.DeriveChildrenFromAccount(generatedAccount, p.Paths)
+	derivedAccounts, err := generator2.DeriveChildrenFromAccount(generatedAccount, p.Paths)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
 	generatedAccountInfo := generatedAccount.ToIdentifiedAccountInfo()
 
-	derivedAccountsInfo := make(map[string]generator.AccountInfo)
+	derivedAccountsInfo := make(map[string]generator2.AccountInfo)
 	for path, derivedAccount := range derivedAccounts {
 		derivedAccountsInfo[path] = derivedAccount.ToAccountInfo()
 	}
 
-	generatedAndDerivedAccountsInfo := generator.GeneratedAndDerivedAccountInfo{
+	generatedAndDerivedAccountsInfo := generator2.GeneratedAndDerivedAccountInfo{
 		GeneratedAccountInfo: generatedAccountInfo.ToGeneratedAccountInfo(mnemonicPhraseNoExtraSpaces),
 		Derived:              derivedAccountsInfo,
 	}

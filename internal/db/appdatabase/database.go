@@ -7,13 +7,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
-	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
-	"github.com/status-im/status-go/internal/nodecfg"
-	"github.com/status-im/status-go/logutils"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
+	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/nodecfg"
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrations"
 

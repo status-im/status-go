@@ -38,8 +38,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/logutils"
 	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"
 	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
 )

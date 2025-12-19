@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/eventfilter"
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 )
 
 type EthClientGetter interface {

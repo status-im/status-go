@@ -4,6 +4,7 @@ package contracts
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/internal/contracts/directory"
 	"github.com/status-im/status-go/internal/contracts/ierc20"
 	"github.com/status-im/status-go/internal/contracts/namewrapper"
@@ -11,9 +12,9 @@ import (
 	"github.com/status-im/status-go/internal/contracts/resolver"
 	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/internal/contracts/stickers"
+	"github.com/status-im/status-go/internal/rpc"
 
 	stickers2 "github.com/status-im/status-go/internal/contracts/stickers"
-	"github.com/status-im/status-go/rpc"
 )
 
 type ContractMakerIface interface {

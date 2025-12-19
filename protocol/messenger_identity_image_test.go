@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"

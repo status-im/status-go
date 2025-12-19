@@ -9,10 +9,10 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/rpc"
 )
 
 func TestKeycardPairingsFile(t *testing.T) {

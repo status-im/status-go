@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"

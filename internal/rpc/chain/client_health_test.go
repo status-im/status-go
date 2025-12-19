@@ -1,0 +1,245 @@
+package chain
+
+import (
+	"context"
+	"errors"
+	"strconv"
+	"testing"
+
+	"github.com/ethereum/go-ethereum/core/vm"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
+
+	healthManager "github.com/status-im/status-go/internal/healthmanager"
+	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
+	ethclient2 "github.com/status-im/status-go/internal/rpc/chain/ethclient"
+	mockEthclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
+	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
+)
+
+type ClientWithFallbackSuite struct {
+	suite.Suite
+	client                 *ClientWithFallback
+	mockEthClients         []*mockEthclient.MockRPSLimitedEthClientInterface
+	providersHealthManager *healthManager.ProvidersHealthManager
+	mockCtrl               *gomock.Controller
+}
+
+func (s *ClientWithFallbackSuite) SetupTest() {
+	s.mockCtrl = gomock.NewController(s.T())
+}
+
+func (s *ClientWithFallbackSuite) TearDownTest() {
+	s.mockCtrl.Finish()
+}
+
+func (s *ClientWithFallbackSuite) setupClients(numClients int) {
+	s.mockEthClients = make([]*mockEthclient.MockRPSLimitedEthClientInterface, 0)
+	ethClients := make([]ethclient2.RPSLimitedEthClientInterface, 0)
+
+	for i := 0; i < numClients; i++ {
+		ethClient := mockEthclient.NewMockRPSLimitedEthClientInterface(s.mockCtrl)
+		ethClient.EXPECT().GetProviderName().AnyTimes().Return("test" + strconv.Itoa(i) + "_provider")
+		ethClient.EXPECT().GetCircuitName().AnyTimes().Return("test" + strconv.Itoa(i) + "_circuit")
+		ethClient.EXPECT().GetLimiter().AnyTimes().Return(nil)
+		ethClient.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient2.EthClientInterface) (interface{}, error)) (interface{}, error) {
+			return f(ethClient)
+		}).AnyTimes()
+
+		s.mockEthClients = append(s.mockEthClients, ethClient)
+		ethClients = append(ethClients, ethClient)
+	}
+	var chainID uint64 = 0
+	s.providersHealthManager = healthManager.NewProvidersHealthManager(chainID)
+	s.client = NewClient(ethClients, chainID, s.providersHealthManager)
+}
+
+func (s *ClientWithFallbackSuite) TestSingleClientSuccess() {
+	s.setupClients(1)
+	ctx := context.Background()
+	hash := common.HexToHash("0x1234")
+	block := &sdkethclient.BlockWithTxHashes{}
+
+	// GIVEN
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(block, nil).Times(1)
+
+	// WHEN
+	result, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), block, result)
+
+	// THEN
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
+	providerStatuses := s.providersHealthManager.GetStatuses()
+	require.Len(s.T(), providerStatuses, 1)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
+}
+
+func (s *ClientWithFallbackSuite) TestSingleClientConnectionError() {
+	s.setupClients(1)
+	ctx := context.Background()
+	hash := common.HexToHash("0x1234")
+
+	// GIVEN
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("connection error")).Times(1)
+
+	// WHEN
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.Error(s.T(), err)
+
+	// THEN
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
+	providerStatuses := s.providersHealthManager.GetStatuses()
+	require.Len(s.T(), providerStatuses, 1)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusDown)
+}
+
+func (s *ClientWithFallbackSuite) TestRPSLimitErrorDoesNotMarkChainDown() {
+	s.setupClients(1)
+
+	ctx := context.Background()
+	hash := common.HexToHash("0x1234")
+
+	// WHEN
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
+
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.Error(s.T(), err)
+
+	// THEN
+
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
+	providerStatuses := s.providersHealthManager.GetStatuses()
+	require.Len(s.T(), providerStatuses, 1)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
+
+	status := providerStatuses["test0_provider"]
+	require.Equal(s.T(), status.Status, rpcstatus.StatusUp, "provider shouldn't be DOWN on RPS limit")
+}
+
+func (s *ClientWithFallbackSuite) TestContextCanceledDoesNotMarkChainDown() {
+	s.setupClients(1)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	hash := common.HexToHash("0x1234")
+
+	// WHEN
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.Error(s.T(), err)
+	require.True(s.T(), errors.Is(err, context.Canceled))
+
+	// THEN
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
+	providerStatuses := s.providersHealthManager.GetStatuses()
+	require.Len(s.T(), providerStatuses, 1)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
+}
+
+func (s *ClientWithFallbackSuite) TestVMErrorDoesNotMarkChainDown() {
+	s.setupClients(1)
+	ctx := context.Background()
+	hash := common.HexToHash("0x1234")
+	vmError := vm.ErrOutOfGas
+
+	// GIVEN
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, vmError).Times(1)
+
+	// WHEN
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.Error(s.T(), err)
+	require.True(s.T(), errors.Is(err, vm.ErrOutOfGas))
+
+	// THEN
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
+	providerStatuses := s.providersHealthManager.GetStatuses()
+	require.Len(s.T(), providerStatuses, 1)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
+}
+
+func (s *ClientWithFallbackSuite) TestNoClientsChainDown() {
+	s.setupClients(0)
+
+	ctx := context.Background()
+	hash := common.HexToHash("0x1234")
+
+	// WHEN
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.Error(s.T(), err)
+
+	// THEN
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
+}
+
+func (s *ClientWithFallbackSuite) TestAllClientsDifferentErrors() {
+	s.setupClients(3)
+	ctx := context.Background()
+	hash := common.HexToHash("0x1234")
+
+	// GIVEN
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+	s.mockEthClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
+	s.mockEthClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, vm.ErrOutOfGas).Times(1)
+
+	// WHEN
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.Error(s.T(), err)
+
+	// THEN
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
+
+	providerStatuses := s.providersHealthManager.GetStatuses()
+	require.Len(s.T(), providerStatuses, 3)
+
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusDown, "provider test0 should be DOWN due to a connection error")
+	require.Equal(s.T(), providerStatuses["test1_provider"].Status, rpcstatus.StatusUp, "provider test1 should not be marked DOWN due to RPS limit error")
+	require.Equal(s.T(), providerStatuses["test2_provider"].Status, rpcstatus.StatusUp, "provider test2 should not be labelled DOWN due to a VM error")
+}
+
+func (s *ClientWithFallbackSuite) TestAllClientsNetworkErrors() {
+	s.setupClients(3)
+	ctx := context.Background()
+	hash := common.HexToHash("0x1234")
+
+	// GIVEN
+	s.mockEthClients[0].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+	s.mockEthClients[1].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+	s.mockEthClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
+
+	// WHEN
+	_, err := s.client.EthGetBlockByHashWithTxHashes(ctx, hash)
+	require.Error(s.T(), err)
+
+	// THEN
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
+
+	providerStatuses := s.providersHealthManager.GetStatuses()
+	require.Len(s.T(), providerStatuses, 3)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusDown)
+	require.Equal(s.T(), providerStatuses["test1_provider"].Status, rpcstatus.StatusDown)
+	require.Equal(s.T(), providerStatuses["test2_provider"].Status, rpcstatus.StatusDown)
+}
+
+func (s *ClientWithFallbackSuite) TestChainStatusDownWhenInitial() {
+	s.setupClients(2)
+
+	chainStatus := s.providersHealthManager.Status()
+	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
+}
+
+func TestClientWithFallbackSuite(t *testing.T) {
+	suite.Run(t, new(ClientWithFallbackSuite))
+}

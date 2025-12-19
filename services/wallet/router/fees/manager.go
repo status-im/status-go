@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/errors"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/services/wallet/common"
 
 	"github.com/status-im/go-wallet-sdk/pkg/gas"

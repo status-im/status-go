@@ -11,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
@@ -57,7 +57,7 @@ var (
 
 type TxResponse struct {
 	KeyUID        string                 `json:"keyUid,omitempty"`
-	Address       types.Address          `json:"address,omitempty"`
+	Address       types2.Address         `json:"address,omitempty"`
 	AddressPath   string                 `json:"addressPath,omitempty"`
 	SignOnKeycard bool                   `json:"signOnKeycard,omitempty"`
 	ChainID       uint64                 `json:"chainId,omitempty"`
@@ -67,14 +67,14 @@ type TxResponse struct {
 	TxHash        common.Hash            `json:"txHash,omitempty"`
 }
 
-func (tm *TransactionManager) SignMessage(message types.HexBytes, privateKey *ecdsa.PrivateKey) (string, error) {
+func (tm *TransactionManager) SignMessage(message types2.HexBytes, privateKey *ecdsa.PrivateKey) (string, error) {
 	if privateKey == nil {
 		return "", fmt.Errorf("account or private key is nil")
 	}
 
 	signature, err := crypto.Sign(message[:], privateKey)
 
-	return types.EncodeHex(signature), err
+	return types2.EncodeHex(signature), err
 }
 
 func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs) (response *TxResponse, err error) {
@@ -149,15 +149,15 @@ func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs walle
 	return &TxResponse{
 		ChainID: chainID,
 		TxArgs:  sendArgs,
-		RawTx:   types.EncodeHex(data),
+		RawTx:   types2.EncodeHex(data),
 		TxHash:  tx.Hash(),
 	}, nil
 }
 
-func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs wallettypes.SendTxArgs, signature []byte) (types.Hash, error) {
+func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs wallettypes.SendTxArgs, signature []byte) (types2.Hash, error) {
 	txWithSignature, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
 	if err != nil {
-		return types.Hash{}, err
+		return types2.Hash{}, err
 	}
 
 	return tm.transactor.SendTransactionWithSignature(&sendArgs, txWithSignature)

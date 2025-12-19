@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"

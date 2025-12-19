@@ -6,8 +6,8 @@ import (
 
 	"github.com/jinzhu/copier"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 )
 
 // TransportLayer is the lowest layer and represents waku message.

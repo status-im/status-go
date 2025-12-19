@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/crypto/types"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 

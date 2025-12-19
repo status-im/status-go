@@ -9,19 +9,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 )
 
-func GetSigner(chainID uint64, from types.Address, privateKey *ecdsa.PrivateKey) bind.SignerFn {
+func GetSigner(chainID uint64, from types2.Address, privateKey *ecdsa.PrivateKey) bind.SignerFn {
 	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
 		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
 		return ethTypes.SignTx(tx, s, privateKey)
 	}
 }
 
-func DeserializePublicKey(compressedKey string) (types.HexBytes, error) {
+func DeserializePublicKey(compressedKey string) (types2.HexBytes, error) {
 	rawKey, err := multiformat.DeserializePublicKey(compressedKey, "f")
 	if err != nil {
 		return nil, err
@@ -38,12 +38,12 @@ func DeserializePublicKey(compressedKey string) (types.HexBytes, error) {
 	return crypto.CompressPubkey(pubKey), nil
 }
 
-func SerializePublicKey(compressedKey types.HexBytes) (string, error) {
+func SerializePublicKey(compressedKey types2.HexBytes) (string, error) {
 	rawKey, err := crypto.DecompressPubkey(compressedKey)
 	if err != nil {
 		return "", err
 	}
-	pubKey := types.EncodeHex(crypto.FromECDSAPub(rawKey))
+	pubKey := types2.EncodeHex(crypto.FromECDSAPub(rawKey))
 
 	secp256k1Code := "0xe701"
 	base58btc := "z"

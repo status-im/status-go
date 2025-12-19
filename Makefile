@@ -473,7 +473,7 @@ benchmark:
 
 lint-panics: generate
 	GOFLAGS=-tags='$(BUILD_TAGS),lint' \
-	go tool goroutine-defer-guard -skip=./cmd -test=false ./...
+	go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/common.LogOnPanic ./...
 
 lint: generate lint-panics
 lint:

@@ -3,7 +3,7 @@ package multidevice
 import (
 	"crypto/ecdsa"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 )
 
 type InstallationMetadata struct {

@@ -27,10 +27,9 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/internal/contracts"
+	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
@@ -210,7 +209,7 @@ func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) 
 	if interceptor.Messenger != nil {
 		signalIDs := make([][]byte, 0, len(identifiers))
 		for _, identifierBytes := range identifiers {
-			messageID := types.EncodeHex(identifierBytes)
+			messageID := cryptotypes.EncodeHex(identifierBytes)
 			err := interceptor.Messenger.processSentMessage(messageID)
 			if err != nil {
 				interceptor.Messenger.logger.Info("messenger failed to process sent messages", zap.Error(err))
@@ -244,13 +243,13 @@ func (interceptor EnvelopeEventsInterceptor) EnvelopeExpired(identifiers [][]byt
 }
 
 // MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (interceptor EnvelopeEventsInterceptor) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
+func (interceptor EnvelopeEventsInterceptor) MailServerRequestCompleted(requestID cryptotypes.Hash, lastEnvelopeHash cryptotypes.Hash, cursor []byte, err error) {
 	//we don't track mailserver requests in Messenger, so just redirect to handler
 	interceptor.EnvelopeEventsHandler.MailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
 }
 
 // MailServerRequestExpired triggered when the mailserver request expires
-func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types.Hash) {
+func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash cryptotypes.Hash) {
 	//we don't track mailserver requests in Messenger, so just redirect to handler
 	interceptor.EnvelopeEventsHandler.MailServerRequestExpired(hash)
 }
@@ -550,7 +549,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
+	m.logger.Info("starting messenger", zap.String("identity", cryptotypes.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 
 	// Start push notification client
 	if m.pushNotificationClient != nil {
@@ -718,7 +717,7 @@ func (m *Messenger) IdentityPublicKeyCompressed() []byte {
 }
 
 func (m *Messenger) IdentityPublicKeyString() string {
-	return types.EncodeHex(crypto.FromECDSAPub(m.IdentityPublicKey()))
+	return cryptotypes.EncodeHex(crypto.FromECDSAPub(m.IdentityPublicKey()))
 }
 
 // cleanTopics remove any topic that does not have a Listen flag set
@@ -1697,7 +1696,7 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 	if err != nil {
 		return spec, err
 	}
-	spec.ID = types.EncodeHex(id)
+	spec.ID = cryptotypes.EncodeHex(id)
 	spec.SendCount++
 	err = m.persistence.SaveRawMessage(&spec)
 	if err != nil {
@@ -1802,7 +1801,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 				return rawMessage, err
 			}
 		} else {
-			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
+			rawMessage.CommunityID, err = cryptotypes.DecodeHex(chat.CommunityID)
 			if err != nil {
 				return rawMessage, err
 			}
@@ -1860,7 +1859,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 	default:
 		return rawMessage, errors.New("chat type not supported")
 	}
-	rawMessage.ID = types.EncodeHex(id)
+	rawMessage.ID = cryptotypes.EncodeHex(id)
 	rawMessage.SendCount++
 	rawMessage.LastSent = m.getTimesource().GetCurrentTime()
 	err = m.persistence.SaveRawMessage(&rawMessage)
@@ -2776,7 +2775,7 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 
 // updateExistingActivityCenterNotification updates AC notification if it exists and hasn't been read yet
 func (r *ReceivedMessageState) updateExistingActivityCenterNotification(publicKey ecdsa.PublicKey, m *Messenger, message *common.Message, responseTo *common.Message) error {
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(message.ID))
+	notification, err := m.persistence.GetActivityCenterNotificationByID(cryptotypes.FromHex(message.ID))
 	if err != nil {
 		return err
 	}
@@ -2869,7 +2868,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	}
 
 	notification := &ActivityCenterNotification{
-		ID:            types.FromHex(notificationID),
+		ID:            cryptotypes.FromHex(notificationID),
 		Name:          chat.Name,
 		Message:       message,
 		ReplyMessage:  responseTo,
@@ -2905,7 +2904,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 	}
 }
 
-func (m *Messenger) outputToCSV(timestamp uint32, messageID types.HexBytes, from string, topic types2.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
+func (m *Messenger) outputToCSV(timestamp uint32, messageID cryptotypes.HexBytes, from string, topic types2.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
 	if !m.outputCSV {
 		return
 	}
@@ -3121,7 +3120,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilt
 
 		var processedMessages []string
 		for _, shhMessage := range messages {
-			logger := logger.With(zap.String("hash", types.EncodeHex(shhMessage.Hash)))
+			logger := logger.With(zap.String("hash", cryptotypes.EncodeHex(shhMessage.Hash)))
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
@@ -3169,7 +3168,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilt
 			m.messaging.MarkP2PMessageAsProcessed(gethcommon.BytesToHash(shhMessage.Hash))
 
 			if allMessagesProcessed {
-				processedMessages = append(processedMessages, types.EncodeHex(shhMessage.Hash))
+				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))
 			}
 		}
 
@@ -3190,12 +3189,12 @@ func (m *Messenger) processStatusMessage(
 	filter types2.ChatFilter,
 	fromArchive bool,
 	logger *zap.Logger) error {
-	messageID := types.EncodeHex(msg.ApplicationLayer.ID)
+	messageID := cryptotypes.EncodeHex(msg.ApplicationLayer.ID)
 
 	logger = logger.With(zap.String("message-id", messageID))
 	ctx, span := m.tracer.Start(trace.DeriveRemoteContext([]byte(messageID)), "Messenger.process_"+msg.ApplicationLayer.Type.String(),
 		oteltrace.WithAttributes(
-			otelattribute.String("hash", types.EncodeHex(hash)),
+			otelattribute.String("hash", cryptotypes.EncodeHex(hash)),
 			otelattribute.String("messageID", messageID),
 			otelattribute.Stringer("messageType", msg.ApplicationLayer.Type),
 			otelattribute.String("signer", crypto.PubkeyToHex(msg.ApplicationLayer.SigPubKey)),
@@ -3303,7 +3302,7 @@ func (m *Messenger) markDeliveredMessages(acks []cryptotypes.HexBytes) {
 }
 
 func (m *Messenger) deleteNotification(response *MessengerResponse, installationID string) error {
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(installationID))
+	notification, err := m.persistence.GetActivityCenterNotificationByID(cryptotypes.FromHex(installationID))
 	if err != nil {
 		return err
 	}
@@ -3317,7 +3316,7 @@ func (m *Messenger) deleteNotification(response *MessengerResponse, installation
 	notification.Deleted = true
 	// we shouldn't sync deleted notification here,
 	// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
-	err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(installationID), updatedAt)
+	err = m.persistence.DeleteActivityCenterNotificationByID(cryptotypes.FromHex(installationID), updatedAt)
 	if err != nil {
 		m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
 		return err
@@ -3386,7 +3385,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 			} else if id != m.installationID {
 				// Add activity center notification when we receive a new installation
 				notification := &ActivityCenterNotification{
-					ID:             types.FromHex(id),
+					ID:             cryptotypes.FromHex(id),
 					Type:           ActivityCenterNotificationTypeNewInstallationReceived,
 					InstallationID: id,
 					Timestamp:      m.getTimesource().GetCurrentTime(),
@@ -3861,9 +3860,9 @@ func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (*Messe
 		return nil, err
 	}
 
-	hexBytesIds := []types.HexBytes{}
+	hexBytesIds := []cryptotypes.HexBytes{}
 	for _, id := range ids {
-		hexBytesIds = append(hexBytesIds, types.FromHex(id))
+		hexBytesIds = append(hexBytesIds, cryptotypes.FromHex(id))
 	}
 
 	updatedAt := m.GetCurrentTimeInMillis()
@@ -3900,9 +3899,9 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 		return 0, 0, nil, err
 	}
 
-	hexBytesIds := []types.HexBytes{}
+	hexBytesIds := []cryptotypes.HexBytes{}
 	for _, id := range ids {
-		hexBytesIds = append(hexBytesIds, types.FromHex(id))
+		hexBytesIds = append(hexBytesIds, cryptotypes.FromHex(id))
 	}
 
 	// Mark notifications as read in the database
@@ -3934,9 +3933,9 @@ func (m *Messenger) MarkMessagesRead(chatID string, ids []string) (*MessengerRes
 		Seen:              true,
 	})
 
-	hexBytesIds := []types.HexBytes{}
+	hexBytesIds := []cryptotypes.HexBytes{}
 	for _, id := range ids {
-		hexBytesIds = append(hexBytesIds, types.FromHex(id))
+		hexBytesIds = append(hexBytesIds, cryptotypes.FromHex(id))
 	}
 
 	// Mark notifications as read in the database

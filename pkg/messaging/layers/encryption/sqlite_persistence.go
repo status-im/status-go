@@ -8,7 +8,7 @@ import (
 
 	dr "github.com/status-im/doubleratchet"
 
-	"github.com/status-im/status-go/crypto"
+	crypto2 "github.com/status-im/status-go/internal/crypto"
 	multidevice2 "github.com/status-im/status-go/pkg/messaging/layers/encryption/multidevice"
 	sharedsecret2 "github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
 )
@@ -289,7 +289,7 @@ func (s *SQLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, installa
 	}
 
 	versions := make(map[string]uint32)
-	identity := crypto.CompressPubkey(publicKey)
+	identity := crypto2.CompressPubkey(publicKey)
 
 	/* #nosec */
 	statement := `SELECT signed_pre_key,installation_id, version
@@ -712,7 +712,7 @@ func (s *sqliteSessionStorage) Load(id []byte) (*dr.State, error) {
 		state.Step = step
 		state.KeysCount = keysCount
 
-		state.DHs = crypto.DHPair{
+		state.DHs = crypto2.DHPair{
 			PrvKey: dhsPrivate,
 			PubKey: dhsPublic,
 		}

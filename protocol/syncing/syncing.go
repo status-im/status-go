@@ -8,8 +8,8 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	maErrors "github.com/status-im/status-go/internal/db/multiaccounts/errors"
@@ -30,9 +30,9 @@ var (
 func MapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accsmanagementtypes.AccountOperable,
 	accType accsmanagementtypes.AccountType) *accsmanagementtypes.Account {
 	return &accsmanagementtypes.Account{
-		Address:               types.BytesToAddress(message.Address),
+		Address:               types2.BytesToAddress(message.Address),
 		KeyUID:                message.KeyUid,
-		PublicKey:             types.HexBytes(message.PublicKey),
+		PublicKey:             types2.HexBytes(message.PublicKey),
 		Type:                  accType,
 		Path:                  message.Path,
 		Name:                  message.Name,
@@ -57,7 +57,7 @@ func HandleSyncWatchOnlyAccount(accountsDB *accounts.Database, message *protobuf
 
 	accountOperability := accsmanagementtypes.AccountFullyOperable
 
-	accAddress := types.BytesToAddress(message.Address)
+	accAddress := types2.BytesToAddress(message.Address)
 	dbAccount, err := accountsDB.GetAccountByAddress(accAddress)
 	if err != nil && err != accounts.ErrDbAccountNotFound {
 		return nil, err

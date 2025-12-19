@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
@@ -29,13 +29,13 @@ func TestGetAddresses(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	accounts := []*accsmanagementtypes.Account{
-		{Address: types.Address{0x01}, Chat: true, Wallet: true},
-		{Address: types.Address{0x02}},
+		{Address: types2.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types2.Address{0x02}},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
 	addresses, err := db.GetAddresses()
 	require.NoError(t, err)
-	require.Equal(t, []types.Address{{0x01}, {0x02}}, addresses)
+	require.Equal(t, []types2.Address{{0x01}, {0x02}}, addresses)
 }
 
 func TestMoveWalletAccount(t *testing.T) {
@@ -51,12 +51,12 @@ func TestMoveWalletAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	accounts := []*accsmanagementtypes.Account{
-		{Address: types.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
-		{Address: types.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
-		{Address: types.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
+		{Address: types2.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
+		{Address: types2.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types2.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types2.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types2.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
+		{Address: types2.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
 	dbAccounts, err := db.GetActiveAccounts()
@@ -80,12 +80,12 @@ func TestMoveWalletAccount(t *testing.T) {
 
 	// Expected after moving down
 	accounts = []*accsmanagementtypes.Account{
-		{Address: types.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
-		{Address: types.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4}, // acc with addr 0x02 is at position 4 (moved from position 1)
-		{Address: types.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
+		{Address: types2.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0},
+		{Address: types2.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types2.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types2.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types2.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4}, // acc with addr 0x02 is at position 4 (moved from position 1)
+		{Address: types2.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 
 	dbAccounts, err = db.GetActiveAccounts()
@@ -106,12 +106,12 @@ func TestMoveWalletAccount(t *testing.T) {
 
 	// Expected after moving up
 	accounts = []*accsmanagementtypes.Account{
-		{Address: types.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0}, // acc with addr 0x06 is at position 0 (moved from position 5)
-		{Address: types.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
-		{Address: types.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
-		{Address: types.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
-		{Address: types.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
-		{Address: types.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
+		{Address: types2.Address{0x06}, Type: accsmanagementtypes.AccountTypeWatch, Position: 0}, // acc with addr 0x06 is at position 0 (moved from position 5)
+		{Address: types2.Address{0x01}, Type: accsmanagementtypes.AccountTypeWatch, Position: 1},
+		{Address: types2.Address{0x03}, Type: accsmanagementtypes.AccountTypeWatch, Position: 2},
+		{Address: types2.Address{0x04}, Type: accsmanagementtypes.AccountTypeWatch, Position: 3},
+		{Address: types2.Address{0x05}, Type: accsmanagementtypes.AccountTypeWatch, Position: 4},
+		{Address: types2.Address{0x02}, Type: accsmanagementtypes.AccountTypeWatch, Position: 5},
 	}
 
 	dbAccounts, err = db.GetActiveAccounts()
@@ -129,7 +129,7 @@ func TestMoveWalletAccount(t *testing.T) {
 func TestGetWalletAddress(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	address := types.Address{0x01}
+	address := types2.Address{0x01}
 	_, err := db.GetWalletAddress()
 	require.Equal(t, err, sql.ErrNoRows)
 	require.NoError(t, db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{{Address: address, Wallet: true}}, false))
@@ -141,7 +141,7 @@ func TestGetWalletAddress(t *testing.T) {
 func TestGetChatAddress(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	address := types.Address{0x01}
+	address := types2.Address{0x01}
 	_, err := db.GetChatAddress()
 	require.Equal(t, err, sql.ErrNoRows)
 	require.NoError(t, db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{{Address: address, Chat: true}}, false))
@@ -155,7 +155,7 @@ func TestAddressExists(t *testing.T) {
 	defer stop()
 
 	accounts := []*accsmanagementtypes.Account{
-		{Address: types.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types2.Address{0x01}, Chat: true, Wallet: true},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
 
@@ -167,7 +167,7 @@ func TestAddressExists(t *testing.T) {
 func TestAddressDoesntExist(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	exists, err := db.AddressExists(types.Address{1, 1, 1})
+	exists, err := db.AddressExists(types2.Address{1, 1, 1})
 	require.NoError(t, err)
 	require.False(t, exists)
 }
@@ -217,7 +217,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 
 	// try to save new watch only account
 	wo4 := &accsmanagementtypes.Account{
-		Address: types.Address{0x14},
+		Address: types2.Address{0x14},
 		Type:    accsmanagementtypes.AccountTypeWatch,
 		Name:    "WatchOnlyAcc4",
 		ColorID: common.CustomizationColorPrimary,
@@ -402,9 +402,9 @@ func TestKeypairs(t *testing.T) {
 
 			// save new account to an existing keypair which is out of the default Status' derivation root path
 			accToAdd := kp.Accounts[ind]
-			accToAdd.Address = types.Address{0x08}
+			accToAdd.Address = types2.Address{0x08}
 			accToAdd.Path = "m/44'/60'/0'/0/10"
-			accToAdd.PublicKey = types.Hex2Bytes("0x000000008")
+			accToAdd.PublicKey = types2.Hex2Bytes("0x000000008")
 			accToAdd.Name = "Generated Acc 8"
 
 			err = db.SaveOrUpdateAccounts([]*accsmanagementtypes.Account{accToAdd}, false)
@@ -422,9 +422,9 @@ func TestKeypairs(t *testing.T) {
 
 			// save new account to an existing keypair which follows Status' default derivation root path
 			accToAdd = kp.Accounts[ind]
-			accToAdd.Address = types.Address{0x09}
+			accToAdd.Address = types2.Address{0x09}
 			accToAdd.Path = "m/44'/60'/0'/0/3"
-			accToAdd.PublicKey = types.Hex2Bytes("0x000000009")
+			accToAdd.PublicKey = types2.Hex2Bytes("0x000000009")
 			accToAdd.Name = "Generated Acc 9"
 
 			expectedLastUsedDerivationIndex = 3
@@ -507,13 +507,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 
 	// prepare new account with the next suggested path
 	generatedWalletAccountThatWillBeRemovedLater := &accsmanagementtypes.Account{
-		Address:               types.Address{0x05},
+		Address:               types2.Address{0x05},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
 		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  suggestedPath,
-		PublicKey:             types.Hex2Bytes("0x000000005"),
+		PublicKey:             types2.Hex2Bytes("0x000000005"),
 		Name:                  "Generated Acc 4",
 		Emoji:                 "emoji-4",
 		ColorID:               common.CustomizationColorPrimary,
@@ -546,13 +546,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 
 	// prepare new account with the custom suggested path
 	generatedWalletAccount := &accsmanagementtypes.Account{
-		Address:               types.Address{0x07},
+		Address:               types2.Address{0x07},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
 		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  customSuggestedPath,
-		PublicKey:             types.Hex2Bytes("0x000000007"),
+		PublicKey:             types2.Hex2Bytes("0x000000007"),
 		Name:                  "Generated Acc 6",
 		Emoji:                 "emoji-6",
 		ColorID:               common.CustomizationColorPrimary,
@@ -582,13 +582,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 
 	// prepare new account with the next suggested path
 	generatedWalletAccount = &accsmanagementtypes.Account{
-		Address:               types.Address{0x06},
+		Address:               types2.Address{0x06},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
 		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  suggestedPath,
-		PublicKey:             types.Hex2Bytes("0x000000006"),
+		PublicKey:             types2.Hex2Bytes("0x000000006"),
 		Name:                  "Generated Acc 5",
 		Emoji:                 "emoji-5",
 		ColorID:               common.CustomizationColorPrimary,
@@ -619,13 +619,13 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 
 	// prepare new account with the next suggested path
 	generatedWalletAccount = &accsmanagementtypes.Account{
-		Address:               types.Address{0x08},
+		Address:               types2.Address{0x08},
 		KeyUID:                kp.KeyUID,
 		Wallet:                false,
 		Chat:                  false,
 		Type:                  accsmanagementtypes.AccountTypeGenerated,
 		Path:                  suggestedPath,
-		PublicKey:             types.Hex2Bytes("0x000000008"),
+		PublicKey:             types2.Hex2Bytes("0x000000008"),
 		Name:                  "Generated Acc 7",
 		Emoji:                 "emoji-7",
 		ColorID:               common.CustomizationColorPrimary,

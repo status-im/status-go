@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router"
 )

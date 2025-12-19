@@ -12,7 +12,7 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/db/sqlite"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"

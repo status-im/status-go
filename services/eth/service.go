@@ -3,8 +3,8 @@ package eth
 import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	accounts "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/rpc"
+	accounts "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/rpc"
 )
 
 const namespace = "eth"

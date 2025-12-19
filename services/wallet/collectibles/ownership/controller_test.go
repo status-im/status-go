@@ -12,12 +12,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/collectibles/ownership"

@@ -13,10 +13,10 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/rpc"
+	network2 "github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
@@ -38,7 +38,7 @@ type fetcherID struct {
 
 type Service struct {
 	activityFetcherManager ManagerIface
-	networksGetter         network.GetterInterface
+	networksGetter         network2.GetterInterface
 	accountsGetter         accounts.AccountsStorage
 	ethClientGetter        rpc.EthClientGetter
 
@@ -58,7 +58,7 @@ type Service struct {
 
 func NewService(
 	activityFetcherManager ManagerIface,
-	networksGetter network.GetterInterface,
+	networksGetter network2.GetterInterface,
 	accountsGetter accounts.AccountsStorage,
 	accountsPublisher *pubsub.Publisher,
 	ethClientGetter rpc.EthClientGetter,
@@ -88,7 +88,7 @@ func (s *Service) startNetworkWatcher() {
 		return
 	}
 
-	chNetworkChange, unsubFnNetworkChange := pubsub.Subscribe[network.EventActiveNetworksChanged](s.networksPublisher, 10)
+	chNetworkChange, unsubFnNetworkChange := pubsub.Subscribe[network2.EventActiveNetworksChanged](s.networksPublisher, 10)
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer unsubFnNetworkChange()

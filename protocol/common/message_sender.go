@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingevents "github.com/status-im/status-go/pkg/messaging/events"
@@ -66,8 +66,8 @@ func EnsureMessageIDIntegrity(messageID string, rawMessage *RawMessage) error {
 	return nil
 }
 
-func setMessageID(messageID cryptotypes.HexBytes, rawMessage *RawMessage) error {
-	messageIDString := cryptotypes.EncodeHex(messageID)
+func setMessageID(messageID types2.HexBytes, rawMessage *RawMessage) error {
+	messageIDString := types2.EncodeHex(messageID)
 
 	err := EnsureMessageIDIntegrity(messageIDString, rawMessage)
 	if err != nil {
@@ -351,7 +351,7 @@ func (s *MessageSender) SendCommunity(
 
 	logger := s.logger.Named("sendCommunity").With(
 		zap.Stringer("messageID", messageID),
-		zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)),
+		zap.String("communityID", types2.EncodeHex(rawMessage.CommunityID)),
 		zap.String("sender", crypto.PubkeyToHex(&rawMessage.Sender.PublicKey)),
 	)
 
@@ -440,7 +440,7 @@ func (s *MessageSender) SendPairInstallation(
 	ctx, span := s.tracer.Start(ctx, "MessageSender.SendPairInstallation")
 	defer span.End()
 
-	s.logger.Debug("sending private message", zap.String("recipient", cryptotypes.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Debug("sending private message", zap.String("recipient", types2.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = s.identity

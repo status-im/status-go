@@ -7,10 +7,10 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 
-	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

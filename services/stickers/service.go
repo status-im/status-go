@@ -5,11 +5,11 @@ import (
 
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/ipfs"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )

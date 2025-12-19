@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 )
 
 const (

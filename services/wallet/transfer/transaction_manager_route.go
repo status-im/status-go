@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	crypto2 "github.com/status-im/status-go/internal/crypto"
+	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/wallet/requests"
@@ -84,12 +84,12 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 		lastUsedNonce = nonce
 	}
 
-	addrTo := types.Address(path.FromToken.Address)
+	addrTo := types2.Address(path.FromToken.Address)
 	approavalSendArgs := &wallettypes.SendTxArgs{
 		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
-		From:     types.Address(addressFrom),
+		From:     types2.Address(addressFrom),
 		To:       &addrTo,
 		Value:    (*hexutil.Big)(big.NewInt(0)),
 		Data:     path.ApprovalPackedData,
@@ -116,7 +116,7 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 	return &wallettypes.TransactionData{
 		TxArgs:     approavalSendArgs,
 		Tx:         builtApprovalTx,
-		HashToSign: types.Hash(approvalTxHash),
+		HashToSign: types2.Hash(approvalTxHash),
 	}, nil
 }
 
@@ -135,7 +135,7 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
-		From:  types.Address(processorInputParams.FromAddr),
+		From:  types2.Address(processorInputParams.FromAddr),
 		Value: path.AmountIn,
 		Data:  path.TxPackedData,
 		Nonce: path.TxNonce,
@@ -157,12 +157,12 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 	isContractDeployment := path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployCollectiblesName ||
 		path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployAssetsName
 	if !isContractDeployment {
-		addrTo := types.Address(processorInputParams.ToAddr)
+		addrTo := types2.Address(processorInputParams.ToAddr)
 		sendArgs.To = &addrTo
 	}
 
 	if path.FromToken != nil {
-		sendArgs.ToContractAddress = types.Address(path.FromToken.Address)
+		sendArgs.ToContractAddress = types2.Address(path.FromToken.Address)
 
 		// special handling for transfer tx if selected token is not ETH
 		// TODO: we should fix that in the trasactor, but till then, the best place to handle it is here
@@ -178,7 +178,7 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 				path.ProcessorName == pathProcessorCommon.ProcessorERC1155Name {
 				// TODO: update functions from `TransactorIface` to use `ToContractAddress` (as an address of the contract a transaction should be sent to)
 				// and `To` (as the destination address, recipient) of `SendTxArgs` struct appropriately
-				toContractAddr := types.Address(path.FromToken.Address)
+				toContractAddr := types2.Address(path.FromToken.Address)
 				sendArgs.To = &toContractAddr
 			}
 		} else if path.ProcessorName == pathProcessorCommon.ProcessorCommunityDeployOwnerTokenName || // special handling for community related txs, tokenID for those txs is ETH
@@ -186,7 +186,7 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 			path.ProcessorName == pathProcessorCommon.ProcessorCommunityRemoteBurnName ||
 			path.ProcessorName == pathProcessorCommon.ProcessorCommunityBurnName ||
 			path.ProcessorName == pathProcessorCommon.ProcessorCommunitySetSignerPubKeyName {
-			toContractAddr := types.Address(*path.UsedContractAddress)
+			toContractAddr := types2.Address(*path.UsedContractAddress)
 			sendArgs.To = &toContractAddr
 			sendArgs.ToContractAddress = toContractAddr
 		}
@@ -202,7 +202,7 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 	return &wallettypes.TransactionData{
 		TxArgs:     sendArgs,
 		Tx:         builtTx,
-		HashToSign: types.Hash(txHash),
+		HashToSign: types2.Hash(txHash),
 	}, nil
 }
 
@@ -212,7 +212,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 		return nil, 0, 0, ErrNoRoute
 	}
 
-	accFrom, err := tm.accountsDB.GetAccountByAddress(types.Address(processorInputParams.FromAddr))
+	accFrom, err := tm.accountsDB.GetAccountByAddress(types2.Address(processorInputParams.FromAddr))
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -282,7 +282,7 @@ func getSignatureForTxHash(txHash string, signatures map[string]requests.Signatu
 		vByte = 1
 	}
 
-	signature := make([]byte, crypto.SignatureLength)
+	signature := make([]byte, crypto2.SignatureLength)
 	copy(signature[32-len(rBytes):32], rBytes)
 	copy(signature[64-len(rBytes):64], sBytes)
 	signature[64] = vByte
@@ -343,7 +343,7 @@ func addSignatureAndSendTransaction(
 	}
 
 	if txWithSignature.To() == nil {
-		toAddr := crypto.CreateAddress(txData.TxArgs.From, txData.Tx.Nonce())
+		toAddr := crypto2.CreateAddress(txData.TxArgs.From, txData.Tx.Nonce())
 		txData.TxArgs.To = &toAddr
 	}
 

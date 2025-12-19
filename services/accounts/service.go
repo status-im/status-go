@@ -10,10 +10,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	accsmanagementtypes "github.com/status-im/status-go/accounts-management/types"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"

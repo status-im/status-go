@@ -27,12 +27,11 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	accsmanagement "github.com/status-im/status-go/accounts-management"
-	"github.com/status-im/status-go/accounts-management/generator"
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/crypto"
-	"github.com/status-im/status-go/crypto/types"
-	cryptotypes "github.com/status-im/status-go/crypto/types"
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/crypto"
+	types3 "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/params"
@@ -90,9 +89,9 @@ var (
 )
 
 type MessageSigner interface {
-	Recover(rpcParams personal.RecoverParams) (addr cryptotypes.Address, err error)
-	CanRecover(rpcParams personal.RecoverParams, revealedAddress cryptotypes.Address) (bool, error)
-	Sign(rpcParams personal.SignParams, verifiedAccount *generator.Account) (result cryptotypes.HexBytes, err error)
+	Recover(rpcParams personal.RecoverParams) (addr types3.Address, err error)
+	CanRecover(rpcParams personal.RecoverParams, revealedAddress types3.Address) (bool, error)
+	Sign(rpcParams personal.SignParams, verifiedAccount *generator.Account) (result types3.HexBytes, err error)
 }
 
 type Manager struct {
@@ -139,9 +138,9 @@ func NewCommunityLock(logger *zap.Logger) *CommunityLock {
 	}
 }
 
-func (c *CommunityLock) Lock(communityID types.HexBytes) {
+func (c *CommunityLock) Lock(communityID types3.HexBytes) {
 	c.mutex.Lock()
-	communityIDStr := types.EncodeHex(communityID)
+	communityIDStr := types3.EncodeHex(communityID)
 	lock, ok := c.locks[communityIDStr]
 	if !ok {
 		lock = &sync.Mutex{}
@@ -152,9 +151,9 @@ func (c *CommunityLock) Lock(communityID types.HexBytes) {
 	lock.Lock()
 }
 
-func (c *CommunityLock) Unlock(communityID types.HexBytes) {
+func (c *CommunityLock) Unlock(communityID types3.HexBytes) {
 	c.mutex.Lock()
-	communityIDStr := types.EncodeHex(communityID)
+	communityIDStr := types3.EncodeHex(communityID)
 	lock, ok := c.locks[communityIDStr]
 	c.mutex.Unlock()
 
@@ -183,14 +182,14 @@ type HistoryArchiveDownloadTaskInfo struct {
 }
 
 type ArchiveFileService interface {
-	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types2.ReceivedMessage, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
-	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
-	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
-	ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
-	GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error)
-	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
+	CreateHistoryArchiveTorrentFromMessages(communityID types3.HexBytes, messages []*types2.ReceivedMessage, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromDB(communityID types3.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	SaveMessageArchiveID(communityID types3.HexBytes, hash string) error
+	GetMessageArchiveIDsToImport(communityID types3.HexBytes) ([]string, error)
+	SetMessageArchiveIDImported(communityID types3.HexBytes, hash string, imported bool) error
+	ExtractMessagesFromHistoryArchive(communityID types3.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
+	GetHistoryArchiveMagnetlink(communityID types3.HexBytes) (string, error)
+	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types3.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
 }
 
 type ArchiveService interface {
@@ -201,18 +200,18 @@ type ArchiveService interface {
 	StartTorrentClient() error
 	Stop() error
 	IsReady() bool
-	GetCommunityChatsFilters(communityID types.HexBytes) (types2.ChatFilters, error)
-	GetCommunityChatsTopics(communityID types.HexBytes) ([]types2.ContentTopic, error)
-	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
-	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
+	GetCommunityChatsFilters(communityID types3.HexBytes) (types2.ChatFilters, error)
+	GetCommunityChatsTopics(communityID types3.HexBytes) ([]types2.ContentTopic, error)
+	GetHistoryArchivePartitionStartTimestamp(communityID types3.HexBytes) (uint64, error)
+	CreateAndSeedHistoryArchive(communityID types3.HexBytes, topics []types2.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
 	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
-	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
-	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
-	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
-	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool
+	StopHistoryArchiveTasksInterval(communityID types3.HexBytes)
+	SeedHistoryArchiveTorrent(communityID types3.HexBytes) error
+	UnseedHistoryArchiveTorrent(communityID types3.HexBytes)
+	IsSeedingHistoryArchiveTorrent(communityID types3.HexBytes) bool
 	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
 	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
-	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
+	DownloadHistoryArchivesByMagnetlink(communityID types3.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
 	TorrentFileExists(communityID string) bool
 }
 
@@ -498,8 +497,8 @@ type Subscription struct {
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 	CommunityEventsMessage                   *CommunityEventsMessage
-	AcceptedRequestsToJoin                   []types.HexBytes
-	RejectedRequestsToJoin                   []types.HexBytes
+	AcceptedRequestsToJoin                   []types3.HexBytes
+	RejectedRequestsToJoin                   []types3.HexBytes
 	CommunityPrivilegedMemberSyncMessage     *CommunityPrivilegedMemberSyncMessage
 	TokenCommunityValidated                  *CommunityResponse
 }
@@ -652,7 +651,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 	}()
 }
 
-func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {
+func (m *Manager) ValidateCommunityByID(communityID types3.HexBytes) (*CommunityResponse, error) {
 	communitiesToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
 	if err != nil {
 		m.logger.Error("failed to validate community by ID", zap.String("id", utils.TruncateWithDot(communityID.String())), zap.Error(err))
@@ -677,12 +676,12 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 			continue
 		}
 
-		m.logger.Info("validating community", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", crypto.PubkeyToHex(signer)))
+		m.logger.Info("validating community", zap.String("id", types3.EncodeHex(community.id)), zap.String("signer", crypto.PubkeyToHex(signer)))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
 
-		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types.EncodeHex(community.id))
+		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types3.EncodeHex(community.id))
 		if err != nil {
 			m.logger.Error("failed to get owner", zap.Error(err))
 			continue
@@ -706,7 +705,7 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 
 		if response != nil {
 
-			m.logger.Info("community validated", zap.String("id", types.EncodeHex(community.id)), zap.String("signer", crypto.PubkeyToHex(signer)))
+			m.logger.Info("community validated", zap.String("id", types3.EncodeHex(community.id)), zap.String("signer", crypto.PubkeyToHex(signer)))
 			m.publish(&Subscription{TokenCommunityValidated: response})
 			err := m.persistence.DeleteCommunitiesToValidateByCommunityID(community.id)
 			if err != nil {
@@ -764,12 +763,12 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []string) (*Kn
 
 	for i := range communityIDs {
 		communityID := communityIDs[i]
-		communityIDBytes, err := types.DecodeHex(communityID)
+		communityIDBytes, err := types3.DecodeHex(communityID)
 		if err != nil {
 			return nil, err
 		}
 
-		community, err := m.GetByID(types.HexBytes(communityIDBytes))
+		community, err := m.GetByID(types3.HexBytes(communityIDBytes))
 		if err != nil && err != ErrOrgNotFound {
 			return nil, err
 		}
@@ -798,7 +797,7 @@ func (m *Manager) JoinedOrSpectated() ([]*Community, error) {
 	return m.persistence.JoinedOrSpectatedCommunities(&m.identity.PublicKey)
 }
 
-func (m *Manager) CommunityUpdateLastOpenedAt(communityID types.HexBytes, timestamp int64) (*Community, error) {
+func (m *Manager) CommunityUpdateLastOpenedAt(communityID types3.HexBytes, timestamp int64) (*Community, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -863,7 +862,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		return nil, err
 	}
 
-	description.ID = types.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
+	description.ID = types3.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
 
 	config := Config{
 		ID:                   &key.PublicKey,
@@ -1047,7 +1046,7 @@ func (m *Manager) fetchCollectiblesOwners(collectibles map[walletcommon.ChainID]
 }
 
 // use it only for testing purposes
-func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+func (m *Manager) ReevaluateMembers(communityID types3.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	return m.reevaluateMembers(communityID)
 }
 
@@ -1059,7 +1058,7 @@ func (m *Manager) ReevaluateMembers(communityID types.HexBytes) (*Community, map
 // and do not affect the result of this function.
 // If permissions are changed in the meantime,
 // they will be accommodated with the next reevaluation.
-func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+func (m *Manager) reevaluateMembers(communityID types3.HexBytes) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -1177,7 +1176,7 @@ func (m *Manager) reevaluateMembers(communityID types.HexBytes) (*Community, map
 }
 
 // Apply results on the most up-to-date community.
-func (m *Manager) applyReevaluateMembersResult(communityID types.HexBytes, result *reevaluateMembersResult) (*Community, error) {
+func (m *Manager) applyReevaluateMembersResult(communityID types3.HexBytes, result *reevaluateMembersResult) (*Community, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -1347,11 +1346,11 @@ func (m *Manager) checkChannelsPermissions(channelsPermissionsPreParsedData map[
 	return m.checkChannelsPermissionsImpl(channelsPermissionsPreParsedData, accountsAndChainIDs, shortcircuit, nil)
 }
 
-func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reevaluateOnStart bool) {
+func (m *Manager) StartMembersReevaluationLoop(communityID types3.HexBytes, reevaluateOnStart bool) {
 	go m.reevaluateMembersLoop(communityID, reevaluateOnStart)
 }
 
-func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOnStart bool) {
+func (m *Manager) reevaluateMembersLoop(communityID types3.HexBytes, reevaluateOnStart bool) {
 	defer utils.LogOnPanic()
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
 		return
@@ -1463,18 +1462,18 @@ func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOn
 	}
 }
 
-func (m *Manager) ForceMembersReevaluation(communityID types.HexBytes) error {
+func (m *Manager) ForceMembersReevaluation(communityID types3.HexBytes) error {
 	if m.forceMembersReevaluation == nil {
 		return errors.New("forcing members reevaluation is not allowed")
 	}
 	return m.scheduleMembersReevaluation(communityID, true)
 }
 
-func (m *Manager) ScheduleMembersReevaluation(communityID types.HexBytes) error {
+func (m *Manager) ScheduleMembersReevaluation(communityID types3.HexBytes) error {
 	return m.scheduleMembersReevaluation(communityID, false)
 }
 
-func (m *Manager) scheduleMembersReevaluation(communityID types.HexBytes, forceImmediateReevaluation bool) error {
+func (m *Manager) scheduleMembersReevaluation(communityID types3.HexBytes, forceImmediateReevaluation bool) error {
 	t, exists := m.membersReevaluationTasks.Load(communityID.String())
 	if !exists {
 		// No reevaluation task yet. We start the loop which will create it
@@ -1519,15 +1518,15 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	return community, changes, nil
 }
 
-func (m *Manager) reevaluateCommunityMembersPermissions(communityID types.HexBytes) error {
+func (m *Manager) reevaluateCommunityMembersPermissions(communityID types3.HexBytes) error {
 	// Publish when the reevluation started since it can take a while
-	signal.SendCommunityMemberReevaluationStarted(types.EncodeHex(communityID))
+	signal.SendCommunityMemberReevaluationStarted(types3.EncodeHex(communityID))
 
 	community, newPrivilegedMembers, err := m.reevaluateMembers(communityID)
 
 	// Publish the reevaluation ending, even if it errored
 	// A possible improvement would be to pass the error here
-	signal.SendCommunityMemberReevaluationEnded(types.EncodeHex(communityID))
+	signal.SendCommunityMemberReevaluationEnded(types3.EncodeHex(communityID))
 
 	if err != nil {
 		return err
@@ -1536,7 +1535,7 @@ func (m *Manager) reevaluateCommunityMembersPermissions(communityID types.HexByt
 	return m.ShareRequestsToJoinWithPrivilegedMembers(community, newPrivilegedMembers)
 }
 
-func (m *Manager) DeleteCommunity(id types.HexBytes) error {
+func (m *Manager) DeleteCommunity(id types3.HexBytes) error {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -1626,7 +1625,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	return community, nil
 }
 
-func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
+func (m *Manager) RemovePrivateKey(id types3.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -1647,7 +1646,7 @@ func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
+func (m *Manager) ExportCommunity(id types3.HexBytes) (*ecdsa.PrivateKey, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -1688,7 +1687,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 		}
 
 		description.Clock = 1
-		description.ID = types.EncodeHex(communityID)
+		description.ID = types3.EncodeHex(communityID)
 
 		config := Config{
 			ID:                   &key.PublicKey,
@@ -1745,7 +1744,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 	return community, nil
 }
 
-func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool, thirdPartyID string) (*CommunityChanges, error) {
+func (m *Manager) CreateChat(communityID types3.HexBytes, chat *protobuf.CommunityChat, publish bool, thirdPartyID string) (*CommunityChanges, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -1771,7 +1770,7 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 	return changes, nil
 }
 
-func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
+func (m *Manager) EditChat(communityID types3.HexBytes, chatID string, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -1807,7 +1806,7 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 	return community, changes, nil
 }
 
-func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Community, *CommunityChanges, error) {
+func (m *Manager) DeleteChat(communityID types3.HexBytes, chatID string) (*Community, *CommunityChanges, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -1932,7 +1931,7 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	return community, changes, nil
 }
 
-func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chatID string, timestamp uint32) (*Community, *CommunityChanges, error) {
+func (m *Manager) EditChatFirstMessageTimestamp(communityID types3.HexBytes, chatID string, timestamp uint32) (*Community, *CommunityChanges, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -2039,7 +2038,7 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	return changes.Community, changes, nil
 }
 
-func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityID types.HexBytes, kickedMembers map[string]*protobuf.CommunityMember) ([]*RequestToJoin, error) {
+func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityID types3.HexBytes, kickedMembers map[string]*protobuf.CommunityMember) ([]*RequestToJoin, error) {
 	var requestsToJoin []*RequestToJoin
 	clock := uint64(time.Now().Unix())
 	for pubKeyStr := range kickedMembers {
@@ -2090,7 +2089,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	var id []byte
 	var err error
 	if len(description.ID) != 0 {
-		id, err = types.DecodeHex(description.ID)
+		id, err = types3.DecodeHex(description.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -2195,7 +2194,7 @@ func (m *Manager) NewHashRatchetKeys(keys []*types2.HashRatchetInfo) error {
 // NOTE: encrypted_community_description_cache is not a cache for the community description
 // The purpose of this cache is tightly coupled with the hash ratchet,
 // meaning the cache is invalidated whenever we receive a key that was previously missing for that community
-func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf.CommunityDescription) ([]*CommunityPrivateDataFailedToDecrypt, *protobuf.CommunityDescription, error) {
+func (m *Manager) preprocessDescription(id types3.HexBytes, description *protobuf.CommunityDescription) ([]*CommunityPrivateDataFailedToDecrypt, *protobuf.CommunityDescription, error) {
 	decryptedCommunity, err := m.persistence.GetDecryptedCommunityDescription(id, description.Clock)
 	if err != nil {
 		return nil, nil, err
@@ -2468,7 +2467,7 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) (*Community
 	return &communityResponse, nil
 }
 
-func (m *Manager) saveOrUpdateRequestToJoin(communityID types.HexBytes, requestToJoin *RequestToJoin) (bool, error) {
+func (m *Manager) saveOrUpdateRequestToJoin(communityID types3.HexBytes, requestToJoin *RequestToJoin) (bool, error) {
 	updated := false
 
 	existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
@@ -2501,7 +2500,7 @@ func (m *Manager) saveOrUpdateRequestToJoin(communityID types.HexBytes, requestT
 }
 
 func (m *Manager) handleCommunityEventRequestAccepted(community *Community, communityEvent *CommunityEvent) ([]*RequestToJoin, error) {
-	acceptedRequestsToJoin := make([]types.HexBytes, 0)
+	acceptedRequestsToJoin := make([]types3.HexBytes, 0)
 
 	requestsToJoin := make([]*RequestToJoin, 0)
 
@@ -2552,7 +2551,7 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 }
 
 func (m *Manager) handleCommunityEventRequestRejected(community *Community, communityEvent *CommunityEvent) ([]*RequestToJoin, error) {
-	rejectedRequestsToJoin := make([]types.HexBytes, 0)
+	rejectedRequestsToJoin := make([]types3.HexBytes, 0)
 
 	requestsToJoin := make([]*RequestToJoin, 0)
 
@@ -2642,11 +2641,11 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 	return nil
 }
 
-func (m *Manager) UpdateClockInRequestToJoin(id types.HexBytes, clock uint64) error {
+func (m *Manager) UpdateClockInRequestToJoin(id types3.HexBytes, clock uint64) error {
 	return m.persistence.UpdateClockInRequestToJoin(id, clock)
 }
 
-func (m *Manager) SetMuted(id types.HexBytes, muted bool) error {
+func (m *Manager) SetMuted(id types3.HexBytes, muted bool) error {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -2871,7 +2870,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 	return community, nil
 }
 
-func (m *Manager) GetRequestToJoin(ID types.HexBytes) (*RequestToJoin, error) {
+func (m *Manager) GetRequestToJoin(ID types3.HexBytes) (*RequestToJoin, error) {
 	return m.persistence.GetRequestToJoin(ID)
 }
 
@@ -2909,7 +2908,7 @@ func (m *Manager) DeclineRequestToJoin(dbRequest *RequestToJoin) (*Community, er
 }
 
 func (m *Manager) shouldUserRetainDeclined(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
-	requestID := CalculateRequestID(crypto.PubkeyToHex(signer), types.HexBytes(community.IDString()))
+	requestID := CalculateRequestID(crypto.PubkeyToHex(signer), types3.HexBytes(community.IDString()))
 	request, err := m.persistence.GetRequestToJoin(requestID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -3043,11 +3042,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 		// verify if revealed addresses indeed belong to requester
 		for _, revealedAccount := range request.RevealedAccounts {
 			recoverParams := personal.RecoverParams{
-				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
-				Signature: types.EncodeHex(revealedAccount.Signature),
+				Message:   types3.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
+				Signature: types3.EncodeHex(revealedAccount.Signature),
 			}
 
-			matching, err := m.signer.CanRecover(recoverParams, cryptotypes.HexToAddress(revealedAccount.Address))
+			matching, err := m.signer.CanRecover(recoverParams, types3.HexToAddress(revealedAccount.Address))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -3130,11 +3129,11 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	// verify if revealed addresses indeed belong to requester
 	for _, revealedAccount := range request.RevealedAccounts {
 		recoverParams := personal.RecoverParams{
-			Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID())),
-			Signature: types.EncodeHex(revealedAccount.Signature),
+			Message:   types3.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID())),
+			Signature: types3.EncodeHex(revealedAccount.Signature),
 		}
 
-		matching, err := m.signer.CanRecover(recoverParams, cryptotypes.HexToAddress(revealedAccount.Address))
+		matching, err := m.signer.CanRecover(recoverParams, types3.HexToAddress(revealedAccount.Address))
 		if err != nil {
 			return err
 		}
@@ -3175,7 +3174,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	return nil
 }
 
-func (m *Manager) handleCommunityEditSharedAddresses(publicKey string, communityID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount, clock uint64) error {
+func (m *Manager) handleCommunityEditSharedAddresses(publicKey string, communityID types3.HexBytes, revealedAccounts []*protobuf.RevealedAccount, clock uint64) error {
 	requestToJoinID := CalculateRequestID(publicKey, communityID)
 	err := m.UpdateClockInRequestToJoin(requestToJoinID, clock)
 	if err != nil {
@@ -3253,7 +3252,7 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 	return ownedERC721Tokens, nil
 }
 
-func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID string, addresses []gethcommon.Address) (*CheckChannelPermissionsResponse, error) {
+func (m *Manager) CheckChannelPermissions(communityID types3.HexBytes, chatID string, addresses []gethcommon.Address) (*CheckChannelPermissionsResponse, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -3372,7 +3371,7 @@ func computeCheckChannelPermissionsResponse(hasViewOnlyPermissions bool, hasView
 	return response
 }
 
-func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addresses []gethcommon.Address) (*CheckAllChannelsPermissionsResponse, error) {
+func (m *Manager) CheckAllChannelsPermissions(communityID types3.HexBytes, addresses []gethcommon.Address) (*CheckAllChannelsPermissionsResponse, error) {
 
 	community, err := m.GetByID(communityID)
 	if err != nil {
@@ -3441,7 +3440,7 @@ func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addres
 	return response, nil
 }
 
-func (m *Manager) GetCheckChannelPermissionResponses(communityID types.HexBytes) (*CheckAllChannelsPermissionsResponse, error) {
+func (m *Manager) GetCheckChannelPermissionResponses(communityID types3.HexBytes) (*CheckAllChannelsPermissionsResponse, error) {
 
 	response, err := m.persistence.GetCheckChannelPermissionResponses(communityID.String())
 	if err != nil {
@@ -3541,7 +3540,7 @@ func UnwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *proto
 	return signer, description, nil
 }
 
-func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, error) {
+func (m *Manager) JoinCommunity(id types3.HexBytes, forceJoin bool) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -3561,7 +3560,7 @@ func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, 
 	return community, nil
 }
 
-func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
+func (m *Manager) SpectateCommunity(id types3.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -3576,12 +3575,12 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64, error) {
+func (m *Manager) GetMagnetlinkMessageClock(communityID types3.HexBytes) (uint64, error) {
 	return m.persistence.GetMagnetlinkMessageClock(communityID)
 }
 
 func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityID string) (uint64, error) {
-	communityIDBytes, err := types.DecodeHex(communityID)
+	communityIDBytes, err := types3.DecodeHex(communityID)
 	if err != nil {
 		return 0, err
 	}
@@ -3601,7 +3600,7 @@ func (m *Manager) GetRequestToJoinByPkAndCommunityID(pk *ecdsa.PublicKey, commun
 	return m.persistence.GetRequestToJoinByPkAndCommunityID(crypto.PubkeyToHex(pk), communityID)
 }
 
-func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
+func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types3.HexBytes, clock uint64) error {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -3613,19 +3612,19 @@ func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID t
 	return m.SaveCommunity(community)
 }
 
-func (m *Manager) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
+func (m *Manager) UpdateMagnetlinkMessageClock(communityID types3.HexBytes, clock uint64) error {
 	return m.persistence.UpdateMagnetlinkMessageClock(communityID, clock)
 }
 
-func (m *Manager) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlinkURI string) error {
+func (m *Manager) UpdateLastSeenMagnetlink(communityID types3.HexBytes, magnetlinkURI string) error {
 	return m.persistence.UpdateLastSeenMagnetlink(communityID, magnetlinkURI)
 }
 
-func (m *Manager) GetLastSeenMagnetlink(communityID types.HexBytes) (string, error) {
+func (m *Manager) GetLastSeenMagnetlink(communityID types3.HexBytes) (string, error) {
 	return m.persistence.GetLastSeenMagnetlink(communityID)
 }
 
-func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
+func (m *Manager) LeaveCommunity(id types3.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -3650,7 +3649,7 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 }
 
 // Same as LeaveCommunity, but we have an option to stay spectating
-func (m *Manager) KickedOutOfCommunity(id types.HexBytes, spectateMode bool) (*Community, error) {
+func (m *Manager) KickedOutOfCommunity(id types3.HexBytes, spectateMode bool) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -3672,7 +3671,7 @@ func (m *Manager) KickedOutOfCommunity(id types.HexBytes, spectateMode bool) (*C
 	return community, nil
 }
 
-func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
+func (m *Manager) AddMemberOwnerToCommunity(communityID types3.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -3695,7 +3694,7 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 	return community, nil
 }
 
-func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
+func (m *Manager) RemoveUserFromCommunity(id types3.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
@@ -3893,11 +3892,11 @@ func (m *Manager) GetByID(id []byte) (*Community, error) {
 }
 
 func (m *Manager) GetByIDReadonly(id []byte) (ReadonlyCommunity, error) {
-	return m.GetByIDStringReadonly(types.EncodeHex(id))
+	return m.GetByIDStringReadonly(types3.EncodeHex(id))
 }
 
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
-	id, err := types.DecodeHex(idString)
+	id, err := types3.DecodeHex(idString)
 	if err != nil {
 		return nil, err
 	}
@@ -3919,11 +3918,11 @@ func (m *Manager) GetByIDStringReadonly(idString string) (ReadonlyCommunity, err
 	return ReadonlyCommunity(community), err
 }
 
-func (m *Manager) SaveRequestToJoinRevealedAddresses(requestID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount) error {
+func (m *Manager) SaveRequestToJoinRevealedAddresses(requestID types3.HexBytes, revealedAccounts []*protobuf.RevealedAccount) error {
 	return m.persistence.SaveRequestToJoinRevealedAddresses(requestID, revealedAccounts)
 }
 
-func (m *Manager) RemoveRequestToJoinRevealedAddresses(requestID types.HexBytes) error {
+func (m *Manager) RemoveRequestToJoinRevealedAddresses(requestID types3.HexBytes) error {
 	return m.persistence.RemoveRequestToJoinRevealedAddresses(requestID)
 }
 
@@ -3962,7 +3961,7 @@ func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, 
 	for i := range request.AddressesToReveal {
 		revealedAcc := &protobuf.RevealedAccount{
 			Address:          request.AddressesToReveal[i],
-			IsAirdropAddress: types.HexToAddress(request.AddressesToReveal[i]) == types.HexToAddress(request.AirdropAddress),
+			IsAirdropAddress: types3.HexToAddress(request.AddressesToReveal[i]) == types3.HexToAddress(request.AirdropAddress),
 		}
 
 		if addSignature {
@@ -3991,31 +3990,31 @@ func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestT
 	return m.persistence.RequestsToJoinForUserByState(crypto.PubkeyToHex(pk), RequestToJoinStatePending)
 }
 
-func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) PendingRequestsToJoinForCommunity(id types3.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching pending invitations", zap.String("community-id", id.String()))
 	return m.persistence.PendingRequestsToJoinForCommunity(id)
 }
 
-func (m *Manager) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) DeclinedRequestsToJoinForCommunity(id types3.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching declined invitations", zap.String("community-id", id.String()))
 	return m.persistence.DeclinedRequestsToJoinForCommunity(id)
 }
 
-func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) CanceledRequestsToJoinForCommunity(id types3.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
 	return m.persistence.CanceledRequestsToJoinForCommunity(id)
 }
 
-func (m *Manager) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) AcceptedRequestsToJoinForCommunity(id types3.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
 	return m.persistence.AcceptedRequestsToJoinForCommunity(id)
 }
 
-func (m *Manager) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) AcceptedPendingRequestsToJoinForCommunity(id types3.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.AcceptedPendingRequestsToJoinForCommunity(id)
 }
 
-func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types3.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.DeclinedPendingRequestsToJoinForCommunity(id)
 }
 
@@ -4024,7 +4023,7 @@ func (m *Manager) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoin, e
 	return m.persistence.AllNonApprovedCommunitiesRequestsToJoin()
 }
 
-func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types3.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching ownership changed invitations", zap.String("community-id", id.String()))
 	return m.persistence.RequestsToJoinForCommunityAwaitingAddresses(id)
 }
@@ -4065,7 +4064,7 @@ func (m *Manager) ShouldHandleSyncCommunitySettings(communitySettings *protobuf.
 }
 
 func (m *Manager) HandleSyncCommunitySettings(syncCommunitySettings *protobuf.SyncCommunitySettings) (*CommunitySettings, error) {
-	id, err := types.DecodeHex(syncCommunitySettings.CommunityId)
+	id, err := types3.DecodeHex(syncCommunitySettings.CommunityId)
 	if err != nil {
 		return nil, err
 	}
@@ -4108,7 +4107,7 @@ func (m *Manager) GetSyncedRawCommunity(id []byte) (*RawCommunityRow, error) {
 	return m.persistence.getSyncedRawCommunity(id)
 }
 
-func (m *Manager) GetCommunitySettingsByID(id types.HexBytes) (*CommunitySettings, error) {
+func (m *Manager) GetCommunitySettingsByID(id types3.HexBytes) (*CommunitySettings, error) {
 	return m.persistence.GetCommunitySettingsByID(id)
 }
 
@@ -4120,7 +4119,7 @@ func (m *Manager) SaveCommunitySettings(settings CommunitySettings) error {
 	return m.persistence.SaveCommunitySettings(settings)
 }
 
-func (m *Manager) CommunitySettingsExist(id types.HexBytes) (bool, error) {
+func (m *Manager) CommunitySettingsExist(id types3.HexBytes) (bool, error) {
 	return m.persistence.CommunitySettingsExist(id)
 }
 
@@ -4157,7 +4156,7 @@ func (m *Manager) EnsureCommunitySettings(org *Community) error {
 	return nil
 }
 
-func (m *Manager) DeleteCommunitySettings(id types.HexBytes) error {
+func (m *Manager) DeleteCommunitySettings(id types3.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
@@ -4283,7 +4282,7 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 		return nil, errors.New("Token is absent in database")
 	}
 
-	communityID, err := types.DecodeHex(token.CommunityID)
+	communityID, err := types3.DecodeHex(token.CommunityID)
 	if err != nil {
 		return nil, err
 	}
@@ -4375,7 +4374,7 @@ func (m *Manager) RemoveCommunityToken(chainID int, contractAddress string) erro
 }
 
 func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembersCount uint64) error {
-	id, err := types.DecodeHex(communityID)
+	id, err := types3.DecodeHex(communityID)
 	if err != nil {
 		return err
 	}
@@ -4470,7 +4469,7 @@ func (m *Manager) saveAndPublish(community *Community) error {
 	return nil
 }
 
-func (m *Manager) GetRevealedAddresses(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
+func (m *Manager) GetRevealedAddresses(communityID types3.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
 	logger := m.logger.Named("GetRevealedAddresses")
 
 	requestID := CalculateRequestID(memberPk, communityID)
@@ -4932,7 +4931,7 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 	return nil
 }
 
-func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID types.HexBytes) ([]*RequestToJoin, error) {
+func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID types3.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
 }
 
@@ -4956,15 +4955,15 @@ func (m *Manager) CreateCommunityTokenDeploymentSignature(ctx context.Context, c
 	return crypto.Sign(digest, community.PrivateKey())
 }
 
-func (m *Manager) GetSyncControlNode(id types.HexBytes) (*protobuf.SyncCommunityControlNode, error) {
+func (m *Manager) GetSyncControlNode(id types3.HexBytes) (*protobuf.SyncCommunityControlNode, error) {
 	return m.persistence.GetSyncControlNode(id)
 }
 
-func (m *Manager) SaveSyncControlNode(id types.HexBytes, syncControlNode *protobuf.SyncCommunityControlNode) error {
+func (m *Manager) SaveSyncControlNode(id types3.HexBytes, syncControlNode *protobuf.SyncCommunityControlNode) error {
 	return m.persistence.SaveSyncControlNode(id, syncControlNode.Clock, syncControlNode.InstallationId)
 }
 
-func (m *Manager) SetSyncControlNode(id types.HexBytes, syncControlNode *protobuf.SyncCommunityControlNode) error {
+func (m *Manager) SetSyncControlNode(id types3.HexBytes, syncControlNode *protobuf.SyncCommunityControlNode) error {
 	existingSyncControlNode, err := m.GetSyncControlNode(id)
 	if err != nil {
 		return err
@@ -4977,7 +4976,7 @@ func (m *Manager) SetSyncControlNode(id types.HexBytes, syncControlNode *protobu
 	return nil
 }
 
-func (m *Manager) GetCommunityRequestToJoinWithRevealedAddresses(pubKey string, communityID types.HexBytes) (*RequestToJoin, error) {
+func (m *Manager) GetCommunityRequestToJoinWithRevealedAddresses(pubKey string, communityID types3.HexBytes) (*RequestToJoin, error) {
 	return m.persistence.GetCommunityRequestToJoinWithRevealedAddresses(pubKey, communityID)
 }
 
@@ -5009,8 +5008,8 @@ func (m *Manager) encryptCommunityDescriptionImpl(groupID []byte, d *protobuf.Co
 
 	m.logger.Debug("encrypting community description",
 		zap.Any("communityID", d.ID),
-		zap.String("groupID", types.EncodeHex(groupID)),
-		zap.String("keyID", types.EncodeHex(keyID)))
+		zap.String("groupID", types3.EncodeHex(groupID)),
+		zap.String("keyID", types3.EncodeHex(keyID)))
 
 	keyIDSeqNo := fmt.Sprintf("%s%d", hex.EncodeToString(keyID), newSeqNo)
 
@@ -5214,11 +5213,11 @@ func (m *Manager) DetermineChannelsForHRKeysRequest() ([]*CommunityWithChannelID
 	return result, nil
 }
 
-func (m *Manager) updateEncryptionKeysRequests(communityID types.HexBytes, channelIDs []string, now int64) error {
+func (m *Manager) updateEncryptionKeysRequests(communityID types3.HexBytes, channelIDs []string, now int64) error {
 	return m.persistence.UpdateAndPruneEncryptionKeyRequests(communityID, channelIDs, now)
 }
 
-func (m *Manager) UpdateEncryptionKeysRequests(communityID types.HexBytes, channelIDs []string) error {
+func (m *Manager) UpdateEncryptionKeysRequests(communityID types3.HexBytes, channelIDs []string) error {
 	return m.updateEncryptionKeysRequests(communityID, channelIDs, time.Now().UnixMilli())
 }
 

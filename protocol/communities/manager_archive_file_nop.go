@@ -7,7 +7,7 @@ import (
 	"crypto/ecdsa"
 	"time"
 
-	"github.com/status-im/status-go/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
