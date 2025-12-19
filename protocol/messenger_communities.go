@@ -1501,21 +1501,27 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	response.AddCommunity(community)
 
 	// We send a push notification in the background
+
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
-		if m.pushNotificationClient != nil {
-			pks, err := community.CanManageUsersPublicKeys()
+		defer m.shutdownWaitGroup.Done()
+
+		if m.pushNotificationClient == nil {
+			return
+		}
+
+		pks, err := community.CanManageUsersPublicKeys()
+		if err != nil {
+			m.logger.Error("failed to get pks", zap.Error(err))
+			return
+		}
+		for _, publicKey := range pks {
+			pkString := crypto.PubkeyToHex(publicKey)
+			_, err = m.pushNotificationClient.SendNotification(publicKey, nil, requestToJoin.ID, pkString, protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY)
 			if err != nil {
-				m.logger.Error("failed to get pks", zap.Error(err))
+				m.logger.Error("error sending notification", zap.Error(err))
 				return
-			}
-			for _, publicKey := range pks {
-				pkString := crypto.PubkeyToHex(publicKey)
-				_, err = m.pushNotificationClient.SendNotification(publicKey, nil, requestToJoin.ID, pkString, protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY)
-				if err != nil {
-					m.logger.Error("error sending notification", zap.Error(err))
-					return
-				}
 			}
 		}
 	}()
