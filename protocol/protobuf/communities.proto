@@ -125,6 +125,7 @@ message CommunityDescription {
   map<string,CommunityBanInfo>banned_members = 19;
   // request to resend revealed addresses
   uint64 resend_accounts_clock = 20;
+  uint64 archive_index_cid_clock = 21;
   // key is hash ratchet key_id + seq_no
   map<string, bytes> privateData = 100;
 }
@@ -207,6 +208,7 @@ message CommunityRequestToJoinResponse {
   reserved 7, 8;
   // CommunityDescription protocol message with owner signature
   bytes community_description_protocol_message = 9;
+  string index_cid = 10;
 }
 
 message CommunityRequestToLeave {
@@ -217,6 +219,11 @@ message CommunityRequestToLeave {
 message CommunityMessageArchiveMagnetlink {
   uint64 clock = 1;
   string magnet_uri = 2;
+}
+
+message CommunityMessageArchiveIndexCid {
+  uint64 clock = 1;
+  string cid = 2;
 }
 
 message WakuMessage {
@@ -252,6 +259,16 @@ message WakuMessageArchiveIndexMetadata {
 
 message WakuMessageArchiveIndex {
   map<string, WakuMessageArchiveIndexMetadata> archives = 1;
+}
+
+message CodexWakuMessageArchiveIndexMetadata {
+  uint32 version = 1;
+  WakuMessageArchiveMetadata metadata = 2;
+  string cid = 3;
+}
+
+message CodexWakuMessageArchiveIndex {
+  map<string, CodexWakuMessageArchiveIndexMetadata> archives = 1;
 }
 
 message CommunityReevaluatePermissionsRequest {

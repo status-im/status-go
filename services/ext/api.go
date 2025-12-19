@@ -2,8 +2,10 @@ package ext
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
@@ -277,6 +279,29 @@ func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.
 // RemovePrivateKey removes the private key of the community with given ID
 func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemovePrivateKey(id)
+}
+
+// SetArchiveDistributionPreference sets the archive distribution preference for the node
+func (api *PublicAPI) SetArchiveDistributionPreference(request *requests.SetArchiveDistributionPreference) (string, error) {
+	if err := request.Validate(); err != nil {
+		return "", err
+	}
+
+	if err := api.service.messenger.SetArchiveDistributionPreference(request.Preference); err != nil {
+		return "", err
+	}
+
+	updatedPreference, err := api.service.messenger.GetArchiveDistributionPreference()
+	if err != nil {
+		return "", err
+	}
+
+	return updatedPreference, nil
+}
+
+// GetArchiveDistributionPreference gets the archive distribution preference for the node
+func (api *PublicAPI) GetArchiveDistributionPreference() (string, error) {
+	return api.service.messenger.GetArchiveDistributionPreference()
 }
 
 // ExportCommunity exports the private key of the community with given ID
@@ -1072,6 +1097,10 @@ func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings,
 	return api.service.messenger.GetCommunitiesSettings()
 }
 
+func (api *PublicAPI) EnableCodexCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	return api.service.messenger.EnableCodexCommunityHistoryArchiveProtocol(overrides)
+}
+
 func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.EnableCommunityHistoryArchiveProtocol()
 }
@@ -1425,4 +1454,37 @@ func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteComm
 
 func (api *PublicAPI) PeerID() string {
 	return api.service.messaging.PeerID().String()
+}
+
+func (m *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
+	return m.service.messenger.IsSeedingHistoryArchiveCodex(communityID)
+}
+
+func (m *PublicAPI) Connect(peerId string, addrs []string) error {
+	return m.service.messenger.Connect(peerId, addrs)
+}
+
+func (m *PublicAPI) Debug() (codex.DebugInfo, error) {
+	return m.service.messenger.Debug()
+}
+
+func (m *PublicAPI) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+	return m.service.messenger.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (m *PublicAPI) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+	return m.service.messenger.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	if duration <= 0 {
+		return 0, errors.New("duration must be greater than zero")
+	}
+
+	d := duration * time.Second
+	updatedInterval, err := api.service.messenger.UpdateMessageArchiveInterval(d)
+	if err != nil {
+		return 0, err
+	}
+	return updatedInterval / time.Second, nil
 }

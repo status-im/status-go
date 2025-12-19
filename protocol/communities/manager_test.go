@@ -9,9 +9,11 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -63,14 +65,31 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
+	messagingEnv, err := messaging.NewTestMessagingEnvironment()
+	s.Require().NoError(err)
+
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+
+	err = sqlite.Migrate(appDb)
+	s.Require().NoError(err)
+
+	core, err := messagingEnv.NewTestCore(
+		messaging.CoreParams{},
+		messaging.WithSQLitePersistence(appDb),
+	)
+	s.Require().NoError(err)
+
 	amc := &ArchiveManagerConfig{
 		TorrentConfig: buildTorrentConfig(),
+		CodexConfig:   buildCodexConfig(s.T()),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
-		Messaging:     nil,
+		Messaging:     core.API(),
 		Identity:      key,
 		Publisher:     m,
 	}
+
 	t := NewArchiveManager(amc)
 	s.Require().NoError(err)
 
@@ -485,6 +504,17 @@ func (s *ManagerSuite) TestStartAndStopTorrentClient() {
 	s.Require().Equal(s.archiveManager.torrentClientStarted(), true)
 }
 
+func (s *ManagerSuite) TestStartAndStopCodexClient() {
+	err := s.archiveManager.StartCodexClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(s.archiveManager.codexClient)
+	defer s.archiveManager.Stop() //nolint: errcheck
+
+	_, err = os.Stat(s.archiveManager.codexConfig.CodexNodeConfig.DataDir)
+	s.Require().NoError(err)
+	s.Require().Equal(s.archiveManager.isCodexClientStarted, true)
+}
+
 func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 	err := s.archiveManager.StartTorrentClient()
 	s.Require().NoError(err)
@@ -563,8 +593,13 @@ func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 func (s *ManagerSuite) TestStartTorrentClient_DelayedUntilOnline() {
 	s.Require().False(s.archiveManager.torrentClientStarted())
 
+	s.T().Cleanup(func() {
+		_ = s.archiveManager.Stop()
+	})
+
 	s.archiveManager.SetOnline(true)
 	s.Require().True(s.archiveManager.torrentClientStarted())
+	s.Require().True(s.archiveManager.isCodexClientStarted)
 }
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
@@ -1638,6 +1673,18 @@ func buildTorrentConfig() *params.TorrentConfig {
 	}
 }
 
+func buildCodexConfig(t *testing.T) *params.CodexConfig {
+	return &params.CodexConfig{
+		Enabled: true,
+		CodexNodeConfig: codex.Config{
+			DataDir:      filepath.Join(t.TempDir(), "codex", "codexdata"),
+			BlockRetries: 5,
+			LogLevel:     "ERROR",
+			Nat:          "none",
+		},
+	}
+}
+
 func buildMessage(timestamp time.Time, topic messagingtypes.ContentTopic, hash []byte) messagingtypes.ReceivedMessage {
 	message := messagingtypes.ReceivedMessage{
 		Sig:       []byte{1},
@@ -1660,6 +1707,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+
 	chat := &protobuf.CommunityChat{
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "added-chat",

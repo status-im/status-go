@@ -29,9 +29,21 @@ func (tmm *ArchiveManagerNop) SetOnline(online bool) {}
 
 func (tmm *ArchiveManagerNop) SetTorrentConfig(*params.TorrentConfig) {}
 
+func (tmm *ArchiveManagerNop) SetCodexConfig(*params.CodexConfig) {}
+
 func (tmm *ArchiveManagerNop) StartTorrentClient() error {
 	return nil
 }
+
+func (tmm *ArchiveManagerNop) StartCodexClient() error {
+	return nil
+}
+
+func (tmm *ArchiveManagerNop) GetCodexClient() CodexClientInterface {
+	return nil
+}
+
+func (tmm *ArchiveManagerNop) SetCodexClient(client CodexClientInterface) {}
 
 func (tmm *ArchiveManagerNop) Stop() error {
 	return nil
@@ -66,9 +78,19 @@ func (tmm *ArchiveManagerNop) SeedHistoryArchiveTorrent(communityID types.HexByt
 	return nil
 }
 
+func (tmm *ArchiveManagerNop) SeedHistoryArchiveIndexCid(communityID types.HexBytes) error {
+	return nil
+}
+
 func (tmm *ArchiveManagerNop) UnseedHistoryArchiveTorrent(communityID types.HexBytes) {}
 
+func (tmm *ArchiveManagerNop) UnseedHistoryArchiveIndexCid(communityID types.HexBytes) {}
+
 func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool {
+	return false
+}
+
+func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool {
 	return false
 }
 
@@ -83,6 +105,14 @@ func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByMagnetlink(communityID ty
 	return nil, nil
 }
 
+func (tmm *ArchiveManagerNop) DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
+	return nil, nil
+}
+
 func (tmm *ArchiveManagerNop) TorrentFileExists(communityID string) bool {
+	return false
+}
+
+func (tmm *ArchiveManagerNop) CodexIndexCidFileExists(communityID types.HexBytes) bool {
 	return false
 }

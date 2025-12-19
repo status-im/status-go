@@ -39,9 +39,11 @@ type MessengerSignalsHandler interface {
 	CreatingHistoryArchives(communityID string)
 	NoHistoryArchivesCreated(communityID string, from int, to int)
 	HistoryArchivesCreated(communityID string, from int, to int)
-	HistoryArchivesSeeding(communityID string)
+	HistoryArchivesSeeding(communityID string, magnetLink bool, indexCid bool)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
+	ManifestFetched(communityID string, indexCid string)
+	IndexDownloadCompleted(communityID string, indexCid string)
 	DownloadingHistoryArchivesStarted(communityID string)
 	DownloadingHistoryArchivesFinished(communityID string)
 	ImportingHistoryArchiveMessages(communityID string)
@@ -76,6 +78,7 @@ type config struct {
 	clusterConfig          params.ClusterConfig
 	browserDatabase        *browsers.Database
 	torrentConfig          *params.TorrentConfig
+	codexConfig            *params.CodexConfig
 	walletService          *wallet.Service
 	communityTokensService communities.CommunityTokensServiceInterface
 	httpServer             *server.MediaServer
@@ -348,6 +351,33 @@ func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
 	return func(c *config) error {
 		c.ensVerifier = ensVerifier
+		return nil
+	}
+}
+
+func WithCodexConfig(codexConfig *params.CodexConfig) func(c *config) error {
+	return func(c *config) error {
+		c.codexConfig = codexConfig
+		return nil
+	}
+}
+
+func WithImportInitialDelay(delay int) func(c *config) error {
+	return func(c *config) error {
+		if delay <= 0 {
+			return nil
+		}
+		importInitialDelay = time.Duration(delay) * time.Second
+		return nil
+	}
+}
+
+func WithMessageArchiveInterval(interval int) func(c *config) error {
+	return func(c *config) error {
+		if interval <= 0 {
+			return nil
+		}
+		messageArchiveInterval = time.Duration(interval) * time.Second
 		return nil
 	}
 }

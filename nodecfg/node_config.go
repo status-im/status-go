@@ -3,6 +3,8 @@ package nodecfg
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"strings"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
@@ -20,22 +22,68 @@ func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 
 type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 
-func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`
+const historyArchiveDistributionPreferenceColumn = "history_archive_distribution_preference"
+
+func nodeConfigHasArchivePreferenceColumn(tx *sql.Tx) bool {
+	rows, err := tx.Query(`PRAGMA table_info(node_config)`)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			cid       int
+			name      string
+			dataType  string
+			notNull   int
+			dfltValue sql.NullString
+			pk        int
+		)
+		if err := rows.Scan(&cid, &name, &dataType, &notNull, &dfltValue, &pk); err != nil {
+			return false
+		}
+		if name == historyArchiveDistributionPreferenceColumn {
+			return true
+		}
+	}
+
+	return false
+}
+
+func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig) error {
+	hasPreferenceColumn := nodeConfigHasArchivePreferenceColumn(tx)
+
+	query := `
 	INSERT OR REPLACE INTO node_config (
 		network_id, data_dir, keystore_dir, node_key,
 		api_modules, enable_ntp_sync, wallet_enabled,
-		browser_enabled, permissions_enabled, connector_enabled, synthetic_id)
-		VALUES (
-		?, ?, ?, ?,
-		?, ?, ?,
-		?, ?, ?, 'id'
-	)`,
+		browser_enabled, permissions_enabled, connector_enabled`
+
+	args := []any{
 		c.NetworkID, "", "", c.NodeKey, c.APIModules, true,
 		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
 		c.PermissionsConfig.Enabled, c.ConnectorConfig.Enabled,
-	)
+	}
+
+	preference := c.HistoryArchiveDistributionPreference
+	if preference == "" {
+		preference = params.DefaultHistoryArchiveDistributionPreference
+	}
+	if hasPreferenceColumn {
+		query += `, history_archive_distribution_preference`
+		args = append(args, preference)
+	}
+
+	query += `, synthetic_id) VALUES (?` + strings.Repeat(",?", len(args)) + `)`
+	args = append(args, "id")
+
+	_, err := tx.Exec(query, args...)
 	return err
+}
+
+func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	return insertNodeConfigBase(tx, c)
 }
 
 func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
@@ -77,6 +125,50 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
     enabled, port, data_dir, torrent_dir, synthetic_id
   ) VALUES (?, ?, ?, ?, 'id')`,
 		c.TorrentConfig.Enabled, c.TorrentConfig.Port, c.TorrentConfig.DataDir, c.TorrentConfig.TorrentDir,
+	)
+	return err
+}
+
+// Insert or update codex_config table
+func insertCodexConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	listenAddrsJSON, err := json.Marshal(c.CodexConfig.CodexNodeConfig.ListenAddrs)
+	if err != nil {
+		return err
+	}
+	bootstrapNodesJSON, err := json.Marshal(c.CodexConfig.CodexNodeConfig.BootstrapNodes)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
+		INSERT OR REPLACE INTO codex_config (
+			enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+			listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
+			repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
+			block_retries, cache_size, log_file, synthetic_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.CodexConfig.Enabled,
+		c.CodexConfig.CodexNodeConfig.LogLevel,
+		c.CodexConfig.CodexNodeConfig.LogFormat,
+		c.CodexConfig.CodexNodeConfig.MetricsEnabled,
+		c.CodexConfig.CodexNodeConfig.MetricsAddress,
+		c.CodexConfig.CodexNodeConfig.MetricsPort,
+		c.CodexConfig.CodexNodeConfig.DataDir,
+		string(listenAddrsJSON),
+		c.CodexConfig.CodexNodeConfig.Nat,
+		c.CodexConfig.CodexNodeConfig.DiscoveryPort,
+		c.CodexConfig.CodexNodeConfig.NetPrivKeyFile,
+		string(bootstrapNodesJSON),
+		c.CodexConfig.CodexNodeConfig.MaxPeers,
+		c.CodexConfig.CodexNodeConfig.NumThreads,
+		c.CodexConfig.CodexNodeConfig.AgentString,
+		c.CodexConfig.CodexNodeConfig.RepoKind,
+		c.CodexConfig.CodexNodeConfig.StorageQuota,
+		c.CodexConfig.CodexNodeConfig.BlockTtl,
+		c.CodexConfig.CodexNodeConfig.BlockMaintenanceInterval,
+		c.CodexConfig.CodexNodeConfig.BlockMaintenanceNumberOfBlocks,
+		c.CodexConfig.CodexNodeConfig.BlockRetries,
+		c.CodexConfig.CodexNodeConfig.CacheSize,
+		c.CodexConfig.CodexNodeConfig.LogFile,
 	)
 	return err
 }
@@ -144,6 +236,7 @@ func nodeConfigNormalInserts() []insertFn {
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
+		insertCodexConfig,
 		insertWakuV2ConfigPostMigration,
 	}
 }
@@ -210,19 +303,82 @@ func migrateNodeConfig(tx *sql.Tx) error {
 func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodecfg := &params.NodeConfig{}
 
-	err := tx.QueryRow(`
-	SELECT
-		network_id, node_key, api_modules,
-		wallet_enabled, browser_enabled, permissions_enabled,
-		connector_enabled FROM node_config
-		WHERE synthetic_id = 'id'
-	`).Scan(
+	hasPreferenceColumn := nodeConfigHasArchivePreferenceColumn(tx)
+
+	query := `
+    SELECT
+        network_id, node_key, api_modules,
+        wallet_enabled, browser_enabled, permissions_enabled`
+
+	scanArgs := []any{
 		&nodecfg.NetworkID, &nodecfg.NodeKey, &nodecfg.APIModules,
 		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
-		&nodecfg.ConnectorConfig.Enabled,
+	}
+
+	if hasPreferenceColumn {
+		query += `, history_archive_distribution_preference`
+		scanArgs = append(scanArgs, &nodecfg.HistoryArchiveDistributionPreference)
+	}
+
+	query += `, connector_enabled FROM node_config
+        WHERE synthetic_id = 'id'`
+	scanArgs = append(scanArgs, &nodecfg.ConnectorConfig.Enabled)
+
+	err := tx.QueryRow(query).Scan(scanArgs...)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	if nodecfg.HistoryArchiveDistributionPreference == "" {
+		nodecfg.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
+	}
+
+	// Load codex_config
+	var listenAddrsStr, bootstrapNodesStr string
+	err = tx.QueryRow(`
+	  SELECT enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+			 listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
+			 repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
+			 block_retries, cache_size, log_file
+	  FROM codex_config WHERE synthetic_id = 'id'
+	`).Scan(
+		&nodecfg.CodexConfig.Enabled,
+		&nodecfg.CodexConfig.CodexNodeConfig.LogLevel,
+		&nodecfg.CodexConfig.CodexNodeConfig.LogFormat,
+		&nodecfg.CodexConfig.CodexNodeConfig.MetricsEnabled,
+		&nodecfg.CodexConfig.CodexNodeConfig.MetricsAddress,
+		&nodecfg.CodexConfig.CodexNodeConfig.MetricsPort,
+		&nodecfg.CodexConfig.CodexNodeConfig.DataDir,
+		&listenAddrsStr,
+		&nodecfg.CodexConfig.CodexNodeConfig.Nat,
+		&nodecfg.CodexConfig.CodexNodeConfig.DiscoveryPort,
+		&nodecfg.CodexConfig.CodexNodeConfig.NetPrivKeyFile,
+		&bootstrapNodesStr,
+		&nodecfg.CodexConfig.CodexNodeConfig.MaxPeers,
+		&nodecfg.CodexConfig.CodexNodeConfig.NumThreads,
+		&nodecfg.CodexConfig.CodexNodeConfig.AgentString,
+		&nodecfg.CodexConfig.CodexNodeConfig.RepoKind,
+		&nodecfg.CodexConfig.CodexNodeConfig.StorageQuota,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockTtl,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockMaintenanceInterval,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockMaintenanceNumberOfBlocks,
+		&nodecfg.CodexConfig.CodexNodeConfig.BlockRetries,
+		&nodecfg.CodexConfig.CodexNodeConfig.CacheSize,
+		&nodecfg.CodexConfig.CodexNodeConfig.LogFile,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
+	}
+	// Unmarshal JSON fields
+	if listenAddrsStr != "" {
+		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.CodexConfig.CodexNodeConfig.ListenAddrs); err != nil {
+			return nil, err
+		}
+	}
+	if bootstrapNodesStr != "" {
+		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.CodexConfig.CodexNodeConfig.BootstrapNodes); err != nil {
+			return nil, err
+		}
 	}
 
 	err = tx.QueryRow("SELECT enabled, log_dir, log_level, log_namespaces, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(

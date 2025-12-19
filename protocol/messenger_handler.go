@@ -165,10 +165,6 @@ func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *Re
 
 		chat.updateChatFromGroupMembershipChanges(group)
 
-		if err != nil {
-			return errors.Wrap(err, "failed to get group creator")
-		}
-
 		publicKeys, err := group.MemberPublicKeys()
 		if err != nil {
 			return errors.Wrap(err, "failed to get group members")
@@ -1267,11 +1263,12 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return nil
 	}
 
-	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
-		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
+	if m.archiveManager.IsTorrentReady() && settings.HistoryArchiveSupportEnabled {
+		lastMagnetlinkClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
 		}
+
 		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
 		if err != nil {
 			return err
@@ -1279,11 +1276,13 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		// We are only interested in a community archive magnet link
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
-		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
+		if !community.IsControlNode() && community.Joined() && clock >= lastMagnetlinkClock {
 			if lastSeenMagnetlink == magnetlink {
 				m.logger.Debug("already processed this magnetlink")
 				return nil
 			}
+
+			// All checks passed - proceed with download
 
 			m.archiveManager.UnseedHistoryArchiveTorrent(id)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
@@ -1316,6 +1315,96 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			}(currentTask, id)
 
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
+		}
+	}
+	return nil
+}
+
+func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, cid string, clock uint64) error {
+	m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Handling history archive index CID message", zap.String("cid", cid))
+	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
+
+	community, err := m.communitiesManager.GetByID(id)
+	if err != nil && err != communities.ErrOrgNotFound {
+		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Couldn't get community for community with id: ", zap.Any("id", id))
+		return err
+	}
+	if community == nil {
+		return nil
+	}
+
+	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
+	if err != nil {
+		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Couldn't get community settings for community with id: ", zap.Any("id", id))
+		return err
+	}
+	if settings == nil {
+		return nil
+	}
+
+	if m.archiveManager.IsCodexReady() && settings.HistoryArchiveSupportEnabled {
+		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Codex is ready and history archive support is enabled", zap.String("communityID", community.IDString()))
+
+		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
+		if err != nil {
+			return err
+		}
+
+		lastSeenCid, err := m.communitiesManager.GetLastSeenIndexCid(id)
+		if err != nil {
+			return err
+		}
+		// We are only interested in a community archive index CID
+		// if it originates from a community that the current account is
+		// part of and doesn't own the private key at the same time
+		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Checking community membership and lastIndexCidClock", zap.String("communityID", community.IDString()), zap.Uint64("lastIndexCidClock", lastIndexCidClock), zap.Uint64("messageClock", clock))
+
+		if !community.IsControlNode() && community.Joined() && clock >= lastIndexCidClock {
+			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] clock >= lastIndexCidClock)")
+			if lastSeenCid == cid {
+				m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] already processed this index cid")
+				return nil
+			}
+
+			// All checks passed - proceed with download
+			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Unseeding existing history archive index CID for community (if any)", zap.String("communityID", community.IDString()))
+			m.archiveManager.UnseedHistoryArchiveIndexCid(id, lastSeenCid)
+			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
+
+			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Starting download and import of history archives", zap.String("cid", cid))
+
+			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
+				defer gocommon.LogOnPanic()
+				// Cancel ongoing download/import task
+				if currentTask != nil && !currentTask.IsCancelled() {
+					currentTask.Cancel()
+					currentTask.Waiter.Wait()
+				}
+
+				// Create new task
+				task := &communities.HistoryArchiveDownloadTask{
+					CancelChan: make(chan struct{}),
+					Waiter:     *new(sync.WaitGroup),
+					Cancelled:  false,
+				}
+
+				m.archiveManager.AddHistoryArchiveDownloadTask(communityID.String(), task)
+
+				// this wait groups tracks the ongoing task for a particular community
+				task.Waiter.Add(1)
+				defer task.Waiter.Done()
+
+				// this wait groups tracks all ongoing tasks across communities
+				m.shutdownWaitGroup.Add(1)
+				defer m.shutdownWaitGroup.Done()
+
+				m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Calling downloadAndImportCodexHistoryArchives", zap.String("cid", cid))
+
+				m.downloadAndImportCodexHistoryArchives(communityID, cid, task.CancelChan)
+			}(currentTask, id)
+
+			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Updating index CID message clock", zap.String("communityID", community.IDString()), zap.Uint64("clock", clock))
+			return m.communitiesManager.UpdateIndexCidMessageClock(id, clock)
 		}
 	}
 	return nil
@@ -1355,9 +1444,55 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 		return
 	}
 
-	err = m.importHistoryArchives(id, cancel)
+	err = m.importHistoryArchives(id, cancel, "")
 	if err != nil {
 		m.logger.Error("failed to import history archives", zap.Error(err))
+		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+		return
+	}
+
+	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
+}
+
+func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, indexCid string, cancel chan struct{}) {
+	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
+	if err != nil {
+		m.logger.Error(
+			"[CODEX][downloadAndImportCodexHistoryArchives] failed to download history archive data",
+			zap.Error(err),
+		)
+		return
+	}
+
+	if downloadTaskInfo.Cancelled {
+		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
+			m.logger.Debug(fmt.Sprintf("[CODEX][downloadAndImportCodexHistoryArchives] downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+		}
+		m.archiveManager.UnseedHistoryArchiveIndexCid(id, indexCid)
+		return
+	}
+
+	m.logger.Debug("[CODEX][download_and_import_codex_history_archives] Updating last seen indexCid",
+		zap.String("indexCid", indexCid))
+	err = m.communitiesManager.UpdateLastSeenIndexCid(id, indexCid)
+	if err != nil {
+		m.logger.Error("[CODEX][download_and_import_codex_history_archives] couldn't update last seen indexCid",
+			zap.String("indexCid", indexCid), zap.Error(err))
+		return
+	}
+
+	m.archiveManager.PublishHistoryArchivesSeedingSignal(id, false, true)
+
+	err = m.checkIfIMemberOfCommunity(id)
+	if err != nil {
+		return
+	}
+
+	m.logger.Debug("[CODEX][downloadAndImportCodexHistoryArchives] Importing history archives now")
+
+	err = m.importHistoryArchives(id, cancel, indexCid)
+	if err != nil {
+		m.logger.Error("[CODEX][downloadAndImportCodexHistoryArchives] failed to import history archives", zap.Error(err))
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 		return
 	}
@@ -1455,6 +1590,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(ctx context.Context, stat
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *common.StatusMessage) error {
+	m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] Handling community request to join")
 	signer := state.CurrentMessageState.PublicKey
 	community, requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, statusMessage.TransportLayer.Dst, requestToJoinProto)
 	if err != nil {
@@ -1494,6 +1630,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 		}
 
 	case communities.RequestToJoinStateDeclined:
+		m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] Community request to join declined")
 		response, err := m.declineRequestToJoinCommunity(requestToJoin)
 		if err == nil {
 			err := state.Response.Merge(response)
@@ -1505,6 +1642,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 		}
 
 	case communities.RequestToJoinStateAccepted:
+		m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] Community request to join accepted")
 		response, err := m.acceptRequestToJoinCommunity(requestToJoin)
 		if err == nil {
 			err := state.Response.Merge(response) // new member has been added
@@ -1512,6 +1650,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 				return err
 			}
 		} else if err == communities.ErrNoPermissionToJoin {
+			m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] No permission to join community")
 			// only control node will end up here as it's the only one that
 			// performed token permission checks
 			response, err = m.declineRequestToJoinCommunity(requestToJoin)
@@ -1564,6 +1703,7 @@ func (m *Messenger) HandleCommunityEditSharedAddresses(ctx context.Context, stat
 }
 
 func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, state *ReceivedMessageState, requestToJoinResponseProto *protobuf.CommunityRequestToJoinResponse, statusMessage *common.StatusMessage) error {
+	m.logger.Debug("[CODEX][HandleCommunityRequestToJoinResponse] Handling community request to join response")
 	signer := state.CurrentMessageState.PublicKey
 	if requestToJoinResponseProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1642,12 +1782,50 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 		if communitySettings == nil {
 			communitySettings, err = m.communitiesManager.GetCommunitySettingsByID(requestToJoinResponseProto.CommunityId)
 			if err != nil {
-				return nil
+				return err
 			}
 		}
 
 		magnetlink := requestToJoinResponseProto.MagnetUri
-		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+		if m.archiveManager.IsTorrentReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+
+			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
+			if err := m.communitiesManager.UpdateMagnetlinkMessageClock(requestToJoinResponseProto.CommunityId, requestToJoinResponseProto.Clock); err != nil {
+				return err
+			}
+			go func(currentTask *communities.HistoryArchiveDownloadTask) {
+				defer gocommon.LogOnPanic()
+				// Cancel ongoing download/import task
+				if currentTask != nil && !currentTask.IsCancelled() {
+					currentTask.Cancel()
+					currentTask.Waiter.Wait()
+				}
+
+				task := &communities.HistoryArchiveDownloadTask{
+					CancelChan: make(chan struct{}),
+					Waiter:     *new(sync.WaitGroup),
+					Cancelled:  false,
+				}
+				m.archiveManager.AddHistoryArchiveDownloadTask(community.IDString(), task)
+
+				task.Waiter.Add(1)
+				defer task.Waiter.Done()
+
+				m.shutdownWaitGroup.Add(1)
+				defer m.shutdownWaitGroup.Done()
+
+				m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
+			}(currentTask)
+		}
+
+		cid := requestToJoinResponseProto.IndexCid
+		if m.archiveManager.IsCodexReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && cid != "" {
+
+			m.logger.Debug("[CODEX][HandleCommunityRequestToJoinResponse] Received index CID to download history archives", zap.String("cid", cid))
+
+			if err := m.communitiesManager.UpdateIndexCidMessageClock(requestToJoinResponseProto.CommunityId, requestToJoinResponseProto.Clock); err != nil {
+				return err
+			}
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {
@@ -1671,7 +1849,9 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 				m.shutdownWaitGroup.Add(1)
 				defer m.shutdownWaitGroup.Done()
 
-				m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
+				m.logger.Debug("[CODEX][HandleCommunityRequestToJoinResponse] Starting download and import of history archives", zap.String("cid", cid))
+
+				m.downloadAndImportCodexHistoryArchives(community.ID(), cid, task.CancelChan)
 			}(currentTask)
 		}
 	}
@@ -3577,7 +3757,32 @@ func (m *Messenger) HandleSyncTrustedUser(ctx context.Context, state *ReceivedMe
 
 	return nil
 }
+
+func (m *Messenger) HandleCommunityMessageArchiveIndexCid(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveIndexCid, statusMessage *common.StatusMessage) error {
+	m.logger.Debug("[CODEX][HandleCommunityMessageArchiveIndexCid] received CommunityMessageArchiveIndexCid", zap.String("cid", message.Cid))
+
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		return err
+	}
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
+		// Ignore Cid messages when torrent distribution is selected
+		m.logger.Debug("[CODEX][HandleCommunityMessageArchiveIndexCid] skipping cid processing due to torrent-only preference")
+		return nil
+	}
+	return m.HandleHistoryArchiveIndexCidMessage(state, state.CurrentMessageState.PublicKey, message.Cid, message.Clock)
+}
+
 func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveMagnetlink, statusMessage *common.StatusMessage) error {
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		return err
+	}
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
+		// Ignore magnetlink messages when codex distribution is selected
+		m.logger.Debug("skipping magnetlink processing due to codex-only preference")
+		return nil
+	}
 	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)
 }
 

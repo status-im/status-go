@@ -120,7 +120,7 @@ func (m *Manager) processPrivilegedUserSharedRequestToJoin(community *Community,
 		return ErrOutdatedSharedRequestToJoinClock
 	}
 
-	revealedAccountsExists := requestToJoin.RevealedAccounts != nil && len(requestToJoin.RevealedAccounts) > 0
+	revealedAccountsExists := len(requestToJoin.RevealedAccounts) > 0
 
 	if member, memberExists := community.Members()[requestToJoin.PublicKey]; memberExists && member.LastUpdateClock > requestToJoin.Clock {
 		return ErrOutdatedSharedRequestToJoinClock

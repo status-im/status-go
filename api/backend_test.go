@@ -615,6 +615,11 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 			"DataDir": "` + testContext.config.RootDataDir + `/archivedata",
 			"TorrentDir": "` + testContext.config.RootDataDir + `/torrents"
 		},
+		"CodexConfig": {
+			"Enabled": false,
+			"data-dir": "` + testContext.config.RootDataDir + `/codexdata",
+			"block-retries": 5
+		},
 		"RuntimeLogLevel": "INFO",
 		"LogLevel": "DEBUG"
 	}`
@@ -1452,6 +1457,7 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 			},
 			"torrentConfigEnabled":   false,
 			"torrentConfigPort":      0,
+			"codexConfigEnabled":     false,
 			"keycardInstanceUID":     "a84599394887b742eed9a99d3834a797",
 			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFileRelativePath),
 		},

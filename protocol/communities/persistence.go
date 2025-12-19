@@ -1003,45 +1003,109 @@ func (p *Persistence) GetMagnetlinkMessageClock(communityID types.HexBytes) (uin
 	return magnetlinkClock, err
 }
 
-func (p *Persistence) SaveCommunityArchiveInfo(communityID types.HexBytes, clock uint64, lastArchiveEndDate uint64) error {
-	_, err := p.db.Exec(`INSERT INTO communities_archive_info (magnetlink_clock, last_message_archive_end_date, community_id) VALUES (?, ?, ?)`,
-		clock,
+func (p *Persistence) SaveCommunityArchiveInfo(communityID types.HexBytes, magnetLinkClock uint64, lastArchiveEndDate uint64, indexCidClock uint64) error {
+	_, err := p.db.Exec(`
+		INSERT INTO communities_archive_info (
+			community_id, magnetlink_clock, last_message_archive_end_date, index_cid_clock
+		) VALUES (?, ?, ?, ?)
+		ON CONFLICT(community_id) DO UPDATE SET
+			magnetlink_clock = excluded.magnetlink_clock,
+			last_message_archive_end_date = excluded.last_message_archive_end_date,
+			index_cid_clock = excluded.index_cid_clock`,
+		communityID.String(),
+		magnetLinkClock,
 		lastArchiveEndDate,
-		communityID.String())
+		indexCidClock,
+	)
 	return err
 }
 
-func (p *Persistence) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
-	_, err := p.db.Exec(`UPDATE communities_archive_info SET
-    magnetlink_clock = ?
-    WHERE community_id = ?`,
-		clock,
-		communityID.String())
+func (p *Persistence) UpdateMagnetlinkMessageClock(communityID types.HexBytes, magnetLinkClock uint64) error {
+	_, err := p.db.Exec(`
+		INSERT INTO communities_archive_info (community_id, magnetlink_clock)
+		VALUES (?, ?)
+		ON CONFLICT(community_id) DO UPDATE SET
+			magnetlink_clock = excluded.magnetlink_clock`,
+		communityID.String(),
+		magnetLinkClock,
+	)
 	return err
 }
 
 func (p *Persistence) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlinkURI string) error {
-	_, err := p.db.Exec(`UPDATE communities_archive_info SET
-    last_magnetlink_uri = ?
-    WHERE community_id = ?`,
+	_, err := p.db.Exec(`
+		INSERT INTO communities_archive_info (community_id, last_magnetlink_uri)
+		VALUES (?, ?)
+		ON CONFLICT(community_id) DO UPDATE SET
+			last_magnetlink_uri = excluded.last_magnetlink_uri`,
+		communityID.String(),
 		magnetlinkURI,
-		communityID.String())
+	)
+	return err
+}
+
+func (p *Persistence) GetLastSeenIndexCid(communityID types.HexBytes) (string, error) {
+	var lastIndexCid string
+	err := p.db.QueryRow(`SELECT last_index_cid FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&lastIndexCid)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return lastIndexCid, err
+}
+
+func (p *Persistence) GetIndexCidMessageClock(communityID types.HexBytes) (uint64, error) {
+	var indexCidClock uint64
+	err := p.db.QueryRow(`SELECT index_cid_clock FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&indexCidClock)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return indexCidClock, err
+}
+
+func (p *Persistence) UpdateLastSeenIndexCid(communityID types.HexBytes, indexCid string) error {
+	_, err := p.db.Exec(`
+		INSERT INTO communities_archive_info (community_id, last_index_cid)
+		VALUES (?, ?)
+		ON CONFLICT(community_id) DO UPDATE SET
+			last_index_cid = excluded.last_index_cid`,
+		communityID.String(),
+		indexCid,
+	)
+	return err
+}
+
+func (p *Persistence) UpdateIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
+	_, err := p.db.Exec(`
+		INSERT INTO communities_archive_info (community_id, index_cid_clock)
+		VALUES (?, ?)
+		ON CONFLICT(community_id) DO UPDATE SET
+			index_cid_clock = excluded.index_cid_clock`,
+		communityID.String(),
+		clock,
+	)
 	return err
 }
 
 func (p *Persistence) SaveLastMessageArchiveEndDate(communityID types.HexBytes, endDate uint64) error {
-	_, err := p.db.Exec(`INSERT INTO communities_archive_info (last_message_archive_end_date, community_id) VALUES (?, ?)`,
+	_, err := p.db.Exec(`
+		INSERT INTO communities_archive_info (community_id, last_message_archive_end_date) VALUES (?, ?)
+		ON CONFLICT(community_id) DO UPDATE SET
+			last_message_archive_end_date = excluded.last_message_archive_end_date`,
+		communityID.String(),
 		endDate,
-		communityID.String())
+	)
 	return err
 }
 
 func (p *Persistence) UpdateLastMessageArchiveEndDate(communityID types.HexBytes, endDate uint64) error {
-	_, err := p.db.Exec(`UPDATE communities_archive_info SET
-    last_message_archive_end_date = ?
-    WHERE community_id = ?`,
+	_, err := p.db.Exec(`
+		INSERT INTO communities_archive_info (community_id, last_message_archive_end_date)
+		VALUES (?, ?)
+		ON CONFLICT(community_id) DO UPDATE SET
+			last_message_archive_end_date = excluded.last_message_archive_end_date`,
+		communityID.String(),
 		endDate,
-		communityID.String())
+	)
 	return err
 }
 
@@ -2118,5 +2182,42 @@ func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types.HexB
 		}
 	}
 
+	return nil
+}
+
+// func (p *Persistence) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
+// 	// return "codex", nil
+// 	var preference string
+// 	err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
+// 	if err == sql.ErrNoRows {
+// 		return ArchiveDistributionMethodUnknown, nil
+// 	} else if err != nil {
+// 		return "", err
+// 	}
+// 	return preference, nil
+// }
+
+func (p *Persistence) GetArchiveDistributionPreference() (string, error) {
+	var preference string
+	err := p.db.QueryRow(`SELECT history_archive_distribution_preference FROM node_config`).Scan(&preference)
+	if err != nil {
+		return "", err
+	}
+	return preference, nil
+}
+
+func (p *Persistence) SetArchiveDistributionPreference(preference string) error {
+	res, err := p.db.Exec(
+		`UPDATE node_config
+		 SET history_archive_distribution_preference = ?
+		 WHERE synthetic_id = 'id'`,
+		preference,
+	)
+	if err != nil {
+		return err
+	}
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return errors.New("node_config row not found")
+	}
 	return nil
 }

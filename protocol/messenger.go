@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	gocommon "github.com/status-im/status-go/common"
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/crypto/types"
 	cryptotypes "github.com/status-im/status-go/crypto/types"
@@ -145,6 +144,7 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
+	ratchetNotFoundDelay time.Duration
 
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
@@ -367,6 +367,7 @@ func NewMessenger(
 
 	amc := &communities.ArchiveManagerConfig{
 		TorrentConfig: c.torrentConfig,
+		CodexConfig:   c.codexConfig,
 		Logger:        logger,
 		Persistence:   communitiesManager.GetPersistence(),
 		Messaging:     messaging,
@@ -434,8 +435,9 @@ func NewMessenger(
 			wait chan struct{}
 			once sync.Once
 		}{wait: make(chan struct{})},
-		browserDatabase: c.browserDatabase,
-		httpServer:      c.httpServer,
+		ratchetNotFoundDelay: 1 * time.Hour,
+		browserDatabase:      c.browserDatabase,
+		httpServer:           c.httpServer,
 		shutdownTasks: []func() error{
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
@@ -666,7 +668,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := utils.ValidateDisplayName(&displayName); err != nil {
+	if err := gocommon.ValidateDisplayName(&displayName); err != nil {
 		// Somehow a wrong display name was saved. We need to update it so that others accept our messages
 		pubKey, err := m.settings.GetPublicKey()
 		if err != nil {
@@ -4682,4 +4684,17 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 
 func (m *Messenger) Messaging() *messaging.API {
 	return m.messaging
+}
+
+func (m *Messenger) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+	return m.archiveManager.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (m *Messenger) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+	return m.archiveManager.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	messageArchiveInterval = duration
+	return duration, nil
 }

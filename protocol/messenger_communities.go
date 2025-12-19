@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	otelattribute "go.opentelemetry.io/otel/attribute"
@@ -30,6 +31,7 @@ import (
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -57,13 +59,14 @@ var grantUpdateInterval = 24 * time.Hour
 // 4 hours interval
 var grantInvokesProfileDispatchInterval = 4 * time.Hour
 
+var importInitialDelay = time.Minute * 5
+
 const discordTimestampLayout = time.RFC3339
 
 const (
 	importSlowRate          = time.Second / 1
 	importFastRate          = time.Second / 100
 	importMessagesChunkSize = 10
-	importInitialDelay      = time.Minute * 5
 )
 
 const (
@@ -255,7 +258,11 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 
 				if sub.HistoryArchivesSeedingSignal != nil {
 
-					m.config.messengerSignalsHandler.HistoryArchivesSeeding(sub.HistoryArchivesSeedingSignal.CommunityID)
+					m.config.messengerSignalsHandler.HistoryArchivesSeeding(
+						sub.HistoryArchivesSeedingSignal.CommunityID,
+						sub.HistoryArchivesSeedingSignal.MagnetLink,
+						sub.HistoryArchivesSeedingSignal.IndexCid,
+					)
 
 					c, err := m.communitiesManager.GetByIDString(sub.HistoryArchivesSeedingSignal.CommunityID)
 					if err != nil {
@@ -263,15 +270,37 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 					}
 
 					if c.IsControlNode() {
-						err := m.dispatchMagnetlinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
-						if err != nil {
-							m.logger.Debug("failed to dispatch magnetlink message", zap.Error(err))
+						if sub.HistoryArchivesSeedingSignal.MagnetLink {
+							err := m.dispatchMagnetlinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
+							if err != nil {
+								m.logger.Debug("failed to dispatch magnetlink message", zap.Error(err))
+							}
+						}
+						if sub.HistoryArchivesSeedingSignal.IndexCid {
+							err := m.dispatchIndexCidMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
+							if err != nil {
+								m.logger.Debug("[CODEX] failed to dispatch index cid message", zap.Error(err))
+							}
 						}
 					}
 				}
 
 				if sub.HistoryArchivesUnseededSignal != nil {
 					m.config.messengerSignalsHandler.HistoryArchivesUnseeded(sub.HistoryArchivesUnseededSignal.CommunityID)
+				}
+
+				if sub.ManifestFetchedSignal != nil {
+					m.config.messengerSignalsHandler.ManifestFetched(
+						sub.ManifestFetchedSignal.CommunityID,
+						sub.ManifestFetchedSignal.IndexCid,
+					)
+				}
+
+				if sub.IndexDownloadCompletedSignal != nil {
+					m.config.messengerSignalsHandler.IndexDownloadCompleted(
+						sub.IndexDownloadCompletedSignal.CommunityID,
+						sub.IndexDownloadCompletedSignal.IndexCid,
+					)
 				}
 
 				if sub.HistoryArchiveDownloadedSignal != nil {
@@ -1919,7 +1948,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 }
 
 func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) (*MessengerResponse, error) {
-	m.logger.Debug("accept request to join community",
+	m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] accept request to join community",
 		zap.String("community", requestToJoin.CommunityID.String()),
 		zap.String("pubkey", requestToJoin.PublicKey))
 
@@ -1963,13 +1992,26 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		}
 
 		// The purpose of this torrent code is to get the 'magnetlink' to populate 'requestToJoinResponseProto.MagnetUri'
-		if m.archiveManager.IsReady() && m.archiveManager.TorrentFileExists(community.IDString()) {
+		if m.archiveManager.IsTorrentReady() && m.archiveManager.TorrentFileExists(community.IDString()) {
 			magnetlink, err := m.archiveManager.GetHistoryArchiveMagnetlink(community.ID())
 			if err != nil {
 				m.logger.Warn("couldn't get magnet link for community", zap.Error(err))
 				return nil, err
 			}
 			requestToJoinResponseProto.MagnetUri = magnetlink
+		}
+
+		if m.archiveManager.IsCodexReady() {
+			m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] checking if currently seeding", zap.String("communityID", community.IDString()))
+			cid, err := m.communitiesManager.GetLastSeenIndexCid(community.ID())
+			if err != nil {
+				m.logger.Warn("couldn't get codex index cid for community", zap.Error(err))
+				return nil, err
+			}
+			if m.archiveManager.IsSeedingHistoryArchiveCodex(community.ID(), cid) {
+				m.logger.Debug("[CODEX][acceptRequestToJoinCommunity] setting requestToJoinResponseProto.IndexCid", zap.String("communityID", community.IDString()), zap.String("cid", cid))
+				requestToJoinResponseProto.IndexCid = cid
+			}
 		}
 
 		payload, err := proto.Marshal(requestToJoinResponseProto)
@@ -2505,7 +2547,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 		return nil, err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && communitySettings.HistoryArchiveSupportEnabled {
+	if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 		go m.archiveManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
 	}
 
@@ -2716,11 +2758,15 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 	}
 
 	id := community.ID()
+	currentIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(id)
+	if err != nil {
+		return nil, err
+	}
 
 	if m.archiveManager.IsReady() {
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.archiveManager.StopHistoryArchiveTasksInterval(id)
-		} else if !m.archiveManager.IsSeedingHistoryArchiveTorrent(id) {
+		} else if !m.archiveManager.IsSeedingHistoryArchiveTorrent(id) && !m.archiveManager.IsSeedingHistoryArchiveCodex(id, currentIndexCid) {
 			var communities []*communities.Community
 			communities = append(communities, community)
 			go m.InitHistoryArchiveTasks(communities)
@@ -3557,6 +3603,13 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 	peerInfo := m.messaging.GetActiveStorenode()
 
+	preference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		m.logger.Error("failed to get archive distribution preference", zap.Error(err))
+		// fallback to codex
+		preference = params.ArchiveDistributionMethodCodex
+	}
+
 	for _, c := range communities {
 
 		if c.Joined() {
@@ -3570,11 +3623,27 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
-			// Check if there's already a torrent file for this community and seed it
-			if m.archiveManager.TorrentFileExists(c.IDString()) {
-				err = m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
+			if preference == params.ArchiveDistributionMethodTorrent {
+				// Check if there's already a torrent file for this community and seed it
+				if m.archiveManager.TorrentFileExists(c.IDString()) {
+					err = m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
+					if err != nil {
+						m.logger.Error("failed to seed history archive", zap.Error(err))
+					}
+				}
+			}
+
+			if preference == params.ArchiveDistributionMethodCodex {
+				// Check if there's already a codex file for this community and seed it
+				currenctIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(c.ID())
 				if err != nil {
-					m.logger.Error("failed to seed history archive", zap.Error(err))
+					m.logger.Error("[CODEX][init_history_archive_tasks] failed to get last seen index cid", zap.Error(err))
+				}
+				if err == nil {
+					err = m.archiveManager.SeedHistoryArchiveIndexCid(c.ID(), currenctIndexCid)
+					if err != nil {
+						m.logger.Error("[CODEX][init_history_archive_tasks] failed to seed history archive", zap.Error(err))
+					}
 				}
 			}
 
@@ -3582,6 +3651,11 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			if err != nil {
 				m.logger.Error("failed to get community chats filters for community", zap.Error(err))
 				continue
+			}
+
+			filter := m.messaging.ChatFilterByChatID(c.UniversalChatID())
+			if filter != nil {
+				filters = append(filters, filter)
 			}
 
 			if len(filters) == 0 {
@@ -3594,11 +3668,6 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic())
-			}
-
-			filter := m.messaging.ChatFilterByChatID(c.UniversalChatID())
-			if filter != nil {
-				filters = append(filters, filter)
 			}
 
 			// First we need to know the timestamp of the latest waku message
@@ -3648,10 +3717,26 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				// Last archive is less than `interval` old, wait until `interval` is complete,
 				// then create archive and kick off archive creation loop for future archives
 				// Seed current archive in the meantime
-				err := m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
-				if err != nil {
-					m.logger.Error("failed to seed history archive", zap.Error(err))
+				if preference == params.ArchiveDistributionMethodTorrent {
+					err := m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
+					if err != nil {
+						m.logger.Error("failed to seed history archive", zap.Error(err))
+					}
 				}
+				if preference == params.ArchiveDistributionMethodCodex {
+					currenctIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(c.ID())
+					if err != nil {
+						m.logger.Error("[CODEX][init_history_archive_tasks] failed to get last seen index cid", zap.Error(err))
+					} else {
+						err := m.archiveManager.SeedHistoryArchiveIndexCid(c.ID(), currenctIndexCid)
+						if err != nil {
+							m.logger.Error("[CODEX][init_history_archive_tasks] failed to seed history archive", zap.Error(err))
+						}
+					}
+				}
+				// we do not have to explicitly seed to codex. If codex is enabled
+				// and the index cid was not explicitly removed, it will be
+				// advertised automatically => or maybe we do?
 				timeToNextInterval := messageArchiveInterval - durationSinceLastArchive
 
 				m.logger.Debug("starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
@@ -3681,6 +3766,7 @@ func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	go func() {
 		defer gocommon.LogOnPanic()
 		time.Sleep(importInitialDelay)
+
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
 		})
@@ -3738,7 +3824,12 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer task.Waiter.Done()
-		err := m.importHistoryArchives(communityID, task.CancelChan)
+		lastSeenIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(communityID)
+		if err != nil {
+			m.logger.Error("failed to get last seen index cid", zap.Error(err))
+			return
+		}
+		err = m.importHistoryArchives(communityID, task.CancelChan, lastSeenIndexCid)
 		if err != nil {
 			m.logger.Error("failed to import history archives", zap.Error(err))
 		}
@@ -3755,7 +3846,7 @@ func (m *Messenger) SlowdownArchivesImport() {
 	m.importRateLimiter.SetLimit(rate.Every(importSlowRate))
 }
 
-func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}) error {
+func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}, indexCid string) error {
 	importTicker := time.NewTicker(100 * time.Millisecond)
 	defer importTicker.Stop()
 
@@ -3766,6 +3857,22 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 		cancelFunc()
 	}()
 
+	preference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		m.logger.Warn("[CODEX][importHistoryArchives] failed to get archive distribution preference, using codex", zap.Error(err))
+		preference = communities.ArchiveDistributionMethodCodex
+	}
+	var codexIndex *protobuf.CodexWakuMessageArchiveIndex
+	if preference == communities.ArchiveDistributionMethodCodex {
+		codexIndex, err = m.archiveManager.CodexLoadHistoryArchiveIndex(
+			ctx, m.identity, communityID, indexCid, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	m.logger.Debug("[CODEX][importHistoryArchives] waiting to start importing history archive messages (importDelayer.wait)", zap.String("communityID", types.EncodeHex(communityID)))
+
 	// don't proceed until initial import delay has passed
 	select {
 	case <-m.importDelayer.wait:
@@ -3775,21 +3882,23 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 
 	delayImport := false
 
+	m.logger.Info("[CODEX][importHistoryArchives] starting to import history archive messages", zap.String("communityID", types.EncodeHex(communityID)))
+
 importMessageArchivesLoop:
 	for {
 		if delayImport {
 			select {
 			case <-ctx.Done():
-				m.logger.Debug("interrupted importing history archive messages")
+				m.logger.Debug("[CODEX][importHistoryArchives] interrupted importing history archive messages")
 				return nil
-			case <-time.After(1 * time.Hour):
+			case <-time.After(m.ratchetNotFoundDelay):
 				delayImport = false
 			}
 		}
 
 		select {
 		case <-ctx.Done():
-			m.logger.Debug("interrupted importing history archive messages")
+			m.logger.Debug("[CODEX][importHistoryArchives] interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
 			err := m.checkIfIMemberOfCommunity(communityID)
@@ -3798,30 +3907,38 @@ importMessageArchivesLoop:
 			}
 			archiveIDsToImport, err := m.archiveManager.GetMessageArchiveIDsToImport(communityID)
 			if err != nil {
-				m.logger.Error("couldn't get message archive IDs to import", zap.Error(err))
+				m.logger.Error("[CODEX][importHistoryArchives] couldn't get message archive IDs to import", zap.Error(err))
 				return err
 			}
 
 			if len(archiveIDsToImport) == 0 {
-				m.logger.Debug("no message archives to import")
+				m.logger.Debug("[CODEX][importHistoryArchives] no message archives to import")
 				break importMessageArchivesLoop
 			}
 
-			m.logger.Info("importing message archive", zap.Int("left", len(archiveIDsToImport)))
+			m.logger.Info("[CODEX][importHistoryArchives] importing message archive", zap.Int("left", len(archiveIDsToImport)))
 
 			// only process one archive at a time, so in case of cancel we don't
 			// wait for all archives to be processed first
 			downloadedArchiveID := archiveIDsToImport[0]
 
-			archiveMessages, err := m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
+			var archiveMessages []*protobuf.WakuMessage
+
+			if preference == communities.ArchiveDistributionMethodCodex {
+				m.logger.Debug("[CODEX][importHistoryArchives] using codex to extract messages")
+				archiveMessages, err = m.archiveManager.ExtractMessagesFromCodexHistoryArchive(communityID, downloadedArchiveID, codexIndex)
+			} else {
+				archiveMessages, err = m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
+			}
 			if err != nil {
 				if errors.Is(err, messagingtypes.ErrHashRatchetGroupIDNotFound) {
+					m.logger.Error("[CODEX][importHistoryArchives] ErrHashRatchetGroupIDNotFound", zap.Error(err))
 					// In case we're missing hash ratchet keys, best we can do is
 					// to wait for them to be received and try import again.
 					delayImport = true
 					continue
 				}
-				m.logger.Error("failed to extract history archive messages", zap.Error(err))
+				m.logger.Error("[CODEX][importHistoryArchives] failed to extract history archive messages", zap.Error(err))
 				continue
 			}
 
@@ -3830,14 +3947,14 @@ importMessageArchivesLoop:
 			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
 				if err := m.importRateLimiter.Wait(ctx); err != nil {
 					if !errors.Is(err, context.Canceled) {
-						m.logger.Error("rate limiter error when handling archive messages", zap.Error(err))
+						m.logger.Error("[CODEX][importHistoryArchives] rate limiter error when handling archive messages", zap.Error(err))
 					}
 					continue importMessageArchivesLoop
 				}
 
 				response, err := m.handleArchiveMessages(messagesChunk)
 				if err != nil {
-					m.logger.Error("failed to handle archive messages", zap.Error(err))
+					m.logger.Error("[CODEX][importHistoryArchives] failed to handle archive messages", zap.Error(err))
 					continue importMessageArchivesLoop
 				}
 
@@ -3851,7 +3968,7 @@ importMessageArchivesLoop:
 
 			err = m.archiveManager.SetMessageArchiveIDImported(communityID, downloadedArchiveID, true)
 			if err != nil {
-				m.logger.Error("failed to mark history message archive as imported", zap.Error(err))
+				m.logger.Error("[CODEX][importHistoryArchives] failed to mark history message archive as imported", zap.Error(err))
 				continue
 			}
 		}
@@ -3881,7 +3998,7 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		return err
 	}
 
-	chatID := community.MagnetlinkMessageChannelID()
+	chatID := community.UniversalChatID()
 	rawMessage := common.RawMessage{
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
@@ -3904,16 +4021,96 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 	return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), magnetLinkMessage.Clock)
 }
 
+func (m *Messenger) dispatchIndexCidMessage(communityID string) error {
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		return err
+	}
+
+	indexCid, err := m.communitiesManager.GetLastSeenIndexCid(community.ID())
+	if err != nil {
+		return err
+	}
+
+	indexCidMessage := &protobuf.CommunityMessageArchiveIndexCid{
+		Clock: m.getTimesource().GetCurrentTime(),
+		Cid:   indexCid,
+	}
+
+	encodedMessage, err := proto.Marshal(indexCidMessage)
+	if err != nil {
+		return err
+	}
+
+	chatID := community.UniversalChatID()
+
+	rawMessage := common.RawMessage{
+		LocalChatID:          chatID,
+		Sender:               community.PrivateKey(),
+		Payload:              encodedMessage,
+		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_INDEX_CID,
+		SkipGroupMessageWrap: true,
+		PubsubTopic:          community.PubsubTopic(),
+		Priority:             &messagingtypes.LowPriority,
+	}
+
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] dispatching index cid message",
+		zap.String("communityID", communityID),
+		zap.String("chatID", chatID),
+		zap.String("cid", indexCid),
+	)
+
+	_, err = m.sender.SendPublic(context.Background(), chatID, rawMessage)
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] dispatched index cid message",
+		zap.String("communityID", communityID),
+		zap.String("chatID", chatID),
+		zap.String("cid", indexCid),
+	)
+
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] calling UpdateCommunityDescriptionIndexCidMessageClock", zap.String("communityID", community.IDString()), zap.Uint64("clock", indexCidMessage.Clock))
+
+	err = m.communitiesManager.UpdateCommunityDescriptionIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[CODEX][dispatchIndexCidMessage] calling UpdateIndexCidMessageClock", zap.String("communityID", community.IDString()), zap.Uint64("clock", indexCidMessage.Clock))
+
+	return m.communitiesManager.UpdateIndexCidMessageClock(community.ID(), indexCidMessage.Clock)
+}
+
 func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
+	m.logger.Info("enabling community history archive protocol")
+	m.logger.Info("checking archive distribution preference")
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		return err
+	}
+
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] archive distribution preference is codex, skipping enabling Torrent distribution")
+		return nil
+	}
 	nodeConfig, err := m.settings.GetNodeConfig()
 	if err != nil {
 		return err
 	}
 
+	if nodeConfig.CodexConfig.Enabled {
+		m.logger.Info("Codex archive distribution is enabled")
+		return fmt.Errorf("cannot enable Torrent archive distribution when Codex archive distribution is already enabled")
+	}
+
 	if nodeConfig.TorrentConfig.Enabled {
+		m.logger.Info("Torrent archive distribution is already enabled")
 		return nil
 	}
 
+	m.logger.Info("enabling torrent archive distribution")
 	nodeConfig.TorrentConfig.Enabled = true
 	err = m.settings.SaveSetting("node-config", nodeConfig)
 	if err != nil {
@@ -3933,6 +4130,79 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	}
 
 	if len(controlledCommunities) > 0 {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] initializing history archive tasks for controlled communities", zap.Int("count", len(controlledCommunities)))
+		go m.InitHistoryArchiveTasks(controlledCommunities)
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
+	}
+	return nil
+}
+
+func (m *Messenger) EnableCodexCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] enabling community history archive protocol")
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] checking archive distribution preference")
+
+	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
+	if err != nil {
+		return err
+	}
+
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] archive distribution preference is torrent, skipping Codex enabling")
+		return nil
+	}
+
+	nodeConfig, err := m.settings.GetNodeConfig()
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] current CodexConfig for history archive protocol", zap.Any("CodexConfig", nodeConfig.CodexConfig))
+
+	if nodeConfig.TorrentConfig.Enabled {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] torrent archive distribution is enabled")
+		return fmt.Errorf("cannot enable Codex archive distribution when Torrent archive distribution is already enabled")
+	}
+
+	if nodeConfig.CodexConfig.Enabled {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] codex archive distribution is already enabled")
+		return nil
+	}
+
+	if len(overrides) > 0 {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] applying CodexConfig overrides", zap.Any("overrides", overrides))
+		if err := communities.ApplyCodexConfigOverrides(&nodeConfig.CodexConfig, overrides); err != nil {
+			return err
+		}
+	}
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] enabling codex archive distribution")
+	nodeConfig.CodexConfig.Enabled = true
+
+	err = m.settings.SaveSetting("node-config", nodeConfig)
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] CodexConfig (with potential overrides)", zap.Any("CodexConfig", nodeConfig.CodexConfig))
+
+	m.config.codexConfig = &nodeConfig.CodexConfig
+	m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+
+	m.logger.Info("[CODEX][enable_community_history_archive_protocol] starting codex client")
+	err = m.archiveManager.StartCodexClient()
+	if err != nil {
+		return err
+	}
+
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return err
+	}
+
+	if len(controlledCommunities) > 0 {
+		m.logger.Info("[CODEX][enable_community_history_archive_protocol] initializing history archive tasks for controlled communities", zap.Int("count", len(controlledCommunities)))
 		go m.InitHistoryArchiveTasks(controlledCommunities)
 	}
 	if m.config.messengerSignalsHandler != nil {
@@ -3947,7 +4217,7 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 	if err != nil {
 		return err
 	}
-	if !nodeConfig.TorrentConfig.Enabled {
+	if !nodeConfig.TorrentConfig.Enabled && !nodeConfig.CodexConfig.Enabled {
 		return nil
 	}
 
@@ -3956,13 +4226,26 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		m.logger.Error("failed to stop torrent manager", zap.Error(err))
 	}
 
-	nodeConfig.TorrentConfig.Enabled = false
-	err = m.settings.SaveSetting("node-config", nodeConfig)
-	m.config.torrentConfig = &nodeConfig.TorrentConfig
-	m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
-	if err != nil {
-		return err
+	if nodeConfig.TorrentConfig.Enabled {
+		nodeConfig.TorrentConfig.Enabled = false
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+		m.config.torrentConfig = &nodeConfig.TorrentConfig
+		m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
+		if err != nil {
+			return err
+		}
 	}
+
+	if nodeConfig.CodexConfig.Enabled {
+		nodeConfig.CodexConfig.Enabled = false
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+		m.config.codexConfig = &nodeConfig.CodexConfig
+		m.archiveManager.SetCodexConfig(&nodeConfig.CodexConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryArchivesProtocolDisabled()
 	}
@@ -4814,4 +5097,30 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
+}
+
+// SetArchiveDistributionPreference sets the archive distribution preference for the node
+func (m *Messenger) SetArchiveDistributionPreference(preference string) error {
+	return m.communitiesManager.SetArchiveDistributionPreference(preference)
+}
+
+// GetArchiveDistributionPreference gets the archive distribution preference for the node
+func (m *Messenger) GetArchiveDistributionPreference() (string, error) {
+	return m.communitiesManager.GetArchiveDistributionPreference()
+}
+
+func (m *Messenger) IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool {
+	currentIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(communityID)
+	if err != nil {
+		return false
+	}
+	return m.archiveManager.IsSeedingHistoryArchiveCodex(communityID, currentIndexCid)
+}
+
+func (m *Messenger) Connect(peerId string, addrs []string) error {
+	return m.archiveManager.GetCodexClient().Connect(peerId, addrs)
+}
+
+func (m *Messenger) Debug() (codex.DebugInfo, error) {
+	return m.archiveManager.GetCodexClient().Debug()
 }

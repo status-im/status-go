@@ -31,11 +31,12 @@ import (
 
 type ArchiveFileManager struct {
 	torrentConfig *params.TorrentConfig
-
-	logger      *zap.Logger
-	persistence *Persistence
-	identity    *ecdsa.PrivateKey
-	messaging   *messaging.API
+	codexConfig   *params.CodexConfig
+	codexClient   CodexClientInterface
+	logger        *zap.Logger
+	persistence   *Persistence
+	identity      *ecdsa.PrivateKey
+	messaging     *messaging.API
 
 	publisher Publisher
 }
@@ -43,12 +44,17 @@ type ArchiveFileManager struct {
 func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 	return &ArchiveFileManager{
 		torrentConfig: amc.TorrentConfig,
+		codexConfig:   amc.CodexConfig,
 		logger:        amc.Logger,
 		persistence:   amc.Persistence,
 		identity:      amc.Identity,
 		messaging:     amc.Messaging,
 		publisher:     amc.Publisher,
 	}
+}
+
+func (m *ArchiveFileManager) SetCodexClient(codexClient CodexClientInterface) {
+	m.codexClient = codexClient
 }
 
 func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {

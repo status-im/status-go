@@ -70,6 +70,12 @@ var maxNbPendingRequestedMembers = 100
 var memberPermissionsCheckInterval = 8 * time.Hour
 var validateInterval = 2 * time.Minute
 
+// Archive distribution preferences
+const (
+	ArchiveDistributionMethodTorrent = "torrent"
+	ArchiveDistributionMethodCodex   = "codex"
+)
+
 // Used for testing only
 func SetValidateInterval(duration time.Duration) {
 	validateInterval = duration
@@ -84,6 +90,7 @@ func SetMaxNbPendingRequestedMembers(maxNb int) {
 // errors
 var (
 	ErrTorrentTimedout                 = errors.New("torrent has timed out")
+	ErrIndexCidTimedout                = errors.New("indexCid has timed out")
 	ErrCommunityRequestAlreadyRejected = errors.New("that user was already rejected from the community")
 	ErrInvalidClock                    = errors.New("invalid clock to cancel request to join")
 	ErrNotPartOfCommunity              = errors.New("not part of the community")
@@ -201,6 +208,7 @@ type ArchiveService interface {
 	StartTorrentClient() error
 	Stop() error
 	IsReady() bool
+	IsTorrentReady() bool
 	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)
 	GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
@@ -213,11 +221,28 @@ type ArchiveService interface {
 	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
 	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
 	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
+	PublishHistoryArchivesSeedingSignal(communityID types.HexBytes, magnetLink bool, indexCid bool)
 	TorrentFileExists(communityID string) bool
+	GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error)
+
+	SetCodexConfig(*params.CodexConfig)
+	SetCodexClient(client CodexClientInterface)
+	StartCodexClient() error
+	GetCodexClient() CodexClientInterface
+	IsCodexReady() bool
+	SeedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string) error
+	UnseedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string)
+	IsSeedingHistoryArchiveCodex(communityID types.HexBytes, indexCid string) bool
+	DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
+	CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string, codexIndex *protobuf.CodexWakuMessageArchiveIndex) ([]*protobuf.WakuMessage, error)
+	CodexLoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID types.HexBytes, indexCid string, isLocal bool) (*protobuf.CodexWakuMessageArchiveIndex, error)
 }
 
 type ArchiveManagerConfig struct {
 	TorrentConfig *params.TorrentConfig
+	CodexConfig   *params.CodexConfig
 	Logger        *zap.Logger
 	Persistence   *Persistence
 	Messaging     *messaging.API
@@ -497,6 +522,8 @@ type Subscription struct {
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
+	ManifestFetchedSignal                    *signal.ManifestFetchedSignal
+	IndexDownloadCompletedSignal             *signal.IndexDownloadCompletedSignal
 	CommunityEventsMessage                   *CommunityEventsMessage
 	AcceptedRequestsToJoin                   []types.HexBytes
 	RejectedRequestsToJoin                   []types.HexBytes
@@ -2237,8 +2264,17 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}
 
 	cdMagnetlinkClock := community.config.CommunityDescription.ArchiveMagnetlinkClock
+	cdIndexCidClock := community.config.CommunityDescription.ArchiveIndexCidClock
+
+	m.logger.Debug("[CODEX][handleCommunityDescription] handling community description archive info",
+		zap.String("communityID", community.IDString()),
+		zap.Uint64("magnetlinkClock", cdMagnetlinkClock),
+		zap.Uint64("indexCidClock", cdIndexCidClock),
+	)
+
 	if !hasCommunityArchiveInfo {
-		err = m.persistence.SaveCommunityArchiveInfo(community.ID(), cdMagnetlinkClock, 0)
+		m.logger.Debug("[CODEX][handleCommunityDescription] saving community archive info: hasCommunityArchiveInfo=false")
+		err = m.persistence.SaveCommunityArchiveInfo(community.ID(), cdMagnetlinkClock, 0, cdIndexCidClock)
 		if err != nil {
 			return nil, err
 		}
@@ -2253,6 +2289,25 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 				return nil, err
 			}
 		}
+
+		// Handle index CID clock comparison - update if community description has newer clock
+		indexCidClock, err := m.persistence.GetIndexCidMessageClock(community.ID())
+		if err != nil {
+			return nil, err
+		}
+		m.logger.Debug("[CODEX][handleCommunityDescription] comparing index CID clocks",
+			zap.String("communityID", community.IDString()),
+			zap.Uint64("cdIndexCidClock", cdIndexCidClock),
+			zap.Uint64("indexCidClock", indexCidClock),
+		)
+		if cdIndexCidClock > indexCidClock {
+			m.logger.Debug("[CODEX][handleCommunityDescription] updating index CID clock (cdIndexCidClock > indexCidClock)")
+			err = m.persistence.UpdateIndexCidMessageClock(community.ID(), cdIndexCidClock)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 	}
 
 	pkString := crypto.PubkeyToHex(&m.identity.PublicKey)
@@ -3613,6 +3668,18 @@ func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID t
 	return m.SaveCommunity(community)
 }
 
+func (m *Manager) UpdateCommunityDescriptionIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
+	m.communityLock.Lock(communityID)
+	defer m.communityLock.Unlock(communityID)
+
+	community, err := m.GetByIDString(communityID.String())
+	if err != nil {
+		return err
+	}
+	community.config.CommunityDescription.ArchiveIndexCidClock = clock
+	return m.SaveCommunity(community)
+}
+
 func (m *Manager) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
 	return m.persistence.UpdateMagnetlinkMessageClock(communityID, clock)
 }
@@ -3624,6 +3691,54 @@ func (m *Manager) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlin
 func (m *Manager) GetLastSeenMagnetlink(communityID types.HexBytes) (string, error) {
 	return m.persistence.GetLastSeenMagnetlink(communityID)
 }
+
+func (m *Manager) UpdateIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
+	return m.persistence.UpdateIndexCidMessageClock(communityID, clock)
+}
+
+func (m *Manager) GetIndexCidMessageClock(communityID types.HexBytes) (uint64, error) {
+	return m.persistence.GetIndexCidMessageClock(communityID)
+}
+
+func (m *Manager) UpdateLastSeenIndexCid(communityID types.HexBytes, indexCid string) error {
+	return m.persistence.UpdateLastSeenIndexCid(communityID, indexCid)
+}
+
+func (m *Manager) GetLastSeenIndexCid(communityID types.HexBytes) (string, error) {
+	return m.persistence.GetLastSeenIndexCid(communityID)
+}
+
+func (m *Manager) GetArchiveDistributionPreference() (string, error) {
+	return m.persistence.GetArchiveDistributionPreference()
+}
+
+// func (m *Manager) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
+// 	return m.persistence.GetArchiveDistributionPreference(communityID)
+// }
+
+func (m *Manager) SetArchiveDistributionPreference(preference string) error {
+	// Validate preference value
+	switch preference {
+	case ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
+		// Valid preference
+	default:
+		return errors.New("invalid archive distribution preference")
+	}
+
+	return m.persistence.SetArchiveDistributionPreference(preference)
+}
+
+// func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
+// 	// Validate preference value
+// 	switch preference {
+// 	case ArchiveDistributionMethodTorrent, ArchiveDistributionMethodCodex:
+// 		// Valid preference
+// 	default:
+// 		return errors.New("invalid archive distribution preference")
+// 	}
+
+// 	return m.persistence.SetArchiveDistributionPreference(communityID, preference)
+// }
 
 func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)

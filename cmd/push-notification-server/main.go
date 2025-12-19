@@ -54,6 +54,7 @@ const (
 	exitCodeCreateWakuFailed
 	exitCodeStartMessagingFailed
 	exitCodeDBMigrationFailed
+	exitCodeCreateCodexFailed
 	exitCodeCreateMessengerFailed
 	exitCodeCreateDatabaseFailed
 	exitCodeStartServerFailed

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/nodecfg"
@@ -26,21 +27,22 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 func randomNodeConfig() *params.NodeConfig {
 	return &params.NodeConfig{
-		NetworkID:          uint64(int64(randomInt(math.MaxInt64))),
-		NodeKey:            randomString(),
-		APIModules:         randomString(),
-		WalletConfig:       params.WalletConfig{Enabled: randomBool()},
-		BrowsersConfig:     params.BrowsersConfig{Enabled: randomBool()},
-		PermissionsConfig:  params.PermissionsConfig{Enabled: randomBool()},
-		ConnectorConfig:    params.ConnectorConfig{Enabled: randomBool()},
-		LogEnabled:         randomBool(),
-		LogDir:             randomString(),
-		LogFile:            randomString(),
-		LogLevel:           randomString(),
-		LogMaxBackups:      randomInt(math.MaxInt64),
-		LogMaxSize:         randomInt(math.MaxInt64),
-		LogCompressRotated: randomBool(),
-		LogToStderr:        randomBool(),
+		NetworkID:                            uint64(int64(randomInt(math.MaxInt64))),
+		NodeKey:                              randomString(),
+		APIModules:                           randomString(),
+		WalletConfig:                         params.WalletConfig{Enabled: randomBool()},
+		BrowsersConfig:                       params.BrowsersConfig{Enabled: randomBool()},
+		PermissionsConfig:                    params.PermissionsConfig{Enabled: randomBool()},
+		ConnectorConfig:                      params.ConnectorConfig{Enabled: randomBool()},
+		HistoryArchiveDistributionPreference: randomString(),
+		LogEnabled:                           randomBool(),
+		LogDir:                               randomString(),
+		LogFile:                              randomString(),
+		LogLevel:                             randomString(),
+		LogMaxBackups:                        randomInt(math.MaxInt64),
+		LogMaxSize:                           randomInt(math.MaxInt64),
+		LogCompressRotated:                   randomBool(),
+		LogToStderr:                          randomBool(),
 		ClusterConfig: params.ClusterConfig{
 			Enabled: randomBool(),
 			Fleet:   randomString(),
@@ -55,6 +57,15 @@ func randomNodeConfig() *params.NodeConfig {
 		WakuV2Config: params.WakuV2Config{
 			LightClient: randomBool(),
 		},
+		CodexConfig: params.CodexConfig{
+			Enabled: randomBool(),
+			CodexNodeConfig: codex.Config{
+				DataDir:       randomString(),
+				DiscoveryPort: randomInt(65535),
+				BlockRetries:  randomInt(10),
+				LogLevel:      randomString(),
+			},
+		},
 	}
 }
 
@@ -66,6 +77,7 @@ func TestGetNodeConfig(t *testing.T) {
 
 	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
 	require.NoError(t, err)
+
 	require.Equal(t, nodeConfig, dbNodeConfig)
 }
 

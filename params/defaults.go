@@ -19,4 +19,7 @@ const (
 
 	// IpfsGatewayURL is the Gateway URL to use for IPFS
 	IpfsGatewayURL = "https://ipfs.status.im/"
+
+	// Number of times to retry fetching a block on Codex before giving up
+	BlockRetries = 50
 )

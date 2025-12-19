@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/images"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -960,30 +961,79 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
-			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
-				request.CommunityID,
-				wakuMessages,
-				topics,
-				startDate,
-				endDate,
-				messageArchiveInterval,
-				community.Encrypted(),
-			)
+			archiveTorrentCreatedSuccessfully := true
+			archiveCodexCreatedSuccessfully := true
+
+			archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
 			if err != nil {
-				m.logger.Error("failed to create history archive torrent", zap.Error(err))
+				m.logger.Error("[CODEX] failed to get archive distribution preference", zap.Error(err))
 				continue
 			}
+
+			if archiveDistributionPreference == params.ArchiveDistributionMethodTorrent {
+				_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
+					request.CommunityID,
+					wakuMessages,
+					topics,
+					startDate,
+					endDate,
+					messageArchiveInterval,
+					community.Encrypted(),
+				)
+				if err != nil {
+					m.logger.Error("failed to create history archive torrent", zap.Error(err))
+					archiveTorrentCreatedSuccessfully = false
+				}
+			}
+
+			if archiveDistributionPreference == params.ArchiveDistributionMethodCodex {
+				m.logger.Debug("[CODEX][RequestImportDiscordChannel] creating history archive codex from messages")
+				_, err = m.archiveManager.CreateHistoryArchiveCodexFromMessages(
+					request.CommunityID,
+					wakuMessages,
+					topics,
+					startDate,
+					endDate,
+					messageArchiveInterval,
+					community.Encrypted(),
+				)
+				if err != nil {
+					m.logger.Error("[CODEX][RequestImportDiscordChannel] failed to create history archive codex", zap.Error(err))
+					archiveCodexCreatedSuccessfully = false
+				}
+			}
+
+			if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
+				continue
+			}
+
 			communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(request.CommunityID)
 			if err != nil {
 				m.logger.Error("Failed to get community settings", zap.Error(err))
 				continue
 			}
-			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
 
+			if m.archiveManager.IsTorrentReady() && communitySettings.HistoryArchiveSupportEnabled {
 				err = m.archiveManager.SeedHistoryArchiveTorrent(request.CommunityID)
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
+			}
+
+			if m.archiveManager.IsCodexReady() && communitySettings.HistoryArchiveSupportEnabled {
+				lastSeenIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(request.CommunityID)
+				if err != nil {
+					m.logger.Error("[CODEX][RequestImportDiscordChannel] failed to get last seen index cid", zap.Error(err))
+				} else {
+					err = m.archiveManager.SeedHistoryArchiveIndexCid(request.CommunityID, lastSeenIndexCid)
+					if err != nil {
+						m.logger.Error("[CODEX][RequestImportDiscordChannel] failed to seed history archive index cid", zap.Error(err), zap.String("indexCid", lastSeenIndexCid))
+					}
+				}
+			}
+
+			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+				m.logger.Debug("[CODEX][TORRENT][RequestImportDiscordChannel] starting history archive tasks interval")
 				go m.archiveManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
 			}
 		}
@@ -1732,26 +1782,73 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			startDate := time.Unix(int64(exportData.OldestMessageTimestamp), 0)
 			endDate := time.Now()
 
-			_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
-				discordCommunity.ID(),
-				wakuMessages,
-				topics,
-				startDate,
-				endDate,
-				messageArchiveInterval,
-				discordCommunity.Encrypted(),
-			)
+			archiveTorrentCreatedSuccessfully := true
+			archiveCodexCreatedSuccessfully := true
+
+			archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
 			if err != nil {
-				m.logger.Error("failed to create history archive torrent", zap.Error(err))
+				m.logger.Error("failed to get archive distribution preference", zap.Error(err))
 				continue
 			}
 
-			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if archiveDistributionPreference == params.ArchiveDistributionMethodTorrent {
+				_, err = m.archiveManager.CreateHistoryArchiveTorrentFromMessages(
+					discordCommunity.ID(),
+					wakuMessages,
+					topics,
+					startDate,
+					endDate,
+					messageArchiveInterval,
+					discordCommunity.Encrypted(),
+				)
+				if err != nil {
+					m.logger.Error("failed to create history archive torrent", zap.Error(err))
+					archiveTorrentCreatedSuccessfully = false
+				}
+			}
 
+			if archiveDistributionPreference == params.ArchiveDistributionMethodCodex {
+				m.logger.Debug("[CODEX][RequestImportDiscordCommunity] creating history archive codex from messages")
+				_, err = m.archiveManager.CreateHistoryArchiveCodexFromMessages(
+					discordCommunity.ID(),
+					wakuMessages,
+					topics,
+					startDate,
+					endDate,
+					messageArchiveInterval,
+					discordCommunity.Encrypted(),
+				)
+				if err != nil {
+					m.logger.Error("[CODEX][RequestImportDiscordCommunity] failed to create history archive codex", zap.Error(err))
+					archiveCodexCreatedSuccessfully = false
+				}
+			}
+
+			if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
+				continue
+			}
+
+			if m.archiveManager.IsTorrentReady() && communitySettings.HistoryArchiveSupportEnabled {
 				err = m.archiveManager.SeedHistoryArchiveTorrent(discordCommunity.ID())
 				if err != nil {
 					m.logger.Error("failed to seed history archive", zap.Error(err))
 				}
+			}
+
+			if m.archiveManager.IsCodexReady() && communitySettings.HistoryArchiveSupportEnabled {
+				lastSeenIndexCid, err := m.communitiesManager.GetLastSeenIndexCid(discordCommunity.ID())
+				if err != nil {
+					m.logger.Error("[CODEX][RequestImportDiscordCommunity] failed to get last seen index cid", zap.Error(err))
+				} else {
+					err = m.archiveManager.SeedHistoryArchiveIndexCid(discordCommunity.ID(), lastSeenIndexCid)
+					if err != nil {
+						m.logger.Error("[CODEX][RequestImportDiscordCommunity] failed to seed history archive index cid", zap.Error(err), zap.String("indexCid", lastSeenIndexCid))
+					}
+				}
+			}
+
+			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+				m.logger.Debug("[CODEX][TORRENT][RequestImportDiscordCommunity] starting history archive tasks interval")
 				go m.archiveManager.StartHistoryArchiveTasksInterval(discordCommunity, messageArchiveInterval)
 			}
 		}

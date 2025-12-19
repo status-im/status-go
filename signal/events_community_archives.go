@@ -36,6 +36,12 @@ const (
 	// EventDownloadingHistoryArchivesFinished is triggered when the community member node
 	// has downloaded all archives
 	EventDownloadingHistoryArchivesFinished = "community.downloadingHistoryArchivesFinished"
+	// EventManifestFetched is triggered when the community member node
+	// has successfully fetched the manifest for an archive index
+	EventManifestFetched = "community.manifestFetched"
+	// EventIndexDownloadCompleted is triggered when the community member node
+	// has completed downloading the archive index file
+	EventIndexDownloadCompleted = "community.indexDownloadCompleted"
 )
 
 type CreatingHistoryArchivesSignal struct {
@@ -56,6 +62,8 @@ type HistoryArchivesCreatedSignal struct {
 
 type HistoryArchivesSeedingSignal struct {
 	CommunityID string `json:"communityId"`
+	MagnetLink  bool   `json:"magnetLink"`
+	IndexCid    bool   `json:"indexCid"`
 }
 
 type HistoryArchivesUnseededSignal struct {
@@ -78,6 +86,16 @@ type ImportingHistoryArchiveMessagesSignal struct {
 
 type DownloadingHistoryArchivesFinishedSignal struct {
 	CommunityID string `json:"communityId"`
+}
+
+type ManifestFetchedSignal struct {
+	CommunityID string `json:"communityId"`
+	IndexCid    string `json:"indexCid"`
+}
+
+type IndexDownloadCompletedSignal struct {
+	CommunityID string `json:"communityId"`
+	IndexCid    string `json:"indexCid"`
 }
 
 func SendHistoryArchivesProtocolEnabled() {
@@ -108,8 +126,12 @@ func SendHistoryArchivesCreated(communityID string, from int, to int) {
 	})
 }
 
-func SendHistoryArchivesSeeding(communityID string) {
-	send(EventHistoryArchivesSeeding, HistoryArchivesSeedingSignal{CommunityID: communityID})
+func SendHistoryArchivesSeeding(communityID string, magnetLink bool, indexCid bool) {
+	send(EventHistoryArchivesSeeding, HistoryArchivesSeedingSignal{
+		CommunityID: communityID,
+		MagnetLink:  magnetLink,
+		IndexCid:    indexCid,
+	})
 }
 
 func SendHistoryArchivesUnseeded(communityID string) {
@@ -139,5 +161,19 @@ func SendImportingHistoryArchiveMessages(communityID string) {
 func SendDownloadingHistoryArchivesFinished(communityID string) {
 	send(EventDownloadingHistoryArchivesFinished, DownloadingHistoryArchivesFinishedSignal{
 		CommunityID: communityID,
+	})
+}
+
+func SendManifestFetched(communityID string, indexCid string) {
+	send(EventManifestFetched, ManifestFetchedSignal{
+		CommunityID: communityID,
+		IndexCid:    indexCid,
+	})
+}
+
+func SendIndexDownloadCompleted(communityID string, indexCid string) {
+	send(EventIndexDownloadCompleted, IndexDownloadCompletedSignal{
+		CommunityID: communityID,
+		IndexCid:    indexCid,
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"gopkg.in/go-playground/validator.v9"
@@ -29,6 +30,13 @@ func TestNewConfigFromJSON(t *testing.T) {
 			"DataDir": "` + tmpDir + `/archivedata",
 			"TorrentDir": "` + tmpDir + `/torrents"
 		},
+		"CodexConfig": {
+			"Enabled": false,
+			"CodexNodeConfig": {
+				"data-dir": "` + tmpDir + `/codex/codexdata",
+				"block-retries": 5
+			}
+		},
 		"RuntimeLogLevel": "DEBUG"
 	}`
 	c, err := params.NewConfigFromJSON(json)
@@ -40,6 +48,8 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
 	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
+	require.Equal(t, filepath.Join(tmpDir, "codex", "codexdata"), c.CodexConfig.CodexNodeConfig.DataDir)
+	require.Equal(t, 5, c.CodexConfig.CodexNodeConfig.BlockRetries)
 }
 
 // TestNodeConfigValidate checks validation of individual fields.

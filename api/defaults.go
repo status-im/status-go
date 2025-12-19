@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"path/filepath"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
+
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
@@ -275,6 +277,8 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.LogEnabled = false
 	}
 
+	nodeConfig.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
+
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
@@ -345,10 +349,36 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	if request.TorrentConfigEnabled != nil {
 		nodeConfig.TorrentConfig.Enabled = *request.TorrentConfigEnabled
-
 	}
 	if request.TorrentConfigPort != nil {
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
+	}
+
+	if request.CodexConfigEnabled != nil {
+		nodeConfig.CodexConfig.Enabled = *request.CodexConfigEnabled
+	}
+
+	if request.CodexConfigBootstrapNode != nil {
+		nodeConfig.CodexConfig.CodexNodeConfig.BootstrapNodes = []string{*request.CodexConfigBootstrapNode}
+	}
+
+	if request.ImportInitialDelay != nil {
+		nodeConfig.ImportInitialDelay = *request.ImportInitialDelay
+	}
+
+	if request.MessageArchiveInterval != nil {
+		nodeConfig.MessageArchiveInterval = *request.MessageArchiveInterval
+	}
+
+	nodeConfig.CodexConfig = params.CodexConfig{
+		Enabled: nodeConfig.CodexConfig.Enabled,
+		CodexNodeConfig: codex.Config{
+			DataDir:        filepath.Join(nodeConfig.RootDataDir, "codex", "codexdata"),
+			BlockRetries:   params.BlockRetries,
+			MetricsEnabled: false,
+			LogFormat:      codex.LogFormatNoColors,
+			BootstrapNodes: nodeConfig.CodexConfig.CodexNodeConfig.BootstrapNodes,
+		},
 	}
 
 	if request.APIConfig != nil {

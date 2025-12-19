@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
+	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/crypto"
@@ -206,12 +207,21 @@ type NodeConfig struct {
 	// ConnectorConfig extra configuration for connector.Service
 	ConnectorConfig ConnectorConfig
 
+	// node-wide selection for history archive distribution preference
+	HistoryArchiveDistributionPreference string
+
+	// TorrentConfig provides configuration for the BitTorrent client used for message history archives.
 	TorrentConfig TorrentConfig
 
 	// OTELConfig provides configuration for OpenTelemetry tracing
 	OTELConfig OTELConfig
 
+	CodexConfig CodexConfig
+
 	OutputMessageCSVEnabled bool
+
+	ImportInitialDelay     int
+	MessageArchiveInterval int
 }
 
 // WalletConfig extra configuration for wallet.Service.
@@ -334,6 +344,17 @@ type TorrentConfig struct {
 	TorrentDir string
 }
 
+type CodexConfig struct {
+	Enabled         bool
+	CodexNodeConfig codex.Config
+}
+
+const (
+	ArchiveDistributionMethodTorrent            = "torrent"
+	ArchiveDistributionMethodCodex              = "codex"
+	DefaultHistoryArchiveDistributionPreference = ArchiveDistributionMethodCodex
+)
+
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
@@ -364,13 +385,32 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		c.APIModules = "net,web3,eth"
 	}
 
-	// Ensure TorrentConfig is valid
+	if c.HistoryArchiveDistributionPreference == "" {
+		c.HistoryArchiveDistributionPreference = DefaultHistoryArchiveDistributionPreference
+	}
+
 	if c.TorrentConfig.Enabled {
-		if c.TorrentConfig.DataDir == "" {
-			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
+		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodTorrent
+	} else if c.CodexConfig.Enabled {
+		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodCodex
+	}
+
+	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodTorrent {
+		if c.TorrentConfig.Enabled {
+			if c.TorrentConfig.DataDir == "" {
+				c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
+			}
+			if c.TorrentConfig.TorrentDir == "" {
+				c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
+			}
 		}
-		if c.TorrentConfig.TorrentDir == "" {
-			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
+	}
+
+	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodCodex {
+		if c.CodexConfig.Enabled {
+			if c.CodexConfig.CodexNodeConfig.DataDir == "" {
+				c.CodexConfig.CodexNodeConfig.DataDir = filepath.Join(c.RootDataDir, "codex", "codexdata")
+			}
 		}
 	}
 
@@ -387,15 +427,16 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	}
 
 	config := &NodeConfig{
-		NetworkID:              networkID,
-		RootDataDir:            dataDir,
-		KeycardPairingDataFile: keycardPairingDataFile,
-		HTTPHost:               "localhost",
-		HTTPPort:               8545,
-		HTTPVirtualHosts:       []string{"localhost"},
-		APIModules:             "eth,net,web3,peer,wallet",
-		LogFile:                "",
-		LogLevel:               "ERROR",
+		NetworkID:                            networkID,
+		RootDataDir:                          dataDir,
+		KeycardPairingDataFile:               keycardPairingDataFile,
+		HTTPHost:                             "localhost",
+		HTTPPort:                             8545,
+		HTTPVirtualHosts:                     []string{"localhost"},
+		APIModules:                           "eth,net,web3,peer,wallet",
+		LogFile:                              "",
+		LogLevel:                             "ERROR",
+		HistoryArchiveDistributionPreference: DefaultHistoryArchiveDistributionPreference,
 		WakuV2Config: WakuV2Config{
 			Host: "0.0.0.0",
 			Port: 0,
@@ -406,6 +447,15 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			Port:       9025,
 			DataDir:    dataDir + "/archivedata",
 			TorrentDir: dataDir + "/torrents",
+		},
+		CodexConfig: CodexConfig{
+			Enabled: false,
+			CodexNodeConfig: codex.Config{
+				BlockRetries:   BlockRetries,
+				DataDir:        filepath.Join(dataDir, "codex", "codexdata"),
+				MetricsEnabled: false,
+				LogFormat:      codex.LogFormatNoColors,
+			},
 		},
 	}
 
@@ -485,6 +535,9 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	if err := c.TorrentConfig.Validate(validate); err != nil {
 		return err
 	}
+	if err := Validate(c.CodexConfig, validate); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -513,6 +566,19 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 	if c.Enabled && (c.DataDir == "" || c.TorrentDir == "") {
 		return fmt.Errorf("TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be \"\"")
 	}
+	return nil
+}
+
+func Validate(c CodexConfig, validate *validator.Validate) error {
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	// TODO uncomment when DataDir is mandatory
+	// Need to check if the codex config should be saved in db
+	// if c.DataDir == "" {
+	// 	return fmt.Errorf("CodexConfig.DataDir cannot be \"\"")
+	// }
 	return nil
 }
 
