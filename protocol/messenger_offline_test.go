@@ -49,7 +49,7 @@ func (s *MessengerOfflineSuite) SetupTest() {
 	s.bob = s.newMessenger(bobPassword, []string{bobAccountAddress})
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1})
 
-	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
+	s.owner.config.communitiesRekeyInterval = 50 * time.Millisecond
 }
 
 func (s *MessengerOfflineSuite) newMessenger(password string, accounts []string) *Messenger {

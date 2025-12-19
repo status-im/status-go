@@ -54,14 +54,24 @@ type MessengerCommunitiesSuite struct {
 func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 
-	s.owner = s.newMessenger("", []string{})
-	s.owner.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
-	s.bob = s.newMessenger(bobPassword, []string{bobAccountAddress})
-	s.bob.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
-	s.alice = s.newMessenger(alicePassword, []string{aliceAccountAddress})
-	s.alice.account.CustomizationColor = multiaccountscommon.CustomizationColorArmy
+	newMessenger := func(password string, walletAddresses []string) *Messenger {
+		privateKey, err := crypto.GenerateKey()
+		s.Require().NoError(err)
 
-	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
+		return s.newMessengerWithConfig(testMessengerConfig{
+			privateKey: privateKey,
+			extraOptions: []Option{
+				WithCommunitiesRekeyInterval(50 * time.Millisecond),
+			},
+		}, password, walletAddresses)
+	}
+
+	s.owner = newMessenger("", []string{})
+	s.owner.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
+	s.bob = newMessenger(bobPassword, []string{bobAccountAddress})
+	s.bob.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
+	s.alice = newMessenger(alicePassword, []string{aliceAccountAddress})
+	s.alice.account.CustomizationColor = multiaccountscommon.CustomizationColorArmy
 
 	s.setMessengerDisplayName(s.owner, "Charlie")
 	s.setMessengerDisplayName(s.bob, "Bobby")
@@ -2630,7 +2640,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
 
 	community, chat := s.createCommunity()
-	s.owner.communitiesManager.RekeyInterval = 1 * time.Hour
+	s.owner.config.communitiesRekeyInterval = 1 * time.Hour
 
 	{ // ensure both community and channel are encrypted
 		permissionRequest := requests.CreateCommunityTokenPermission{
@@ -3720,7 +3730,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	// Check that rekeying is occurring by counting the number of keyIDs in the encryptor's DB
 	// This test could be flaky, as the rekey function may not be finished before RekeyInterval * 2 has passed
 	for i := 0; i < 5; i++ {
-		time.Sleep(s.owner.communitiesManager.RekeyInterval * 2)
+		time.Sleep(s.owner.config.communitiesRekeyInterval * 10)
 		communityKeys, err = s.owner.messaging.GetKeysForGroup(community.ID())
 		s.Require().NoError(err)
 		s.Require().Greater(len(communityKeys), communityKeyCount)
@@ -3734,7 +3744,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
-	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
+	s.owner.config.communitiesRekeyInterval = 500 * time.Minute
 
 	// Create a new community
 	response, err := s.owner.CreateCommunity(

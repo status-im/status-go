@@ -4331,18 +4331,15 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 func (m *Messenger) startCommunityRekeyLoop() {
 	logger := m.logger.Named("CommunityRekeyLoop")
 	var d time.Duration
-	if m.communitiesManager.RekeyInterval != 0 {
-		if m.communitiesManager.RekeyInterval < 10 {
-			d = time.Nanosecond
-		} else {
-			d = m.communitiesManager.RekeyInterval / 10
-		}
+	if m.config.communitiesRekeyInterval != 0 {
+		d = m.config.communitiesRekeyInterval
 	} else {
 		d = 5 * time.Minute
 	}
 
+	m.logger.Info("starting community rekey loop", zap.Duration("interval", d))
+
 	ticker := time.NewTicker(d)
-	defer ticker.Stop()
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
@@ -4365,10 +4362,10 @@ func (m *Messenger) startCommunityRekeyLoop() {
 func (m *Messenger) rekeyCommunities(logger *zap.Logger) {
 	// TODO in future have a community level rki rather than a global rki
 	var rekeyInterval time.Duration
-	if m.communitiesManager.RekeyInterval == 0 {
+	if m.config.communitiesRekeyInterval == 0 {
 		rekeyInterval = 48 * time.Hour
 	} else {
-		rekeyInterval = m.communitiesManager.RekeyInterval
+		rekeyInterval = m.config.communitiesRekeyInterval
 	}
 
 	shouldRekey := func(hashRatchetGroupID []byte) bool {

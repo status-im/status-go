@@ -46,10 +46,6 @@ func (f *TestMessagingEnvironment) Setup(t *testing.T) error {
 	return nil
 }
 
-func (f *TestMessagingEnvironment) TearDown() error {
-	return f.waku.Waku.Stop()
-}
-
 func (f *TestMessagingEnvironment) NewTestCore(params CoreParams, options ...Options) (*Core, error) {
 	return newCore(f.waku, params, newConfig(options...))
 }
