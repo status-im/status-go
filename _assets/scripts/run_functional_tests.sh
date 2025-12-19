@@ -2,6 +2,8 @@
 
 set -o nounset
 
+unset LD_LIBRARY_PATH
+
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 source "${GIT_ROOT}/_assets/scripts/codecov.sh"

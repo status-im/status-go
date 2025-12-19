@@ -63,7 +63,6 @@ Session.vim
 .undodir/*
 .idea/*
 !.idea/codeStyles/
-/.vscode/
 /cmd/*/.ethereum/
 *.iml
 
@@ -117,3 +116,10 @@ pkg/sentry/SENTRY_PRODUCTION
 
 go.work
 go.work.sum
+
+# Libs directory (Codex)
+libs
+coverage_merged.out
+test_0.coverage.out
+test-coverage.html
+api/pre_login.log

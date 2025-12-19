@@ -34,6 +34,7 @@ help: ##@other Show this help
 RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
+LIBS_DIR := $(abspath ./libs)
 
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
  detected_OS := Windows
@@ -77,14 +78,15 @@ endif
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  LIB_EXT := dylib
- GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
+ GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIB_EXT := dll
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
 else ifeq ($(detected_OS),Linux)
  GOBIN_SHARED_LIB_EXT := so
  LIB_EXT := so
- CGO_LDFLAGS += "-Wl,-soname,libstatus.so.0"
+ GOBIN_SHARED_LIB_CGO_LDFLAGS :=  CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-Wl,-soname,libstatus.so.0 -L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
 endif
 
 CGO_CFLAGS+=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
@@ -130,8 +132,8 @@ else
 endif
 
 LIBSDS := $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR) -I$(LIBS_DIR)
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -L$(LIBS_DIR) -lcodex
 
 # Common flags
 
@@ -204,11 +206,17 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 #----------------
 all: $(GO_CMD_NAMES)
 
+CGO_ENV := CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="-Wl,-rpath,$(LIBS_DIR) $(CGO_LDFLAGS)"
+ifeq ($(detected_OS),Darwin)
+CGO_ENV += DYLD_LIBRARY_PATH=$(LIBS_DIR):$(NIM_SDS_LIB_DIR):$$DYLD_LIBRARY_PATH
+else
+CGO_ENV += LD_LIBRARY_PATH=$(LIBS_DIR):$(NIM_SDS_LIB_DIR):$$LD_LIBRARY_PATH
+endif
+
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
 $(GO_CMD_BUILDS): generate $(LIBWAKU) $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -v \
+	$(CGO_ENV) go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
@@ -284,6 +292,72 @@ rebuild-libsds: | clean-libsds $(LIBSDS)
 
 # Status-go targets
 
+# Add rpath to libstdc++ to avoid runtime errors with NIX
+ifeq ($(detected_OS),Darwin)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libc++.1.dylib)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(DYLD_LIBRARY_PATH)
+    LD_NAME := DYLD_LIBRARY_PATH
+else ifeq ($(detected_OS),Windows)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++-6.dll)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR);$(CXXLIB_DIR);$(PATH)
+    LD_NAME := PATH
+else
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++.so.6)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(LD_LIBRARY_PATH)
+    LD_NAME := LD_LIBRARY_PATH
+endif
+
+#----------------
+# Codex
+#----------------
+.PHONY: fetch-libcodex test-libcodex clean-libcodex
+
+ifeq ($(USE_CODEX),true)
+BUILD_TAGS += use_codex
+endif
+
+UNAME_M := $(shell uname -m)
+ifneq ($(filter $(UNAME_M),x86_64 amd64 i686 i386),)
+  CODEX_ARCH := amd64
+else ifneq ($(filter $(UNAME_M),aarch64 arm64 arm),)
+  CODEX_ARCH := arm64
+else
+  CODEX_ARCH := $(UNAME_M)
+endif
+
+ifeq ($(detected_OS),Darwin)
+CODEX_OS := "macos"
+else
+CODEX_OS := $(detected_OS)
+endif
+
+CODEX_VERSION := $(shell go list -m -f '{{.Version}}' github.com/codex-storage/codex-go-bindings 2>/dev/null)
+CODEX_DOWNLOAD_URL := "https://github.com/logos-storage/logos-storage-go-bindings/releases/download/$(CODEX_VERSION)/codex-${CODEX_OS}-${CODEX_ARCH}.zip"
+
+fetch-libcodex:
+	@set -e; \
+	if [ -f "$(LIBS_DIR)/libcodex.so" ] || [ -f "$(LIBS_DIR)/libcodex.dylib" ] || [ -f "$(LIBS_DIR)/libcodex.dll" ]; then \
+		echo "libcodex already present in $(LIBS_DIR); skipping download"; \
+	else \
+		echo "Fetching libcodex from: ${CODEX_DOWNLOAD_URL} ${OS} ${HOST_OS}"; \
+		mkdir -p $(LIBS_DIR); \
+		curl -fSL --create-dirs -o $(LIBS_DIR)/codex-${CODEX_OS}-${CODEX_ARCH}.zip ${CODEX_DOWNLOAD_URL}; \
+		unzip -o -qq $(LIBS_DIR)/codex-${CODEX_OS}-${CODEX_ARCH}.zip -d $(LIBS_DIR); \
+		rm -f $(LIBS_DIR)/codex*.zip; \
+	fi
+
+test-libcodex: generate |
+	$(CGO_ENV) go test -tags '$(BUILD_TAGS) use_codex' -run TestCodexStart ./codex/... -v -json -count=1 | jq -r '.Output'
+
+clean-libcodex:
+	@echo "Removing libcodex"
+	rm -Rf $(LIBS_DIR)/*
+
+# Status-go targets
+
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
 
@@ -293,7 +367,7 @@ status-backend: build/bin/status-backend
 run-status-backend: PORT ?= 0
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
+	$(CGO_ENV) go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -310,15 +384,14 @@ statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-c-bindings:
 	@## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
-	go run -mod=mod cmd/library/*.go > $(STATUS_GO_BINDINGS_PATH)/main.go
+	$(CGO_ENV) go run -mod=mod cmd/library/*.go > $(STATUS_GO_BINDINGS_PATH)/main.go
 
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build \
+	$(CGO_ENV) go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-archive \
@@ -348,8 +421,7 @@ endif
 
 statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
-	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(ANDROID_BUILD_FLAGS) $(CGO_ENV) go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
@@ -359,8 +431,7 @@ statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-ios #
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
-	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(IOS_BUILD_FLAGS) $(CGO_ENV) go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
 	@echo "iOS library built"
@@ -404,6 +475,9 @@ generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= go tool go-generate-fast
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
+ifeq ($(NO_NETWORK),)
+generate: fetch-libcodex
+endif
 generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
@@ -428,7 +502,7 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 lint-fix:
-	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
+	$(CGO_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
@@ -452,14 +526,13 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /transactions/fake | \
 	grep -v /tests-unit-network)
 test-unit: ##@tests Run unit and integration tests
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	./_assets/scripts/run_unit_tests.sh
+	$(CGO_ENV) ./_assets/scripts/run_unit_tests.sh
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
 test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./tests-unit-network/...)
 test-unit-network: ##@tests Run unit and integration tests with network access
-	./_assets/scripts/run_unit_tests.sh
+	$(CGO_ENV) ./_assets/scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -468,7 +541,7 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
-	@./_assets/scripts/run_functional_tests.sh
+	CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" ./_assets/scripts/run_functional_tests.sh
 
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
@@ -476,13 +549,13 @@ benchmark:
 
 lint-panics: generate
 	GOFLAGS=-tags='$(BUILD_TAGS),lint' \
-	go tool goroutine-defer-guard -skip=./cmd -test=false ./...
+	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" go tool goroutine-defer-guard -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
 lint:
-	golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
+	$(CGO_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 
-clean: ##@other Cleanup
+clean: clean-libcodex | ##@other Cleanup
 	rm -fr build/bin/*
 
 git-clean:
@@ -559,3 +632,4 @@ generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL 
 
 env:
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+

@@ -8,10 +8,30 @@
 
 let
   optionalString = pkgs.lib.optionalString;
+  codexVersion = "v0.0.28";
+  arch =
+    if stdenv.hostPlatform.isx86_64 then "amd64"
+    else if stdenv.hostPlatform.isAarch64 then "arm64"
+    else stdenv.hostPlatform.arch;
+  os = if stdenv.isDarwin then "macos" else "Linux";
+  hash = 
+    if stdenv.hostPlatform.isDarwin 
+    # nix store prefetch-file --json --unpack https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${codexVersion}/codex-macos-arm64.zip | jq -r .hash
+    then "sha256-GcerkH8izZ5QHG5ARNNrM1fktaeBKjF6AGNsA6vxVj0="
+    # nix store prefetch-file --json --unpack https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${codexVersion}/codex-Linux-amd64.zip | jq -r .hash
+    else "sha256-sYhbgBN0LNA7YhmBigPwo1h34QTADTxFGjO8QAw8m18=";
+
+  # Pre-fetch libcodex to avoid network during build
+  codexLib = pkgs.fetchzip {
+    url = "https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${codexVersion}/codex-${os}-${arch}.zip";
+    hash = hash;
+    stripRoot = false;
+  };
+
 in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
-  vendorHash = "sha256-bImoWkSlJw2oRgtXh4e76gxAmgzaFqGvhTzsH8dYwWY=";
+  vendorHash = "sha256-WCYruo0mEMzm/G8LGZCZRftfbOGxEyXp5BiUPOfpJCY=";
 
   inherit meta version;
 
@@ -43,10 +63,13 @@ in pkgs.buildGoModule {
   preBuild = ''
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
+    export LIBS_DIR="${codexLib}"
 
     make generate \
+        NO_NETWORK=1 \
         NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \
         NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib" \
+        GO111MODULE=on \
         GO_GENERATE_CMD='go generate'
   '';
 
@@ -58,9 +81,14 @@ in pkgs.buildGoModule {
   # Also set CLEANUP_GENERATED_FILES_DRY_RUN=true to avoid running cleanup_generated_files.sh script,
   # which is not available at this phase, because buildGoModule only copies Go files.
   buildPhase = ''
+    runHook preBuild
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
+    CGO_ENABLED=1 \
+    CGO_CFLAGS="-I$LIBS_DIR -I$NIM_SDS_INC_DIR" \
+    CGO_LDFLAGS="-L$LIBS_DIR -lcodex -Wl,-rpath,$LIBS_DIR -L$NIM_SDS_LIB_DIR -lsds" \
     make statusgo-library \
+        NO_NETWORK=1 \
         NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \
         NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib" \
         STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
