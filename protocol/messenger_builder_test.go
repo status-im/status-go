@@ -47,7 +47,7 @@ type testMessengerConfig struct {
 	extraOptions []Option
 }
 
-func (tmc *testMessengerConfig) complete() error {
+func (tmc *testMessengerConfig) complete(t *testing.T) error {
 	if len(tmc.name) == 0 {
 		tmc.name = uuid.NewString()[0:6]
 	}
@@ -63,6 +63,7 @@ func (tmc *testMessengerConfig) complete() error {
 	if tmc.logger == nil {
 		logger := testutils.MustCreateTestLogger()
 		tmc.logger = logger.Named(tmc.name)
+		t.Logf("created test logger - logger name: %s, test name: %s, ", tmc.name, t.Name())
 		logger.Debug("created test logger", zap.String("name", tmc.name))
 	}
 
@@ -78,7 +79,7 @@ func (tmc *testMessengerConfig) complete() error {
 }
 
 func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
-	err := config.complete()
+	err := config.complete(t)
 	if err != nil {
 		return nil, err
 	}

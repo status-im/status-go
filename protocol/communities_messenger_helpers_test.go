@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strconv"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
@@ -236,7 +237,7 @@ type testCommunitiesMessengerConfig struct {
 	collectiblesManager communities.CollectiblesManager
 }
 
-func (tcmc *testCommunitiesMessengerConfig) complete() error {
+func (tcmc *testCommunitiesMessengerConfig) complete(t *testing.T) error {
 	if tcmc.nodeConfig == nil {
 		tcmc.nodeConfig = defaultTestCommunitiesMessengerNodeConfig()
 	}
@@ -244,7 +245,7 @@ func (tcmc *testCommunitiesMessengerConfig) complete() error {
 		tcmc.appSettings = defaultTestCommunitiesMessengerSettings()
 	}
 
-	err := tcmc.testMessengerConfig.complete()
+	err := tcmc.testMessengerConfig.complete(t)
 	if err != nil {
 		return err
 	}
@@ -282,7 +283,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 }
 
 func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMessagingEnvironment, config testCommunitiesMessengerConfig) *Messenger {
-	err := config.complete()
+	err := config.complete(s.T())
 	s.Require().NoError(err)
 
 	ctrl := gomock.NewController(s.T())
