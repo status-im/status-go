@@ -439,7 +439,6 @@ func NewMessenger(
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			archiveManager.Stop,
-			database.Close,
 		},
 		logger:                           logger,
 		tracer:                           c.tracer,
