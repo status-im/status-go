@@ -195,8 +195,8 @@ func (v *Verifier) verify(ctx context.Context, rpcEndpoint, contractAddress stri
 	for _, ensInfo := range ensDetails {
 		v.quitWg.Add(1)
 		go func(info Details) {
-			defer v.quitWg.Done()
 			defer gocommon.LogOnPanic()
+			defer v.quitWg.Done()
 			select {
 			case ch <- v.verifyENSName(info, ethClient):
 				return
