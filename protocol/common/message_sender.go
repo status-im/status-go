@@ -81,10 +81,10 @@ func setMessageID(messageID types2.HexBytes, rawMessage *RawMessage) error {
 
 func (s *MessageSender) Start() {
 	s.wg.Add(1)
-	defer s.wg.Done()
 
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer s.wg.Done()
 
 		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[messagingevents.SentMessage](s.messaging.Publisher(), 100)
 		defer unsubSentMessages()
