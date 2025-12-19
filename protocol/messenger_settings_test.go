@@ -26,12 +26,6 @@ func (s *MessengerSettingsSuite) SetupTest() {
 
 	prepareMessengersForPairing(&s.Suite, s.m, s.m2)
 }
-
-func (s *MessengerSettingsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.m2)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func prepareMessengersForPairing(s *suite.Suite, m1, m2 *Messenger) {
 	// Set m's installation metadata
 	aim := &messagingtypes.InstallationMetadata{

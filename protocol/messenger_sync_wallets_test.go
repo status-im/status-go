@@ -98,7 +98,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 
 	// Create new device and add main account to
 	alicesOtherDevice := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Store only chat and default wallet account on other device
 	profileKpOtherDevice, _, _, err := accounts.GetProfileKeypairForTest(true, true, false)
@@ -324,7 +323,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 
 	// Create a main account on alice's other device
 	alicesOtherDevice := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
@@ -522,7 +520,6 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 
 	// Create new device and add main account to
 	alicesOtherDevice := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()

@@ -23,7 +23,6 @@ type MessengerRemoveMessageSuite struct {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -72,7 +71,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessage() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteMessagePreviousLastMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -121,7 +119,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessagePreviousLastMessage() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteWrongMessageType() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -148,7 +145,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteWrongMessageType() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteMessageFirstThenMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -201,7 +197,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageFirstThenMessage() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteImageMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -275,7 +270,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteImageMessage() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -353,7 +347,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteMessageWithAMention() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -413,7 +406,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageWithAMention() {
 // as read but the message still unseen (Seen == false)
 func (s *MessengerRemoveMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -472,7 +464,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteMessageReplyToImage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -525,7 +516,6 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageReplyToImage() {
 
 func (s *MessengerRemoveMessageSuite) TestDeleteMessageForMeReplyToImage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)

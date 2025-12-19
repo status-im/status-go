@@ -224,8 +224,10 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case sub, more := <-c:
@@ -380,8 +382,10 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		recentlyPublishedOrgs[community.IDString()] = community.CreateDeepCopy()
 	}
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case sub, more := <-c:
@@ -503,8 +507,10 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	// We check every 5 minutes if we need to update
 	ticker := time.NewTicker(5 * time.Minute)
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -822,8 +828,10 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 
 	ticker := time.NewTicker(grantUpdateInterval)
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -1501,21 +1509,27 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	response.AddCommunity(community)
 
 	// We send a push notification in the background
+
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
-		if m.pushNotificationClient != nil {
-			pks, err := community.CanManageUsersPublicKeys()
+		defer m.shutdownWaitGroup.Done()
+
+		if m.pushNotificationClient == nil {
+			return
+		}
+
+		pks, err := community.CanManageUsersPublicKeys()
+		if err != nil {
+			m.logger.Error("failed to get pks", zap.Error(err))
+			return
+		}
+		for _, publicKey := range pks {
+			pkString := crypto.PubkeyToHex(publicKey)
+			_, err = m.pushNotificationClient.SendNotification(publicKey, nil, requestToJoin.ID, pkString, protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY)
 			if err != nil {
-				m.logger.Error("failed to get pks", zap.Error(err))
+				m.logger.Error("error sending notification", zap.Error(err))
 				return
-			}
-			for _, publicKey := range pks {
-				pkString := crypto.PubkeyToHex(publicKey)
-				_, err = m.pushNotificationClient.SendNotification(publicKey, nil, requestToJoin.ID, pkString, protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY)
-				if err != nil {
-					m.logger.Error("error sending notification", zap.Error(err))
-					return
-				}
 			}
 		}
 	}()
@@ -4317,19 +4331,20 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 func (m *Messenger) startCommunityRekeyLoop() {
 	logger := m.logger.Named("CommunityRekeyLoop")
 	var d time.Duration
-	if m.communitiesManager.RekeyInterval != 0 {
-		if m.communitiesManager.RekeyInterval < 10 {
-			d = time.Nanosecond
-		} else {
-			d = m.communitiesManager.RekeyInterval / 10
-		}
+	if m.config.communitiesRekeyInterval != 0 {
+		d = m.config.communitiesRekeyInterval
 	} else {
 		d = 5 * time.Minute
 	}
 
+	m.logger.Info("starting community rekey loop", zap.Duration("interval", d))
+
 	ticker := time.NewTicker(d)
+
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-ticker.C:
@@ -4347,10 +4362,10 @@ func (m *Messenger) startCommunityRekeyLoop() {
 func (m *Messenger) rekeyCommunities(logger *zap.Logger) {
 	// TODO in future have a community level rki rather than a global rki
 	var rekeyInterval time.Duration
-	if m.communitiesManager.RekeyInterval == 0 {
+	if m.config.communitiesRekeyInterval == 0 {
 		rekeyInterval = 48 * time.Hour
 	} else {
-		rekeyInterval = m.communitiesManager.RekeyInterval
+		rekeyInterval = m.config.communitiesRekeyInterval
 	}
 
 	shouldRekey := func(hashRatchetGroupID []byte) bool {
@@ -4779,8 +4794,10 @@ func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Commun
 func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-time.After(5 * time.Minute):

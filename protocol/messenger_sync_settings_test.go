@@ -93,7 +93,7 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 	}
 
 	var err error
-	s.m, err = newRunningTestMessenger(s.messagingEnv, testMessengerConfig{appSettings: &settings})
+	s.m, err = newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{appSettings: &settings})
 	s.Require().NoError(err)
 	s.privateKey = s.m.identity
 	s.alice = s.m
@@ -101,11 +101,6 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 	s.alice2 = s.anotherMessenger()
 
 	prepAliceMessengersForPairing(&s.Suite, s.alice, s.alice2)
-}
-
-func (s *MessengerSyncSettingsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice2)
-	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {

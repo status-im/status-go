@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
+	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,8 +17,6 @@ type TestMessagingEnvironment struct {
 	// To enable communication between multiple messaging core instances in tests,
 	// share a single Waku instance across them.
 	waku *testWakuWrapper
-
-	cores []*Core
 }
 
 func NewTestMessagingEnvironment() (*TestMessagingEnvironment, error) {
@@ -27,33 +26,28 @@ func NewTestMessagingEnvironment() (*TestMessagingEnvironment, error) {
 	}
 
 	return &TestMessagingEnvironment{
-		waku:  waku,
-		cores: make([]*Core, 0),
+		waku: waku,
 	}, nil
 }
 
-func (f *TestMessagingEnvironment) Setup() error {
-	return f.waku.Waku.Start()
-}
-
-func (f *TestMessagingEnvironment) TearDown() error {
-	for _, core := range f.cores {
-		if err := core.stop(); err != nil {
-			return err
-		}
+func (f *TestMessagingEnvironment) Setup(t *testing.T) error {
+	err := f.waku.Waku.Start()
+	if err != nil {
+		return err
 	}
-	f.cores = make([]*Core, 0)
 
-	return f.waku.Waku.Stop()
+	t.Cleanup(func() {
+		err = f.waku.Waku.Stop()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	return nil
 }
 
 func (f *TestMessagingEnvironment) NewTestCore(params CoreParams, options ...Options) (*Core, error) {
-	core, err := newCore(f.waku, params, newConfig(options...))
-	if err != nil {
-		return nil, err
-	}
-	f.cores = append(f.cores, core)
-	return core, nil
+	return newCore(f.waku, params, newConfig(options...))
 }
 
 func (f *TestMessagingEnvironment) SubscribePostEvents() chan *PostMessageSubscription {

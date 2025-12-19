@@ -31,14 +31,8 @@ func (s *MessengerSyncContactRequestDecisionSuite) SetupTest() {
 	PairDevices(&s.Suite, s.m, s.m2)
 }
 
-func (s *MessengerSyncContactRequestDecisionSuite) TearDownTest() {
-	s.Require().NoError(s.m2.Shutdown())
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest() {
 	userB := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, userB)
 
 	numM1DispatchedAcceptContactRequest := 0
 	numM2DispatchedAcceptContactRequest := 0

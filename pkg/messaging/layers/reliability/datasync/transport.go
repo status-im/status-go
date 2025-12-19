@@ -1,6 +1,7 @@
 package datasync
 
 import (
+	"context"
 	"errors"
 	"math"
 	"math/rand"
@@ -44,8 +45,13 @@ func (t *NodeTransport) AddPacket(p transport.Packet) {
 	t.packets <- p
 }
 
-func (t *NodeTransport) Watch() transport.Packet {
-	return <-t.packets
+func (t *NodeTransport) Watch(ctx context.Context) (*transport.Packet, bool) {
+	select {
+	case <-ctx.Done():
+		return nil, false
+	case p := <-t.packets:
+		return &p, true
+	}
 }
 
 func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload *protobuf.Payload) error {

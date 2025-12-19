@@ -29,20 +29,6 @@ func (s *MessengerDeleteMessagesSuite) SetupTest() {
 	s.owner = s.newMessenger("", []string{})
 	s.bob = s.newMessenger(bobPassword, []string{bobAddress})
 	s.admin = s.newMessenger(alicePassword, []string{aliceAddress1})
-
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.admin.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerDeleteMessagesSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.owner)
-	TearDownMessenger(&s.Suite, s.bob)
-	TearDownMessenger(&s.Suite, s.admin)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerDeleteMessagesSuite) sendMessageAndCheckDelivery(sender *Messenger, text string, chatID string) *common.Message {

@@ -165,20 +165,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
 
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
-
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.owner)
-	TearDownMessenger(&s.Suite, s.bob)
-	TearDownMessenger(&s.Suite, s.alice)
-	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option) *Messenger {

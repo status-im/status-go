@@ -56,7 +56,6 @@ func buildImageMessage(s *MessengerShareMessageSuite, chat Chat) *common.Message
 
 func (s *MessengerShareMessageSuite) TestImageMessageSharing() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)

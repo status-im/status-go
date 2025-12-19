@@ -21,7 +21,6 @@ type MessengerMuteSuite struct {
 
 func (s *MessengerMuteSuite) TestSetMute() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	chatID := publicChatName
 
@@ -70,7 +69,6 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 	mockTimeOneMinuteAgo := time.Now().Add(-time.Minute)
 
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	chatID := publicChatName
 

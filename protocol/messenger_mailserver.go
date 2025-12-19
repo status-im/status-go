@@ -320,6 +320,7 @@ const missingMessageCheckPeriod = 30 * time.Second
 
 func (m *Messenger) checkForMissingMessagesLoop() {
 	defer gocommon.LogOnPanic()
+	defer m.shutdownWaitGroup.Done()
 
 	t := time.NewTicker(missingMessageCheckPeriod)
 	defer t.Stop()

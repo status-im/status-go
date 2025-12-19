@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strconv"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
@@ -236,7 +237,7 @@ type testCommunitiesMessengerConfig struct {
 	collectiblesManager communities.CollectiblesManager
 }
 
-func (tcmc *testCommunitiesMessengerConfig) complete() error {
+func (tcmc *testCommunitiesMessengerConfig) complete(t *testing.T) error {
 	if tcmc.nodeConfig == nil {
 		tcmc.nodeConfig = defaultTestCommunitiesMessengerNodeConfig()
 	}
@@ -244,7 +245,7 @@ func (tcmc *testCommunitiesMessengerConfig) complete() error {
 		tcmc.appSettings = defaultTestCommunitiesMessengerSettings()
 	}
 
-	err := tcmc.testMessengerConfig.complete()
+	err := tcmc.testMessengerConfig.complete(t)
 	if err != nil {
 		return err
 	}
@@ -282,7 +283,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 }
 
 func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMessagingEnvironment, config testCommunitiesMessengerConfig) *Messenger {
-	err := config.complete()
+	err := config.complete(s.T())
 	s.Require().NoError(err)
 
 	ctrl := gomock.NewController(s.T())
@@ -328,7 +329,7 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 
 	config.extraOptions = append(config.extraOptions, options...)
 
-	messenger, err := newTestMessenger(messagingEnv, config.testMessengerConfig)
+	messenger, err := newTestMessenger(s.T(), messagingEnv, config.testMessengerConfig)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
@@ -357,6 +358,17 @@ func newTestCommunitiesMessenger(s *suite.Suite, messagingEnv *messaging.TestMes
 
 	err = messenger.messaging.Start()
 	s.Require().NoError(err)
+	s.T().Cleanup(func() {
+		err := messenger.messaging.Stop()
+		s.Assert().NoError(err)
+	})
+
+	_, err = messenger.Start()
+	s.Require().NoError(err)
+	s.T().Cleanup(func() {
+		err := messenger.Shutdown()
+		s.Assert().NoError(err)
+	})
 
 	return messenger
 }

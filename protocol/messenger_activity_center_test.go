@@ -40,19 +40,10 @@ func (s *MessengerActivityCenterMessageSuite) SetupTest() {
 
 	s.m = s.newMessenger(alicePassword, []string{aliceAccountAddress})
 	s.m.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
-
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerActivityCenterMessageSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.m)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -106,7 +97,6 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	alice := s.m
 	bob := s.newMessenger(bobPassword, []string{bobAddress})
-	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)
@@ -146,7 +136,6 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	alice := s.m
 	bob := s.newMessenger(bobPassword, []string{bobAddress})
-	defer TearDownMessenger(&s.Suite, bob)
 
 	// create an http server
 	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
@@ -228,7 +217,6 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNotifications() {
 	alice := s.m
 	bob := s.newMessenger(bobPassword, []string{bobAddress})
-	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)
@@ -278,7 +266,6 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotifications() {
 	alice := s.m
 	bob := s.newMessenger(bobPassword, []string{bobAddress})
-	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)
@@ -301,7 +288,6 @@ func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotificat
 func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMentionAndReply() (*Messenger, *Messenger, *common.Message, *common.Message, *communities.Community) {
 	alice := s.m
 	bob := s.newMessenger(bobPassword, []string{bobAddress})
-	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)
@@ -475,7 +461,6 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificat
 func (s *MessengerActivityCenterMessageSuite) TestAliceDoesNotReceiveCommunityNotificationsBeforeJoined() {
 	alice := s.m
 	bob := s.newMessenger(bobPassword, []string{bobAddress})
-	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
 	community, chat := s.createCommunity(bob)
