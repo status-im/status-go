@@ -133,7 +133,6 @@ type Subscriptions struct {
 	SharedSecrets      []*sharedsecret.Secret
 	SendContactCode    <-chan struct{}
 	NewHashRatchetKeys chan []*HashRatchetInfo
-	Quit               chan struct{}
 }
 
 func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
@@ -146,7 +145,6 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
 		SharedSecrets:      secrets,
 		SendContactCode:    p.publisher.Start(),
 		NewHashRatchetKeys: make(chan []*HashRatchetInfo, maxKeysChannelSize),
-		Quit:               make(chan struct{}),
 	}
 	return p.subscriptions, nil
 }
@@ -154,7 +152,7 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
 func (p *Protocol) Stop() error {
 	p.publisher.Stop()
 	if p.subscriptions != nil {
-		close(p.subscriptions.Quit)
+		close(p.subscriptions.NewHashRatchetKeys)
 	}
 	return nil
 }

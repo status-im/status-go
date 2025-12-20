@@ -1212,16 +1212,17 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *types2.Enc
 					m.logger.Error("failed to clean processed messages", zap.Error(err))
 				}
 
-			case keys := <-subscriptions.NewHashRatchetKeys:
+			case keys, ok := <-subscriptions.NewHashRatchetKeys:
+				if !ok {
+					m.logger.Debug("quitting encryption subscription loop")
+					return
+				}
 				if m.communitiesManager == nil {
 					continue
 				}
 				if err := m.communitiesManager.NewHashRatchetKeys(keys); err != nil {
 					m.logger.Error("failed to invalidate cache for decrypted communities", zap.Error(err))
 				}
-			case <-subscriptions.Quit:
-				m.logger.Debug("quitting encryption subscription loop")
-				return
 			}
 		}
 	}()
@@ -1304,7 +1305,10 @@ func (m *Messenger) watchConnectionChange() {
 		defer ticker.Stop()
 		for {
 			select {
-			case status := <-subscription.C():
+			case status, ok := <-subscription.C():
+				if !ok {
+					return
+				}
 				processNewState(status.IsOnline)
 			case <-ticker.C:
 				processNewState(m.Online())

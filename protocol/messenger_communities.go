@@ -3692,9 +3692,15 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 }
 
 func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
-		time.Sleep(importInitialDelay)
+		defer m.shutdownWaitGroup.Done()
+		select {
+		case <-m.quit:
+			return
+		case <-time.After(importInitialDelay):
+		}
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
 		})
@@ -3784,6 +3790,8 @@ func (m *Messenger) importHistoryArchives(communityID types3.HexBytes, cancel ch
 	select {
 	case <-m.importDelayer.wait:
 	case <-ctx.Done():
+		return nil
+	case <-m.quit:
 		return nil
 	}
 
