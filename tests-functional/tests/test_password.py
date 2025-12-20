@@ -31,24 +31,33 @@ class TestPassword:
             backend.change_database_password(backend.password + "-wrong", new_password)
 
         # Try a correct password
-        backend.change_database_password(backend.password, new_password)
-        backend.wait_for_signal(SignalType.DB_REENCRYPTION_STARTED.value)
-        backend.wait_for_signal(SignalType.DB_REENCRYPTION_FINISHED.value)
-        backend.wait_for_signal(SignalType.NODE_STOPPED.value)
-        backend.wait_for_signal(SignalType.NODE_STARTED.value)
-        backend.wait_for_signal(SignalType.NODE_READY.value)
+        with backend.expect_signals_sequence(
+            [
+                SignalType.DB_REENCRYPTION_STARTED,
+                SignalType.DB_REENCRYPTION_FINISHED,
+                SignalType.NODE_STOPPED,
+                SignalType.NODE_STARTED,
+                SignalType.NODE_READY,
+            ]
+        ):
+            backend.change_database_password(backend.password, new_password)
 
-        backend.logout()
-        backend.wait_for_signal(SignalType.NODE_STOPPED.value)
+        with backend.expect_signal(SignalType.NODE_STOPPED):
+            backend.logout()
 
         # Try login with the old password
         logging.info(f"Logging in with old password: {backend.password}, key uid: {backend.key_uid}")
-        backend.login(backend.key_uid, backend.password)
-        signal = backend.wait_for_signal(SignalType.NODE_LOGIN.value)
+        with backend.expect_signal(SignalType.NODE_LOGIN) as exp:
+            backend.login(backend.key_uid, backend.password)
+        signal = exp.result
         event = signal.get("event")
         assert "error" in event
         assert "failed to open database" in event.get("error")
 
         # Login with the new password
-        backend.login(backend.key_uid, new_password)
-        backend.wait_for_login()
+        with backend.expect_signal(SignalType.NODE_LOGIN) as exp:
+            backend.login(backend.key_uid, new_password)
+        signal = exp.result
+        # Verify successful login (no error)
+        event = signal.get("event")
+        assert "error" not in event or not event.get("error")

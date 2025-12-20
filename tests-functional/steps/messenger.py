@@ -33,16 +33,18 @@ class MessengerSteps(NetworkConditionsSteps):
         Raises:
             AssertionError: If the message is not found or signal is not received
         """
-        response = sender.wakuext_service.send_contact_request(receiver.public_key, "contact_request")
-        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
-        message_id = expected_message.get("id")
-        receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id)
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, timeout=60) as exp:
+            response = sender.wakuext_service.send_contact_request(receiver.public_key, "contact_request")
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+            message_id = expected_message.get("id")
+        signal = exp.result
+        assert message_id in str(signal), f"Message ID {message_id} not found in signal"
         return message_id
 
     def accept_contact_request_and_wait_for_signal_to_be_received(self, message_id, sender, receiver):
-        receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
         accepted_signal = f"@{receiver.public_key} accepted your contact request"
-        sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
+        with sender.expect_signal(SignalType.MESSAGES_NEW, pattern=accepted_signal, timeout=60):
+            receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
 
     def make_contacts(self, sender, receiver) -> str:
         """

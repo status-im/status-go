@@ -71,6 +71,62 @@ class LocalPairingEventAction(Enum):
     ACTION_KEYSTORE_FILES_TRANSFER = 6
 
 
+class SignalExpectation:
+    """Context manager for expecting signals with race condition protection."""
+
+    def __init__(self, signal_client, signal_type, count=1, accept_fn=None, pattern=None, predicate=None, timeout=20):
+        self.signal_client = signal_client
+        self.signal_type = signal_type
+        self.count = count
+        self.timeout = timeout
+        self.result = None
+        self.start_index = 0
+
+        # Combine all filtering methods into accept_fn
+        if pattern:
+            self.accept_fn = lambda s: pattern in json.dumps(s)
+        elif predicate:
+            self.accept_fn = predicate
+        else:
+            self.accept_fn = accept_fn
+
+    def __enter__(self):
+        # Remember the current index of received signals
+        self.start_index = len(self.signal_client.received_signals[self.signal_type]["received"])
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            return False
+
+        # Wait for new signals
+        start_time = time.time()
+        while True:
+            received = self.signal_client.received_signals[self.signal_type]["received"]
+            new_signals = received[self.start_index :]
+
+            # Apply filter if provided
+            if self.accept_fn:
+                new_signals = [s for s in new_signals if self.accept_fn(s)]
+
+            # Check if we have enough signals
+            if len(new_signals) >= self.count:
+                if self.count == 1:
+                    self.result = new_signals[-1]
+                else:
+                    self.result = new_signals[-self.count :]
+                logging.debug(f"Signal {self.signal_type} received in {round(time.time() - start_time)} seconds")
+                return False
+
+            # Check timeout
+            if time.time() - start_time >= self.timeout:
+                raise TimeoutError(
+                    f"Expected {self.count} signal(s) of type {self.signal_type}, " f"but got {len(new_signals)} in {self.timeout} seconds"
+                )
+
+            time.sleep(0.2)
+
+
 class SignalClient:
     def __init__(self, ws_url):
         self.url = f"{ws_url}/signals"
@@ -225,3 +281,75 @@ class SignalClient:
         with open(self.signal_file_path, "a+") as file:
             json.dump(signal_data, file)
             file.write("\n")
+
+    def expect_signal(self, signal_type, count=1, accept_fn=None, pattern=None, predicate=None, timeout=20):
+        """
+        Create a context manager for expecting signals with race condition protection.
+
+        Args:
+            signal_type: The type of signal to expect (SignalType enum or string)
+            count: Number of signals to expect (default: 1)
+            accept_fn: Optional filter function that takes signal and returns True if accepted
+            pattern: Optional string pattern to search for in signal JSON (alternative to accept_fn)
+            predicate: Optional predicate function (alternative to accept_fn)
+            timeout: Maximum time to wait for signals in seconds (default: 20)
+
+        Returns:
+            SignalExpectation context manager
+
+        Example:
+            with backend.expect_signal(SignalType.MESSAGES_NEW) as exp:
+                sender.send_message(...)
+            signal = exp.result
+        """
+        signal_type = self._convert_signal_type(signal_type)
+        return SignalExpectation(self, signal_type, count, accept_fn, pattern, predicate, timeout)
+
+    def expect_signals_sequence(self, signal_types, timeout=60):
+        """
+        Create a context manager for expecting multiple signals from a single action.
+
+        This is a convenience method for cases where one action triggers multiple
+        sequential signals. It's equivalent to nested expect_signal contexts but
+        more readable.
+
+        Args:
+            signal_types: List of signal types to expect in sequence
+            timeout: Maximum time to wait for ALL signals (default: 60)
+
+        Returns:
+            Context manager that waits for all signals
+
+        Example:
+            with backend.expect_signals_sequence([
+                SignalType.DB_REENCRYPTION_STARTED,
+                SignalType.DB_REENCRYPTION_FINISHED,
+                SignalType.NODE_STOPPED,
+                SignalType.NODE_STARTED,
+                SignalType.NODE_READY
+            ]):
+                backend.change_password(old, new)
+        """
+        from contextlib import ExitStack
+
+        class SequenceExpectation:
+            def __init__(self, signal_client, signal_types, timeout):
+                self.signal_client = signal_client
+                self.signal_types = [signal_client._convert_signal_type(st) for st in signal_types]
+                self.timeout = timeout
+                self.expectations = []
+                self.stack = ExitStack()
+
+            def __enter__(self):
+                # Create and enter all expectations to capture start_index before action
+                for signal_type in self.signal_types:
+                    exp = self.signal_client.expect_signal(signal_type, timeout=self.timeout)
+                    self.expectations.append(exp)
+                    self.stack.enter_context(exp)
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                # ExitStack will handle all __exit__ calls
+                return self.stack.__exit__(exc_type, exc_val, exc_tb)
+
+        return SequenceExpectation(self, signal_types, timeout)
