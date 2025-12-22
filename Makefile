@@ -111,6 +111,10 @@ endif
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
+# Normalize path separators for Windows (backslashes cause issues when passed through shells)
+ifeq ($(mkspecs),win32)
+	NIM_SDS_SOURCE_DIR := $(subst \,/,$(NIM_SDS_SOURCE_DIR))
+endif
 
 # Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR
 
