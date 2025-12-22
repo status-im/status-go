@@ -660,10 +660,20 @@ func TestMarshalMessageJSON(t *testing.T) {
 	}
 	msg.PaymentRequests = []*protobuf.PaymentRequest{
 		{
-			Amount:   "1000000000000000000",
 			Receiver: "0x7F47C2e98a4BBf5487E6fb082eC2D9Ab0E6d8882",
 			Symbol:   "ETH",
+			Amount:   "1000000000000000000",
 			ChainId:  1,
+			TokenKey: "eth",
+			LogoUri:  "https://example.com/eth-logo.png",
+		},
+		{
+			Receiver: "0x1234567890123456789012345678901234567890",
+			Symbol:   "USDC",
+			Amount:   "500000000",
+			ChainId:  1,
+			TokenKey: "usdc",
+			LogoUri:  "https://example.com/usdc-logo.png",
 		},
 	}
 

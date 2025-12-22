@@ -142,6 +142,11 @@ func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdpart
 	return api.s.decoder.Decode(data)
 }
 
+// GetMandatoryTokenKeys returns keys of all mandatory tokens.
+func (api *API) GetMandatoryTokenKeys(ctx context.Context) ([]string, error) {
+	return wcommon.MandatoryTokens(), nil
+}
+
 // GetAllTokenLists returns all token lists (including native, custom, community token lists).
 func (api *API) GetAllTokenLists(ctx context.Context) ([]*tokentypes.TokenList, error) {
 	return api.s.tokenManager.GetAllTokenLists()
