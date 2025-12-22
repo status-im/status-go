@@ -109,6 +109,9 @@ endif
 
 # `nim-sds` variables
 
+# Pin nim-sds revision here. Can be a tag (default) or commit hash.
+NIM_SDS_VERSION ?= d026a2c2af5322c90a3c252dbb29f0cf35c04003
+
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
@@ -252,13 +255,17 @@ rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 # libsds targets
 
-$(NIM_SDS_SOURCE_DIR): ##@build Clone nim-sds
+.PHONY: clone-nim-sds
+clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
-	@echo "Cloning nim-sds ..."
-	git clone --branch v0.2.1 https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
+	@echo "Cloning or updating nim-sds ..."
+	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
+		git clone https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR); \
+	else \
+		cd $(NIM_SDS_SOURCE_DIR) && git fetch --tags; \
+	fi
+	cd $(NIM_SDS_SOURCE_DIR) && git checkout $(NIM_SDS_VERSION)
 endif
-
-clone-nim-sds: $(NIM_SDS_SOURCE_DIR)
 
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
@@ -563,6 +570,3 @@ pytest-lint:
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go run tools/generate-db/main.go -out-dir build/db
-
-env:
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
