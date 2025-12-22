@@ -150,7 +150,7 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 			InstallationID: installationID,
 			TimeSource:     &testTimeSource{},
 		},
-		messaging2.WithLogger(config.logger),
+		messaging2.WithLogger(config.logger.Named("messaging")),
 		messaging2.WithTracer(trace.NewTracer(otel.Tracer("messaging_"+config.name))),
 		messaging2.WithSQLitePersistence(appDb),
 	)
@@ -159,7 +159,7 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 	}
 
 	ensVerifier := ens.New(
-		config.logger,
+		config.logger.Named("ens"),
 		&testTimeSource{},
 		appDb,
 		"",
@@ -173,7 +173,7 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 	}
 
 	options := []Option{
-		WithCustomLogger(config.logger),
+		WithCustomLogger(config.logger.Named("messenger")),
 		WithDatabase(appDb),
 		WithWalletDatabase(walletDb),
 		WithBrowserDatabase(browsers.NewDB(appDb)),
