@@ -16,6 +16,7 @@ var (
 	ErrCreateCommunityTokenPermissionTooManyTokenCriteria  = errors.New("too many token criteria")
 	ErrCreateCommunityTokenPermissionInvalidPermissionType = errors.New("invalid community token permission type")
 	ErrCreateCommunityTokenPermissionInvalidTokenCriteria  = errors.New("invalid community permission token criteria data")
+	ErrBecomeMemberOrAdminPermissionRequiresCriteria       = errors.New("token criteria required for become member/admin permission type")
 	ErrConvertingAmountToBigInt                            = errors.New("converting amount to big.Int")
 )
 
@@ -53,6 +54,10 @@ func (p *CreateCommunityTokenPermission) Validate() error {
 		if len(c.ContractAddresses) > 0 && amountBig.Cmp(big.NewInt(0)) == 0 {
 			return ErrCreateCommunityTokenPermissionInvalidTokenCriteria
 		}
+	}
+
+	if len(p.TokenCriteria) == 0 && (p.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER || p.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+		return ErrBecomeMemberOrAdminPermissionRequiresCriteria
 	}
 
 	return nil
