@@ -28,7 +28,6 @@ type CommunityEventsTestsInterface interface {
 	GetMember() *Messenger
 	GetSuite() *suite.Suite
 	GetCollectiblesServiceMock() *CollectiblesServiceMock
-	SetupAdditionalMessengers([]*Messenger)
 	GetAccountsTestData() map[string][]string
 	GetAccountsPasswords() map[string]string
 }
@@ -406,8 +405,6 @@ func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Co
 }
 
 func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.CommunityMember_Roles, additionalEventSenders []*Messenger) *communities.Community {
-	base.SetupAdditionalMessengers(additionalEventSenders)
-
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	s := base.GetSuite()
 	s.Require().NoError(err, "eventSender.communitiesManager.All")
@@ -1407,11 +1404,7 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 }
 
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	_, err := user.Start()
-
 	s := base.GetSuite()
-	s.Require().NoError(err)
-	defer TearDownMessenger(s, user)
 
 	advertiseCommunityToUserOldWay(s, community, base.GetControlNode(), user)
 
@@ -1419,7 +1412,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	requestID := testSendRequestToJoin(base, user, community.ID())
 
 	// event sender receives request to join
-	_, err = WaitOnMessengerResponse(
+	_, err := WaitOnMessengerResponse(
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
 			return checkRequestToJoinInResponse(r, user, communities.RequestToJoinStatePending, 0)

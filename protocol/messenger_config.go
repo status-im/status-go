@@ -107,6 +107,8 @@ type config struct {
 	accountsPublisher *pubsub.Publisher
 
 	onlineChecker func() bool
+
+	communitiesRekeyInterval time.Duration
 }
 
 func messengerDefaultConfig() config {
@@ -348,6 +350,13 @@ func WithAccountsPublisher(publisher *pubsub.Publisher) Option {
 func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
 	return func(c *config) error {
 		c.ensVerifier = ensVerifier
+		return nil
+	}
+}
+
+func WithCommunitiesRekeyInterval(interval time.Duration) func(c *config) error {
+	return func(c *config) error {
+		c.communitiesRekeyInterval = interval
 		return nil
 	}
 }

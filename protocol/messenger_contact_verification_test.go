@@ -131,7 +131,6 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -259,7 +258,6 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 
 func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -370,7 +368,6 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 
 func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -497,7 +494,6 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 	// GIVEN
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -555,7 +551,6 @@ func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 
 func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -669,7 +664,6 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 
 func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 
@@ -764,7 +758,6 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 
 func (s *MessengerVerificationRequests) TestTrustStatus() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
 

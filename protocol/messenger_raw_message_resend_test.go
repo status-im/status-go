@@ -40,9 +40,6 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 		mockedBalances:  &s.mockedBalances,
 	})
 
-	_, err := s.aliceMessenger.Start()
-	s.Require().NoError(err)
-
 	s.bobMessenger = newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			name: "bob",
@@ -52,18 +49,9 @@ func (s *MessengerRawMessageResendTest) SetupTest() {
 		mockedBalances:  &s.mockedBalances,
 	})
 
-	_, err = s.bobMessenger.Start()
-	s.Require().NoError(err)
-
 	community, _ := createOnRequestCommunity(&s.Suite, s.aliceMessenger)
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.aliceMessenger, s.bobMessenger)
 	joinOnRequestCommunity(&s.Suite, community.ID(), s.aliceMessenger, s.bobMessenger, bobPassword, []string{bobAddress})
-}
-
-func (s *MessengerRawMessageResendTest) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.aliceMessenger)
-	TearDownMessenger(&s.Suite, s.bobMessenger)
-	s.MessengerBaseTestSuite.TearDownTest()
 }
 
 func (s *MessengerRawMessageResendTest) waitForMessageSent(messageID string) {

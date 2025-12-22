@@ -50,7 +50,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequ
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
 }
@@ -60,7 +59,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequ
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoin(s, community, user)
 }
@@ -71,7 +69,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
 }
@@ -81,7 +78,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testRejectMemberRequestToJoin(s, community, user)
 }

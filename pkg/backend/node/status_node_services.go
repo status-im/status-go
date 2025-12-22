@@ -472,32 +472,3 @@ func (b *StatusNode) NewsFeedService() *newsfeed.Service {
 	}
 	return b.newsfeedSrvc
 }
-
-func (b *StatusNode) Cleanup() error {
-	if b.Config() != nil && b.Config().WalletConfig.Enabled {
-		if b.walletSrvc != nil {
-			if b.walletSrvc.IsStarted() {
-				err := b.walletSrvc.Stop()
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	if b.ensSrvc != nil {
-		err := b.ensSrvc.Stop()
-		if err != nil {
-			return err
-		}
-	}
-
-	if b.pendingTracker != nil {
-		err := b.pendingTracker.Stop()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -33,6 +34,7 @@ type Verifier struct {
 	rpcEndpoint     string
 	contractAddress string
 	quit            chan struct{}
+	quitWg          sync.WaitGroup
 }
 
 func New(logger *zap.Logger, timesource timesource.Provider, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
@@ -48,13 +50,14 @@ func New(logger *zap.Logger, timesource timesource.Provider, db *sql.DB, rpcEndp
 }
 
 func (v *Verifier) Start() error {
+	v.quitWg.Add(1)
 	go v.verifyLoop()
 	return nil
 }
 
 func (v *Verifier) Stop() error {
 	close(v.quit)
-
+	v.quitWg.Wait()
 	return nil
 }
 
@@ -101,12 +104,12 @@ func (v *Verifier) SetOnline(online bool) {
 
 func (v *Verifier) verifyLoop() {
 	defer gocommon.LogOnPanic()
+	defer v.quitWg.Done()
 	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
-
 		case <-v.quit:
-			ticker.Stop()
 			return
 		case <-ticker.C:
 			if !v.online || v.rpcEndpoint == "" || v.contractAddress == "" {
@@ -190,9 +193,18 @@ func (v *Verifier) verify(ctx context.Context, rpcEndpoint, contractAddress stri
 	ethClient := ethclient.NewClient(rpcClient)
 
 	for _, ensInfo := range ensDetails {
+		v.quitWg.Add(1)
 		go func(info Details) {
 			defer gocommon.LogOnPanic()
-			ch <- v.verifyENSName(info, ethClient)
+			defer v.quitWg.Done()
+			select {
+			case ch <- v.verifyENSName(info, ethClient):
+				return
+			case <-ctx.Done():
+				return
+			case <-v.quit:
+				return
+			}
 		}(ensInfo)
 	}
 

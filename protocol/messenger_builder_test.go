@@ -3,10 +3,13 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
@@ -44,7 +47,7 @@ type testMessengerConfig struct {
 	extraOptions []Option
 }
 
-func (tmc *testMessengerConfig) complete() error {
+func (tmc *testMessengerConfig) complete(t *testing.T) error {
 	if len(tmc.name) == 0 {
 		tmc.name = uuid.NewString()[0:6]
 	}
@@ -60,6 +63,8 @@ func (tmc *testMessengerConfig) complete() error {
 	if tmc.logger == nil {
 		logger := testutils.MustCreateTestLogger()
 		tmc.logger = logger.Named(tmc.name)
+		t.Logf("created test logger - logger name: %s, test name: %s, ", tmc.name, t.Name())
+		logger.Debug("created test logger", zap.String("name", tmc.name))
 	}
 
 	if tmc.appSettings == nil {
@@ -73,8 +78,8 @@ func (tmc *testMessengerConfig) complete() error {
 	return nil
 }
 
-func newTestMessenger(messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
-	err := config.complete()
+func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+	err := config.complete(t)
 	if err != nil {
 		return nil, err
 	}
@@ -90,14 +95,28 @@ func newTestMessenger(messagingEnv *messaging2.TestMessagingEnvironment, config 
 	if err != nil {
 		return nil, err
 	}
+	t.Cleanup(func() {
+		err = madb.Close()
+		assert.NoError(t, err)
+	})
+
 	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}
+	t.Cleanup(func() {
+		err = walletDb.Close()
+		assert.NoError(t, err)
+	})
+
 	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}
+	t.Cleanup(func() {
+		err = appDb.Close()
+		assert.NoError(t, err)
+	})
 
 	err = sqlite.Migrate(appDb)
 	if err != nil {
@@ -201,21 +220,23 @@ func newTestMessenger(messagingEnv *messaging2.TestMessagingEnvironment, config 
 	return m, nil
 }
 
-func newRunningTestMessenger(messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
-	m, err := newTestMessenger(messagingEnv, config)
-	if err != nil {
-		return nil, err
-	}
+func newRunningTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+	m, err := newTestMessenger(t, messagingEnv, config)
+	require.NoError(t, err)
 
 	err = m.messaging.Start()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err = m.messaging.Stop()
+		assert.NoError(t, err)
+	})
 
 	_, err = m.Start()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err := m.Shutdown()
+		assert.NoError(t, err)
+	})
 
 	return m, nil
 }

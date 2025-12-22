@@ -95,11 +95,6 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.Require().Equal(3, len(dbKeypairs))
 }
 
-func (s *MessengerSyncKeycardsStateSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.other)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycards() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings

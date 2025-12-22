@@ -51,7 +51,6 @@ func (s *MessengerSuite) retrieveIdentityImages(alice, bob *Messenger, chat *Cha
 func (s *MessengerSuite) TestTwoImagesAreAddedToChatIdentityForPrivateChat() {
 	alice := s.m
 	bob := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, bob)
 
 	bobPkString := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
@@ -67,7 +66,6 @@ func (s *MessengerSuite) TestTwoImagesAreAddedToChatIdentityForPrivateChat() {
 func (s *MessengerSuite) TestOneImageIsAddedToChatIdentityForPublicChat() {
 	alice := s.m
 	bob := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, bob)
 
 	chat := CreatePublicChat("alic-and-bob-chat", &testTimeSource{})
 	s.Require().Equal(publicChat, GetChatContextFromChatType(chat.ChatType))

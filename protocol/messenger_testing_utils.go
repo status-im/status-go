@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"math/big"
-	mathRand "math/rand"
 	"sync"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -220,26 +218,6 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 	s.Require().True(ok)
 }
 
-func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, ctx context.Context) {
-	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-	available := m.messaging.WaitForAvailableStoreNode(ctx)
-	s.Require().True(available)
-}
-
-func TearDownMessenger(s *suite.Suite, m *Messenger) {
-	if m == nil {
-		return
-	}
-	s.Require().NoError(m.Shutdown())
-	if m.database != nil {
-		s.Require().NoError(m.database.Close())
-	}
-	if m.multiAccounts != nil {
-		s.Require().NoError(m.multiAccounts.Close())
-	}
-}
-
 func randomInt(length int) int {
 	max := big.NewInt(int64(length))
 	value, err := rand.Int(rand.Reader, max)
@@ -259,27 +237,6 @@ func randomString(length int, runes []rune) string {
 
 func RandomLettersString(length int) string {
 	return randomString(length, letterRunes)
-}
-
-func RandomColor() string {
-	return "#" + randomString(6, hexRunes)
-}
-
-func RandomCommunityTags(count int) []string {
-	availableTagsCount := requests.AvailableTagsCount()
-
-	if count > availableTagsCount {
-		count = availableTagsCount
-	}
-
-	//source := mathRand.New(mathRand.NewSource(time.Now().UnixNano()))
-	indices := mathRand.Perm(availableTagsCount)
-	shuffled := make([]string, count)
-	for i := 0; i < count; i++ {
-		shuffled[i] = requests.TagByIndex(uint32(indices[i]))
-	}
-
-	return shuffled
 }
 
 func RandomBytes(length int) []byte {

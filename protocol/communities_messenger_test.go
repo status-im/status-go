@@ -54,32 +54,28 @@ type MessengerCommunitiesSuite struct {
 func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 
-	s.owner = s.newMessenger("", []string{})
+	newMessenger := func(password string, walletAddresses []string) *Messenger {
+		privateKey, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+
+		return s.newMessengerWithConfig(testMessengerConfig{
+			privateKey: privateKey,
+			extraOptions: []Option{
+				WithCommunitiesRekeyInterval(50 * time.Millisecond),
+			},
+		}, password, walletAddresses)
+	}
+
+	s.owner = newMessenger("", []string{})
 	s.owner.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
-	s.bob = s.newMessenger(bobPassword, []string{bobAccountAddress})
+	s.bob = newMessenger(bobPassword, []string{bobAccountAddress})
 	s.bob.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
-	s.alice = s.newMessenger(alicePassword, []string{aliceAccountAddress})
+	s.alice = newMessenger(alicePassword, []string{aliceAccountAddress})
 	s.alice.account.CustomizationColor = multiaccountscommon.CustomizationColorArmy
-
-	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
-
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
 
 	s.setMessengerDisplayName(s.owner, "Charlie")
 	s.setMessengerDisplayName(s.bob, "Bobby")
 	s.setMessengerDisplayName(s.alice, "Alice")
-}
-
-func (s *MessengerCommunitiesSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.owner)
-	TearDownMessenger(&s.Suite, s.bob)
-	TearDownMessenger(&s.Suite, s.alice)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerCommunitiesSuite) setMessengerDisplayName(m *Messenger, name string) {
@@ -2411,16 +2407,12 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 	err = m2.SetInstallationMetadata(m2.installationID, metadata)
 	s.Require().NoError(err)
 
-	_, err = m2.Start()
-	s.Require().NoError(err)
-
 	return m2
 }
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2474,7 +2466,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2565,7 +2556,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2646,12 +2636,11 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 	// Create new device
 	ownersOtherDevice := s.createOtherDevice(s.owner)
-	defer TearDownMessenger(&s.Suite, ownersOtherDevice)
 
 	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
 
 	community, chat := s.createCommunity()
-	s.owner.communitiesManager.RekeyInterval = 1 * time.Hour
+	s.owner.config.communitiesRekeyInterval = 1 * time.Hour
 
 	{ // ensure both community and channel are encrypted
 		permissionRequest := requests.CreateCommunityTokenPermission{
@@ -2729,7 +2718,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -2930,7 +2918,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 	s.advertiseCommunityTo(community, s.owner, s.alice)
 
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
@@ -2957,7 +2944,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -3069,7 +3055,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
 
 	// New device is created & paired
 	ownersOtherDevice := s.createOtherDevice(s.owner)
-	defer TearDownMessenger(&s.Suite, ownersOtherDevice)
 
 	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
 	PairDevices(&s.Suite, s.owner, ownersOtherDevice)
@@ -3127,7 +3112,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_OutdatedDescription() {
 
 	// Create another device
 	aliceOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, aliceOtherDevice)
 
 	// Make other device receive community
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, aliceOtherDevice)
@@ -3167,7 +3151,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_LeftCommunity() {
 
 	// Create another device
 	aliceOtherDevice := s.createOtherDevice(s.alice)
-	defer TearDownMessenger(&s.Suite, aliceOtherDevice)
 
 	// Create sync message
 	syncCommunityMsg, err := s.alice.buildSyncInstallationCommunity(response.Communities()[0], 1)
@@ -3574,10 +3557,6 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 func (s *MessengerCommunitiesSuite) TestCommunityMaxNumberOfMembers() {
 	john := s.newMessenger("johnPassword", []string{"0x0765400000000000000000000000000000000000"})
-	_, err := john.Start()
-	s.Require().NoError(err)
-
-	defer TearDownMessenger(&s.Suite, john)
 
 	// Bring back the original values
 	defer communities.SetMaxNbMembers(5000)
@@ -3751,7 +3730,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	// Check that rekeying is occurring by counting the number of keyIDs in the encryptor's DB
 	// This test could be flaky, as the rekey function may not be finished before RekeyInterval * 2 has passed
 	for i := 0; i < 5; i++ {
-		time.Sleep(s.owner.communitiesManager.RekeyInterval * 2)
+		time.Sleep(s.owner.config.communitiesRekeyInterval * 10)
 		communityKeys, err = s.owner.messaging.GetKeysForGroup(community.ID())
 		s.Require().NoError(err)
 		s.Require().Greater(len(communityKeys), communityKeyCount)
@@ -3765,7 +3744,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
-	s.owner.communitiesManager.RekeyInterval = 500 * time.Minute
+	s.owner.config.communitiesRekeyInterval = 500 * time.Minute
 
 	// Create a new community
 	response, err := s.owner.CreateCommunity(

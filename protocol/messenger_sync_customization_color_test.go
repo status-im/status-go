@@ -29,11 +29,6 @@ func (s *MessengerSyncAccountCustomizationColorSuite) SetupTest() {
 	prepareAliceMessengersForPairing(&s.Suite, s.alice, s.alice2)
 }
 
-func (s *MessengerSyncAccountCustomizationColorSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.alice2)
-	s.MessengerBaseTestSuite.TearDownTest()
-}
-
 func prepareAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	// Set Alice's installation metadata
 	aim := &messagingtypes.InstallationMetadata{

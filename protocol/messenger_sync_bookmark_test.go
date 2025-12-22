@@ -33,7 +33,6 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 
 	// pair
 	theirMessenger := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",

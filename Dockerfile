@@ -6,9 +6,24 @@ ENV CC=clang
 ENV CXX=clang++
 
 RUN apt-get update \
-    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config \
+    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config curl xz-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Nim using choosenim
+ARG NIM_VERSION=2.2.4
+ENV CHOOSENIM_NO_ANALYTICS=1
+RUN curl https://nim-lang.org/choosenim/init.sh -sSf | sh -s -- -y \
+    && /root/.nimble/bin/choosenim ${NIM_VERSION}
+
+ENV PATH="/root/.nimble/bin:${PATH}"
+
+# Create system-wide symlinks for Nim binaries
+RUN ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nim /usr/local/bin/nim \
+    && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nimble /usr/local/bin/nimble \
+    && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/choosenim /usr/local/bin/choosenim \
+    && chmod 755 /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/* \
+    && nim --version
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''

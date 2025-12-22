@@ -13,6 +13,7 @@ import (
 	"io"
 	"math"
 	mrand "math/rand"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -192,7 +193,8 @@ type Client struct {
 	// resendingLoopQuitChan is a channel to indicate to the send loop that should be terminating
 	resendingLoopQuitChan chan struct{}
 
-	quit chan struct{}
+	quit   chan struct{}
+	quitWg sync.WaitGroup
 
 	// registrationSubscriptions is a list of chan of client subscribed to the registration event
 	registrationSubscriptions []chan struct{}
@@ -265,6 +267,7 @@ func (c *Client) Stop() error {
 	c.stopRegistrationLoop()
 	c.stopResendingLoop()
 	c.quitRegistrationSubscriptions()
+	c.quitWg.Wait()
 	return nil
 }
 
@@ -707,8 +710,10 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 
 // subscribeForMessageEvents subscribes for newly sent/scheduled messages so we can check if we need to send a push notification
 func (c *Client) subscribeForMessageEvents() {
+	c.quitWg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer c.quitWg.Done()
 		c.config.Logger.Debug("subscribing for message events")
 
 		messagesSub, unsubMessages := pubsub.Subscribe[common.MessageEvent](c.sender.Publisher(), 100)
@@ -774,8 +779,10 @@ func (c *Client) stopResendingLoop() {
 func (c *Client) startRegistrationLoop() {
 	c.stopRegistrationLoop()
 	c.registrationLoopQuitChan = make(chan struct{})
+	c.quitWg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer c.quitWg.Done()
 		err := c.registrationLoop()
 		if err != nil {
 			c.config.Logger.Error("registration loop exited with an error", zap.Error(err))
@@ -786,8 +793,10 @@ func (c *Client) startRegistrationLoop() {
 func (c *Client) startResendingLoop() {
 	c.stopResendingLoop()
 	c.resendingLoopQuitChan = make(chan struct{})
+	c.quitWg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer c.quitWg.Done()
 		err := c.resendingLoop()
 		if err != nil {
 			c.config.Logger.Error("resending loop exited with an error", zap.Error(err))
@@ -1541,6 +1550,8 @@ func (c *Client) resendingLoop() error {
 		case <-time.After(waitFor * time.Second):
 		case <-c.resendingLoopQuitChan:
 			return nil
+		case <-c.quit:
+			return nil
 		}
 	}
 }
@@ -1596,9 +1607,10 @@ func (c *Client) registrationLoop() error {
 		waitFor := time.Duration(nextRetry)
 		c.config.Logger.Debug("Waiting for", zap.Any("wait for", waitFor))
 		select {
-
 		case <-time.After(waitFor * time.Second):
 		case <-c.registrationLoopQuitChan:
+			return nil
+		case <-c.quit:
 			return nil
 		}
 	}

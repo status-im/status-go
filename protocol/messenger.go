@@ -439,7 +439,6 @@ func NewMessenger(
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			archiveManager.Stop,
-			database.Close,
 		},
 		logger:                           logger,
 		tracer:                           c.tracer,
@@ -614,7 +613,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	m.messaging.SetStorenodeConfigProvider(m)
 
+	m.shutdownWaitGroup.Add(1)
 	go m.checkForMissingMessagesLoop()
+
+	m.shutdownWaitGroup.Add(1)
 	go m.checkForStorenodeCycleSignals()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
@@ -623,10 +625,14 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.archiveManager.IsReady() {
+		m.shutdownWaitGroup.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
+			defer m.shutdownWaitGroup.Done()
 
 			select {
+			case <-m.quit:
+				return
 			case <-m.ctx.Done():
 				return
 			case <-m.messaging.OnStorenodeAvailable():
@@ -1187,10 +1193,16 @@ func (m *Messenger) handleInstallations(installations []*types2.Installation) {
 
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
 func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *types2.EncryptionSubscriptions) {
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
+			case <-m.quit:
+				return
+			case <-m.ctx.Done():
+				return
 			case <-subscriptions.SendContactCode:
 				if err := m.publishContactCode(); err != nil {
 					m.logger.Error("failed to publish contact code", zap.Error(err))
@@ -1242,8 +1254,10 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 }
 
 func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.VerificationRecord) {
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case records, more := <-c:
@@ -1284,6 +1298,7 @@ func (m *Messenger) watchConnectionChange() {
 
 	subscribedConnectionStatus := func(subscription types2.ConnectionStatusSubscription) {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
@@ -1307,14 +1322,18 @@ func (m *Messenger) watchConnectionChange() {
 		m.logger.Error("failed to subscribe to connection status changes", zap.Error(err))
 		return
 	}
+
+	m.shutdownWaitGroup.Add(1)
 	go subscribedConnectionStatus(subscription)
 }
 
 // watchChatsToUnmute checks every minute to identify and unmute chats that should no longer be muted.
 func (m *Messenger) watchChatsToUnmute() {
 	m.logger.Debug("Checking for chats to unmute every minute")
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			// Execute the check immediately upon starting
 			response := &MessengerResponse{}
@@ -1368,8 +1387,10 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 		}
 	}
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		check()
 
 		ticker := time.NewTicker(time.Minute)
@@ -1395,8 +1416,10 @@ func (m *Messenger) watchIdentityImageChanges() {
 
 	channel := m.multiAccounts.SubscribeToIdentityImageChanges()
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case change := <-channel:
@@ -1433,8 +1456,10 @@ func (m *Messenger) watchIdentityImageChanges() {
 func (m *Messenger) watchPendingCommunityRequestToJoin() {
 	m.logger.Debug("watching community request to join")
 
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
 			case <-time.After(time.Minute * 10):
@@ -1468,17 +1493,22 @@ func (m *Messenger) PublishIdentityImage() error {
 
 // handlePushNotificationClientRegistration handles registration events
 func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		for {
-			_, more := <-c
-			if !more {
+			select {
+			case <-m.quit:
 				return
+			case _, more := <-c:
+				if !more {
+					return
+				}
+				if err := m.publishContactCode(); err != nil {
+					m.logger.Error("failed to publish contact code", zap.Error(err))
+				}
 			}
-			if err := m.publishContactCode(); err != nil {
-				m.logger.Error("failed to publish contact code", zap.Error(err))
-			}
-
 		}
 	}()
 }
@@ -2660,6 +2690,8 @@ func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan 
 			case <-ticker.C:
 				m.ProcessAllMessages()
 			case <-cancel:
+				return
+			case <-m.quit:
 				return
 			}
 		}
@@ -4652,9 +4684,10 @@ func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage
 
 func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 	logger := m.logger.Named(name)
-
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
 		// Delay by a few minutes to minimize messenger's startup time
 		var interval time.Duration = 5 * time.Minute
 		for {

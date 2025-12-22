@@ -55,7 +55,6 @@ func (s *MessengerSyncClearHistory) pair() *Messenger {
 
 func (s *MessengerSyncClearHistory) TestSyncClearHistory() {
 	theirMessenger := s.pair()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	response, err := s.m.CreatePublicChat(&requests.CreatePublicChat{
 		ID: publicChatName,

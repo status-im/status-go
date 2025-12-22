@@ -112,11 +112,11 @@ type Manager struct {
 	messaging                *messaging.API
 	timesource               common.TimeSource
 	quit                     chan struct{}
+	quitWg                   sync.WaitGroup
 	communityTokensService   CommunityTokensServiceInterface
 	membersReevaluationTasks sync.Map // stores `membersReevaluationTask`
 	forceMembersReevaluation map[string]chan struct{}
 	stopped                  bool
-	RekeyInterval            time.Duration
 	PermissionChecker        PermissionChecker
 	keyDistributor           KeyDistributor
 	communityLock            *CommunityLock
@@ -532,8 +532,10 @@ func (m *Manager) Start() error {
 		m.runOwnerVerificationLoop()
 	}
 
+	m.quitWg.Add(1)
 	go func() {
 		defer utils.LogOnPanic()
+		defer m.quitWg.Done()
 		_ = m.fillMissingCommunityTokens()
 	}()
 
@@ -541,8 +543,10 @@ func (m *Manager) Start() error {
 }
 
 func (m *Manager) runENSVerificationLoop() {
+	m.quitWg.Add(1)
 	go func() {
 		defer utils.LogOnPanic()
+		defer m.quitWg.Done()
 		for {
 			select {
 			case <-m.quit:
@@ -622,8 +626,10 @@ func (m *Manager) CommunitiesToValidate() (map[string][]communityToValidate, err
 
 func (m *Manager) runOwnerVerificationLoop() {
 	m.logger.Info("starting owner verification loop")
+	m.quitWg.Add(1)
 	go func() {
 		defer utils.LogOnPanic()
+		defer m.quitWg.Done()
 		for {
 			select {
 			case <-m.quit:
@@ -724,6 +730,7 @@ func (m *Manager) Stop() error {
 	for _, c := range m.subscriptions {
 		close(c)
 	}
+	m.quitWg.Wait()
 	return nil
 }
 
@@ -1347,11 +1354,15 @@ func (m *Manager) checkChannelsPermissions(channelsPermissionsPreParsedData map[
 }
 
 func (m *Manager) StartMembersReevaluationLoop(communityID types3.HexBytes, reevaluateOnStart bool) {
-	go m.reevaluateMembersLoop(communityID, reevaluateOnStart)
+	m.quitWg.Add(1)
+	go func() {
+		defer utils.LogOnPanic()
+		defer m.quitWg.Done()
+		m.reevaluateMembersLoop(communityID, reevaluateOnStart)
+	}()
 }
 
 func (m *Manager) reevaluateMembersLoop(communityID types3.HexBytes, reevaluateOnStart bool) {
-	defer utils.LogOnPanic()
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
 		return
 	}

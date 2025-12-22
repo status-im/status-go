@@ -35,12 +35,6 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 	s.owner = s.newMessenger("", []string{})
 	s.eventSender = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.eventSender.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
 
 }
 
@@ -62,7 +56,6 @@ func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, 
 }
 
 func (s *CommunityEventsEventualConsistencySuite) TearDownTest() {
-	s.EventSenderCommunityEventsSuiteBase.TearDownTest()
 	s.messagesOrderController.Stop()
 }
 
@@ -79,7 +72,6 @@ func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []r
 
 	// set up additional user that will send request to join
 	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
-	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, user)
 

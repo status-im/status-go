@@ -2074,14 +2074,6 @@ func (b *StatusBackend) Logout() error {
 	defer b.mu.Unlock()
 
 	b.logger.Debug("logging out")
-	err := b.cleanupServices()
-	if err != nil {
-		return err
-	}
-	err = b.closeDBs()
-	if err != nil {
-		return err
-	}
 
 	b.AccountsManager().Logout()
 	b.account = nil
@@ -2091,6 +2083,11 @@ func (b *StatusBackend) Logout() error {
 			return err
 		}
 		b.statusNode = nil
+	}
+
+	err := b.closeDBs()
+	if err != nil {
+		return err
 	}
 
 	if !b.LocalPairingStateManager.IsPairing() {
@@ -2122,14 +2119,6 @@ func (b *StatusBackend) Logout() error {
 func (b *StatusBackend) switchToPreLoginLog() error {
 	_ = logutils2.ZapLogger().Sync()
 	return logutils2.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
-}
-
-// cleanupServices stops parts of services that aren't managed by a node and removes injected data from services.
-func (b *StatusBackend) cleanupServices() error {
-	if b.statusNode == nil {
-		return nil
-	}
-	return b.statusNode.Cleanup()
 }
 
 func (b *StatusBackend) closeDBs() error {

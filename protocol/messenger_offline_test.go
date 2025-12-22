@@ -49,21 +49,7 @@ func (s *MessengerOfflineSuite) SetupTest() {
 	s.bob = s.newMessenger(bobPassword, []string{bobAccountAddress})
 	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1})
 
-	_, err := s.owner.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
-
-	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
-}
-
-func (s *MessengerOfflineSuite) TearDownTest() {
-	s.Require().NoError(s.owner.Shutdown())
-	s.Require().NoError(s.bob.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
-	s.MessengerBaseTestSuite.TearDownTest()
+	s.owner.config.communitiesRekeyInterval = 50 * time.Millisecond
 }
 
 func (s *MessengerOfflineSuite) newMessenger(password string, accounts []string) *Messenger {

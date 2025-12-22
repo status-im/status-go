@@ -21,7 +21,6 @@ type MessengerPinMessageSuite struct {
 
 func (s *MessengerPinMessageSuite) TestPinMessage() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
@@ -90,7 +89,6 @@ func (s *MessengerPinMessageSuite) TestPinMessage() {
 
 func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 	theirMessenger := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)

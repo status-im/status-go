@@ -38,19 +38,6 @@ func (s *MessengerCommunitiesSignersSuite) SetupTest() {
 	s.john = s.newMessenger(accountPassword, []string{commonAccountAddress})
 	s.bob = s.newMessenger(accountPassword, []string{bobAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAddress1})
-	_, err := s.john.Start()
-	s.Require().NoError(err)
-	_, err = s.bob.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerCommunitiesSignersSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.john)
-	TearDownMessenger(&s.Suite, s.bob)
-	TearDownMessenger(&s.Suite, s.alice)
-	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletAddresses []string) *Messenger {
@@ -596,13 +583,12 @@ func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool
 	}
 
 	// Create alice second instance
-	alice2, err := newRunningTestMessenger(s.messagingEnv, testMessengerConfig{
+	alice2, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{
 		privateKey:   s.alice.identity,
 		extraOptions: []Option{WithCommunityTokensService(s.collectiblesServiceMock)},
 	})
 
 	s.Require().NoError(err)
-	defer TearDownMessenger(&s.Suite, alice2)
 
 	// Create communities backup
 

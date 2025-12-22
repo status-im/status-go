@@ -193,6 +193,10 @@ func main() {
 		os.Exit(exitCodeStartServerFailed)
 	}
 
+	defer func() {
+		server.Stop()
+	}()
+
 	_, err = messenger.Start()
 	if err != nil {
 		fmt.Println("failed to start messenger", err)

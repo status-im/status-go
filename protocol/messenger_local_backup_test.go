@@ -35,11 +35,9 @@ func makeMutualContacts(lhs *Messenger, rhs *Messenger) error {
 func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Create bob1
 	bob1 := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, bob1)
 
 	// Create bob2
 	bob2 := s.anotherMessenger()
-	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Enable message backup on both accounts
 	err := bob1.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true)
@@ -217,7 +215,6 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 
 	// Create a one-to-one chat
 	alice := s.newMessenger()
-	defer TearDownMessenger(&s.Suite, alice)
 
 	err = makeMutualContacts(bob1, alice)
 	s.Require().NoError(err)
