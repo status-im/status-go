@@ -11,7 +11,7 @@ let
 in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
-  vendorHash = "sha256-fvEBn/FYsineTe65PEwr4U71ZZqL5BMOsSe9wKuBb0Y=";
+  vendorHash = "sha256-vP+8Kd5q7WR9dyXsGlD0kzZUtOaapskz9wJ3rgyaT14=";
 
   inherit meta version;
 
