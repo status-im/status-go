@@ -15,7 +15,7 @@ import (
 )
 
 func TestSdsFileDescriptors(t *testing.T) {
-	t.Skip("nim-sds uses nim-chronos, which doesn't close file descriptors on cleanup")
+	t.Skip("test demonstrates issue #7216")
 
 	if !isLsofAvailable() {
 		t.Skip("lsof command not available")
