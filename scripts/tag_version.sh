@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-source _assets/scripts/parse_commits.sh
-source _assets/scripts/colors.sh
+source scripts/parse_commits.sh
+source scripts/colors.sh
 
 get_latest_tag() {
     # Get the latest tag on develop

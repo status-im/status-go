@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source _assets/scripts/colors.sh
+source scripts/colors.sh
 
 # Track whether any validation failed to report all issues before exiting
 FAILED=0

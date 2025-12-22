@@ -80,4 +80,4 @@ jobs:
         env:
           BASE_BRANCH: ${{ github.base_ref }}
         run: |
-          bash _assets/scripts/migration_check.sh
+          bash scripts/migration_check.sh

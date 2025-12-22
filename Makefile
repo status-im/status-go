@@ -31,7 +31,7 @@ help: SHELL := /bin/sh
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
+RELEASE_TAG ?= $(shell ./scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
 
@@ -403,8 +403,8 @@ setup-dev:
 clean-generated: CLEANUP_GENERATED_FILES?=true
 clean-generated: CLEANUP_GENERATED_FILES_DRY_RUN?=false
 clean-generated: ##@generate Remove orphaned generated files
-	if [ "$(CLEANUP_GENERATED_FILES)" = "true" ]; then \
-		./_assets/scripts/cleanup_generated_files.sh; \
+	@if [ "$(CLEANUP_GENERATED_FILES)" = "true" ]; then \
+		./scripts/cleanup_generated_files.sh; \
 	else \
 	  	echo "Skipping cleanup of generated files"; \
 	fi
@@ -460,7 +460,7 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /tests-unit-network)
 test-unit: ##@tests Run unit and integration tests
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	./_assets/scripts/run_unit_tests.sh
+	./scripts/run_unit_tests.sh
 
 test-single: test-unit-prep
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -470,7 +470,7 @@ test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
 test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./tests-unit-network/...)
 test-unit-network: ##@tests Run unit and integration tests with network access
-	./_assets/scripts/run_unit_tests.sh
+	./scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -479,11 +479,11 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
-	@./_assets/scripts/run_functional_tests.sh
+	@./scripts/run_functional_tests.sh
 
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
-	@./_assets/scripts/run_benchmark.sh
+	@./scripts/run_benchmark.sh
 
 lint-panics: generate
 	GOFLAGS=-tags='$(BUILD_TAGS),lint' \
@@ -530,18 +530,18 @@ migration:
 	touch $(DEFAULT_MIGRATION_PATH)/$$(date '+%s')_$(D).up.sql
 
 migration-check:
-	bash _assets/scripts/migration_check.sh
+	bash scripts/migration_check.sh
 
 commit-check: SHELL := /bin/sh
 commit-check:
-	@bash _assets/scripts/commit_check.sh
+	@bash scripts/commit_check.sh
 
 version: SHELL := /bin/sh
 version:
-	@./_assets/scripts/version.sh
+	@./scripts/version.sh
 
 tag-version:
-	bash _assets/scripts/tag_version.sh $(TARGET_COMMIT)
+	bash scripts/tag_version.sh $(TARGET_COMMIT)
 
 migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
@@ -550,7 +550,7 @@ migration-wallet:
 install-git-hooks: SHELL := /bin/sh
 install-git-hooks:
 	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
-		$(GIT_ROOT)/_assets/hooks/* $(GIT_ROOT)/.git/hooks
+		$(GIT_ROOT)/githooks/* $(GIT_ROOT)/.git/hooks
 
 -include install-git-hooks
 .PHONY: install-git-hooks

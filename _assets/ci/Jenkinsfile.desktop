@@ -51,7 +51,7 @@ pipeline {
       GOCACHE  = "${WORKSPACE_TMP}/gocache"
       PATH     = "${PATH}:${GOPATH}/bin:/c/Users/jenkins/go/bin"
       REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
-      VERSION  = sh(script: "./_assets/scripts/version.sh", returnStdout: true)
+      VERSION  = sh(script: "./scripts/version.sh", returnStdout: true)
       ARTIFACT = utils.pkgFilename(
           name:    'status-go',
           type:    env.PLATFORM,
