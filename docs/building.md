@@ -100,6 +100,12 @@ Unit tests can also be run using `go test` command. If you want to launch specif
 go test -v ./api/ -testify.m ^RPCSendTransaction$
 ```
 
+Or use `make test-single`:
+
+```
+make test-single PKG=./messaging/controller/processor TEST=^TestSDSWrappedMessages$
+```
+
 Note -testify.m as [testify/suite](https://godoc.org/github.com/stretchr/testify/suite) is used to group individual tests.
 
 To run a single test in a test suite (e.g. `TestTransferringKeystoreFiles`, which is part of `SyncDeviceSuite`):

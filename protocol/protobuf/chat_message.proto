@@ -123,6 +123,8 @@ message PaymentRequest {
     string symbol = 2;
     string amount = 3;
     uint32 chainId = 4;
+    string tokenKey = 5;
+    string logoUri = 6;
 }
 
 message UnfurledLinkThumbnail {

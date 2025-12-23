@@ -6,7 +6,7 @@ set -o pipefail
 REPO_URL="git@github.com:status-im/status-go-benchmarks.git"
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
-source "${GIT_ROOT}/_assets/scripts/colors.sh"
+source "${GIT_ROOT}/scripts/colors.sh"
 
 echo -e "${GRN}Pushing benchmark results${RST}"
 

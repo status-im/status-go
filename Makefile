@@ -31,7 +31,7 @@ help: SHELL := /bin/sh
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
+RELEASE_TAG ?= $(shell ./scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
 
@@ -109,8 +109,15 @@ endif
 
 # `nim-sds` variables
 
+# Pin nim-sds revision here. Can be a tag (default) or commit hash.
+NIM_SDS_VERSION ?= 8d33a7f7dafe37f482d09a8fb113869f78baf0b8
+
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
+# Normalize path separators for Windows (backslashes cause issues when passed through shells)
+ifeq ($(mkspecs),win32)
+	NIM_SDS_SOURCE_DIR := $(subst \,/,$(NIM_SDS_SOURCE_DIR))
+endif
 
 # Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR
 
@@ -232,7 +239,7 @@ clone-nwaku: $(NWAKU_SOURCE_DIR)
 $(LIBWAKU): clone-nwaku
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku" $(LIBWAKU)
-	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=/bin/bash
 endif
 
 build-libwaku: $(LIBWAKU)
@@ -248,19 +255,23 @@ rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 # libsds targets
 
-$(NIM_SDS_SOURCE_DIR): ##@build Clone nim-sds
+.PHONY: clone-nim-sds
+clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
-	@echo "Cloning nim-sds ..."
-	git clone --branch v0.2.1 https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
+	@echo "Cloning or updating nim-sds ..."
+	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
+		git clone https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR); \
+	else \
+		cd $(NIM_SDS_SOURCE_DIR) && git fetch --tags; \
+	fi
+	cd $(NIM_SDS_SOURCE_DIR) && git checkout $(NIM_SDS_VERSION)
 endif
-
-clone-nim-sds: $(NIM_SDS_SOURCE_DIR)
 
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=/bin/bash
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
 endif
@@ -392,8 +403,8 @@ setup-dev:
 clean-generated: CLEANUP_GENERATED_FILES?=true
 clean-generated: CLEANUP_GENERATED_FILES_DRY_RUN?=false
 clean-generated: ##@generate Remove orphaned generated files
-	if [ "$(CLEANUP_GENERATED_FILES)" = "true" ]; then \
-		./_assets/scripts/cleanup_generated_files.sh; \
+	@if [ "$(CLEANUP_GENERATED_FILES)" = "true" ]; then \
+		./scripts/cleanup_generated_files.sh; \
 	else \
 	  	echo "Skipping cleanup of generated files"; \
 	fi
@@ -449,13 +460,17 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /tests-unit-network)
 test-unit: ##@tests Run unit and integration tests
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	./_assets/scripts/run_unit_tests.sh
+	./scripts/run_unit_tests.sh
+
+test-single: test-unit-prep
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	go test -v $(PKG) -testify.m $(TEST)
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
 test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./tests-unit-network/...)
 test-unit-network: ##@tests Run unit and integration tests with network access
-	./_assets/scripts/run_unit_tests.sh
+	./scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -464,11 +479,11 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
-	@./_assets/scripts/run_functional_tests.sh
+	@./scripts/run_functional_tests.sh
 
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
-	@./_assets/scripts/run_benchmark.sh
+	@./scripts/run_benchmark.sh
 
 lint-panics: generate
 	GOFLAGS=-tags='$(BUILD_TAGS),lint' \
@@ -515,18 +530,18 @@ migration:
 	touch $(DEFAULT_MIGRATION_PATH)/$$(date '+%s')_$(D).up.sql
 
 migration-check:
-	bash _assets/scripts/migration_check.sh
+	bash scripts/migration_check.sh
 
 commit-check: SHELL := /bin/sh
 commit-check:
-	@bash _assets/scripts/commit_check.sh
+	@bash scripts/commit_check.sh
 
 version: SHELL := /bin/sh
 version:
-	@./_assets/scripts/version.sh
+	@./scripts/version.sh
 
 tag-version:
-	bash _assets/scripts/tag_version.sh $(TARGET_COMMIT)
+	bash scripts/tag_version.sh $(TARGET_COMMIT)
 
 migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
@@ -535,7 +550,7 @@ migration-wallet:
 install-git-hooks: SHELL := /bin/sh
 install-git-hooks:
 	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
-		$(GIT_ROOT)/_assets/hooks/* $(GIT_ROOT)/.git/hooks
+		$(GIT_ROOT)/githooks/* $(GIT_ROOT)/.git/hooks
 
 -include install-git-hooks
 .PHONY: install-git-hooks
@@ -555,6 +570,3 @@ pytest-lint:
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go run tools/generate-db/main.go -out-dir build/db
-
-env:
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \

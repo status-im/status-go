@@ -52,7 +52,7 @@ pipeline {
     stage('Push Results') {
       steps {
         sshagent(credentials: ['status-go-benchmarks-deploy-key']) {
-          sh './_assets/scripts/push_benchmark.sh'
+          sh './scripts/push_benchmark.sh'
         }
       }
     }

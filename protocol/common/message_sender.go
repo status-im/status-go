@@ -191,6 +191,7 @@ func (s *MessageSender) SendPublic(
 		Ephemeral:           rawMessage.Ephemeral,
 		Priority:            rawMessage.Priority,
 		HashRatchet:         hashRatchetParams,
+		CommunityID:         rawMessage.CommunityID,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send public message")
@@ -390,6 +391,7 @@ func (s *MessageSender) SendCommunity(
 			PubsubTopic:  rawMessage.PubsubTopic,
 			ContentTopic: rawMessage.ContentTopic,
 			HashRatchet:  hashRatchetParams,
+			CommunityID:  rawMessage.CommunityID,
 		})
 
 	} else {
@@ -406,6 +408,7 @@ func (s *MessageSender) SendCommunity(
 			ContentTopic:       rawMessage.ContentTopic,
 			HashRatchet:        hashRatchetParams,
 			CommunityPublicKey: pubkey,
+			CommunityID:        rawMessage.CommunityID,
 		})
 	}
 
