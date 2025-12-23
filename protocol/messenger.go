@@ -549,6 +549,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	m.logger.Info("starting messenger", zap.String("identity", cryptotypes.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
+	fmt.Println("^^^ privkey", hex.EncodeToString(crypto.FromECDSA(m.identity)))
 
 	// Start push notification client
 	if m.pushNotificationClient != nil {
@@ -1549,7 +1550,7 @@ func (m *Messenger) Shutdown() (err error) {
 	}
 	m.started = false
 	_ = m.logger.Sync()
-	return
+	return err
 }
 
 // NOT IMPLEMENTED
@@ -1680,6 +1681,7 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 func (m *Messenger) SetLocalPairing(localPairing bool) {
 	m.localPairing = localPairing
 }
+
 func (m *Messenger) hasPairedDevices() bool {
 	logger := m.logger.Named("hasPairedDevices")
 
@@ -1722,7 +1724,6 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 	var id []byte
 
 	id, err = m.sender.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
-
 	if err != nil {
 		return spec, err
 	}
@@ -1772,14 +1773,12 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		specCopyForPairedDevices := rawMessage
 		if !crypto.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryptionLayer {
 			id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
-
 			if err != nil {
 				return rawMessage, err
 			}
 		}
 
 		err = m.sendToPairedDevices(ctx, specCopyForPairedDevices)
-
 		if err != nil {
 			return rawMessage, err
 		}
@@ -1921,7 +1920,6 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 		if message.ContentType == protobuf.ChatMessage_IMAGE {
 			imagesCount++
 		}
-
 	}
 
 	for _, message := range messages {
@@ -2060,7 +2058,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	// the sent status in a different table and join on query for messages,
 	// but that's a much larger change and it would require an expensive migration of clients
 	rawMessage.BeforeDispatch = func(rawMessage *common.RawMessage) error {
-
 		if rawMessage.Sent {
 			message.OutgoingStatus = common.OutgoingStatusSent
 		}
@@ -2116,7 +2113,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		zap.String("Timestamp", strconv.FormatUint(message.Timestamp, 10)),
 	)
 	err = m.prepareMessages(response.messages)
-
 	if err != nil {
 		return nil, err
 	}
@@ -2968,7 +2964,6 @@ func (m *Messenger) shouldSkipDuplicate(messageType protobuf.ApplicationMetadata
 }
 
 func (m *Messenger) handleImportedMessages(messagesToHandle map[types2.ChatFilter][]*types2.ReceivedMessage) error {
-
 	messageState := m.buildMessageState()
 
 	logger := m.logger.With(zap.String("site", "handleImportedMessages"))
@@ -3122,7 +3117,6 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types2.ChatFilte
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilter][]*types2.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
-
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()
 
@@ -3783,7 +3777,6 @@ func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm s
 	}
 
 	return m.filterOutHiddenChatMessages(messages)
-
 }
 
 func (m *Messenger) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
@@ -3859,7 +3852,6 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 
 func (m *Messenger) markMessageAsUnreadImpl(chatID string, messageID string) (uint64, uint64, error) {
 	count, countWithMentions, err := m.persistence.MarkMessageAsUnread(chatID, messageID)
-
 	if err != nil {
 		return 0, 0, err
 	}
@@ -4160,7 +4152,6 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 	}
 
 	muteTillTimeRemoveMs, err := time.Parse(time.RFC3339, MuteTill.Format(time.RFC3339))
-
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -4465,7 +4456,6 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 		return "", "", err
 	}
 	return name, identicon, nil
-
 }
 
 func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, error) {
