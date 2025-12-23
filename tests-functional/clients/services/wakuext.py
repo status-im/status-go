@@ -929,3 +929,8 @@ class WakuextService(Service):
         params = [sign_params]
         response = self.rpc_request("signData", params)
         return response
+
+    def create_community_token_deployment_signature(self, chain_id: int, address_from: str, community_id: str):
+        params = [chain_id, address_from, community_id]
+        response = self.rpc_request("createCommunityTokenDeploymentSignature", params)
+        return response

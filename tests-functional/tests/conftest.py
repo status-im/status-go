@@ -4,6 +4,7 @@ import os
 from uuid import uuid4
 
 import pytest
+from dotenv import load_dotenv
 from filelock import FileLock
 from requests import ReadTimeout
 
@@ -13,10 +14,27 @@ from clients.contract_deployers.snt import SNTDeployer
 from clients.contract_deployers.erc721 import ERC721Deployer
 from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
-from resources.constants import USE_IPV6
+from resources.constants import USE_IPV6, Account
 from utils import fake
 
 logger = logging.getLogger(__name__)
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+
+def get_sepolia_user(name: str) -> Account:
+    address_env = f"SEPOLIA_{name.upper()}_ADDRESS"
+    private_key_env = f"SEPOLIA_{name.upper()}_PRIVATE_KEY"
+    address = os.getenv(address_env)
+    private_key = os.getenv(private_key_env)
+    if not address or not private_key:
+        raise ValueError(f"Environment variables {address_env} and {private_key_env} must be set for Sepolia {name}")
+    return Account(
+        address=address,
+        private_key=private_key,
+        password="Strong12345",
+        passphrase="",
+    )
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -248,3 +266,15 @@ def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3
         token_overrides=snt_token_overrides,
         multicall_contract_address=multicall3_deployer.contract_address,
     )
+
+
+@pytest.fixture(scope="function", autouse=False)
+def sepolia_owner_backend(backend_recovered_profile):
+    user = get_sepolia_user("owner")
+    return backend_recovered_profile(name="sepolia_owner", user=user)
+
+
+@pytest.fixture(scope="function", autouse=False)
+def sepolia_member_backend(backend_recovered_profile):
+    user = get_sepolia_user("member")
+    return backend_recovered_profile(name="sepolia_member", user=user)

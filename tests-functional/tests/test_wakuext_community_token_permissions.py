@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 from typing import Optional, List
 
 import pytest
@@ -151,6 +152,70 @@ class TestCommunityTokenPermissions(MessengerSteps):
         return bool(
             member_community and member_community.get("name") == expected_name and member_community.get("description") == expected_description
         )
+
+    def deploy_owner_token(self, owner_backend, community_id, chain_id=11155111):
+        """Deploy owner and master tokens for the community, similar to computeDeployOwnerContractsFee logic"""
+        accounts = owner_backend.accounts_service.get_accounts()
+        wallet_account = next(a for a in accounts if not a.get("chat"))
+        address_from = wallet_account["address"]
+
+        # Owner token deployment params
+        owner_deployment_params = {
+            "name": "Owner Token",
+            "symbol": "OT",
+            "tokenType": 2,  # ERC721
+            "communityId": community_id,
+            "supply": "1",
+            "decimals": 0,
+            "privilegesLevel": 1,  # Owner
+            "baseTokenURI": "",
+            "receiver": address_from,
+            "signerPublicKey": owner_backend.public_key,
+        }
+
+        # Master token deployment params
+        master_deployment_params = {
+            "name": "Master Token",
+            "symbol": "MT",
+            "tokenType": 2,  # ERC721
+            "communityId": community_id,
+            "supply": "1",
+            "decimals": 0,
+            "privilegesLevel": 2,  # Master
+            "baseTokenURI": "",
+        }
+
+        # Create deployment signature
+        signature_result = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
+        signature = signature_result["signature"]
+
+        # Generate UUID for the transaction
+        transaction_uuid = str(uuid.uuid4())
+
+        # Get suggested routes for deploying owner token
+        owner_backend.wallet_service.suggested_community_routes(
+            uuid=transaction_uuid,
+            send_type="CommunityDeployOwnerToken",
+            chain_id=chain_id,
+            address_from=address_from,
+            community_id=community_id,
+            signer_pub_key=owner_backend.public_key,
+            token_ids=[],
+            wallet_addresses=[],
+            transfer_details=[],
+            signature=signature,
+            owner_token_parameters=owner_deployment_params,
+            master_token_parameters=master_deployment_params,
+        )
+
+        # Build transactions from route
+        transaction_data = owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
+
+        # Sign the transaction
+        signatures = owner_backend.wallet_service.sign_message(address_from, owner_backend.password, transaction_data["message"])
+
+        # Send the transaction
+        owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
@@ -309,41 +374,35 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
-    @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
-    def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client):
+    # @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7167")
+    def test_owner_edits_visible_before_and_after_minting_owner_token(self, sepolia_owner_backend, sepolia_member_backend):
         """Test that owner edits are visible before and after minting the owner token"""
-
-        # Mint NFT #1 to owner wallet (for owner verification)
-        owner_address = self.fund_backend_account_with_tokens(
-            owner_backend, foundry_client, amount=1, token_type=CommunityTokenType.ERC721, token_id=0
-        )
-        self.verify_token_balance(foundry_client, CommunityTokenType.ERC721, self.erc721_address, owner_address, token_id=0)
 
         # Owner creates a community
         community_id = self.create_token_gated_community(
-            owner_backend,
+            sepolia_owner_backend,
             permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
             token_criteria=[],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
         # Fetch community as member
-        response = self.fetch_community(member_backend, community_id)
+        response = self.fetch_community(sepolia_member_backend, community_id)
         assert response, "Community not found"
 
-        permissions_resp = member_backend.wakuext_service.check_permissions_to_join_community(community_id)
+        permissions_resp = sepolia_member_backend.wakuext_service.check_permissions_to_join_community(community_id)
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
         # Member requests to join community
-        join_resp = member_backend.wakuext_service.request_to_join_community(community_id, [fake.address()])
+        join_resp = sepolia_member_backend.wakuext_service.request_to_join_community(community_id, [fake.address()])
         requests = join_resp.get("requestsToJoinCommunity", [])
         assert requests, "No requests to join community"
         assert len(requests) == 1, "Unexpected multiple requests to join community"
 
         req_id = requests[0].get("id")
         # Wait for member validation
-        owner_backend.wait_for_signal(
+        sepolia_owner_backend.wait_for_signal(
             SignalType.MESSAGES_NEW,
             lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
             == RequestToJoinState.RequestToJoinStatePending.value,
@@ -351,52 +410,40 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         time.sleep(2)
 
-        accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
+        accept_resp = sepolia_owner_backend.wakuext_service.accept_request_to_join_community(req_id)
         assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is in community
-        communities = owner_backend.wakuext_service.communities()
+        communities = sepolia_owner_backend.wakuext_service.communities()
         owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
-        assert member_backend.public_key in owner_community.get("members", {})
+        assert sepolia_member_backend.public_key in owner_community.get("members", {})
 
         # When the Owner edits the community
-        new_name, new_description = self.edit_community(owner_backend, community_id)
+        new_name, new_description = self.edit_community(sepolia_owner_backend, community_id)
         logger.info(f"New name: {new_name}, new description2: {new_description}")
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, member_backend, community_id, new_name, new_description)
+        retry_call(self.check_member_community_updated, sepolia_member_backend, community_id, new_name, new_description)
 
         # When the Owner mints the owner token
-        # Simulate minting owner token by saving and adding a community token with owner privileges
-        token_data = {
-            "tokenType": 2,  # ERC721
-            "communityId": community_id,
-            "address": self.erc721_address,
-            "chainId": 31337,
-            "name": "Owner Token",
-            "supply": "1",
-            "symbol": "OT",
-            "privilegesLevel": 1,  # Owner level
-        }
-        owner_backend.wakuext_service.save_community_token(token_data)
-        owner_backend.wakuext_service.add_community_token(community_id, 31337, self.erc721_address)
+        self.deploy_owner_token(sepolia_owner_backend, community_id)
 
         # And the Owner edits the community again
-        new_name2, new_description2 = self.edit_community(owner_backend, community_id)
+        new_name2, new_description2 = self.edit_community(sepolia_owner_backend, community_id)
         logger.info(f"New name2: {new_name2}, new description2: {new_description2}")
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, member_backend, community_id, new_name2, new_description2)
+        retry_call(self.check_member_community_updated, sepolia_member_backend, community_id, new_name2, new_description2)
 
         # When the Owner logouts and logs back in
-        owner_backend.logout()
-        owner_backend.login(owner_backend.key_uid, owner_backend.password)
-        owner_backend.wait_for_login()
-        owner_backend.wakuext_service.start_messenger()
+        sepolia_owner_backend.logout()
+        sepolia_owner_backend.login(sepolia_owner_backend.key_uid, sepolia_owner_backend.password)
+        sepolia_owner_backend.wait_for_login()
+        sepolia_owner_backend.wakuext_service.start_messenger()
 
         # And the Owner edits the community again
-        new_name3, new_description3 = self.edit_community(owner_backend, community_id)
+        new_name3, new_description3 = self.edit_community(sepolia_owner_backend, community_id)
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, member_backend, community_id, new_name3, new_description3)
+        retry_call(self.check_member_community_updated, sepolia_member_backend, community_id, new_name3, new_description3)

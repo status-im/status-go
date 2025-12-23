@@ -1,3 +1,5 @@
+from typing import Optional
+
 from clients.rpc import RpcClient
 from clients.services.service import Service
 
@@ -95,3 +97,48 @@ class WalletService(Service):
 
     def restart_wallet_reload_timer(self):
         return self.rpc_request("restartWalletReloadTimer")
+
+    def suggested_community_routes(
+        self,
+        uuid: str,
+        send_type: str,
+        chain_id: int,
+        address_from: str,
+        community_id: str,
+        signer_pub_key: str,
+        token_ids: list,
+        wallet_addresses: list,
+        transfer_details: list,
+        signature: str = "",
+        owner_token_parameters: Optional[dict] = None,
+        master_token_parameters: Optional[dict] = None,
+    ):
+        params = [
+            {
+                "uuid": uuid,
+                "sendType": send_type,
+                "from": address_from,
+                "addrTo": "",
+                "amountIn": "",
+                "amountOut": "",
+                "tokenID": "",
+                "tokenAddress": "",
+                "toTokenID": "",
+                "toTokenAddress": "",
+                "disabledFromChainIDs": [],
+                "disabledToChainIDs": [],
+                "gasFeeMode": 0,
+                "txPurpose": 0,
+                "communityId": community_id,
+                "signerPubKey": signer_pub_key,
+                "tokenIds": token_ids,
+                "walletAddresses": wallet_addresses,
+                "transferDetails": transfer_details,
+                "signature": signature,
+            }
+        ]
+        if owner_token_parameters:
+            params[0]["ownerTokenParameters"] = owner_token_parameters
+        if master_token_parameters:
+            params[0]["masterTokenParameters"] = master_token_parameters
+        return self.rpc_request("suggestedCommunityRoutes", params)
