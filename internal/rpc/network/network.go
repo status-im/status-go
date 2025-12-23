@@ -319,7 +319,7 @@ func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 	return networks, nil
 }
 
-// GetConfiguredNetworks returns the configured networks.
+// GetEmbeddedNetworks returns the embedded networks.
 func (nm *Manager) GetEmbeddedNetworks() []params.Network {
 	return nm.embeddedNetworks
 }
