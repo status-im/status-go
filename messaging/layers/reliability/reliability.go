@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	_ "github.com/waku-org/sds-go-bindings/sds"
+	"github.com/waku-org/sds-go-bindings/sds"
 
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsproto "github.com/status-im/mvds/protobuf"
@@ -29,15 +29,18 @@ type Reliability struct {
 	datasync              *datasync.DataSync
 	mvdsPersistence       mvdsnode.Persistence
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
+	sdsManager            *sds.ReliabilityManager
 	logger                *zap.Logger
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, logger *zap.Logger) *Reliability {
+	logger = logger.Named("reliability")
 	return &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		logger:                logger.Named("reliability"),
+		sdsManager:            newSdsReliabilityManager(logger.Named("sds")),
+		logger:                logger,
 	}
 }
 
@@ -92,6 +95,13 @@ func (r *Reliability) Stop() {
 		r.datasync.Stop()
 	}
 	r.datasync = nil
+	if r.sdsManager != nil {
+		err := r.sdsManager.Cleanup()
+		if err != nil {
+			r.logger.Error("failed to cleanup sds reliability manager", zap.Error(err))
+		}
+		r.sdsManager = nil
+	}
 }
 
 func (r *Reliability) Started() bool {

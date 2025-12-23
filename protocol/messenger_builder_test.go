@@ -130,6 +130,7 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 			InstallationID: installationID,
 			TimeSource:     &testTimeSource{},
 		},
+		messaging.WithLogger(config.logger.Named("messa")),
 		messaging.WithLogger(config.logger),
 		messaging.WithSQLitePersistence(appDb),
 	)
@@ -138,7 +139,7 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 	}
 
 	ensVerifier := ens.New(
-		config.logger,
+		config.logger.Named("ens"),
 		&testTimeSource{},
 		appDb,
 		"",
@@ -148,7 +149,7 @@ func newTestMessenger(messagingEnv *messaging.TestMessagingEnvironment, config t
 	tokenManager := token.NewTokenManager(walletDb, nil, nil, network.NewManager(appDb, nil), appDb, nil, nil, nil, nil, token.NewPersistence(walletDb))
 
 	options := []Option{
-		WithCustomLogger(config.logger),
+		WithCustomLogger(config.logger.Named("messenger")),
 		WithDatabase(appDb),
 		WithWalletDatabase(walletDb),
 		WithBrowserDatabase(browsers.NewDB(appDb)),
