@@ -99,23 +99,52 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 	return message, nil
 }
 
-func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, fromSyncing bool) (*MessengerResponse, error) {
+func (m *Messenger) retrieveContactRequest(requestID string, contact *contacts.Contact) (*common.Message, error) {
 	contactRequest, err := m.persistence.MessageByID(requestID)
+	if err == common.ErrRecordNotFound {
+		// original requestID(Message ID) is useless since we don't sync UserMessage in this case
+		requestID = defaultContactRequestID(contact.ID)
+		contactRequest, err = m.persistence.MessageByID(requestID)
+	}
+	if err == common.ErrRecordNotFound {
+		// We still can't find the contact request, create one with default values
+		m.logger.Warn("could not find contact request message, creating a default one", zap.String("requestID", requestID), zap.String("contactID", contact.ID))
+		contactRequest, err = m.createDefaultContactRequest(contact, m.getTimesource().GetCurrentTime())
+	}
 	if err != nil {
-		m.logger.Error("could not find contact request message", zap.Error(err))
+		m.logger.Error("could not retrieve contact request message", zap.Error(err))
+		return nil, err
+	}
+	return contactRequest, nil
+}
+
+func (m *Messenger) acceptContactRequest(ctx context.Context, requestID, contactID string, fromSyncing bool) (*MessengerResponse, error) {
+	var ensName, nickname, displayName string
+	var customizationColor multiaccountscommon.CustomizationColor
+
+	contact, ok := m.allContacts.Load(contactID)
+	var err error
+	if ok {
+		ensName = contact.EnsName
+		nickname = contact.LocalNickname
+		displayName = contact.DisplayName
+		customizationColor = contact.CustomizationColor
+	} else {
+		contact, err = m.BuildContact(&requests.BuildContact{PublicKey: contactID})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	contactRequest, err := m.retrieveContactRequest(requestID, contact)
+	if err != nil {
 		return nil, err
 	}
 
 	m.logger.Info("acceptContactRequest")
 
-	var ensName, nickname, displayName string
-	customizationColor := multiaccountscommon.IDToColorFallbackToBlue(contactRequest.CustomizationColor)
-
-	if contact, ok := m.allContacts.Load(contactRequest.From); ok {
-		ensName = contact.EnsName
-		nickname = contact.LocalNickname
-		displayName = contact.DisplayName
-		customizationColor = contact.CustomizationColor
+	if customizationColor == "" {
+		customizationColor = multiaccountscommon.IDToColorFallbackToBlue(contactRequest.CustomizationColor)
 	}
 
 	response, err := m.addContact(ctx, contactRequest.From, ensName, nickname, displayName, customizationColor, contactRequest.ID, "", fromSyncing, false, false)
@@ -149,7 +178,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 		return nil, err
 	}
 
-	response, err := m.acceptContactRequest(ctx, request.ID.String(), false)
+	response, err := m.acceptContactRequest(ctx, request.ID.String(), request.ContactID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -165,23 +194,18 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 func (m *Messenger) declineContactRequest(requestID, contactID string, fromSyncing bool) (*MessengerResponse, error) {
 	m.logger.Info("declineContactRequest")
 
-	contactRequest, err := m.persistence.MessageByID(requestID)
-	if err == common.ErrRecordNotFound && fromSyncing {
-		// original requestID(Message ID) is useless since we don't sync UserMessage in this case
-		requestID = defaultContactRequestID(contactID)
-		contactRequest, err = m.persistence.MessageByID(requestID)
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
+	if err != nil {
+		return nil, err
 	}
+
+	contactRequest, err := m.retrieveContactRequest(requestID, contact)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
-	var contact *contacts.Contact
 	if contactRequest != nil {
-		contact, err = m.BuildContact(&requests.BuildContact{PublicKey: contactRequest.From})
-		if err != nil {
-			return nil, err
-		}
 		contactRequest.ContactRequestState = common.ContactRequestStateDismissed
 		err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
 		if err != nil {
@@ -206,7 +230,7 @@ func (m *Messenger) declineContactRequest(requestID, contactID string, fromSynci
 	}
 
 	// update notification with the correct status
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(requestID))
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +256,7 @@ func (m *Messenger) DeclineContactRequest(ctx context.Context, request *requests
 		return nil, err
 	}
 
-	response, err := m.declineContactRequest(request.ID.String(), "", false)
+	response, err := m.declineContactRequest(request.ID.String(), request.ContactID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1219,17 +1243,30 @@ func (m *Messenger) GetLatestContactRequestForContact(contactID string) (*Messen
 	return response, nil
 }
 
+func (m *Messenger) retrieveLatestContactRequestIDForContact(contactID string) (string, error) {
+	if len(contactID) == 0 {
+		return "", ErrGetLatestContactRequestForContactInvalidID
+	}
+
+	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contactID)
+	if err == common.ErrRecordNotFound {
+		// No pending request found, use a default one
+		contactRequestID = defaultContactRequestID(contactID)
+	}
+	return contactRequestID, err
+}
+
 func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, request *requests.AcceptLatestContactRequestForContact) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
-	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(request.ID.String())
+	contactRequestID, err := m.retrieveLatestContactRequestIDForContact(request.ID.String())
 	if err != nil {
 		return nil, err
 	}
 
-	return m.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+	return m.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID), ContactID: request.ID.String()})
 }
 
 func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, request *requests.DismissLatestContactRequestForContact) (*MessengerResponse, error) {
@@ -1237,12 +1274,12 @@ func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, r
 		return nil, err
 	}
 
-	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(request.ID.String())
+	contactRequestID, err := m.retrieveLatestContactRequestIDForContact(request.ID.String())
 	if err != nil {
 		return nil, err
 	}
 
-	return m.DeclineContactRequest(ctx, &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID)})
+	return m.DeclineContactRequest(ctx, &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID), ContactID: request.ID.String()})
 }
 
 func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {

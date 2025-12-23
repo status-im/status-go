@@ -103,7 +103,11 @@ func (c *Client) FetchTransfers(ctx context.Context, chainID uint64, parameters 
 			if err != nil {
 				return nil, nextCursor, err
 			}
-			responseTransfers = append(responseTransfers, tmpResponse.Transfers...)
+			for _, t := range tmpResponse.Transfers {
+				if t.IsValid() {
+					responseTransfers = append(responseTransfers, t)
+				}
+			}
 			if tmpResponse.PageKey == "" {
 				outgoingCursor = ""
 				outgoingDone = true
@@ -121,7 +125,11 @@ func (c *Client) FetchTransfers(ctx context.Context, chainID uint64, parameters 
 			if err != nil {
 				return nil, nextCursor, err
 			}
-			responseTransfers = append(responseTransfers, tmpResponse.Transfers...)
+			for _, t := range tmpResponse.Transfers {
+				if t.IsValid() {
+					responseTransfers = append(responseTransfers, t)
+				}
+			}
 			if tmpResponse.PageKey == "" {
 				incomingCursor = ""
 				incomingDone = true

@@ -210,17 +210,16 @@ func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, 
 	}
 }
 
-func (s *MessengerContactRequestSuite) acceptContactRequest(
-	contactRequest *common.Message, sender *Messenger, receiver *Messenger) {
+func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *common.Message, sender *Messenger, receiver *Messenger) {
 	s.T().Log("acceptContactRequest",
 		zap.String("sender", sender.IdentityPublicKeyString()),
 		zap.String("receiver", receiver.IdentityPublicKeyString()))
 
 	// Accept contact request, receiver side
-	resp, err := receiver.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
+	resp, err := receiver.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
 
-	// Chack updated contact request message and mutual state update
+	// Check updated contact request message and mutual state update
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Messages(), 2)
 
@@ -348,7 +347,7 @@ func (s *MessengerContactRequestSuite) createContactRequest(contactPublicKey str
 
 func (s *MessengerContactRequestSuite) declineContactRequest(contactRequest *common.Message, theirMessenger *Messenger) {
 	// Dismiss contact request, receiver side
-	resp, err := theirMessenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
+	resp, err := theirMessenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
 
 	// Check the contact state is correctly set
@@ -681,7 +680,7 @@ func (s *MessengerContactRequestSuite) TestAliceSeesOnlyOneAcceptFromBob() {
 	s.acceptContactRequest(contactRequest, alice, bob)
 
 	// Accept contact request again
-	_, err := bob.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
+	_, err := bob.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
 
 	// Check we don't have extra messages on Alice's side
@@ -1694,4 +1693,36 @@ func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
 		s.blockContactAndSync(alice1, alice2, bob)
 		s.unblockContactAndSync(alice1, alice2, bob)
 	}
+}
+
+func (s *MessengerContactRequestSuite) TestAcceptContactWithoutRequest() { //nolint: unused
+	theirMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
+
+	// Send contact request but don't wait to receive it
+	request := &requests.SendContactRequest{
+		ID:      theirMessenger.myHexIdentity(),
+		Message: "hello!",
+	}
+	s.sendContactRequest(request, s.m)
+
+	contactRequest, err := s.m.createDefaultContactRequest(s.m.selfContact, s.m.getTimesource().GetCurrentTime())
+	s.Require().NoError(err)
+	resp, err := theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
+	s.Require().NoError(err)
+	// Check updated contact request message and mutual state update
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequestMsg := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+
+	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
+	s.Require().NotNil(mutualStateUpdate)
+
+	s.Require().Equal(contactRequestMsg.ID, contactRequest.ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
+
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.From)
+	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(outgoingMutualStateEventAcceptedDefaultText, contactRequestMsg.From))
 }

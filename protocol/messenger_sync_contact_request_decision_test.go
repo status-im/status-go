@@ -74,7 +74,7 @@ func (s *MessengerSyncContactRequestDecisionSuite) TestSyncAcceptContactRequest(
 	s.Require().NoError(err)
 
 	// m accept contact request from userB
-	_, err = s.m.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: contactRequestMessageID})
+	_, err = s.m.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: contactRequestMessageID, ContactID: crypto.PubkeyToHex(&s.m2.identity.PublicKey)})
 	s.Require().NoError(err)
 
 	// check sync contact request decision processed for m2

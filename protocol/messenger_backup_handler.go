@@ -192,6 +192,7 @@ func (m *Messenger) handleLocalBackupCommunities(state *ReceivedMessageState, co
 		err := m.handleSyncInstallationCommunity(state, syncCommunity)
 		if err != nil {
 			errors = append(errors, err)
+			continue
 		}
 
 		err = m.requestCommunityKeysAndSharedAddresses(syncCommunity)

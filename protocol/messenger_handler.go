@@ -311,11 +311,10 @@ func (m *Messenger) PendingNotificationContactRequest(contactID string) (*Activi
 	return m.persistence.ActiveContactRequestNotification(contactID)
 }
 
-func (m *Messenger) createContactRequestForContactUpdate(contact *contacts.Contact, messageState *ReceivedMessageState) (*common.Message, error) {
-
+func (m *Messenger) createDefaultContactRequest(contact *contacts.Contact, timestamp uint64) (*common.Message, error) {
 	contactRequest, err := m.generateContactRequest(
 		contact.ContactRequestRemoteClock,
-		messageState.CurrentMessageState.WhisperTimestamp,
+		timestamp,
 		contact,
 		defaultContactRequestText(),
 		false,
@@ -327,12 +326,21 @@ func (m *Messenger) createContactRequestForContactUpdate(contact *contacts.Conta
 	contactRequest.ID = defaultContactRequestID(contact.ID)
 
 	// save this message
-	messageState.Response.AddMessage(contactRequest)
 	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
-
 	if err != nil {
 		return nil, err
 	}
+
+	return contactRequest, nil
+}
+func (m *Messenger) createContactRequestForContactUpdate(contact *contacts.Contact, messageState *ReceivedMessageState) (*common.Message, error) {
+	contactRequest, err := m.createDefaultContactRequest(contact, messageState.CurrentMessageState.WhisperTimestamp)
+	if err != nil {
+		return nil, err
+	}
+
+	// save this message
+	messageState.Response.AddMessage(contactRequest)
 
 	return contactRequest, nil
 }
@@ -526,47 +534,50 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 		}
 	}
 
-	if message.ContactRequestRemoteClock != 0 || message.ContactRequestLocalClock != 0 {
-		// Some local action about contact requests were performed,
-		// process them
-		contact.ProcessSyncContactRequestState(
-			contacts.ContactRequestState(message.ContactRequestRemoteState),
-			uint64(message.ContactRequestRemoteClock),
-			contacts.ContactRequestState(message.ContactRequestLocalState),
-			uint64(message.ContactRequestLocalClock))
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
+	// Check if we need to create a contact request
+	if chat != nil {
+		if message.ContactRequestRemoteClock != 0 || message.ContactRequestLocalClock != 0 {
+			// Some local action about contact requests were performed,
+			// process them
+			contact.ProcessSyncContactRequestState(
+				contacts.ContactRequestState(message.ContactRequestRemoteState),
+				uint64(message.ContactRequestRemoteClock),
+				contacts.ContactRequestState(message.ContactRequestLocalState),
+				uint64(message.ContactRequestLocalClock))
+			state.ModifiedContacts.Store(contact.ID, true)
+			state.AllContacts.Store(contact.ID, contact)
 
-		err := m.syncContactRequestForInstallationContact(contact, state, chat, contact.ContactRequestLocalState == contacts.ContactRequestStateSent)
-		if err != nil {
-			return err
-		}
-	} else if message.Added || message.HasAddedUs {
-		// NOTE(cammellos): this is for handling backward compatibility, old clients
-		// won't propagate ContactRequestRemoteClock or ContactRequestLocalClock
-
-		if message.Added && contact.LastUpdatedLocally < message.LastUpdatedLocally {
-			contact.ContactRequestSent(message.LastUpdatedLocally)
-
-			err := m.syncContactRequestForInstallationContact(contact, state, chat, true)
+			err := m.syncContactRequestForInstallationContact(contact, state, chat, contact.ContactRequestLocalState == contacts.ContactRequestStateSent)
 			if err != nil {
 				return err
 			}
-		}
+		} else if message.Added || message.HasAddedUs {
+			// NOTE(cammellos): this is for handling backward compatibility, old clients
+			// won't propagate ContactRequestRemoteClock or ContactRequestLocalClock
 
-		if message.HasAddedUs && contact.LastUpdated < message.LastUpdated {
-			contact.ContactRequestReceived(message.LastUpdated)
+			if message.Added && contact.LastUpdatedLocally < message.LastUpdatedLocally {
+				contact.ContactRequestSent(message.LastUpdatedLocally)
 
-			err := m.syncContactRequestForInstallationContact(contact, state, chat, false)
-			if err != nil {
-				return err
+				err := m.syncContactRequestForInstallationContact(contact, state, chat, true)
+				if err != nil {
+					return err
+				}
 			}
-		}
 
-		if message.Removed && contact.LastUpdatedLocally < message.LastUpdatedLocally {
-			err := m.removeContact(context.Background(), state.Response, contact.ID, false)
-			if err != nil {
-				return err
+			if message.HasAddedUs && contact.LastUpdated < message.LastUpdated {
+				contact.ContactRequestReceived(message.LastUpdated)
+
+				err := m.syncContactRequestForInstallationContact(contact, state, chat, false)
+				if err != nil {
+					return err
+				}
+			}
+
+			if message.Removed && contact.LastUpdatedLocally < message.LastUpdatedLocally {
+				err := m.removeContact(context.Background(), state.Response, contact.ID, false)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}

@@ -288,7 +288,7 @@ class TestLocalPairing(MessengerSteps):
         self.make_contacts(user_accepted, bob1)
         self.send_contact_request_and_wait_for_signal_to_be_received(user_pending, bob1)
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(user_declined, bob1)
-        bob1.wakuext_service.decline_contact_request(message_id)
+        bob1.wakuext_service.decline_contact_request(message_id, user_declined.public_key)
 
         # Pair second device
         pair_server_as_sender(bob1, bob2)
