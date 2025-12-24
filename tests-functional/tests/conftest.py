@@ -25,15 +25,19 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 def get_sepolia_user(name: str) -> Account:
     address_env = f"SEPOLIA_{name.upper()}_ADDRESS"
     private_key_env = f"SEPOLIA_{name.upper()}_PRIVATE_KEY"
+    mnemonic_env = f"SEPOLIA_{name.upper()}_MNEMONIC"
+    password_env = "SEPOLIA_TEST_PASSWORD"
     address = os.getenv(address_env)
     private_key = os.getenv(private_key_env)
-    if not address or not private_key:
-        raise ValueError(f"Environment variables {address_env} and {private_key_env} must be set for Sepolia {name}")
+    mnemonic = os.getenv(mnemonic_env)
+    password = os.getenv(password_env)
+    if not address or not private_key or not mnemonic or not password:
+        raise ValueError(f"Environment variables {address_env}, {private_key_env}, {mnemonic_env}, and {password_env} must be set for Sepolia {name}")
     return Account(
         address=address,
         private_key=private_key,
-        password="Strong12345",
-        passphrase="",
+        password=password,
+        passphrase=mnemonic,
     )
 
 
