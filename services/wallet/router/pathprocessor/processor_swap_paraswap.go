@@ -32,7 +32,7 @@ type SwapParaswapProcessor struct {
 }
 
 const (
-	partnerID = "status.app"
+	ParaswapPartnerID = "status.app"
 )
 
 func getPartnerAddressAndFeePcnt(chainID uint64) (common.Address, float64) {
@@ -61,7 +61,7 @@ func NewSwapParaswapProcessor(ethClientGetter rpc.EthClientGetter, transactor tr
 		ethClientGetter: ethClientGetter,
 		paraswapClient: paraswap.NewClientV5(
 			defaultChainID,
-			partnerID,
+			ParaswapPartnerID,
 			partnerAddress,
 			partnerFeePcnt,
 		),

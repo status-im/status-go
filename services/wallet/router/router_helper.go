@@ -526,3 +526,14 @@ func (r *Router) TokenAvailableForBridgingViaHop(chainID uint64, address common.
 	hopContracts := hop.GetTokenContractsAvailableOnChain(chainID)
 	return slices.Contains(hopContracts, address)
 }
+
+// IsChainSupportedForSwapViaParaswap returns true if the chain is supported for swap via Paraswap, false otherwise.
+func (r *Router) IsChainSupportedForSwapViaParaswap(chainID uint64) (bool, error) {
+	paraswapClient := r.paraswapClientFactory(chainID)
+	tokens, err := paraswapClient.FetchTokensList(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	return len(tokens) > 0, nil
+}
