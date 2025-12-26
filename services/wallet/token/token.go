@@ -191,6 +191,8 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time
 		},
 
 		Chains: walletcommon.AllChainIDsAsUint64(),
+
+		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
 	}
 
 	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)
