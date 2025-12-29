@@ -22,8 +22,6 @@ replace github.com/mutecomm/go-sqlcipher/v4 v4.4.2 => github.com/status-im/go-sq
 
 replace github.com/libp2p/go-libp2p-pubsub v0.13.1 => github.com/waku-org/go-libp2p-pubsub v0.13.1-gowaku
 
-replace github.com/oNaiPs/go-generate-fast v0.3.0 => github.com/status-im/go-generate-fast v0.0.0-20250916164518-c78009bcfa9e
-
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.3.0
