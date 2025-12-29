@@ -126,3 +126,8 @@ func (s *Multidevice) DisableInstallation(myIdentityKey *ecdsa.PublicKey, instal
 	myIdentityKeyC := crypto.CompressPubkey(myIdentityKey)
 	return s.persistence.DisableInstallation(myIdentityKeyC, installationID)
 }
+
+func (s *Multidevice) DeleteInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	myIdentityKeyC := crypto.CompressPubkey(myIdentityKey)
+	return s.persistence.DeleteInstallation(myIdentityKeyC, installationID)
+}

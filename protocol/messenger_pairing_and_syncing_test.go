@@ -56,7 +56,23 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	}
 	s.Require().NotNil(theirInstallation)
 	s.Require().True(theirInstallation.Enabled)
+}
 
+func (s *MessengerPairingSuite) TestDeleteInstallation() {
+	installationID := uuid.New().String()
+	_, err := s.m.EnableInstallationAndPair(&requests.EnableInstallationAndPair{InstallationID: installationID})
+	s.Require().NoError(err)
+
+	installations := s.m.Installations()
+	s.Require().NoError(err)
+	s.Require().Len(installations, 2)
+
+	err = s.m.DeleteInstallation(installationID)
+	s.Require().NoError(err)
+
+	installations = s.m.Installations()
+	s.Require().NoError(err)
+	s.Require().Len(installations, 1)
 }
 
 type stubEnableInstallationAndPair struct {
