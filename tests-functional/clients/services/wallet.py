@@ -42,7 +42,7 @@ class WalletService(Service):
         return self.rpc_request("setCustomTxDetails", params)
 
     def get_suggested_routes_async(self, params: dict):
-        return self.rpc_request("getSuggestedRoutesAsync", params)
+        return self.rpc_request("getSuggestedRoutesAsync", [params])
 
     def build_transactions_from_route(self, uuid: str):
         params = [uuid]
@@ -101,7 +101,7 @@ class WalletService(Service):
     def suggested_community_routes(
         self,
         uuid: str,
-        send_type: str,
+        send_type: int,
         chain_id: int,
         address_from: str,
         community_id: str,
@@ -113,32 +113,26 @@ class WalletService(Service):
         owner_token_parameters: Optional[dict] = None,
         master_token_parameters: Optional[dict] = None,
     ):
-        params = [
-            {
-                "uuid": uuid,
-                "sendType": send_type,
-                "from": address_from,
-                "addrTo": "",
-                "amountIn": "",
-                "amountOut": "",
-                "tokenID": "",
-                "tokenAddress": "",
-                "toTokenID": "",
-                "toTokenAddress": "",
-                "disabledFromChainIDs": [],
-                "disabledToChainIDs": [],
-                "gasFeeMode": 0,
-                "txPurpose": 0,
-                "communityId": community_id,
-                "signerPubKey": signer_pub_key,
-                "tokenIds": token_ids,
-                "walletAddresses": wallet_addresses,
-                "transferDetails": transfer_details,
-                "signature": signature,
-            }
-        ]
+        community_params = {
+            "communityID": community_id,
+            "signerPubKey": signer_pub_key,
+            "tokenIds": token_ids,
+            "walletAddresses": wallet_addresses,
+            "transferDetails": transfer_details,
+            "tokenDeploymentSignature": signature,
+        }
         if owner_token_parameters:
-            params[0]["ownerTokenParameters"] = owner_token_parameters
+            community_params["ownerTokenParameters"] = owner_token_parameters
         if master_token_parameters:
-            params[0]["masterTokenParameters"] = master_token_parameters
-        return self.rpc_request("suggestedCommunityRoutes", params)
+            community_params["masterTokenParameters"] = master_token_parameters
+
+        native_address = "0x0000000000000000000000000000000000000000"
+        params = {
+            "tokenKey": f"{chain_id}-{native_address}",
+            "toTokenKey": f"{chain_id}-{native_address}",
+            "fromChainID": chain_id,
+            "toChainID": chain_id,
+            "gasFeeMode": 0,
+            "communityRouteInputParams": community_params,
+        }
+        return self.rpc_request("getSuggestedRoutes", [params])

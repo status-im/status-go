@@ -275,10 +275,22 @@ def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3
 @pytest.fixture(scope="function", autouse=False)
 def sepolia_owner_backend(backend_recovered_profile):
     user = get_sepolia_user("owner")
-    return backend_recovered_profile(name="sepolia_owner", user=user)
+    return backend_recovered_profile(
+        name="sepolia_owner",
+        user=user,
+        disable_override_networks=True,
+        network_id=11155111,
+        token_overrides=[{"symbol": "ETH", "name": "Sepolia Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18}],
+    )
 
 
 @pytest.fixture(scope="function", autouse=False)
 def sepolia_member_backend(backend_recovered_profile):
     user = get_sepolia_user("member")
-    return backend_recovered_profile(name="sepolia_member", user=user)
+    return backend_recovered_profile(
+        name="sepolia_member",
+        user=user,
+        disable_override_networks=True,
+        network_id=11155111,
+        token_overrides=[{"symbol": "ETH", "name": "Sepolia Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18}],
+    )

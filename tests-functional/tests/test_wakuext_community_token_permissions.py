@@ -16,6 +16,8 @@ from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
 
+COMMUNITY_DEPLOY_OWNER_TOKEN = 25
+
 
 def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
     # Generate signatures for joining community with selected addresses to reveal
@@ -187,7 +189,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Create deployment signature
         signature_result = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
-        signature = signature_result["signature"]
+        signature = signature_result
 
         # Generate UUID for the transaction
         transaction_uuid = str(uuid.uuid4())
@@ -195,7 +197,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Get suggested routes for deploying owner token
         owner_backend.wallet_service.suggested_community_routes(
             uuid=transaction_uuid,
-            send_type="CommunityDeployOwnerToken",
+            send_type=COMMUNITY_DEPLOY_OWNER_TOKEN,
             chain_id=chain_id,
             address_from=address_from,
             community_id=community_id,
@@ -427,6 +429,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         retry_call(self.check_member_community_updated, sepolia_member_backend, community_id, new_name, new_description)
 
         # When the Owner mints the owner token
+        sepolia_owner_backend.wallet_service.restart_wallet_reload_timer()
+        time.sleep(2)  # Sync metadata
         self.deploy_owner_token(sepolia_owner_backend, community_id)
 
         # And the Owner edits the community again
