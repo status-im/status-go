@@ -23,10 +23,23 @@ in mkShell {
     rustc cargo
     nim
     lib-sds-pkg
+    libwaku
   ];
 
   shellHook = ''
     export USE_SYSTEM_NIM=1
+    
+    export LIBWAKU_PATH="${pkgs.libwaku}"
+    export LIBSDS_PATH="${pkgs.lib-sds-pkg}"
+    
+    export LD_LIBRARY_PATH="${pkgs.libwaku}/bin:${pkgs.lib-sds-pkg}/lib:''${LD_LIBRARY_PATH:-}"
+    export LIBRARY_PATH="${pkgs.libwaku}/bin:${pkgs.lib-sds-pkg}/lib:''${LIBRARY_PATH:-}"
+    
+    export CGO_CFLAGS="-I${pkgs.libwaku}/include -I${pkgs.lib-sds-pkg}/include"
+    export CGO_LDFLAGS="-L${pkgs.libwaku}/bin -L${pkgs.lib-sds-pkg}/lib"
+    
+    echo "CGO_CFLAGS: $CGO_CFLAGS"
+    echo "CGO_LDFLAGS: $CGO_LDFLAGS"
   ''
   + lib.optionalString (!isMacM1) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/

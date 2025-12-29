@@ -1,38 +1,61 @@
 {
   "nodes": {
-    "nim-sds": {
+    "lmn": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "zerokit": "zerokit"
       },
       "locked": {
-        "lastModified": 1762510817,
-        "narHash": "sha256-VwTp+2JB8ZM8Yx9RPOZ95GBrw5hFdDGMKhS5w9uQ2CQ=",
-        "rev": "b6431260110fe62956ff4d7bab6767556c19d040",
-        "revCount": 67,
+        "lastModified": 1767020554,
+        "narHash": "sha256-LvnMp8dcmznNk6rb8cVfqWmZCga9UG/NCMQxrj3riMQ=",
+        "ref": "refs/heads/master",
+        "rev": "33383fee2d1e5444947acbe7316d5d31221d2852",
+        "revCount": 2196,
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/waku-org/nim-sds"
+        "url": "https://github.com/logos-messaging/logos-messaging-nim"
       },
       "original": {
-        "rev": "b6431260110fe62956ff4d7bab6767556c19d040",
+        "rev": "33383fee2d1e5444947acbe7316d5d31221d2852",
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/waku-org/nim-sds"
+        "url": "https://github.com/logos-messaging/logos-messaging-nim"
+      }
+    },
+    "nim-sds": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_2"
+      },
+      "locked": {
+        "lastModified": 1766504822,
+        "narHash": "sha256-tWVLbYoi8/xNzsbJmzMBnuc4GsB7/4oH05yCwuokKT8=",
+        "ref": "refs/heads/master",
+        "rev": "fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6",
+        "revCount": 76,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/logos-messaging/nim-sds"
+      },
+      "original": {
+        "rev": "fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/logos-messaging/nim-sds"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1757590060,
-        "narHash": "sha256-EWwwdKLMZALkgHFyKW7rmyhxECO74+N+ZO5xTDnY/5c=",
+        "lastModified": 1740603184,
+        "narHash": "sha256-t+VaahjQAWyA+Ctn2idyo1yxRIYpaDxMgHkgCNiMJa4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
+        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
+        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
         "type": "github"
       }
     },
@@ -54,68 +77,69 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1740603184,
-        "narHash": "sha256-t+VaahjQAWyA+Ctn2idyo1yxRIYpaDxMgHkgCNiMJa4=",
+        "lastModified": 1757590060,
+        "narHash": "sha256-EWwwdKLMZALkgHFyKW7rmyhxECO74+N+ZO5xTDnY/5c=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
+        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "f44bd8ca21e026135061a0a57dcf3d0775b67a49",
+        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
         "type": "github"
-      }
-    },
-    "nwaku": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_3",
-        "zerokit": "zerokit"
-      },
-      "locked": {
-        "lastModified": 1747983922,
-        "narHash": "sha256-zaS/kTsJ8Z7ugcsw0pob1wXmd9WfZ4ZPqpM8UB1R2Vk=",
-        "ref": "refs/heads/master",
-        "rev": "e755fd834f5f3d6fba216b09469316f0328b3b6f",
-        "revCount": 2040,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/waku-org/nwaku"
-      },
-      "original": {
-        "rev": "e755fd834f5f3d6fba216b09469316f0328b3b6f",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/waku-org/nwaku"
       }
     },
     "root": {
       "inputs": {
+        "lmn": "lmn",
         "nim-sds": "nim-sds",
-        "nixpkgs": "nixpkgs_2",
-        "nwaku": "nwaku"
+        "nixpkgs": "nixpkgs_3"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "lmn",
+          "zerokit",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1748399823,
+        "narHash": "sha256-kahD8D5hOXOsGbNdoLLnqCL887cjHkx98Izc37nDjlA=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "d68a69dc71bc19beb3479800392112c2f6218159",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
       }
     },
     "zerokit": {
       "inputs": {
         "nixpkgs": [
-          "nwaku",
+          "lmn",
           "nixpkgs"
-        ]
+        ],
+        "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1743756626,
-        "narHash": "sha256-SvhfEl0bJcRsCd79jYvZbxQecGV2aT+TXjJ57WVv7Aw=",
+        "lastModified": 1749115386,
+        "narHash": "sha256-UexIE2D7zr6aRajwnKongXwCZCeRZDXOL0kfjhqUFSU=",
         "owner": "vacp2p",
         "repo": "zerokit",
-        "rev": "c60e0c33fc6350a4b1c20e6b6727c44317129582",
+        "rev": "dc0b31752c91e7b4fefc441cfa6a8210ad7dba7b",
         "type": "github"
       },
       "original": {
         "owner": "vacp2p",
         "repo": "zerokit",
-        "rev": "c60e0c33fc6350a4b1c20e6b6727c44317129582",
+        "rev": "dc0b31752c91e7b4fefc441cfa6a8210ad7dba7b",
         "type": "github"
       }
     }
