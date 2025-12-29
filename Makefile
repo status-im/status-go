@@ -301,9 +301,9 @@ status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
-run-status-backend: generate
+run-status-backend: generate $(LIBSDS)
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
