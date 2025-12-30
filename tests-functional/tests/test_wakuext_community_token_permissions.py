@@ -16,7 +16,7 @@ from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
 
-COMMUNITY_DEPLOY_OWNER_TOKEN = 26
+COMMUNITY_DEPLOY_OWNER_TOKEN = 25
 
 
 def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
@@ -156,34 +156,43 @@ class TestCommunityTokenPermissions(MessengerSteps):
         )
 
     def deploy_owner_token(self, owner_backend, community_id, chain_id=11155111):
-        """Mint owner and master tokens for the community using existing contract"""
+        """Deploy and mint owner token for the community in one step"""
         accounts = owner_backend.accounts_service.get_accounts()
         wallet_account = next(a for a in accounts if not a.get("chat"))
-        wallet_pubkey = wallet_account["public-key"]
+        pubkey = community_id
         address_from = wallet_account["address"]
 
-        contract_address = "0xCDE984e57cdb88c70b53437cc694345B646371f9"
+        contract_address = "0xCDE984e57cdb88c70b53437cc694345B646371f9"  # CommunityTokenDeployer
 
-        # Transfer details for minting owner and master tokens
-        transfer_details = [
-            {
-                "tokenType": 2,  # ERC721
-                "privilegeLevel": 1,  # Owner
-                "tokenContractAddress": contract_address,
-                "amount": "0x1",
-            },
-            {
-                "tokenType": 2,  # ERC721
-                "privilegeLevel": 2,  # Master
-                "tokenContractAddress": contract_address,
-                "amount": "0x1",
-            },
-        ]
+        # Generate deployment signature
+        signature = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
+
+        # Owner and master token parameters for deployment
+        owner_token_parameters = {
+            "name": "TestOwnerToken",
+            "symbol": "TOT",
+            "tokenUri": "",
+            "infiniteSupply": True,
+            "decimals": 0,
+            "transferable": True,
+            "remoteSelfDestruct": False,
+            "base64image": "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=",
+        }
+        master_token_parameters = {
+            "name": "TestMasterToken",
+            "symbol": "TMT",
+            "tokenUri": "",
+            "infiniteSupply": True,
+            "decimals": 0,
+            "transferable": True,
+            "remoteSelfDestruct": False,
+            "base64image": "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=",
+        }
 
         # Generate UUID for the transaction
         transaction_uuid = str(uuid.uuid4())
 
-        # Get suggested routes for minting tokens
+        # Get suggested routes for deploying tokens
         owner_backend.wallet_service.suggested_community_routes(
             uuid=transaction_uuid,
             send_type=COMMUNITY_DEPLOY_OWNER_TOKEN,
@@ -191,10 +200,13 @@ class TestCommunityTokenPermissions(MessengerSteps):
             address_from=address_from,
             addr_to=contract_address,
             community_id=community_id,
-            signer_pub_key=wallet_pubkey,
+            signer_pub_key=pubkey,
             token_ids=[],
-            wallet_addresses=[address_from],
-            transfer_details=transfer_details,
+            wallet_addresses=[],
+            transfer_details=[],
+            signature=signature,
+            owner_token_parameters=owner_token_parameters,
+            master_token_parameters=master_token_parameters,
         )
 
         # Build transactions from route
