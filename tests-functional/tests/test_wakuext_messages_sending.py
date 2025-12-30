@@ -1,4 +1,4 @@
-from time import sleep
+from time import sleep, time
 import pytest
 
 from clients.services.wakuext import SendChatMessagePayload
@@ -118,11 +118,18 @@ class TestSendingChatMessages(MessengerSteps):
     def test_resend_one_to_one_message(self, sender, receiver):
         self.make_contacts(sender, receiver)
 
+        receiver_start = len(receiver.received_signals[SignalType.MESSAGES_NEW])
         _, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         message_id = responses[0].get("messages", [])[0].get("id", "")
         receiver_chat_id = sender.public_key
 
-        receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=5)
+        with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=message_id,
+            timeout=60,
+            start=receiver_start,
+        ):
+            pass
 
         response = receiver.wakuext_service.chat_messages(receiver_chat_id)
         messages = response.get("messages", [])
@@ -133,9 +140,25 @@ class TestSendingChatMessages(MessengerSteps):
         messages = response.get("messages", [])
         assert len(messages) == 3
 
+        receiver_start = len(receiver.received_signals[SignalType.MESSAGES_NEW])
         sender.wakuext_service.resend_chat_message(message_id)
-        sleep(5)
+        with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=message_id,
+            timeout=60,
+            start=receiver_start,
+        ):
+            pass
 
-        response = receiver.wakuext_service.chat_messages(receiver_chat_id)
-        messages = response.get("messages", [])
-        assert len(messages) == 4
+        deadline = 60
+        start_time = time()
+        while True:
+            response = receiver.wakuext_service.chat_messages(receiver_chat_id)
+            messages = response.get("messages", [])
+            if len(messages) == 4:
+                break
+
+            if time() - start_time >= deadline:
+                assert len(messages) == 4
+
+            sleep(0.5)

@@ -144,11 +144,8 @@ class TestUserStatus(MessengerSteps):
             response = sender.wakuext_service.set_user_status(new_status, custom_text)
             # TODO: Add more assertions on response
 
-            receiver.find_signal_containing_pattern(
-                SignalType.MESSAGES_NEW.value,
-                event_pattern=custom_text,
-                timeout=10,
-            )
+            with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=custom_text, timeout=10):
+                pass
 
             response = receiver.wakuext_service.status_updates()
             # TODO: Add more assertions on response

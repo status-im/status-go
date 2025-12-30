@@ -4,21 +4,30 @@ from clients.connector import ConnectorClient, ConnectorApiError
 from clients.signals import SignalType
 
 
-def wait_event(backend, signal_type):
-    signal = backend.wait_for_signal(signal_type)
-    return signal.get("event")
+def wait_event(backend, signal_type, action=None, timeout=20, start="now"):
+    with backend.expect_signal(signal_type, timeout=timeout, start=start) as exp:
+        if action is not None:
+            action()
+    return exp.result.get("event")
 
 
 def accept_connector(backend, connector, wallet_acc):
-    # Expect SEND_REQUEST_ACCOUNTS signal, check dApp name
-    event = wait_event(backend, SignalType.CONNECTOR_SEND_REQUEST_ACCOUNTS.value)
+    # Trigger request and expect SEND_REQUEST_ACCOUNTS signal, check dApp name
+    event = wait_event(
+        backend,
+        SignalType.CONNECTOR_SEND_REQUEST_ACCOUNTS.value,
+        action=connector.eth_request_accounts,
+        timeout=30,
+    )
     assert event.get("name") == connector.name
 
-    # Accept request
-    backend.connector_service.request_accounts_accepted(event.get("requestId"), wallet_acc, backend.network_id)
-
-    # Expect DAPP_PERMISSION_GRANTED signal, check dApp name, shared account and chain ID
-    event = wait_event(backend, SignalType.CONNECTOR_DAPP_PERMISSION_GRANTED.value)
+    # Accept request and expect DAPP_PERMISSION_GRANTED signal, check dApp name, shared account and chain ID
+    event = wait_event(
+        backend,
+        SignalType.CONNECTOR_DAPP_PERMISSION_GRANTED.value,
+        action=lambda: backend.connector_service.request_accounts_accepted(event.get("requestId"), wallet_acc, backend.network_id),
+        timeout=30,
+    )
     assert event.get("name") == connector.name
     assert event.get("sharedAccount") == wallet_acc
     assert len(event.get("chains")) == 1 and event.get("chains")[0] == backend.network_id
@@ -59,9 +68,7 @@ class TestStatusConnector:
         message = connector.receive()
         assert message.get("result") == []
 
-        # Use eth_requestAccounts to trigger connection request
-        connector.eth_request_accounts()
-        # And accept connection request
+        # Use eth_requestAccounts to trigger connection request and accept it
         accept_connector(backend, connector, wallet_account)
 
         # Receive accounts on connector
@@ -79,9 +86,7 @@ class TestStatusConnector:
         assert accounts[0] == wallet_account
 
     def test_connect_and_request_accounts(self, backend, connector, wallet_account):
-        # Request accounts through connector using eth_requestAccounts
-        connector.eth_request_accounts()
-        # Accept connection request
+        # Request accounts through connector using eth_requestAccounts and accept connection request
         accept_connector(backend, connector, wallet_account)
 
         # Receive accounts on connector
@@ -98,7 +103,6 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -117,7 +121,6 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -136,7 +139,6 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -156,7 +158,6 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -176,7 +177,6 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -196,7 +196,6 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
@@ -218,16 +217,17 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
 
-        # Initiate send transaction
-        connector.eth_send_transaction(tx)
-
-        # Wait for signal and approve with a dummy tx hash
-        event = wait_event(backend, SignalType.CONNECTOR_SEND_TRANSACTION.value)
+        # Initiate send transaction and wait for signal, then approve with a dummy tx hash
+        event = wait_event(
+            backend,
+            SignalType.CONNECTOR_SEND_TRANSACTION.value,
+            action=lambda: connector.eth_send_transaction(tx),
+            timeout=30,
+        )
         request_id = event.get("requestId")
         fake_hash = "0x" + "1" * 64
         backend.connector_service.send_transaction_accepted(request_id, fake_hash)
@@ -244,41 +244,42 @@ class TestStatusConnector:
             connector.receive()
 
         # Establish connection
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
 
-        # Switch to the same chain ID
-        connector.wallet_switch_ethereum_chain(backend.network_id)
+        # Switch to the same chain ID and expect CHAIN_ID_SWITCHED signal
+        event = wait_event(
+            backend,
+            SignalType.CONNECTOR_DAPP_CHAIN_ID_SWITCHED.value,
+            action=lambda: connector.wallet_switch_ethereum_chain(backend.network_id),
+            timeout=30,
+        )
         message = connector.receive()
         assert message.get("error") is None
-
-        # Expect CHAIN_ID_SWITCHED signal, verify chain ID
-        event = wait_event(backend, SignalType.CONNECTOR_DAPP_CHAIN_ID_SWITCHED.value)
         assert event.get("chainId") == hex(backend.network_id)
 
     def test_revoke_permissions_on_disconnect(self, backend, connector, wallet_account):
         # Request accounts through connector
         # And accept connection request
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         message = connector.receive()
         assert message.get("result") is not None
 
-        # Handle Revoke Permissions before disconnect
-        connector.wallet_revoke_permissions()
+        # Handle Revoke Permissions before disconnect and expect DAPP_PERMISSION_REVOKED signal
+        event = wait_event(
+            backend,
+            SignalType.CONNECTOR_DAPP_PERMISSION_REVOKED.value,
+            action=connector.wallet_revoke_permissions,
+            timeout=30,
+        )
 
         message = connector.receive()
         assert message.get("error") is None
-
-        # Expect DAPP_PERMISSION_REVOKED signal, check dApp name
-        event = wait_event(backend, SignalType.CONNECTOR_DAPP_PERMISSION_REVOKED.value)
         assert event.get("name") == connector.name
 
     def test_unavailable_statusgo_method(self, backend, connector, wallet_account):
         # First, register the dApp by calling some proper command
-        connector.eth_request_accounts()
         accept_connector(backend, connector, wallet_account)
         connector.receive()  # Read out the message
 

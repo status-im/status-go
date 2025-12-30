@@ -38,7 +38,8 @@ class TestContactVerification(MessengerSteps):
         assert send_resp.get("verificationRequests")[0].get("challenge") == challenge
         assert send_resp.get("verificationRequests")[0].get("verification_status") == ContactVerificationState.ContactVerificationStatePending.value
 
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=challenge, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=challenge, timeout=10):
+            pass
 
         get_received_resp_before = member.wakuext_service.get_received_verification_requests()
         req_id = get_received_resp_before[0].get("id")
@@ -60,7 +61,8 @@ class TestContactVerification(MessengerSteps):
             accept_resp.get("verificationRequests")[0].get("verification_status") == ContactVerificationState.ContactVerificationStateAccepted.value
         )
 
-        creator.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=challenge_response, timeout=10)
+        with creator.expect_signal(SignalType.MESSAGES_NEW, pattern=challenge_response, timeout=10):
+            pass
 
         get_received_resp_after = member.wakuext_service.get_received_verification_requests()
         assert get_received_resp_after[0].get("challenge") == challenge
@@ -77,7 +79,8 @@ class TestContactVerification(MessengerSteps):
         challenge = f"verify-decline-{uuid4()}"
         creator.wakuext_service.send_contact_verification_request(member.public_key, challenge)
 
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=challenge, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=challenge, timeout=10):
+            pass
 
         get_received_resp_before = member.wakuext_service.get_received_verification_requests()
         req_id = get_received_resp_before[0].get("id")
@@ -101,7 +104,8 @@ class TestContactVerification(MessengerSteps):
         challenge = f"verify-cancel-{uuid4()}"
         creator.wakuext_service.send_contact_verification_request(member.public_key, challenge)
 
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=challenge, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=challenge, timeout=10):
+            pass
 
         get_received_resp_before = member.wakuext_service.get_received_verification_requests()
         req_id = get_received_resp_before[0].get("id")
@@ -116,11 +120,16 @@ class TestContactVerification(MessengerSteps):
             decline_resp.get("verificationRequests")[0].get("verification_status") == ContactVerificationState.ContactVerificationStateCanceled.value
         )
 
-        member.wait_for_signal_predicate(
-            SignalType.MESSAGES_NEW.value,
-            lambda signal: signal.get("event").get("verificationRequests")[0].get("verification_status")
+        with member.expect_signal(
+            SignalType.MESSAGES_NEW,
+            accept_fn=lambda signal: bool((signal.get("event", {}).get("verificationRequests") or []))
+            and (signal.get("event", {}).get("verificationRequests") or [])[0].get("challenge") == challenge
+            and (signal.get("event", {}).get("verificationRequests") or [])[0].get("verification_status")
             == ContactVerificationState.ContactVerificationStateCanceled.value,
-        )
+            start="beginning",
+            timeout=10,
+        ):
+            pass
 
         get_received_resp_after = member.wakuext_service.get_received_verification_requests()
         assert get_received_resp_after[0].get("challenge") == challenge

@@ -61,13 +61,13 @@ class TestWalletAssets:
                 case _:
                     return False
 
-        self.rpc_client.prepare_wait_for_signal(
-            SignalType.WALLET.value,
-            2,
-            accept_fn,
-        )
-        _ = self.rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
-        signals = self.rpc_client.wait_for_signal(SignalType.WALLET.value)
+        with self.rpc_client.expect_signal(
+            SignalType.WALLET,
+            count=2,
+            accept_fn=accept_fn,
+        ) as exp:
+            _ = self.rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
+        signals = exp.result
 
         # Verify
         assert len(signals) == 2

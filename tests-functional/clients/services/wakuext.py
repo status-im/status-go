@@ -437,9 +437,9 @@ class WakuextService(Service):
         response = self.rpc_request("setLightClient", params)
         return response
 
-    def peers(self):
+    def peers(self, timeout=5):
         params = []
-        response = self.rpc_request("peers", params)
+        response = self.rpc_request("peers", params, timeout=timeout)
         return response
 
     def chat_messages(self, chat_id: str, cursor="", limit=10):

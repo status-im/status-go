@@ -52,11 +52,12 @@ class TestCommunityMembershipRequests(MessengerSteps):
         assert len(cancel_resp.get("requestsToJoinCommunity")) == 1
         assert cancel_resp.get("requestsToJoinCommunity")[0].get("state") == RequestToJoinState.RequestToJoinStateCanceled.value
 
-        creator.wait_for_signal_predicate(
-            SignalType.MESSAGES_NEW.value,
-            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
+        with creator.expect_signal(
+            SignalType.MESSAGES_NEW,
+            accept_fn=lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
             == RequestToJoinState.RequestToJoinStateCanceled.value,
-        )
+        ):
+            pass
 
         canceled = creator.wakuext_service.canceled_requests_to_join_for_community(self.community_id)
         assert len(canceled) == 1
@@ -106,11 +107,12 @@ class TestCommunityMembershipRequests(MessengerSteps):
         assert len(accept_resp.get("requestsToJoinCommunity")) == 1
         assert accept_resp.get("requestsToJoinCommunity")[0].get("state") == RequestToJoinState.RequestToJoinStateAccepted.value
 
-        requester.wait_for_signal_predicate(
-            SignalType.MESSAGES_NEW.value,
-            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
+        with requester.expect_signal(
+            SignalType.MESSAGES_NEW,
+            accept_fn=lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
             == RequestToJoinState.RequestToJoinStateAccepted.value,
-        )
+        ):
+            pass
 
         canceled = creator.wakuext_service.canceled_requests_to_join_for_community(self.community_id)
         assert canceled is None

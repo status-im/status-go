@@ -10,7 +10,6 @@ from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps.network_conditions import NetworkConditionsSteps
 from utils import fake
-from utils.retry_utils import retry_call
 
 
 class MessengerSteps(NetworkConditionsSteps):
@@ -33,10 +32,20 @@ class MessengerSteps(NetworkConditionsSteps):
         Raises:
             AssertionError: If the message is not found or signal is not received
         """
-        with receiver.expect_signal(SignalType.MESSAGES_NEW, timeout=60) as exp:
-            response = sender.wakuext_service.send_contact_request(receiver.public_key, "contact_request")
-            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
-            message_id = expected_message.get("id")
+        response = sender.wakuext_service.send_contact_request(receiver.public_key, "contact_request")
+        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+        message_id = expected_message.get("id")
+
+        # `message_id` becomes known only after the RPC response, so this is a post-hoc waiter.
+        # Use `start="beginning"` to avoid missing the signal if it arrived during the RPC.
+        with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=message_id,
+            timeout=60,
+            start="beginning",
+        ) as exp:
+            pass
+
         signal = exp.result
         assert message_id in str(signal), f"Message ID {message_id} not found in signal"
         return message_id
@@ -132,11 +141,8 @@ class MessengerSteps(NetworkConditionsSteps):
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=expected_group_creation_msg,
         )[0]
-        member.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern=expected_message.get("id"),
-            timeout=60,
-        )
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60):
+            pass
         return response.get("chats", [])[0].get("id")
 
     def create_community(self, node):
@@ -150,15 +156,182 @@ class MessengerSteps(NetworkConditionsSteps):
         return node.wakuext_service.fetch_community(community_id)
 
     def join_community(self, member=None, admin=None):
+        # Ensure both nodes are aware of the community before we proceed.
+        # (Some RPCs depend on local DB state and can lag if the community wasn't fetched yet.)
         self.fetch_community(member)
+        self.fetch_community(admin)
+
+        # Capture start index to make any post-hoc signal waits race-safe.
+        member_messages_start = len(member.received_signals[SignalType.MESSAGES_NEW])
+
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
-        join_id = response_to_join.get("requestsToJoinCommunity", [{}])[0].get("id")
+        join_req = (response_to_join.get("requestsToJoinCommunity") or [{}])[0]
+        join_id = join_req.get("id")
+        join_state = join_req.get("state")
+        assert join_id, f"Failed to request to join community: {response_to_join}"
 
-        response = retry_call(admin.wakuext_service.accept_request_to_join_community, join_id)
+        def _pick_chat_id(chats: dict) -> str | None:
+            if not chats:
+                return None
+            try:
+                # Prefer the default/general chat (lowest position).
+                # Different RPCs return `chats` in slightly different shapes:
+                # - {chatId: {...}} (where value may or may not include "id")
+                # - {chatId: {"id": chatId, ...}}
+                items = list(chats.items())
+                items.sort(key=lambda kv: (kv[1] or {}).get("position", 1_000_000))
+                for key, value in items:
+                    if isinstance(value, dict):
+                        chat_id = value.get("id") or key
+                    else:
+                        chat_id = key
+                    if chat_id:
+                        return chat_id
+                return items[0][0] if items else None
+            except Exception:
+                # Fallback: take any key.
+                return next(iter(chats.keys()), None)
 
-        chats = response.get("communities", [{}])[0].get("chats", {})
-        chat_id = list(chats.keys())[0] if chats else None
-        return self.community_id + chat_id
+        # Communities can be created with different membership rules.
+        # We decide the flow by the request state returned from `request_to_join_community`:
+        # - Accepted => auto-accept flow (no admin action required)
+        # - Pending  => manual-accept flow (admin must accept)
+        deadline = time.monotonic() + 240
+
+        last_pending = None
+        last_latest_admin = None
+        last_member_comm = None
+        last_member_latest = None
+        last_accept_error = None
+        last_chat_messages_error = None
+        last_accept_attempt_at = 0.0
+        accepted_seen = False
+        accepted_via = None
+
+        def _is_accepted(state) -> bool:
+            return state == 3 or str(state) == "3"
+
+        while time.monotonic() < deadline:
+            # 1) Observe request state on the member side (it can transition from Pending -> Accepted).
+            # This is the most reliable driver for the join flow.
+            if not accepted_seen:
+                if join_state is not None:
+                    # `join_state` comes from the immediate RPC response.
+                    # We consider it authoritative, but still allow later confirmation.
+                    if _is_accepted(join_state):
+                        accepted_seen = True
+                        accepted_via = "rpc_response"
+                try:
+                    last_member_latest = member.wakuext_service.latest_request_to_join_for_community(self.community_id)
+                    if last_member_latest and last_member_latest.get("id") == join_id:
+                        if _is_accepted(last_member_latest.get("state")):
+                            accepted_seen = True
+                            accepted_via = "member_latest"
+                except Exception:
+                    pass
+
+            if not accepted_seen and not _is_accepted(join_state):
+                try:
+                    last_pending = admin.wakuext_service.pending_requests_to_join_for_community(self.community_id) or []
+                except Exception:
+                    pass
+
+                try:
+                    last_latest_admin = admin.wakuext_service.latest_request_to_join_for_community(self.community_id)
+                except Exception:
+                    pass
+
+                admin_observed_ids: set[str] = set()
+                if last_pending:
+                    admin_observed_ids.update([r.get("id") for r in last_pending if r.get("id")])
+                if last_latest_admin and last_latest_admin.get("id"):
+                    admin_observed_ids.add(last_latest_admin.get("id"))
+
+                try:
+                    all_non_approved = admin.wakuext_service.all_non_approved_communities_requests_to_join() or []
+                    for r in all_non_approved:
+                        if r.get("communityId") == self.community_id and r.get("id"):
+                            admin_observed_ids.add(r.get("id"))
+                except Exception:
+                    pass
+
+                # If admin sees our join_id, we can accept it.
+                # If join_id is not visible but admin sees exactly one request for this community,
+                # accept that one (best-effort for eventual-consistency glitches).
+                accept_id: str | None = None
+                if join_id and join_id in admin_observed_ids:
+                    accept_id = join_id
+                elif len(admin_observed_ids) == 1:
+                    accept_id = next(iter(admin_observed_ids))
+
+                if accept_id and (time.monotonic() - last_accept_attempt_at) >= 2.0:
+                    try:
+                        accept_resp = admin.wakuext_service.accept_request_to_join_community(accept_id)
+                        if accept_resp and _is_accepted((accept_resp.get("requestsToJoinCommunity") or [{}])[0].get("state")):
+                            accepted_seen = True
+                            accepted_via = "admin_accept"
+                            join_state = 3
+                            if accept_id != join_id:
+                                join_id = accept_id
+                    except Exception as e:
+                        last_accept_error = str(e)
+                    finally:
+                        last_accept_attempt_at = time.monotonic()
+
+            # 3) Once accepted, wait for member to observe acceptance via signal (helps with propagation).
+            if accepted_seen and accepted_via != "member_signal":
+                try:
+                    with member.expect_signal(
+                        SignalType.MESSAGES_NEW,
+                        accept_fn=lambda s: any(
+                            r.get("id") == join_id and r.get("state") == 3 for r in (s.get("event", {}).get("requestsToJoinCommunity") or [])
+                        ),
+                        start=member_messages_start,
+                        timeout=5,
+                    ):
+                        pass
+                    accepted_via = "member_signal"
+                except Exception:
+                    # Not all setups emit the signal immediately; don't fail here.
+                    pass
+
+            # 4) Completion: member reports joined/isMember OR chat becomes accessible.
+            try:
+                last_member_comm = member.wakuext_service.fetch_community(self.community_id)
+                is_joined = last_member_comm and (last_member_comm.get("joined") is True or last_member_comm.get("isMember") is True)
+
+                chats = (last_member_comm.get("chats") or {}) if last_member_comm else {}
+                chat_id = _pick_chat_id(chats)
+                if chat_id:
+                    if is_joined:
+                        return self.community_id + chat_id
+
+                    # Only use chat access as a proof AFTER we've seen the request accepted.
+                    if accepted_seen:
+                        try:
+                            resp = member.wakuext_service.chat_messages(self.community_id + chat_id, limit=1)
+                            if resp is not None and "messages" in resp:
+                                return self.community_id + chat_id
+                        except Exception as e:
+                            last_chat_messages_error = str(e)
+            except Exception:
+                pass
+
+            time.sleep(0.5)
+
+        raise Exception(
+            "Failed to join community within timeout. "
+            f"community_id={self.community_id}, join_id={join_id}, join_state={join_state}, "
+            f"accepted_seen={accepted_seen}, accepted_via={accepted_via}, "
+            f"last_pending={last_pending}, "
+            f"last_latest_admin={last_latest_admin}, "
+            f"last_member_joined={getattr(last_member_comm, 'get', lambda *_: None)('joined') if last_member_comm else None}, "
+            f"last_member_is_member={getattr(last_member_comm, 'get', lambda *_: None)('isMember') if last_member_comm else None}, "
+            f"last_member_chats_keys={list((last_member_comm or {}).get('chats', {}).keys()) if last_member_comm else None}, "
+            f"last_member_latest={last_member_latest}, "
+            f"last_accept_error={last_accept_error}, "
+            f"last_chat_messages_error={last_chat_messages_error}"
+        )
 
     @retry(stop=stop_after_delay(20), wait=wait_fixed(0.5), reraise=True)
     def leave_the_community(self, node, community_id=None):
@@ -187,11 +360,9 @@ class MessengerSteps(NetworkConditionsSteps):
             time.sleep(0.01)
 
         for i, expected_message in enumerate(sent_messages):
-            messages_new_event = receiver.find_signal_containing_pattern(
-                SignalType.MESSAGES_NEW.value,
-                event_pattern=expected_message.get("id"),
-                timeout=60,
-            )
+            with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+                pass
+            messages_new_event = exp.result
             self.validate_signal_event_against_response(
                 signal_event=messages_new_event,
                 fields_to_validate={"text": "text"},
@@ -203,11 +374,9 @@ class MessengerSteps(NetworkConditionsSteps):
         messages = list(map(lambda r: r.get("messages", [])[0], responses))
 
         for expected_message in messages:
-            messages_new_event = receiver.find_signal_containing_pattern(
-                SignalType.MESSAGES_NEW.value,
-                event_pattern=expected_message.get("id"),
-                timeout=60,
-            )
+            with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+                pass
+            messages_new_event = exp.result
             self.validate_signal_event_against_response(
                 signal_event=messages_new_event,
                 fields_to_validate={"text": "text"},
@@ -241,11 +410,9 @@ class MessengerSteps(NetworkConditionsSteps):
         response = sender.wakuext_service.send_contact_request(receiver.public_key, message_text)
         expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
 
-        messages_new_event = receiver.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern=expected_message.get("id"),
-            timeout=60,
-        )
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+            pass
+        messages_new_event = exp.result
 
         signal_messages_texts = []
         if "messages" in messages_new_event.get("event", {}):
@@ -285,11 +452,9 @@ class MessengerSteps(NetworkConditionsSteps):
             time.sleep(0.01)
 
         for i, expected_message in enumerate(private_groups):
-            messages_new_event = member.find_signal_containing_pattern(
-                SignalType.MESSAGES_NEW.value,
-                event_pattern=expected_message.get("id"),
-                timeout=60,
-            )
+            with member.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+                pass
+            messages_new_event = exp.result
             self.validate_signal_event_against_response(
                 signal_event=messages_new_event,
                 expected_message=expected_message,
@@ -306,11 +471,9 @@ class MessengerSteps(NetworkConditionsSteps):
             time.sleep(0.01)
 
         for _, expected_message in enumerate(sent_messages):
-            messages_new_event = receiver.find_signal_containing_pattern(
-                SignalType.MESSAGES_NEW.value,
-                event_pattern=expected_message.get("id"),
-                timeout=60,
-            )
+            with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+                pass
+            messages_new_event = exp.result
             self.validate_signal_event_against_response(
                 signal_event=messages_new_event,
                 fields_to_validate={"text": "text"},

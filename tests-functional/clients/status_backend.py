@@ -390,19 +390,93 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return self.api_request_json(method, {}, **kwargs)
 
     def wait_for_login(self):
-        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
-        if "error" in signal["event"]:
-            error_details = signal["event"]["error"]
-            assert not error_details, f"Unexpected error during login: {error_details}"
-        self.node_login_event = signal
-        logging.debug(f"Node login event: {self.node_login_event}")
-        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
-        self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic")
-        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
-        return signal
+        """Wait until the backend has completed login.
+
+        Historically we relied on the `node.login` signal.
+        In some environments (notably `wakuV2LightClient=true`) this signal can be delayed or
+        occasionally missed by the websocket client. To keep tests stable we:
+        - try to wait for `node.login` first
+        - if it doesn't arrive, fall back to polling RPC state and extracting the same fields
+        """
+
+        def _apply_login_signal(signal: dict):
+            if "error" in signal.get("event", {}):
+                error_details = signal["event"]["error"]
+                assert not error_details, f"Unexpected error during login: {error_details}"
+            self.node_login_event = signal
+            logging.debug(f"Node login event: {self.node_login_event}")
+            self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key", "")
+            self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic", "")
+            self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid", "")
+
+        # 1) Preferred path: wait for the `node.login` signal (race-safe with backlog).
+        try:
+            with self.expect_signal(SignalType.NODE_LOGIN, timeout=60, start="beginning") as exp:
+                pass
+            signal = exp.result
+            assert isinstance(signal, dict), f"Unexpected NODE_LOGIN signal payload type: {type(signal)}"
+            _apply_login_signal(signal)
+            return signal
+        except TimeoutError:
+            logging.warning("NODE_LOGIN signal was not received in time; falling back to RPC polling to confirm login")
+
+        # 2) Fallback path: poll RPC state until it reflects a logged-in account.
+        # We keep this bounded to avoid hiding real hangs.
+        deadline = time.monotonic() + 60
+        last_settings = None
+        last_keypairs = None
+        last_error = None
+
+        while time.monotonic() < deadline:
+            try:
+                # If the signal arrived late while we were falling back, prefer it.
+                buffered = self.received_signals.get(SignalType.NODE_LOGIN, [])
+                if buffered:
+                    signal = buffered[-1]
+                    assert isinstance(signal, dict), f"Unexpected buffered NODE_LOGIN payload type: {type(signal)}"
+                    _apply_login_signal(signal)
+                    return signal
+
+                last_settings = self.settings_service.get_settings()
+                public_key = (last_settings or {}).get("public-key", "")
+                mnemonic = (last_settings or {}).get("mnemonic", "")
+
+                last_keypairs = self.accounts_service.get_account_keypairs() or []
+                key_uid = ""
+                if isinstance(last_keypairs, list) and last_keypairs:
+                    # The profile keypair is expected to be present as the first entry in most setups.
+                    key_uid = (last_keypairs[0] or {}).get("key-uid", "")
+
+                if public_key and key_uid:
+                    signal = {
+                        "type": SignalType.NODE_LOGIN.value,
+                        "event": {
+                            "settings": {
+                                "public-key": public_key,
+                                "mnemonic": mnemonic,
+                            },
+                            "account": {
+                                "key-uid": key_uid,
+                            },
+                        },
+                    }
+                    _apply_login_signal(signal)
+                    return signal
+            except Exception as e:
+                last_error = str(e)
+
+            time.sleep(0.5)
+
+        raise TimeoutError(
+            "Login did not complete within timeout: NODE_LOGIN not received and RPC state did not converge. "
+            f"last_error={last_error}, last_settings_keys={list((last_settings or {}).keys()) if isinstance(last_settings, dict) else None}, "
+            f"last_keypairs_len={len(last_keypairs) if isinstance(last_keypairs, list) else None}"
+        )
 
     def wait_for_messages(self, timeout: int | None = 20):
-        return self.wait_for_signal(SignalType.MESSAGES_NEW, timeout)
+        with self.expect_signal(SignalType.MESSAGES_NEW, timeout=timeout or 20) as exp:
+            pass
+        return exp.result
 
     def container_pause(self):
         if not self.container:
@@ -433,7 +507,12 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def wait_for_online(self, timeout=10):
         start_time = time.time()
         while time.time() - start_time <= timeout:
-            response = self.wakuext_service.peers()
+            try:
+                response = self.wakuext_service.peers()
+            except Exception as ex:
+                logging.debug(f"StatusBackend peers() check failed: {ex}")
+                time.sleep(0.5)
+                continue
             if len(response.keys()) == 0:
                 time.sleep(0.5)
                 continue

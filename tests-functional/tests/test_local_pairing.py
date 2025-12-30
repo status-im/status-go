@@ -113,29 +113,62 @@ def check_server_receiver_events(events):
         assert "error" not in event or not event["error"]
 
 
-def wait_for_action_of_type(backend: StatusBackend, action, type):
-    backend.wait_for_signal_predicate(
-        SignalType.LOCAL_PAIRING.value,
-        lambda signal: signal.get("event", {}).get("action") == action and signal.get("event", {}).get("type") == type,
-    )
+def wait_for_action_of_type(backend: StatusBackend, action, type, *, start, timeout=20):
+    with backend.expect_signal(
+        SignalType.LOCAL_PAIRING,
+        accept_fn=lambda signal: signal.get("event", {}).get("action") == action and signal.get("event", {}).get("type") == type,
+        start=start,
+        timeout=timeout,
+    ):
+        pass
 
 
 def pair_server_as_sender(sender, receiver, message_sync_enabled=False):
+    sender_start = len(sender.received_signals[SignalType.LOCAL_PAIRING])
+    receiver_start = len(receiver.received_signals[SignalType.LOCAL_PAIRING])
+
     connection_string = sender.get_connection_string_for_bootstrapping_another_device(message_sync_enabled)
     response = receiver.input_connection_string_for_bootstrapping(connection_string)
     assert response["error"] is None
     assert response["keyUID"] == sender.key_uid
 
-    wait_for_action_of_type(sender, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
-    wait_for_action_of_type(receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value)
+    wait_for_action_of_type(
+        sender,
+        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+        LocalPairingEventType.EVENT_PROCESS_SUCCESS.value,
+        start=sender_start,
+        timeout=60,
+    )
+    wait_for_action_of_type(
+        receiver,
+        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+        LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value,
+        start=receiver_start,
+        timeout=60,
+    )
 
 
 def pair_server_as_receiver(sender, receiver):
+    sender_start = len(sender.received_signals[SignalType.LOCAL_PAIRING])
+    receiver_start = len(receiver.received_signals[SignalType.LOCAL_PAIRING])
+
     connection_string = receiver.get_connection_string_for_being_bootstrapped()
     sender.input_connection_string_for_bootstrapping_another_device(connection_string)
 
-    wait_for_action_of_type(sender, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_PROCESS_SUCCESS.value)
-    wait_for_action_of_type(receiver, LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value, LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value)
+    wait_for_action_of_type(
+        sender,
+        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+        LocalPairingEventType.EVENT_PROCESS_SUCCESS.value,
+        start=sender_start,
+        timeout=60,
+    )
+    wait_for_action_of_type(
+        receiver,
+        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+        LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value,
+        start=receiver_start,
+        timeout=60,
+    )
 
 
 def login_paired_device(backend: StatusBackend, key_uid, password):
@@ -177,11 +210,8 @@ class TestLocalPairing(MessengerSteps):
         assert response["emojiReactions"][0]["emoji"] == "1f642", "Failed to add emoji reaction to message"
 
         # Wait for the message to be delivered
-        bob.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern=message_id2,
-            timeout=60,
-        )
+        with bob.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id2, timeout=60):
+            pass
 
         # Check that bob has the messages before pairing
         messages = bob.wakuext_service.chat_messages(alice.public_key, limit=10)["messages"]

@@ -28,13 +28,11 @@ class TestMessageReactions(MessengerSteps):
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = receiver.wakuext_service.chats()[0]["id"]
         # Send emoji reaction
+        sender_start = len(sender.received_signals[SignalType.MESSAGES_NEW])
         response = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_id, "2764")
         # TODO: Add more assertions on response
-        sender.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern="emojiReactions",
-            timeout=60,
-        )
+        with sender.expect_signal(SignalType.MESSAGES_NEW, pattern="emojiReactions", timeout=60, start=sender_start):
+            pass
 
         result = sender.wakuext_service.emoji_reactions_by_chat_id_message_id(sender_chat_id, message_id)
         # TODO: Add more assertions on response
@@ -48,38 +46,32 @@ class TestMessageReactions(MessengerSteps):
         )
         emoji_id = result[0]["id"]
 
+        sender_start = len(sender.received_signals[SignalType.MESSAGES_NEW])
         response = receiver.wakuext_service.send_emoji_reaction_retraction(emoji_id)
         # TODO: Add more assertions on response
         assert response["chats"][0]["id"] == receiver_chat_id
 
-        sender.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern="retracted",
-            timeout=60,
-        )
+        with sender.expect_signal(SignalType.MESSAGES_NEW, pattern="retracted", timeout=60, start=sender_start):
+            pass
         response = sender.wakuext_service.emoji_reactions_by_chat_id_message_id(sender_chat_id, message_id)
         assert not response
 
         response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, "test_message 1")
         message_1 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         # Send emoji reaction
+        sender_start = len(sender.received_signals[SignalType.MESSAGES_NEW])
         response = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_1["id"], "1f642")
         emoji_1_id = response["emojiReactions"][0]["id"]
-        sender.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern=emoji_1_id,
-            timeout=60,
-        )
+        with sender.expect_signal(SignalType.MESSAGES_NEW, pattern=emoji_1_id, timeout=60, start=sender_start):
+            pass
 
         response = receiver.wakuext_service.send_one_to_one_message(sender.public_key, "test_message 2")
         message_2 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        receiver_start = len(receiver.received_signals[SignalType.MESSAGES_NEW])
         response = sender.wakuext_service.send_emoji_reaction(sender_chat_id, message_2["id"], "1f641")
         emoji_2_id = response["emojiReactions"][0]["id"]
-        receiver.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern=emoji_2_id,
-            timeout=60,
-        )
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=emoji_2_id, timeout=60, start=receiver_start):
+            pass
         time.sleep(10)
         result = sender.wakuext_service.emoji_reactions_by_chat_id(sender_chat_id, 20)
         # TODO: Add more assertions on response
@@ -148,19 +140,13 @@ class TestMessageReactions(MessengerSteps):
         new_emoji_id = response["emojiReactions"][0]["id"]
 
         # Wait for receiver to get the reaction
-        receiver.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern=new_emoji_id,
-            timeout=60,
-        )
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=new_emoji_id, timeout=60, start="beginning"):
+            pass
 
         # Test receiver sending the SAME type of a previous reaction (should be allowed)
         response = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_id, "2693")
         emoji_2_id = response["emojiReactions"][0]["id"]
         assert response["emojiReactions"][0]["emoji"] == "2693"
 
-        sender.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value,
-            event_pattern=emoji_2_id,
-            timeout=60,
-        )
+        with sender.expect_signal(SignalType.MESSAGES_NEW, pattern=emoji_2_id, timeout=60, start="beginning"):
+            pass

@@ -52,8 +52,15 @@ class TestContactRequests(MessengerSteps):
             response = sender.wakuext_service.send_contact_request(receiver.public_key, message_text)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
             sleep(30)
-        receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
-        sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+        with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=expected_message.get("id"),
+            start="beginning",
+            timeout=60,
+        ):
+            pass
+        with sender.expect_signal(SignalType.MESSAGE_DELIVERED, start="beginning", timeout=60):
+            pass
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_contact_request_with_ip_change(self, sender, receiver):
@@ -61,4 +68,10 @@ class TestContactRequests(MessengerSteps):
         message_text = f"test_contact_request_{uuid4()}"
         response = sender.wakuext_service.send_contact_request(receiver.public_key, message_text)
         expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
-        receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
+        with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=expected_message.get("id"),
+            start="beginning",
+            timeout=60,
+        ):
+            pass

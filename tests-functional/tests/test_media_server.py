@@ -11,8 +11,9 @@ class TestMediaServer:
 
     def test_media_server_health(self, backend_new_profile):
         backend = backend_new_profile("sender")
-        signal = backend.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)
-        event = signal["event"]
+        with backend.expect_signal(SignalType.MEDIASERVER_STARTED, timeout=60, start="beginning") as exp:
+            pass
+        event = exp.result["event"]
 
         # Event port should match advertized port, not the actual port we're listening on
         assert event["port"] == backend.media_server_port
@@ -33,8 +34,12 @@ class TestMediaServer:
         backend_1 = backend_new_profile("backend_1")
         backend_2 = backend_new_profile("backend_2")
 
-        _ = backend_1.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)["event"]
-        _ = backend_2.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)["event"]
+        with backend_1.expect_signal(SignalType.MEDIASERVER_STARTED, timeout=60, start="beginning") as exp1:
+            pass
+        _ = exp1.result["event"]
+        with backend_2.expect_signal(SignalType.MEDIASERVER_STARTED, timeout=60, start="beginning") as exp2:
+            pass
+        _ = exp2.result["event"]
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".crt", delete=False) as cert_file:
             cert_file.write(backend_1.image_server_tls_cert())

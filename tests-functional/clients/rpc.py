@@ -29,7 +29,7 @@ class RpcClient(ApiClient):
 
         return response
 
-    def rpc_valid_request(self, method, params=None):
+    def rpc_valid_request(self, method, params=None, **kwargs):
         request_id = self.request_id
 
         if params is None:
@@ -37,6 +37,6 @@ class RpcClient(ApiClient):
         data = {"jsonrpc": "2.0", "method": method, "id": request_id}
         if params:
             data["params"] = params
-        response = self.api_request_json("CallRPC", data)
+        response = self.api_request_json("CallRPC", data, **kwargs)
         self.validate_json_rpc_response(response, request_id)
         return response.get("result")
