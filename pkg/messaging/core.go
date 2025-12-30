@@ -90,6 +90,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	stack.Reliability = reliability.NewReliability(
 		config.persistence.MVDSStorage(),
 		params.Identity,
+		stack.Transport,
 		config.logger,
 	)
 

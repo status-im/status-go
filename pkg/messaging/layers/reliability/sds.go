@@ -7,9 +7,10 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 )
 
-func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
+func newSdsReliabilityManager(transport *transport.Transport, logger *zap.Logger) *sds.ReliabilityManager {
 	reliabilityManager, err := sds.NewReliabilityManager(logger)
 	if err != nil {
 		logger.Error("failed to create ReliabilityManager", zap.Error(err))
@@ -19,6 +20,7 @@ func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
 	callbacks := sds.EventCallbacks{
 		OnMessageSent: func(messageId sds.MessageID, channelId string) {
 			logger.Debug("message sent with sds", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
+			transport.ConfirmMessageSent(string(messageId))
 		},
 		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.MessageID, channelId string) {
 			logger.Debug("missing dependencies",

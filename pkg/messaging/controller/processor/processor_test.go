@@ -117,6 +117,7 @@ func (s *ProcessorSuite) SetupTest() {
 	stack.Reliability = reliability.NewReliability(
 		mvdsnode.NewSQLitePersistence(db),
 		identity,
+		stack.Transport,
 		s.logger,
 	)
 

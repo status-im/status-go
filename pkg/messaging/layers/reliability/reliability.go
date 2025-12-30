@@ -15,6 +15,7 @@ import (
 
 	datasync2 "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 )
 
 // MessageDispatcher is a function that dispatches messages to a given public key.
@@ -33,13 +34,13 @@ type Reliability struct {
 	logger                *zap.Logger
 }
 
-func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, logger *zap.Logger) *Reliability {
+func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, transport *transport.Transport, logger *zap.Logger) *Reliability {
 	logger = logger.Named("reliability")
 	return &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		sdsManager:            newSdsReliabilityManager(logger.Named("sds")),
+		sdsManager:            newSdsReliabilityManager(transport, logger.Named("sds")),
 		logger:                logger,
 	}
 }
