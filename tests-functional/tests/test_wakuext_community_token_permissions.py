@@ -159,6 +159,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         """Deploy owner and master tokens for the community, similar to computeDeployOwnerContractsFee logic"""
         accounts = owner_backend.accounts_service.get_accounts()
         wallet_account = next(a for a in accounts if not a.get("chat"))
+        wallet_pubkey = wallet_account["public-key"]
         address_from = wallet_account["address"]
 
         # Owner token deployment params
@@ -172,7 +173,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             "privilegesLevel": 1,  # Owner
             "baseTokenURI": "",
             "receiver": address_from,
-            "signerPublicKey": owner_backend.public_key,
+            "signerPublicKey": wallet_pubkey,
         }
 
         # Master token deployment params
@@ -201,7 +202,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             chain_id=chain_id,
             address_from=address_from,
             community_id=community_id,
-            signer_pub_key=owner_backend.public_key,
+            signer_pub_key=wallet_pubkey,
             token_ids=[],
             wallet_addresses=[],
             transfer_details=[],
