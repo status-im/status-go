@@ -18,7 +18,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     lmn.url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=fb4a112407460534a9154f3aaee8888045dc6852";
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6";
+    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=b6431260110fe62956ff4d7bab6767556c19d040";
   };
 
   outputs = { self, nixpkgs, lmn, nim-sds }:
