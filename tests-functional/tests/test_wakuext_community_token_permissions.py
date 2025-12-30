@@ -16,7 +16,7 @@ from utils.retry_utils import retry_call
 
 logger = logging.getLogger(__name__)
 
-COMMUNITY_DEPLOY_OWNER_TOKEN = 25
+COMMUNITY_DEPLOY_OWNER_TOKEN = 26
 
 
 def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
@@ -156,59 +156,45 @@ class TestCommunityTokenPermissions(MessengerSteps):
         )
 
     def deploy_owner_token(self, owner_backend, community_id, chain_id=11155111):
-        """Deploy owner and master tokens for the community, similar to computeDeployOwnerContractsFee logic"""
+        """Mint owner and master tokens for the community using existing contract"""
         accounts = owner_backend.accounts_service.get_accounts()
         wallet_account = next(a for a in accounts if not a.get("chat"))
         wallet_pubkey = wallet_account["public-key"]
         address_from = wallet_account["address"]
 
-        # Owner token deployment params
-        owner_deployment_params = {
-            "name": "Owner Token",
-            "symbol": "OT",
-            "tokenType": 2,  # ERC721
-            "communityId": community_id,
-            "supply": "1",
-            "decimals": 0,
-            "privilegesLevel": 1,  # Owner
-            "baseTokenURI": "",
-            "receiver": address_from,
-            "signerPublicKey": wallet_pubkey,
-        }
+        contract_address = "0xCDE984e57cdb88c70b53437cc694345B646371f9"
 
-        # Master token deployment params
-        master_deployment_params = {
-            "name": "Master Token",
-            "symbol": "MT",
-            "tokenType": 2,  # ERC721
-            "communityId": community_id,
-            "supply": "1",
-            "decimals": 0,
-            "privilegesLevel": 2,  # Master
-            "baseTokenURI": "",
-        }
-
-        # Create deployment signature
-        signature_result = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
-        signature = signature_result
+        # Transfer details for minting owner and master tokens
+        transfer_details = [
+            {
+                "tokenType": 2,  # ERC721
+                "privilegeLevel": 1,  # Owner
+                "tokenContractAddress": contract_address,
+                "amount": "0x1",
+            },
+            {
+                "tokenType": 2,  # ERC721
+                "privilegeLevel": 2,  # Master
+                "tokenContractAddress": contract_address,
+                "amount": "0x1",
+            },
+        ]
 
         # Generate UUID for the transaction
         transaction_uuid = str(uuid.uuid4())
 
-        # Get suggested routes for deploying owner token
+        # Get suggested routes for minting tokens
         owner_backend.wallet_service.suggested_community_routes(
             uuid=transaction_uuid,
             send_type=COMMUNITY_DEPLOY_OWNER_TOKEN,
             chain_id=chain_id,
             address_from=address_from,
+            addr_to=contract_address,
             community_id=community_id,
             signer_pub_key=wallet_pubkey,
             token_ids=[],
-            wallet_addresses=[],
-            transfer_details=[],
-            signature=signature,
-            owner_token_parameters=owner_deployment_params,
-            master_token_parameters=master_deployment_params,
+            wallet_addresses=[address_from],
+            transfer_details=transfer_details,
         )
 
         # Build transactions from route

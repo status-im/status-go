@@ -1,7 +1,10 @@
+import logging
 from typing import Optional
 
 from clients.rpc import RpcClient
 from clients.services.service import Service
+
+logger = logging.getLogger(__name__)
 
 
 class WalletService(Service):
@@ -109,6 +112,7 @@ class WalletService(Service):
         token_ids: list,
         wallet_addresses: list,
         transfer_details: list,
+        addr_to: Optional[str] = None,
         signature: str = "",
         owner_token_parameters: Optional[dict] = None,
         master_token_parameters: Optional[dict] = None,
@@ -127,7 +131,13 @@ class WalletService(Service):
             community_params["masterTokenParameters"] = master_token_parameters
 
         native_address = "0x0000000000000000000000000000000000000000"
+        addr_to = addr_to if addr_to else native_address
         params = {
+            "uuid": uuid,
+            "sendType": send_type,
+            "addrFrom": address_from,
+            "addrTo": addr_to,
+            "amountIn": "0x0",
             "tokenKey": f"{chain_id}-{native_address}",
             "toTokenKey": f"{chain_id}-{native_address}",
             "fromChainID": chain_id,
@@ -135,4 +145,7 @@ class WalletService(Service):
             "gasFeeMode": 0,
             "communityRouteInputParams": community_params,
         }
+
+        logger.info(f"Params to suggested_community_routes {params}")
+
         return self.rpc_request("getSuggestedRoutes", [params])
