@@ -360,8 +360,9 @@ func (s *ProcessorSuite) TestGetEphemeralKey() {
 func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	payload := []byte("hello")
 	communityID := []byte("community123")
+	messageID := "message1"
 
-	wrappedPayload, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, communityID)
+	wrappedPayload, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, messageID, communityID)
 	s.Require().NoError(err)
 	s.Require().True(len(wrappedPayload) > 0)
 

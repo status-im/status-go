@@ -5,7 +5,6 @@ import (
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 )
@@ -40,15 +39,13 @@ func newSdsReliabilityManager(transport *transport.Transport, logger *zap.Logger
 }
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
-func (r *Reliability) WrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
-	sdsMessageID := crypto.Keccak256(payload)
-
+func (r *Reliability) WrapPayloadForSDS(payload []byte, messageID string, communityID []byte) ([]byte, error) {
 	r.logger.Debug("original payload wrapped with SDS",
 		zap.String("channelId", cryptotypes.EncodeHex(communityID)),
 		zap.Int("payloadLength", len(payload)),
-		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
+		zap.String("messageId", messageID),
 	)
-	sdsWrappedPayload, err := r.sdsManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
+	sdsWrappedPayload, err := r.sdsManager.WrapOutgoingMessage(payload, sds.MessageID(messageID), cryptotypes.EncodeHex(communityID))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap a community message with SDS")
 	}
