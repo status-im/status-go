@@ -473,6 +473,43 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             f"last_keypairs_len={len(last_keypairs) if isinstance(last_keypairs, list) else None}"
         )
 
+    def wait_for_wakuext_ready(self, timeout: float = 30, poll_interval: float = 0.5, *, start_messenger: bool = True):
+        """Wait until `wakuext_*` RPC namespace is available after login.
+
+        In some environments `wait_for_login()` can complete before the `wakuext` RPC namespace is fully
+        registered/ready, so the first `wakuext_*` call may fail with `-32601`.
+
+        This helper keeps the waiting logic out of tests.
+
+        Args:
+            timeout: Total time in seconds.
+            poll_interval: Sleep interval between attempts.
+            start_messenger: If True, try to call `wakuext_startMessenger` while waiting.
+
+        Raises:
+            TimeoutError: if `wakuext` does not become ready within the given timeout.
+        """
+
+        deadline = time.monotonic() + float(timeout)
+        last_error = None
+        messenger_started = False
+
+        while time.monotonic() < deadline:
+            try:
+                if start_messenger and not messenger_started:
+                    # Best-effort: this itself can fail with -32601 if the namespace isn't ready yet.
+                    self.wakuext_service.start_messenger()
+                    messenger_started = True
+
+                # Probe a lightweight wakuext call that doesn't produce log noise.
+                _ = self.wakuext_service.chats()
+                return
+            except Exception as e:
+                last_error = str(e)
+                time.sleep(poll_interval)
+
+        raise TimeoutError(f"wakuext RPC namespace did not become ready in {timeout} seconds: {last_error}")
+
     def wait_for_messages(self, timeout: int | None = 20):
         with self.expect_signal(SignalType.MESSAGES_NEW, timeout=timeout or 20) as exp:
             pass
