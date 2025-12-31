@@ -12,7 +12,10 @@ class WalletService(Service):
         super().__init__(client, "wallet")
 
     def get_balances_at_by_chain(self, chains: list, addresses: list, tokens: list):
-        params = [chains, addresses, tokens]
+        # If tokens is empty, use native tokens for the specified chains
+        if not tokens:
+            tokens = [f"{chain}-0x0000000000000000000000000000000000000000" for chain in chains]
+        params = [addresses, tokens]
         return self.rpc_request("getBalancesByChain", params)
 
     def start_wallet(self):

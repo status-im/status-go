@@ -216,6 +216,31 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "isActive": True,
                 "isDeactivatable": False,
             }
+        elif self.network_id == 42161:  # Arbitrum One
+            network = {
+                "chainId": 42161,
+                "chainName": "Arbitrum One",
+                "rpcProviders": [
+                    {
+                        "chainId": 42161,
+                        "name": "Arbitrum One",
+                        "url": "https://arb1.arbitrum.io/rpc",
+                        "enableRpsLimiter": False,
+                        "type": "user",
+                        "enabled": True,
+                        "authType": "no-auth",
+                    }
+                ],
+                "shortName": "arb1",
+                "nativeCurrencyName": "Ether",
+                "nativeCurrencySymbol": "ETH",
+                "nativeCurrencyDecimals": 18,
+                "isTest": False,
+                "layer": 2,
+                "enabled": True,
+                "isActive": True,
+                "isDeactivatable": False,
+            }
         else:
             network = {
                 "chainID": self.network_id,

@@ -41,6 +41,27 @@ def get_sepolia_user(name: str) -> Account:
     )
 
 
+def get_arbitrum_user(name: str) -> Account:
+    address_env = f"ARBITRUM_{name.upper()}_ADDRESS"
+    private_key_env = f"ARBITRUM_{name.upper()}_PRIVATE_KEY"
+    mnemonic_env = f"ARBITRUM_{name.upper()}_MNEMONIC"
+    password_env = "ARBITRUM_TEST_PASSWORD"
+    address = os.getenv(address_env)
+    private_key = os.getenv(private_key_env)
+    mnemonic = os.getenv(mnemonic_env)
+    password = os.getenv(password_env)
+    if not address or not private_key or not mnemonic or not password:
+        raise ValueError(
+            f"Environment variables {address_env}, {private_key_env}, {mnemonic_env}, and {password_env} must be set for Arbitrum {name}"
+        )
+    return Account(
+        address=address,
+        private_key=private_key,
+        password=password,
+        passphrase=mnemonic,
+    )
+
+
 @pytest.fixture(scope="function", autouse=False)
 def backend_factory(request):
     """
@@ -293,4 +314,44 @@ def sepolia_member_backend(backend_recovered_profile):
         disable_override_networks=True,
         network_id=11155111,
         token_overrides=[{"symbol": "ETH", "name": "Sepolia Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18}],
+    )
+
+
+@pytest.fixture(scope="function", autouse=False)
+def arbitrum_owner_backend(backend_recovered_profile):
+    user = get_arbitrum_user("owner")
+    return backend_recovered_profile(
+        name="arbitrum_owner",
+        user=user,
+        disable_override_networks=False,
+        network_id=42161,
+        token_overrides=[
+            {"symbol": "ETH", "name": "Arbitrum Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18},
+            {
+                "symbol": "CommunityTokenDeployer",
+                "name": "CommunityTokenDeployer",
+                "address": "0x744Fd6e98dad09Fb8CCF530B5aBd32B56D64943b",
+                "decimals": 0,
+            },
+        ],
+    )
+
+
+@pytest.fixture(scope="function", autouse=False)
+def arbitrum_member_backend(backend_recovered_profile):
+    user = get_arbitrum_user("member")
+    return backend_recovered_profile(
+        name="arbitrum_member",
+        user=user,
+        disable_override_networks=False,
+        network_id=42161,
+        token_overrides=[
+            {"symbol": "ETH", "name": "Arbitrum Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18},
+            {
+                "symbol": "CommunityTokenDeployer",
+                "name": "CommunityTokenDeployer",
+                "address": "0x744Fd6e98dad09Fb8CCF530B5aBd32B56D64943b",
+                "decimals": 0,
+            },
+        ],
     )
