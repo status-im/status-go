@@ -230,11 +230,18 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
 
         # Wait for balance to be fetched (request to join uses cached balances)
-        # Trigger explicit refresh and give it a moment without relying on wallet signals (may be throttled)
+        # Trigger explicit refresh and wait until permission check sees the balance
         member_with_snt_backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
-        time.sleep(2)
+        permissions_resp = None
+        for attempt in range(3):
+            time.sleep(2)
+            permissions_resp = member_with_snt_backend.wakuext_service.check_permissions_to_join_community(community_id)
+            if permissions_resp and permissions_resp.get("satisfied"):
+                break
 
-        permissions_resp = member_with_snt_backend.wakuext_service.check_permissions_to_join_community(community_id)
+            # Retry by forcing refresh again (balance update is async)
+            member_with_snt_backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
+
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
