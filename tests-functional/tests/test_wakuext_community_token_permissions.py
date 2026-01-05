@@ -4,6 +4,7 @@ import uuid
 from typing import Optional, List
 import secrets
 import os
+import json
 from eth_keys.main import KeyAPI as keys
 
 import pytest
@@ -182,27 +183,33 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if owner_balance == 0:
             raise ValueError(f"Owner address {owner_address} has no ETH balance on chain {chain_id}")
         fund_amount = str(owner_balance // 10)  # 10% of balance
-        fund_uuid = str(uuid.uuid4())
-        native_address = "0x0000000000000000000000000000000000000000"
-        params = {
-            "uuid": fund_uuid,
-            "sendType": 0,  # Transfer
-            "addrFrom": owner_address,
-            "addrTo": address_from,
-            "amountIn": hex(int(fund_amount)),
-            "tokenKey": f"{chain_id}-{native_address}",
-            "toTokenKey": f"{chain_id}-{native_address}",
+        send_tx_args = {
+            "version": 2,  # EIP-1559
+            "from": owner_address,
+            "to": address_from,
+            "value": hex(int(fund_amount)),
+            "gas": "0xc350",  # 50000 gas for Arbitrum L2
+            "maxFeePerGas": "0x4a817c800",  # 20 gwei
+            "maxPriorityFeePerGas": "0x77359400",  # 2 gwei
             "fromChainID": chain_id,
             "toChainID": chain_id,
-            "gasFeeMode": 0,
         }
-        owner_backend.wallet_service.get_suggested_routes_async(params)
-        time.sleep(2)  # Wait for route calculation
-        fund_transaction_data = owner_backend.wallet_service.build_transactions_from_route(fund_uuid)
-        if fund_transaction_data is None:
-            raise ValueError(f"Failed to build transaction data for fund transfer, route not found for amount {fund_amount}")
-        fund_signatures = owner_backend.wallet_service.sign_message(owner_address, owner_backend.password, fund_transaction_data["message"])
-        owner_backend.wallet_service.send_router_transactions_with_signatures(fund_uuid, fund_signatures)
+        build_tx = owner_backend.wallet_service.build_transaction(chain_id, json.dumps(send_tx_args))
+        tx_args = build_tx["txArgs"]
+        send_tx_args["nonce"] = tx_args["nonce"]  # Propagate fetched
+        message = build_tx["messageToSign"]
+        signature = owner_backend.wallet_service.sign_message(message, owner_address, owner_backend.password)
+        if signature.startswith("0x"):
+            signature = signature[2:]
+        owner_backend.prepare_wait_for_signal(
+            SignalType.WALLET.value,
+            1,
+            lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
+        )
+        owner_backend.wallet_service.send_transaction_with_signature(chain_id, "WalletTransfer", json.dumps(send_tx_args), signature)
+        event_response = owner_backend.wait_for_signal(SignalType.WALLET.value)["event"]
+        tx_status = json.loads(event_response["message"].replace("'", '"'))
+        assert tx_status["status"] == "Success"
 
         chain_id = owner_backend.network_id
         # CommunityTokenDeployer contract addresses by chain
@@ -245,6 +252,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         owner_backend.wallet_service.get_balances_at_by_chain([chain_id], [address_from], [])
 
         # Get suggested routes for deploying tokens
+        signer_pub_key = owner_backend.get_compressed_pubkey()
+
         owner_backend.wallet_service.suggested_community_routes(
             uuid=transaction_uuid,
             send_type=COMMUNITY_DEPLOY_OWNER_TOKEN,
@@ -252,7 +261,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             address_from=address_from,
             addr_to=contract_address,
             community_id=community_id,
-            signer_pub_key=owner_backend.public_key,
+            signer_pub_key=signer_pub_key,
             token_ids=[],
             wallet_addresses=[],
             transfer_details=[],

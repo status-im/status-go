@@ -54,8 +54,8 @@ class WalletService(Service):
         params = [uuid]
         return self.rpc_request("buildTransactionsFromRoute", params)
 
-    def sign_message(self, hash: str, address: str, password: str):
-        params = [hash, address, password]
+    def sign_message(self, address: str, password: str, message: str):
+        params = [address, password, message]
         return self.rpc_request("signMessage", params)
 
     def get_ethereum_chain(
@@ -103,6 +103,14 @@ class WalletService(Service):
 
     def restart_wallet_reload_timer(self):
         return self.rpc_request("restartWalletReloadTimer")
+
+    def build_transaction(self, chain_id: int, send_tx_args_json: str):
+        params = [chain_id, send_tx_args_json]
+        return self.rpc_request("buildTransaction", params)
+
+    def send_transaction_with_signature(self, chain_id: int, tx_type: int, send_tx_args_json: str, signature: str):
+        params = [chain_id, tx_type, send_tx_args_json, signature]
+        return self.rpc_request("sendTransactionWithSignature", params)
 
     def suggested_community_routes(
         self,

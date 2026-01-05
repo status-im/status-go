@@ -8,6 +8,7 @@ import tempfile
 import time
 import uuid
 
+from eth_keys.main import KeyAPI
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed, wait_exponential, retry_if_exception_type
 
@@ -597,3 +598,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         # Use client.post directly, because this method is old and has json-incompatible arguments
         response = self.client.post(self.method_url(method), data=key)
         return response.content.decode()
+
+    def get_compressed_pubkey(self):
+        uncompressed_bytes = bytes.fromhex(self.public_key[4:])
+        pubkey = KeyAPI.PublicKey(uncompressed_bytes)
+        return "0x" + pubkey.to_compressed_bytes().hex()
