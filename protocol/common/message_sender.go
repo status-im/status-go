@@ -192,7 +192,6 @@ func (s *MessageSender) SendPublic(
 		Priority:            rawMessage.Priority,
 		HashRatchet:         hashRatchetParams,
 		CommunityID:         rawMessage.CommunityID,
-		MessageType:         rawMessage.MessageType,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send public message")

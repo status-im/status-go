@@ -2,8 +2,6 @@ package types
 
 import (
 	"crypto/ecdsa"
-
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type SendPublicParams struct {
@@ -17,7 +15,6 @@ type SendPublicParams struct {
 	HashRatchet         *SendPublicHashRatchetParams
 	CommunityPublicKey  *ecdsa.PublicKey
 	CommunityID         []byte
-	MessageType         protobuf.ApplicationMetadataMessage_Type
 }
 
 type SendPublicHashRatchetParams struct {

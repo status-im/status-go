@@ -15,10 +15,10 @@ import (
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const sdsForCommunitiesEnabled = true
+const sdsMaxMessageSize = 1024 * 1024
 
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
 	messageID := messagingtypes.MessageID(params.Sender, params.Payload)
@@ -40,7 +40,7 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 		zap.Any("hashRatchet", params.HashRatchet),
 	)
 
-	if sdsForCommunitiesEnabled && len(params.CommunityID) > 0 && params.MessageType != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+	if sdsForCommunitiesEnabled && len(params.CommunityID) > 0 && len(params.Payload) <= sdsMaxMessageSize {
 		logger.Debug("send public message with SDS", zap.String("communityID", cryptotypes.EncodeHex(params.CommunityID)))
 		sdsWrappedPayload, err := s.stack.Reliability.WrapPayloadForSDS(params.Payload, cryptotypes.EncodeHex(messageID), params.CommunityID)
 		if err != nil {
