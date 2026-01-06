@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-const sdsForCommunitiesEnabled = true
+const sdsForCommunitiesEnabled = false
 const sdsMaxMessageSize = 1024 * 1024
 
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {

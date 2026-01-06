@@ -1,8 +1,6 @@
 package types
 
-import (
-	"crypto/ecdsa"
-)
+import "crypto/ecdsa"
 
 type SendPublicParams struct {
 	Sender              *ecdsa.PublicKey
