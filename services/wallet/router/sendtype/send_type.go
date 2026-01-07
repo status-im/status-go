@@ -45,7 +45,7 @@ func (s SendType) IsCommunityRelatedTransfer() bool {
 		s == CommunityMintTokens || s == CommunityRemoteBurn || s == CommunityBurn || s == CommunitySetSignerPubKey
 }
 
-// canUseProcessor is used to check if certain SendType can be used with a given path processor
+// CanUseProcessor is used to check if certain SendType can be used with a given path processor
 func (s SendType) CanUseProcessor(pathProcessorName string) bool {
 	switch s {
 	case Transfer:
