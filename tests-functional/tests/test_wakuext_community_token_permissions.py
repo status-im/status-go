@@ -252,7 +252,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         owner_backend.wallet_service.get_balances_at_by_chain([chain_id], [address_from], [])
 
         # Get suggested routes for deploying tokens
-        signer_pub_key = owner_backend.get_compressed_pubkey()
+        signer_pub_key = owner_backend.public_key
 
         owner_backend.wallet_service.suggested_community_routes(
             uuid=transaction_uuid,
