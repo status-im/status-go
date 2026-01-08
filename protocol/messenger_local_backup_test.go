@@ -39,6 +39,9 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Create bob2
 	bob2 := s.anotherMessenger()
 
+	// Create alice
+	alice := s.newMessenger()
+
 	// Enable message backup on both accounts
 	err := bob1.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true)
 	s.Require().NoError(err)
@@ -67,14 +70,32 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().Len(bob1.Contacts(), 2)
 
 	//-------------------- COMMUNITIES --------------------
-	// Create a community
+	// Create a community to spectate
 	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:        "to-spectate",
+		Color:       "#ffffff",
+		Description: "community to spectate",
+	}
+	response, err := alice.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	// Spectate the community
+	advertiseCommunityTo(&s.Suite, response.Communities()[0], alice, bob1)
+	response, err = bob1.SpectateCommunity(response.Communities()[0].ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Create a community
+	description = &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
 	}
-	response, err := bob1.CreateCommunity(description, true)
+	response, err = bob1.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -214,8 +235,6 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.NoError(err)
 
 	// Create a one-to-one chat
-	alice := s.newMessenger()
-
 	err = makeMutualContacts(bob1, alice)
 	s.Require().NoError(err)
 
@@ -310,6 +329,10 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 
 	// Validate communities on bob2
 	communities, err = bob2.JoinedCommunities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+
+	communities, err = bob2.SpectatedCommunities()
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)
 
