@@ -182,9 +182,16 @@ func (api *API) GetTokensByKeys(keys []string) ([]*tokentypes.Token, error) {
 	return api.s.tokenManager.GetTokensByKeys(keys)
 }
 
+// TokenAvailableForBridgingViaHop returns true if the token with the given chainID and address is available for bridging via Hop
 func (api *API) TokenAvailableForBridgingViaHop(ctx context.Context, chainID uint64, address common.Address) bool {
 	logutils.ZapLogger().Debug("call to get tokens available for bridge on chain")
 	return api.s.router.TokenAvailableForBridgingViaHop(chainID, address)
+}
+
+// IsChainSupportedForSwapViaParaswap returns true if the chain is supported for swap via Paraswap, false otherwise.
+func (api *API) IsChainSupportedForSwapViaParaswap(ctx context.Context, chainID uint64) (bool, error) {
+	logutils.ZapLogger().Debug("call to check if chain is supported for swap via Paraswap")
+	return api.s.router.IsChainSupportedForSwapViaParaswap(chainID)
 }
 
 func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
