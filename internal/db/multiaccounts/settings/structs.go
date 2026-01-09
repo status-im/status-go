@@ -207,7 +207,6 @@ type Settings struct {
 	OpenseaEnabled                      bool                          `json:"opensea-enabled?,omitempty"`
 	BackupPath                          string                        `json:"backup-path,omitempty"`
 	MessagesBackupEnabled               bool                          `json:"messages-backup-enabled?,omitempty"`
-	AutoMessageEnabled                  bool                          `json:"auto-message-enabled?,omitempty"`
 	GifAPIKey                           string                        `json:"gifs/api-key"`
 	TestNetworksEnabled                 bool                          `json:"test-networks-enabled?,omitempty"`
 	ProfileMigrationNeeded              bool                          `json:"profile-migration-needed,omitempty"`
