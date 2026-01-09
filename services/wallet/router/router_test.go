@@ -96,7 +96,7 @@ type routerSuggestedRoutesEnvelope struct {
 
 func setupSignalHandler(t *testing.T) (chan responses.RouterSuggestedRoutes, func()) {
 	suggestedRoutesCh := make(chan responses.RouterSuggestedRoutes)
-	signalHandler := signal.MobileSignalHandler(func(data []byte) {
+	signalHandler := signal.Handler(func(data []byte) {
 		var envelope signal.Envelope
 		err := json.Unmarshal(data, &envelope)
 		assert.NoError(t, err)
@@ -108,8 +108,8 @@ func setupSignalHandler(t *testing.T) (chan responses.RouterSuggestedRoutes, fun
 			suggestedRoutesCh <- response.Routes
 		}
 	})
-	signal.SetMobileSignalHandler(signalHandler)
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	signal.SetHandler(signalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	closeFn := func() {
 		close(suggestedRoutesCh)

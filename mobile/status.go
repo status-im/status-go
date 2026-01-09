@@ -932,20 +932,6 @@ func stopLocalNotifications() string {
 	return makeJSONResponse(err)
 }
 
-func SetMobileSignalHandler(handler SignalHandler) {
-	call(setMobileSignalHandler, handler)
-}
-
-// setMobileSignalHandler setup geth callback to notify about new signal
-// used for gomobile builds
-func setMobileSignalHandler(handler SignalHandler) {
-	signal.SetMobileSignalHandler(func(data []byte) {
-		if len(data) > 0 {
-			handler.HandleSignal(string(data))
-		}
-	})
-}
-
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	call(setSignalEventCallback, cb)
 }

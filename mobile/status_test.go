@@ -14,19 +14,13 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-type testSignalHandler struct {
-	receivedSignal string
-}
-
-func (t *testSignalHandler) HandleSignal(data string) {
-	t.receivedSignal = data
-}
-
-func TestSetMobileSignalHandler(t *testing.T) {
+func TestSetSignalHandler(t *testing.T) {
 	// Setup
-	handler := &testSignalHandler{}
-	SetMobileSignalHandler(handler)
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	var data string
+	signal.SetHandler(func(b []byte) {
+		data = string(b)
+	})
+	t.Cleanup(signal.ResetHandler)
 
 	// Test data
 	testAccount := &multiaccounts.Account{Name: "test"}
@@ -37,9 +31,9 @@ func TestSetMobileSignalHandler(t *testing.T) {
 	signal.SendLoggedIn(testAccount, testSettings, testEnsUsernames, nil)
 
 	// Assertions
-	require.Contains(t, handler.receivedSignal, `"key-uid":"0x1"`, "Signal should contain the correct KeyUID")
-	require.Contains(t, handler.receivedSignal, `"name":"test"`, "Signal should contain the correct account name")
-	require.Contains(t, handler.receivedSignal, `"ensUsernames":{"test":"test"}`, "Signal should contain the correct ENS usernames")
+	require.Contains(t, data, `"key-uid":"0x1"`, "Signal should contain the correct KeyUID")
+	require.Contains(t, data, `"name":"test"`, "Signal should contain the correct account name")
+	require.Contains(t, data, `"ensUsernames":{"test":"test"}`, "Signal should contain the correct ENS usernames")
 }
 
 func TestIntendedPanic(t *testing.T) {

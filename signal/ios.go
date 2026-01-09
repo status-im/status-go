@@ -8,6 +8,6 @@ package signal
 #cgo LDFLAGS: -framework Foundation
 #include <stddef.h>
 #include <stdbool.h>
-extern bool StatusServiceSignalEvent( const char *jsonEvent );
+extern void SignalEvent( const char *jsonEvent );
 */
 import "C"

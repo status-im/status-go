@@ -77,7 +77,7 @@ func (s *Server) Port() (int, error) {
 }
 
 func (s *Server) Setup() {
-	signal.SetMobileSignalHandler(s.signalHandler)
+	signal.SetHandler(s.signalHandler)
 }
 
 func (s *Server) signalHandler(data []byte) {

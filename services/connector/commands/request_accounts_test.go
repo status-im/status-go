@@ -52,7 +52,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	accountAddress := types.Address{0x03}
 	dAppPermissionGranted := false
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -73,7 +73,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 			dAppPermissionGranted = true
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	expectedResponse := FormatAccountAddressToResponse(accountAddress)
 	response, err := state.cmd.Execute(state.ctx, request)
@@ -105,7 +105,7 @@ func TestRequestAccountsRejected(t *testing.T) {
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -122,7 +122,7 @@ func TestRequestAccountsRejected(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestAccountsRejectedByUser, err)
@@ -153,7 +153,7 @@ func TestRequestAccounts_EphemeralDoesNotReuseNormalSession(t *testing.T) {
 	// Now call eth_requestAccounts with the ephemeral clientID for the same origin.
 	// This MUST NOT silently reuse the normal-session permission — it must trigger the share UI.
 	sharePromptInvoked := false
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		require.NoError(t, json.Unmarshal(s, &evt))
 		if evt.Type == signal.EventConnectorSendRequestAccounts {
@@ -168,7 +168,7 @@ func TestRequestAccounts_EphemeralDoesNotReuseNormalSession(t *testing.T) {
 			}))
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	ephemeralDApp := signal.ConnectorDApp{
 		URL: origin, Name: "SomeDApp", IconURL: "", ClientID: ephemeralClientID,
