@@ -223,18 +223,17 @@ func (p *Persistence) SetTrustStatus(contactID string, trust TrustStatus, update
 }
 
 func (p *Persistence) UpsertTrustStatus(contactID string, trust TrustStatus, updatedAt uint64) (shouldSync bool, err error) {
-	var t uint64
-	err = p.db.QueryRow(`SELECT updated_at FROM trusted_users WHERE id = ?`, contactID).Scan(&t)
+	var u uint64
+	var t TrustStatus
+	err = p.db.QueryRow(`SELECT updated_at, trust_status FROM trusted_users WHERE id = ?`, contactID).Scan(&u, &t)
 
 	if err == sql.ErrNoRows {
 		return true, p.SetTrustStatus(contactID, trust, updatedAt)
 	}
 
-	if err == nil && updatedAt > t {
+	if err == nil && updatedAt > u && t != trust {
 		_, err := p.db.Exec("UPDATE trusted_users SET trust_status = ?, updated_at = ? WHERE id = ?", trust, updatedAt, contactID)
-		if err != nil {
-			return true, err
-		}
+		return true, err
 	}
 
 	return false, err
