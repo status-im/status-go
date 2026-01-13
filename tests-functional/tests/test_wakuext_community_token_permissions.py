@@ -42,10 +42,9 @@ def request_to_join_with_signatures(backend: StatusBackend, community_id: str, a
 @pytest.mark.rpc
 class TestCommunityTokenPermissions(MessengerSteps):
     @pytest.fixture(autouse=True)
-    def setup_tokens(self, snt_addresses, erc721_addresses):
+    def setup_tokens(self, snt_addresses):
         self.snt_address = snt_addresses["snt"]
         self.snt_controller_address = snt_addresses["controller"]
-        self.erc721_address = erc721_addresses["erc721"]
 
     def _communities_list(self, communities_response):
         if isinstance(communities_response, dict):
@@ -107,13 +106,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
             logging.debug(f"Generate tokens result: exit_code={gen_tokens_result.exit_code}, output={gen_tokens_result.output.decode()}")
             logger.debug(f"Funded {member_address} with {amount} SNT tokens at contract {self.snt_address}")
 
-        elif token_type == CommunityTokenType.ERC721:
-            mint_result = foundry_client.generate_token_erc721(self.erc721_address, member_address, token_id, user_1.private_key)
-            logging.debug(f"Mint ERC721 result: exit_code={mint_result.exit_code}, output={mint_result.output.decode()}")
-            logger.debug(f"Minted ERC721 token #{token_id} to {member_address} at contract {self.erc721_address}")
-
         else:
-            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20, ERC721")
+            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20")
 
         return member_address
 
@@ -125,21 +119,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
             balance = int(balance_result.output.decode().strip(), 16)
             assert balance >= min_balance, f"Insufficient {token_type.name} balance: {balance}, expected at least {min_balance}"
 
-        elif token_type == CommunityTokenType.ERC721:
-            assert token_id is not None, "token_id is required for ERC721 verification"
-            owner_result = foundry_client.get_erc721_owner(contract_address, token_id)
-            assert owner_result.exit_code == 0, "Owner check command failed"
-            output = owner_result.output.decode().strip()
-            if output.startswith("0x") and len(output) == 66:
-                actual_owner = "0x" + output[26:]
-            else:
-                actual_owner = output
-            actual_owner = actual_owner.lower()
-            expected_owner = owner_address.lower()
-            assert actual_owner == expected_owner, f"Address {owner_address} does not own ERC721 token #{token_id}, owner is {actual_owner}"
-
         else:
-            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20, ERC721")
+            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20")
 
     def edit_community(self, owner_backend, community_id):
         new_name = fake.community_name()

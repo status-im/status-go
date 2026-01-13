@@ -120,4 +120,4 @@ go.work.sum
 
 # Token deployment cache files
 tests-functional/snt_addresses.json*
-tests-functional/erc721_addresses.json*
+
