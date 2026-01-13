@@ -86,6 +86,7 @@ var (
 	ErrCommunityRequestAlreadyRejected = errors.New("that user was already rejected from the community")
 	ErrInvalidClock                    = errors.New("invalid clock to cancel request to join")
 	ErrNotPartOfCommunity              = errors.New("not part of the community")
+	ErrOrgAlreadySpectatedOrJoined     = errors.New("already spectated or joined the community")
 )
 
 type MessageSigner interface {
@@ -3578,6 +3579,10 @@ func (m *Manager) SpectateCommunity(id types3.HexBytes) (*Community, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
+	}
+	if community.Spectated() || community.Joined() {
+		// Nothing to do, we are already spectating or joined
+		return community, ErrOrgAlreadySpectatedOrJoined
 	}
 	community.Spectate()
 	if err = m.SaveCommunity(community); err != nil {

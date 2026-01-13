@@ -30,6 +30,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 )
@@ -79,6 +80,8 @@ type Router struct {
 	pathProcessors       map[string]pathprocessor.PathProcessor
 	scheduler            *async.Scheduler
 
+	paraswapClientFactory func(chainID uint64) paraswap.ClientInterface
+
 	activeBalanceMap sync.Map // map[string]*big.Int
 
 	activeRoutesMutex sync.Mutex
@@ -116,7 +119,10 @@ func NewRouter(
 		feesManager:          fees.NewFeeManager(rpcClient, logger.Named("feeManager")),
 		pathProcessors:       processors,
 		scheduler:            async.NewScheduler(),
-		logger:               logger,
+		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
+			return paraswap.NewClientV5(chainID, pathprocessor.ParaswapPartnerID, walletCommon.ZeroAddress(), 0)
+		},
+		logger: logger,
 	}
 }
 

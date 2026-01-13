@@ -35,9 +35,7 @@ type ProviderID = string
 // Provider IDs
 const (
 	StatusSmartProxy  = "status-smart-proxy"
-	ProxyNodefleet    = "proxy-nodefleet"
 	ProxyInfura       = "proxy-infura"
-	ProxyGrove        = "proxy-grove"
 	SmartProxyAlchemy = "smart-proxy-alchemy"
 	Nodefleet         = "nodefleet"
 	Infura            = "infura"
@@ -272,4 +270,11 @@ func MandatoryTokens() []string {
 		}
 	}
 	return mandatoryTokens
+}
+
+func SkippedTokenKeys() []string {
+	return []string{
+		types.TokenKey(OptimismMainnet, common.HexToAddress("0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000")),
+		types.TokenKey(OptimismSepolia, common.HexToAddress("0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000")),
+	}
 }

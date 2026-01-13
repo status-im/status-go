@@ -19,8 +19,9 @@ const (
 )
 
 type CommunitySet struct {
-	Joined  []*communities.Community
-	Deleted []*communities.Community
+	Joined    []*communities.Community
+	Deleted   []*communities.Community
+	Spectated []*communities.Community
 }
 
 func (m *Messenger) backupContacts() []*protobuf.Backup {
@@ -59,9 +60,15 @@ func (m *Messenger) retrieveAllCommunities() (*CommunitySet, error) {
 		return nil, err
 	}
 
+	spectatedCs, err := m.communitiesManager.Spectated()
+	if err != nil {
+		return nil, err
+	}
+
 	return &CommunitySet{
-		Joined:  joinedCs,
-		Deleted: deletedCs,
+		Joined:    joinedCs,
+		Deleted:   deletedCs,
+		Spectated: spectatedCs,
 	}, nil
 }
 
@@ -100,6 +107,7 @@ func (m *Messenger) backupCommunities(clock uint64) ([]*protobuf.Backup, error) 
 
 	var backupMessages []*protobuf.Backup
 	combinedCs := append(communitySet.Joined, communitySet.Deleted...)
+	combinedCs = append(combinedCs, communitySet.Spectated...)
 
 	for _, c := range combinedCs {
 		_, beingImported := m.importingCommunities[c.IDString()]
