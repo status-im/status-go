@@ -2,17 +2,15 @@ import logging
 import time
 import uuid
 from typing import Optional, List
-import secrets
 import os
-import json
-from eth_keys.main import KeyAPI as keys
+
 
 import pytest
 
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from clients.signals import SignalType, WalletEventType
 from clients.status_backend import StatusBackend
-from resources.constants import user_1, wallet_account_details_root
+from resources.constants import user_1
 from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
 from utils import fake
@@ -142,55 +140,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
     def deploy_owner_token(self, owner_backend, community_id, foundry_client):
         """Deploy and mint owner token for the community in one step"""
-        private_key_bytes = secrets.token_bytes(32)
-        private_key_hex = "0x" + private_key_bytes.hex()
-        private_key_obj = keys.PrivateKey(private_key_bytes)
-        address_from = private_key_obj.public_key.to_checksum_address()
-        name = f"Deployer-{secrets.token_hex(4)}"
-        owner_backend.accounts_service.add_keypair_via_private_key(private_key_hex, owner_backend.password, name, wallet_account_details_root)
-
-        # Fund the generated address with 1% of balance from ARBITRUM_OWNER_ADDRESS
-        owner_address = os.environ["ARBITRUM_OWNER_ADDRESS"]
-        chain_id = owner_backend.network_id
-        # Force fetch balances for the owner address
-        owner_backend.wallet_service.fetch_or_get_cached_wallet_balances([owner_address], True)
-        time.sleep(2)  # Wait for balance to be cached
-        balances = owner_backend.wallet_service.get_balances_at_by_chain([chain_id], [owner_address], [])
-        owner_balance = 0
-        if balances and str(chain_id) in balances and owner_address.lower() in balances[str(chain_id)]:
-            eth_token = "0x0000000000000000000000000000000000000000"
-            if eth_token in balances[str(chain_id)][owner_address.lower()]:
-                owner_balance = int(balances[str(chain_id)][owner_address.lower()][eth_token], 16)
-        if owner_balance == 0:
-            raise ValueError(f"Owner address {owner_address} has no ETH balance on chain {chain_id}")
-        fund_amount = str(owner_balance // 10)  # 10% of balance
-        send_tx_args = {
-            "version": 2,  # EIP-1559
-            "from": owner_address,
-            "to": address_from,
-            "value": hex(int(fund_amount)),
-            "gas": "0xc350",  # 50000 gas for Arbitrum L2
-            "maxFeePerGas": "0x4a817c800",  # 20 gwei
-            "maxPriorityFeePerGas": "0x77359400",  # 2 gwei
-            "fromChainID": chain_id,
-            "toChainID": chain_id,
-        }
-        build_tx = owner_backend.wallet_service.build_transaction(chain_id, json.dumps(send_tx_args))
-        tx_args = build_tx["txArgs"]
-        send_tx_args["nonce"] = tx_args["nonce"]  # Propagate fetched
-        message = build_tx["messageToSign"]
-        signature = owner_backend.wallet_service.sign_message(message, owner_address, owner_backend.password)
-        if signature.startswith("0x"):
-            signature = signature[2:]
-        owner_backend.prepare_wait_for_signal(
-            SignalType.WALLET.value,
-            1,
-            lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
-        )
-        owner_backend.wallet_service.send_transaction_with_signature(chain_id, "WalletTransfer", json.dumps(send_tx_args), signature)
-        event_response = owner_backend.wait_for_signal(SignalType.WALLET.value)["event"]
-        tx_status = json.loads(event_response["message"].replace("'", '"'))
-        assert tx_status["status"] == "Success"
+        address_from = os.environ["ARBITRUM_OWNER_ADDRESS"]
 
         chain_id = owner_backend.network_id
         # CommunityTokenDeployer contract addresses by chain
