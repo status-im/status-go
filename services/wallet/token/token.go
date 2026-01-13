@@ -185,6 +185,7 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time
 			walletcommon.CoingeckoArbitrumTokenListID: defaulttokenlists.CoingeckoArbitrumTokenList.JsonData,
 			walletcommon.CoingeckoBSCTokenListID:      defaulttokenlists.CoingeckoBscTokenList.JsonData,
 			walletcommon.CoingeckoBaseTokenListID:     defaulttokenlists.CoingeckoBaseTokenList.JsonData,
+			walletcommon.CoingeckoLineaTokenListID:    defaulttokenlists.CoingeckoLineaTokenList.JsonData,
 		},
 		CustomParsers: map[string]parsers.TokenListParser{
 			walletcommon.StatusTokenListID: &parsers.StatusTokenListParser{},
@@ -193,6 +194,12 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time
 		Chains: walletcommon.AllChainIDsAsUint64(),
 
 		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
+	}
+
+	for key, data := range config.InitialLists {
+		if len(data) == 0 {
+			delete(config.InitialLists, key)
+		}
 	}
 
 	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)

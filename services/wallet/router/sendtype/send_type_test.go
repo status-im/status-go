@@ -161,11 +161,12 @@ func TestSendType_IsAvailableFor(t *testing.T) {
 		walletCommon.ArbitrumMainnet,
 		walletCommon.BaseMainnet,
 		walletCommon.BSCMainnet,
+		walletCommon.LineaMainnet,
+		walletCommon.LineaSepolia,
 		999999, // unknown
 	}
 
-	swapNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet}
-	bridgeNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.EthereumSepolia, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet}
+	swapNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet, walletCommon.LineaMainnet}
 	ensNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.EthereumSepolia}
 
 	// Test Swap
@@ -174,10 +175,9 @@ func TestSendType_IsAvailableFor(t *testing.T) {
 		assert.Equal(t, expected, Swap.IsAvailableFor(chainID), "Swap on chain %d", chainID)
 	}
 
-	// Test Bridge (includes sepolia networks)
-	bridgeNetworksExtended := append(bridgeNetworks, walletCommon.OptimismSepolia, walletCommon.ArbitrumSepolia, walletCommon.BaseSepolia)
+	// Test Bridge (a real check is performed when AvailableFor for path processor is called, here it's always true)
 	for _, chainID := range chainIDs {
-		expected := slices.Contains(bridgeNetworksExtended, chainID)
+		expected := true
 		assert.Equal(t, expected, Bridge.IsAvailableFor(chainID), "Bridge on chain %d", chainID)
 	}
 

@@ -20,4 +20,5 @@ var (
 	CoingeckoArbitrumTokenList DownloadedTokenList
 	CoingeckoBaseTokenList     DownloadedTokenList
 	CoingeckoBscTokenList      DownloadedTokenList
+	CoingeckoLineaTokenList    DownloadedTokenList
 )

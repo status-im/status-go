@@ -9,7 +9,6 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/go-wallet-sdk/pkg/common"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/builder"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
@@ -94,11 +93,11 @@ func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
 	coingeckoTokensByTokenKey := make(map[string]GeckoToken)
 
 	// for native tokens, platform is empty (zero address), but the id is ethereum, that's why we need to add it manually
-	for _, chainID := range common.AllChains {
+	for _, chainID := range walletcommon.AllChainIDsAsUint64() {
 		token := tokentypes.Token{Token: &types.Token{ChainID: chainID}}
 
 		// native token for BSC chain doesn't have the coingecko ID, so skip it
-		if chainID == common.BSCMainnet || chainID == common.BSCTestnet {
+		if chainID == walletcommon.BSCMainnet || chainID == walletcommon.BSCTestnet {
 			continue
 		}
 

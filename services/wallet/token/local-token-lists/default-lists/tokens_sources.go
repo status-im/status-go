@@ -46,4 +46,9 @@ var TokensSources = map[string]TokensSource{
 		SourceURL:  "https://prod.market.status.im/v1/token_lists/base/all.json",
 		OutputFile: "services/wallet/token/local-token-lists/default-lists/coingecko_base.go",
 	},
+	common.CoingeckoLineaTokenListID: {
+		Name:       "Coingecko",
+		SourceURL:  "https://prod.market.status.im/v1/token_lists/linea/all.json",
+		OutputFile: "services/wallet/token/local-token-lists/default-lists/coingecko_linea.go",
+	},
 }
