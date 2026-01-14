@@ -1,13 +1,9 @@
 {
   "go.testTags": "gowaku_skip_migrations,gowaku_no_rln,use_codex",
-  "cSpell.words": [
-    "unmarshalling"
-  ],
+  "cSpell.words": ["unmarshalling"],
   "gopls": {
     "formatting.local": "github.com/status-im/status-go",
-    "build.buildFlags": [
-      "-tags=gowaku_skip_migrations,gowaku_no_rln"
-    ]
+    "build.buildFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln"]
   },
   // format all files on save if a formatter is available
   "editor.formatOnSave": true,
@@ -15,9 +11,13 @@
   // because it does the same thing but also formats imports
   "go.formatTool": "goimports",
   "go.toolsEnvVars": {
-    "CGO_ENABLED": "1",
+    "CGO_ENABLED": "1"
+  },
+  "go.testEnvVars": {
     "CGO_CFLAGS": "-I${workspaceFolder}/libs",
     "CGO_LDFLAGS": "-L${workspaceFolder}/libs -lcodex -Wl,-rpath,${workspaceFolder}/libs"
   },
+  "go.buildFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln"],
+  "go.testFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln,use_codex"],
   "idf.pythonInstallPath": "/usr/bin/python"
 }
