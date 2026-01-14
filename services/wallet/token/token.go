@@ -41,7 +41,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -52,8 +51,6 @@ const (
 
 	communityTokenListName   = "Community tokens"
 	communityTokenListSource = "local"
-
-	EventCommunityTokenReceived walletevent.EventType = "wallet-community-token-received"
 )
 
 type ReceivedToken struct {
@@ -75,7 +72,6 @@ type ManagerInterface interface {
 	CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error
 	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error)
 	MarkAsPreviouslyOwnedToken(token *tokentypes.Token, owner common.Address) (bool, error)
-	SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokentypes.Token, isFirst bool)
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
