@@ -434,6 +434,86 @@ func bnbSmartChain(proxyHost string, enableRpcProviders bool) params.Network {
 	}
 }
 
+func linea(proxyHost, stageName string, enableRpcProviders bool) params.Network {
+	const chainID = common.LineaMainnet
+	const chainName = "linea"
+	const networkName = "mainnet"
+
+	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
+	if enableRpcProviders {
+		rpcProviders = []params.RpcProvider{
+			// Smart proxy provider
+			*params.NewEthRpcProxyProvider(chainID, common.StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+			// Proxy providers
+			*params.NewProxyProvider(chainID, common.ProxyInfura, proxyUrl(stageName, common.Infura, chainName, networkName), false),
+			// Direct providers
+			*params.NewDirectProvider(chainID, common.DirectInfura, security.NewSensitiveString("https://linea-mainnet.infura.io/v3/"), true),
+			*params.NewDirectProvider(chainID, common.DirectGrove, security.NewSensitiveString("https://linea.rpc.grove.city/v1/"), false), // rpc.grove.city is not working at all, maybe we should remove it as an option from all networks
+			// Smart Proxy specific providers
+			*params.NewEthRpcProxyProvider(chainID, common.SmartProxyAlchemy, smartProxyUrlWithProvider(proxyHost, chainName, networkName, common.Alchemy), false),
+		}
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "Linea",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://lineascan.build/",
+		IconURL:                "network/Network=Linea",
+		ChainColor:             "#121212",
+		ShortName:              "linea",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 false,
+		Layer:                  2,
+		Enabled:                false,
+		RelatedChainID:         common.LineaSepolia,
+		IsActive:               false,
+		IsDeactivatable:        true,
+	}
+}
+
+func lineaSepolia(proxyHost, stageName string, enableRpcProviders bool) params.Network {
+	const chainID = common.LineaSepolia
+	const chainName = "linea"
+	const networkName = "sepolia"
+
+	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
+	if enableRpcProviders {
+		rpcProviders = []params.RpcProvider{
+			// Smart proxy provider
+			*params.NewEthRpcProxyProvider(chainID, common.StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+			// Proxy providers
+			*params.NewProxyProvider(chainID, common.ProxyInfura, proxyUrl(stageName, common.Infura, chainName, networkName), false),
+			// Direct providers
+			*params.NewDirectProvider(chainID, common.DirectInfura, security.NewSensitiveString("https://linea-sepolia.infura.io/v3/"), true),
+			*params.NewDirectProvider(chainID, common.DirectGrove, security.NewSensitiveString("https://linea-sepolia-testnet.rpc.grove.city/v1/"), false), // rpc.grove.city is not working at all, maybe we should remove it as an option from all networks
+			// Smart Proxy specific providers
+			*params.NewEthRpcProxyProvider(chainID, common.SmartProxyAlchemy, smartProxyUrlWithProvider(proxyHost, chainName, networkName, common.Alchemy), false),
+		}
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "Linea Sepolia",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://sepolia.lineascan.build/",
+		IconURL:                "network/Network=Linea-test",
+		ChainColor:             "#121212",
+		ShortName:              "linea",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  2,
+		Enabled:                false,
+		RelatedChainID:         common.LineaMainnet,
+		IsActive:               false,
+		IsDeactivatable:        true,
+	}
+}
+
 func bnbSmartChainTestnet(proxyHost string, enableRpcProviders bool) params.Network {
 	const chainID = common.BSCTestnet
 	const chainName = "bsc"
@@ -481,6 +561,8 @@ func defaultNetworks(proxyHost, stageName string, thirdpartyServicesEnabled bool
 		arbitrumSepolia(proxyHost, stageName, thirdpartyServicesEnabled),
 		base(proxyHost, stageName, thirdpartyServicesEnabled),
 		baseSepolia(proxyHost, stageName, thirdpartyServicesEnabled),
+		linea(proxyHost, stageName, thirdpartyServicesEnabled),
+		lineaSepolia(proxyHost, stageName, thirdpartyServicesEnabled),
 		statusNetworkSepolia(proxyHost, thirdpartyServicesEnabled),
 		bnbSmartChain(proxyHost, thirdpartyServicesEnabled),
 		bnbSmartChainTestnet(proxyHost, thirdpartyServicesEnabled),

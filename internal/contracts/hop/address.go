@@ -7,6 +7,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
@@ -299,6 +300,30 @@ var hopBridgeContractAddresses = map[uint64]map[common.Address]map[string]common
 			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
 			L2CanonicalToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
 			L2Bridge:           common.HexToAddress("0xe22D2beDb3Eca35E6397e0C6D62857094aA26F52"),
+			L2HopBridgeToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
+			L2AmmWrapper:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2SaddleSwap:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2SaddleLpToken:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+		},
+	},
+	walletCommon.LineaMainnet: {
+		common.HexToAddress("0x0000000000000000000000000000000000000000"): { // ETH
+			L1CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L1MessengerWrapper: common.HexToAddress("0x789Ac91519a3344E4845E12870F3364E7Df26D23"),
+			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2CanonicalToken:   common.HexToAddress("0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f"),
+			L2Bridge:           common.HexToAddress("0xCbb852A6274e03fA00fb4895dE0463f66dF27a11"),
+			L2HopBridgeToken:   common.HexToAddress("0xDc38c5aF436B9652225f92c370A011C673FA7Ba5"),
+			L2AmmWrapper:       common.HexToAddress("0xC8A4FB931e8D77df8497790381CA7d228E68a41b"),
+			L2SaddleSwap:       common.HexToAddress("0x2935173357c010F8B56c8719a44f9FbdDa90f67c"),
+			L2SaddleLpToken:    common.HexToAddress("0x7689674c3EcEC55086b08A3cEA785de2848d8C87"),
+		},
+		common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"): { // HOP
+			L1CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L1MessengerWrapper: common.HexToAddress("0x29cFb537c004f5852F5A7ded08BE1FC3ba465850"),
+			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2CanonicalToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
+			L2Bridge:           common.HexToAddress("0x0a6b1904369fE59E002ad0713ae89d4E3dF5A7Cf"),
 			L2HopBridgeToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
 			L2AmmWrapper:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
 			L2SaddleSwap:       common.HexToAddress("0x0000000000000000000000000000000000000000"),

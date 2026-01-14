@@ -135,7 +135,7 @@ func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
 		return gas.ChainClassArbStack, nil
 	case common.OptimismMainnet, common.OptimismSepolia, common.BaseMainnet, common.BaseSepolia:
 		return gas.ChainClassOPStack, nil
-	case common.StatusNetworkSepolia:
+	case common.StatusNetworkSepolia, common.LineaMainnet, common.LineaSepolia:
 		return gas.ChainClassLineaStack, nil
 	}
 	return "", fmt.Errorf("chainID class identification not handled for chainID: %d", chainID)

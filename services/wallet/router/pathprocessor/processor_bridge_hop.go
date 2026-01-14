@@ -173,13 +173,13 @@ func (h *HopBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, er
 	}
 
 	// We check if the contract is available on the receiver network for the token
-	if _, _, err := hop.GetContractAddress(params.FromToken); err != nil {
+	if _, _, err := hop.GetContractAddress(params.ToToken); err != nil {
 		return false, ErrToChainNotSupported
 	}
 
 	// We check if the contract is available on the sender network for the token
-	_, err := h.GetContractAddress(params)
-	// toToken is not nil only if the send type is Swap
+	_, _, err := hop.GetContractAddress(params.FromToken)
+
 	return err == nil, err
 }
 
@@ -408,13 +408,10 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 
 	hopChainsMap := map[uint64]string{
 		walletCommon.EthereumMainnet: "ethereum",
-		walletCommon.EthereumSepolia: "ethereum",
 		walletCommon.OptimismMainnet: "optimism",
-		walletCommon.OptimismSepolia: "optimism",
 		walletCommon.ArbitrumMainnet: "arbitrum",
-		walletCommon.ArbitrumSepolia: "arbitrum",
 		walletCommon.BaseMainnet:     "base",
-		walletCommon.BaseSepolia:     "base",
+		walletCommon.LineaMainnet:    "linea",
 	}
 
 	fromChainName, ok := hopChainsMap[params.FromToken.ChainID]

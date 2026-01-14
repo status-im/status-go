@@ -23,6 +23,7 @@ func main() {
 		defaulttokenlists.CoingeckoArbitrumTokenList,
 		defaulttokenlists.CoingeckoBscTokenList,
 		defaulttokenlists.CoingeckoBaseTokenList,
+		defaulttokenlists.CoingeckoLineaTokenList,
 	}
 
 	fmt.Println("Analyzing token lists")
