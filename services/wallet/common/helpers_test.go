@@ -19,12 +19,3 @@ func TestPackApprovalInputData(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedData, hex.EncodeToString(data))
 }
-
-func TestGetTokenIdFromSymbol(t *testing.T) {
-
-	expectedData := big.NewInt(100)
-
-	data, err := GetTokenIdFromSymbol(expectedData.String())
-	require.NoError(t, err)
-	require.Equal(t, expectedData, data)
-}

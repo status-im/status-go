@@ -9,10 +9,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/logutils"
@@ -314,12 +311,7 @@ func getToken(token *tokenTypes.Token, processorName string) *ac.Token {
 		ret.Address = token.Address
 		switch processorName {
 		case pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
-			id, err := wCommon.GetTokenIdFromSymbol(token.Symbol)
-			if err != nil {
-				logutils.ZapLogger().Warn("malformed token symbol", zap.Error(err))
-				return nil
-			}
-			ret.TokenID = (*hexutil.Big)(id)
+			ret.TokenID = token.CollectibleTokenID
 			if processorName == pathProcessorCommon.ProcessorERC721Name {
 				ret.TokenType = ac.Erc721
 			} else {

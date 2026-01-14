@@ -36,14 +36,6 @@ func PackApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Ad
 	return erc20ABI.Pack("approve", approvalContractAddress, amountIn)
 }
 
-func GetTokenIdFromSymbol(symbol string) (*big.Int, error) {
-	id, success := big.NewInt(0).SetString(symbol, 0)
-	if !success {
-		return nil, fmt.Errorf("failed to convert %s to big.Int", symbol)
-	}
-	return id, nil
-}
-
 func FullDomainName(username string) string {
 	return username + "." + StatusDomain
 }

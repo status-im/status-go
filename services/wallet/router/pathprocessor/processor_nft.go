@@ -61,7 +61,7 @@ func (s *NFTProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
 	}
 
 	// Only handle same-chain transfers with no destination token (NFT transfers)
-	if params.FromChain.ChainID != params.ToChain.ChainID || params.ToToken != nil {
+	if params.FromChain.ChainID != params.ToChain.ChainID {
 		return false, nil
 	}
 
