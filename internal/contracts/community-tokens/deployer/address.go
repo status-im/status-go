@@ -34,3 +34,11 @@ func ContractAddress(chainID uint64) (common.Address, error) {
 	}
 	return addr, nil
 }
+
+func CommunitiesSupportedOnChain(chainID uint64) bool {
+	addr, err := ContractAddress(chainID)
+	if err != nil {
+		return false
+	}
+	return addr != (common.Address{})
+}

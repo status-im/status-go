@@ -599,5 +599,6 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 
 func BuildDefaultNetworks(walletSecretsConfig *requests.WalletSecretsConfig, thirdpartyServicesEnabled bool) []params.Network {
 	proxyHost := getProxyHost(walletSecretsConfig.EthRpcProxyUrl.Reveal(), walletSecretsConfig.StatusProxyStageName)
-	return setRPCs(defaultNetworks(proxyHost, walletSecretsConfig.StatusProxyStageName, thirdpartyServicesEnabled), walletSecretsConfig)
+	networks := setRPCs(defaultNetworks(proxyHost, walletSecretsConfig.StatusProxyStageName, thirdpartyServicesEnabled), walletSecretsConfig)
+	return networkhelper.WithCommunitiesSupported(networks)
 }
