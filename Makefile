@@ -78,6 +78,7 @@ ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  LIB_EXT := dylib
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
+ CGO_CFLAGS+=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIB_EXT := dll
@@ -86,8 +87,6 @@ else ifeq ($(detected_OS),Linux)
  LIB_EXT := so
  CGO_LDFLAGS += "-Wl,-soname,libstatus.so.0"
 endif
-
-CGO_CFLAGS+=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 export GOPATH ?= $(HOME)/go
 
 GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
@@ -139,6 +138,12 @@ endif
 LIBSDS := $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+
+# mbedtls configuration for go-sqlcipher
+ifeq ($(detected_OS),Windows)
+ # On Windows, use portable C implementations and add -Werror=implicit-function-declaration workaround
+ CGO_CFLAGS+=-Wno-implicit-function-declaration
+endif
 
 # Common flags
 
