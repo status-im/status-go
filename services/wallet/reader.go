@@ -189,15 +189,13 @@ func (r *Reader) processERC20TransferEvent(chainID uint64, event erc20.Erc20Tran
 	if err != nil {
 		return err
 	}
-	isFirst := false
 	if token.CommunityData != nil {
-		isFirst, _ = r.tokenManager.MarkAsPreviouslyOwnedToken(token, event.To)
-	}
-	if token.CommunityData != nil {
-		go func() {
-			defer gocommon.LogOnPanic()
-			r.tokenManager.SignalCommunityTokenReceived(event.To, event.Raw.TxHash, event.Value, token, isFirst)
-		}()
+		// Only add community tokens to the previously owned tokens list,
+		// not any other spam token the account might've received.
+		_, err = r.tokenManager.MarkAsPreviouslyOwnedToken(token, event.To)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

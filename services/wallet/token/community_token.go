@@ -3,9 +3,7 @@ package token
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"go.uber.org/zap"
@@ -15,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/assets"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
@@ -23,7 +20,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokentypes.Token, address common.Address) {
@@ -212,49 +208,6 @@ func (tm *Manager) UpsertCustom(token tokentypes.Token) error {
 func (tm *Manager) DeleteCustom(chainID uint64, address common.Address) error {
 	_, err := tm.walletDB.Exec(`DELETE FROM TOKENS WHERE address = ? and network_id = ?`, address, chainID)
 	return err
-}
-
-func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *tokentypes.Token, isFirst bool) {
-	defer gocommon.LogOnPanic()
-	if tm.walletFeed == nil || t == nil || t.CommunityData == nil {
-		return
-	}
-
-	if len(t.CommunityData.Name) == 0 {
-		_ = tm.fillCommunityData(t)
-	}
-	if len(t.CommunityData.Name) == 0 && tm.communityManager != nil {
-		communityData, _ := tm.communityManager.FetchCommunityMetadata(t.CommunityData.ID)
-		if communityData != nil {
-			t.CommunityData.Name = communityData.CommunityName
-			t.CommunityData.Color = communityData.CommunityColor
-			t.CommunityData.Image = tm.communityManager.GetCommunityImageURL(t.CommunityData.ID)
-		}
-	}
-
-	floatAmount, _ := new(big.Float).Quo(new(big.Float).SetInt(value), new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(t.Decimals)), nil))).Float64()
-	t.LogoURI = tm.communityTokenImageBuilder.MakeCommunityTokenImagesURL(t.CommunityData.ID, t.ChainID, t.Symbol)
-
-	receivedToken := ReceivedToken{
-		Token:   *t,
-		Amount:  floatAmount,
-		TxHash:  txHash,
-		IsFirst: isFirst,
-	}
-
-	encodedMessage, err := json.Marshal(receivedToken)
-	if err != nil {
-		return
-	}
-
-	tm.walletFeed.Send(walletevent.Event{
-		Type:    EventCommunityTokenReceived,
-		ChainID: t.ChainID,
-		Accounts: []common.Address{
-			address,
-		},
-		Message: string(encodedMessage),
-	})
 }
 
 func (tm *Manager) fillCommunityData(token *tokentypes.Token) error {

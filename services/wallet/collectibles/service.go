@@ -33,7 +33,6 @@ const (
 	EventCollectiblesOwnershipUpdatePartial           walletevent.EventType = "wallet-collectibles-ownership-update-partial"
 	EventCollectiblesOwnershipUpdateFinished          walletevent.EventType = "wallet-collectibles-ownership-update-finished"
 	EventCollectiblesOwnershipUpdateFinishedWithError walletevent.EventType = "wallet-collectibles-ownership-update-finished-with-error"
-	EventCommunityCollectiblesReceived                walletevent.EventType = "wallet-collectibles-community-collectibles-received"
 	EventCollectiblesDataUpdated                      walletevent.EventType = "wallet-collectibles-data-updated"
 
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
@@ -447,83 +446,6 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 		}
 	}
 	return nil, errors.New("unknown data type")
-}
-
-func (s *Service) notifyCommunityCollectiblesReceived(account common.Address, chainID walletCommon.ChainID, collectibles []thirdparty.CollectibleUniqueID, hashMap map[thirdparty.CollectibleUniqueID]TxHashData) {
-	ctx := context.Background()
-
-	firstCollectibles, err := s.ownershipDB.GetIsFirstOfCollection(account, collectibles)
-	if err != nil {
-		return
-	}
-
-	collectiblesData, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, collectibles, false)
-	if err != nil {
-		s.logger.Error("Error fetching collectibles data", zap.Error(err))
-		return
-	}
-
-	communityCollectibles := fullCollectiblesDataToCommunityHeader(collectiblesData)
-
-	if len(communityCollectibles) == 0 {
-		return
-	}
-
-	type CollectibleGroup struct {
-		contractID thirdparty.ContractID
-		txHash     string
-	}
-
-	groups := make(map[CollectibleGroup]Collectible)
-	for _, localCollectible := range communityCollectibles {
-		// to satisfy gosec: C601 checks
-		collectible := localCollectible
-		txHash := ""
-		for key, value := range hashMap {
-			if key.Same(&collectible.ID) {
-				collectible.LatestTxHash = value.TxID.Hex()
-				txHash = value.Hash.Hex()
-				break
-			}
-		}
-
-		for id, value := range firstCollectibles {
-			if value && id.Same(&collectible.ID) {
-				collectible.IsFirst = true
-				break
-			}
-		}
-
-		group := CollectibleGroup{
-			contractID: collectible.ID.ContractID,
-			txHash:     txHash,
-		}
-		_, ok := groups[group]
-		if !ok {
-			collectible.ReceivedAmount = float64(0)
-		}
-		collectible.ReceivedAmount = collectible.ReceivedAmount + 1
-		groups[group] = collectible
-	}
-
-	groupedCommunityCollectibles := make([]Collectible, 0, len(groups))
-	for _, collectible := range groups {
-		groupedCommunityCollectibles = append(groupedCommunityCollectibles, collectible)
-	}
-
-	encodedMessage, err := json.Marshal(groupedCommunityCollectibles)
-	if err != nil {
-		return
-	}
-
-	s.walletFeed.Send(walletevent.Event{
-		Type:    EventCommunityCollectiblesReceived,
-		ChainID: uint64(chainID),
-		Accounts: []common.Address{
-			account,
-		},
-		Message: string(encodedMessage),
-	})
 }
 
 func (s *Service) startOwnershipLoadWatcher() {
