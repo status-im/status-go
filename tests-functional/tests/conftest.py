@@ -1,15 +1,12 @@
 import json
 import logging
-import os
 from uuid import uuid4
 
 import pytest
-from filelock import FileLock
 from requests import ReadTimeout
 
 from clients.anvil import Anvil
 from clients.contract_deployers.multicall3 import Multicall3Deployer
-from clients.contract_deployers.snt import SNTDeployer
 from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
 from resources.constants import USE_IPV6
@@ -167,35 +164,45 @@ def multicall3_deployer(foundry_client):
 @pytest.fixture(scope="session")
 def snt_addresses(foundry_client):
     logger = logging.getLogger(__name__)
-    addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "snt_addresses.json")
-    lock_path = addresses_file + ".lock"  # Lock file next to JSON
+    container_file_path = "/app/contracts/snt_addresses.json"
 
-    with FileLock(lock_path, timeout=120):  # Acquire lock (120s timeout for deploy)
-        data = None
-        if os.path.exists(addresses_file):
-            try:
-                with open(addresses_file, "r") as f:
-                    data = json.load(f)
-                # Re-check contracts INSIDE lock (critical for races)
-                if foundry_client.check_contract_exists(data["snt"]) and foundry_client.check_contract_exists(data["controller"]):
-                    logger.info("Using existing SNT deployment addresses")
-                    return data
-                else:
-                    logger.warning("Existing SNT addresses invalid (no code), will redeploy")
-            except (json.JSONDecodeError, KeyError, IOError) as e:
-                logger.warning(f"Failed to load existing addresses: {e}, will redeploy")
+    try:
+        # Read addresses from the pre-deployed contracts in the container
+        host_file_path = foundry_client.get_archive(container_file_path)
+        with open(host_file_path, "r") as f:
+            data = json.load(f)
 
-        # Deploy (now EXCLUSIVE due to lock)
-        logger.info("Deploying new SNT token...")
-        deployer = SNTDeployer(foundry_client)
-        data = {
-            "snt": deployer.snt_contract_address,
-            "controller": deployer.snt_token_controller_address,
-        }
-        with open(addresses_file, "w") as f:
-            json.dump(data, f, indent=2)
-        logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
+        logger.info(f"Using pre-deployed SNT contracts: token={data['snt']}, controller={data['controller']}")
         return data
+    except Exception as e:
+        logger.error(f"Failed to load SNT addresses from container: {e}")
+        logger.info("SNT contracts should be deployed as part of docker-compose startup")
+        raise RuntimeError(
+            "SNT contracts not found. Make sure the foundry container has deployed contracts during startup. "
+            "This should happen automatically in entrypoint.sh"
+        ) from e
+
+
+@pytest.fixture(scope="session")
+def communities_addresses(foundry_client):
+    logger = logging.getLogger(__name__)
+    container_file_path = "/app/contracts/communities_addresses.json"
+
+    try:
+        # Read addresses from the pre-deployed contracts in the container
+        host_file_path = foundry_client.get_archive(container_file_path)
+        with open(host_file_path, "r") as f:
+            data = json.load(f)
+
+        logger.info("Using pre-deployed Communities contracts")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to load Communities addresses from container: {e}")
+        logger.info("Communities contracts should be deployed as part of docker-compose startup")
+        raise RuntimeError(
+            "Communities contracts not found. Make sure the foundry container has deployed contracts during startup. "
+            "This should happen automatically in entrypoint.sh"
+        ) from e
 
 
 @pytest.fixture(scope="function")
