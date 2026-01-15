@@ -1,6 +1,7 @@
 package alchemy
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -64,6 +65,48 @@ type Transfer struct {
 	Hash            common.Hash          `json:"hash"`
 	RawContract     RawContract          `json:"rawContract"`
 	Metadata        Metadata             `json:"metadata"`
+}
+
+// UnmarshalJSON handles the "to" field which Alchemy returns as empty string
+func (t *Transfer) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Category        TransferCategory     `json:"category"`
+		BlockNum        *bigint.VarHexBigInt `json:"blockNum"`
+		FromAddress     common.Address       `json:"from"`
+		ToAddress       json.RawMessage      `json:"to"`
+		Value           float64              `json:"value,omitempty"`
+		Erc1155Metadata []Erc1155Metadata    `json:"erc1155Metadata,omitempty"`
+		TokenID         *bigint.VarHexBigInt `json:"tokenId"`
+		Asset           string               `json:"asset"`
+		UniqueID        string               `json:"uniqueId"`
+		Hash            common.Hash          `json:"hash"`
+		RawContract     RawContract          `json:"rawContract"`
+		Metadata        Metadata             `json:"metadata"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	t.Category = aux.Category
+	t.BlockNum = aux.BlockNum
+	t.FromAddress = aux.FromAddress
+	t.Value = aux.Value
+	t.Erc1155Metadata = aux.Erc1155Metadata
+	t.TokenID = aux.TokenID
+	t.Asset = aux.Asset
+	t.UniqueID = aux.UniqueID
+	t.Hash = aux.Hash
+	t.RawContract = aux.RawContract
+	t.Metadata = aux.Metadata
+
+	toStr := string(aux.ToAddress)
+	if toStr != "" && toStr != "null" && toStr != `""` {
+		var addr common.Address
+		if err := json.Unmarshal(aux.ToAddress, &addr); err != nil {
+			return err
+		}
+		t.ToAddress = &addr
+	}
+	return nil
 }
 
 func (t Transfer) String() string {

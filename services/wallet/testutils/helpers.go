@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"sort"
@@ -108,4 +109,37 @@ func (m *Uint64SliceMatcher) Matches(x interface{}) bool {
 
 func (m *Uint64SliceMatcher) String() string {
 	return "matches uint64 slice regardless of order"
+}
+
+// StringSliceElementsMatcher is a custom matcher for comparing string slices regardless of order.
+type StringSliceElementsMatcher struct {
+	expected []string
+}
+
+func NewStringSliceElementsMatcher(expected []string) gomock.Matcher {
+	return &StringSliceElementsMatcher{expected: expected}
+}
+
+func (m *StringSliceElementsMatcher) Matches(x interface{}) bool {
+	actual, ok := x.([]string)
+	if !ok {
+		return false
+	}
+	if len(actual) != len(m.expected) {
+		return false
+	}
+	expectedSet := make(map[string]struct{}, len(m.expected))
+	for _, k := range m.expected {
+		expectedSet[k] = struct{}{}
+	}
+	for _, k := range actual {
+		if _, ok := expectedSet[k]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (m *StringSliceElementsMatcher) String() string {
+	return fmt.Sprintf("contains elements %v", m.expected)
 }

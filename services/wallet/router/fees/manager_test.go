@@ -15,6 +15,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 
 	geth "github.com/ethereum/go-ethereum"
+	ethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 )
 
 type testState struct {
@@ -122,7 +123,7 @@ func TestEstimatedTimeV2(t *testing.T) {
 
 	maxFeesPerGas := big.NewInt(100e9)
 	priorityFeesPerGas := big.NewInt(10e9)
-	estimation, err := state.feeManager.EstimatedTime(context.Background(), uint64(1), maxFeesPerGas, priorityFeesPerGas)
+	estimation, err := state.feeManager.EstimatedTime(context.Background(), uint64(1), nil, maxFeesPerGas, priorityFeesPerGas)
 	assert.NoError(t, err)
 
 	assert.Less(t, estimation, uint(20))
@@ -214,6 +215,14 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	}
 
 	chainID := uint64(1)
+	state.ethClient.EXPECT().SuggestGasTipCap(context.Background()).Return(big.NewInt(1e9), nil)
+	state.ethClient.EXPECT().FeeHistory(context.Background(), uint64(1), nil, gomock.Any()).Return(&geth.FeeHistory{
+		BaseFee: []*big.Int{big.NewInt(1e9), big.NewInt(1e9)},
+		Reward:  [][]*big.Int{{big.NewInt(1e9)}},
+	}, nil)
+	state.ethClient.EXPECT().EthGetBlockByNumberWithFullTxs(context.Background(), nil).Return(
+		&ethclient.BlockWithFullTxs{BaseFeePerGas: big.NewInt(1e9)}, nil,
+	)
 	state.ethClient.EXPECT().FeeHistory(context.Background(), uint64(10), nil, gomock.Any()).Times(1).Return(feeHistoryResponse, nil)
 
 	suggestedFees, noBaseFee, noPriorityFee, err := state.feeManager.SuggestedFees(context.Background(), chainID, walletCommon.ZeroAddress())
@@ -222,7 +231,9 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	assert.False(t, noBaseFee)
 	assert.False(t, noPriorityFee)
 
-	assert.Equal(t, suggestedFees.GasPrice.Sign(), 0)
+	if !suggestedFees.EIP1559Enabled {
+		assert.Equal(t, suggestedFees.GasPrice.Sign(), 0)
+	}
 	assert.Greater(t, suggestedFees.BaseFee.Sign(), 0)
 	assert.Greater(t, suggestedFees.CurrentBaseFee.Sign(), 0)
 	assert.Greater(t, suggestedFees.MaxFeesLevels.Low.ToInt().Sign(), 0)

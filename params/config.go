@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/security"
@@ -387,10 +388,10 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 	// Ensure TorrentConfig is valid
 	if c.TorrentConfig.Enabled {
 		if c.TorrentConfig.DataDir == "" {
-			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
+			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, gocommon.ArchivesRelativePath)
 		}
 		if c.TorrentConfig.TorrentDir == "" {
-			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
+			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, gocommon.TorrentTorrentsRelativePath)
 		}
 	}
 

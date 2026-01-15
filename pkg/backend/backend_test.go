@@ -43,6 +43,7 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -457,7 +458,7 @@ func TestHashTypedData(t *testing.T) {
 	domain := map[string]json.RawMessage{
 		"name":              json.RawMessage(`"Ether Text"`),
 		"version":           json.RawMessage(`"1"`),
-		"chainId":           json.RawMessage(fmt.Sprintf("%d", params.StatusChainNetworkID)),
+		"chainId":           json.RawMessage(fmt.Sprintf("%d", walletcommon.StatusNetworkSepolia)),
 		"verifyingContract": json.RawMessage(`"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`),
 	}
 	msg := map[string]json.RawMessage{
