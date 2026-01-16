@@ -31,6 +31,12 @@ const (
 	EventActivityFetchComplete walletevent.EventType = "wallet-activity-fetch-complete"
 )
 
+// EventActivityDetected is published when new activity entries are detected for an account/chainID
+type EventActivityDetected struct {
+	ChainID uint64
+	Account gethcommon.Address
+}
+
 type fetcherID struct {
 	account gethcommon.Address
 	chainID uint64
@@ -42,10 +48,11 @@ type Service struct {
 	accountsGetter         accounts.AccountsStorage
 	ethClientGetter        rpc.EthClientGetter
 
-	networksPublisher *pubsub.Publisher
-	accountsPublisher *pubsub.Publisher
-	eventFeed         *event.Feed
-	checkRefetchCh    chan bool
+	networksPublisher         *pubsub.Publisher
+	accountsPublisher         *pubsub.Publisher
+	activityDetectedPublisher *pubsub.Publisher
+	eventFeed                 *event.Feed
+	checkRefetchCh            chan bool
 
 	cancelFnMap      map[fetcherID]context.CancelFunc
 	cancelFnMapMutex sync.RWMutex
@@ -67,20 +74,31 @@ func NewService(
 	logger := logutils.ZapLogger().Named("ActivityFetcher")
 
 	service := &Service{
-		activityFetcherManager: activityFetcherManager,
-		networksGetter:         networksGetter,
-		accountsGetter:         accountsGetter,
-		ethClientGetter:        ethClientGetter,
-		networksPublisher:      networksGetter.GetPublisher(),
-		accountsPublisher:      accountsPublisher,
-		eventFeed:              eventFeed,
-		checkRefetchCh:         make(chan bool),
-		cancelFnMap:            make(map[fetcherID]context.CancelFunc),
-		logger:                 logger,
-		ch:                     make(chan walletevent.Event, 100),
+		activityFetcherManager:    activityFetcherManager,
+		networksGetter:            networksGetter,
+		accountsGetter:            accountsGetter,
+		ethClientGetter:           ethClientGetter,
+		networksPublisher:         networksGetter.GetPublisher(),
+		accountsPublisher:         accountsPublisher,
+		activityDetectedPublisher: pubsub.NewPublisher(),
+		eventFeed:                 eventFeed,
+		checkRefetchCh:            make(chan bool),
+		cancelFnMap:               make(map[fetcherID]context.CancelFunc),
+		logger:                    logger,
+		ch:                        make(chan walletevent.Event, 100),
 	}
 
 	return service
+}
+
+// GetPublisher returns the publisher for activity detected events
+func (s *Service) GetPublisher() *pubsub.Publisher {
+	return s.activityDetectedPublisher
+}
+
+// GetActivityTokens returns unique tokens from activity transfers for a given account and chain
+func (s *Service) GetActivityTokens(chainID uint64, address gethcommon.Address) ([]ActivityToken, error) {
+	return s.activityFetcherManager.GetActivityTokens(chainID, address)
 }
 
 func (s *Service) startNetworkWatcher() {
@@ -458,6 +476,14 @@ func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account get
 	if err != nil {
 		s.logger.Error("Failed to fetch activity", zap.Error(err))
 		return
+	}
+
+	// Publish event that new activity entries were detected
+	if s.activityDetectedPublisher != nil {
+		pubsub.Publish(s.activityDetectedPublisher, EventActivityDetected{
+			ChainID: chainID,
+			Account: account,
+		})
 	}
 }
 

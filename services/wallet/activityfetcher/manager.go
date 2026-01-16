@@ -19,11 +19,22 @@ const (
 	maxEntriesPerFetch = 1000
 )
 
+// ActivityToken represents a token found in activity transfers
+type ActivityToken struct {
+	Address  gethcommon.Address
+	IsNative bool
+}
+
+type ActivityTokenProvider interface {
+	GetActivityTokens(chainID uint64, address gethcommon.Address) ([]ActivityToken, error)
+}
+
 type ManagerIface interface {
 	IsChainSupported(chainID uint64) bool
 	FetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address, currentBlock uint64) (thirdparty.ActivityEntryContainer, error)
 	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address gethcommon.Address) (*gethrpc.BlockNumber, *time.Time, error)
 	ClearAll(ctx context.Context) error
+	ActivityTokenProvider
 }
 
 type Manager struct {
@@ -108,4 +119,23 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, account get
 
 func (m *Manager) ClearAll(ctx context.Context) error {
 	return m.fetcher.ClearAll(ctx)
+}
+
+// GetActivityTokens returns unique tokens from activity transfers for a given account and chain
+func (m *Manager) GetActivityTokens(chainID uint64, address gethcommon.Address) ([]ActivityToken, error) {
+	tokens, err := m.fetcher.GetActivityTokens(context.Background(), chainID, address)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert ac.Token to ActivityToken
+	result := make([]ActivityToken, 0, len(tokens))
+	for _, token := range tokens {
+		result = append(result, ActivityToken{
+			Address:  token.Address,
+			IsNative: token.TokenType == 0, // Native is 0 in ac.TokenType
+		})
+	}
+
+	return result, nil
 }

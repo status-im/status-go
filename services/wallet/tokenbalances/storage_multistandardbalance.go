@@ -2,6 +2,7 @@ package tokenbalances
 
 import (
 	"context"
+	"maps"
 	"math/big"
 
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
@@ -52,4 +53,24 @@ func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []
 		}
 	}
 	return ret, nil
+}
+
+func (s *StorageMultistandardBalance) GetAllBalancesForAccountAndChain(ctx context.Context, accountAddress AccountAddress, chainID uint64) (map[ContractAddress]*big.Int, State, error) {
+	balances := make(map[ContractAddress]*big.Int)
+
+	// Add all ERC20 balances
+	erc20balances, state, err := s.multistandardbalanceStorage.GetERC20Balances(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: accountAddress})
+	if err != nil {
+		return nil, state, err
+	}
+	maps.Copy(balances, erc20balances)
+
+	// Add the native token
+	nativeBalance, state, err := s.multistandardbalanceStorage.GetNativeBalance(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: accountAddress})
+	if err != nil {
+		return nil, state, err
+	}
+	balances[NativeTokenAddress] = nativeBalance
+
+	return balances, state, nil
 }

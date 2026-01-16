@@ -318,7 +318,6 @@ func (b *StatusNode) createWalletService(accountsDB *accounts.Database, appDB *s
 			b.pendingTracker,
 			walletFeed,
 			b.mediaServer,
-			b.tokenManager,
 			statusProxyStageName,
 		)
 	}

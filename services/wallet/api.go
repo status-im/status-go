@@ -48,17 +48,18 @@ import (
 )
 
 func NewAPI(s *Service) *API {
-	return &API{s, s.reader}
+	return &API{s}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	s      *Service
-	reader ReaderInterface
+	s *Service
 }
 
 func (api *API) StartWallet(ctx context.Context) error {
-	return api.reader.Start()
+	// TODO: Make all Wallet sub-services (automatic fetches for balances,
+	// collectibles, activity, etc. start here)
+	return nil
 }
 
 func (api *API) StopWallet(ctx context.Context) error {
@@ -71,61 +72,6 @@ func (api *API) GetPairingsJSONFileContent() ([]byte, error) {
 
 func (api *API) SetPairingsJSONFileContent(content []byte) error {
 	return api.s.keycardPairings.SetPairingsJSONFileContent(content)
-}
-
-func (api *API) GetLastWalletTokenUpdate() map[common.Address]int64 {
-	return api.reader.GetLastTokenUpdateTimestamps()
-}
-
-// GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
-// [chainID][account][tokenAddress]balance
-func (api *API) GetBalancesByChain(ctx context.Context, addresses []common.Address, tokenKeys []string) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
-	ret := make(map[uint64]map[common.Address]map[common.Address]*hexutil.Big)
-
-	tokensPerChain := make(map[uint64][]common.Address)
-	for _, tokenKey := range tokenKeys {
-		token, err := api.s.tokenManager.GetTokenByKey(tokenKey)
-		if err != nil {
-			return nil, err
-		}
-		tokensPerChain[token.ChainID] = append(tokensPerChain[token.ChainID], token.Address)
-	}
-
-	for chainID, tokens := range tokensPerChain {
-		ret[chainID] = make(map[common.Address]map[common.Address]*hexutil.Big)
-		fetchResults, err := api.s.tokenBalancesFetcher.Fetch(ctx, chainID, tokens, addresses)
-		if err != nil {
-			return nil, err
-		}
-		for account, tokenBalances := range fetchResults {
-			ret[chainID][account] = make(map[common.Address]*hexutil.Big)
-			for token, balance := range tokenBalances {
-				ret[chainID][account][token] = (*hexutil.Big)(balance)
-			}
-		}
-	}
-
-	return ret, nil
-}
-
-// The client doesn't really need to force balance refreshes, it can just get them from the tokenbalances Storage.
-// Every reason for which reader used to trigger a fetch is already handled by the multistandardbalance Controller.
-// - Account addition
-// - Active network change / Testnet mode toggle
-// - App start
-// - Periodic refresh
-// The only outlier is the user-triggered refresh, which is handled in API method RestartWalletReloadTimer
-// This will be fully refactored soon to avoid the duplicate storage and simplify the API, for now we just use the tokenbalances Storage
-// and ignore the forceRefresh parameter.
-func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]tokentypes.StorageToken, error) {
-	activeNetworks, err := api.s.rpcClient.GetNetworkManager().GetActiveNetworks()
-	if err != nil {
-		return nil, err
-	}
-
-	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
-
-	return api.reader.GetCachedBalances(chainIDs, addresses)
 }
 
 type DerivedAddress struct {
@@ -343,14 +289,12 @@ func (api *API) GetFlatEthereumChains(ctx context.Context) ([]*params.Network, e
 	return api.s.rpcClient.GetNetworkManager().GetAll()
 }
 
-// @deprecated
 // FetchPrices fetches prices for a given token keys and currencies. If no tokens are provided, all tokens of interest are fetched.
 func (api *API) FetchPrices(ctx context.Context, tokensKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	logutils.ZapLogger().Debug("call to FetchPrices")
 	return api.s.marketManager.FetchPrices(tokensKeys, currencies)
 }
 
-// @deprecated
 // FetchTokenMarketValues fetches market values for a given token keys and currency. If no tokens are provided, all tokens of interest are fetched.
 func (api *API) FetchMarketValues(ctx context.Context, tokensKeys []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	logutils.ZapLogger().Debug("call to FetchMarketValues")
@@ -367,7 +311,6 @@ func (api *API) GetDailyMarketValues(ctx context.Context, tokenKey string, curre
 	return api.s.marketManager.FetchHistoricalDailyPrices(tokenKey, currency, limit, allData, aggregate)
 }
 
-// @deprecated
 // FetchTokenDetails fetches token details for a given tokens. If no tokens are provided, all tokens of interest are fetched.
 func (api *API) FetchTokenDetails(ctx context.Context, tokensKeys []string) (map[string]thirdparty.TokenDetails, error) {
 	logutils.ZapLogger().Debug("call to FetchTokenDetails")
@@ -839,11 +782,6 @@ func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, pass
 	}
 
 	return walletconnect.SafeSignTypedDataForDApps(typedJson, account.PrivateKey(), chainID, legacy)
-}
-
-func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
-	api.s.multistandardBalanceController.TriggerFullFetch()
-	return nil
 }
 
 func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
