@@ -204,6 +204,9 @@ func (nm *Manager) setEmbeddedFields(networks []*params.Network) {
 				network.RpcProviders, embeddedNetwork.RpcProviders)
 		}
 	}
+
+	// CommunitiesSupported is derived (not persisted) and should always reflect the contract availability.
+	networkhelper.ApplyCommunitiesSupported(networks)
 }
 
 // networkWithoutEmbeddedProviders returns a copy of the given network without embedded RPC providers.
