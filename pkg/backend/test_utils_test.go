@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/common"
+	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/params"
 )
 
@@ -47,6 +48,10 @@ func makeTestNodeConfig(t *testing.T) (*params.NodeConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Node startup always initializes TokenManager (even when WalletConfig.Enabled is false),
+	// and TokenManager requires at least one active network.
+	nodeConfig.Networks = networktestutil.MinimalActiveNetworks()
 
 	return nodeConfig, nil
 }

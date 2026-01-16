@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
@@ -143,6 +144,10 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			WalletRootAddress: derivedAccs[accscommon.PathWalletRoot].Address(),
 		}
 	}
+
+	// Node startup initializes TokenManager even when WalletConfig.Enabled is false,
+	// and TokenManager requires at least one active network.
+	data.config.Networks = networktestutil.MinimalActiveNetworks()
 
 	data.backend = NewStatusBackend(testutils.MustCreateTestLogger())
 	data.backend.UpdateRootDataDir(tmpdir)

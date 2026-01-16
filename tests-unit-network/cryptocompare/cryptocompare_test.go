@@ -14,6 +14,8 @@ import (
 	mock_network "github.com/status-im/status-go/internal/rpc/network/mock"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/pubsub"
+	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -23,6 +25,7 @@ import (
 func getTokenSymbols(t *testing.T) []*tokentypes.Token {
 	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
+	require.NoError(t, protocolsqlite.Migrate(appDB))
 
 	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
@@ -56,6 +59,9 @@ func getTokenSymbols(t *testing.T) []*tokentypes.Token {
 	networkManager.EXPECT().Get(gomock.Any()).Return(ptrNetworkList, nil).AnyTimes()
 	networkManager.EXPECT().GetAll().Return(ptrNetworkList, nil).AnyTimes()
 	networkManager.EXPECT().GetEmbeddedNetworks().Return(networksList).AnyTimes()
+	networkManager.EXPECT().GetActiveNetworks().Return(ptrNetworkList, nil).AnyTimes()
+	networkManager.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+	networkManager.EXPECT().GetTestNetworksEnabled().Return(false, nil).AnyTimes()
 
 	// Skeleton token store to get full list of tokens
 	tm, err := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil, time.Hour, time.Hour)
