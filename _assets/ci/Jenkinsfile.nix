@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 // vim: ft=groovy
-library 'status-jenkins-lib@v1.9.26'
+library 'status-jenkins-lib@v1.9.39'
 
 pipeline {
   agent { label "${params.AGENT_LABEL} && nix-2.24" }
