@@ -1,4 +1,4 @@
-package communities
+package logosstorage
 
 import (
 	"encoding/json"

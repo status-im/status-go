@@ -1,4 +1,4 @@
-package communities_test
+package logosstorage_test
 
 import (
 	"bytes"
@@ -15,12 +15,12 @@ import (
 
 	"github.com/codex-storage/codex-go-bindings/codex"
 
-	"github.com/status-im/status-go/protocol/communities"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 )
 
 type CodexClientTestSuite struct {
 	suite.Suite
-	client       communities.CodexClientInterface
+	client       logosstorage.CodexClientInterface
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
 

@@ -1,4 +1,4 @@
-package communities_test
+package logosstorage_test
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +22,7 @@ import (
 // against a real Codex instance
 type CodexArchiveDownloaderIntegrationSuite struct {
 	suite.Suite
-	client       communities.CodexClientInterface
+	client       logosstorage.CodexClientInterface
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
 
@@ -103,7 +103,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 	cancelChan := make(chan struct{})
 	logger, _ := zap.NewDevelopment() // Use development logger for integration tests
 
-	downloader := communities.NewCodexArchiveDownloader(
+	downloader := logosstorage.NewCodexArchiveDownloader(
 		suite.client,
 		index,
 		communityID,

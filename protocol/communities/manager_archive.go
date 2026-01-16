@@ -32,6 +32,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 	"github.com/status-im/status-go/signal"
 
 	"github.com/anacrolix/torrent"
@@ -67,7 +68,7 @@ type ArchiveManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
 	codexConfig                  *params.CodexConfig
-	codexClient                  CodexClientInterface
+	codexClient                  logosstorage.CodexClientInterface
 	isCodexClientStarted         bool
 	codexClientMu                sync.RWMutex
 	downloadTimeout              time.Duration // timeout for archive downloads, defaults to 20s
@@ -107,7 +108,7 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	}
 }
 
-func (m *ArchiveManager) GetCodexClient() CodexClientInterface {
+func (m *ArchiveManager) GetCodexClient() logosstorage.CodexClientInterface {
 	m.codexClientMu.RLock()
 	defer m.codexClientMu.RUnlock()
 	return m.codexClient
@@ -257,7 +258,7 @@ func (m *ArchiveManager) StartCodexClient() error {
 
 	m.logger.Info("[CODEX][start_codex_client] Using the following CodexNodeConfig", zap.Any("config", cfgCopy.CodexNodeConfig))
 
-	client, err := NewCodexClient(cfgCopy)
+	client, err := logosstorage.NewCodexClient(cfgCopy)
 	if err != nil {
 		return err
 	}
@@ -330,7 +331,7 @@ func (m *ArchiveManager) Stop() error {
 	return nil
 }
 
-func (m *ArchiveManager) SetCodexClient(client CodexClientInterface) {
+func (m *ArchiveManager) SetCodexClient(client logosstorage.CodexClientInterface) {
 	m.codexClientMu.Lock()
 	defer m.codexClientMu.Unlock()
 
@@ -1220,7 +1221,7 @@ func (m *ArchiveManager) ExtractMessagesFromCodexHistoryArchive(communityID type
 func (m *ArchiveManager) CodexLoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID types.HexBytes, indexCid string, isLocal bool) (*protobuf.CodexWakuMessageArchiveIndex, error) {
 	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
 
-	indexDownloader := NewCodexIndexDownloader(m.codexClient, m.logger)
+	indexDownloader := logosstorage.NewCodexIndexDownloader(m.codexClient, m.logger)
 
 	var indexBuf bytes.Buffer
 	if isLocal {
@@ -1336,7 +1337,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	archiveDownloaderCancel := make(chan struct{})
 
 	// Create the archive downloader using the protobuf index directly
-	archiveDownloader := NewCodexArchiveDownloader(
+	archiveDownloader := logosstorage.NewCodexArchiveDownloader(
 		m.codexClient, index, id, existingArchiveIDs,
 		archiveDownloaderCancel, m.logger)
 

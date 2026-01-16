@@ -17,9 +17,9 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/communities"
-	mock_communities "github.com/status-im/status-go/protocol/communities/mock/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	mock_logosstorage "github.com/status-im/status-go/services/logos-storage/mock"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/suite"
@@ -29,7 +29,7 @@ import (
 type MockCodexArchiveManagerSuite struct {
 	suite.Suite
 	ctrl           *gomock.Controller
-	mockCodex      *mock_communities.MockCodexClientInterface
+	mockCodex      *mock_logosstorage.MockCodexClientInterface
 	archiveManager *communities.ArchiveManager
 	manager        *communities.Manager
 }
@@ -69,7 +69,7 @@ func (s *MockCodexArchiveManagerSuite) buildManagers() (*communities.Manager, *c
 
 func (s *MockCodexArchiveManagerSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
-	s.mockCodex = mock_communities.NewMockCodexClientInterface(s.ctrl)
+	s.mockCodex = mock_logosstorage.NewMockCodexClientInterface(s.ctrl)
 
 	m, am := s.buildManagers()
 	communities.SetValidateInterval(30 * time.Millisecond)

@@ -1,4 +1,4 @@
-package communities_test
+package logosstorage_test
 
 import (
 	"path/filepath"
@@ -7,11 +7,11 @@ import (
 	"github.com/codex-storage/codex-go-bindings/codex"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/communities"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 )
 
-func NewCodexClientTest(t *testing.T) communities.CodexClientInterface {
-	client, err := communities.NewCodexClient(params.CodexConfig{
+func NewCodexClientTest(t *testing.T) logosstorage.CodexClientInterface {
+	client, err := logosstorage.NewCodexClient(params.CodexConfig{
 		Enabled: true,
 		CodexNodeConfig: codex.Config{
 			DataDir:        filepath.Join(t.TempDir(), "codex", "codexdata"),

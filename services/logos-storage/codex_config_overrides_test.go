@@ -1,4 +1,4 @@
-package communities
+package logosstorage_test
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/params"
+	. "github.com/status-im/status-go/services/logos-storage"
 )
 
 type CodexConfigOverridesTestSuite struct {

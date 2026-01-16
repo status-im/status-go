@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ import (
 
 type CodexArchiveManagerSuite struct {
 	suite.Suite
-	codexClient    communities.CodexClientInterface
+	codexClient    logosstorage.CodexClientInterface
 	archiveManager *communities.ArchiveManager
 	manager        *communities.Manager
 	identity       *ecdsa.PrivateKey // Store identity for test access

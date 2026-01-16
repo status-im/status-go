@@ -1,4 +1,4 @@
-package communities_test
+package logosstorage_test
 
 import (
 	"bytes"
@@ -16,8 +16,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/communities"
-	mock_communities "github.com/status-im/status-go/protocol/communities/mock/communities"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
+	mock_logosstorage "github.com/status-im/status-go/services/logos-storage/mock"
 )
 
 // ============================================================================
@@ -28,7 +28,7 @@ import (
 // using a real CodexClient instance against a running Codex node.
 type CodexIndexDownloaderRealClientSuite struct {
 	suite.Suite
-	client       communities.CodexClientInterface
+	client       logosstorage.CodexClientInterface
 	logger       *zap.Logger
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
@@ -74,7 +74,7 @@ func (suite *CodexIndexDownloaderRealClientSuite) TestDownloadIndexFileFromLocal
 	cid, payload := suite.UploadRandomDataToCodex(1024)
 
 	// Create downloader
-	downloader := communities.NewCodexIndexDownloader(suite.client, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.client, suite.logger)
 
 	// Act: Download the index file from local node
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -93,7 +93,7 @@ func (suite *CodexIndexDownloaderRealClientSuite) TestDownloadIndexFileFromNetwo
 	cid, payload := suite.UploadRandomDataToCodex(1024)
 
 	// Create downloader
-	downloader := communities.NewCodexIndexDownloader(suite.client, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.client, suite.logger)
 
 	// Act: Download the index file from network
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -114,7 +114,7 @@ func (suite *CodexIndexDownloaderRealClientSuite) TestDownloadIndexFileFromLocal
 	cid, payload := suite.UploadRandomDataToCodex(1024 * 1024)
 
 	// Create downloader
-	downloader := communities.NewCodexIndexDownloader(suite.client, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.client, suite.logger)
 
 	// Act: Download the large file
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -139,7 +139,7 @@ func (suite *CodexIndexDownloaderRealClientSuite) TestDownloadIndexFileFromLocal
 type CodexIndexDownloaderMockClientSuite struct {
 	suite.Suite
 	ctrl       *gomock.Controller
-	mockClient *mock_communities.MockCodexClientInterface
+	mockClient *mock_logosstorage.MockCodexClientInterface
 	logger     *zap.Logger
 }
 
@@ -149,7 +149,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) SetupSuite() {
 
 func (suite *CodexIndexDownloaderMockClientSuite) SetupTest() {
 	suite.ctrl = gomock.NewController(suite.T())
-	suite.mockClient = mock_communities.NewMockCodexClientInterface(suite.ctrl)
+	suite.mockClient = mock_logosstorage.NewMockCodexClientInterface(suite.ctrl)
 }
 
 func (suite *CodexIndexDownloaderMockClientSuite) TearDownTest() {
@@ -164,7 +164,7 @@ func TestCodexIndexDownloaderMockClientSuite(t *testing.T) {
 func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromLocalNode_ContextCancellation() {
 	// Arrange
 	testCid := "zDvZRwzmTestCID123"
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	// Setup mock to simulate slow download that respects context cancellation
 	downloadStarted := make(chan struct{})
@@ -205,7 +205,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromLocal
 func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromLocalNode_DownloadError() {
 	// Arrange
 	testCid := "zDvZRwzmTestCID123"
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 	expectedError := errors.New("local download failed: network error")
 
 	suite.mockClient.EXPECT().
@@ -228,7 +228,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromLocal
 func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwork_ContextCancellation() {
 	// Arrange
 	testCid := "zDvZRwzmTestCID456"
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	downloadStarted := make(chan struct{})
 	suite.mockClient.EXPECT().
@@ -262,7 +262,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwo
 func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwork_NetworkError() {
 	// Arrange
 	testCid := "zDvZRwzmTestCID789"
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 	expectedError := errors.New("network download failed: connection timeout")
 
 	suite.mockClient.EXPECT().
@@ -285,7 +285,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwo
 func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwork_TimeoutError() {
 	// Arrange
 	testCid := "zDvZRwzmTestCIDTimeout"
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	suite.mockClient.EXPECT().
 		DownloadWithContext(gomock.Any(), testCid, gomock.Any()).
@@ -316,7 +316,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwo
 func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwork_PartialWrite() {
 	// Arrange
 	testCid := "zDvZRwzmPartialWrite"
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	suite.mockClient.EXPECT().
 		DownloadWithContext(gomock.Any(), testCid, gomock.Any()).
@@ -347,7 +347,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwo
 func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromLocalNode_EmptyOutput() {
 	// Arrange
 	testCid := "zDvZRwzmEmptyCID"
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	// Mock returns success but writes nothing (empty file)
 	suite.mockClient.EXPECT().
@@ -373,7 +373,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwo
 	// Arrange
 	testCid := "zDvZRwzmSuccessCID"
 	testData := []byte("test index file content")
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	suite.mockClient.EXPECT().
 		DownloadWithContext(gomock.Any(), testCid, gomock.Any()).
@@ -398,7 +398,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromLocal
 	// Arrange
 	testCid := "zDvZRwzmLocalSuccessCID"
 	testData := []byte("local index file content")
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	suite.mockClient.EXPECT().
 		LocalDownloadWithContext(gomock.Any(), testCid, gomock.Any()).
@@ -427,7 +427,7 @@ func (suite *CodexIndexDownloaderMockClientSuite) TestDownloadIndexFileFromNetwo
 	chunk3 := []byte("chunk3")
 	expectedData := append(append(chunk1, chunk2...), chunk3...)
 
-	downloader := communities.NewCodexIndexDownloader(suite.mockClient, suite.logger)
+	downloader := logosstorage.NewCodexIndexDownloader(suite.mockClient, suite.logger)
 
 	suite.mockClient.EXPECT().
 		DownloadWithContext(gomock.Any(), testCid, gomock.Any()).

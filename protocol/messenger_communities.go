@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -4172,7 +4173,7 @@ func (m *Messenger) EnableCodexCommunityHistoryArchiveProtocol(overrides map[str
 
 	if len(overrides) > 0 {
 		m.logger.Info("[CODEX][enable_community_history_archive_protocol] applying CodexConfig overrides", zap.Any("overrides", overrides))
-		if err := communities.ApplyCodexConfigOverrides(&nodeConfig.CodexConfig, overrides); err != nil {
+		if err := logosstorage.ApplyCodexConfigOverrides(&nodeConfig.CodexConfig, overrides); err != nil {
 			return err
 		}
 	}

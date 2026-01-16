@@ -1,4 +1,4 @@
-package communities
+package logosstorage
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/codex-storage/codex-go-bindings/codex"
 )
 
-//go:generate go tool mockgen -package=mock_communities -source=codex_client_interface.go -destination=mock/communities/codex_client_interface.go
+//go:generate go tool mockgen -package=mock_logosstorage -source=codex_client_interface.go -destination=mock/codex_client_interface.go
 
 // CodexClientInterface defines the interface for CodexClient operations needed by the downloader
 type CodexClientInterface interface {

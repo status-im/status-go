@@ -21,6 +21,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 	"github.com/status-im/status-go/signal"
 
 	"github.com/anacrolix/torrent/bencode"
@@ -32,7 +33,7 @@ import (
 type ArchiveFileManager struct {
 	torrentConfig *params.TorrentConfig
 	codexConfig   *params.CodexConfig
-	codexClient   CodexClientInterface
+	codexClient   logosstorage.CodexClientInterface
 	logger        *zap.Logger
 	persistence   *Persistence
 	identity      *ecdsa.PrivateKey
@@ -53,7 +54,7 @@ func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 	}
 }
 
-func (m *ArchiveFileManager) SetCodexClient(codexClient CodexClientInterface) {
+func (m *ArchiveFileManager) SetCodexClient(codexClient logosstorage.CodexClientInterface) {
 	m.codexClient = codexClient
 }
 

@@ -44,6 +44,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
+	logosstorage "github.com/status-im/status-go/services/logos-storage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
@@ -226,9 +227,9 @@ type ArchiveService interface {
 	GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error)
 
 	SetCodexConfig(*params.CodexConfig)
-	SetCodexClient(client CodexClientInterface)
+	SetCodexClient(client logosstorage.CodexClientInterface)
 	StartCodexClient() error
-	GetCodexClient() CodexClientInterface
+	GetCodexClient() logosstorage.CodexClientInterface
 	IsCodexReady() bool
 	SeedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string) error
 	UnseedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string)
