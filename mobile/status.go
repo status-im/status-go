@@ -556,6 +556,26 @@ func logout() string {
 	return makeJSONResponse(statusBackend.Logout())
 }
 
+func DeleteMultiaccount(requestJSON string) string {
+	return callWithResponse(deleteMultiaccount, requestJSON)
+}
+
+func deleteMultiaccount(requestJSON string) string {
+	var request requests.DeleteMultiaccount
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.DeleteMultiaccount(request.KeyUID, request.KeyStoreDir)
+	return makeJSONResponse(err)
+}
+
 func SignMessage(rpcParams string) string {
 	return callWithResponse(signMessage, rpcParams)
 }

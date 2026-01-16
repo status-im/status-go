@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -1462,7 +1463,6 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	backend := NewStatusBackend(testutils.MustCreateTestLogger())
-	require.NoError(t, err)
 
 	backend.UpdateRootDataDir(conf.RootDataDir)
 
@@ -1502,4 +1502,25 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	acc, err := backend.RestoreKeycardAccountAndLogin(request)
 	require.NoError(t, err)
 	require.NotNil(t, acc)
+}
+
+func TestDeleteMultiaccount(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, true)
+
+	rootDataDir := testContext.backend.rootDataDir
+	keyStoreDir := filepath.Join(rootDataDir, "keystore")
+
+	err := testContext.backend.OpenAccounts(false)
+	require.NoError(t, err)
+
+	files, err := os.ReadDir(rootDataDir)
+	require.NoError(t, err)
+	require.NotEqual(t, 3, len(files))
+
+	err = testContext.backend.DeleteMultiaccount(testContext.profileKeypair.KeyUID, keyStoreDir)
+	require.NoError(t, err)
+
+	files, err = os.ReadDir(rootDataDir)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(files))
 }
