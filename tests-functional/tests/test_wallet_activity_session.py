@@ -9,7 +9,12 @@ from clients.contract_deployers.snt import (
     SNTV2_ABI,
     SNT_TOKEN_CONTROLLER_ABI,
 )
-from resources.constants import DEPLOYER_ACCOUNT, ANVIL_NETWORK_ID, NATIVE_TOKEN_ADDRESS
+from resources.constants import (
+    DEPLOYER_ACCOUNT,
+    ANVIL_NETWORK_ID,
+    NATIVE_TOKEN_ADDRESS,
+    COMMUNITIES_ADDRESSES_CONTAINER_PATH,
+)
 from resources.constants import user_1, user_2
 from utils import wallet_utils
 
@@ -59,7 +64,7 @@ class TestWalletActivitySession:
         self.anvil_client.eth.default_account = Web3.to_checksum_address(DEPLOYER_ACCOUNT.address)
         self.snt_address = snt_addresses["snt"]
         self.snt_controller_address = snt_addresses["controller"]
-        self.communities_deployer = CommunitiesDeployer.from_file(foundry_client, "/app/contracts/communities_addresses.json")
+        self.communities_deployer = CommunitiesDeployer.from_file(foundry_client, COMMUNITIES_ADDRESSES_CONTAINER_PATH)
         self.erc20_token_list = {ANVIL_NETWORK_ID: self.snt_address}
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
 

@@ -220,3 +220,9 @@ class Foundry:
             return False
         code = result.output.decode().strip().lower()
         return code != "0x"
+
+    def load_json(self, container_path: str) -> dict:
+        """Load JSON file from container."""
+        host_path = self.get_archive(container_path)
+        with open(host_path, "r") as f:
+            return json.load(f)

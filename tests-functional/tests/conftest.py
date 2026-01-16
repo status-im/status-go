@@ -1,4 +1,3 @@
-import json
 import logging
 from uuid import uuid4
 
@@ -9,8 +8,14 @@ from clients.anvil import Anvil
 from clients.contract_deployers.multicall3 import Multicall3Deployer
 from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
-from resources.constants import USE_IPV6
+from resources.constants import (
+    USE_IPV6,
+    SNT_ADDRESSES_CONTAINER_PATH,
+    COMMUNITIES_ADDRESSES_CONTAINER_PATH,
+)
 from utils import fake
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -163,20 +168,13 @@ def multicall3_deployer(foundry_client):
 
 @pytest.fixture(scope="session")
 def snt_addresses(foundry_client):
-    logger = logging.getLogger(__name__)
-    container_file_path = "/app/contracts/snt_addresses.json"
-
     try:
-        # Read addresses from the pre-deployed contracts in the container
-        host_file_path = foundry_client.get_archive(container_file_path)
-        with open(host_file_path, "r") as f:
-            data = json.load(f)
-
+        data = foundry_client.load_json(SNT_ADDRESSES_CONTAINER_PATH)
         logger.info(f"Using pre-deployed SNT contracts: token={data['snt']}, controller={data['controller']}")
         return data
     except Exception as e:
         logger.error(f"Failed to load SNT addresses from container: {e}")
-        logger.info("SNT contracts should be deployed as part of docker-compose startup")
+        logger.error("SNT contracts should be deployed as part of docker-compose startup")
         raise RuntimeError(
             "SNT contracts not found. Make sure the foundry container has deployed contracts during startup. "
             "This should happen automatically in entrypoint.sh"
@@ -185,20 +183,13 @@ def snt_addresses(foundry_client):
 
 @pytest.fixture(scope="session")
 def communities_addresses(foundry_client):
-    logger = logging.getLogger(__name__)
-    container_file_path = "/app/contracts/communities_addresses.json"
-
     try:
-        # Read addresses from the pre-deployed contracts in the container
-        host_file_path = foundry_client.get_archive(container_file_path)
-        with open(host_file_path, "r") as f:
-            data = json.load(f)
-
+        data = foundry_client.load_json(COMMUNITIES_ADDRESSES_CONTAINER_PATH)
         logger.info("Using pre-deployed Communities contracts")
         return data
     except Exception as e:
         logger.error(f"Failed to load Communities addresses from container: {e}")
-        logger.info("Communities contracts should be deployed as part of docker-compose startup")
+        logger.error("Communities contracts should be deployed as part of docker-compose startup")
         raise RuntimeError(
             "Communities contracts not found. Make sure the foundry container has deployed contracts during startup. "
             "This should happen automatically in entrypoint.sh"
