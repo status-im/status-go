@@ -11,30 +11,16 @@ echo "Deploying SNT contracts..."
 # Extract SNT addresses from broadcast output
 SNT_BROADCAST_FILE="/app/status-network-token-v2/broadcast/Deploy.s.sol/31337/run-latest.json"
 if [ -f "$SNT_BROADCAST_FILE" ]; then
-    # Parse the broadcast JSON to extract contract addresses using Python
-    python3 << 'PYTHON_SCRIPT' > $CONTRACTS_PATH/snt_addresses.json
-import json
+    # Parse the broadcast JSON to extract contract addresses using grep/sed
+    SNT_ADDR=$(grep -A1 '"internal_type": "contract SNTV2"' "$SNT_BROADCAST_FILE" | grep '"value"' | sed 's/.*"value": "\([^"]*\)".*/\1/')
+    CONTROLLER_ADDR=$(grep -A1 '"internal_type": "contract SNTTokenController"' "$SNT_BROADCAST_FILE" | grep '"value"' | sed 's/.*"value": "\([^"]*\)".*/\1/')
 
-with open("/app/status-network-token-v2/broadcast/Deploy.s.sol/31337/run-latest.json", "r") as f:
-    data = json.load(f)
-
-returns = data.get("returns", {})
-snt_address = None
-controller_address = None
-
-for key, value in returns.items():
-    if value.get("internal_type") == "contract SNTV2":
-        snt_address = value.get("value")
-    elif value.get("internal_type") == "contract SNTTokenController":
-        controller_address = value.get("value")
-
-result = {
-    "snt": snt_address,
-    "controller": controller_address
+    cat > $CONTRACTS_PATH/snt_addresses.json << EOF
+{
+  "snt": "$SNT_ADDR",
+  "controller": "$CONTROLLER_ADDR"
 }
-
-print(json.dumps(result, indent=2))
-PYTHON_SCRIPT
+EOF
 
     echo "SNT deployed successfully"
     echo "Addresses saved to $CONTRACTS_PATH/snt_addresses.json"
@@ -50,8 +36,8 @@ echo "Deploying Communities contracts..."
 # Extract Communities addresses from broadcast output
 COMMUNITIES_BROADCAST_FILE="/app/communities-contracts/broadcast/DeployContracts.s.sol/31337/run-latest.json"
 if [ -f "$COMMUNITIES_BROADCAST_FILE" ]; then
-    # Save the entire returns object from the broadcast file
-    cat "$COMMUNITIES_BROADCAST_FILE" | python3 -c "import sys, json; data = json.load(sys.stdin); print(json.dumps(data.get('returns', {}), indent=2))" > $CONTRACTS_PATH/communities_addresses.json
+    # Extract returns section using sed
+    sed -n '/"returns":/,/^  },$/p' "$COMMUNITIES_BROADCAST_FILE" | sed '1s/"returns"://' | sed '$s/,$//' > $CONTRACTS_PATH/communities_addresses.json
 
     echo "Communities contracts deployed successfully"
     echo "Addresses saved to $CONTRACTS_PATH/communities_addresses.json"
