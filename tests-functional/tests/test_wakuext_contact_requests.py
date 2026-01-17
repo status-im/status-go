@@ -1,7 +1,9 @@
+import re
 from uuid import uuid4
 import pytest
 from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
+from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
@@ -50,7 +52,7 @@ class TestContactRequests(MessengerSteps):
 
     def test_accept_contact_request(self, sender, receiver):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
-        response = receiver.wakuext_service.accept_contact_request(message_id)
+        response = receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
         # TODO: Add more assertions on response
 
         contacts = response.get("contacts", [])
@@ -71,7 +73,10 @@ class TestContactRequests(MessengerSteps):
 
     def test_decline_contact_request(self, sender, receiver):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
-        response = receiver.wakuext_service.decline_contact_request(message_id)
+        # Send without contact ID first and expect an error
+        with pytest.raises(ApiResponseError, match=re.escape("decline-contact-request: invalid contact id")):
+            receiver.wakuext_service.decline_contact_request(message_id, "")
+        response = receiver.wakuext_service.decline_contact_request(message_id, sender.public_key)
         # TODO: Add more assertions on response
 
         contacts = response.get("contacts", [])

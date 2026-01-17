@@ -310,11 +310,10 @@ func (m *Messenger) PendingNotificationContactRequest(contactID string) (*Activi
 	return m.persistence.ActiveContactRequestNotification(contactID)
 }
 
-func (m *Messenger) createContactRequestForContactUpdate(contact *contacts.Contact, messageState *ReceivedMessageState) (*common.Message, error) {
-
+func (m *Messenger) createDefaultContactRequest(contact *contacts.Contact, timestamp uint64) (*common.Message, error) {
 	contactRequest, err := m.generateContactRequest(
 		contact.ContactRequestRemoteClock,
-		messageState.CurrentMessageState.WhisperTimestamp,
+		timestamp,
 		contact,
 		defaultContactRequestText(),
 		false,
@@ -326,12 +325,21 @@ func (m *Messenger) createContactRequestForContactUpdate(contact *contacts.Conta
 	contactRequest.ID = defaultContactRequestID(contact.ID)
 
 	// save this message
-	messageState.Response.AddMessage(contactRequest)
 	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
-
 	if err != nil {
 		return nil, err
 	}
+
+	return contactRequest, nil
+}
+func (m *Messenger) createContactRequestForContactUpdate(contact *contacts.Contact, messageState *ReceivedMessageState) (*common.Message, error) {
+	contactRequest, err := m.createDefaultContactRequest(contact, messageState.CurrentMessageState.WhisperTimestamp)
+	if err != nil {
+		return nil, err
+	}
+
+	// save this message
+	messageState.Response.AddMessage(contactRequest)
 
 	return contactRequest, nil
 }
@@ -3413,7 +3421,7 @@ func (m *Messenger) HandleSyncContactRequestDecision(ctx context.Context, state 
 	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
 		response, err = m.updateAcceptedContactRequest(nil, message.RequestId, message.ContactId, true)
 	} else {
-		response, err = m.declineContactRequest(message.RequestId, message.ContactId, true)
+		response, err = m.declineContactRequest(message.RequestId, message.ContactId)
 	}
 	if err != nil {
 		return err
