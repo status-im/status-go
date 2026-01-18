@@ -242,6 +242,15 @@ func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl
 // DoGetRequestWithCredentials performs a GET request with the given URL and parameters
 // If creds is not nil, it will add basic auth to the request
 func (c *HTTPClient) DoGetRequestWithCredentials(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds, options ...RequestOption) (body []byte, err error) {
+	// Diagnostic: Log when authenticated request is made (without revealing credentials)
+	hasUser := creds != nil && !creds.User.Empty()
+	hasPassword := creds != nil && !creds.Password.Empty()
+	logutils.ZapLogger().Debug("Authenticated HTTP request",
+		zap.String("url", url),
+		zap.Bool("hasUser", hasUser),
+		zap.Bool("hasPassword", hasPassword),
+	)
+
 	allOptions := []RequestOption{WithCredentials(creds)}
 	allOptions = append(allOptions, options...)
 	body, _, err = c.doGetRequest(ctx, url, params, allOptions...)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
@@ -64,6 +65,14 @@ const (
 
 func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.Client {
 	baseURL := leaderboard.GetMarketProxyUrl(config.UrlOverride.Reveal(), config.StageName)
+
+	// Diagnostic: Log whether market data proxy credentials are being used
+	logutils.ZapLogger().Info("=== Market Data Proxy Client Diagnostic ===",
+		zap.String("baseURL", baseURL),
+		zap.String("stageName", config.StageName),
+		zap.Bool("User_Set", !config.User.Empty()),
+		zap.Bool("Password_Set", !config.Password.Empty()),
+	)
 
 	return coingecko.NewClientWithParams(coingecko.Params{
 		URL:      baseURL,

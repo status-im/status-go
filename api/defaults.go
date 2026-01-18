@@ -7,7 +7,10 @@ import (
 	"math/big"
 	"path/filepath"
 
+	"go.uber.org/zap"
+
 	accscommon "github.com/status-im/status-go/accounts-management/common"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/crypto/types"
@@ -220,6 +223,17 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if !request.EthRpcProxyPassword.Empty() {
 		walletConfig.EthRpcProxyPassword = request.EthRpcProxyPassword
 	}
+
+	// Diagnostic: Log whether proxy credentials were received from the client
+	logutils.ZapLogger().Info("=== Proxy Credentials Diagnostic (buildWalletConfig) ===",
+		zap.Bool("MarketDataProxyUser_Set", !walletConfig.MarketDataProxyConfig.User.Empty()),
+		zap.Bool("MarketDataProxyPassword_Set", !walletConfig.MarketDataProxyConfig.Password.Empty()),
+		zap.Bool("StatusProxyUser_Set", !walletConfig.StatusProxyUser.Empty()),
+		zap.Bool("StatusProxyPassword_Set", !walletConfig.StatusProxyPassword.Empty()),
+		zap.Bool("EthRpcProxyUser_Set", !walletConfig.EthRpcProxyUser.Empty()),
+		zap.Bool("EthRpcProxyPassword_Set", !walletConfig.EthRpcProxyPassword.Empty()),
+		zap.String("MarketDataProxyStageName", walletConfig.MarketDataProxyConfig.StageName),
+	)
 
 	return walletConfig
 }
