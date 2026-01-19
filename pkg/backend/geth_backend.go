@@ -328,6 +328,59 @@ func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
 	return b.multiaccountsDB.SaveAccount(account)
 }
 
+func (b *StatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return errors.New("accounts db wasn't initialized")
+	}
+
+	err := b.multiaccountsDB.DeleteAccount(keyUID)
+	if err != nil {
+		return err
+	}
+
+	appDbPath, err := b.getAppDBPath(keyUID)
+	if err != nil {
+		return err
+	}
+
+	walletDbPath, err := b.getWalletDBPath(keyUID)
+	if err != nil {
+		return err
+	}
+
+	dbFiles := []string{
+		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-shm", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-wal", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-shm", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-wal", keyUID)),
+		appDbPath,
+		appDbPath + "-shm",
+		appDbPath + "-wal",
+		walletDbPath,
+		walletDbPath + "-shm",
+		walletDbPath + "-wal",
+	}
+	for _, path := range dbFiles {
+		if _, err := os.Stat(path); err == nil {
+			err = os.Remove(path)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if b.account != nil && b.account.KeyUID == keyUID {
+		// reset active account
+		b.account = nil
+	}
+
+	return os.RemoveAll(keyStoreDir)
+}
+
 func (b *StatusBackend) runDBFileMigrations(account multiaccounts.Account, password string) (string, error) {
 	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
 	unsupportedPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))

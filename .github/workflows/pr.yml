@@ -3,7 +3,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: read # Keep permissions read-only. Required to provide `repo-token` for arduino/setup-protoc@v3 stage.
 
 jobs:
   golangci:
@@ -37,6 +37,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "29.3"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache go-generate-fast
         uses: actions/cache@v4

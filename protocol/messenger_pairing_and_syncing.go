@@ -403,6 +403,10 @@ func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID, c
 		return nil
 	}
 
+	if contactId == "" || requestID == "" {
+		return errors.New("invalid contact request parameters")
+	}
+
 	clock, chat := m.getLastClockWithRelatedChat()
 
 	var status protobuf.SyncContactRequestDecision_DecisionStatus

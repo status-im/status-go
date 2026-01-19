@@ -68,7 +68,7 @@ func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) 
 	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
 
 	// Accept contact request, receiver side
-	_, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types2.Hex2Bytes(contactRequests[0].ID)})
+	_, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types2.Hex2Bytes(contactRequests[0].ID), ContactID: contactRequests[0].From})
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination

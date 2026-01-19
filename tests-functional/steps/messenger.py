@@ -40,7 +40,7 @@ class MessengerSteps(NetworkConditionsSteps):
         return message_id
 
     def accept_contact_request_and_wait_for_signal_to_be_received(self, message_id, sender, receiver):
-        receiver.wakuext_service.accept_contact_request(message_id)
+        receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
         accepted_signal = f"@{receiver.public_key} accepted your contact request"
         sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
 
