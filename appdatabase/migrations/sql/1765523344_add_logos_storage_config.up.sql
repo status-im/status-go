@@ -1,4 +1,4 @@
-CREATE TABLE codex_config (
+CREATE TABLE logos_storage_config (
   enabled BOOLEAN DEFAULT false,
   log_level TEXT DEFAULT 'info',
   log_format TEXT DEFAULT 'auto',
@@ -13,7 +13,7 @@ CREATE TABLE codex_config (
   bootstrap_nodes TEXT,
   max_peers INTEGER DEFAULT 160,
   num_threads INTEGER DEFAULT 0,
-  agent_string TEXT DEFAULT 'Codex',
+  agent_string TEXT DEFAULT 'LogosStorage',
   repo_kind TEXT DEFAULT 'fs',
   storage_quota INTEGER DEFAULT 21474836480, -- 20 GiB
   block_ttl INTEGER DEFAULT 2592000, -- 30 days

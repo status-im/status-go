@@ -1321,12 +1321,12 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 }
 
 func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, cid string, clock uint64) error {
-	m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Handling history archive index CID message", zap.String("cid", cid))
+	m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Handling history archive index CID message", zap.String("cid", cid))
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
 
 	community, err := m.communitiesManager.GetByID(id)
 	if err != nil && err != communities.ErrOrgNotFound {
-		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Couldn't get community for community with id: ", zap.Any("id", id))
+		m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Couldn't get community for community with id: ", zap.Any("id", id))
 		return err
 	}
 	if community == nil {
@@ -1335,15 +1335,15 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 
 	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
 	if err != nil {
-		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Couldn't get community settings for community with id: ", zap.Any("id", id))
+		m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Couldn't get community settings for community with id: ", zap.Any("id", id))
 		return err
 	}
 	if settings == nil {
 		return nil
 	}
 
-	if m.archiveManager.IsCodexReady() && settings.HistoryArchiveSupportEnabled {
-		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Codex is ready and history archive support is enabled", zap.String("communityID", community.IDString()))
+	if m.archiveManager.IsLogosStorageReady() && settings.HistoryArchiveSupportEnabled {
+		m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] LogosStorage is ready and history archive support is enabled", zap.String("communityID", community.IDString()))
 
 		lastIndexCidClock, err := m.communitiesManager.GetIndexCidMessageClock(id)
 		if err != nil {
@@ -1357,21 +1357,21 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 		// We are only interested in a community archive index CID
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
-		m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Checking community membership and lastIndexCidClock", zap.String("communityID", community.IDString()), zap.Uint64("lastIndexCidClock", lastIndexCidClock), zap.Uint64("messageClock", clock))
+		m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Checking community membership and lastIndexCidClock", zap.String("communityID", community.IDString()), zap.Uint64("lastIndexCidClock", lastIndexCidClock), zap.Uint64("messageClock", clock))
 
 		if !community.IsControlNode() && community.Joined() && clock >= lastIndexCidClock {
-			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] clock >= lastIndexCidClock)")
+			m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] clock >= lastIndexCidClock)")
 			if lastSeenCid == cid {
-				m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] already processed this index cid")
+				m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] already processed this index cid")
 				return nil
 			}
 
 			// All checks passed - proceed with download
-			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Unseeding existing history archive index CID for community (if any)", zap.String("communityID", community.IDString()))
+			m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Unseeding existing history archive index CID for community (if any)", zap.String("communityID", community.IDString()))
 			m.archiveManager.UnseedHistoryArchiveIndexCid(id, lastSeenCid)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
-			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Starting download and import of history archives", zap.String("cid", cid))
+			m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Starting download and import of history archives", zap.String("cid", cid))
 
 			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
 				defer gocommon.LogOnPanic()
@@ -1398,12 +1398,12 @@ func (m *Messenger) HandleHistoryArchiveIndexCidMessage(state *ReceivedMessageSt
 				m.shutdownWaitGroup.Add(1)
 				defer m.shutdownWaitGroup.Done()
 
-				m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Calling downloadAndImportCodexHistoryArchives", zap.String("cid", cid))
+				m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Calling downloadAndImportLogosStorageHistoryArchives", zap.String("cid", cid))
 
-				m.downloadAndImportCodexHistoryArchives(communityID, cid, task.CancelChan)
+				m.downloadAndImportLogosStorageHistoryArchives(communityID, cid, task.CancelChan)
 			}(currentTask, id)
 
-			m.logger.Debug("[CODEX][HandleHistoryArchiveIndexCidMessage] Updating index CID message clock", zap.String("communityID", community.IDString()), zap.Uint64("clock", clock))
+			m.logger.Debug("[LogosStorage][HandleHistoryArchiveIndexCidMessage] Updating index CID message clock", zap.String("communityID", community.IDString()), zap.Uint64("clock", clock))
 			return m.communitiesManager.UpdateIndexCidMessageClock(id, clock)
 		}
 	}
@@ -1454,11 +1454,11 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 	m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 }
 
-func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, indexCid string, cancel chan struct{}) {
+func (m *Messenger) downloadAndImportLogosStorageHistoryArchives(id types.HexBytes, indexCid string, cancel chan struct{}) {
 	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByIndexCid(id, indexCid, cancel)
 	if err != nil {
 		m.logger.Error(
-			"[CODEX][downloadAndImportCodexHistoryArchives] failed to download history archive data",
+			"[LogosStorage][downloadAndImportLogosStorageHistoryArchives] failed to download history archive data",
 			zap.Error(err),
 		)
 		return
@@ -1466,17 +1466,17 @@ func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, ind
 
 	if downloadTaskInfo.Cancelled {
 		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
-			m.logger.Debug(fmt.Sprintf("[CODEX][downloadAndImportCodexHistoryArchives] downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
+			m.logger.Debug(fmt.Sprintf("[LogosStorage][downloadAndImportLogosStorageHistoryArchives] downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
 		}
 		m.archiveManager.UnseedHistoryArchiveIndexCid(id, indexCid)
 		return
 	}
 
-	m.logger.Debug("[CODEX][download_and_import_codex_history_archives] Updating last seen indexCid",
+	m.logger.Debug("[LogosStorage][download_and_import_logos_storage_history_archives] Updating last seen indexCid",
 		zap.String("indexCid", indexCid))
 	err = m.communitiesManager.UpdateLastSeenIndexCid(id, indexCid)
 	if err != nil {
-		m.logger.Error("[CODEX][download_and_import_codex_history_archives] couldn't update last seen indexCid",
+		m.logger.Error("[LogosStorage][download_and_import_logos_storage_history_archives] couldn't update last seen indexCid",
 			zap.String("indexCid", indexCid), zap.Error(err))
 		return
 	}
@@ -1488,11 +1488,11 @@ func (m *Messenger) downloadAndImportCodexHistoryArchives(id types.HexBytes, ind
 		return
 	}
 
-	m.logger.Debug("[CODEX][downloadAndImportCodexHistoryArchives] Importing history archives now")
+	m.logger.Debug("[LogosStorage][downloadAndImportLogosStorageHistoryArchives] Importing history archives now")
 
 	err = m.importHistoryArchives(id, cancel, indexCid)
 	if err != nil {
-		m.logger.Error("[CODEX][downloadAndImportCodexHistoryArchives] failed to import history archives", zap.Error(err))
+		m.logger.Error("[LogosStorage][downloadAndImportLogosStorageHistoryArchives] failed to import history archives", zap.Error(err))
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(id))
 		return
 	}
@@ -1590,7 +1590,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(ctx context.Context, stat
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *common.StatusMessage) error {
-	m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] Handling community request to join")
+	m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] Handling community request to join")
 	signer := state.CurrentMessageState.PublicKey
 	community, requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, statusMessage.TransportLayer.Dst, requestToJoinProto)
 	if err != nil {
@@ -1630,7 +1630,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 		}
 
 	case communities.RequestToJoinStateDeclined:
-		m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] Community request to join declined")
+		m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] Community request to join declined")
 		response, err := m.declineRequestToJoinCommunity(requestToJoin)
 		if err == nil {
 			err := state.Response.Merge(response)
@@ -1642,7 +1642,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 		}
 
 	case communities.RequestToJoinStateAccepted:
-		m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] Community request to join accepted")
+		m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] Community request to join accepted")
 		response, err := m.acceptRequestToJoinCommunity(requestToJoin)
 		if err == nil {
 			err := state.Response.Merge(response) // new member has been added
@@ -1650,7 +1650,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 				return err
 			}
 		} else if err == communities.ErrNoPermissionToJoin {
-			m.logger.Debug("[CODEX][HandleCommunityRequestToJoin] No permission to join community")
+			m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] No permission to join community")
 			// only control node will end up here as it's the only one that
 			// performed token permission checks
 			response, err = m.declineRequestToJoinCommunity(requestToJoin)
@@ -1703,7 +1703,7 @@ func (m *Messenger) HandleCommunityEditSharedAddresses(ctx context.Context, stat
 }
 
 func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, state *ReceivedMessageState, requestToJoinResponseProto *protobuf.CommunityRequestToJoinResponse, statusMessage *common.StatusMessage) error {
-	m.logger.Debug("[CODEX][HandleCommunityRequestToJoinResponse] Handling community request to join response")
+	m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoinResponse] Handling community request to join response")
 	signer := state.CurrentMessageState.PublicKey
 	if requestToJoinResponseProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1819,9 +1819,9 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 		}
 
 		cid := requestToJoinResponseProto.IndexCid
-		if m.archiveManager.IsCodexReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && cid != "" {
+		if m.archiveManager.IsLogosStorageReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && cid != "" {
 
-			m.logger.Debug("[CODEX][HandleCommunityRequestToJoinResponse] Received index CID to download history archives", zap.String("cid", cid))
+			m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoinResponse] Received index CID to download history archives", zap.String("cid", cid))
 
 			if err := m.communitiesManager.UpdateIndexCidMessageClock(requestToJoinResponseProto.CommunityId, requestToJoinResponseProto.Clock); err != nil {
 				return err
@@ -1849,9 +1849,9 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 				m.shutdownWaitGroup.Add(1)
 				defer m.shutdownWaitGroup.Done()
 
-				m.logger.Debug("[CODEX][HandleCommunityRequestToJoinResponse] Starting download and import of history archives", zap.String("cid", cid))
+				m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoinResponse] Starting download and import of history archives", zap.String("cid", cid))
 
-				m.downloadAndImportCodexHistoryArchives(community.ID(), cid, task.CancelChan)
+				m.downloadAndImportLogosStorageHistoryArchives(community.ID(), cid, task.CancelChan)
 			}(currentTask)
 		}
 	}
@@ -3759,7 +3759,7 @@ func (m *Messenger) HandleSyncTrustedUser(ctx context.Context, state *ReceivedMe
 }
 
 func (m *Messenger) HandleCommunityMessageArchiveIndexCid(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveIndexCid, statusMessage *common.StatusMessage) error {
-	m.logger.Debug("[CODEX][HandleCommunityMessageArchiveIndexCid] received CommunityMessageArchiveIndexCid", zap.String("cid", message.Cid))
+	m.logger.Debug("[LogosStorage][HandleCommunityMessageArchiveIndexCid] received CommunityMessageArchiveIndexCid", zap.String("cid", message.Cid))
 
 	archiveDistributionPreference, err := m.GetArchiveDistributionPreference()
 	if err != nil {
@@ -3767,7 +3767,7 @@ func (m *Messenger) HandleCommunityMessageArchiveIndexCid(ctx context.Context, s
 	}
 	if archiveDistributionPreference == communities.ArchiveDistributionMethodTorrent {
 		// Ignore Cid messages when torrent distribution is selected
-		m.logger.Debug("[CODEX][HandleCommunityMessageArchiveIndexCid] skipping cid processing due to torrent-only preference")
+		m.logger.Debug("[LogosStorage][HandleCommunityMessageArchiveIndexCid] skipping cid processing due to torrent-only preference")
 		return nil
 	}
 	return m.HandleHistoryArchiveIndexCidMessage(state, state.CurrentMessageState.PublicKey, message.Cid, message.Clock)
@@ -3778,9 +3778,9 @@ func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	if archiveDistributionPreference == communities.ArchiveDistributionMethodCodex {
-		// Ignore magnetlink messages when codex distribution is selected
-		m.logger.Debug("skipping magnetlink processing due to codex-only preference")
+	if archiveDistributionPreference == communities.ArchiveDistributionMethodLogosStorage {
+		// Ignore magnetlink messages when LogosStorage distribution is selected
+		m.logger.Debug("skipping magnetlink processing due to LogosStorage-only preference")
 		return nil
 	}
 	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)

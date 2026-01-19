@@ -15,9 +15,9 @@ func (s *SetArchiveDistributionPreference) Validate() error {
 
 	// Validate preference value
 	switch s.Preference {
-	case "torrent", "codex":
+	case "torrent", "LogosStorage":
 		return nil
 	default:
-		return errors.New("invalid preference, must be one of: torrent, codex")
+		return errors.New("invalid preference, must be one of: torrent, LogosStorage")
 	}
 }

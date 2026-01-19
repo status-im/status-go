@@ -76,7 +76,7 @@
       "args": [
         "-test.v",
         "-test.run",
-        "TestMessengerCommunitiesTokenPermissionsSuite/TestFullCodexIntegration",
+        "TestMessengerCommunitiesTokenPermissionsSuite/TestFullLogosStorageIntegration",
         "-count=1"
       ],
       "buildFlags": "-tags=gowaku_no_rln,gowaku_skip_migrations",
@@ -85,7 +85,7 @@
       }
     },
     {
-      "name": "Debug Mock Tests (Codex)",
+      "name": "Debug Mock Tests (LogosStorage)",
       "type": "go",
       "request": "launch",
       "mode": "test",

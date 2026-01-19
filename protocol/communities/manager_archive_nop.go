@@ -29,21 +29,21 @@ func (tmm *ArchiveManagerNop) SetOnline(online bool) {}
 
 func (tmm *ArchiveManagerNop) SetTorrentConfig(*params.TorrentConfig) {}
 
-func (tmm *ArchiveManagerNop) SetCodexConfig(*params.CodexConfig) {}
+func (tmm *ArchiveManagerNop) SetLogosStorageConfig(*params.LogosStorageConfig) {}
 
 func (tmm *ArchiveManagerNop) StartTorrentClient() error {
 	return nil
 }
 
-func (tmm *ArchiveManagerNop) StartCodexClient() error {
+func (tmm *ArchiveManagerNop) StartLogosStorageClient() error {
 	return nil
 }
 
-func (tmm *ArchiveManagerNop) GetCodexClient() CodexClientInterface {
+func (tmm *ArchiveManagerNop) GetLogosStorageClient() LogosStorageClientInterface {
 	return nil
 }
 
-func (tmm *ArchiveManagerNop) SetCodexClient(client CodexClientInterface) {}
+func (tmm *ArchiveManagerNop) SetLogosStorageClient(client LogosStorageClientInterface) {}
 
 func (tmm *ArchiveManagerNop) Stop() error {
 	return nil
@@ -90,7 +90,7 @@ func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveTorrent(communityID types.H
 	return false
 }
 
-func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveCodex(communityID types.HexBytes) bool {
+func (tmm *ArchiveManagerNop) IsSeedingHistoryArchiveLogosStorage(communityID types.HexBytes) bool {
 	return false
 }
 
@@ -113,6 +113,6 @@ func (tmm *ArchiveManagerNop) TorrentFileExists(communityID string) bool {
 	return false
 }
 
-func (tmm *ArchiveManagerNop) CodexIndexCidFileExists(communityID types.HexBytes) bool {
+func (tmm *ArchiveManagerNop) LogosStorageIndexCidFileExists(communityID types.HexBytes) bool {
 	return false
 }

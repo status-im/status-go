@@ -216,7 +216,7 @@ type NodeConfig struct {
 	// OTELConfig provides configuration for OpenTelemetry tracing
 	OTELConfig OTELConfig
 
-	CodexConfig CodexConfig
+	LogosStorageConfig LogosStorageConfig
 
 	OutputMessageCSVEnabled bool
 
@@ -344,15 +344,15 @@ type TorrentConfig struct {
 	TorrentDir string
 }
 
-type CodexConfig struct {
-	Enabled         bool
-	CodexNodeConfig codex.Config
+type LogosStorageConfig struct {
+	Enabled                bool
+	LogosStorageNodeConfig codex.Config
 }
 
 const (
 	ArchiveDistributionMethodTorrent            = "torrent"
-	ArchiveDistributionMethodCodex              = "codex"
-	DefaultHistoryArchiveDistributionPreference = ArchiveDistributionMethodCodex
+	ArchiveDistributionMethodLogosStorage       = "LogosStorage"
+	DefaultHistoryArchiveDistributionPreference = ArchiveDistributionMethodLogosStorage
 )
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
@@ -391,8 +391,8 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 
 	if c.TorrentConfig.Enabled {
 		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodTorrent
-	} else if c.CodexConfig.Enabled {
-		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodCodex
+	} else if c.LogosStorageConfig.Enabled {
+		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodLogosStorage
 	}
 
 	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodTorrent {
@@ -406,10 +406,10 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		}
 	}
 
-	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodCodex {
-		if c.CodexConfig.Enabled {
-			if c.CodexConfig.CodexNodeConfig.DataDir == "" {
-				c.CodexConfig.CodexNodeConfig.DataDir = filepath.Join(c.RootDataDir, "codex", "codexdata")
+	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodLogosStorage {
+		if c.LogosStorageConfig.Enabled {
+			if c.LogosStorageConfig.LogosStorageNodeConfig.DataDir == "" {
+				c.LogosStorageConfig.LogosStorageNodeConfig.DataDir = filepath.Join(c.RootDataDir, "logos-storage", "data")
 			}
 		}
 	}
@@ -448,11 +448,11 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			DataDir:    dataDir + "/archivedata",
 			TorrentDir: dataDir + "/torrents",
 		},
-		CodexConfig: CodexConfig{
+		LogosStorageConfig: LogosStorageConfig{
 			Enabled: false,
-			CodexNodeConfig: codex.Config{
+			LogosStorageNodeConfig: codex.Config{
 				BlockRetries:   BlockRetries,
-				DataDir:        filepath.Join(dataDir, "codex", "codexdata"),
+				DataDir:        filepath.Join(dataDir, "logos-storage", "data"),
 				MetricsEnabled: false,
 				LogFormat:      codex.LogFormatNoColors,
 			},
@@ -535,7 +535,7 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	if err := c.TorrentConfig.Validate(validate); err != nil {
 		return err
 	}
-	if err := Validate(c.CodexConfig, validate); err != nil {
+	if err := Validate(c.LogosStorageConfig, validate); err != nil {
 		return err
 	}
 	return nil
@@ -569,15 +569,15 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 	return nil
 }
 
-func Validate(c CodexConfig, validate *validator.Validate) error {
+func Validate(c LogosStorageConfig, validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
 		return err
 	}
 
 	// TODO uncomment when DataDir is mandatory
-	// Need to check if the codex config should be saved in db
+	// Need to check if the logos-storage config should be saved in db
 	// if c.DataDir == "" {
-	// 	return fmt.Errorf("CodexConfig.DataDir cannot be \"\"")
+	// 	return fmt.Errorf("LogosStorageConfig.DataDir cannot be \"\"")
 	// }
 	return nil
 }

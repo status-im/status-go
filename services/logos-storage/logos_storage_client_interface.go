@@ -9,8 +9,8 @@ import (
 
 //go:generate go tool mockgen -package=mock_logosstorage -source=logos_storage_client_interface.go -destination=mock/logos_storage_client_interface.go
 
-// CodexClientInterface defines the interface for CodexClient operations needed by the downloader
-type CodexClientInterface interface {
+// LogosStorageClientInterface defines the interface for LogosStorageClient operations needed by the downloader
+type LogosStorageClientInterface interface {
 	// Upload methods
 	Upload(data io.Reader, filename string) (string, error)
 	UploadArchive(encodedArchive []byte) (string, error)

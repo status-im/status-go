@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-func ApplyCodexConfigOverrides(cfg *params.CodexConfig, overrides map[string]string) error {
+func ApplyLogosStorageConfigOverrides(cfg *params.LogosStorageConfig, overrides map[string]string) error {
 	if cfg == nil || len(overrides) == 0 {
 		return nil
 	}
@@ -21,7 +21,7 @@ func ApplyCodexConfigOverrides(cfg *params.CodexConfig, overrides map[string]str
 			continue
 		}
 		if err := setStructFieldValue(reflect.ValueOf(cfg), key, raw); err != nil {
-			return fmt.Errorf("failed to apply CodexConfig override %q: %w", key, err)
+			return fmt.Errorf("failed to apply LogosStorageConfig override %q: %w", key, err)
 		}
 	}
 

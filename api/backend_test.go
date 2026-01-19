@@ -615,9 +615,9 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 			"DataDir": "` + testContext.config.RootDataDir + `/archivedata",
 			"TorrentDir": "` + testContext.config.RootDataDir + `/torrents"
 		},
-		"CodexConfig": {
+		"LogosStorageConfig": {
 			"Enabled": false,
-			"data-dir": "` + testContext.config.RootDataDir + `/codexdata",
+			"data-dir": "` + testContext.config.RootDataDir + `/logos-storage/data",
 			"block-retries": 5
 		},
 		"RuntimeLogLevel": "INFO",
@@ -1455,11 +1455,11 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 				"alchemyBaseMainnetToken":     "",
 				"alchemyBaseSepoliaToken":     "",
 			},
-			"torrentConfigEnabled":   false,
-			"torrentConfigPort":      0,
-			"codexConfigEnabled":     false,
-			"keycardInstanceUID":     "a84599394887b742eed9a99d3834a797",
-			"keycardPairingDataFile": path.Join(tmpdir, DefaultKeycardPairingDataFileRelativePath),
+			"torrentConfigEnabled":      false,
+			"torrentConfigPort":         0,
+			"logosStorageConfigEnabled": false,
+			"keycardInstanceUID":        "a84599394887b742eed9a99d3834a797",
+			"keycardPairingDataFile":    path.Join(tmpdir, DefaultKeycardPairingDataFileRelativePath),
 		},
 	}
 

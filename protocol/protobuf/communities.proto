@@ -261,14 +261,14 @@ message WakuMessageArchiveIndex {
   map<string, WakuMessageArchiveIndexMetadata> archives = 1;
 }
 
-message CodexWakuMessageArchiveIndexMetadata {
+message LogosStorageWakuMessageArchiveIndexMetadata {
   uint32 version = 1;
   WakuMessageArchiveMetadata metadata = 2;
   string cid = 3;
 }
 
-message CodexWakuMessageArchiveIndex {
-  map<string, CodexWakuMessageArchiveIndexMetadata> archives = 1;
+message LogosStorageWakuMessageArchiveIndex {
+  map<string, LogosStorageWakuMessageArchiveIndexMetadata> archives = 1;
 }
 
 message CommunityReevaluatePermissionsRequest {

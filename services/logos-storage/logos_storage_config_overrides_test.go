@@ -10,211 +10,211 @@ import (
 	. "github.com/status-im/status-go/services/logos-storage"
 )
 
-type CodexConfigOverridesTestSuite struct {
+type LogosStorageConfigOverridesTestSuite struct {
 	suite.Suite
 }
 
-func TestCodexConfigOverridesTestSuite(t *testing.T) {
-	suite.Run(t, new(CodexConfigOverridesTestSuite))
+func TestLogosStorageConfigOverridesTestSuite(t *testing.T) {
+	suite.Run(t, new(LogosStorageConfigOverridesTestSuite))
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_AllFields() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_AllFields() {
+	cfg := &params.LogosStorageConfig{}
 
 	overrides := map[string]string{
-		// params.CodexConfig fields
+		// params.LogosStorageConfig fields
 		"Enabled": "true",
 
-		// codex.Config fields (nested under CodexNodeConfig)
-		"CodexNodeConfig.LogLevel":                       "DEBUG",
-		"CodexNodeConfig.LogFormat":                      "json",
-		"CodexNodeConfig.MetricsEnabled":                 "true",
-		"CodexNodeConfig.MetricsAddress":                 "0.0.0.0",
-		"CodexNodeConfig.MetricsPort":                    "9090",
-		"CodexNodeConfig.DataDir":                        "/custom/data/dir",
-		"CodexNodeConfig.ListenAddrs":                    `["/ip4/0.0.0.0/tcp/4001","/ip4/0.0.0.0/tcp/4002"]`,
-		"CodexNodeConfig.Nat":                            "none",
-		"CodexNodeConfig.DiscoveryPort":                  "8091",
-		"CodexNodeConfig.NetPrivKeyFile":                 "/path/to/key",
-		"CodexNodeConfig.BootstrapNodes":                 `["spr:CiUIAhIhA1..","spr:CiUIAhIhA2.."]`,
-		"CodexNodeConfig.MaxPeers":                       "200",
-		"CodexNodeConfig.NumThreads":                     "4",
-		"CodexNodeConfig.AgentString":                    "CustomCodex/1.0",
-		"CodexNodeConfig.RepoKind":                       "sqlite",
-		"CodexNodeConfig.StorageQuota":                   "50000000000",
-		"CodexNodeConfig.BlockTtl":                       "604800",
-		"CodexNodeConfig.BlockMaintenanceInterval":       "300",
-		"CodexNodeConfig.BlockMaintenanceNumberOfBlocks": "2000",
-		"CodexNodeConfig.BlockRetries":                   "5000",
-		"CodexNodeConfig.CacheSize":                      "1024",
-		"CodexNodeConfig.LogFile":                        "/var/log/codex.log",
+		// codex.Config fields (nested under LogosStorageNodeConfig)
+		"LogosStorageNodeConfig.LogLevel":                       "DEBUG",
+		"LogosStorageNodeConfig.LogFormat":                      "json",
+		"LogosStorageNodeConfig.MetricsEnabled":                 "true",
+		"LogosStorageNodeConfig.MetricsAddress":                 "0.0.0.0",
+		"LogosStorageNodeConfig.MetricsPort":                    "9090",
+		"LogosStorageNodeConfig.DataDir":                        "/custom/data/dir",
+		"LogosStorageNodeConfig.ListenAddrs":                    `["/ip4/0.0.0.0/tcp/4001","/ip4/0.0.0.0/tcp/4002"]`,
+		"LogosStorageNodeConfig.Nat":                            "none",
+		"LogosStorageNodeConfig.DiscoveryPort":                  "8091",
+		"LogosStorageNodeConfig.NetPrivKeyFile":                 "/path/to/key",
+		"LogosStorageNodeConfig.BootstrapNodes":                 `["spr:CiUIAhIhA1..","spr:CiUIAhIhA2.."]`,
+		"LogosStorageNodeConfig.MaxPeers":                       "200",
+		"LogosStorageNodeConfig.NumThreads":                     "4",
+		"LogosStorageNodeConfig.AgentString":                    "CustomLogosStorage/1.0",
+		"LogosStorageNodeConfig.RepoKind":                       "sqlite",
+		"LogosStorageNodeConfig.StorageQuota":                   "50000000000",
+		"LogosStorageNodeConfig.BlockTtl":                       "604800",
+		"LogosStorageNodeConfig.BlockMaintenanceInterval":       "300",
+		"LogosStorageNodeConfig.BlockMaintenanceNumberOfBlocks": "2000",
+		"LogosStorageNodeConfig.BlockRetries":                   "5000",
+		"LogosStorageNodeConfig.CacheSize":                      "1024",
+		"LogosStorageNodeConfig.LogFile":                        "/var/log/logos-storage.log",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.Require().NoError(err)
 
-	// Verify params.CodexConfig fields
+	// Verify params.LogosStorageConfig fields
 	s.Equal(true, cfg.Enabled)
 
 	// Verify codex.Config fields
-	s.Equal("DEBUG", cfg.CodexNodeConfig.LogLevel)
-	s.Equal(codex.LogFormat("json"), cfg.CodexNodeConfig.LogFormat)
-	s.Equal(true, cfg.CodexNodeConfig.MetricsEnabled)
-	s.Equal("0.0.0.0", cfg.CodexNodeConfig.MetricsAddress)
-	s.Equal(9090, cfg.CodexNodeConfig.MetricsPort)
-	s.Equal("/custom/data/dir", cfg.CodexNodeConfig.DataDir)
-	s.Equal([]string{"/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/tcp/4002"}, cfg.CodexNodeConfig.ListenAddrs)
-	s.Equal("none", cfg.CodexNodeConfig.Nat)
-	s.Equal(8091, cfg.CodexNodeConfig.DiscoveryPort)
-	s.Equal("/path/to/key", cfg.CodexNodeConfig.NetPrivKeyFile)
-	s.Equal([]string{"spr:CiUIAhIhA1..", "spr:CiUIAhIhA2.."}, cfg.CodexNodeConfig.BootstrapNodes)
-	s.Equal(200, cfg.CodexNodeConfig.MaxPeers)
-	s.Equal(4, cfg.CodexNodeConfig.NumThreads)
-	s.Equal("CustomCodex/1.0", cfg.CodexNodeConfig.AgentString)
-	s.Equal(codex.RepoKind("sqlite"), cfg.CodexNodeConfig.RepoKind)
-	s.Equal(50000000000, cfg.CodexNodeConfig.StorageQuota)
-	s.Equal("604800", cfg.CodexNodeConfig.BlockTtl)
-	s.Equal("300", cfg.CodexNodeConfig.BlockMaintenanceInterval)
-	s.Equal(2000, cfg.CodexNodeConfig.BlockMaintenanceNumberOfBlocks)
-	s.Equal(5000, cfg.CodexNodeConfig.BlockRetries)
-	s.Equal(1024, cfg.CodexNodeConfig.CacheSize)
-	s.Equal("/var/log/codex.log", cfg.CodexNodeConfig.LogFile)
+	s.Equal("DEBUG", cfg.LogosStorageNodeConfig.LogLevel)
+	s.Equal(codex.LogFormat("json"), cfg.LogosStorageNodeConfig.LogFormat)
+	s.Equal(true, cfg.LogosStorageNodeConfig.MetricsEnabled)
+	s.Equal("0.0.0.0", cfg.LogosStorageNodeConfig.MetricsAddress)
+	s.Equal(9090, cfg.LogosStorageNodeConfig.MetricsPort)
+	s.Equal("/custom/data/dir", cfg.LogosStorageNodeConfig.DataDir)
+	s.Equal([]string{"/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/tcp/4002"}, cfg.LogosStorageNodeConfig.ListenAddrs)
+	s.Equal("none", cfg.LogosStorageNodeConfig.Nat)
+	s.Equal(8091, cfg.LogosStorageNodeConfig.DiscoveryPort)
+	s.Equal("/path/to/key", cfg.LogosStorageNodeConfig.NetPrivKeyFile)
+	s.Equal([]string{"spr:CiUIAhIhA1..", "spr:CiUIAhIhA2.."}, cfg.LogosStorageNodeConfig.BootstrapNodes)
+	s.Equal(200, cfg.LogosStorageNodeConfig.MaxPeers)
+	s.Equal(4, cfg.LogosStorageNodeConfig.NumThreads)
+	s.Equal("CustomLogosStorage/1.0", cfg.LogosStorageNodeConfig.AgentString)
+	s.Equal(codex.RepoKind("sqlite"), cfg.LogosStorageNodeConfig.RepoKind)
+	s.Equal(50000000000, cfg.LogosStorageNodeConfig.StorageQuota)
+	s.Equal("604800", cfg.LogosStorageNodeConfig.BlockTtl)
+	s.Equal("300", cfg.LogosStorageNodeConfig.BlockMaintenanceInterval)
+	s.Equal(2000, cfg.LogosStorageNodeConfig.BlockMaintenanceNumberOfBlocks)
+	s.Equal(5000, cfg.LogosStorageNodeConfig.BlockRetries)
+	s.Equal(1024, cfg.LogosStorageNodeConfig.CacheSize)
+	s.Equal("/var/log/logos-storage.log", cfg.LogosStorageNodeConfig.LogFile)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_NilConfig() {
-	err := ApplyCodexConfigOverrides(nil, map[string]string{"Enabled": "true"})
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_NilConfig() {
+	err := ApplyLogosStorageConfigOverrides(nil, map[string]string{"Enabled": "true"})
 	s.NoError(err, "should handle nil config gracefully")
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_EmptyOverrides() {
-	cfg := &params.CodexConfig{}
-	err := ApplyCodexConfigOverrides(cfg, map[string]string{})
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_EmptyOverrides() {
+	cfg := &params.LogosStorageConfig{}
+	err := ApplyLogosStorageConfigOverrides(cfg, map[string]string{})
 	s.NoError(err, "should handle empty overrides gracefully")
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_InvalidFieldName() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_InvalidFieldName() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
 		"NonExistentField": "value",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.Error(err)
 	s.Contains(err.Error(), "unknown field")
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_InvalidBoolValue() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_InvalidBoolValue() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
 		"Enabled": "not-a-bool",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.Error(err)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_InvalidIntValue() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_InvalidIntValue() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
-		"CodexNodeConfig.MetricsPort": "not-a-number",
+		"LogosStorageNodeConfig.MetricsPort": "not-a-number",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.Error(err)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_EmptyKey() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_EmptyKey() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
 		"":        "should-be-ignored",
 		"Enabled": "true",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.NoError(err)
 	s.Equal(true, cfg.Enabled)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_WhitespaceKey() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_WhitespaceKey() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
 		"   ":     "should-be-ignored",
 		"Enabled": "true",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.NoError(err)
 	s.Equal(true, cfg.Enabled)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_StringSliceJSON() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_StringSliceJSON() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
-		"CodexNodeConfig.ListenAddrs": `["/ip4/0.0.0.0/tcp/4001"]`,
+		"LogosStorageNodeConfig.ListenAddrs": `["/ip4/0.0.0.0/tcp/4001"]`,
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.NoError(err)
-	s.Equal([]string{"/ip4/0.0.0.0/tcp/4001"}, cfg.CodexNodeConfig.ListenAddrs)
+	s.Equal([]string{"/ip4/0.0.0.0/tcp/4001"}, cfg.LogosStorageNodeConfig.ListenAddrs)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_StringSliceCommaSeparated() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_StringSliceCommaSeparated() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
-		"CodexNodeConfig.BootstrapNodes": "node1,node2,node3",
+		"LogosStorageNodeConfig.BootstrapNodes": "node1,node2,node3",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.NoError(err)
-	s.Equal([]string{"node1", "node2", "node3"}, cfg.CodexNodeConfig.BootstrapNodes)
+	s.Equal([]string{"node1", "node2", "node3"}, cfg.LogosStorageNodeConfig.BootstrapNodes)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_StringSliceEmpty() {
-	cfg := &params.CodexConfig{
-		CodexNodeConfig: codex.Config{
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_StringSliceEmpty() {
+	cfg := &params.LogosStorageConfig{
+		LogosStorageNodeConfig: codex.Config{
 			ListenAddrs: []string{"existing"},
 		},
 	}
 	overrides := map[string]string{
-		"CodexNodeConfig.ListenAddrs": "",
+		"LogosStorageNodeConfig.ListenAddrs": "",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.NoError(err)
-	s.Nil(cfg.CodexNodeConfig.ListenAddrs)
+	s.Nil(cfg.LogosStorageNodeConfig.ListenAddrs)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_NestedPath() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_NestedPath() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
-		"CodexNodeConfig.DataDir": "/test/path",
+		"LogosStorageNodeConfig.DataDir": "/test/path",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.NoError(err)
-	s.Equal("/test/path", cfg.CodexNodeConfig.DataDir)
+	s.Equal("/test/path", cfg.LogosStorageNodeConfig.DataDir)
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_InvalidNestedPath() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_InvalidNestedPath() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
-		"CodexNodeConfig.NonExistent.Field": "value",
+		"LogosStorageNodeConfig.NonExistent.Field": "value",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.Error(err)
 	s.Contains(err.Error(), "unknown field")
 	s.Regexp(`\bNonExistent\b`, err.Error())
-	s.Contains(err.Error(), "CodexNodeConfig.NonExistent.Field")
+	s.Contains(err.Error(), "LogosStorageNodeConfig.NonExistent.Field")
 }
 
-func (s *CodexConfigOverridesTestSuite) TestApplyCodexConfigOverrides_EmptySegmentInPath() {
-	cfg := &params.CodexConfig{}
+func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_EmptySegmentInPath() {
+	cfg := &params.LogosStorageConfig{}
 	overrides := map[string]string{
-		"CodexNodeConfig..DataDir": "/test/path",
+		"LogosStorageNodeConfig..DataDir": "/test/path",
 	}
 
-	err := ApplyCodexConfigOverrides(cfg, overrides)
+	err := ApplyLogosStorageConfigOverrides(cfg, overrides)
 	s.Error(err)
 	s.Contains(err.Error(), "invalid empty segment")
 }

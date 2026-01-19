@@ -15,12 +15,12 @@ class TestCommunityArchives(MessengerSteps):
 
         # Community owner
         self.creator = backend_new_profile("creator")
-        # Define codex as archive distribution preference
-        self.creator.wakuext_service.set_archive_distribution_preference("codex")
+        # Define LogosStorage as archive distribution preference
+        self.creator.wakuext_service.set_archive_distribution_preference("LogosStorage")
         # Enable community history archive protocol
-        self.creator.wakuext_service.enable_codex_community_history_archive_protocol(
+        self.creator.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
-                "CodexNodeConfig.DiscoveryPort": 8091,
+                "LogosStorageNodeConfig.DiscoveryPort": 8091,
             }
         )
 
@@ -28,23 +28,23 @@ class TestCommunityArchives(MessengerSteps):
 
         # Create a first member that will join the community first
         self.member = backend_new_profile("member", import_initial_delay=5)
-        # Define codex as archive distribution preference
-        self.member.wakuext_service.set_archive_distribution_preference("codex")
-        self.member.wakuext_service.enable_codex_community_history_archive_protocol(
+        # Define LogosStorage as archive distribution preference
+        self.member.wakuext_service.set_archive_distribution_preference("LogosStorage")
+        self.member.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
-                "CodexNodeConfig.DiscoveryPort": 8092,
-                "CodexNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
+                "LogosStorageNodeConfig.DiscoveryPort": 8092,
+                "LogosStorageNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
             }
         )
 
         # Create another member that will join the community later after the first message is sent
         self.another_member = backend_new_profile("member", import_initial_delay=5)
-        # Define codex as archive distribution preference
-        self.another_member.wakuext_service.set_archive_distribution_preference("codex")
-        self.another_member.wakuext_service.enable_codex_community_history_archive_protocol(
+        # Define LogosStorage as archive distribution preference
+        self.another_member.wakuext_service.set_archive_distribution_preference("LogosStorage")
+        self.another_member.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
-                "CodexNodeConfig.DiscoveryPort": 8093,
-                "CodexNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
+                "LogosStorageNodeConfig.DiscoveryPort": 8093,
+                "LogosStorageNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
             }
         )
 
@@ -71,7 +71,7 @@ class TestCommunityArchives(MessengerSteps):
     def test_community_archive_index_exists(self):
         # Set message archive interval to 80 seconds which is longer that the retention policy
         # of the Waky node.
-        # So we are expecting to retrieve the archive from Codex even after the Waky node
+        # So we are expecting to retrieve the archive from LogosStorage even after the Waky node
         # has already deleted the messages locally.
         message_archive_interval = 80
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
@@ -116,7 +116,7 @@ class TestCommunityArchives(MessengerSteps):
 
         # Ensure that the community archive index is being seeded by the community owner.
         # has_community_archive returns true if lastSeenIndexCid from DB is not empty
-        # and HasCid on the CodexClient returns true.
+        # and HasCid on the LogosStorageClient returns true.
         has_archive_index = self.creator.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Creator should have community archive index after messages are sent"
 
@@ -127,20 +127,20 @@ class TestCommunityArchives(MessengerSteps):
         archive_timeout = 10
 
         # Wait for index download completed signal. This signal is emitted
-        # immediately after archive index is downloaded from Codex node.
+        # immediately after archive index is downloaded from LogosStorage node.
         logging.info("Waiting for community member to download archive index...")
         self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
         logging.info("Success! Archive index downloaded!")
 
         # The HistoryArchivesSeedingSignal is emitted right after all archives
-        # are downloaded to the Codex node and the corresponding index CID is
+        # are downloaded to the LogosStorage node and the corresponding index CID is
         # recorded in the database as "lastSeenIndexCid".
         logging.info("Waiting for community member to download ALL history archives...")
         self.member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
         logging.info("Success! Community member has downloaded ALL history archives!")
 
         # The archive index should be "seeding": index CID in the database and
-        # HasCid on the CodexClient returns true.
+        # HasCid on the LogosStorageClient returns true.
         logging.info("Verifying that community member has index CID file...")
         has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Member should have community archive index after messages are sent"
@@ -170,18 +170,18 @@ class TestCommunityArchives(MessengerSteps):
         logging.info("Verified that another member does not have the message before archive import.")
 
         # Wait for index download completed signal - index should be now downloaded
-        # for Codex.
+        # for LogosStorage.
         logging.info("Waiting for another member to download archive index...")
         self.another_member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
         logging.info("Success! Archive index downloaded by another member!")
 
-        # Wait for seeding signal - all archives should be now downloaded to Codex node
+        # Wait for seeding signal - all archives should be now downloaded to LogosStorage node
         # and index should be seeding.
         logging.info("Waiting for another member to download ALL history archives...")
         self.another_member.wait_for_signal(SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout)
         logging.info("Success! Another member has downloaded ALL history archives!")
 
-        # IndexCid in the database and HasCid on the CodexClient returns true (seeding).
+        # IndexCid in the database and HasCid on the LogosStorageClient returns true (seeding).
         logging.info("Verifying that another member has index CID file...")
         has_archive_index = self.another_member.wakuext_service.has_community_archive(community_id)
         assert has_archive_index is True, "Another member should have community archive index after messages are sent"
@@ -222,7 +222,7 @@ class TestCommunityArchives(MessengerSteps):
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
 
         # Create a community
-        response = self.creator.wakuext_service.create_community("Codex community", "No one should join", history_archive_support_enabled=True)
+        response = self.creator.wakuext_service.create_community("LogosStorage community", "No one should join", history_archive_support_enabled=True)
         community_id = response.get("communities", [{}])[0].get("id")
         default_chat_id = response.get("chats", [{}])[0].get("id")
 
@@ -249,7 +249,7 @@ class TestCommunityArchives(MessengerSteps):
         self.creator.wakuext_service.update_message_archive_interval(message_archive_interval)
 
         # Create a community
-        response = self.creator.wakuext_service.create_community("Codex community", "No one should join", history_archive_support_enabled=True)
+        response = self.creator.wakuext_service.create_community("LogosStorage community", "No one should join", history_archive_support_enabled=True)
         community_id = response.get("communities", [{}])[0].get("id")
 
         time.sleep(message_archive_interval + 10)
@@ -285,7 +285,7 @@ class TestCommunityArchives(MessengerSteps):
             # We need to wait for the archive dispatch + download + import which should not take more than 10 seconds
             archive_timeout = 10
 
-            # Wait for the archive index to be downloaded from Codex node.
+            # Wait for the archive index to be downloaded from LogosStorage node.
             logging.info("Waiting for community member to download archive index...")
             self.member.wait_for_signal(SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout)
             logging.info("Success! Archive index downloaded!")
@@ -296,7 +296,7 @@ class TestCommunityArchives(MessengerSteps):
             logging.info("Success! Community member has downloaded ALL history archives!")
 
             # The archive index should be "seeding": index CID in the database and
-            # HasCid on the CodexClient returns true.
+            # HasCid on the LogosStorageClient returns true.
             logging.info("Verifying that community member has index CID file...")
             has_archive_index = self.member.wakuext_service.has_community_archive(community_id)
             assert has_archive_index is True, "Member should have community archive index after messages are sent"
@@ -356,7 +356,7 @@ class TestCommunityArchives(MessengerSteps):
         self.member.wait_for_login()
         self.member.wakuext_service.start_messenger()
 
-        # Re-connect member to community codex client
+        # Re-connect member to community LogosStorage client
         info = self.creator.wakuext_service.debug()
         self.member.wakuext_service.connect(info["id"], info["addrs"])
 

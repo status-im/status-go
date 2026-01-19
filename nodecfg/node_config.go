@@ -129,46 +129,46 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-// Insert or update codex_config table
-func insertCodexConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	listenAddrsJSON, err := json.Marshal(c.CodexConfig.CodexNodeConfig.ListenAddrs)
+// Insert or update logos_storage_config table
+func insertLogosStorageConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	listenAddrsJSON, err := json.Marshal(c.LogosStorageConfig.LogosStorageNodeConfig.ListenAddrs)
 	if err != nil {
 		return err
 	}
-	bootstrapNodesJSON, err := json.Marshal(c.CodexConfig.CodexNodeConfig.BootstrapNodes)
+	bootstrapNodesJSON, err := json.Marshal(c.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes)
 	if err != nil {
 		return err
 	}
 	_, err = tx.Exec(`
-		INSERT OR REPLACE INTO codex_config (
+		INSERT OR REPLACE INTO logos_storage_config (
 			enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
 			listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
 			repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
 			block_retries, cache_size, log_file, synthetic_id
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.CodexConfig.Enabled,
-		c.CodexConfig.CodexNodeConfig.LogLevel,
-		c.CodexConfig.CodexNodeConfig.LogFormat,
-		c.CodexConfig.CodexNodeConfig.MetricsEnabled,
-		c.CodexConfig.CodexNodeConfig.MetricsAddress,
-		c.CodexConfig.CodexNodeConfig.MetricsPort,
-		c.CodexConfig.CodexNodeConfig.DataDir,
+		c.LogosStorageConfig.Enabled,
+		c.LogosStorageConfig.LogosStorageNodeConfig.LogLevel,
+		c.LogosStorageConfig.LogosStorageNodeConfig.LogFormat,
+		c.LogosStorageConfig.LogosStorageNodeConfig.MetricsEnabled,
+		c.LogosStorageConfig.LogosStorageNodeConfig.MetricsAddress,
+		c.LogosStorageConfig.LogosStorageNodeConfig.MetricsPort,
+		c.LogosStorageConfig.LogosStorageNodeConfig.DataDir,
 		string(listenAddrsJSON),
-		c.CodexConfig.CodexNodeConfig.Nat,
-		c.CodexConfig.CodexNodeConfig.DiscoveryPort,
-		c.CodexConfig.CodexNodeConfig.NetPrivKeyFile,
+		c.LogosStorageConfig.LogosStorageNodeConfig.Nat,
+		c.LogosStorageConfig.LogosStorageNodeConfig.DiscoveryPort,
+		c.LogosStorageConfig.LogosStorageNodeConfig.NetPrivKeyFile,
 		string(bootstrapNodesJSON),
-		c.CodexConfig.CodexNodeConfig.MaxPeers,
-		c.CodexConfig.CodexNodeConfig.NumThreads,
-		c.CodexConfig.CodexNodeConfig.AgentString,
-		c.CodexConfig.CodexNodeConfig.RepoKind,
-		c.CodexConfig.CodexNodeConfig.StorageQuota,
-		c.CodexConfig.CodexNodeConfig.BlockTtl,
-		c.CodexConfig.CodexNodeConfig.BlockMaintenanceInterval,
-		c.CodexConfig.CodexNodeConfig.BlockMaintenanceNumberOfBlocks,
-		c.CodexConfig.CodexNodeConfig.BlockRetries,
-		c.CodexConfig.CodexNodeConfig.CacheSize,
-		c.CodexConfig.CodexNodeConfig.LogFile,
+		c.LogosStorageConfig.LogosStorageNodeConfig.MaxPeers,
+		c.LogosStorageConfig.LogosStorageNodeConfig.NumThreads,
+		c.LogosStorageConfig.LogosStorageNodeConfig.AgentString,
+		c.LogosStorageConfig.LogosStorageNodeConfig.RepoKind,
+		c.LogosStorageConfig.LogosStorageNodeConfig.StorageQuota,
+		c.LogosStorageConfig.LogosStorageNodeConfig.BlockTtl,
+		c.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceInterval,
+		c.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceNumberOfBlocks,
+		c.LogosStorageConfig.LogosStorageNodeConfig.BlockRetries,
+		c.LogosStorageConfig.LogosStorageNodeConfig.CacheSize,
+		c.LogosStorageConfig.LogosStorageNodeConfig.LogFile,
 	)
 	return err
 }
@@ -236,7 +236,7 @@ func nodeConfigNormalInserts() []insertFn {
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
-		insertCodexConfig,
+		insertLogosStorageConfig,
 		insertWakuV2ConfigPostMigration,
 	}
 }
@@ -333,50 +333,50 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		nodecfg.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
 	}
 
-	// Load codex_config
+	// Load logos_storage_config
 	var listenAddrsStr, bootstrapNodesStr string
 	err = tx.QueryRow(`
 	  SELECT enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
 			 listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
 			 repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
 			 block_retries, cache_size, log_file
-	  FROM codex_config WHERE synthetic_id = 'id'
+	  FROM logos_storage_config WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.CodexConfig.Enabled,
-		&nodecfg.CodexConfig.CodexNodeConfig.LogLevel,
-		&nodecfg.CodexConfig.CodexNodeConfig.LogFormat,
-		&nodecfg.CodexConfig.CodexNodeConfig.MetricsEnabled,
-		&nodecfg.CodexConfig.CodexNodeConfig.MetricsAddress,
-		&nodecfg.CodexConfig.CodexNodeConfig.MetricsPort,
-		&nodecfg.CodexConfig.CodexNodeConfig.DataDir,
+		&nodecfg.LogosStorageConfig.Enabled,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.LogLevel,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.LogFormat,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MetricsEnabled,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MetricsAddress,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MetricsPort,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.DataDir,
 		&listenAddrsStr,
-		&nodecfg.CodexConfig.CodexNodeConfig.Nat,
-		&nodecfg.CodexConfig.CodexNodeConfig.DiscoveryPort,
-		&nodecfg.CodexConfig.CodexNodeConfig.NetPrivKeyFile,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.Nat,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.DiscoveryPort,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.NetPrivKeyFile,
 		&bootstrapNodesStr,
-		&nodecfg.CodexConfig.CodexNodeConfig.MaxPeers,
-		&nodecfg.CodexConfig.CodexNodeConfig.NumThreads,
-		&nodecfg.CodexConfig.CodexNodeConfig.AgentString,
-		&nodecfg.CodexConfig.CodexNodeConfig.RepoKind,
-		&nodecfg.CodexConfig.CodexNodeConfig.StorageQuota,
-		&nodecfg.CodexConfig.CodexNodeConfig.BlockTtl,
-		&nodecfg.CodexConfig.CodexNodeConfig.BlockMaintenanceInterval,
-		&nodecfg.CodexConfig.CodexNodeConfig.BlockMaintenanceNumberOfBlocks,
-		&nodecfg.CodexConfig.CodexNodeConfig.BlockRetries,
-		&nodecfg.CodexConfig.CodexNodeConfig.CacheSize,
-		&nodecfg.CodexConfig.CodexNodeConfig.LogFile,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MaxPeers,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.NumThreads,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.AgentString,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.RepoKind,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.StorageQuota,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockTtl,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceInterval,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceNumberOfBlocks,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockRetries,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.CacheSize,
+		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.LogFile,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 	// Unmarshal JSON fields
 	if listenAddrsStr != "" {
-		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.CodexConfig.CodexNodeConfig.ListenAddrs); err != nil {
+		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.LogosStorageConfig.LogosStorageNodeConfig.ListenAddrs); err != nil {
 			return nil, err
 		}
 	}
 	if bootstrapNodesStr != "" {
-		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.CodexConfig.CodexNodeConfig.BootstrapNodes); err != nil {
+		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes); err != nil {
 			return nil, err
 		}
 	}

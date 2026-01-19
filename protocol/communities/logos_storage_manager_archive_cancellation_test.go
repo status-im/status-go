@@ -25,16 +25,16 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// MockCodexArchiveManagerSuite contains deterministic unit tests using mocked CodexClient
-type MockCodexArchiveManagerSuite struct {
+// MockLogosStorageArchiveManagerSuite contains deterministic unit tests using mocked LogosStorageClient
+type MockLogosStorageArchiveManagerSuite struct {
 	suite.Suite
-	ctrl           *gomock.Controller
-	mockCodex      *mock_logosstorage.MockCodexClientInterface
-	archiveManager *communities.ArchiveManager
-	manager        *communities.Manager
+	ctrl             *gomock.Controller
+	mockLogosStorage *mock_logosstorage.MockLogosStorageClientInterface
+	archiveManager   *communities.ArchiveManager
+	manager          *communities.Manager
 }
 
-func (s *MockCodexArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager) {
+func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -49,44 +49,44 @@ func (s *MockCodexArchiveManagerSuite) buildManagers() (*communities.Manager, *c
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	codexConfig := &params.CodexConfig{
+	logosStorageConfig := &params.LogosStorageConfig{
 		Enabled: true,
 	}
 
 	amc := &communities.ArchiveManagerConfig{
-		TorrentConfig: nil,
-		CodexConfig:   codexConfig,
-		Logger:        logger,
-		Persistence:   m.GetPersistence(),
-		Messaging:     nil,
-		Identity:      key,
-		Publisher:     m,
+		TorrentConfig:      nil,
+		LogosStorageConfig: logosStorageConfig,
+		Logger:             logger,
+		Persistence:        m.GetPersistence(),
+		Messaging:          nil,
+		Identity:           key,
+		Publisher:          m,
 	}
 	archiveManager := communities.NewArchiveManager(amc)
 
 	return m, archiveManager
 }
 
-func (s *MockCodexArchiveManagerSuite) SetupTest() {
+func (s *MockLogosStorageArchiveManagerSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
-	s.mockCodex = mock_logosstorage.NewMockCodexClientInterface(s.ctrl)
+	s.mockLogosStorage = mock_logosstorage.NewMockLogosStorageClientInterface(s.ctrl)
 
 	m, am := s.buildManagers()
 	communities.SetValidateInterval(30 * time.Millisecond)
 	s.manager = m
 	s.archiveManager = am
 
-	// Inject the mock CodexClient into the ArchiveManager
-	s.archiveManager.SetCodexClient(s.mockCodex)
+	// Inject the mock LogosStorageClient into the ArchiveManager
+	s.archiveManager.SetLogosStorageClient(s.mockLogosStorage)
 }
 
-func (s *MockCodexArchiveManagerSuite) TearDownTest() {
+func (s *MockLogosStorageArchiveManagerSuite) TearDownTest() {
 	s.ctrl.Finish()
 	s.Require().NoError(s.manager.Stop())
 }
 
 // TestMockDownloadCancellationBeforeIndexIsDownloaded tests cancellation before index is downloaded
-func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationBeforeIndexIsDownloaded() {
+func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationBeforeIndexIsDownloaded() {
 	// Subscribe to signals
 	subscription := s.manager.Subscribe()
 
@@ -95,7 +95,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationBeforeIndexIs
 	cancelChan := make(chan struct{})
 
 	// Mock expectations: DownloadWithContext may be called but should be cancelled immediately
-	s.mockCodex.EXPECT().
+	s.mockLogosStorage.EXPECT().
 		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
 		DoAndReturn(func(ctx context.Context, cid string, output any) error {
 			// Block until context is cancelled
@@ -141,12 +141,12 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationBeforeIndexIs
 	time.Sleep(50 * time.Millisecond)
 
 	s.Require().False(indexDownloadCompletedReceived, "IndexDownloadCompletedSignal should not be received when cancelled early")
-	s.T().Logf("✓ Mock test: Early cancellation verified with zero CodexClient calls")
+	s.T().Logf("✓ Mock test: Early cancellation verified with zero LogosStorageClient calls")
 }
 
 // TestMockDownloadCancellationDuringIndexDownload tests cancellation during index download
 // Uses mock to control exact timing of index download completion
-func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDownload() {
+func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDownload() {
 	subscription := s.manager.Subscribe()
 
 	archiveData := make([]byte, 1024)
@@ -156,8 +156,8 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 	// archiveCid := "test-archive-cid-def456"
 	indexCid := "test-index-cid-uvw123"
 
-	// index := &protobuf.CodexWakuMessageArchiveIndex{
-	// 	Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	// index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+	// 	Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 	// 		"test-hash-large": {
 	// 			Cid: archiveCid,
 	// 			Metadata: &protobuf.WakuMessageArchiveMetadata{
@@ -175,7 +175,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 
 	// Mock expectations: Index download never completes due to cancellation
 	downloadStarted := make(chan struct{})
-	s.mockCodex.EXPECT().
+	s.mockLogosStorage.EXPECT().
 		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
 		DoAndReturn(func(ctx context.Context, cid string, output any) error {
 			close(downloadStarted)
@@ -235,7 +235,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDo
 }
 
 // TestMockDownloadCancellationDuringArchiveDownload tests cancellation during archive downloads
-func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchiveDownload() {
+func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuringArchiveDownload() {
 	subscription := s.manager.Subscribe()
 
 	// Create multiple archives
@@ -257,12 +257,12 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 	}
 
 	indexCid := "test-index-cid-archive-download"
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata),
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: make(map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata),
 	}
 
 	for _, archive := range archives {
-		index.Archives[archive.hash] = &protobuf.CodexWakuMessageArchiveIndexMetadata{
+		index.Archives[archive.hash] = &protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			Cid: archive.cid,
 			Metadata: &protobuf.WakuMessageArchiveMetadata{
 				From: archive.from,
@@ -271,7 +271,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 		}
 	}
 
-	codexIndexBytes, err := proto.Marshal(index)
+	logosStorageIndexBytes, err := proto.Marshal(index)
 	s.Require().NoError(err)
 
 	communityID := types.HexBytes("mock-cancel-test-3")
@@ -279,19 +279,19 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 
 	// Mock expectations
 	// Index download succeeds
-	s.mockCodex.EXPECT().
+	s.mockLogosStorage.EXPECT().
 		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
 		DoAndReturn(func(ctx context.Context, cid string, output any) error {
 			// Write the index bytes to whatever writer we receive
 			if w, ok := output.(io.Writer); ok {
-				_, _ = w.Write(codexIndexBytes)
+				_, _ = w.Write(logosStorageIndexBytes)
 			}
 			return nil
 		}).
 		Times(1)
 
 	// First archive download succeeds
-	s.mockCodex.EXPECT().
+	s.mockLogosStorage.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), archives[0].cid).
 		DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
 			return codex.Manifest{Cid: cid, DatasetSize: len(archives[0].data)}, nil
@@ -299,7 +299,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 		Times(1)
 
 	// HasCid for first archive - called during polling after trigger succeeds
-	s.mockCodex.EXPECT().
+	s.mockLogosStorage.EXPECT().
 		HasCid(archives[0].cid).
 		Return(true, nil).
 		AnyTimes()
@@ -308,7 +308,7 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 	// All 3 goroutines start simultaneously, and each calls TriggerDownloadWithContext BEFORE polling.
 	// Archives 2 and 3 will have their triggers called, but should receive cancellation.
 	for i := 1; i < len(archives); i++ {
-		s.mockCodex.EXPECT().
+		s.mockLogosStorage.EXPECT().
 			TriggerDownloadWithContext(gomock.Any(), archives[i].cid).
 			DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
 				// Block until context is cancelled
@@ -384,6 +384,6 @@ func (s *MockCodexArchiveManagerSuite) TestMockDownloadCancellationDuringArchive
 }
 
 // Run the mock-based unit test suite
-func TestMockCodexArchiveManagerSuite(t *testing.T) {
-	suite.Run(t, new(MockCodexArchiveManagerSuite))
+func TestMockLogosStorageArchiveManagerSuite(t *testing.T) {
+	suite.Run(t, new(MockLogosStorageArchiveManagerSuite))
 }

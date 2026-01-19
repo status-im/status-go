@@ -57,9 +57,9 @@ func randomNodeConfig() *params.NodeConfig {
 		WakuV2Config: params.WakuV2Config{
 			LightClient: randomBool(),
 		},
-		CodexConfig: params.CodexConfig{
+		LogosStorageConfig: params.LogosStorageConfig{
 			Enabled: randomBool(),
-			CodexNodeConfig: codex.Config{
+			LogosStorageNodeConfig: codex.Config{
 				DataDir:       randomString(),
 				DiscoveryPort: randomInt(65535),
 				BlockRetries:  randomInt(10),

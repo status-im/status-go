@@ -1097,8 +1097,8 @@ func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings,
 	return api.service.messenger.GetCommunitiesSettings()
 }
 
-func (api *PublicAPI) EnableCodexCommunityHistoryArchiveProtocol(overrides map[string]string) error {
-	return api.service.messenger.EnableCodexCommunityHistoryArchiveProtocol(overrides)
+func (api *PublicAPI) EnableLogosStorageCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	return api.service.messenger.EnableLogosStorageCommunityHistoryArchiveProtocol(overrides)
 }
 
 func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
@@ -1457,7 +1457,7 @@ func (api *PublicAPI) PeerID() string {
 }
 
 func (m *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
-	return m.service.messenger.IsSeedingHistoryArchiveCodex(communityID)
+	return m.service.messenger.IsSeedingHistoryArchiveLogosStorage(communityID)
 }
 
 func (m *PublicAPI) Connect(peerId string, addrs []string) error {

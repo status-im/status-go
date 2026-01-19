@@ -22,20 +22,20 @@ import (
 	"go.uber.org/zap"
 )
 
-// CodexArchiveDownloaderSuite demonstrates testify's suite functionality
-type CodexArchiveDownloaderSuite struct {
+// LogosStorageArchiveDownloaderSuite demonstrates testify's suite functionality
+type LogosStorageArchiveDownloaderSuite struct {
 	suite.Suite
 	ctrl       *gomock.Controller
-	mockClient *mock_logosstorage.MockCodexClientInterface
-	index      *protobuf.CodexWakuMessageArchiveIndex
+	mockClient *mock_logosstorage.MockLogosStorageClientInterface
+	index      *protobuf.LogosStorageWakuMessageArchiveIndex
 }
 
 // SetupTest runs before each test method
-func (suite *CodexArchiveDownloaderSuite) SetupTest() {
+func (suite *LogosStorageArchiveDownloaderSuite) SetupTest() {
 	suite.ctrl = gomock.NewController(suite.T())
-	suite.mockClient = mock_logosstorage.NewMockCodexClientInterface(suite.ctrl)
-	suite.index = &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	suite.mockClient = mock_logosstorage.NewMockLogosStorageClientInterface(suite.ctrl)
+	suite.index = &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"test-archive-hash-1": {
 				Cid: "test-cid-1",
 				Metadata: &protobuf.WakuMessageArchiveMetadata{
@@ -48,16 +48,16 @@ func (suite *CodexArchiveDownloaderSuite) SetupTest() {
 }
 
 // TearDownTest runs after each test method
-func (suite *CodexArchiveDownloaderSuite) TearDownTest() {
+func (suite *LogosStorageArchiveDownloaderSuite) TearDownTest() {
 	suite.ctrl.Finish()
 }
 
 // Run the test suite
-func TestCodexArchiveDownloaderSuite(t *testing.T) {
-	suite.Run(t, new(CodexArchiveDownloaderSuite))
+func TestLogosStorageArchiveDownloaderSuite(t *testing.T) {
+	suite.Run(t, new(LogosStorageArchiveDownloaderSuite))
 }
 
-func (suite *CodexArchiveDownloaderSuite) TestBasicSingleArchive() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestBasicSingleArchive() {
 	// Test data
 	communityID := "test-community"
 	existingArchiveIDs := []string{} // No existing archives
@@ -77,7 +77,7 @@ func (suite *CodexArchiveDownloaderSuite) TestBasicSingleArchive() {
 
 	// Create downloader with mock client
 	logger := zap.NewNop() // No-op logger for tests
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
 
 	// Set fast polling interval for tests (10ms instead of default 1s)
 	downloader.SetPollingInterval(10 * time.Millisecond)
@@ -123,10 +123,10 @@ func (suite *CodexArchiveDownloaderSuite) TestBasicSingleArchive() {
 	suite.T().Logf("   - Callback invoked: %v", callbackInvoked)
 }
 
-func (suite *CodexArchiveDownloaderSuite) TestMultipleArchives() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestMultipleArchives() {
 	// Create test data with multiple archives
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"archive-1": {
 				Cid:      "cid-1",
 				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 1000, To: 2000},
@@ -164,7 +164,7 @@ func (suite *CodexArchiveDownloaderSuite) TestMultipleArchives() {
 
 	// Create downloader
 	logger := zap.NewNop() // No-op logger for tests
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, index, communityID, existingArchiveIDs, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, existingArchiveIDs, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 
 	// Track the order in which archives are started (deterministic)
@@ -230,7 +230,7 @@ func (suite *CodexArchiveDownloaderSuite) TestMultipleArchives() {
 	suite.T().Logf("   - Start order (sorted): %v", startOrder)
 }
 
-func (suite *CodexArchiveDownloaderSuite) TestErrorDuringTriggerDownload() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestErrorDuringTriggerDownload() {
 	// Test that errors during TriggerDownloadWithContext are handled properly
 	communityID := "test-community"
 	existingArchiveIDs := []string{} // No existing archives
@@ -247,7 +247,7 @@ func (suite *CodexArchiveDownloaderSuite) TestErrorDuringTriggerDownload() {
 
 	// Create downloader with mock client
 	logger := zap.NewNop() // No-op logger for tests
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 
 	// Track callbacks - onArchiveDownloaded should NOT be called on failure
@@ -282,7 +282,7 @@ func (suite *CodexArchiveDownloaderSuite) TestErrorDuringTriggerDownload() {
 	suite.T().Log("   - Success callback was NOT invoked")
 }
 
-func (suite *CodexArchiveDownloaderSuite) TestActualCancellationDuringTriggerDownload() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestActualCancellationDuringTriggerDownload() {
 	// Test real cancellation during TriggerDownloadWithContext using DoAndReturn
 	communityID := "test-community"
 	existingArchiveIDs := []string{} // No existing archives
@@ -304,7 +304,7 @@ func (suite *CodexArchiveDownloaderSuite) TestActualCancellationDuringTriggerDow
 
 	// Create downloader with mock client
 	logger := zap.NewNop() // No-op logger for tests
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 	downloader.SetPollingTimeout(200 * time.Millisecond) // Short timeout - we should never reach polling
 
@@ -346,7 +346,7 @@ func (suite *CodexArchiveDownloaderSuite) TestActualCancellationDuringTriggerDow
 	suite.T().Log("   - Success callback was NOT invoked")
 }
 
-func (suite *CodexArchiveDownloaderSuite) TestCancellationDuringPolling() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestCancellationDuringPolling() {
 	// Test that cancellation during the polling phase is handled properly
 	communityID := "test-community"
 	existingArchiveIDs := []string{} // No existing archives
@@ -366,7 +366,7 @@ func (suite *CodexArchiveDownloaderSuite) TestCancellationDuringPolling() {
 
 	// Create downloader with mock client
 	logger := zap.NewNop() // No-op logger for tests
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
 	downloader.SetPollingInterval(50 * time.Millisecond) // Longer interval to allow cancellation
 	downloader.SetPollingTimeout(1 * time.Second)        // Short timeout for test (instead of 30s)
 
@@ -414,7 +414,7 @@ func (suite *CodexArchiveDownloaderSuite) TestCancellationDuringPolling() {
 	suite.T().Log("   - Download marked as cancelled")
 }
 
-func (suite *CodexArchiveDownloaderSuite) TestPollingTimeout() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestPollingTimeout() {
 	// Test that polling timeout is handled properly (no success callback)
 	communityID := "test-community"
 	existingArchiveIDs := []string{} // No existing archives
@@ -434,7 +434,7 @@ func (suite *CodexArchiveDownloaderSuite) TestPollingTimeout() {
 
 	// Create downloader with mock client
 	logger := zap.NewNop() // No-op logger for tests
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, suite.index, communityID, existingArchiveIDs, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond) // Fast polling for test
 	downloader.SetPollingTimeout(100 * time.Millisecond) // Short timeout for test (instead of 30s)
 
@@ -472,10 +472,10 @@ func (suite *CodexArchiveDownloaderSuite) TestPollingTimeout() {
 	suite.T().Log("   - Success callback was NOT invoked")
 }
 
-func (suite *CodexArchiveDownloaderSuite) TestWithExistingArchives() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestWithExistingArchives() {
 	// Test with some archives already downloaded (existing archive IDs)
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"archive-1": {
 				Cid:      "cid-1",
 				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 1000, To: 2000},
@@ -510,7 +510,7 @@ func (suite *CodexArchiveDownloaderSuite) TestWithExistingArchives() {
 
 	// Create downloader with existing archives
 	logger := zap.NewNop() // No-op logger for tests
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, index, communityID, existingArchiveIDs, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, existingArchiveIDs, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 
 	// Track which archives are started and completed
@@ -558,14 +558,14 @@ func (suite *CodexArchiveDownloaderSuite) TestWithExistingArchives() {
 }
 
 // Test case: One success, one error
-func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_OneSuccessOneError() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_OneSuccessOneError() {
 	communityID := "test-community"
 	cancelChan := make(chan struct{})
 	defer close(cancelChan)
 
 	// 2 archives: archive-2 (newer) succeeds, archive-1 (older) fails
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"archive-1": {
 				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 1000, To: 2000},
 				Cid:      "cid-1",
@@ -591,7 +591,7 @@ func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_OneSuccessOneError(
 		Return(codex.Manifest{}, fmt.Errorf("trigger failed"))
 
 	logger := zap.NewNop()
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 	downloader.SetPollingTimeout(1 * time.Second)
 
@@ -611,13 +611,13 @@ func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_OneSuccessOneError(
 }
 
 // Test case: One success, one error, one cancellation
-func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_SuccessErrorCancellation() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_SuccessErrorCancellation() {
 	communityID := "test-community"
 	cancelChan := make(chan struct{})
 
 	// 3 archives
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"archive-1": {
 				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 1000, To: 2000},
 				Cid:      "cid-1",
@@ -656,7 +656,7 @@ func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_SuccessErrorCancell
 		AnyTimes()
 
 	logger := zap.NewNop()
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 	downloader.SetPollingTimeout(1 * time.Second)
 
@@ -682,13 +682,13 @@ func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_SuccessErrorCancell
 }
 
 // Test case: One success, then cancellation
-func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_SuccessThenCancellation() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_SuccessThenCancellation() {
 	communityID := "test-community"
 	cancelChan := make(chan struct{})
 
 	// 2 archives
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"archive-1": {
 				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 1000, To: 2000},
 				Cid:      "cid-1",
@@ -718,7 +718,7 @@ func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_SuccessThenCancella
 		AnyTimes()
 
 	logger := zap.NewNop()
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 	downloader.SetPollingTimeout(1 * time.Second)
 
@@ -744,13 +744,13 @@ func (suite *CodexArchiveDownloaderSuite) TestPartialSuccess_SuccessThenCancella
 }
 
 // Test case: No success, only cancellation
-func (suite *CodexArchiveDownloaderSuite) TestNoSuccess_OnlyCancellation() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestNoSuccess_OnlyCancellation() {
 	communityID := "test-community"
 	cancelChan := make(chan struct{})
 
 	// 2 archives
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"archive-1": {
 				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 1000, To: 2000},
 				Cid:      "cid-1",
@@ -772,7 +772,7 @@ func (suite *CodexArchiveDownloaderSuite) TestNoSuccess_OnlyCancellation() {
 		AnyTimes()
 
 	logger := zap.NewNop()
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 	downloader.SetPollingTimeout(1 * time.Second)
 
@@ -796,14 +796,14 @@ func (suite *CodexArchiveDownloaderSuite) TestNoSuccess_OnlyCancellation() {
 }
 
 // Test case: No success, only errors
-func (suite *CodexArchiveDownloaderSuite) TestNoSuccess_OnlyErrors() {
+func (suite *LogosStorageArchiveDownloaderSuite) TestNoSuccess_OnlyErrors() {
 	communityID := "test-community"
 	cancelChan := make(chan struct{})
 	defer close(cancelChan)
 
 	// 2 archives
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata{
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			"archive-1": {
 				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 1000, To: 2000},
 				Cid:      "cid-1",
@@ -824,7 +824,7 @@ func (suite *CodexArchiveDownloaderSuite) TestNoSuccess_OnlyErrors() {
 		Return(codex.Manifest{}, fmt.Errorf("trigger failed for cid-2"))
 
 	logger := zap.NewNop()
-	downloader := logosstorage.NewCodexArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
 	downloader.SetPollingInterval(10 * time.Millisecond)
 	downloader.SetPollingTimeout(1 * time.Second)
 

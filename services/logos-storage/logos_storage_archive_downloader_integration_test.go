@@ -18,21 +18,21 @@ import (
 	"go.uber.org/zap"
 )
 
-// CodexArchiveDownloaderIntegrationSuite tests the full archive download workflow
-// against a real Codex instance
-type CodexArchiveDownloaderIntegrationSuite struct {
+// LogosStorageArchiveDownloaderIntegrationSuite tests the full archive download workflow
+// against a real LogosStorage instance
+type LogosStorageArchiveDownloaderIntegrationSuite struct {
 	suite.Suite
-	client       logosstorage.CodexClientInterface
+	client       logosstorage.LogosStorageClientInterface
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
 
 // SetupTest runs before each test method
-func (suite *CodexArchiveDownloaderIntegrationSuite) SetupTest() {
-	suite.client = NewCodexClientTest(suite.T())
+func (suite *LogosStorageArchiveDownloaderIntegrationSuite) SetupTest() {
+	suite.client = NewLogosStorageClientTest(suite.T())
 }
 
 // TearDownTest runs after each test method
-func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownTest() {
+func (suite *LogosStorageArchiveDownloaderIntegrationSuite) TearDownTest() {
 	// Clean up all uploaded CIDs
 	for _, cid := range suite.uploadedCIDs {
 		if err := suite.client.RemoveCid(cid); err != nil {
@@ -43,8 +43,8 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TearDownTest() {
 	}
 }
 
-func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWorkflow() {
-	// Step 1: Create test archive data and upload multiple archives to Codex
+func (suite *LogosStorageArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWorkflow() {
+	// Step 1: Create test archive data and upload multiple archives to LogosStorage
 	archives := []struct {
 		hash string
 		from uint64
@@ -66,7 +66,7 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 			archives[i].hash, hex.EncodeToString(archives[i].data[:16]))
 	}
 
-	// Upload all archives to Codex
+	// Upload all archives to LogosStorage
 	for _, archive := range archives {
 		cid, err := suite.client.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
 		require.NoError(suite.T(), err, "Failed to upload %s", archive.hash)
@@ -81,14 +81,14 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 		require.True(suite.T(), exists, "CID %s should exist after upload", cid)
 	}
 
-	// Step 2: Create archive index for CodexArchiveDownloader
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata),
+	// Step 2: Create archive index for LogosStorageArchiveDownloader
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: make(map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata),
 	}
 
 	for _, archive := range archives {
 		cid := archiveCIDs[archive.hash]
-		index.Archives[archive.hash] = &protobuf.CodexWakuMessageArchiveIndexMetadata{
+		index.Archives[archive.hash] = &protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			Cid: cid,
 			Metadata: &protobuf.WakuMessageArchiveMetadata{
 				From: archive.from,
@@ -97,13 +97,13 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 		}
 	}
 
-	// Step 3: Set up CodexArchiveDownloader
+	// Step 3: Set up LogosStorageArchiveDownloader
 	communityID := "integration-test-community"
 	existingArchiveIDs := []string{} // No existing archives
 	cancelChan := make(chan struct{})
 	logger, _ := zap.NewDevelopment() // Use development logger for integration tests
 
-	downloader := logosstorage.NewCodexArchiveDownloader(
+	downloader := logosstorage.NewLogosStorageArchiveDownloader(
 		suite.client,
 		index,
 		communityID,
@@ -208,13 +208,13 @@ func (suite *CodexArchiveDownloaderIntegrationSuite) TestFullArchiveDownloadWork
 	}
 
 	suite.T().Log("🎉 Full archive download workflow completed successfully!")
-	suite.T().Logf("   - Uploaded %d archives to Codex", len(archives))
+	suite.T().Logf("   - Uploaded %d archives to LogosStorage", len(archives))
 	suite.T().Logf("   - Triggered download for all archives")
 	suite.T().Logf("   - Polled until all downloads completed")
 	suite.T().Logf("   - Verified all archive content matches original data")
 }
 
 // Run the integration test suite
-func TestCodexArchiveDownloaderIntegrationSuite(t *testing.T) {
-	suite.Run(t, new(CodexArchiveDownloaderIntegrationSuite))
+func TestLogosStorageArchiveDownloaderIntegrationSuite(t *testing.T) {
+	suite.Run(t, new(LogosStorageArchiveDownloaderIntegrationSuite))
 }

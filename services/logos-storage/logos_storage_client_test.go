@@ -18,18 +18,18 @@ import (
 	logosstorage "github.com/status-im/status-go/services/logos-storage"
 )
 
-type CodexClientTestSuite struct {
+type LogosStorageClientTestSuite struct {
 	suite.Suite
-	client       logosstorage.CodexClientInterface
+	client       logosstorage.LogosStorageClientInterface
 	uploadedCIDs []string // Track uploaded CIDs for cleanup
 }
 
-// TestCodexClientTestSuite runs the test suite
-func TestCodexClientTestSuite(t *testing.T) {
-	suite.Run(t, new(CodexClientTestSuite))
+// TestLogosStorageClientTestSuite runs the test suite
+func TestLogosStorageClientTestSuite(t *testing.T) {
+	suite.Run(t, new(LogosStorageClientTestSuite))
 }
 
-func (suite *CodexClientTestSuite) UploadRandomDataToCodex(size int) (string, []byte) {
+func (suite *LogosStorageClientTestSuite) UploadRandomDataToLogosStorage(size int) (string, []byte) {
 	// Generate random payload to ensure proper round-trip verification
 	payload := make([]byte, size)
 	_, err := rand.Read(payload)
@@ -52,13 +52,13 @@ func safeCancel(ctx context.Context, cancel context.CancelFunc) {
 }
 
 // SetupTest runs before each test method
-func (suite *CodexClientTestSuite) SetupTest() {
-	suite.client = NewCodexClientTest(suite.T())
+func (suite *LogosStorageClientTestSuite) SetupTest() {
+	suite.client = NewLogosStorageClientTest(suite.T())
 	suite.uploadedCIDs = []string{}
 }
 
 // TearDownTest runs after each test method
-func (suite *CodexClientTestSuite) TearDownTest() {
+func (suite *LogosStorageClientTestSuite) TearDownTest() {
 	// Clean up all uploaded CIDs
 	for _, cid := range suite.uploadedCIDs {
 		if err := suite.client.RemoveCid(cid); err != nil {
@@ -69,16 +69,16 @@ func (suite *CodexClientTestSuite) TearDownTest() {
 	}
 }
 
-func (suite *CodexClientTestSuite) TestUpload_Success() {
+func (suite *LogosStorageClientTestSuite) TestUpload_Success() {
 	cid, err := suite.client.Upload(bytes.NewReader([]byte("payload")), "hello.txt")
 
 	require.NoError(suite.T(), err)
-	// Codex uses CIDv1 with base58btc encoding (prefix: zDv)
+	// LogosStorage uses CIDv1 with base58btc encoding (prefix: zDv)
 	assert.Equal(suite.T(), "zDvZRwzmBEaJ338xaCHbKbGAJ4X41YyccS6eyorrYBbmPnWuLxCh", cid)
 }
 
-func (suite *CodexClientTestSuite) TestDownload_Success() {
-	cid, payload := suite.UploadRandomDataToCodex(1024) // 1KB payload
+func (suite *LogosStorageClientTestSuite) TestDownload_Success() {
+	cid, payload := suite.UploadRandomDataToLogosStorage(1024) // 1KB payload
 
 	var buf bytes.Buffer
 	err := suite.client.Download(cid, &buf)
@@ -86,11 +86,11 @@ func (suite *CodexClientTestSuite) TestDownload_Success() {
 	assert.Equal(suite.T(), payload, buf.Bytes())
 }
 
-func (suite *CodexClientTestSuite) TestDownloadWithContext_Cancel() {
+func (suite *LogosStorageClientTestSuite) TestDownloadWithContext_Cancel() {
 	// skip test - flaky
 	// suite.T().Skip("Flaky test - needs investigation")
 
-	cid, _ := suite.UploadRandomDataToCodex(50 * 1024 * 1024)
+	cid, _ := suite.UploadRandomDataToLogosStorage(50 * 1024 * 1024)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer safeCancel(ctx, cancel)
@@ -112,11 +112,11 @@ func (suite *CodexClientTestSuite) TestDownloadWithContext_Cancel() {
 	}
 }
 
-func (suite *CodexClientTestSuite) TestDownloadWithContext_ContextAlreadyCancelled() {
+func (suite *LogosStorageClientTestSuite) TestDownloadWithContext_ContextAlreadyCancelled() {
 	// skip test - flaky
 	// suite.T().Skip("Flaky test - needs investigation")
 
-	cid, _ := suite.UploadRandomDataToCodex(50 * 1024 * 1024)
+	cid, _ := suite.UploadRandomDataToLogosStorage(50 * 1024 * 1024)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -126,8 +126,8 @@ func (suite *CodexClientTestSuite) TestDownloadWithContext_ContextAlreadyCancell
 	require.ErrorIs(suite.T(), err, context.Canceled)
 }
 
-func (suite *CodexClientTestSuite) TestHasCid_Success() {
-	cid, _ := suite.UploadRandomDataToCodex(1024)
+func (suite *LogosStorageClientTestSuite) TestHasCid_Success() {
+	cid, _ := suite.UploadRandomDataToLogosStorage(1024)
 
 	// yes, we could compute here a fresh CID by using any valid CID will do
 	nonExistingCid := "zDvZRwzmBEaJ338xaCHbKbGAJ4X41YyccS6eyorrYBbmPnWuLxCw"
@@ -150,15 +150,15 @@ func (suite *CodexClientTestSuite) TestHasCid_Success() {
 	}
 }
 
-func (suite *CodexClientTestSuite) TestRemoveCid_Success() {
-	cid, _ := suite.UploadRandomDataToCodex(1024)
+func (suite *LogosStorageClientTestSuite) TestRemoveCid_Success() {
+	cid, _ := suite.UploadRandomDataToLogosStorage(1024)
 
 	err := suite.client.RemoveCid(cid)
 	require.NoError(suite.T(), err)
 }
 
-func (suite *CodexClientTestSuite) TestTriggerDownload() {
-	cid, payload := suite.UploadRandomDataToCodex(50 * 1024 * 1024)
+func (suite *LogosStorageClientTestSuite) TestTriggerDownload() {
+	cid, payload := suite.UploadRandomDataToLogosStorage(50 * 1024 * 1024)
 
 	ctx := context.Background()
 	manifest, err := suite.client.TriggerDownloadWithContext(ctx, cid)
@@ -203,10 +203,10 @@ func (suite *CodexClientTestSuite) TestTriggerDownload() {
 	assert.Equal(suite.T(), payload, downloadBuf.Bytes(), "Downloaded data does not match uploaded data")
 }
 
-func (suite *CodexClientTestSuite) TestTriggerDownloadWithContext_Cancellation() {
+func (suite *LogosStorageClientTestSuite) TestTriggerDownloadWithContext_Cancellation() {
 	suite.T().Skip("Not sure if we are going to have cancellation in trigger download")
 
-	cid, _ := suite.UploadRandomDataToCodex(50 * 1024 * 1024)
+	cid, _ := suite.UploadRandomDataToLogosStorage(50 * 1024 * 1024)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer safeCancel(ctx, cancel)
@@ -233,8 +233,8 @@ func (suite *CodexClientTestSuite) TestTriggerDownloadWithContext_Cancellation()
 	}
 }
 
-func (suite *CodexClientTestSuite) TestLocalDownload() {
-	cid, payload := suite.UploadRandomDataToCodex(1024)
+func (suite *LogosStorageClientTestSuite) TestLocalDownload() {
+	cid, payload := suite.UploadRandomDataToLogosStorage(1024)
 
 	var buf bytes.Buffer
 	err := suite.client.LocalDownload(cid, &buf)
@@ -242,8 +242,8 @@ func (suite *CodexClientTestSuite) TestLocalDownload() {
 	assert.Equal(suite.T(), payload, buf.Bytes(), "Downloaded data mismatch")
 }
 
-func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Success() {
-	cid, payload := suite.UploadRandomDataToCodex(1024)
+func (suite *LogosStorageClientTestSuite) TestLocalDownloadWithContext_Success() {
+	cid, payload := suite.UploadRandomDataToLogosStorage(1024)
 
 	ctx := context.Background()
 	var buf bytes.Buffer
@@ -252,9 +252,9 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Success() {
 	assert.Equal(suite.T(), payload, buf.Bytes(), "Downloaded data mismatch")
 }
 
-func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
+func (suite *LogosStorageClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
 	// Create a context with a very short timeout
-	cid, _ := suite.UploadRandomDataToCodex(50 * 1024 * 1024)
+	cid, _ := suite.UploadRandomDataToLogosStorage(50 * 1024 * 1024)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
@@ -277,8 +277,8 @@ func (suite *CodexClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
 	}
 }
 
-func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Success() {
-	cid, payload := suite.UploadRandomDataToCodex(1024)
+func (suite *LogosStorageClientTestSuite) TestFetchManifestWithContext_Success() {
+	cid, payload := suite.UploadRandomDataToLogosStorage(1024)
 
 	ctx := context.Background()
 	manifest, err := suite.client.FetchManifestWithContext(ctx, cid)
@@ -295,7 +295,7 @@ func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Success() {
 	assert.Equal(suite.T(), "application/octet-stream", manifest.Mimetype)
 }
 
-func (suite *CodexClientTestSuite) TestFetchManifestWithContext_NonExistentCID() {
+func (suite *LogosStorageClientTestSuite) TestFetchManifestWithContext_NonExistentCID() {
 	ctx := context.Background()
 	nonExistentCID := "zDvZRwzmNonExistentCID123456789"
 
@@ -303,10 +303,10 @@ func (suite *CodexClientTestSuite) TestFetchManifestWithContext_NonExistentCID()
 	assert.Error(suite.T(), err, "Expected error when fetching manifest for non-existent CID")
 }
 
-func (suite *CodexClientTestSuite) TestFetchManifestWithContext_Cancellation() {
+func (suite *LogosStorageClientTestSuite) TestFetchManifestWithContext_Cancellation() {
 	suite.T().Skip("Not sure if we are going to have cancellation in fetch manifest")
 
-	cid, _ := suite.UploadRandomDataToCodex(50 * 1024 * 1024)
+	cid, _ := suite.UploadRandomDataToLogosStorage(50 * 1024 * 1024)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer safeCancel(ctx, cancel)

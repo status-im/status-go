@@ -2185,18 +2185,6 @@ func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types.HexB
 	return nil
 }
 
-// func (p *Persistence) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-// 	// return "codex", nil
-// 	var preference string
-// 	err := p.db.QueryRow(`SELECT preferred_distribution_method FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&preference)
-// 	if err == sql.ErrNoRows {
-// 		return ArchiveDistributionMethodUnknown, nil
-// 	} else if err != nil {
-// 		return "", err
-// 	}
-// 	return preference, nil
-// }
-
 func (p *Persistence) GetArchiveDistributionPreference() (string, error) {
 	var preference string
 	err := p.db.QueryRow(`SELECT history_archive_distribution_preference FROM node_config`).Scan(&preference)

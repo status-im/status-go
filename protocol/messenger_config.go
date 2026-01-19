@@ -78,7 +78,7 @@ type config struct {
 	clusterConfig          params.ClusterConfig
 	browserDatabase        *browsers.Database
 	torrentConfig          *params.TorrentConfig
-	codexConfig            *params.CodexConfig
+	logosStorageConfig     *params.LogosStorageConfig
 	walletService          *wallet.Service
 	communityTokensService communities.CommunityTokensServiceInterface
 	httpServer             *server.MediaServer
@@ -355,9 +355,9 @@ func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
 	}
 }
 
-func WithCodexConfig(codexConfig *params.CodexConfig) func(c *config) error {
+func WithLogosStorageConfig(logosStorageConfig *params.LogosStorageConfig) func(c *config) error {
 	return func(c *config) error {
-		c.codexConfig = codexConfig
+		c.logosStorageConfig = logosStorageConfig
 		return nil
 	}
 }

@@ -10,11 +10,11 @@ import (
 	logosstorage "github.com/status-im/status-go/services/logos-storage"
 )
 
-func NewCodexClientTest(t *testing.T) logosstorage.CodexClientInterface {
-	client, err := logosstorage.NewCodexClient(params.CodexConfig{
+func NewLogosStorageClientTest(t *testing.T) logosstorage.LogosStorageClientInterface {
+	client, err := logosstorage.NewLogosStorageClient(params.LogosStorageConfig{
 		Enabled: true,
-		CodexNodeConfig: codex.Config{
-			DataDir:        filepath.Join(t.TempDir(), "codex", "codexdata"),
+		LogosStorageNodeConfig: codex.Config{
+			DataDir:        filepath.Join(t.TempDir(), "logos-storage", "data"),
 			LogFormat:      codex.LogFormatNoColors,
 			MetricsEnabled: false,
 			LogLevel:       "ERROR",
@@ -22,21 +22,21 @@ func NewCodexClientTest(t *testing.T) logosstorage.CodexClientInterface {
 		},
 	})
 	if err != nil {
-		t.Fatalf("Failed to create Codex client: %v", err)
+		t.Fatalf("Failed to create LogosStorage client: %v", err)
 	}
 
 	t.Cleanup(func() {
 		if err := client.Stop(); err != nil {
-			t.Fatalf("Failed to stop codex: %v", err)
+			t.Fatalf("Failed to stop LogosStorage: %v", err)
 		}
 
 		if err := client.Destroy(); err != nil {
-			t.Fatalf("Failed to destroy codex: %v", err)
+			t.Fatalf("Failed to destroy LogosStorage: %v", err)
 		}
 	})
 
 	if err = client.Start(); err != nil {
-		t.Fatalf("Failed to start Codex node: %v", err)
+		t.Fatalf("Failed to start LogosStorage node: %v", err)
 	}
 
 	return client

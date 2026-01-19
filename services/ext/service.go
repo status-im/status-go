@@ -353,7 +353,7 @@ func buildMessengerOptions(
 		protocol.WithENSVerifier(ensVerifier),
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
-		protocol.WithCodexConfig(&config.CodexConfig),
+		protocol.WithLogosStorageConfig(&config.LogosStorageConfig),
 		protocol.WithImportInitialDelay(config.ImportInitialDelay),
 		protocol.WithMessageArchiveInterval(config.MessageArchiveInterval),
 		protocol.WithHTTPServer(httpServer),

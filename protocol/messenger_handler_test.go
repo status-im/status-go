@@ -182,7 +182,7 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 	s.Require().False(state.Response.Chats()[0].Active)
 }
 
-func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithCodex() {
+func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithLogosStorage() {
 	adminPrivateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -212,10 +212,10 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithC
 	response, err := s.m.CreateCommunity(description, false)
 	s.Require().NoError(err)
 
-	s.m.archiveManager.SetCodexConfig(&params.CodexConfig{
+	s.m.archiveManager.SetLogosStorageConfig(&params.LogosStorageConfig{
 		Enabled: true,
-		CodexNodeConfig: codex.Config{
-			DataDir:        filepath.Join(s.T().TempDir(), "codex", "codexdata"),
+		LogosStorageNodeConfig: codex.Config{
+			DataDir:        filepath.Join(s.T().TempDir(), "logos-storage", "data"),
 			LogFormat:      codex.LogFormatNoColors,
 			MetricsEnabled: false,
 			LogLevel:       "ERROR",
@@ -223,7 +223,7 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithC
 		},
 	})
 
-	err = s.m.archiveManager.StartCodexClient()
+	err = s.m.archiveManager.StartLogosStorageClient()
 	s.Require().NoError(err)
 	defer func() {
 		_ = s.m.archiveManager.Stop()
@@ -238,8 +238,8 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithC
 	})
 	s.Require().NoError(err)
 	// not valid after new distribution preference implementation
-	// s.m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodCodex)
-	err = s.m.communitiesManager.SetArchiveDistributionPreference(params.ArchiveDistributionMethodCodex)
+	// s.m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodLogosStorage)
+	err = s.m.communitiesManager.SetArchiveDistributionPreference(params.ArchiveDistributionMethodLogosStorage)
 	s.Require().NoError(err)
 
 	var buf bytes.Buffer
@@ -257,5 +257,5 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithC
 	// err = s.m.HandleHistoryArchiveMagnetlinkMessage(state, &community.PrivateKey().PublicKey, "", 100)
 	err = s.m.HandleCommunityMessageArchiveMagnetlink(context.Background(), state, message, nil)
 	s.Require().NoError(err)
-	s.Require().Contains(buf.String(), "skipping magnetlink processing due to codex-only preference")
+	s.Require().Contains(buf.String(), "skipping magnetlink processing due to LogosStorage-only preference")
 }

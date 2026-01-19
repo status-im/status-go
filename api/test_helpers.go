@@ -117,9 +117,9 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			"DataDir": "` + tmpdir + `/archivedata",
 			"TorrentDir": "` + tmpdir + `/torrents"
 		},
-		"CodexConfig": {
+		"LogosStorageConfig": {
 			"Enabled": false,
-			"data-dir": "` + tmpdir + `/codexdata",
+			"data-dir": "` + tmpdir + `/logos-storage/data",
 			"block-retries": 5
 		},
 		"RuntimeLogLevel": "INFO",

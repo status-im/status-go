@@ -354,12 +354,12 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
 	}
 
-	if request.CodexConfigEnabled != nil {
-		nodeConfig.CodexConfig.Enabled = *request.CodexConfigEnabled
+	if request.LogosStorageConfigEnabled != nil {
+		nodeConfig.LogosStorageConfig.Enabled = *request.LogosStorageConfigEnabled
 	}
 
-	if request.CodexConfigBootstrapNode != nil {
-		nodeConfig.CodexConfig.CodexNodeConfig.BootstrapNodes = []string{*request.CodexConfigBootstrapNode}
+	if request.LogosStorageConfigBootstrapNode != nil {
+		nodeConfig.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes = []string{*request.LogosStorageConfigBootstrapNode}
 	}
 
 	if request.ImportInitialDelay != nil {
@@ -370,14 +370,14 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.MessageArchiveInterval = *request.MessageArchiveInterval
 	}
 
-	nodeConfig.CodexConfig = params.CodexConfig{
-		Enabled: nodeConfig.CodexConfig.Enabled,
-		CodexNodeConfig: codex.Config{
-			DataDir:        filepath.Join(nodeConfig.RootDataDir, "codex", "codexdata"),
+	nodeConfig.LogosStorageConfig = params.LogosStorageConfig{
+		Enabled: nodeConfig.LogosStorageConfig.Enabled,
+		LogosStorageNodeConfig: codex.Config{
+			DataDir:        filepath.Join(nodeConfig.RootDataDir, "logos-storage", "data"),
 			BlockRetries:   params.BlockRetries,
 			MetricsEnabled: false,
 			LogFormat:      codex.LogFormatNoColors,
-			BootstrapNodes: nodeConfig.CodexConfig.CodexNodeConfig.BootstrapNodes,
+			BootstrapNodes: nodeConfig.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes,
 		},
 	}
 

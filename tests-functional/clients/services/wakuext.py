@@ -864,11 +864,11 @@ class WakuextService(Service):
     def enable_community_history_archive_protocol(self):
         return self.rpc_request("enableCommunityHistoryArchiveProtocol")
 
-    def enable_codex_community_history_archive_protocol(self, codex_overrides=None):
+    def enable_logos_storage_community_history_archive_protocol(self, logos_storage_overrides=None):
         params = []
-        if codex_overrides:
-            params = [{k: str(v) for k, v in codex_overrides.items()}]
-        return self.rpc_request("enableCodexCommunityHistoryArchiveProtocol", params)
+        if logos_storage_overrides:
+            params = [{k: str(v) for k, v in logos_storage_overrides.items()}]
+        return self.rpc_request("enableLogosStorageCommunityHistoryArchiveProtocol", params)
 
     def disable_community_history_archive_protocol(self):
         response = self.rpc_request("disableCommunityHistoryArchiveProtocol")

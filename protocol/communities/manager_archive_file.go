@@ -31,31 +31,31 @@ import (
 )
 
 type ArchiveFileManager struct {
-	torrentConfig *params.TorrentConfig
-	codexConfig   *params.CodexConfig
-	codexClient   logosstorage.CodexClientInterface
-	logger        *zap.Logger
-	persistence   *Persistence
-	identity      *ecdsa.PrivateKey
-	messaging     *messaging.API
+	torrentConfig      *params.TorrentConfig
+	logosStorageConfig *params.LogosStorageConfig
+	logosStorageClient logosstorage.LogosStorageClientInterface
+	logger             *zap.Logger
+	persistence        *Persistence
+	identity           *ecdsa.PrivateKey
+	messaging          *messaging.API
 
 	publisher Publisher
 }
 
 func NewArchiveFileManager(amc *ArchiveManagerConfig) *ArchiveFileManager {
 	return &ArchiveFileManager{
-		torrentConfig: amc.TorrentConfig,
-		codexConfig:   amc.CodexConfig,
-		logger:        amc.Logger,
-		persistence:   amc.Persistence,
-		identity:      amc.Identity,
-		messaging:     amc.Messaging,
-		publisher:     amc.Publisher,
+		torrentConfig:      amc.TorrentConfig,
+		logosStorageConfig: amc.LogosStorageConfig,
+		logger:             amc.Logger,
+		persistence:        amc.Persistence,
+		identity:           amc.Identity,
+		messaging:          amc.Messaging,
+		publisher:          amc.Publisher,
 	}
 }
 
-func (m *ArchiveFileManager) SetCodexClient(codexClient logosstorage.CodexClientInterface) {
-	m.codexClient = codexClient
+func (m *ArchiveFileManager) SetLogosStorageClient(logosStorageClient logosstorage.LogosStorageClientInterface) {
+	m.logosStorageClient = logosStorageClient
 }
 
 func (m *ArchiveFileManager) createHistoryArchiveTorrent(communityID types.HexBytes, msgs []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {

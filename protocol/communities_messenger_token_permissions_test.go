@@ -161,9 +161,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) defaultNodeCfg(tempDir strin
 	s.Require().NoError(err)
 
 	// false is default, but being explicit here for clarity
-	nodeCfg.CodexConfig.Enabled = false
-	nodeCfg.CodexConfig.CodexNodeConfig.Nat = "none"
-	// nodeCfg.CodexConfig.CodexNodeConfig.LogLevel = "TRACE"
+	nodeCfg.LogosStorageConfig.Enabled = false
+	nodeCfg.LogosStorageConfig.LogosStorageNodeConfig.Nat = "none"
+	// nodeCfg.LogosStorageConfig.LogosStorageNodeConfig.LogLevel = "TRACE"
 	nodeCfg.TorrentConfig.Enabled = false
 	nodeCfg.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
 
@@ -2169,7 +2169,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	// 1.1. Create community
 	community, chat := s.createCommunity()
 
-	// createCommunity sets history archive distribution method to "codex" - we need torrent for this test
+	// createCommunity sets history archive distribution method to "logos-storage" - we need torrent for this test
 	err := s.owner.communitiesManager.SetArchiveDistributionPreference(communities.ArchiveDistributionMethodTorrent)
 	s.Require().NoError(err)
 
@@ -2370,7 +2370,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	s.Require().Equal(messageText1, response.Messages()[0].Text)
 }
 
-func PrintArchiveIndex(index *protobuf.CodexWakuMessageArchiveIndex) {
+func PrintArchiveIndex(index *protobuf.LogosStorageWakuMessageArchiveIndex) {
 	fmt.Println("********************* Archive Index **********************")
 	for hash, meta := range index.Archives {
 		fmt.Printf("  Hash: %s\n", hash)
@@ -2383,16 +2383,16 @@ func PrintArchiveIndex(index *protobuf.CodexWakuMessageArchiveIndex) {
 	}
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHistoryArchives_withSharedCodexClient() {
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadLogosStorageHistoryArchives_withSharedLogosStorageClient() {
 	dataDir := s.T().TempDir()
-	codexDataDir := filepath.Join(dataDir, "codex", "codexdata")
+	logosStorageDataDir := filepath.Join(dataDir, "logos-storage", "data")
 
-	log.Println("Codex data directory:", codexDataDir)
+	log.Println("LogosStorage data directory:", logosStorageDataDir)
 
-	codexConfig := params.CodexConfig{
+	logosStorageConfig := params.LogosStorageConfig{
 		Enabled: false,
-		CodexNodeConfig: codex.Config{
-			DataDir:      codexDataDir,
+		LogosStorageNodeConfig: codex.Config{
+			DataDir:      logosStorageDataDir,
 			BlockRetries: 10,
 			LogLevel:     "ERROR",
 			LogFormat:    codex.LogFormatNoColors,
@@ -2400,18 +2400,18 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 		},
 	}
 
-	// Share CodexClient between owner and bob
-	s.owner.archiveManager.SetCodexConfig(&codexConfig)
-	s.bob.archiveManager.SetCodexConfig(&codexConfig)
+	// Share LogosStorageClient between owner and bob
+	s.owner.archiveManager.SetLogosStorageConfig(&logosStorageConfig)
+	s.bob.archiveManager.SetLogosStorageConfig(&logosStorageConfig)
 
-	err := s.owner.archiveManager.StartCodexClient()
+	err := s.owner.archiveManager.StartLogosStorageClient()
 	s.Require().NoError(err)
-	codexClient := s.owner.archiveManager.GetCodexClient()
-	s.Require().NotNil(codexClient)
-	// no need to stop codex client, as it will be stopped during messenger Stop
-	// defer codexClient.Stop() //nolint: errcheck
+	logosStorageClient := s.owner.archiveManager.GetLogosStorageClient()
+	s.Require().NotNil(logosStorageClient)
+	// no need to stop logosStorage client, as it will be stopped during messenger Stop
+	// defer logosStorageClient.Stop() //nolint: errcheck
 
-	s.bob.archiveManager.SetCodexClient(codexClient)
+	s.bob.archiveManager.SetLogosStorageClient(logosStorageClient)
 
 	// 1.1. Create community
 	community, chat := s.createCommunity()
@@ -2419,12 +2419,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	archiveDistributionPreferenceOwner, err := s.owner.GetArchiveDistributionPreference()
 	s.Require().NoError(err)
 	log.Println("Archive distribution preference for owner:", archiveDistributionPreferenceOwner)
-	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceOwner)
+	s.Require().Equal(communities.ArchiveDistributionMethodLogosStorage, archiveDistributionPreferenceOwner)
 
 	archiveDistributionPreferenceBob, err := s.bob.GetArchiveDistributionPreference()
 	s.Require().NoError(err)
 	log.Println("Archive distribution preference for bob:", archiveDistributionPreferenceBob)
-	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceBob)
+	s.Require().Equal(communities.ArchiveDistributionMethodLogosStorage, archiveDistributionPreferenceBob)
 
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
@@ -2512,7 +2512,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 
-	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveCodexFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
+	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveLogosStorageFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
 
@@ -2549,23 +2549,23 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	indexCid, err := s.owner.communitiesManager.GetLastSeenIndexCid(community.ID())
 	s.Require().NoError(err)
 	s.Require().NotEmpty(indexCid)
-	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.owner.identity, community.ID(), indexCid, true)
+	archiveIndex, err := s.owner.archiveManager.LogosStorageLoadHistoryArchiveIndex(ctx, s.owner.identity, community.ID(), indexCid, true)
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	PrintArchiveIndex(archiveIndex)
 
 	// log
-	s.T().Logf("Codex archive OWNER index CID: %s", indexCid)
+	s.T().Logf("LogosStorage archive OWNER index CID: %s", indexCid)
 
-	// Let's trigger actual download from codex - archive will be overwritten
+	// Let's trigger actual download from LogosStorage - archive will be overwritten
 	cancelChan := make(chan struct{})
 	defer close(cancelChan)
 	s.bob.importDelayer.once.Do(func() {
 		close(s.bob.importDelayer.wait)
 	})
 
-	s.bob.downloadAndImportCodexHistoryArchives(community.ID(), indexCid, cancelChan)
+	s.bob.downloadAndImportLogosStorageHistoryArchives(community.ID(), indexCid, cancelChan)
 
 	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
 	receivedMessage1, err := s.bob.MessageByID(message1.ID)
@@ -2611,57 +2611,57 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	s.Require().Equal(messageText1, response.Messages()[0].Text)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHistoryArchives() {
-	// The messengers used in the tests in this suite use the helper newTestMessenger (protocol/messenger_builder_test.go). In the config setup (config.complete), tmc.nodeConfig defaults to an empty params.NodeConfig{} unless the test overrides it. The default params.NodeConfig zero-value has all nested configs (including CodexConfig.Enabled) set to false.
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadLogosStorageHistoryArchives() {
+	// The messengers used in the tests in this suite use the helper newTestMessenger (protocol/messenger_builder_test.go). In the config setup (config.complete), tmc.nodeConfig defaults to an empty params.NodeConfig{} unless the test overrides it. The default params.NodeConfig zero-value has all nested configs (including LogosStorageConfig.Enabled) set to false.
 
-	// During newTestMessenger, the in-memory appDb is migrated and then sDB.CreateSettings(*config.appSettings, *config.nodeConfig) is called (messenger_builder_test.go (line 120)). If you don’t override config.nodeConfig beforehand, this writes CodexConfig.Enabled = false into the node-config tables—mirroring what a brand-new install would do.
+	// During newTestMessenger, the in-memory appDb is migrated and then sDB.CreateSettings(*config.appSettings, *config.nodeConfig) is called (messenger_builder_test.go (line 120)). If you don’t override config.nodeConfig beforehand, this writes LogosStorageConfig.Enabled = false into the node-config tables—mirroring what a brand-new install would do.
 
-	// So TestImportDecryptedCodexArchiveMessages starts from that baseline: the in-memory DB contains the node config seeded with CodexConfig.Enabled false (unless you explicitly mutate it in the test).
+	// So TestImportDecryptedLogosStorageArchiveMessages starts from that baseline: the in-memory DB contains the node config seeded with LogosStorageConfig.Enabled false (unless you explicitly mutate it in the test).
 
-	// Following the above reasoning, we read the codex config from the database and verify that CodexConfig setting are what we expect them to be.
+	// Following the above reasoning, we read the LogosStorage config from the database and verify that LogosStorageConfig setting are what we expect them to be.
 
 	ownerNodeCfgFromDB, err := s.owner.settings.GetNodeConfig()
 	s.Require().NoError(err)
 	s.Assert().Equal(
-		s.nodeConfigs[s.owner.IdentityPublicKeyString()].CodexConfig,
-		ownerNodeCfgFromDB.CodexConfig,
+		s.nodeConfigs[s.owner.IdentityPublicKeyString()].LogosStorageConfig,
+		ownerNodeCfgFromDB.LogosStorageConfig,
 	)
 
 	bobNodeCfgFromDB, err := s.bob.settings.GetNodeConfig()
 	s.Require().NoError(err)
 	s.Assert().Equal(
-		s.nodeConfigs[s.bob.IdentityPublicKeyString()].CodexConfig,
-		bobNodeCfgFromDB.CodexConfig,
+		s.nodeConfigs[s.bob.IdentityPublicKeyString()].LogosStorageConfig,
+		bobNodeCfgFromDB.LogosStorageConfig,
 	)
 
 	// now to be specific
-	s.Assert().False(ownerNodeCfgFromDB.CodexConfig.Enabled)
-	s.Assert().False(bobNodeCfgFromDB.CodexConfig.Enabled)
+	s.Assert().False(ownerNodeCfgFromDB.LogosStorageConfig.Enabled)
+	s.Assert().False(bobNodeCfgFromDB.LogosStorageConfig.Enabled)
 
-	s.Require().NoError(s.owner.EnableCodexCommunityHistoryArchiveProtocol(nil))
-	s.Require().NoError(s.bob.EnableCodexCommunityHistoryArchiveProtocol(nil))
+	s.Require().NoError(s.owner.EnableLogosStorageCommunityHistoryArchiveProtocol(nil))
+	s.Require().NoError(s.bob.EnableLogosStorageCommunityHistoryArchiveProtocol(nil))
 
 	ownerNodeCfgFromDB2, err := s.owner.settings.GetNodeConfig()
 	s.Require().NoError(err)
 	bobNodeCfgFromDB2, err := s.bob.settings.GetNodeConfig()
 	s.Require().NoError(err)
 
-	s.Assert().True(ownerNodeCfgFromDB2.CodexConfig.Enabled)
-	s.Assert().True(bobNodeCfgFromDB2.CodexConfig.Enabled)
+	s.Assert().True(ownerNodeCfgFromDB2.LogosStorageConfig.Enabled)
+	s.Assert().True(bobNodeCfgFromDB2.LogosStorageConfig.Enabled)
 
-	// get codex client for owner - cast to concrete type
-	ownerCodexClient := s.owner.archiveManager.GetCodexClient()
-	s.Require().NotNil(ownerCodexClient)
+	// get LogosStorage client for owner - cast to concrete type
+	ownerLogosStorageClient := s.owner.archiveManager.GetLogosStorageClient()
+	s.Require().NotNil(ownerLogosStorageClient)
 
 	// get PeerId of the owner:
-	ownerInfo, err := ownerCodexClient.Debug()
+	ownerInfo, err := ownerLogosStorageClient.Debug()
 	s.Require().NoError(err)
 	s.Require().NotNil(ownerInfo)
 
-	bobCodexClient := s.bob.archiveManager.GetCodexClient()
-	s.Require().NotNil(bobCodexClient)
+	bobLogosStorageClient := s.bob.archiveManager.GetLogosStorageClient()
+	s.Require().NotNil(bobLogosStorageClient)
 
-	err = bobCodexClient.Connect(ownerInfo.ID, ownerInfo.Addrs)
+	err = bobLogosStorageClient.Connect(ownerInfo.ID, ownerInfo.Addrs)
 	s.Require().NoError(err)
 
 	// 1.1. Create community
@@ -2670,12 +2670,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	archiveDistributionPreferenceOwner, err := s.owner.GetArchiveDistributionPreference()
 	s.Require().NoError(err)
 	log.Println("Archive distribution preference for owner:", archiveDistributionPreferenceOwner)
-	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceOwner)
+	s.Require().Equal(communities.ArchiveDistributionMethodLogosStorage, archiveDistributionPreferenceOwner)
 
 	archiveDistributionPreferenceBob, err := s.bob.GetArchiveDistributionPreference()
 	s.Require().NoError(err)
 	log.Println("Archive distribution preference for bob:", archiveDistributionPreferenceBob)
-	s.Require().Equal(communities.ArchiveDistributionMethodCodex, archiveDistributionPreferenceBob)
+	s.Require().Equal(communities.ArchiveDistributionMethodLogosStorage, archiveDistributionPreferenceBob)
 
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
@@ -2763,8 +2763,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 
-	// this will create archive and push it to codex
-	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveCodexFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
+	// this will create archive and push it to LogosStorage
+	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveLogosStorageFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
 
@@ -2774,7 +2774,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	indexCid, err := s.owner.communitiesManager.GetLastSeenIndexCid(community.ID())
 	s.Require().NoError(err)
 	s.Require().NotEmpty(indexCid)
-	archiveIndex, err := s.owner.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.owner.identity, community.ID(), indexCid, true)
+	archiveIndex, err := s.owner.archiveManager.LogosStorageLoadHistoryArchiveIndex(ctx, s.owner.identity, community.ID(), indexCid, true)
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
@@ -2784,7 +2784,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	s.Require().NoError(err)
 
 	// log
-	s.T().Logf("Codex archive OWNER index CID: %s", indexCid)
+	s.T().Logf("LogosStorage archive OWNER index CID: %s", indexCid)
 
 	community, err = s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
@@ -2813,7 +2813,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	// by forcing `encryption.ErrHashRatchetGroupIDNotFound` in `ExtractMessagesFromHistoryArchive` after decryption here:
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4403
 
-	// Let's trigger actual download from bob's codex node
+	// Let's trigger actual download from bob's LogosStorage node
 	cancelChan := make(chan struct{})
 	defer close(cancelChan)
 	s.bob.importDelayer.once.Do(func() {
@@ -2822,7 +2822,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 
 	s.bob.ratchetNotFoundDelay = 1 * time.Second
 
-	s.bob.downloadAndImportCodexHistoryArchives(community.ID(), indexCid, cancelChan)
+	s.bob.downloadAndImportLogosStorageHistoryArchives(community.ID(), indexCid, cancelChan)
 
 	// Ensure bob has archive
 	ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
@@ -2830,14 +2830,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadCodexHisto
 	indexCid, err = s.bob.communitiesManager.GetLastSeenIndexCid(community.ID())
 	s.Require().NoError(err)
 	s.Require().NotEmpty(indexCid)
-	archiveIndex, err = s.bob.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.bob.identity, community.ID(), indexCid, true)
+	archiveIndex, err = s.bob.archiveManager.LogosStorageLoadHistoryArchiveIndex(ctx, s.bob.identity, community.ID(), indexCid, true)
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	PrintArchiveIndex(archiveIndex)
 
 	// log
-	s.T().Logf("Codex archive BOB index CID: %s", indexCid)
+	s.T().Logf("LogosStorage archive BOB index CID: %s", indexCid)
 
 	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
 	receivedMessage1, err := s.bob.MessageByID(message1.ID)

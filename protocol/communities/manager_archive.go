@@ -67,10 +67,10 @@ type EncodedArchiveData struct {
 type ArchiveManager struct {
 	torrentConfig                *params.TorrentConfig
 	torrentClient                *torrent.Client
-	codexConfig                  *params.CodexConfig
-	codexClient                  logosstorage.CodexClientInterface
-	isCodexClientStarted         bool
-	codexClientMu                sync.RWMutex
+	logosStorageConfig           *params.LogosStorageConfig
+	logosStorageClient           logosstorage.LogosStorageClientInterface
+	isLogosStorageClientStarted  bool
+	logosStorageClientMu         sync.RWMutex
 	downloadTimeout              time.Duration // timeout for archive downloads, defaults to 20s
 	torrentTasks                 map[string]metainfo.Hash
 	historyArchiveDownloadTasks  map[string]*HistoryArchiveDownloadTask
@@ -93,7 +93,7 @@ type ArchiveManager struct {
 func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	return &ArchiveManager{
 		torrentConfig:               amc.TorrentConfig,
-		codexConfig:                 amc.CodexConfig,
+		logosStorageConfig:          amc.LogosStorageConfig,
 		downloadTimeout:             20 * time.Second,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
@@ -108,35 +108,34 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 	}
 }
 
-func (m *ArchiveManager) GetCodexClient() logosstorage.CodexClientInterface {
-	m.codexClientMu.RLock()
-	defer m.codexClientMu.RUnlock()
-	return m.codexClient
+func (m *ArchiveManager) GetLogosStorageClient() logosstorage.LogosStorageClientInterface {
+	m.logosStorageClientMu.RLock()
+	defer m.logosStorageClientMu.RUnlock()
+	return m.logosStorageClient
 }
 
 func (m *ArchiveManager) SetOnline(online bool) {
-	m.logger.Info("[CODEX][set_online] testing online status:", zap.Bool("online", online))
+	m.logger.Info("[LogosStorage][set_online] testing online status:", zap.Bool("online", online))
 	if online {
-		m.logger.Info("[CODEX][set_online] Online: checking if torrent/codex clients need to be started...")
-		m.codexClientMu.RLock()
-		codexStarted := m.isCodexClientStarted
-		m.codexClientMu.RUnlock()
+		m.logger.Info("[LogosStorage][set_online] Online: checking if torrent/LogosStorage clients need to be started...")
+		m.logosStorageClientMu.RLock()
+		logosStorageStarted := m.isLogosStorageClientStarted
+		m.logosStorageClientMu.RUnlock()
 
-		m.logger.Info("[CODEX][set_online] Online. codexStarted:", zap.Bool("codexStarted", codexStarted))
-
+		m.logger.Info("[LogosStorage][set_online] Online. logosStorageStarted:", zap.Bool("logosStorageStarted", logosStorageStarted))
 		if m.torrentConfig != nil && m.torrentConfig.Enabled && !m.torrentClientStarted() {
-			m.logger.Info("[CODEX][set_online] Starting torrent client...")
+			m.logger.Info("[LogosStorage][set_online] Starting torrent client...")
 			err := m.StartTorrentClient()
 			if err != nil {
-				m.logger.Error("[CODEX][set_online] couldn't start torrent client", zap.Error(err))
+				m.logger.Error("[LogosStorage][set_online] couldn't start torrent client", zap.Error(err))
 			}
 		}
 
-		if m.codexConfig != nil && m.codexConfig.Enabled && !codexStarted {
-			m.logger.Info("[CODEX][set_online] Starting codex client...")
-			err := m.StartCodexClient()
+		if m.logosStorageConfig != nil && m.logosStorageConfig.Enabled && !logosStorageStarted {
+			m.logger.Info("[LogosStorage][set_online] Starting LogosStorage client...")
+			err := m.StartLogosStorageClient()
 			if err != nil {
-				m.logger.Error("[CODEX][set_online] couldn't start codex client", zap.Error(err))
+				m.logger.Error("[LogosStorage][set_online] couldn't start LogosStorage client", zap.Error(err))
 			}
 		}
 	}
@@ -147,9 +146,9 @@ func (m *ArchiveManager) SetTorrentConfig(config *params.TorrentConfig) {
 	m.ArchiveFileManager.torrentConfig = config
 }
 
-func (m *ArchiveManager) SetCodexConfig(config *params.CodexConfig) {
-	m.codexConfig = config
-	m.ArchiveFileManager.codexConfig = config
+func (m *ArchiveManager) SetLogosStorageConfig(config *params.LogosStorageConfig) {
+	m.logosStorageConfig = config
+	m.ArchiveFileManager.logosStorageConfig = config
 }
 
 // getTCPandUDPport will return the same port number given if != 0,
@@ -240,64 +239,64 @@ func (m *ArchiveManager) StartTorrentClient() error {
 	return nil
 }
 
-func (m *ArchiveManager) StartCodexClient() error {
-	m.codexClientMu.Lock()
-	defer m.codexClientMu.Unlock()
+func (m *ArchiveManager) StartLogosStorageClient() error {
+	m.logosStorageClientMu.Lock()
+	defer m.logosStorageClientMu.Unlock()
 
-	if m.codexConfig == nil {
-		return fmt.Errorf("can't start codex client: missing codexConfig")
+	if m.logosStorageConfig == nil {
+		return fmt.Errorf("can't start LogosStorage client: missing LogosStorageConfig")
 	}
 
-	if m.isCodexClientStarted {
+	if m.isLogosStorageClientStarted {
 		return nil
 	}
 
 	var err error
-	cfgCopy := *m.codexConfig
-	cfgCopy.CodexNodeConfig = m.codexConfig.CodexNodeConfig
+	cfgCopy := *m.logosStorageConfig
+	cfgCopy.LogosStorageNodeConfig = m.logosStorageConfig.LogosStorageNodeConfig
 
-	m.logger.Info("[CODEX][start_codex_client] Using the following CodexNodeConfig", zap.Any("config", cfgCopy.CodexNodeConfig))
+	m.logger.Info("[LogosStorage][start_logosstorage_client] Using the following LogosStorageNodeConfig", zap.Any("config", cfgCopy.LogosStorageNodeConfig))
 
-	client, err := logosstorage.NewCodexClient(cfgCopy)
+	client, err := logosstorage.NewLogosStorageClient(cfgCopy)
 	if err != nil {
 		return err
 	}
-	m.codexClient = client
-	m.ArchiveFileManager.codexClient = client
+	m.logosStorageClient = client
+	m.ArchiveFileManager.logosStorageClient = client
 
-	if err := m.codexClient.Start(); err != nil {
-		m.isCodexClientStarted = false
-		m.codexClient = nil
-		m.ArchiveFileManager.codexClient = nil
+	if err := m.logosStorageClient.Start(); err != nil {
+		m.isLogosStorageClientStarted = false
+		m.logosStorageClient = nil
+		m.ArchiveFileManager.logosStorageClient = nil
 		return err
 	}
 
-	m.isCodexClientStarted = true
+	m.isLogosStorageClientStarted = true
 
 	return nil
 }
 
-func (m *ArchiveManager) StopCodexClient() error {
-	m.codexClientMu.Lock()
-	defer m.codexClientMu.Unlock()
+func (m *ArchiveManager) StopLogosStorageClient() error {
+	m.logosStorageClientMu.Lock()
+	defer m.logosStorageClientMu.Unlock()
 
 	errs := []error{}
-	if m.isCodexClientStarted {
-		m.logger.Info("[CODEX] Stopping codex client")
+	if m.isLogosStorageClientStarted {
+		m.logger.Info("[LogosStorage] Stopping LogosStorage client")
 
-		e := m.codexClient.Stop()
+		e := m.logosStorageClient.Stop()
 		if e != nil {
 			errs = append(errs, e)
 		}
 
-		e = m.codexClient.Destroy()
+		e = m.logosStorageClient.Destroy()
 		if e != nil {
 			errs = append(errs, e)
 		}
 
-		m.isCodexClientStarted = false
-		m.codexClient = nil
-		m.ArchiveFileManager.codexClient = nil
+		m.isLogosStorageClientStarted = false
+		m.logosStorageClient = nil
+		m.ArchiveFileManager.logosStorageClient = nil
 	}
 
 	if len(errs) > 0 {
@@ -308,7 +307,7 @@ func (m *ArchiveManager) StopCodexClient() error {
 }
 
 func (m *ArchiveManager) Stop() error {
-	if m.torrentClientStarted() || m.isCodexClientStarted {
+	if m.torrentClientStarted() || m.isLogosStorageClientStarted {
 		m.stopHistoryArchiveTasksIntervals()
 	}
 
@@ -319,7 +318,7 @@ func (m *ArchiveManager) Stop() error {
 		m.torrentClient = nil
 	}
 
-	err := m.StopCodexClient()
+	err := m.StopLogosStorageClient()
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -331,13 +330,13 @@ func (m *ArchiveManager) Stop() error {
 	return nil
 }
 
-func (m *ArchiveManager) SetCodexClient(client logosstorage.CodexClientInterface) {
-	m.codexClientMu.Lock()
-	defer m.codexClientMu.Unlock()
+func (m *ArchiveManager) SetLogosStorageClient(client logosstorage.LogosStorageClientInterface) {
+	m.logosStorageClientMu.Lock()
+	defer m.logosStorageClientMu.Unlock()
 
-	m.codexClient = client
-	m.ArchiveFileManager.codexClient = client
-	m.isCodexClientStarted = true
+	m.logosStorageClient = client
+	m.ArchiveFileManager.logosStorageClient = client
+	m.isLogosStorageClientStarted = true
 }
 
 func (m *ArchiveManager) SetDownloadTimeout(timeout time.Duration) {
@@ -349,8 +348,8 @@ func (m *ArchiveManager) torrentClientStarted() bool {
 }
 
 func (m *ArchiveManager) IsTorrentReady() bool {
-	m.codexClientMu.RLock()
-	defer m.codexClientMu.RUnlock()
+	m.logosStorageClientMu.RLock()
+	defer m.logosStorageClientMu.RUnlock()
 
 	// Simply checking for `torrentConfig.Enabled`
 	// isn't enough as there's a possibility that the torrent client
@@ -358,21 +357,21 @@ func (m *ArchiveManager) IsTorrentReady() bool {
 	return m.torrentConfig != nil && m.torrentConfig.Enabled && m.torrentClientStarted()
 }
 
-func (m *ArchiveManager) IsCodexReady() bool {
-	m.codexClientMu.RLock()
-	defer m.codexClientMu.RUnlock()
+func (m *ArchiveManager) IsLogosStorageReady() bool {
+	m.logosStorageClientMu.RLock()
+	defer m.logosStorageClientMu.RUnlock()
 
-	// Simply checking for `codexConfig.Enabled`
-	// isn't enough as there's a possibility that the codex client
+	// Simply checking for `logosStorageConfig.Enabled`
+	// isn't enough as there's a possibility that the LogosStorage client
 	// couldn't be instantiated (for example in case of port conflicts)
-	return m.codexConfig != nil && m.codexConfig.Enabled && m.isCodexClientStarted
+	return m.logosStorageConfig != nil && m.logosStorageConfig.Enabled && m.isLogosStorageClientStarted
 }
 
 func (m *ArchiveManager) IsReady() bool {
-	m.codexClientMu.RLock()
-	defer m.codexClientMu.RUnlock()
+	m.logosStorageClientMu.RLock()
+	defer m.logosStorageClientMu.RUnlock()
 
-	return m.IsTorrentReady() || m.IsCodexReady()
+	return m.IsTorrentReady() || m.IsLogosStorageReady()
 }
 
 func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error) {
@@ -477,15 +476,15 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID ty
 
 func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	archiveTorrentCreatedSuccessfully := false
-	archiveCodexCreatedSuccessfully := false
+	archiveLogosStorageCreatedSuccessfully := false
 	distributionPreference, err := m.persistence.GetArchiveDistributionPreference()
 	if err != nil {
-		// fallback to codex
-		m.logger.Debug("[CODEX][CreateAndSeedHistoryArchive] failed to get archive distribution preference - falling back to codex", zap.Error(err))
-		distributionPreference = params.ArchiveDistributionMethodCodex
+		// fallback to LogosStorage
+		m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] failed to get archive distribution preference - falling back to LogosStorage", zap.Error(err))
+		distributionPreference = params.ArchiveDistributionMethodLogosStorage
 	}
 
-	var errTorrent, errCodex error
+	var errTorrent, errLogosStorage error
 
 	if distributionPreference == params.ArchiveDistributionMethodTorrent {
 		archiveTorrentCreatedSuccessfully = true
@@ -503,44 +502,44 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 		}
 	}
 
-	if distributionPreference == params.ArchiveDistributionMethodCodex {
+	if distributionPreference == params.ArchiveDistributionMethodLogosStorage {
 		lastIndexCid, err := m.persistence.GetLastSeenIndexCid(communityID)
 		if err != nil {
 			m.UnseedHistoryArchiveIndexCid(communityID, lastIndexCid)
 		} else {
 			if err != nil {
-				m.logger.Debug("[CODEX][CreateAndSeedHistoryArchive] failed to get last seen index cid - proceeding without un-seeding", zap.Error(err))
+				m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] failed to get last seen index cid - proceeding without un-seeding", zap.Error(err))
 			}
 		}
-		archiveCodexCreatedSuccessfully = true
-		// codexArchiveIDs, errCodex := m.ArchiveFileManager.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
-		codexArchiveIDs, errCodex := m.CreateHistoryArchiveCodexFromDB(communityID, topics, startDate, endDate, partition, encrypt)
-		if errCodex != nil {
-			archiveCodexCreatedSuccessfully = false
-			m.logger.Error("[CODEX][CreateAndSeedHistoryArchive] failed to create history archive codex", zap.Error(errCodex))
+		archiveLogosStorageCreatedSuccessfully = true
+		// logosStorageArchiveIDs, errLogosStorage := m.ArchiveFileManager.CreateHistoryArchiveLogosStorageFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+		logosStorageArchiveIDs, errLogosStorage := m.CreateHistoryArchiveLogosStorageFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+		if errLogosStorage != nil {
+			archiveLogosStorageCreatedSuccessfully = false
+			m.logger.Error("[LogosStorage][CreateAndSeedHistoryArchive] failed to create history archive LogosStorage", zap.Error(errLogosStorage))
 		} else {
-			if len(codexArchiveIDs) == 0 {
-				// no new codex archives were created - no need to distribute new index cid
+			if len(logosStorageArchiveIDs) == 0 {
+				// no new LogosStorage archives were created - no need to distribute new index cid
 				// but we need to (re)start seeding that we stopped above
-				archiveCodexCreatedSuccessfully = false
-				m.logger.Debug("[CODEX][CreateAndSeedHistoryArchive] no new codex archive ids were created - re-seeding existing index cid")
+				archiveLogosStorageCreatedSuccessfully = false
+				m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] no new LogosStorage archive ids were created - re-seeding existing index cid")
 				if err = m.SeedHistoryArchiveIndexCid(communityID, lastIndexCid); err != nil {
-					m.logger.Error("[CODEX][CreateAndSeedHistoryArchive] failed to seed existing history archive codex index cid", zap.Error(err))
+					m.logger.Error("[LogosStorage][CreateAndSeedHistoryArchive] failed to seed existing history archive LogosStorage index cid", zap.Error(err))
 				}
 			}
-			// else: we created new codex archives and they are already published to codex
-			// in CreateHistoryArchiveCodexFromDB (thus they are seeded)
+			// else: we created new LogosStorage archives and they are already published to LogosStorage
+			// in CreateHistoryArchiveLogosStorageFromDB (thus they are seeded)
 		}
 	}
-	if !archiveTorrentCreatedSuccessfully && !archiveCodexCreatedSuccessfully {
-		return errors.Join(errTorrent, errCodex)
+	if !archiveTorrentCreatedSuccessfully && !archiveLogosStorageCreatedSuccessfully {
+		return errors.Join(errTorrent, errLogosStorage)
 	}
 	// one way of publishing index succeeded - we can publish the seeding signal
 	m.publisher.publish(&Subscription{
 		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
 			CommunityID: communityID.String(),
-			MagnetLink:  archiveTorrentCreatedSuccessfully, // true if torrent created successfully
-			IndexCid:    archiveCodexCreatedSuccessfully,   // true if codex created successfully
+			MagnetLink:  archiveTorrentCreatedSuccessfully,      // true if torrent created successfully
+			IndexCid:    archiveLogosStorageCreatedSuccessfully, // true if LogosStorage created successfully
 		},
 	})
 
@@ -612,7 +611,7 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 				m.UnseedHistoryArchiveIndexCid(community.ID(), lastIndexCid)
 			} else {
 				if err != nil {
-					m.logger.Debug("[CODEX][start_history_archive_tasks_interval] failed to get last seen index cid - proceeding without un-seeding", zap.Error(err))
+					m.logger.Debug("[LogosStorage][start_history_archive_tasks_interval] failed to get last seen index cid - proceeding without un-seeding", zap.Error(err))
 				}
 			}
 			m.historyArchiveTasks.Delete(id)
@@ -698,17 +697,17 @@ func (m *ArchiveManager) SeedHistoryArchiveIndexCid(communityID types.HexBytes, 
 	if indexCid == "" {
 		return nil
 	}
-	if !m.IsCodexReady() {
+	if !m.IsLogosStorageReady() {
 		return nil
 	}
 	// do not seed if already seeding
-	if m.IsSeedingHistoryArchiveCodex(communityID, indexCid) {
+	if m.IsSeedingHistoryArchiveLogosStorage(communityID, indexCid) {
 		return nil
 	}
 
 	// for the purpose of seeding, we just need to make sure that the index cid
-	// is fetched to the codex node - codex will seed it by advertising it on DHT
-	_, err := m.codexClient.TriggerDownload(indexCid)
+	// is fetched to the LogosStorage node - LogosStorage will seed it by advertising it on DHT
+	_, err := m.logosStorageClient.TriggerDownload(indexCid)
 	if err != nil {
 		return err
 	}
@@ -719,17 +718,17 @@ func (m *ArchiveManager) UnseedHistoryArchiveIndexCid(communityID types.HexBytes
 	if indexCid == "" {
 		return
 	}
-	if !m.IsCodexReady() {
+	if !m.IsLogosStorageReady() {
 		return
 	}
-	if !m.IsSeedingHistoryArchiveCodex(communityID, indexCid) {
+	if !m.IsSeedingHistoryArchiveLogosStorage(communityID, indexCid) {
 		return
 	}
-	m.logger.Debug("[CODEX] Un-seeding index CID for community", zap.String("id", communityID.String()), zap.String("cid", indexCid))
+	m.logger.Debug("[LogosStorage] Un-seeding index CID for community", zap.String("id", communityID.String()), zap.String("cid", indexCid))
 
-	err := m.codexClient.RemoveCid(indexCid)
+	err := m.logosStorageClient.RemoveCid(indexCid)
 	if err != nil {
-		m.logger.Error("[CODEX] failed to remove CID from Codex", zap.Error(err))
+		m.logger.Error("[LogosStorage] failed to remove CID from LogosStorage", zap.Error(err))
 	}
 }
 
@@ -740,16 +739,16 @@ func (m *ArchiveManager) IsSeedingHistoryArchiveTorrent(communityID types.HexByt
 	return ok && torrent.Seeding()
 }
 
-func (m *ArchiveManager) IsSeedingHistoryArchiveCodex(communityID types.HexBytes, indexCid string) bool {
+func (m *ArchiveManager) IsSeedingHistoryArchiveLogosStorage(communityID types.HexBytes, indexCid string) bool {
 	if indexCid == "" {
 		return false
 	}
-	if !m.IsCodexReady() {
+	if !m.IsLogosStorageReady() {
 		return false
 	}
-	hasCid, err := m.codexClient.HasCid(indexCid)
+	hasCid, err := m.logosStorageClient.HasCid(indexCid)
 	if err != nil {
-		m.logger.Debug("[CODEX] failed to verify Codex CID availability", zap.String("communityID", communityID.String()), zap.String("cid", indexCid), zap.Error(err))
+		m.logger.Debug("[LogosStorage] failed to verify LogosStorage CID availability", zap.String("communityID", communityID.String()), zap.String("cid", indexCid), zap.Error(err))
 		return false
 	}
 	return hasCid
@@ -925,7 +924,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 						HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
 							CommunityID: communityID.String(),
 							MagnetLink:  true,  // Downloaded via magnet link
-							IndexCid:    false, // No Codex CID in magnet link downloads
+							IndexCid:    false, // No LogosStorage CID in magnet link downloads
 						},
 					})
 					m.logger.Debug("finished downloading archives")
@@ -950,15 +949,15 @@ func (m *ArchiveManager) PublishHistoryArchivesSeedingSignal(
 	})
 }
 
-func (m *ArchiveManager) CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-	return m.createHistoryArchiveCodex(communityID, messages, topics, startDate, endDate, partition, encrypt)
+func (m *ArchiveManager) CreateHistoryArchiveLogosStorageFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return m.createHistoryArchiveLogosStorage(communityID, messages, topics, startDate, endDate, partition, encrypt)
 }
 
-func (m *ArchiveManager) CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-	return m.createHistoryArchiveCodex(communityID, make([]*messagingtypes.ReceivedMessage, 0), topics, startDate, endDate, partition, encrypt)
+func (m *ArchiveManager) CreateHistoryArchiveLogosStorageFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+	return m.createHistoryArchiveLogosStorage(communityID, make([]*messagingtypes.ReceivedMessage, 0), topics, startDate, endDate, partition, encrypt)
 }
 
-func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, msgs []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (m *ArchiveManager) createHistoryArchiveLogosStorage(communityID types.HexBytes, msgs []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 
 	loadFromDB := len(msgs) == 0
 
@@ -968,34 +967,33 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 		to = endDate
 	}
 
-	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
-	codexWakuMessageArchiveIndex := make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata)
-	codexArchiveIDs := make([]string, 0)
+	logosStorageWakuMessageArchiveIndexProto := &protobuf.LogosStorageWakuMessageArchiveIndex{}
+	logosStorageWakuMessageArchiveIndex := make(map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata)
+	logosStorageArchiveIDs := make([]string, 0)
 
 	lastSeenIndexCid, err := m.persistence.GetLastSeenIndexCid(communityID)
 	if err != nil {
-		return codexArchiveIDs, err
+		return logosStorageArchiveIDs, err
 	}
 
-	if m.IsSeedingHistoryArchiveCodex(communityID, lastSeenIndexCid) {
-		m.logger.Debug("[CODEX][createHistoryArchiveCodex] codex index file exists, loading from file")
+	if m.IsSeedingHistoryArchiveLogosStorage(communityID, lastSeenIndexCid) {
+		m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] LogosStorage index file exists, loading from file")
 		ctx, cancel := context.WithTimeout(context.Background(), m.downloadTimeout)
 		defer cancel()
-		codexWakuMessageArchiveIndexProto, err = m.CodexLoadHistoryArchiveIndex(ctx, m.identity, communityID, lastSeenIndexCid, true)
+		logosStorageWakuMessageArchiveIndexProto, err = m.LogosStorageLoadHistoryArchiveIndex(ctx, m.identity, communityID, lastSeenIndexCid, true)
 		if err != nil {
-			return codexArchiveIDs, err
+			return logosStorageArchiveIDs, err
 		}
 	}
 
-	maps.Copy(codexWakuMessageArchiveIndex, codexWakuMessageArchiveIndexProto.Archives)
-
+	maps.Copy(logosStorageWakuMessageArchiveIndex, logosStorageWakuMessageArchiveIndexProto.Archives)
 	topicsAsByteArrays := topicsAsByteArrays(topics)
 
 	m.publisher.publish(&Subscription{CreatingHistoryArchivesSignal: &signal.CreatingHistoryArchivesSignal{
 		CommunityID: communityID.String(),
 	}})
 
-	m.logger.Debug("[CODEX][createHistoryArchiveCodex] creating archives",
+	m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] creating archives",
 		zap.Any("startDate", startDate),
 		zap.Any("endDate", endDate),
 		zap.Duration("partition", partition),
@@ -1013,7 +1011,7 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 		if loadFromDB {
 			messages, err = m.persistence.GetWakuMessagesByFilterTopic(topics, uint64(from.Unix()), uint64(to.Unix()))
 			if err != nil {
-				return codexArchiveIDs, err
+				return logosStorageArchiveIDs, err
 			}
 		} else {
 			for _, msg := range msgs {
@@ -1025,7 +1023,7 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 
 		if len(messages) == 0 {
 			// No need to create an archive with zero messages
-			m.logger.Debug("[CODEX] no messages in this partition")
+			m.logger.Debug("[LogosStorage] no messages in this partition")
 			from = to
 			to = to.Add(partition)
 			if to.After(endDate) {
@@ -1034,7 +1032,7 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 			continue
 		}
 
-		m.logger.Debug("[CODEX][createHistoryArchiveCodex] creating Codex archive with messages", zap.Int("messagesCount", len(messages)))
+		m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] creating LogosStorage archive with messages", zap.Int("messagesCount", len(messages)))
 
 		// Not only do we partition messages, we also chunk them
 		// roughly by size, such that each chunk will not exceed a given
@@ -1045,14 +1043,14 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 
 		for _, msg := range messages {
 			msgSize := len(msg.Payload) + len(msg.Sig)
-			m.logger.Debug("[CODEX][createHistoryArchiveCodex] message size",
+			m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] message size",
 				zap.Int("messageSize", msgSize),
 				zap.String("contentTopic", string(msg.Topic[:])),
 				zap.ByteString("payload[0:31]", msg.Payload[:min(32, len(msg.Payload))]),
 			)
 			if msgSize > maxArchiveSizeInBytes {
 				// we drop messages this big
-				m.logger.Debug("[CODEX][createHistoryArchiveCodex] dropping message due to size", zap.Int("messageSize", msgSize))
+				m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] dropping message due to size", zap.Int("messageSize", msgSize))
 				continue
 			}
 
@@ -1070,38 +1068,38 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 			wakuMessageArchive := m.createWakuMessageArchive(from, to, messages, topicsAsByteArrays)
 			encodedArchive, err := proto.Marshal(wakuMessageArchive)
 			if err != nil {
-				return codexArchiveIDs, err
+				return logosStorageArchiveIDs, err
 			}
 
 			if encrypt {
 				encodedArchive, err = m.messaging.BuildHashRatchetMessage(communityID, encodedArchive)
 				if err != nil {
-					return codexArchiveIDs, err
+					return logosStorageArchiveIDs, err
 				}
 			}
 
-			// upload archive to codex and get CID back
-			cid, err := m.codexClient.UploadArchive(encodedArchive)
+			// upload archive to LogosStorage and get CID back
+			cid, err := m.logosStorageClient.UploadArchive(encodedArchive)
 			if err != nil {
-				m.logger.Error("[CODEX] failed to upload to codex", zap.Error(err))
-				return codexArchiveIDs, err
+				m.logger.Error("[LogosStorage] failed to upload to LogosStorage", zap.Error(err))
+				return logosStorageArchiveIDs, err
 			}
 
-			m.logger.Debug("[CODEX][createHistoryArchiveCodex] archive uploaded to codex", zap.String("cid", cid))
+			m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] archive uploaded to LogosStorage", zap.String("cid", cid))
 
-			codexWakuMessageArchiveIndexMetadata := &protobuf.CodexWakuMessageArchiveIndexMetadata{
+			logosStorageWakuMessageArchiveIndexMetadata := &protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 				Metadata: wakuMessageArchive.Metadata,
 				Cid:      cid,
 			}
 
-			codexWakuMessageArchiveIndexMetadataBytes, err := proto.Marshal(codexWakuMessageArchiveIndexMetadata)
+			logosStorageWakuMessageArchiveIndexMetadataBytes, err := proto.Marshal(logosStorageWakuMessageArchiveIndexMetadata)
 			if err != nil {
-				return codexArchiveIDs, err
+				return logosStorageArchiveIDs, err
 			}
 
-			codexArchiveID := crypto.Keccak256Hash(codexWakuMessageArchiveIndexMetadataBytes).String()
-			codexArchiveIDs = append(codexArchiveIDs, codexArchiveID)
-			codexWakuMessageArchiveIndex[codexArchiveID] = codexWakuMessageArchiveIndexMetadata
+			logosStorageArchiveID := crypto.Keccak256Hash(logosStorageWakuMessageArchiveIndexMetadataBytes).String()
+			logosStorageArchiveIDs = append(logosStorageArchiveIDs, logosStorageArchiveID)
+			logosStorageWakuMessageArchiveIndex[logosStorageArchiveID] = logosStorageWakuMessageArchiveIndexMetadata
 		}
 
 		from = to
@@ -1111,34 +1109,34 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 		}
 	}
 
-	if len(codexArchiveIDs) > 0 {
-		codexWakuMessageArchiveIndexProto.Archives = codexWakuMessageArchiveIndex
-		codexIndexBytes, err := proto.Marshal(codexWakuMessageArchiveIndexProto)
+	if len(logosStorageArchiveIDs) > 0 {
+		logosStorageWakuMessageArchiveIndexProto.Archives = logosStorageWakuMessageArchiveIndex
+		logosStorageIndexBytes, err := proto.Marshal(logosStorageWakuMessageArchiveIndexProto)
 		if err != nil {
-			return codexArchiveIDs, err
+			return logosStorageArchiveIDs, err
 		}
 
 		if encrypt {
-			codexIndexBytes, err = m.messaging.BuildHashRatchetMessage(communityID, codexIndexBytes)
+			logosStorageIndexBytes, err = m.messaging.BuildHashRatchetMessage(communityID, logosStorageIndexBytes)
 			if err != nil {
-				return codexArchiveIDs, err
+				return logosStorageArchiveIDs, err
 			}
 		}
 
-		// upload index file to codex
-		cid, err := m.codexClient.UploadArchive(codexIndexBytes)
+		// upload index file to LogosStorage
+		cid, err := m.logosStorageClient.UploadArchive(logosStorageIndexBytes)
 		if err != nil {
-			m.logger.Error("[CODEX][createHistoryArchiveCodex] failed to upload to codex", zap.Error(err))
-			return codexArchiveIDs, err
+			m.logger.Error("[LogosStorage][createHistoryArchiveLogosStorage] failed to upload to LogosStorage", zap.Error(err))
+			return logosStorageArchiveIDs, err
 		}
 
-		m.logger.Debug("[CODEX][createHistoryArchiveCodex] index uploaded to codex", zap.String("cid", cid))
-		m.logger.Debug("[CODEX][createHistoryArchiveCodex] archives uploaded to Codex", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
+		m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] index uploaded to LogosStorage", zap.String("cid", cid))
+		m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] archives uploaded to LogosStorage", zap.Any("from", startDate.Unix()), zap.Any("to", endDate.Unix()))
 
-		m.logger.Debug("[CODEX][create_history_archive_codex] updating last seen index cid", zap.String("cid", cid))
+		m.logger.Debug("[LogosStorage][create_history_archive_logos_storage] updating last seen index cid", zap.String("cid", cid))
 		err = m.persistence.UpdateLastSeenIndexCid(communityID, cid)
 		if err != nil {
-			return codexArchiveIDs, err
+			return logosStorageArchiveIDs, err
 		}
 
 		m.publisher.publish(&Subscription{
@@ -1149,7 +1147,7 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 			},
 		})
 	} else {
-		m.logger.Debug("[CODEX][createHistoryArchiveCodex] no archives created")
+		m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] no archives created")
 		m.publisher.publish(&Subscription{
 			NoHistoryArchivesCreatedSignal: &signal.NoHistoryArchivesCreatedSignal{
 				CommunityID: communityID.String(),
@@ -1161,28 +1159,28 @@ func (m *ArchiveManager) createHistoryArchiveCodex(communityID types.HexBytes, m
 
 	lastMessageArchiveEndDate, err := m.persistence.GetLastMessageArchiveEndDate(communityID)
 	if err != nil {
-		return codexArchiveIDs, err
+		return logosStorageArchiveIDs, err
 	}
 
-	m.logger.Debug("[CODEX][create_history_archive_codex] updating lastMessageArchiveEndDate", zap.Uint64("lastMessageArchiveEndDate", lastMessageArchiveEndDate))
+	m.logger.Debug("[LogosStorage][create_history_archive_logosstorage] updating lastMessageArchiveEndDate", zap.Uint64("lastMessageArchiveEndDate", lastMessageArchiveEndDate))
 	err = m.persistence.UpdateLastMessageArchiveEndDate(communityID, uint64(from.Unix()))
 	if err != nil {
-		return codexArchiveIDs, err
+		return logosStorageArchiveIDs, err
 	}
-	return codexArchiveIDs, nil
+	return logosStorageArchiveIDs, nil
 }
 
-func (m *ArchiveManager) ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string, codexIndex *protobuf.CodexWakuMessageArchiveIndex) ([]*protobuf.WakuMessage, error) {
-	metadata, ok := codexIndex.Archives[archiveID]
+func (m *ArchiveManager) ExtractMessagesFromLogosStorageHistoryArchive(communityID types.HexBytes, archiveID string, logosStorageIndex *protobuf.LogosStorageWakuMessageArchiveIndex) ([]*protobuf.WakuMessage, error) {
+	metadata, ok := logosStorageIndex.Archives[archiveID]
 	if !ok || metadata == nil {
-		return nil, fmt.Errorf("archive %s missing from codex index", archiveID)
+		return nil, fmt.Errorf("archive %s missing from LogosStorage index", archiveID)
 	}
 	cid := metadata.Cid
 
 	var buf bytes.Buffer
-	err := m.codexClient.LocalDownload(cid, &buf)
+	err := m.logosStorageClient.LocalDownload(cid, &buf)
 	if err != nil {
-		m.logger.Error("[CODEX] failed to download archive from codex", zap.Error(err))
+		m.logger.Error("[LogosStorage] failed to download archive from LogosStorage", zap.Error(err))
 		return nil, err
 	}
 	data := buf.Bytes()
@@ -1218,10 +1216,10 @@ func (m *ArchiveManager) ExtractMessagesFromCodexHistoryArchive(communityID type
 	return archive.Messages, nil
 }
 
-func (m *ArchiveManager) CodexLoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID types.HexBytes, indexCid string, isLocal bool) (*protobuf.CodexWakuMessageArchiveIndex, error) {
-	codexWakuMessageArchiveIndexProto := &protobuf.CodexWakuMessageArchiveIndex{}
+func (m *ArchiveManager) LogosStorageLoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID types.HexBytes, indexCid string, isLocal bool) (*protobuf.LogosStorageWakuMessageArchiveIndex, error) {
+	logosStorageWakuMessageArchiveIndexProto := &protobuf.LogosStorageWakuMessageArchiveIndex{}
 
-	indexDownloader := logosstorage.NewCodexIndexDownloader(m.codexClient, m.logger)
+	indexDownloader := logosstorage.NewLogosStorageIndexDownloader(m.logosStorageClient, m.logger)
 
 	var indexBuf bytes.Buffer
 	if isLocal {
@@ -1241,12 +1239,12 @@ func (m *ArchiveManager) CodexLoadHistoryArchiveIndex(ctx context.Context, myKey
 	}
 	indexData := indexBuf.Bytes()
 
-	err := proto.Unmarshal(indexData, codexWakuMessageArchiveIndexProto)
+	err := proto.Unmarshal(indexData, logosStorageWakuMessageArchiveIndexProto)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(codexWakuMessageArchiveIndexProto.Archives) == 0 && len(indexData) > 0 {
+	if len(logosStorageWakuMessageArchiveIndexProto.Archives) == 0 && len(indexData) > 0 {
 		// This means we're dealing with an encrypted index file, so we have to decrypt it first
 		pk, err := crypto.DecompressPubkey(communityID)
 		if err != nil {
@@ -1259,13 +1257,13 @@ func (m *ArchiveManager) CodexLoadHistoryArchiveIndex(ctx context.Context, myKey
 			return nil, err
 		}
 
-		err = proto.Unmarshal(decryptedData, codexWakuMessageArchiveIndexProto)
+		err = proto.Unmarshal(decryptedData, logosStorageWakuMessageArchiveIndexProto)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return codexWakuMessageArchiveIndexProto, nil
+	return logosStorageWakuMessageArchiveIndexProto, nil
 }
 
 func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error) {
@@ -1287,13 +1285,13 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		defer common.LogOnPanic()
 		select {
 		case <-cancelTask:
-			m.logger.Debug("[CODEX] cancelling downloading index from Codex")
+			m.logger.Debug("[LogosStorage] cancelling downloading index from LogosStorage")
 			cancel()
 		case <-done:
 		}
 	}()
 
-	index, err := m.CodexLoadHistoryArchiveIndex(indexCtx,
+	index, err := m.LogosStorageLoadHistoryArchiveIndex(indexCtx,
 		m.identity, communityID, indexCid, false)
 	close(done)
 	if err != nil {
@@ -1303,7 +1301,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		}
 		// check if error is due to cancellation
 		if errors.Is(err, context.Canceled) {
-			m.logger.Debug("[CODEX] cancelled downloading index from Codex")
+			m.logger.Debug("[LogosStorage] cancelled downloading index from LogosStorage")
 			downloadTaskInfo.Cancelled = true
 			return downloadTaskInfo, nil
 		}
@@ -1328,7 +1326,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	downloadTaskInfo.TotalArchivesCount = len(index.Archives)
 
 	if len(existingArchiveIDs) == len(index.Archives) {
-		m.logger.Debug("[CODEX] aborting download, no new archives")
+		m.logger.Debug("[LogosStorage] aborting download, no new archives")
 		return downloadTaskInfo, nil
 	}
 
@@ -1337,15 +1335,15 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 	archiveDownloaderCancel := make(chan struct{})
 
 	// Create the archive downloader using the protobuf index directly
-	archiveDownloader := logosstorage.NewCodexArchiveDownloader(
-		m.codexClient, index, id, existingArchiveIDs,
+	archiveDownloader := logosstorage.NewLogosStorageArchiveDownloader(
+		m.logosStorageClient, index, id, existingArchiveIDs,
 		archiveDownloaderCancel, m.logger)
 
 	// Set up callback for when individual archives are downloaded
 	archiveDownloader.SetOnArchiveDownloaded(func(hash string, from, to uint64) {
 		err = m.persistence.SaveMessageArchiveID(communityID, hash)
 		if err != nil {
-			m.logger.Error("[CODEX] couldn't save message archive ID", zap.Error(err))
+			m.logger.Error("[LogosStorage] couldn't save message archive ID", zap.Error(err))
 		}
 		m.publisher.publish(&Subscription{
 			HistoryArchiveDownloadedSignal: &signal.HistoryArchiveDownloadedSignal{
@@ -1355,13 +1353,13 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 			},
 		})
 
-		m.logger.Debug("[CODEX] archive downloaded successfully",
+		m.logger.Debug("[LogosStorage] archive downloaded successfully",
 			zap.String("hash", hash),
 			zap.Uint64("from", from),
 			zap.Uint64("to", to))
 	})
 
-	m.logger.Debug("[CODEX] starting downloading individual archives from Codex")
+	m.logger.Debug("[LogosStorage] starting downloading individual archives from LogosStorage")
 
 	archiveDownloader.StartDownload()
 
@@ -1382,7 +1380,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 		case <-timeout:
 			return nil, ErrIndexCidTimedout
 		case <-cancelTask:
-			m.logger.Debug("[CODEX] cancelled downloading individual archives")
+			m.logger.Debug("[LogosStorage] cancelled downloading individual archives")
 			close(archiveDownloaderCancel)
 			downloadTaskInfo.TotalDownloadedArchivesCount = archiveDownloader.GetTotalDownloadedArchivesCount()
 			downloadTaskInfo.Cancelled = true
@@ -1406,7 +1404,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 				downloadTaskInfo.TotalDownloadedArchivesCount =
 					archiveDownloader.GetTotalDownloadedArchivesCount()
 
-				m.logger.Info("[CODEX] downloading archives from Codex completed",
+				m.logger.Info("[LogosStorage] downloading archives from LogosStorage completed",
 					zap.Int("totalArchives", downloadTaskInfo.TotalArchivesCount),
 					zap.Int("downloadedArchives", downloadTaskInfo.TotalDownloadedArchivesCount))
 
@@ -1415,7 +1413,7 @@ func (m *ArchiveManager) DownloadHistoryArchivesByIndexCid(communityID types.Hex
 				// Update progress
 				downloadTaskInfo.TotalDownloadedArchivesCount =
 					archiveDownloader.GetTotalDownloadedArchivesCount()
-				m.logger.Debug("[CODEX] downloading archives in progress",
+				m.logger.Debug("[LogosStorage] downloading archives in progress",
 					zap.Int("completed", downloadTaskInfo.TotalDownloadedArchivesCount),
 					zap.Int("total", downloadTaskInfo.TotalArchivesCount),
 					zap.Int(

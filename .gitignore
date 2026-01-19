@@ -117,7 +117,7 @@ pkg/sentry/SENTRY_PRODUCTION
 go.work
 go.work.sum
 
-# Libs directory (Codex)
+# Libs directory (LogosStorage)
 libs
 coverage_merged.out
 test_0.coverage.out

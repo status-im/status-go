@@ -29,21 +29,21 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type CodexArchiveManagerSuite struct {
+type LogosStorageArchiveManagerSuite struct {
 	suite.Suite
-	codexClient    logosstorage.CodexClientInterface
-	archiveManager *communities.ArchiveManager
-	manager        *communities.Manager
-	identity       *ecdsa.PrivateKey // Store identity for test access
-	uploadedCIDs   []string          // Track uploaded CIDs for cleanup
+	logosStorageClient logosstorage.LogosStorageClientInterface
+	archiveManager     *communities.ArchiveManager
+	manager            *communities.Manager
+	identity           *ecdsa.PrivateKey // Store identity for test access
+	uploadedCIDs       []string          // Track uploaded CIDs for cleanup
 }
 
-func buildCodexConfig(t *testing.T) *params.CodexConfig {
+func buildLogosStorageConfig(t *testing.T) *params.LogosStorageConfig {
 	rootDir := t.TempDir()
-	return &params.CodexConfig{
+	return &params.LogosStorageConfig{
 		Enabled: true,
-		CodexNodeConfig: codex.Config{
-			DataDir:      filepath.Join(rootDir, "codex", "codexdata"),
+		LogosStorageNodeConfig: codex.Config{
+			DataDir:      filepath.Join(rootDir, "logos-storage", "data"),
 			BlockRetries: 5,
 			LogLevel:     "ERROR",
 			Nat:          "none",
@@ -51,7 +51,7 @@ func buildCodexConfig(t *testing.T) *params.CodexConfig {
 	}
 }
 
-func (s *CodexArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager, *ecdsa.PrivateKey) {
+func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager, *ecdsa.PrivateKey) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -67,13 +67,13 @@ func (s *CodexArchiveManagerSuite) buildManagers() (*communities.Manager, *commu
 	s.Require().NoError(m.Start())
 
 	amc := &communities.ArchiveManagerConfig{
-		TorrentConfig: nil,
-		CodexConfig:   buildCodexConfig(s.T()),
-		Logger:        logger,
-		Persistence:   m.GetPersistence(),
-		Messaging:     nil,
-		Identity:      key,
-		Publisher:     m,
+		TorrentConfig:      nil,
+		LogosStorageConfig: buildLogosStorageConfig(s.T()),
+		Logger:             logger,
+		Persistence:        m.GetPersistence(),
+		Messaging:          nil,
+		Identity:           key,
+		Publisher:          m,
 	}
 	t := communities.NewArchiveManager(amc)
 	s.Require().NoError(err)
@@ -81,7 +81,7 @@ func (s *CodexArchiveManagerSuite) buildManagers() (*communities.Manager, *commu
 	return m, t, key
 }
 
-func (s *CodexArchiveManagerSuite) CreateCommunity() *communities.Community {
+func (s *LogosStorageArchiveManagerSuite) CreateCommunity() *communities.Community {
 	request := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "token membership description",
@@ -96,37 +96,37 @@ func (s *CodexArchiveManagerSuite) CreateCommunity() *communities.Community {
 }
 
 // SetupSuite runs once before all tests in the suite
-func (s *CodexArchiveManagerSuite) SetupTest() {
+func (s *LogosStorageArchiveManagerSuite) SetupTest() {
 	m, t, key := s.buildManagers()
 	communities.SetValidateInterval(30 * time.Millisecond)
 	s.manager = m
 	s.archiveManager = t
 	s.identity = key
-	s.Require().NoError(s.archiveManager.StartCodexClient())
-	client := s.archiveManager.GetCodexClient()
+	s.Require().NoError(s.archiveManager.StartLogosStorageClient())
+	client := s.archiveManager.GetLogosStorageClient()
 	s.Require().NotNil(client)
-	s.codexClient = client
+	s.logosStorageClient = client
 }
 
 // TearDownSuite runs once after each test in the suite
-func (s *CodexArchiveManagerSuite) TearDownTest() {
+func (s *LogosStorageArchiveManagerSuite) TearDownTest() {
 	// Clean up all uploaded CIDs
 	for _, cid := range s.uploadedCIDs {
-		if err := s.codexClient.RemoveCid(cid); err != nil {
+		if err := s.logosStorageClient.RemoveCid(cid); err != nil {
 			s.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		} else {
 			s.T().Logf("Successfully removed CID: %s", cid)
 		}
 	}
-	s.Require().NoError(s.archiveManager.StopCodexClient())
+	s.Require().NoError(s.archiveManager.StopLogosStorageClient())
 	s.Require().NoError(s.manager.Stop())
 }
 
-func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
+func (s *LogosStorageArchiveManagerSuite) TestDownloadingArchivesFromLogosStorage() {
 	// Subscribe to signals before starting the test
 	subscription := s.manager.Subscribe()
 
-	// Create test archive data and upload multiple archives to Codex
+	// Create test archive data and upload multiple archives to LogosStorage
 	archives := []struct {
 		hash string
 		from uint64
@@ -148,9 +148,9 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 			archives[i].hash, hex.EncodeToString(archives[i].data[:16]))
 	}
 
-	// Upload all archives to Codex
+	// Upload all archives to LogosStorage
 	for _, archive := range archives {
-		cid, err := s.codexClient.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
+		cid, err := s.logosStorageClient.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
 		require.NoError(s.T(), err, "Failed to upload %s", archive.hash)
 
 		archiveCIDs[archive.hash] = cid
@@ -158,19 +158,19 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 		s.T().Logf("Uploaded %s to CID: %s", archive.hash, cid)
 
 		// Verify upload succeeded
-		exists, err := s.codexClient.HasCid(cid)
+		exists, err := s.logosStorageClient.HasCid(cid)
 		require.NoError(s.T(), err, "Failed to check CID existence for %s", archive.hash)
 		require.True(s.T(), exists, "CID %s should exist after upload", cid)
 	}
 
-	// Create archive index for CodexArchiveDownloader
-	index := &protobuf.CodexWakuMessageArchiveIndex{
-		Archives: make(map[string]*protobuf.CodexWakuMessageArchiveIndexMetadata),
+	// Create archive index for LogosStorageArchiveDownloader
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: make(map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata),
 	}
 
 	for _, archive := range archives {
 		cid := archiveCIDs[archive.hash]
-		index.Archives[archive.hash] = &protobuf.CodexWakuMessageArchiveIndexMetadata{
+		index.Archives[archive.hash] = &protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
 			Cid: cid,
 			Metadata: &protobuf.WakuMessageArchiveMetadata{
 				From: archive.from,
@@ -179,17 +179,17 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 		}
 	}
 
-	// upload archive index to codex
-	codexIndexBytes, err := proto.Marshal(index)
+	// upload archive index to LogosStorage
+	logosStorageIndexBytes, err := proto.Marshal(index)
 	s.Require().NoError(err, "Failed to marshal index")
 
-	cid, err := s.codexClient.UploadArchive(codexIndexBytes)
-	s.Require().NoError(err, "Failed to upload archive index to Codex")
+	cid, err := s.logosStorageClient.UploadArchive(logosStorageIndexBytes)
+	s.Require().NoError(err, "Failed to upload archive index to LogosStorage")
 	s.Require().NotEmpty(cid, "Uploaded index CID should not be empty")
 
 	s.T().Logf("Uploaded archive index to CID: %s", cid)
 
-	// Now that we have both the individual archives and the index uploaded to Codex,
+	// Now that we have both the individual archives and the index uploaded to LogosStorage,
 	// we can proceed with the download workflow.
 
 	communityID := types.HexBytes("test-community-id")
@@ -273,7 +273,7 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 	// Verify that the index file exists and has correct content
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	loadedIndex, err := s.archiveManager.CodexLoadHistoryArchiveIndex(ctx, s.identity, communityID, cid, true)
+	loadedIndex, err := s.archiveManager.LogosStorageLoadHistoryArchiveIndex(ctx, s.identity, communityID, cid, true)
 	s.Require().NoError(err, "Failed to load index file from disk")
 	s.Require().NotNil(loadedIndex, "Loaded index should not be nil")
 	s.Require().Equal(len(archives), len(loadedIndex.Archives), "Loaded index should contain all archives")
@@ -292,6 +292,6 @@ func (s *CodexArchiveManagerSuite) TestDownloadingArchivesFromCodex() {
 }
 
 // Run the integration test suite
-func TestCodexArchiveManagerSuite(t *testing.T) {
-	suite.Run(t, new(CodexArchiveManagerSuite))
+func TestLogosStorageArchiveManagerSuite(t *testing.T) {
+	suite.Run(t, new(LogosStorageArchiveManagerSuite))
 }

@@ -22,11 +22,11 @@ func (amm *ArchiveFileManagerNop) CreateHistoryArchiveTorrentFromDB(communityID 
 	return nil, nil
 }
 
-func (amm *ArchiveFileManagerNop) CreateHistoryArchiveCodexFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveLogosStorageFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 	return nil, nil
 }
 
-func (amm *ArchiveFileManagerNop) CreateHistoryArchiveCodexFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
+func (amm *ArchiveFileManagerNop) CreateHistoryArchiveLogosStorageFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
 	return nil, nil
 }
 
@@ -46,7 +46,7 @@ func (amm *ArchiveFileManagerNop) ExtractMessagesFromHistoryArchive(communityID 
 	return nil, nil
 }
 
-func (amm *ArchiveFileManagerNop) ExtractMessagesFromCodexHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
+func (amm *ArchiveFileManagerNop) ExtractMessagesFromLogosStorageHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error) {
 	return nil, nil
 }
 

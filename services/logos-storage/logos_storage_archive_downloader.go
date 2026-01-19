@@ -13,9 +13,9 @@ import (
 	"go.uber.org/zap"
 )
 
-type CodexArchiveDownloader struct {
-	codexClient        CodexClientInterface
-	index              *protobuf.CodexWakuMessageArchiveIndex
+type LogosStorageArchiveDownloader struct {
+	logosStorageClient LogosStorageClientInterface
+	index              *protobuf.LogosStorageWakuMessageArchiveIndex
 	communityID        string
 	existingArchiveIDs []string
 	cancelChan         chan struct{} // for cancellation support
@@ -39,10 +39,10 @@ type CodexArchiveDownloader struct {
 	onStartingArchiveDownload func(hash string, from, to uint64)
 }
 
-// NewCodexArchiveDownloader creates a new archive downloader
-func NewCodexArchiveDownloader(codexClient CodexClientInterface, index *protobuf.CodexWakuMessageArchiveIndex, communityID string, existingArchiveIDs []string, cancelChan chan struct{}, logger *zap.Logger) *CodexArchiveDownloader {
-	return &CodexArchiveDownloader{
-		codexClient:                  codexClient,
+// NewLogosStorageArchiveDownloader creates a new archive downloader
+func NewLogosStorageArchiveDownloader(logosStorageClient LogosStorageClientInterface, index *protobuf.LogosStorageWakuMessageArchiveIndex, communityID string, existingArchiveIDs []string, cancelChan chan struct{}, logger *zap.Logger) *LogosStorageArchiveDownloader {
+	return &LogosStorageArchiveDownloader{
+		logosStorageClient:           logosStorageClient,
 		index:                        index,
 		communityID:                  communityID,
 		existingArchiveIDs:           existingArchiveIDs,
@@ -58,78 +58,78 @@ func NewCodexArchiveDownloader(codexClient CodexClientInterface, index *protobuf
 }
 
 // SetPollingInterval sets the polling interval for HasCid checks (useful for testing)
-func (d *CodexArchiveDownloader) SetPollingInterval(interval time.Duration) {
+func (d *LogosStorageArchiveDownloader) SetPollingInterval(interval time.Duration) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.pollingInterval = interval
 }
 
 // SetPollingTimeout sets the timeout for HasCid polling (useful for testing)
-func (d *CodexArchiveDownloader) SetPollingTimeout(timeout time.Duration) {
+func (d *LogosStorageArchiveDownloader) SetPollingTimeout(timeout time.Duration) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.pollingTimeout = timeout
 }
 
 // SetOnArchiveDownloaded sets a callback function to be called when an archive is successfully downloaded
-func (d *CodexArchiveDownloader) SetOnArchiveDownloaded(callback func(hash string, from, to uint64)) {
+func (d *LogosStorageArchiveDownloader) SetOnArchiveDownloaded(callback func(hash string, from, to uint64)) {
 	d.onArchiveDownloaded = callback
 }
 
 // SetOnStartingArchiveDownload sets a callback function to be called before starting an archive download
 // This callback is called on the main thread before launching goroutines, making it useful for testing
 // the deterministic order in which archives are processed (sorted newest first)
-func (d *CodexArchiveDownloader) SetOnStartingArchiveDownload(callback func(hash string, from, to uint64)) {
+func (d *LogosStorageArchiveDownloader) SetOnStartingArchiveDownload(callback func(hash string, from, to uint64)) {
 	d.onStartingArchiveDownload = callback
 }
 
 // GetTotalArchivesCount returns the total number of archives to download
-func (d *CodexArchiveDownloader) GetTotalArchivesCount() int {
+func (d *LogosStorageArchiveDownloader) GetTotalArchivesCount() int {
 	return d.totalArchivesCount
 }
 
 // GetTotalDownloadedArchivesCount returns the number of archives already downloaded
-func (d *CodexArchiveDownloader) GetTotalDownloadedArchivesCount() int {
+func (d *LogosStorageArchiveDownloader) GetTotalDownloadedArchivesCount() int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.totalDownloadedArchivesCount
 }
 
-func (d *CodexArchiveDownloader) GetPendingArchivesCount() int {
+func (d *LogosStorageArchiveDownloader) GetPendingArchivesCount() int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return len(d.archiveDownloadCancel)
 }
 
 // GetArchiveDownloadProgress returns the download progress for a specific archive
-func (d *CodexArchiveDownloader) GetArchiveDownloadProgress(hash string) int64 {
+func (d *LogosStorageArchiveDownloader) GetArchiveDownloadProgress(hash string) int64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.archiveDownloadProgress[hash]
 }
 
 // IsDownloadComplete returns whether all archives have been downloaded
-func (d *CodexArchiveDownloader) IsDownloadComplete() bool {
+func (d *LogosStorageArchiveDownloader) IsDownloadComplete() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.downloadComplete
 }
 
 // IsCancelled returns whether the download was cancelled
-func (d *CodexArchiveDownloader) IsCancelled() bool {
+func (d *LogosStorageArchiveDownloader) IsCancelled() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.cancelled
 }
 
 // StartDownload begins downloading all missing archives
-func (d *CodexArchiveDownloader) StartDownload() {
+func (d *LogosStorageArchiveDownloader) StartDownload() {
 	defer common.LogOnPanic()
 	d.downloadAllArchives()
 }
 
 // downloadAllArchives handles the main download loop for all archives
-func (d *CodexArchiveDownloader) downloadAllArchives() {
+func (d *LogosStorageArchiveDownloader) downloadAllArchives() {
 	defer common.LogOnPanic()
 	// Create sorted list of archives (newest first, like torrent version)
 	type archiveInfo struct {
@@ -237,7 +237,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 			err := d.triggerSingleArchiveDownload(archiveHash, archiveCid, archiveCancel)
 			if err != nil {
 				// Don't proceed to polling if trigger failed (could be cancellation or other error)
-				d.logger.Debug("[CODEX] failed to trigger download",
+				d.logger.Debug("[LogosStorage] failed to trigger download",
 					zap.String("cid", archiveCid),
 					zap.String("hash", archiveHash),
 					zap.Error(err))
@@ -253,21 +253,21 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 			for {
 				select {
 				case <-timeout:
-					d.logger.Debug("[CODEX] timeout waiting for CID to be available locally",
+					d.logger.Debug("[LogosStorage] timeout waiting for CID to be available locally",
 						zap.String("cid", archiveCid),
 						zap.String("hash", archiveHash),
 						zap.Duration("timeout", d.pollingTimeout))
 					return
 				case <-archiveCancel:
-					d.logger.Debug("[CODEX] download cancelled",
+					d.logger.Debug("[LogosStorage] download cancelled",
 						zap.String("cid", archiveCid),
 						zap.String("hash", archiveHash))
 					return
 				case <-ticker.C:
-					hasCid, err := d.codexClient.HasCid(archiveCid)
+					hasCid, err := d.logosStorageClient.HasCid(archiveCid)
 					if err != nil {
 						// Log error but continue polling
-						d.logger.Debug("[CODEX] error checking CID availability",
+						d.logger.Debug("[LogosStorage] error checking CID availability",
 							zap.String("cid", archiveCid),
 							zap.String("hash", archiveHash),
 							zap.Error(err))
@@ -279,7 +279,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 						d.totalDownloadedArchivesCount++
 						d.mu.Unlock()
 
-						d.logger.Debug("[CODEX] archive download completed",
+						d.logger.Debug("[LogosStorage] archive download completed",
 							zap.String("cid", archiveCid),
 							zap.String("totalDownloadedArchivesCount", fmt.Sprintf("%d", d.totalDownloadedArchivesCount)),
 						)
@@ -297,7 +297,7 @@ func (d *CodexArchiveDownloader) downloadAllArchives() {
 }
 
 // triggerSingleArchiveDownload downloads a single archive by its CID
-func (d *CodexArchiveDownloader) triggerSingleArchiveDownload(hash, cid string, cancelChan <-chan struct{}) error {
+func (d *LogosStorageArchiveDownloader) triggerSingleArchiveDownload(hash, cid string, cancelChan <-chan struct{}) error {
 	defer common.LogOnPanic()
 	// Create a context that can be cancelled via our cancel channel
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -314,7 +314,7 @@ func (d *CodexArchiveDownloader) triggerSingleArchiveDownload(hash, cid string, 
 		}
 	}()
 
-	manifest, err := d.codexClient.TriggerDownloadWithContext(ctx, cid)
+	manifest, err := d.logosStorageClient.TriggerDownloadWithContext(ctx, cid)
 	if err != nil {
 		return fmt.Errorf("failed to trigger archive download with CID %s: %w", cid, err)
 	}

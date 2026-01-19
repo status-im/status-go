@@ -9,38 +9,38 @@ import (
 	"go.uber.org/zap"
 )
 
-type CodexIndexDownloader struct {
-	codexClient CodexClientInterface
-	logger      *zap.Logger
+type LogosStorageIndexDownloader struct {
+	logosStorageClient LogosStorageClientInterface
+	logger             *zap.Logger
 }
 
-func NewCodexIndexDownloader(codexClient CodexClientInterface, logger *zap.Logger) *CodexIndexDownloader {
-	return &CodexIndexDownloader{
-		codexClient: codexClient,
-		logger:      logger,
+func NewLogosStorageIndexDownloader(logosStorageClient LogosStorageClientInterface, logger *zap.Logger) *LogosStorageIndexDownloader {
+	return &LogosStorageIndexDownloader{
+		logosStorageClient: logosStorageClient,
+		logger:             logger,
 	}
 }
 
-func (d *CodexIndexDownloader) DownloadIndexFileFromLocalNode(
+func (d *LogosStorageIndexDownloader) DownloadIndexFileFromLocalNode(
 	ctx context.Context,
 	indexCid string,
 	output io.Writer,
 ) error {
 	defer common.LogOnPanic()
 
-	d.logger.Debug("[CODEX][download_index_file_from_local_node] downloading codex index file from local node", zap.String("indexCid", indexCid))
+	d.logger.Debug("[LOGOS_STORAGE][download_index_file_from_local_node] downloading LogosStorage index file from local node", zap.String("indexCid", indexCid))
 
-	return d.codexClient.LocalDownloadWithContext(ctx, indexCid, output)
+	return d.logosStorageClient.LocalDownloadWithContext(ctx, indexCid, output)
 }
 
-func (d *CodexIndexDownloader) DownloadIndexFileFromNetwork(
+func (d *LogosStorageIndexDownloader) DownloadIndexFileFromNetwork(
 	ctx context.Context,
 	indexCid string,
 	output io.Writer,
 ) error {
 	defer common.LogOnPanic()
 
-	d.logger.Debug("[CODEX][download_index_file_from_network] downloading codex index file from network", zap.String("indexCid", indexCid))
+	d.logger.Debug("[LogosStorage][download_index_file_from_network] downloading LogosStorage index file from network", zap.String("indexCid", indexCid))
 
-	return d.codexClient.DownloadWithContext(ctx, indexCid, output)
+	return d.logosStorageClient.DownloadWithContext(ctx, indexCid, output)
 }
