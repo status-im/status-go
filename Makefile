@@ -267,7 +267,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
 		git clone https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR); \
 	else \
-		cd $(NIM_SDS_SOURCE_DIR) && git fetch --tags; \
+		cd $(NIM_SDS_SOURCE_DIR) && git fetch --all --tags; \
 	fi
 	cd $(NIM_SDS_SOURCE_DIR) && git checkout $(NIM_SDS_VERSION)
 endif
