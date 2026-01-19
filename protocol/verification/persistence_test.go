@@ -141,9 +141,13 @@ func (s *PersistenceSuite) TestTrustStatus() {
 
 	success, err = s.db.UpsertTrustStatus("0x03", TrustStatusUNKNOWN, 1500)
 	s.NoError(err)
-	s.False(success)
+	s.True(success)
 
 	trustStatus, err = s.db.GetTrustStatus("0x03")
 	s.NoError(err)
 	s.Equal(TrustStatusUNKNOWN, trustStatus)
+
+	success, err = s.db.UpsertTrustStatus("0x03", TrustStatusUNKNOWN, 1500) // same trust status, should not be successful
+	s.NoError(err)
+	s.False(success)
 }
