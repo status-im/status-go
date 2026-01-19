@@ -14,11 +14,6 @@ var (
 		reactFieldName: "appearance",
 		dBColumnName:   "appearance",
 	}
-	AutoMessageEnabled = SettingField{
-		reactFieldName: "auto-message-enabled?",
-		dBColumnName:   "auto_message_enabled",
-		valueHandler:   BoolHandler,
-	}
 	BackupPath = SettingField{
 		reactFieldName: "backup-path",
 		dBColumnName:   "backup_path",
@@ -510,7 +505,6 @@ var (
 	}
 	SettingFieldRegister = []SettingField{
 		Appearance,
-		AutoMessageEnabled,
 		BackupPath,
 		Bio,
 		ChaosMode,

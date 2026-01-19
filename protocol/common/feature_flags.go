@@ -12,9 +12,6 @@ type FeatureFlags struct {
 	// MailserverCycle indicates whether we should enable or not the mailserver cycle
 	MailserverCycle bool
 
-	// DisableAutoMessageLoop disables auto message loop
-	DisableAutoMessageLoop bool
-
 	// EnableMercuryoProvider indicates whether we should enable the Mercuryo provider in the Wallet
 	EnableMercuryoProvider bool
 }
