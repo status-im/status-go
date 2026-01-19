@@ -269,7 +269,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	else \
 		cd $(NIM_SDS_SOURCE_DIR) && git fetch --all --tags; \
 	fi
-	cd $(NIM_SDS_SOURCE_DIR) && git fetch origin && git checkout $(NIM_SDS_VERSION)
+	cd $(NIM_SDS_SOURCE_DIR) && git checkout $(NIM_SDS_VERSION)
 endif
 
 $(LIBSDS): clone-nim-sds
