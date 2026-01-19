@@ -4,10 +4,12 @@ import os
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 from filelock import FileLock
 from requests import ReadTimeout
 
 from clients.anvil import Anvil
+from clients.async_status_backend import AsyncStatusBackend
 from clients.contract_deployers.multicall3 import Multicall3Deployer
 from clients.contract_deployers.snt import SNTDeployer
 from clients.foundry import Foundry
@@ -227,3 +229,95 @@ def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3
         token_overrides=snt_token_overrides,
         multicall_contract_address=multicall3_deployer.contract_address,
     )
+
+
+# =============================================================================
+# Async Fixtures
+# =============================================================================
+
+
+@pytest_asyncio.fixture
+async def async_backend_factory(request):
+    """
+    Async backend factory that creates backends one by one.
+    Each backend is created separately and all are cleaned up at the end.
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_something(async_backend_factory):
+            backend = await async_backend_factory("sender")
+            # ... use backend
+    """
+    params = getattr(request, "param", {})
+    privileged = params.get("privileged", False)
+    ipv6 = params.get("ipv6", USE_IPV6)
+
+    created_backends: list[AsyncStatusBackend] = []
+
+    _cls_obj = getattr(request, "cls", None)
+    cls_name = _cls_obj.__name__ if _cls_obj is not None else None
+    node = getattr(request, "node", None)
+    test_name = getattr(node, "name", f"test-{uuid4()}")
+
+    async def factory(name: str = "", **kwargs) -> AsyncStatusBackend:
+        logging.debug(f"[ASYNC SETUP] Creating {name} backend for {cls_name or test_name}")
+        logging.debug(f"[ASYNC SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
+
+        backend = AsyncStatusBackend(privileged=privileged, ipv6=ipv6, **kwargs)
+        await backend.initialize()
+        created_backends.append(backend)
+        logging.debug(f"[ASYNC SETUP] {name.capitalize()} backend created")
+
+        return backend
+
+    yield factory
+
+    logging.debug(f"[ASYNC TEARDOWN] Cleaning up {len(created_backends)} backends for {cls_name or 'test'}")
+
+    for i, backend in enumerate(reversed(created_backends)):
+        logging.debug(f"[ASYNC TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
+        await backend.shutdown(log_sufix=test_name)
+
+
+@pytest_asyncio.fixture
+async def async_backend_new_profile(async_backend_factory):
+    """
+    Async fixture that creates a backend with a new profile.
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_something(async_backend_new_profile):
+            backend = await async_backend_new_profile("sender")
+            # backend is logged in and ready to use
+    """
+    backends: list[AsyncStatusBackend] = []
+
+    async def factory(
+        name: str = "",
+        waku_light_client: bool = False,
+        **kwargs,
+    ) -> AsyncStatusBackend:
+        password = kwargs.pop("password", fake.profile_password())
+
+        logging.debug(f"[ASYNC SETUP] async_backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
+        backend = await async_backend_factory(name, **kwargs)
+        backends.append(backend)
+
+        await backend.init_status_backend()
+        await backend.create_account_and_login(password=password, waku_light_client=waku_light_client, **kwargs)
+        await backend.wait_for_login()
+
+        if backend.wakuext_service:
+            await backend.wakuext_service.start_messenger()
+        if backend.wallet_service:
+            await backend.wallet_service.start_wallet()
+
+        return backend
+
+    yield factory
+
+    for backend in backends:
+        try:
+            await backend.logout(timeout=10)
+        except Exception as e:
+            logging.warning(f"Failed to logout during shutdown: {e}")
