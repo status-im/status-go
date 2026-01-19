@@ -192,81 +192,30 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def _set_networks(self, data, **kwargs):
         self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
-        if self.network_id == 11155111:  # Sepolia
-            network = {
-                "chainId": 11155111,
-                "chainName": "Sepolia",
-                "rpcProviders": [
-                    {
-                        "chainId": 11155111,
-                        "name": "Infura Sepolia",
-                        "url": "https://sepolia.infura.io/v3/0fbc961f49944da4b8fde35715e2171b",
-                        "enableRpsLimiter": False,
-                        "type": "user",
-                        "enabled": True,
-                        "authType": "no-auth",
-                    }
-                ],
-                "shortName": "sep",
-                "nativeCurrencyName": "Sepolia Ether",
-                "nativeCurrencySymbol": "ETH",
-                "nativeCurrencyDecimals": 18,
-                "isTest": True,
-                "layer": 1,
-                "enabled": True,
-                "isActive": True,
-                "isDeactivatable": False,
-            }
-        elif self.network_id == 42161:  # Arbitrum One
-            network = {
-                "chainId": 42161,
-                "chainName": "Arbitrum One",
-                "rpcProviders": [
-                    {
-                        "chainId": 42161,
-                        "name": "Arbitrum One",
-                        "url": "https://arb1.arbitrum.io/rpc",
-                        "enableRpsLimiter": False,
-                        "type": "user",
-                        "enabled": True,
-                        "authType": "no-auth",
-                    }
-                ],
-                "shortName": "arb1",
-                "nativeCurrencyName": "Ether",
-                "nativeCurrencySymbol": "ETH",
-                "nativeCurrencyDecimals": 18,
-                "isTest": False,
-                "layer": 2,
-                "enabled": True,
-                "isActive": True,
-                "isDeactivatable": False,
-            }
-        else:
-            network = {
-                "chainID": self.network_id,
-                "chainName": "Anvil",
-                "rpcProviders": [
-                    {
-                        "chainId": self.network_id,
-                        "name": "Anvil Direct",
-                        "url": Config.anvil_url,
-                        "enableRpsLimiter": False,
-                        "type": "embedded-direct",
-                        "enabled": True,
-                        "authType": "no-auth",
-                    }
-                ],
-                "shortName": "eth",
-                "nativeCurrencyName": "Ether",
-                "nativeCurrencySymbol": "ETH",
-                "nativeCurrencyDecimals": 18,
-                "isTest": False,
-                "layer": 1,
-                "enabled": True,
-                "isActive": True,
-                "isDeactivatable": False,
-            }
+        network = {
+            "chainID": self.network_id,
+            "chainName": "Anvil",
+            "rpcProviders": [
+                {
+                    "chainId": self.network_id,
+                    "name": "Anvil Direct",
+                    "url": Config.anvil_url,
+                    "enableRpsLimiter": False,
+                    "type": "embedded-direct",
+                    "enabled": True,
+                    "authType": "no-auth",
+                }
+            ],
+            "shortName": "eth",
+            "nativeCurrencyName": "Ether",
+            "nativeCurrencySymbol": "ETH",
+            "nativeCurrencyDecimals": 18,
+            "isTest": False,
+            "layer": 1,
+            "enabled": True,
+            "isActive": True,
+            "isDeactivatable": False,
+        }
         network = self._set_token_overrides(network, kwargs.get("token_overrides", []))
 
         data["testNetworksEnabled"] = True
@@ -332,6 +281,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         data["customTokens"] = tokens
         return data
+
+    def enable_test_networks(self):
+        """Enable test networks via settings service."""
+        self.settings_service.save_setting("test-networks-enabled?", True)
 
     def extract_data(self, path: str):
         if self.container:
