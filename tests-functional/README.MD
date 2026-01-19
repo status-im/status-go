@@ -30,10 +30,10 @@ Functional tests for status-go
 ## How to Run
 
 1. Functional tests will spawn `status-go` containers as needed, using the docker image name provided in `--docker-image`.
-    Run this command to build a docker image for local runs in root dir `status-go`:
+    Run this command to build a docker image for local runs in **root dir** `status-go`:
     ```sh
     # Note we tag the image with the commit hash. Functional tests will refer to the same when `--docker-image` is empty.
-    docker build --tag "statusgo-$(git rev-parse --short HEAD)" .
+    docker build --platform linux/amd64 --tag "statusgo-$(git rev-parse --short HEAD)" .
     ```
 2. Functional tests rely on local instances of Waku and Anvil.
    Run this command to start all environment dependencies:
