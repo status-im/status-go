@@ -255,6 +255,17 @@ func (s *SQLitePersistence) DisableInstallation(identity []byte, installationID 
 	return err
 }
 
+func (s *SQLitePersistence) DeleteInstallation(identity []byte, installationID string) error {
+	stmt, err := s.db.Prepare(`DELETE FROM installations
+				   WHERE identity = ? AND installation_id = ?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(identity, installationID)
+	return err
+}
+
 // SetInstallationMetadata sets the metadata for a given installation
 func (s *SQLitePersistence) SetInstallationMetadata(identity []byte, installationID string, metadata *InstallationMetadata) error {
 	stmt, err := s.db.Prepare(`INSERT INTO installation_metadata(name, device_type, fcm_token, identity, installation_id) VALUES(?,?,?,?,?)`)

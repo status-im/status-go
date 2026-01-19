@@ -196,6 +196,10 @@ func (api *PublicAPI) DisableInstallation(installationID string) error {
 	return api.service.messenger.DisableInstallation(installationID)
 }
 
+func (api *PublicAPI) DeleteInstallation(installationID string) error {
+	return api.service.messenger.DeleteInstallation(installationID)
+}
+
 // GetOurInstallations returns all the installations available given an identity
 func (api *PublicAPI) GetOurInstallations() []*types2.Installation {
 	return api.service.messenger.Installations()

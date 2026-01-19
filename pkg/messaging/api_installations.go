@@ -60,3 +60,7 @@ func (a *API) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID 
 func (a *API) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
 	return a.core.stack.Encryption.DisableInstallation(myIdentityKey, installationID)
 }
+
+func (a *API) DeleteInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return a.core.stack.Encryption.DeleteInstallation(myIdentityKey, installationID)
+}
