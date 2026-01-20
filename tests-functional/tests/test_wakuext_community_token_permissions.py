@@ -370,11 +370,10 @@ class TestCommunityTokenPermissions(MessengerSteps):
     def test_owner_edits_visible_before_and_after_minting_owner_token(self, arbitrum_owner_backend, arbitrum_member_backend, foundry_client):
         """Test that owner edits are visible before and after minting the owner token on Arbitrum Mainnet"""
 
-        # Owner creates a community
+        # Owner creates a token-gated community
         community_id = self.create_token_gated_community(
             arbitrum_owner_backend,
             permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
-            token_criteria=[],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
