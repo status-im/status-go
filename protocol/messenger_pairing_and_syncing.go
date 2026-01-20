@@ -586,3 +586,18 @@ func (m *Messenger) DisableInstallation(id string) error {
 	m.allInstallations.Store(id, installation)
 	return nil
 }
+
+func (m *Messenger) DeleteInstallation(id string) error {
+	_, ok := m.allInstallations.Load(id)
+	if !ok {
+		return errors.New("no installation found")
+	}
+
+	err := m.messaging.DeleteInstallation(&m.identity.PublicKey, id)
+	if err != nil {
+		return err
+	}
+
+	m.allInstallations.Delete(id)
+	return nil
+}

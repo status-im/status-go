@@ -587,12 +587,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
-	if !m.config.featureFlags.DisableAutoMessageLoop {
-		err = m.startAutoMessageLoop()
-		if err != nil {
-			return nil, err
-		}
-	}
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()

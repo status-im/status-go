@@ -3170,6 +3170,27 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_LeftCommunity() {
 	s.Require().False(community.Spectated())
 }
 
+func (s *MessengerCommunitiesSuite) TestInvalidAnyoneCanPermissions() {
+	// Cannot create a "anyone can" permission for admins (that would be chaotic)
+	community, _ := s.createCommunity()
+	_, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID:   community.ID(),
+		Type:          protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{}, // Empty Criteria
+	})
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, requests.ErrBecomeMemberOrAdminPermissionRequiresCriteria)
+
+	// Cannot create a "anyone can" permission for members (that's the default)
+	community, _ = s.createCommunity()
+	_, err = s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID:   community.ID(),
+		Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{}, // Empty Criteria
+	})
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, requests.ErrBecomeMemberOrAdminPermissionRequiresCriteria)
+}
 func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{

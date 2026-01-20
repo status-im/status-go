@@ -228,13 +228,6 @@ func WithPushNotificationServer(server PushNotificationServer) func(c *config) e
 	}
 }
 
-func WithAutoMessageDisabled() func(c *config) error {
-	return func(c *config) error {
-		c.featureFlags.DisableAutoMessageLoop = true
-		return nil
-	}
-}
-
 func WithEnvelopeEventsConfig(emc *messagingtypes.EnvelopeEventsConfig) Option {
 	return func(c *config) error {
 		c.envelopeEventsConfig = emc

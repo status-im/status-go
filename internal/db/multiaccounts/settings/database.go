@@ -401,7 +401,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance,
 		profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens,
 		waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents,
-		gif_favorites, opensea_enabled, auto_message_enabled, gif_api_key,
+		gif_favorites, opensea_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
@@ -471,7 +471,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&sqlite.JSONBlob{Data: &s.GifRecents},
 		&sqlite.JSONBlob{Data: &s.GifFavorites},
 		&s.OpenseaEnabled,
-		&s.AutoMessageEnabled,
 		&s.GifAPIKey,
 		&s.TestNetworksEnabled,
 		&s.MutualContactEnabled,
@@ -607,14 +606,6 @@ func (db *Database) ShouldBroadcastUserStatus() (result bool, err error) {
 	err = db.makeSelectRow(SendStatusUpdates).Scan(&result)
 	// If the `send_status_updates` value is nil the sql.ErrNoRows will be returned
 	// because this feature is opt out, `true` should be returned in the case where no value is found
-	if err == sql.ErrNoRows {
-		return true, nil
-	}
-	return result, err
-}
-
-func (db *Database) AutoMessageEnabled() (result bool, err error) {
-	err = db.makeSelectRow(AutoMessageEnabled).Scan(&result)
 	if err == sql.ErrNoRows {
 		return true, nil
 	}

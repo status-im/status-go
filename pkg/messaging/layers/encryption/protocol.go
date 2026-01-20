@@ -621,6 +621,11 @@ func (p *Protocol) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installat
 	return p.multidevice.DisableInstallation(myIdentityKey, installationID)
 }
 
+// DeleteInstallation deletes an installation from this device.
+func (p *Protocol) DeleteInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return p.multidevice.DeleteInstallation(myIdentityKey, installationID)
+}
+
 // GetOurInstallations returns all the installations available given an identity
 func (p *Protocol) GetOurInstallations(myIdentityKey *ecdsa.PublicKey) ([]*multidevice.Installation, error) {
 	return p.multidevice.GetOurInstallations(myIdentityKey)
