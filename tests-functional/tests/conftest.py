@@ -231,93 +231,45 @@ def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3
     )
 
 
-# =============================================================================
-# Async Fixtures
-# =============================================================================
-
-
 @pytest_asyncio.fixture
-async def async_backend_factory(request):
+async def async_backend_new_profile(backend_new_profile):
     """
-    Async backend factory that creates backends one by one.
-    Each backend is created separately and all are cleaned up at the end.
+    Async fixture that creates backend with new profile and async signal support.
 
-    Usage:
-        @pytest.mark.asyncio
-        async def test_something(async_backend_factory):
-            backend = await async_backend_factory("sender")
-            # ... use backend
-    """
-    params = getattr(request, "param", {})
-    privileged = params.get("privileged", False)
-    ipv6 = params.get("ipv6", USE_IPV6)
-
-    created_backends: list[AsyncStatusBackend] = []
-
-    _cls_obj = getattr(request, "cls", None)
-    cls_name = _cls_obj.__name__ if _cls_obj is not None else None
-    node = getattr(request, "node", None)
-    test_name = getattr(node, "name", f"test-{uuid4()}")
-
-    async def factory(name: str = "", **kwargs) -> AsyncStatusBackend:
-        logging.debug(f"[ASYNC SETUP] Creating {name} backend for {cls_name or test_name}")
-        logging.debug(f"[ASYNC SETUP] Parameters: privileged={privileged}, ipv6={ipv6}")
-
-        backend = AsyncStatusBackend(privileged=privileged, ipv6=ipv6, **kwargs)
-        await backend.initialize()
-        created_backends.append(backend)
-        logging.debug(f"[ASYNC SETUP] {name.capitalize()} backend created")
-
-        return backend
-
-    yield factory
-
-    logging.debug(f"[ASYNC TEARDOWN] Cleaning up {len(created_backends)} backends for {cls_name or 'test'}")
-
-    for i, backend in enumerate(reversed(created_backends)):
-        logging.debug(f"[ASYNC TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
-        await backend.shutdown(log_sufix=test_name)
-
-
-@pytest_asyncio.fixture
-async def async_backend_new_profile(async_backend_factory):
-    """
-    Async fixture that creates a backend with a new profile.
+    Uses sync backend_new_profile for RPC, wraps with AsyncStatusBackend for signals.
 
     Usage:
         @pytest.mark.asyncio
         async def test_something(async_backend_new_profile):
             backend = await async_backend_new_profile("sender")
-            # backend is logged in and ready to use
+            # RPC calls are sync: backend.wakuext_service.send_contact_request(...)
+            # Signal waiting is async: await backend.wait_for_signal(...)
     """
-    backends: list[AsyncStatusBackend] = []
+    async_backends: list[AsyncStatusBackend] = []
 
     async def factory(
         name: str = "",
         waku_light_client: bool = False,
         **kwargs,
     ) -> AsyncStatusBackend:
-        password = kwargs.pop("password", fake.profile_password())
+        logging.debug(f"[ASYNC SETUP] Creating {name} with wakuV2LightClient={waku_light_client}")
 
-        logging.debug(f"[ASYNC SETUP] async_backend_new_profile parameters: wakuV2LightClient={waku_light_client}")
-        backend = await async_backend_factory(name, **kwargs)
-        backends.append(backend)
+        # Create sync backend (handles RPC, login, etc.)
+        sync_backend = backend_new_profile(name, waku_light_client=waku_light_client, **kwargs)
 
-        await backend.init_status_backend()
-        await backend.create_account_and_login(password=password, waku_light_client=waku_light_client, **kwargs)
-        await backend.wait_for_login()
+        # Wrap with async backend for signal support
+        async_backend = AsyncStatusBackend(sync_backend)
+        await async_backend.start_signal_client()
+        async_backends.append(async_backend)
 
-        if backend.wakuext_service:
-            await backend.wakuext_service.start_messenger()
-        if backend.wallet_service:
-            await backend.wallet_service.start_wallet()
-
-        return backend
+        logging.debug(f"[ASYNC SETUP] {name.capitalize()} backend ready with signal client")
+        return async_backend
 
     yield factory
 
-    for backend in backends:
+    # Cleanup: stop signal clients (sync backend cleanup handled by backend_new_profile)
+    for async_backend in async_backends:
         try:
-            await backend.logout(timeout=10)
+            await async_backend.stop_signal_client()
         except Exception as e:
-            logging.warning(f"Failed to logout during shutdown: {e}")
+            logging.warning(f"Failed to stop signal client: {e}")
