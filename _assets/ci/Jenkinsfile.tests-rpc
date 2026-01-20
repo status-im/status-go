@@ -79,7 +79,7 @@ pipeline {
             passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
     ),
         ]) {
-          nix.develop('make test-functional', pure: false)
+          nix.develop('USE_NWAKU=${USE_NWAKU} make test-functional', pure: false)
         }
       } }
     }
@@ -123,5 +123,5 @@ def getJobPathTokens() {
 }
 
 def getNWakuMode() {
-    return getJobPathTokens().contains('nwaku')
+    return getJobPathTokens().any { it.contains('nwaku') }
 }
