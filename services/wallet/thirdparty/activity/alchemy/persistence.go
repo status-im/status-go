@@ -159,3 +159,70 @@ func (p *Persistence) ClearAll(ctx context.Context) error {
 	_, err := p.db.ExecContext(ctx, "DELETE FROM fetched_alchemy_transfers")
 	return err
 }
+
+// TokenInfo represents a token extracted from activity transfers
+type TokenInfo struct {
+	Address  common.Address
+	Category TransferCategory
+}
+
+// GetActivityTokens returns unique tokens from activity transfers for a given account and chain
+// It extracts token information from the transfer JSON and returns Native and ERC20 tokens only
+func (p *Persistence) GetActivityTokens(chainID uint64, address common.Address) ([]TokenInfo, error) {
+	// Query to extract category and token address from JSON
+	// For external/internal transfers (native), rawContract.address is often empty
+	// For ERC20 transfers, rawContract.address contains the token contract address
+	query := `
+		SELECT DISTINCT
+			json_extract(transfer, '$.category') as category,
+			json_extract(transfer, '$.rawContract.address') as token_address
+		FROM fetched_alchemy_transfers
+		WHERE chain_id = ? AND address = ?
+		AND json_extract(transfer, '$.category') IN ('external', 'internal', 'erc20')
+	`
+
+	rows, err := p.db.Query(query, chainID, address.Hex())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokensMap := make(map[string]TokenInfo)
+	for rows.Next() {
+		var category string
+		var tokenAddress sql.NullString
+
+		if err := rows.Scan(&category, &tokenAddress); err != nil {
+			return nil, err
+		}
+
+		var info TokenInfo
+		info.Category = TransferCategory(category)
+
+		// For native transfers (external/internal), use zero address
+		if info.Category == TransferCategoryExternal || info.Category == TransferCategoryInternal {
+			info.Address = common.Address{}
+		} else if tokenAddress.Valid && tokenAddress.String != "" {
+			info.Address = common.HexToAddress(tokenAddress.String)
+		} else {
+			// Skip if no valid token address for non-native transfers
+			continue
+		}
+
+		// Use address+category as key to ensure uniqueness
+		key := fmt.Sprintf("%s-%s", info.Address.Hex(), info.Category)
+		tokensMap[key] = info
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Convert map to slice
+	tokens := make([]TokenInfo, 0, len(tokensMap))
+	for _, token := range tokensMap {
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
