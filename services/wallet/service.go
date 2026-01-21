@@ -9,13 +9,17 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/zap"
 
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/rpc"
 	rpc2 "github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/transactions"
+	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
@@ -57,6 +61,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/efp"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/tokenhistoricalownership"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -97,13 +102,29 @@ func NewService(
 	pendingTxManager *pendingtxtracker.PendingTxTracker,
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
-	tokenManager *token.Manager,
 	statusProxyStageName string,
 ) (*Service, error) {
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
+
+	walletPublisher := pubsub.NewPublisher()
+
 	communityManager := community.NewManager(db, mediaServer, feed)
+
+	tokenManager := createTokenManager(
+		config,
+		db,
+		rpcClient,
+		rpcClient.GetNetworkManager(),
+		appDB,
+		accountsPublisher,
+		accountsDB,
+		communityManager,
+		communitytokensdatabase.NewCommunityTokensDatabase(appDB),
+		mediaServer,
+		walletPublisher,
+	)
 
 	featureFlags := &protocolCommon.FeatureFlags{}
 
@@ -232,13 +253,11 @@ func NewService(
 		logutils.ZapLogger().Named("TransferDetectorController"),
 	)
 
-	reader := NewReader(
-		tokenManager,
-		marketManager,
-		feed,
-		multistandardBalanceController.GetPublisher(),
+	tokenBalancesService := tokenbalances.NewService(
 		tokenBalancesStorage,
-		transferDetectorController.GetPublisher(),
+		multistandardBalanceController.GetPublisher(),
+		multistandardBalanceController,
+		tokenManager,
 	)
 
 	collectiblesPublisher := pubsub.NewPublisher()
@@ -286,41 +305,55 @@ func NewService(
 	activityFetcherManager := activityfetcher.NewManager(alchemyFetcherManager)
 	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient, feed)
 
+	tokenHistoricalOwnershipService := tokenhistoricalownership.NewService(
+		db,
+		tokenhistoricalownership.NewStorage(db),
+		activityFetcherService.GetPublisher(),
+		activityFetcherService,
+		tokenBalancesStorage,
+		tokenBalancesService.GetPublisher(),
+		transferDetectorController.GetPublisher(),
+		accountsPublisher,
+	)
+
+	tokenManager.SetHistoricallyOwnedTokensProvider(tokenHistoricalOwnershipService)
+
 	return &Service{
-		db:                             db,
-		accountsDB:                     accountsDB,
-		rpcClient:                      rpcClient,
-		tokenManager:                   tokenManager,
-		communityManager:               communityManager,
-		savedAddressesManager:          savedAddressesManager,
-		transactionManager:             transactionManager,
-		pendingTxManager:               pendingTxManager,
-		multistandardBalanceController: multistandardBalanceController,
-		transferDetectorController:     transferDetectorController,
-		tokenBalancesFetcher:           tokenBalancesFetcher,
-		tokenBalancesStorage:           tokenBalancesStorage,
-		cryptoOnRampManager:            cryptoOnRampManager,
-		collectiblesManager:            collectiblesManager,
-		collectibles:                   collectibles,
-		followingManager:               followingManager,
-		gethManager:                    gethManager,
-		marketManager:                  marketManager,
-		transactor:                     transactor,
-		feed:                           feed,
-		signals:                        signals,
-		reader:                         reader,
-		currency:                       currency,
-		activity:                       activity,
-		decoder:                        NewDecoder(),
-		blockChainState:                blockChainState,
-		keycardPairings:                NewKeycardPairings(),
-		config:                         config,
-		featureFlags:                   featureFlags,
-		router:                         router,
-		routeExecutionManager:          routeExecutionManager,
-		leaderboardService:             leaderboardService,
-		activityFetcherService:         activityFetcherService,
-		started:                        false,
+		db:                              db,
+		accountsDB:                      accountsDB,
+		rpcClient:                       rpcClient,
+		tokenManager:                    tokenManager,
+		communityManager:                communityManager,
+		savedAddressesManager:           savedAddressesManager,
+		transactionManager:              transactionManager,
+		pendingTxManager:                pendingTxManager,
+		multistandardBalanceController:  multistandardBalanceController,
+		transferDetectorController:      transferDetectorController,
+		tokenBalancesFetcher:            tokenBalancesFetcher,
+		tokenBalancesStorage:            tokenBalancesStorage,
+		cryptoOnRampManager:             cryptoOnRampManager,
+		collectiblesManager:             collectiblesManager,
+		collectibles:                    collectibles,
+		followingManager:                followingManager,
+		gethManager:                     gethManager,
+		marketManager:                   marketManager,
+		transactor:                      transactor,
+		feed:                            feed,
+		signals:                         signals,
+		tokenBalancesService:            tokenBalancesService,
+		tokenHistoricalOwnershipService: tokenHistoricalOwnershipService,
+		currency:                        currency,
+		activity:                        activity,
+		decoder:                         NewDecoder(),
+		blockChainState:                 blockChainState,
+		keycardPairings:                 NewKeycardPairings(),
+		config:                          config,
+		featureFlags:                    featureFlags,
+		router:                          router,
+		routeExecutionManager:           routeExecutionManager,
+		leaderboardService:              leaderboardService,
+		activityFetcherService:          activityFetcherService,
+		started:                         false,
 	}, nil
 }
 
@@ -386,40 +419,42 @@ func buildPathProcessors(
 
 // Service is a wallet service.
 type Service struct {
-	db                             *sql.DB
-	accountsDB                     *accounts.Database
-	rpcClient                      *rpc2.Client
-	tokenManager                   *token.Manager
-	communityManager               *community.Manager
-	savedAddressesManager          *SavedAddressesManager
-	transactionManager             *transfer.TransactionManager
-	pendingTxManager               *pendingtxtracker.PendingTxTracker
-	multistandardBalanceController *multistandardbalance.Controller
-	tokenBalancesFetcher           tokenbalances.FetcherIface
-	tokenBalancesStorage           tokenbalances.Storage
-	transferDetectorController     *transferdetector.Controller
-	cryptoOnRampManager            *onramp.Manager
-	collectiblesManager            *collectibles.Manager
-	collectibles                   *collectibles.Service
-	followingManager               *following.Manager
-	gethManager                    *accsmanagement.AccountsManager
-	marketManager                  *market.Manager
-	transactor                     *transactions.Transactor
-	feed                           *event.Feed
-	signals                        *walletevent.SignalsTransmitter
-	reader                         *Reader
-	currency                       *currency.Service
-	activity                       *activity.Service
-	decoder                        *Decoder
-	blockChainState                *blockchainstate.BlockChainState
-	keycardPairings                *KeycardPairings
-	config                         *params.NodeConfig
-	featureFlags                   *protocolCommon.FeatureFlags
-	router                         *router.Router
-	routeExecutionManager          *routeexecution.Manager
-	leaderboardService             *leaderboard.MarketDataService
-	activityFetcherService         *activityfetcher.Service
-	started                        bool
+	db                              *sql.DB
+	accountsDB                      *accounts.Database
+	rpcClient                       *rpc2.Client
+	tokenManager                    *token.Manager
+	communityManager                *community.Manager
+	savedAddressesManager           *SavedAddressesManager
+	transactionManager              *transfer.TransactionManager
+	pendingTxManager                *pendingtxtracker.PendingTxTracker
+	multistandardBalanceController  *multistandardbalance.Controller
+	tokenBalancesFetcher            tokenbalances.FetcherIface
+	tokenBalancesStorage            tokenbalances.Storage
+	transferDetectorController      *transferdetector.Controller
+	cryptoOnRampManager             *onramp.Manager
+	collectiblesManager             *collectibles.Manager
+	collectibles                    *collectibles.Service
+	followingManager                *following.Manager
+	gethManager                     *accsmanagement.AccountsManager
+	marketManager                   *market.Manager
+	transactor                      *transactions.Transactor
+	feed                            *event.Feed
+	signals                         *walletevent.SignalsTransmitter
+	tokenBalancesService            *tokenbalances.Service
+	tokenHistoricalOwnershipService *tokenhistoricalownership.Service
+	currency                        *currency.Service
+	activity                        *activity.Service
+	decoder                         *Decoder
+	blockChainState                 *blockchainstate.BlockChainState
+	keycardPairings                 *KeycardPairings
+	config                          *params.NodeConfig
+	featureFlags                    *protocolCommon.FeatureFlags
+	router                          *router.Router
+	routeExecutionManager           *routeexecution.Manager
+	leaderboardService              *leaderboard.MarketDataService
+	activityFetcherService          *activityfetcher.Service
+	walletPublisher                 *pubsub.Publisher
+	started                         bool
 
 	cancelWalletServiceCtx context.CancelFunc
 }
@@ -430,8 +465,11 @@ func (s *Service) Start() error {
 		ctx, cancel := context.WithCancel(context.Background())
 		s.cancelWalletServiceCtx = cancel
 
+		s.tokenManager.Start(ctx)
 		s.multistandardBalanceController.Start()
 		s.transferDetectorController.Start()
+		s.tokenBalancesService.Start()
+		s.tokenHistoricalOwnershipService.Start()
 		s.currency.Start(ctx)
 		err := s.signals.Start(ctx)
 		s.collectibles.Start(ctx)
@@ -451,11 +489,14 @@ func (s *Service) SetWalletCommunityInfoProvider(provider thirdparty.CommunityIn
 // Stop reactor and close db.
 func (s *Service) Stop() error {
 	logutils.ZapLogger().Info("wallet will be stopped")
+	s.walletPublisher.Close()
+
 	s.router.Stop()
 	s.signals.Stop()
 	s.multistandardBalanceController.Stop()
 	s.transferDetectorController.Stop()
-	s.reader.Stop()
+	s.tokenBalancesService.Stop()
+	s.tokenHistoricalOwnershipService.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()
 	s.tokenManager.Stop()
@@ -627,4 +668,63 @@ func (s *Service) ImportBackup(data []byte) error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func createTokenManager(
+	config *params.NodeConfig,
+	walletDB *sql.DB,
+	ethClientGetter rpc.EthClientGetter,
+	networkManager network.ManagerInterface,
+	appDB *sql.DB,
+	accountsPublisher *pubsub.Publisher,
+	accountsDB *accounts.Database,
+	communityManager *community.Manager,
+	communityTokensDB *communitytokensdatabase.Database,
+	communityTokenImageBuilder token.CommunityTokenImageBuilder,
+	walletPublisher *pubsub.Publisher,
+) *token.Manager {
+	const (
+		defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
+		defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
+	)
+
+	autoRefreshInterval := defaultAutoRefreshInterval
+	autoRefreshCheckInterval := defaultAutoRefreshCheckInterval
+	if config.WalletConfig.TokensListsAutoRefreshInterval > 0 &&
+		config.WalletConfig.TokensListsAutoRefreshCheckInterval > 0 &&
+		config.WalletConfig.TokensListsAutoRefreshInterval > config.WalletConfig.TokensListsAutoRefreshCheckInterval {
+		autoRefreshInterval = time.Duration(config.WalletConfig.TokensListsAutoRefreshInterval) * time.Second
+		autoRefreshCheckInterval = time.Duration(config.WalletConfig.TokensListsAutoRefreshCheckInterval) * time.Second
+	}
+
+	tokenManager, err := token.NewTokenManager(
+		walletDB,
+		ethClientGetter,
+		networkManager,
+		appDB,
+		accountsPublisher,
+		accountsDB,
+		communityManager,
+		communityTokensDB,
+		communityTokenImageBuilder,
+		autoRefreshInterval,
+		autoRefreshCheckInterval,
+		walletPublisher)
+	if err != nil {
+		logutils.ZapLogger().Error("failed to create token manager", zap.Error(err))
+		return nil
+	}
+
+	// check for possible custom tokens in the config
+	if len(config.WalletConfig.CustomTokens) > 0 {
+		for _, token := range config.WalletConfig.CustomTokens {
+			err := tokenManager.UpsertCustom(*token)
+			if err != nil {
+				logutils.ZapLogger().Error("failed to upsert custom token", zap.Error(err))
+				return nil
+			}
+		}
+	}
+
+	return tokenManager
 }
