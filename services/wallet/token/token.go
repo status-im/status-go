@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math/big"
 	"slices"
 	"time"
 
@@ -23,8 +22,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/event"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/contracts"
@@ -35,12 +32,12 @@ import (
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/tokenhistoricalownership"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -53,60 +50,57 @@ const (
 	communityTokenListSource = "local"
 )
 
-type ReceivedToken struct {
-	tokentypes.Token
-	Amount  float64     `json:"amount"`
-	TxHash  common.Hash `json:"txHash"`
-	IsFirst bool        `json:"isFirst"`
-}
-
 type CommunityTokenImageBuilder interface {
 	MakeCommunityTokenImagesURL(communityID string, chainID uint64, symbol string) string
+}
+
+type HistoricallyOwnedTokensProvider interface {
+	GetOwnedTokenKeys(ownerAddress common.Address) ([]string, error)
+	GetPublisher() *pubsub.Publisher
 }
 
 type ManagerInterface interface {
 	GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error)
 	GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error)
 	GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error)
-	GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error)
-	CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error
 	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error)
-	MarkAsPreviouslyOwnedToken(token *tokentypes.Token, owner common.Address) (bool, error)
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
-	walletDB                   *sql.DB
-	settings                   *settings2.Database
-	ethClientGetter            rpc.EthClientGetter
-	ContractMaker              *contracts.ContractMaker
-	networkManager             network.ManagerInterface
-	communityTokensDB          *communitytokensdatabase.Database
-	communityManager           *community.Manager
-	communityTokenImageBuilder CommunityTokenImageBuilder
-	walletFeed                 *event.Feed
-	accountsDB                 *accounts.Database
-	accountsPublisher          *pubsub.Publisher
-	tokenBalancesStorage       balanceStorage
+	walletDB                        *sql.DB
+	settings                        *settings2.Database
+	ethClientGetter                 rpc.EthClientGetter
+	ContractMaker                   *contracts.ContractMaker
+	networkManager                  network.ManagerInterface
+	communityTokensDB               *communitytokensdatabase.Database
+	communityManager                community.CommunityManagerInterface
+	communityTokenImageBuilder      CommunityTokenImageBuilder
+	accountsDB                      *accounts.Database
+	accountsPublisher               *pubsub.Publisher
+	historicallyOwnedTokensProvider HistoricallyOwnedTokensProvider
 
 	tokensManager manager.Manager
 
 	stopCh   chan struct{}
 	notifyCh chan struct{}
+
+	publisher *pubsub.Publisher
 }
 
 func NewTokenManager(
 	walletDB *sql.DB,
 	ethClientGetter rpc.EthClientGetter,
-	communityManager *community.Manager,
 	networkManager network.ManagerInterface,
 	appDB *sql.DB,
-	communityTokenImageBuilder CommunityTokenImageBuilder,
-	walletFeed *event.Feed,
 	accountsPublisher *pubsub.Publisher,
 	accountsDB *accounts.Database,
+	communityManager *community.Manager,
+	communityTokensDB *communitytokensdatabase.Database,
+	communityTokenImageBuilder CommunityTokenImageBuilder,
 	autoRefreshInterval time.Duration,
 	autoRefreshCheckInterval time.Duration,
+	publisher *pubsub.Publisher,
 ) (*Manager, error) {
 	maker := contracts.NewContractMaker(ethClientGetter)
 
@@ -127,12 +121,11 @@ func NewTokenManager(
 		ContractMaker:              maker,
 		networkManager:             networkManager,
 		communityManager:           communityManager,
-		communityTokensDB:          communitytokensdatabase.NewCommunityTokensDatabase(appDB),
+		communityTokensDB:          communityTokensDB,
 		communityTokenImageBuilder: communityTokenImageBuilder,
-		walletFeed:                 walletFeed,
 		accountsPublisher:          accountsPublisher,
 		accountsDB:                 accountsDB,
-		tokenBalancesStorage:       balanceStorage{walletDB: walletDB},
+		publisher:                  publisher,
 	}
 
 	tokensManager, err := setUpTokenListsManager(manager, walletDB, lastTokensUpdate, autoRefreshInterval, autoRefreshCheckInterval)
@@ -145,6 +138,10 @@ func NewTokenManager(
 
 	return manager, nil
 
+}
+
+func (tm *Manager) SetHistoricallyOwnedTokensProvider(provider HistoricallyOwnedTokensProvider) {
+	tm.historicallyOwnedTokensProvider = provider
 }
 
 func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time, autoRefreshInterval time.Duration,
@@ -203,7 +200,6 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time
 
 func (tm *Manager) Start(ctx context.Context) error {
 	tm.stopCh = make(chan struct{})
-	tm.startAccountsWatcher()
 
 	tm.notifyCh = make(chan struct{})
 	return tm.startTokenListsNotifier(ctx)
@@ -244,35 +240,17 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
 				if err != nil {
 					logutils.ZapLogger().Error("failed to set last tokens update", zap.Error(err))
 				}
+				if tm.publisher != nil {
+					pubsub.Publish(tm.publisher, tokentypes.EventTokenListUpdated{})
+				}
 				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
 			}
 		}
 	}()
 
+	go tm.watchHistoricallyOwnedTokensEvents()
+
 	return nil
-}
-
-func (tm *Manager) startAccountsWatcher() {
-	if tm.accountsPublisher == nil || tm.accountsDB == nil {
-		return
-	}
-
-	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](tm.accountsPublisher, 10)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer unsubFn()
-		for {
-			select {
-			case <-tm.stopCh:
-				return
-			case event, ok := <-ch:
-				if !ok {
-					return
-				}
-				tm.onAccountsRemoved(event.Accounts)
-			}
-		}
-	}()
 }
 
 func (tm *Manager) Stop() {
@@ -399,27 +377,46 @@ func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error)
 // getTokenKeysForTokensOfInterestForActiveNetworksMode returns the token keys for the tokens of interest for the active networks mode (testnet or mainnet)
 // On top of the used tokens keys, it adds all tokens that share the same cross chain id (because of grouping) and all mandatory tokens.
 func (tm *Manager) getTokenKeysForTokensOfInterestForActiveNetworksMode() ([]string, error) {
-	testnetMode, err := tm.settings.GetTestNetworksEnabled()
+	activeNetworks, err := tm.networkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, err
 	}
 
-	usedTokensKeys, err := tm.tokenBalancesStorage.getUsedTokensKeys(testnetMode)
+	activeChainIDs := make([]uint64, 0)
+	for _, network := range activeNetworks {
+		activeChainIDs = append(activeChainIDs, network.ChainID)
+	}
+
+	accounts, err := tm.accountsDB.GetAllAccounts()
 	if err != nil {
 		return nil, err
 	}
 
-	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
-	if err != nil {
-		return nil, err
-	}
+	usedTokensKeys := make(map[string]struct{})
 
-	// Because of grouping it's important to add all tokens that share the same cross chain id to the used tokens keys
-	for _, token := range tokens {
-		if token.CrossChainID == "" {
-			continue
+	if tm.historicallyOwnedTokensProvider != nil {
+		for _, account := range accounts {
+			userTokenKeys, err := tm.historicallyOwnedTokensProvider.GetOwnedTokenKeys(common.Address(account.Address[:]))
+			if err != nil {
+				return nil, err
+			}
+			for _, tokenKey := range userTokenKeys {
+				usedTokensKeys[tokenKey] = struct{}{}
+			}
 		}
-		usedTokensKeys[token.Key()] = nil
+
+		tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
+		if err != nil {
+			return nil, err
+		}
+
+		// Because of grouping it's important to add all tokens that share the same cross chain id to the used tokens keys
+		for _, token := range tokens {
+			if token.CrossChainID == "" {
+				continue
+			}
+			usedTokensKeys[token.Key()] = struct{}{}
+		}
 	}
 
 	// It's also important to add all mandatory tokens to the used tokens keys
@@ -431,10 +428,10 @@ func (tm *Manager) getTokenKeysForTokensOfInterestForActiveNetworksMode() ([]str
 		if !ok {
 			continue
 		}
-		if walletcommon.ChainID(chainID).IsMainnet() == testnetMode {
+		if slices.Contains(activeChainIDs, chainID) {
 			continue
 		}
-		usedTokensKeys[tokenKey] = nil
+		usedTokensKeys[tokenKey] = struct{}{}
 	}
 
 	return maps.Keys(usedTokensKeys), nil
@@ -602,14 +599,6 @@ func (tm *Manager) GetAllTokenLists() ([]*tokentypes.TokenList, error) {
 	return tokenLists, nil
 }
 
-func (tm *Manager) GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error) {
-	return tm.tokenBalancesStorage.getBalances()
-}
-
-func (tm *Manager) CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error {
-	return tm.tokenBalancesStorage.saveBalances(balances)
-}
-
 func (tm *Manager) setLastTokenListsRefreshTime(time time.Time) error {
 	return tm.settings.SaveSettingField(settings2.LastTokensUpdate, time)
 }
@@ -638,54 +627,6 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 
 	tm.discoverTokenCommunityID(ctx, token, address)
 	return token, nil
-}
-
-func (tm *Manager) MarkAsPreviouslyOwnedToken(token *tokentypes.Token, owner common.Address) (bool, error) {
-	logutils.ZapLogger().Info("Marking token as previously owned",
-		zap.Any("token", token),
-		zap.Stringer("owner", owner),
-	)
-	if token == nil {
-		return false, errors.New("token is nil")
-	}
-	if (owner == common.Address{}) {
-		return false, errors.New("owner is nil")
-	}
-
-	tokenBalances, err := tm.tokenBalancesStorage.getBalances()
-	if err != nil {
-		return false, err
-	}
-
-	if tokenBalances[owner] == nil {
-		tokenBalances[owner] = make([]tokentypes.StorageToken, 0)
-	} else {
-		for _, t := range tokenBalances[owner] {
-			if t.TokenAddress == token.Token.Address && t.TokenChainID == token.Token.ChainID {
-				logutils.ZapLogger().Info("Token already marked as previously owned",
-					zap.Any("token", token),
-					zap.Stringer("owner", owner),
-				)
-				return false, nil
-			}
-		}
-	}
-
-	// append token to the list of tokens
-	tokenBalances[owner] = append(tokenBalances[owner], tokentypes.StorageToken{
-		TokenAddress: token.Token.Address,
-		TokenChainID: token.Token.ChainID,
-		RawBalance:   "0",
-		Balance:      &big.Float{},
-	})
-
-	// save the updated list of tokens
-	err = tm.tokenBalancesStorage.saveBalances(tokenBalances)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
 }
 
 func (tm *Manager) FindSNT(chainID uint64) (*tokentypes.Token, error) {
@@ -740,34 +681,31 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 	}, nil
 }
 
-func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]*tokentypes.Token, error) {
-	balancesPerAccount, err := tm.tokenBalancesStorage.getBalances()
-	if err != nil {
-		return nil, err
+func (tm *Manager) GetPublisher() *pubsub.Publisher {
+	return tm.publisher
+}
+
+func (tm *Manager) watchHistoricallyOwnedTokensEvents() {
+	defer gocommon.LogOnPanic()
+
+	if tm.historicallyOwnedTokensProvider == nil {
+		logutils.ZapLogger().Warn("historicallyOwnedTokensProvider is nil, token historical ownership events will not be monitored")
+		return
 	}
 
-	tokens := make(map[common.Address][]*tokentypes.Token)
-	for account, balances := range balancesPerAccount {
-		for _, balance := range balances {
-			token, err := tm.GetTokenByChainAddress(balance.TokenChainID, balance.TokenAddress)
-			if err != nil {
-				return nil, err
+	ch, unsub := pubsub.Subscribe[tokenhistoricalownership.EventOwnershipChanged](tm.historicallyOwnedTokensProvider.GetPublisher(), 10)
+	defer unsub()
+
+	for {
+		select {
+		case <-tm.stopCh:
+			return
+		case _, ok := <-ch:
+			if !ok {
+				return
 			}
-			tokens[account] = append(tokens[account], token)
+			// Signal token list change
+			tm.notifyCh <- struct{}{}
 		}
 	}
-
-	return tokens, nil
-}
-
-func (tm *Manager) onAccountsRemoved(removedAddresses []common.Address) {
-	for _, account := range removedAddresses {
-		err := tm.tokenBalancesStorage.removeTokenBalances(account)
-		if err != nil {
-			logutils.ZapLogger().Error("token.Manager: can't remove token balances", zap.Error(err))
-		}
-	}
-}
-func (tm *Manager) GetCachedBalancesByChain(accounts []common.Address, tokens []*tokentypes.Token) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
-	return tm.tokenBalancesStorage.getCachedBalancesByChain(accounts, tokens)
 }

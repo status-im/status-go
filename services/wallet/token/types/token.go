@@ -1,10 +1,6 @@
 package tokentypes
 
 import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 )
 
@@ -20,18 +16,6 @@ type CommunityData struct {
 	Name  string `json:"name"`
 	Color string `json:"color"`
 	Image string `json:"image,omitempty"`
-}
-
-type StorageToken struct {
-	TokenAddress            common.Address               `json:"tokenAddress"`
-	TokenChainID            uint64                       `json:"tokenChainId"`
-	RawBalance              string                       `json:"rawBalance"`
-	Balance                 *big.Float                   `json:"balance"`
-	HasError                bool                         `json:"hasError"`
-	Description             string                       `json:"description"`
-	AssetWebsiteURL         string                       `json:"assetWebsiteUrl"`
-	BuiltOn                 string                       `json:"builtOn"`
-	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
 }
 
 type TokenList struct {

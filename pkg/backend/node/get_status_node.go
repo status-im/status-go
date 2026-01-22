@@ -23,7 +23,6 @@ import (
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
-	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/timesource"
@@ -54,7 +53,6 @@ import (
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
@@ -90,8 +88,6 @@ type StatusNode struct {
 	mediaServerAdvertizePort int
 	mediaServerEnableTLS     *bool
 	mediaServer              *server.MediaServer
-
-	tokenManager *token.Manager
 
 	logger *zap.Logger
 
@@ -329,10 +325,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 	}
 	n.mediaServer.SetDataProviders(n.appDB, n.walletDB, n.downloader)
 
-	if err := n.createAndStartTokenManager(); err != nil {
-		return err
-	}
-
 	if err := n.initServices(config, n.mediaServer); err != nil {
 		return err
 	}
@@ -371,46 +363,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 	}
 
 	return nil
-}
-
-func (n *StatusNode) createAndStartTokenManager() error {
-	const (
-		defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
-		defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
-	)
-
-	autoRefreshInterval := defaultAutoRefreshInterval
-	autoRefreshCheckInterval := defaultAutoRefreshCheckInterval
-	if n.config.WalletConfig.TokensListsAutoRefreshInterval > 0 &&
-		n.config.WalletConfig.TokensListsAutoRefreshCheckInterval > 0 &&
-		n.config.WalletConfig.TokensListsAutoRefreshInterval > n.config.WalletConfig.TokensListsAutoRefreshCheckInterval {
-		autoRefreshInterval = time.Duration(n.config.WalletConfig.TokensListsAutoRefreshInterval) * time.Second
-		autoRefreshCheckInterval = time.Duration(n.config.WalletConfig.TokensListsAutoRefreshCheckInterval) * time.Second
-	}
-
-	accDB, err := accounts.NewDB(n.appDB)
-	if err != nil {
-		return err
-	}
-
-	n.tokenManager, err = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
-		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
-		autoRefreshInterval, autoRefreshCheckInterval)
-	if err != nil {
-		return err
-	}
-
-	// check for possible custom tokens in the config
-	if len(n.config.WalletConfig.CustomTokens) > 0 {
-		for _, token := range n.config.WalletConfig.CustomTokens {
-			err := n.tokenManager.UpsertCustom(*token)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return n.tokenManager.Start(context.Background())
 }
 
 func (n *StatusNode) setupRPCClient() (err error) {
@@ -523,7 +475,10 @@ func (n *StatusNode) GetWalletDB() *sql.DB {
 }
 
 func (n *StatusNode) TokenManager() *token.Manager {
-	return n.tokenManager
+	if n.walletSrvc != nil {
+		return n.walletSrvc.GetTokenManager()
+	}
+	return nil
 }
 
 func (n *StatusNode) TokenBalancesFetcher() tokenbalances.FetcherIface {
