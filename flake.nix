@@ -17,7 +17,7 @@
     # A commit from nixpkgs 24.11 release : https://github.com/NixOS/nixpkgs/tree/release-24.11
     nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    lmn.url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=fb4a112407460534a9154f3aaee8888045dc6852";
+    lmn.url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=c27405b19c62bd06ccf5a322590fc55ffa172ea3";
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6";
   };
 
