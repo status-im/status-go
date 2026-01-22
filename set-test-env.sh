@@ -8,7 +8,7 @@ export LIBS_DIR="$(realpath "$SCRIPT_DIR/libs")"
 export NIM_SDS_LIB_DIR="$(realpath "$SCRIPT_DIR/../nim-sds/build")"
 export NIM_SDS_INC_DIR="$(realpath "$SCRIPT_DIR/../nim-sds/library")"
 export CGO_CFLAGS="-I$LIBS_DIR -I$NIM_SDS_INC_DIR"
-export CGO_LDFLAGS="-L$LIBS_DIR -lcodex -Wl,-rpath,$LIBS_DIR -L$NIM_SDS_LIB_DIR -lsds"
+export CGO_LDFLAGS="-L$LIBS_DIR -lstorage -Wl,-rpath,$LIBS_DIR -L$NIM_SDS_LIB_DIR -lsds"
 
 # Detect OS and set library path accordingly
 if [[ "$OSTYPE" == "darwin"* ]]; then

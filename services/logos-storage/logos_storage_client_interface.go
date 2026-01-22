@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 )
 
 //go:generate go tool mockgen -package=mock_logosstorage -source=logos_storage_client_interface.go -destination=mock/logos_storage_client_interface.go
@@ -22,12 +22,11 @@ type LogosStorageClientInterface interface {
 	LocalDownloadWithContext(ctx context.Context, cid string, output io.Writer) error
 
 	// Async download methods
-	TriggerDownload(cid string) (codex.Manifest, error)
-	TriggerDownloadWithContext(ctx context.Context, cid string) (codex.Manifest, error)
+	TriggerDownload(cid string) (storage.Manifest, error)
+	TriggerDownloadWithContext(ctx context.Context, cid string) (storage.Manifest, error)
 
 	// Manifest methods
-	FetchManifestWithContext(ctx context.Context, cid string) (codex.Manifest, error)
-
+	FetchManifestWithContext(ctx context.Context, cid string) (storage.Manifest, error)
 	// CID management methods
 	HasCid(cid string) (bool, error)
 	RemoveCid(cid string) error
@@ -39,7 +38,7 @@ type LogosStorageClientInterface interface {
 
 	// Peer Management methods
 	PeerId() (string, error)
-	Debug() (codex.DebugInfo, error)
+	Debug() (storage.DebugInfo, error)
 	Connect(peerId string, peerAddresses []string) error
 
 	// logging methods

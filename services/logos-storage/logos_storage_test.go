@@ -6,11 +6,11 @@ package logosstorage_test
 import (
 	"testing"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 )
 
 func TestLogosStorageStart(t *testing.T) {
-	node, err := codex.New(codex.Config{
+	node, err := storage.New(storage.Config{
 		BlockRetries: 5,
 		DataDir:      t.TempDir(),
 	})

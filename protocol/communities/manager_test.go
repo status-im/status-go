@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
@@ -24,6 +24,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/testutils"
+	"github.com/status-im/status-go/protocol/communities/archive"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -47,7 +48,7 @@ func TestManagerSuite(t *testing.T) {
 type ManagerSuite struct {
 	suite.Suite
 	manager        *Manager
-	archiveManager *ArchiveManager
+	archiveManager *archive.ArchiveManager
 }
 
 func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *ArchiveManager) {
@@ -80,7 +81,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	)
 	s.Require().NoError(err)
 
-	amc := &ArchiveManagerConfig{
+	amc := &archive.ArchiveManagerConfig{
 		TorrentConfig:      buildTorrentConfig(),
 		LogosStorageConfig: buildLogosStorageConfig(s.T()),
 		Logger:             logger,
@@ -1676,7 +1677,7 @@ func buildTorrentConfig() *params.TorrentConfig {
 func buildLogosStorageConfig(t *testing.T) *params.LogosStorageConfig {
 	return &params.LogosStorageConfig{
 		Enabled: true,
-		LogosStorageNodeConfig: codex.Config{
+		LogosStorageNodeConfig: storage.Config{
 			DataDir:      filepath.Join(t.TempDir(), "logos-storage", "data"),
 			BlockRetries: 5,
 			LogLevel:     "ERROR",

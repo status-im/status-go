@@ -1,5 +1,6 @@
 # Build status-go in a Go builder container
-FROM golang:1.24.7-bookworm AS builder
+# glibc≥2.39 (to match libstorage requirements)
+FROM golang:1.24.7-trixie AS builder
 
 # Set environment variables to use Clang
 ENV CC=clang

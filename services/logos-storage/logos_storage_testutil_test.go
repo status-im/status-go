@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	"github.com/status-im/status-go/params"
 	logosstorage "github.com/status-im/status-go/services/logos-storage"
@@ -13,9 +13,9 @@ import (
 func NewLogosStorageClientTest(t *testing.T) logosstorage.LogosStorageClientInterface {
 	client, err := logosstorage.NewLogosStorageClient(params.LogosStorageConfig{
 		Enabled: true,
-		LogosStorageNodeConfig: codex.Config{
+		LogosStorageNodeConfig: storage.Config{
 			DataDir:        filepath.Join(t.TempDir(), "logos-storage", "data"),
-			LogFormat:      codex.LogFormatNoColors,
+			LogFormat:      storage.LogFormatNoColors,
 			MetricsEnabled: false,
 			LogLevel:       "ERROR",
 			Nat:            "none",

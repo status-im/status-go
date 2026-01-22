@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
@@ -346,7 +346,7 @@ type TorrentConfig struct {
 
 type LogosStorageConfig struct {
 	Enabled                bool
-	LogosStorageNodeConfig codex.Config
+	LogosStorageNodeConfig storage.Config
 }
 
 const (
@@ -450,11 +450,11 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		},
 		LogosStorageConfig: LogosStorageConfig{
 			Enabled: false,
-			LogosStorageNodeConfig: codex.Config{
+			LogosStorageNodeConfig: storage.Config{
 				BlockRetries:   BlockRetries,
 				DataDir:        filepath.Join(dataDir, "logos-storage", "data"),
 				MetricsEnabled: false,
-				LogFormat:      codex.LogFormatNoColors,
+				LogFormat:      storage.LogFormatNoColors,
 			},
 		},
 	}

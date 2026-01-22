@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 
@@ -279,29 +279,6 @@ func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.
 // RemovePrivateKey removes the private key of the community with given ID
 func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemovePrivateKey(id)
-}
-
-// SetArchiveDistributionPreference sets the archive distribution preference for the node
-func (api *PublicAPI) SetArchiveDistributionPreference(request *requests.SetArchiveDistributionPreference) (string, error) {
-	if err := request.Validate(); err != nil {
-		return "", err
-	}
-
-	if err := api.service.messenger.SetArchiveDistributionPreference(request.Preference); err != nil {
-		return "", err
-	}
-
-	updatedPreference, err := api.service.messenger.GetArchiveDistributionPreference()
-	if err != nil {
-		return "", err
-	}
-
-	return updatedPreference, nil
-}
-
-// GetArchiveDistributionPreference gets the archive distribution preference for the node
-func (api *PublicAPI) GetArchiveDistributionPreference() (string, error) {
-	return api.service.messenger.GetArchiveDistributionPreference()
 }
 
 // ExportCommunity exports the private key of the community with given ID
@@ -1457,14 +1434,14 @@ func (api *PublicAPI) PeerID() string {
 }
 
 func (m *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
-	return m.service.messenger.IsSeedingHistoryArchiveLogosStorage(communityID)
+	return m.service.messenger.IsSeedingHistoryArchive(communityID)
 }
 
 func (m *PublicAPI) Connect(peerId string, addrs []string) error {
 	return m.service.messenger.Connect(peerId, addrs)
 }
 
-func (m *PublicAPI) Debug() (codex.DebugInfo, error) {
+func (m *PublicAPI) Debug() (storage.DebugInfo, error) {
 	return m.service.messenger.Debug()
 }
 

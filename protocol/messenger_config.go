@@ -39,7 +39,7 @@ type MessengerSignalsHandler interface {
 	CreatingHistoryArchives(communityID string)
 	NoHistoryArchivesCreated(communityID string, from int, to int)
 	HistoryArchivesCreated(communityID string, from int, to int)
-	HistoryArchivesSeeding(communityID string, magnetLink bool, indexCid bool)
+	HistoryArchivesSeeding(communityID string)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
 	ManifestFetched(communityID string, indexCid string)

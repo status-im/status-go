@@ -3,7 +3,7 @@ package logosstorage_test
 import (
 	"testing"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/params"
@@ -25,7 +25,7 @@ func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverri
 		// params.LogosStorageConfig fields
 		"Enabled": "true",
 
-		// codex.Config fields (nested under LogosStorageNodeConfig)
+		// storage.Config fields (nested under LogosStorageNodeConfig)
 		"LogosStorageNodeConfig.LogLevel":                       "DEBUG",
 		"LogosStorageNodeConfig.LogFormat":                      "json",
 		"LogosStorageNodeConfig.MetricsEnabled":                 "true",
@@ -56,9 +56,9 @@ func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverri
 	// Verify params.LogosStorageConfig fields
 	s.Equal(true, cfg.Enabled)
 
-	// Verify codex.Config fields
+	// Verify storage.Config fields
 	s.Equal("DEBUG", cfg.LogosStorageNodeConfig.LogLevel)
-	s.Equal(codex.LogFormat("json"), cfg.LogosStorageNodeConfig.LogFormat)
+	s.Equal(storage.LogFormat("json"), cfg.LogosStorageNodeConfig.LogFormat)
 	s.Equal(true, cfg.LogosStorageNodeConfig.MetricsEnabled)
 	s.Equal("0.0.0.0", cfg.LogosStorageNodeConfig.MetricsAddress)
 	s.Equal(9090, cfg.LogosStorageNodeConfig.MetricsPort)
@@ -71,7 +71,7 @@ func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverri
 	s.Equal(200, cfg.LogosStorageNodeConfig.MaxPeers)
 	s.Equal(4, cfg.LogosStorageNodeConfig.NumThreads)
 	s.Equal("CustomLogosStorage/1.0", cfg.LogosStorageNodeConfig.AgentString)
-	s.Equal(codex.RepoKind("sqlite"), cfg.LogosStorageNodeConfig.RepoKind)
+	s.Equal(storage.RepoKind("sqlite"), cfg.LogosStorageNodeConfig.RepoKind)
 	s.Equal(50000000000, cfg.LogosStorageNodeConfig.StorageQuota)
 	s.Equal("604800", cfg.LogosStorageNodeConfig.BlockTtl)
 	s.Equal("300", cfg.LogosStorageNodeConfig.BlockMaintenanceInterval)
@@ -171,7 +171,7 @@ func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverri
 
 func (s *LogosStorageConfigOverridesTestSuite) TestApplyLogosStorageConfigOverrides_StringSliceEmpty() {
 	cfg := &params.LogosStorageConfig{
-		LogosStorageNodeConfig: codex.Config{
+		LogosStorageNodeConfig: storage.Config{
 			ListenAddrs: []string{"existing"},
 		},
 	}

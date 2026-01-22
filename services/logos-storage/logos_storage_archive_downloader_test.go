@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -66,7 +66,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestBasicSingleArchive() {
 	// Set up mock expectations - same as before
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "test-cid-1").
-		Return(codex.Manifest{Cid: "test-cid-1"}, nil).
+		Return(storage.Manifest{Cid: "test-cid-1"}, nil).
 		Times(1)
 
 	// First HasCid call returns false, second returns true (simulating polling)
@@ -152,7 +152,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestMultipleArchives() {
 	for _, cid := range expectedCids {
 		suite.mockClient.EXPECT().
 			TriggerDownloadWithContext(gomock.Any(), cid).
-			Return(codex.Manifest{Cid: cid}, nil).
+			Return(storage.Manifest{Cid: cid}, nil).
 			Times(1)
 
 		// Each archive becomes available after one poll
@@ -239,7 +239,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestErrorDuringTriggerDownload(
 	// Mock TriggerDownloadWithContext to simulate an error
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "test-cid-1").
-		Return(codex.Manifest{}, assert.AnError). // Return a generic error to simulate failure
+		Return(storage.Manifest{}, assert.AnError). // Return a generic error to simulate failure
 		Times(1)
 
 	// No HasCid calls should be made since TriggerDownload fails
@@ -291,13 +291,13 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestActualCancellationDuringTri
 	// Use DoAndReturn to create a realistic TriggerDownload that waits for cancellation
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "test-cid-1").
-		DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
+		DoAndReturn(func(ctx context.Context, cid string) (storage.Manifest, error) {
 			// Simulate work by waiting for context cancellation
 			select {
 			case <-time.After(5 * time.Second): // This should never happen in our test
-				return codex.Manifest{Cid: cid}, nil
+				return storage.Manifest{Cid: cid}, nil
 			case <-ctx.Done(): // Wait for actual context cancellation
-				return codex.Manifest{}, ctx.Err() // Return the actual cancellation error
+				return storage.Manifest{}, ctx.Err() // Return the actual cancellation error
 			}
 		}).
 		Times(1)
@@ -355,7 +355,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestCancellationDuringPolling()
 	// Mock successful TriggerDownload
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "test-cid-1").
-		Return(codex.Manifest{Cid: "test-cid-1"}, nil).
+		Return(storage.Manifest{Cid: "test-cid-1"}, nil).
 		Times(1)
 
 	// Mock polling - allow multiple calls, but we'll cancel before completion
@@ -423,7 +423,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestPollingTimeout() {
 	// Mock successful TriggerDownload
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "test-cid-1").
-		Return(codex.Manifest{Cid: "test-cid-1"}, nil).
+		Return(storage.Manifest{Cid: "test-cid-1"}, nil).
 		Times(1)
 
 	// Mock polling to always return false (simulating timeout)
@@ -499,7 +499,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestWithExistingArchives() {
 	// Only archive-2 should be downloaded (not in existingArchiveIDs)
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-2").
-		Return(codex.Manifest{Cid: "cid-2"}, nil).
+		Return(storage.Manifest{Cid: "cid-2"}, nil).
 		Times(1) // Only one call expected
 
 	// Only archive-2 should be polled
@@ -580,7 +580,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_OneSuccessOn
 	// Archive-2 succeeds
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-2").
-		Return(codex.Manifest{Cid: "cid-2"}, nil)
+		Return(storage.Manifest{Cid: "cid-2"}, nil)
 	suite.mockClient.EXPECT().
 		HasCid("cid-2").
 		Return(true, nil)
@@ -588,7 +588,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_OneSuccessOn
 	// Archive-1 fails
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-1").
-		Return(codex.Manifest{}, fmt.Errorf("trigger failed"))
+		Return(storage.Manifest{}, fmt.Errorf("trigger failed"))
 
 	logger := zap.NewNop()
 	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)
@@ -636,7 +636,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_SuccessError
 	// Archive-3 (newest) succeeds
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-3").
-		Return(codex.Manifest{Cid: "cid-3"}, nil)
+		Return(storage.Manifest{Cid: "cid-3"}, nil)
 	suite.mockClient.EXPECT().
 		HasCid("cid-3").
 		Return(true, nil)
@@ -644,12 +644,12 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_SuccessError
 	// Archive-2 fails
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-2").
-		Return(codex.Manifest{}, fmt.Errorf("trigger failed"))
+		Return(storage.Manifest{}, fmt.Errorf("trigger failed"))
 
 	// Archive-1 will be cancelled (no expectations needed)
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-1").
-		DoAndReturn(func(ctx context.Context, cid string) (*codex.Manifest, error) {
+		DoAndReturn(func(ctx context.Context, cid string) (*storage.Manifest, error) {
 			<-ctx.Done() // Wait for cancellation
 			return nil, ctx.Err()
 		}).
@@ -703,7 +703,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_SuccessThenC
 	// Archive-2 (newer) succeeds
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-2").
-		Return(codex.Manifest{Cid: "cid-2"}, nil)
+		Return(storage.Manifest{Cid: "cid-2"}, nil)
 	suite.mockClient.EXPECT().
 		HasCid("cid-2").
 		Return(true, nil)
@@ -711,7 +711,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestPartialSuccess_SuccessThenC
 	// Archive-1 will be cancelled
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-1").
-		DoAndReturn(func(ctx context.Context, cid string) (*codex.Manifest, error) {
+		DoAndReturn(func(ctx context.Context, cid string) (*storage.Manifest, error) {
 			<-ctx.Done() // Wait for cancellation
 			return nil, ctx.Err()
 		}).
@@ -765,7 +765,7 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestNoSuccess_OnlyCancellation(
 	// Both archives will be cancelled
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, cid string) (*codex.Manifest, error) {
+		DoAndReturn(func(ctx context.Context, cid string) (*storage.Manifest, error) {
 			<-ctx.Done() // Wait for cancellation
 			return nil, ctx.Err()
 		}).
@@ -818,10 +818,10 @@ func (suite *LogosStorageArchiveDownloaderSuite) TestNoSuccess_OnlyErrors() {
 	// Both archives fail
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-1").
-		Return(codex.Manifest{}, fmt.Errorf("trigger failed for cid-1"))
+		Return(storage.Manifest{}, fmt.Errorf("trigger failed for cid-1"))
 	suite.mockClient.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), "cid-2").
-		Return(codex.Manifest{}, fmt.Errorf("trigger failed for cid-2"))
+		Return(storage.Manifest{}, fmt.Errorf("trigger failed for cid-2"))
 
 	logger := zap.NewNop()
 	downloader := logosstorage.NewLogosStorageArchiveDownloader(suite.mockClient, index, communityID, []string{}, cancelChan, logger)

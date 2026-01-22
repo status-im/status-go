@@ -364,6 +364,19 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 	return p.recordBundleToCommunity(r)
 }
 
+// CommunityExists checks if a community with the given ID exists in the database.
+// This is a lightweight alternative to GetByID when only existence checking is needed.
+func (p *Persistence) CommunityExists(memberIdentity *ecdsa.PublicKey, id []byte) (bool, error) {
+	r, err := p.getByID(id, memberIdentity)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return r != nil, nil
+}
+
 func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -985,103 +998,59 @@ func (p *Persistence) HasCommunityArchiveInfo(communityID types.HexBytes) (exist
 	return exists, err
 }
 
-func (p *Persistence) GetLastSeenMagnetlink(communityID types.HexBytes) (string, error) {
-	var magnetlinkURI string
-	err := p.db.QueryRow(`SELECT last_magnetlink_uri FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&magnetlinkURI)
+func (p *Persistence) GetLastSeenArchiveLink(communityID types.HexBytes) (string, error) {
+	var archiveLink string
+	err := p.db.QueryRow(`SELECT last_archive_link FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&archiveLink)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
-	return magnetlinkURI, err
+	return archiveLink, err
 }
 
-func (p *Persistence) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64, error) {
-	var magnetlinkClock uint64
-	err := p.db.QueryRow(`SELECT magnetlink_clock FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&magnetlinkClock)
+func (p *Persistence) GetArchiveLinkMessageClock(communityID types.HexBytes) (uint64, error) {
+	var archiveLinkClock uint64
+	err := p.db.QueryRow(`SELECT archive_link_clock FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&archiveLinkClock)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
-	return magnetlinkClock, err
+	return archiveLinkClock, err
 }
 
-func (p *Persistence) SaveCommunityArchiveInfo(communityID types.HexBytes, magnetLinkClock uint64, lastArchiveEndDate uint64, indexCidClock uint64) error {
+func (p *Persistence) SaveCommunityArchiveInfo(communityID types.HexBytes, archiveLinkClock uint64, lastArchiveEndDate uint64) error {
 	_, err := p.db.Exec(`
 		INSERT INTO communities_archive_info (
-			community_id, magnetlink_clock, last_message_archive_end_date, index_cid_clock
-		) VALUES (?, ?, ?, ?)
+			community_id, archive_link_clock, last_message_archive_end_date
+		) VALUES (?, ?, ?)
 		ON CONFLICT(community_id) DO UPDATE SET
-			magnetlink_clock = excluded.magnetlink_clock,
-			last_message_archive_end_date = excluded.last_message_archive_end_date,
-			index_cid_clock = excluded.index_cid_clock`,
+			archive_link_clock = excluded.archive_link_clock,
+			last_message_archive_end_date = excluded.last_message_archive_end_date`,
 		communityID.String(),
-		magnetLinkClock,
+		archiveLinkClock,
 		lastArchiveEndDate,
-		indexCidClock,
 	)
 	return err
 }
 
-func (p *Persistence) UpdateMagnetlinkMessageClock(communityID types.HexBytes, magnetLinkClock uint64) error {
+func (p *Persistence) UpdateArchiveLinkMessageClock(communityID types.HexBytes, archiveLinkClock uint64) error {
 	_, err := p.db.Exec(`
-		INSERT INTO communities_archive_info (community_id, magnetlink_clock)
+		INSERT INTO communities_archive_info (community_id, archive_link_clock)
 		VALUES (?, ?)
 		ON CONFLICT(community_id) DO UPDATE SET
-			magnetlink_clock = excluded.magnetlink_clock`,
+			archive_link_clock = excluded.archive_link_clock`,
 		communityID.String(),
-		magnetLinkClock,
+		archiveLinkClock,
 	)
 	return err
 }
 
-func (p *Persistence) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlinkURI string) error {
+func (p *Persistence) UpdateLastSeenArchiveLink(communityID types.HexBytes, archiveLink string) error {
 	_, err := p.db.Exec(`
-		INSERT INTO communities_archive_info (community_id, last_magnetlink_uri)
+		INSERT INTO communities_archive_info (community_id, last_archive_link)
 		VALUES (?, ?)
 		ON CONFLICT(community_id) DO UPDATE SET
-			last_magnetlink_uri = excluded.last_magnetlink_uri`,
+			last_archive_link = excluded.last_archive_link`,
 		communityID.String(),
-		magnetlinkURI,
-	)
-	return err
-}
-
-func (p *Persistence) GetLastSeenIndexCid(communityID types.HexBytes) (string, error) {
-	var lastIndexCid string
-	err := p.db.QueryRow(`SELECT last_index_cid FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&lastIndexCid)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return lastIndexCid, err
-}
-
-func (p *Persistence) GetIndexCidMessageClock(communityID types.HexBytes) (uint64, error) {
-	var indexCidClock uint64
-	err := p.db.QueryRow(`SELECT index_cid_clock FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&indexCidClock)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	return indexCidClock, err
-}
-
-func (p *Persistence) UpdateLastSeenIndexCid(communityID types.HexBytes, indexCid string) error {
-	_, err := p.db.Exec(`
-		INSERT INTO communities_archive_info (community_id, last_index_cid)
-		VALUES (?, ?)
-		ON CONFLICT(community_id) DO UPDATE SET
-			last_index_cid = excluded.last_index_cid`,
-		communityID.String(),
-		indexCid,
-	)
-	return err
-}
-
-func (p *Persistence) UpdateIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
-	_, err := p.db.Exec(`
-		INSERT INTO communities_archive_info (community_id, index_cid_clock)
-		VALUES (?, ?)
-		ON CONFLICT(community_id) DO UPDATE SET
-			index_cid_clock = excluded.index_cid_clock`,
-		communityID.String(),
-		clock,
+		archiveLink,
 	)
 	return err
 }

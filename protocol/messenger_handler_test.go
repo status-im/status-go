@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/communities"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -212,18 +213,24 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithL
 	response, err := s.m.CreateCommunity(description, false)
 	s.Require().NoError(err)
 
-	s.m.archiveManager.SetLogosStorageConfig(&params.LogosStorageConfig{
+	logosStorageConfig := &params.LogosStorageConfig{
 		Enabled: true,
-		LogosStorageNodeConfig: codex.Config{
+		LogosStorageNodeConfig: storage.Config{
 			DataDir:        filepath.Join(s.T().TempDir(), "logos-storage", "data"),
-			LogFormat:      codex.LogFormatNoColors,
+			LogFormat:      storage.LogFormatNoColors,
 			MetricsEnabled: false,
 			LogLevel:       "ERROR",
 			Nat:            "none",
 		},
-	})
+	}
 
-	err = s.m.archiveManager.StartLogosStorageClient()
+	amc := &archivetypes.ArchiveManagerConfig{
+		LogosStorageConfig: logosStorageConfig,
+	}
+
+	s.m.SetupArchiveManager(amc)
+
+	err = s.m.archiveManager.Start()
 	s.Require().NoError(err)
 	defer func() {
 		_ = s.m.archiveManager.Stop()
@@ -237,25 +244,21 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithL
 		HistoryArchiveSupportEnabled: true,
 	})
 	s.Require().NoError(err)
-	// not valid after new distribution preference implementation
-	// s.m.communitiesManager.SetArchiveDistributionPreference(community.ID(), communities.ArchiveDistributionMethodLogosStorage)
-	err = s.m.communitiesManager.SetArchiveDistributionPreference(params.ArchiveDistributionMethodLogosStorage)
-	s.Require().NoError(err)
 
 	var buf bytes.Buffer
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(&buf), zap.DebugLevel)
 	s.m.logger = zap.New(core)
 
-	message := &protobuf.CommunityMessageArchiveMagnetlink{
-		MagnetUri: "magnet:?xt=urn:btih:d58f7e0c4e3b3f1e8e4f8e4e8e4f8e4e8e4f8e4e",
+	message := &protobuf.CommunityMessageArchiveLink{
+		ArchiveLink: "magnet:?xt=urn:btih:d58f7e0c4e3b3f1e8e4f8e4e8e4f8e4e8e4f8e4e",
 	}
 
 	state.CurrentMessageState.PublicKey = &community.PrivateKey().PublicKey
 
 	// detecting archive distribution preference now happens earlier
 	// err = s.m.HandleHistoryArchiveMagnetlinkMessage(state, &community.PrivateKey().PublicKey, "", 100)
-	err = s.m.HandleCommunityMessageArchiveMagnetlink(context.Background(), state, message, nil)
+	err = s.m.HandleCommunityMessageArchiveLink(context.Background(), state, message, nil)
 	s.Require().NoError(err)
 	s.Require().Contains(buf.String(), "skipping magnetlink processing due to LogosStorage-only preference")
 }

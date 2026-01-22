@@ -8,7 +8,7 @@
 
 let
   optionalString = pkgs.lib.optionalString;
-  codexVersion = "v0.0.28";
+  logosStorageVersion = "v0.0.30";
   arch =
     if stdenv.hostPlatform.isx86_64 then "amd64"
     else if stdenv.hostPlatform.isAarch64 then "arm64"
@@ -16,14 +16,14 @@ let
   os = if stdenv.isDarwin then "macos" else "Linux";
   hash = 
     if stdenv.hostPlatform.isDarwin 
-    # nix store prefetch-file --json --unpack https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${codexVersion}/codex-macos-arm64.zip | jq -r .hash
+    # nix store prefetch-file --json --unpack https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${logosStorageVersion}/storage-macos-arm64.zip | jq -r .hash
     then "sha256-GcerkH8izZ5QHG5ARNNrM1fktaeBKjF6AGNsA6vxVj0="
-    # nix store prefetch-file --json --unpack https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${codexVersion}/codex-Linux-amd64.zip | jq -r .hash
+    # nix store prefetch-file --json --unpack https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${logosStorageVersion}/storage-linux-amd64.zip | jq -r .hash
     else "sha256-sYhbgBN0LNA7YhmBigPwo1h34QTADTxFGjO8QAw8m18=";
 
-  # Pre-fetch libcodex to avoid network during build
-  codexLib = pkgs.fetchzip {
-    url = "https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${codexVersion}/codex-${os}-${arch}.zip";
+  # Pre-fetch libstorage to avoid network during build
+  logosStorageLib = pkgs.fetchzip {
+    url = "https://github.com/logos-storage/logos-storage-go-bindings/releases/download/${logosStorageVersion}/storage-${os}-${arch}.zip";
     hash = hash;
     stripRoot = false;
   };
@@ -63,7 +63,7 @@ in pkgs.buildGoModule {
   preBuild = ''
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
-    export LIBS_DIR="${codexLib}"
+    export LIBS_DIR="${logosStorageLib}"
 
     make generate \
         NO_NETWORK=1 \
@@ -86,7 +86,7 @@ in pkgs.buildGoModule {
     export HOME=$TMPDIR
     CGO_ENABLED=1 \
     CGO_CFLAGS="-I$LIBS_DIR -I$NIM_SDS_INC_DIR" \
-    CGO_LDFLAGS="-L$LIBS_DIR -lcodex -Wl,-rpath,$LIBS_DIR -L$NIM_SDS_LIB_DIR -lsds" \
+    CGO_LDFLAGS="-L$LIBS_DIR -lstorage -Wl,-rpath,$LIBS_DIR -L$NIM_SDS_LIB_DIR -lsds" \
     make statusgo-library \
         NO_NETWORK=1 \
         NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \

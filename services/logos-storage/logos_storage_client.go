@@ -5,15 +5,15 @@ import (
 	"context"
 	"io"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	"github.com/status-im/status-go/params"
 )
 
 // LogosStorageClient handles basic upload/download operations with LogosStorage storage
 type LogosStorageClient struct {
-	config    codex.Config
-	node      *codex.CodexNode
+	config    storage.Config
+	node      *storage.StorageNode
 	enabled   bool
 	started   bool
 	stopped   bool
@@ -22,7 +22,7 @@ type LogosStorageClient struct {
 
 // NewLogosStorageClient creates a new LogosStorage client
 func NewLogosStorageClient(config params.LogosStorageConfig) (LogosStorageClientInterface, error) {
-	node, err := codex.New(config.LogosStorageNodeConfig)
+	node, err := storage.New(config.LogosStorageNodeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (c *LogosStorageClient) UpdateLogLevel(logLevel string) error {
 
 // Upload uploads data from a reader to LogosStorage and returns the CID
 func (c *LogosStorageClient) Upload(data io.Reader, filename string) (string, error) {
-	options := codex.UploadOptions{
+	options := storage.UploadOptions{
 		Filepath: filename,
 	}
 	return c.node.UploadReader(context.Background(), options, data)
@@ -87,7 +87,7 @@ func (c *LogosStorageClient) Download(cid string, output io.Writer) error {
 	return c.DownloadWithContext(context.Background(), cid, output)
 }
 
-func (c *LogosStorageClient) TriggerDownload(cid string) (codex.Manifest, error) {
+func (c *LogosStorageClient) TriggerDownload(cid string) (storage.Manifest, error) {
 	return c.TriggerDownloadWithContext(context.Background(), cid)
 }
 
@@ -102,7 +102,7 @@ func (c *LogosStorageClient) RemoveCid(cid string) error {
 
 // DownloadWithContext downloads data from LogosStorage by CID with cancellation support
 func (c *LogosStorageClient) DownloadWithContext(ctx context.Context, cid string, output io.Writer) error {
-	options := codex.DownloadStreamOptions{
+	options := storage.DownloadStreamOptions{
 		Writer: output,
 	}
 	return c.node.DownloadStream(ctx, cid, options)
@@ -113,17 +113,17 @@ func (c *LogosStorageClient) LocalDownload(cid string, output io.Writer) error {
 }
 
 func (c *LogosStorageClient) LocalDownloadWithContext(ctx context.Context, cid string, output io.Writer) error {
-	return c.node.DownloadStream(ctx, cid, codex.DownloadStreamOptions{
+	return c.node.DownloadStream(ctx, cid, storage.DownloadStreamOptions{
 		Writer: output,
 		Local:  true,
 	})
 }
 
-func (c *LogosStorageClient) FetchManifestWithContext(ctx context.Context, cid string) (codex.Manifest, error) {
+func (c *LogosStorageClient) FetchManifestWithContext(ctx context.Context, cid string) (storage.Manifest, error) {
 	return c.DownloadManifest(cid)
 }
 
-func (c *LogosStorageClient) TriggerDownloadWithContext(ctx context.Context, cid string) (codex.Manifest, error) {
+func (c *LogosStorageClient) TriggerDownloadWithContext(ctx context.Context, cid string) (storage.Manifest, error) {
 	return c.node.Fetch(cid)
 }
 
@@ -132,7 +132,7 @@ func (c *LogosStorageClient) UploadArchive(encodedArchive []byte) (string, error
 	return c.Upload(bytes.NewReader(encodedArchive), "archive-data.bin")
 }
 
-func (c *LogosStorageClient) DownloadManifest(cid string) (codex.Manifest, error) {
+func (c *LogosStorageClient) DownloadManifest(cid string) (storage.Manifest, error) {
 	return c.node.DownloadManifest(cid)
 }
 
@@ -140,7 +140,7 @@ func (c *LogosStorageClient) PeerId() (string, error) {
 	return c.node.PeerId()
 }
 
-func (c *LogosStorageClient) Debug() (codex.DebugInfo, error) {
+func (c *LogosStorageClient) Debug() (storage.DebugInfo, error) {
 	return c.node.Debug()
 }
 

@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"path/filepath"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
@@ -372,11 +372,11 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	nodeConfig.LogosStorageConfig = params.LogosStorageConfig{
 		Enabled: nodeConfig.LogosStorageConfig.Enabled,
-		LogosStorageNodeConfig: codex.Config{
+		LogosStorageNodeConfig: storage.Config{
 			DataDir:        filepath.Join(nodeConfig.RootDataDir, "logos-storage", "data"),
 			BlockRetries:   params.BlockRetries,
 			MetricsEnabled: false,
-			LogFormat:      codex.LogFormatNoColors,
+			LogFormat:      storage.LogFormatNoColors,
 			BootstrapNodes: nodeConfig.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes,
 		},
 	}

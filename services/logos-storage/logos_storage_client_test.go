@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	logosstorage "github.com/status-im/status-go/services/logos-storage"
 )
@@ -74,7 +74,7 @@ func (suite *LogosStorageClientTestSuite) TestUpload_Success() {
 
 	require.NoError(suite.T(), err)
 	// LogosStorage uses CIDv1 with base58btc encoding (prefix: zDv)
-	assert.Equal(suite.T(), "zDvZRwzmBEaJ338xaCHbKbGAJ4X41YyccS6eyorrYBbmPnWuLxCh", cid)
+	assert.Equal(suite.T(), "zDvZRwzm199EVdjriqwtmzdqrTfSJ5W6jsXZbeNVyKnZybnMdpRs", cid)
 }
 
 func (suite *LogosStorageClientTestSuite) TestDownload_Success() {
@@ -212,7 +212,7 @@ func (suite *LogosStorageClientTestSuite) TestTriggerDownloadWithContext_Cancell
 	defer safeCancel(ctx, cancel)
 
 	channelError := make(chan error, 1)
-	var manifest codex.Manifest
+	var manifest storage.Manifest
 	go func() {
 		var err error
 		manifest, err = suite.client.TriggerDownloadWithContext(ctx, cid)
@@ -227,7 +227,7 @@ func (suite *LogosStorageClientTestSuite) TestTriggerDownloadWithContext_Cancell
 	case err := <-channelError:
 		require.Error(suite.T(), err)
 		assert.ErrorIs(suite.T(), err, context.Canceled)
-		assert.Nil(suite.T(), manifest, "expected nil manifest on cancellation")
+		assert.Equal(suite.T(), storage.Manifest{}, manifest, "expected zero value manifest on cancellation")
 	case <-time.After(5 * time.Second):
 		suite.T().Fatal("Test timed out - trigger download didn't respond to cancellation")
 	}
@@ -312,7 +312,7 @@ func (suite *LogosStorageClientTestSuite) TestFetchManifestWithContext_Cancellat
 	defer safeCancel(ctx, cancel)
 
 	channelError := make(chan error, 1)
-	var manifest codex.Manifest
+	var manifest storage.Manifest
 	go func() {
 		var err error
 		manifest, err = suite.client.FetchManifestWithContext(ctx, cid)

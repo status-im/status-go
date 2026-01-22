@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
 	"github.com/google/uuid"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/archive"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -2169,13 +2170,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	// 1.1. Create community
 	community, chat := s.createCommunity()
 
-	// createCommunity sets history archive distribution method to "logos-storage" - we need torrent for this test
-	err := s.owner.communitiesManager.SetArchiveDistributionPreference(communities.ArchiveDistributionMethodTorrent)
-	s.Require().NoError(err)
-
-	err = s.bob.communitiesManager.SetArchiveDistributionPreference(communities.ArchiveDistributionMethodTorrent)
-	s.Require().NoError(err)
-
 	// 1.2. Setup permissions
 	communityPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -2265,12 +2259,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	}
 
 	// Share archive directory between all users
-	s.owner.archiveManager.SetTorrentConfig(&torrentConfig)
-	s.bob.archiveManager.SetTorrentConfig(&torrentConfig)
+	amc := &archive.ArchiveManagerConfig{
+		TorrentConfig: &torrentConfig,
+	}
+
+	s.owner.SetupArchiveManager(amc)
+	s.bob.SetupArchiveManager(amc)
+
 	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 
-	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
+	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
 
@@ -2391,11 +2390,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadLogosStora
 
 	logosStorageConfig := params.LogosStorageConfig{
 		Enabled: false,
-		LogosStorageNodeConfig: codex.Config{
+		LogosStorageNodeConfig: storage.Config{
 			DataDir:      logosStorageDataDir,
 			BlockRetries: 10,
 			LogLevel:     "ERROR",
-			LogFormat:    codex.LogFormatNoColors,
+			LogFormat:    storage.LogFormatNoColors,
 			Nat:          "none",
 		},
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/protobuf/proto"
 
@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/archive"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	mock_logosstorage "github.com/status-im/status-go/services/logos-storage/mock"
@@ -30,11 +31,11 @@ type MockLogosStorageArchiveManagerSuite struct {
 	suite.Suite
 	ctrl             *gomock.Controller
 	mockLogosStorage *mock_logosstorage.MockLogosStorageClientInterface
-	archiveManager   *communities.ArchiveManager
+	archiveManager   *archive.ArchiveManager
 	manager          *communities.Manager
 }
 
-func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager) {
+func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *archive.ArchiveManager) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -53,7 +54,7 @@ func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Mana
 		Enabled: true,
 	}
 
-	amc := &communities.ArchiveManagerConfig{
+	amc := &archive.ArchiveManagerConfig{
 		TorrentConfig:      nil,
 		LogosStorageConfig: logosStorageConfig,
 		Logger:             logger,
@@ -62,7 +63,7 @@ func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Mana
 		Identity:           key,
 		Publisher:          m,
 	}
-	archiveManager := communities.NewArchiveManager(amc)
+	archiveManager := archive.NewArchiveManager(amc)
 
 	return m, archiveManager
 }
@@ -293,8 +294,8 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuring
 	// First archive download succeeds
 	s.mockLogosStorage.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), archives[0].cid).
-		DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
-			return codex.Manifest{Cid: cid, DatasetSize: len(archives[0].data)}, nil
+		DoAndReturn(func(ctx context.Context, cid string) (storage.Manifest, error) {
+			return storage.Manifest{Cid: cid, DatasetSize: len(archives[0].data)}, nil
 		}).
 		Times(1)
 
@@ -310,10 +311,10 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuring
 	for i := 1; i < len(archives); i++ {
 		s.mockLogosStorage.EXPECT().
 			TriggerDownloadWithContext(gomock.Any(), archives[i].cid).
-			DoAndReturn(func(ctx context.Context, cid string) (codex.Manifest, error) {
+			DoAndReturn(func(ctx context.Context, cid string) (storage.Manifest, error) {
 				// Block until context is cancelled
 				<-ctx.Done()
-				return codex.Manifest{}, ctx.Err()
+				return storage.Manifest{}, ctx.Err()
 			}).
 			Times(1)
 	}

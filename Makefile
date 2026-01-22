@@ -78,15 +78,15 @@ endif
 ifeq ($(detected_OS),Darwin)
  GOBIN_SHARED_LIB_EXT := dylib
  LIB_EXT := dylib
- GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
+ GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lstorage -Wl,-rpath,$(LIBS_DIR)"
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIB_EXT := dll
- GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lstorage -Wl,-rpath,$(LIBS_DIR)"
 else ifeq ($(detected_OS),Linux)
  GOBIN_SHARED_LIB_EXT := so
  LIB_EXT := so
- GOBIN_SHARED_LIB_CGO_LDFLAGS :=  CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-Wl,-soname,libstatus.so.0 -L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)"
+ GOBIN_SHARED_LIB_CGO_LDFLAGS :=  CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-Wl,-soname,libstatus.so.0 -L$(LIBS_DIR) -lstorage -Wl,-rpath,$(LIBS_DIR)"
 endif
 
 CGO_CFLAGS+=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
@@ -133,7 +133,7 @@ endif
 
 LIBSDS := $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR) -I$(LIBS_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -L$(LIBS_DIR) -lcodex
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -L$(LIBS_DIR) -lstorage
 
 # Common flags
 
@@ -311,49 +311,49 @@ else
 endif
 
 #----------------
-# Codex
+# LogosStorage
 #----------------
-.PHONY: fetch-libcodex test-libcodex clean-libcodex
+.PHONY: fetch-libstorage test-libstorage clean-libstorage
 
-ifeq ($(USE_CODEX),true)
-BUILD_TAGS += use_codex
+ifeq ($(USE_LOGOS_STORAGE),true)
+BUILD_TAGS += use_logos_storage
 endif
 
 UNAME_M := $(shell uname -m)
 ifneq ($(filter $(UNAME_M),x86_64 amd64 i686 i386),)
-  CODEX_ARCH := amd64
+  LOGOS_STORAGE_ARCH := amd64
 else ifneq ($(filter $(UNAME_M),aarch64 arm64 arm),)
-  CODEX_ARCH := arm64
+  LOGOS_STORAGE_ARCH := arm64
 else
-  CODEX_ARCH := $(UNAME_M)
+  LOGOS_STORAGE_ARCH := $(UNAME_M)
 endif
 
 ifeq ($(detected_OS),Darwin)
-CODEX_OS := "macos"
+LOGOS_STORAGE_OS := "macos"
 else
-CODEX_OS := $(detected_OS)
+LOGOS_STORAGE_OS := $(detected_OS)
 endif
 
-CODEX_VERSION := $(shell go list -m -f '{{.Version}}' github.com/codex-storage/codex-go-bindings 2>/dev/null)
-CODEX_DOWNLOAD_URL := "https://github.com/logos-storage/logos-storage-go-bindings/releases/download/$(CODEX_VERSION)/codex-${CODEX_OS}-${CODEX_ARCH}.zip"
+LOGOS_STORAGE_VERSION := $(shell go list -m -f '{{.Version}}' github.com/logos-storage/logos-storage-go-bindings 2>/dev/null)
+LOGOS_STORAGE_DOWNLOAD_URL := "https://github.com/logos-storage/logos-storage-go-bindings/releases/download/$(LOGOS_STORAGE_VERSION)/storage-${LOGOS_STORAGE_OS}-${LOGOS_STORAGE_ARCH}.zip"
 
-fetch-libcodex:
+fetch-libstorage:
 	@set -e; \
-	if [ -f "$(LIBS_DIR)/libcodex.so" ] || [ -f "$(LIBS_DIR)/libcodex.dylib" ] || [ -f "$(LIBS_DIR)/libcodex.dll" ]; then \
-		echo "libcodex already present in $(LIBS_DIR); skipping download"; \
+	if [ -f "$(LIBS_DIR)/libstorage.so" ] || [ -f "$(LIBS_DIR)/libstorage.dylib" ] || [ -f "$(LIBS_DIR)/libstorage.dll" ]; then \
+		echo "libstorage already present in $(LIBS_DIR); skipping download"; \
 	else \
-		echo "Fetching libcodex from: ${CODEX_DOWNLOAD_URL} ${OS} ${HOST_OS}"; \
+		echo "Fetching libstorage from: ${LOGOS_STORAGE_DOWNLOAD_URL} ${LOGOS_STORAGE_OS} ${HOST_OS}"; \
 		mkdir -p $(LIBS_DIR); \
-		curl -fSL --create-dirs -o $(LIBS_DIR)/codex-${CODEX_OS}-${CODEX_ARCH}.zip ${CODEX_DOWNLOAD_URL}; \
-		unzip -o -qq $(LIBS_DIR)/codex-${CODEX_OS}-${CODEX_ARCH}.zip -d $(LIBS_DIR); \
-		rm -f $(LIBS_DIR)/codex*.zip; \
+		curl -fSL --create-dirs -o $(LIBS_DIR)/logos-storage-${LOGOS_STORAGE_OS}-${LOGOS_STORAGE_ARCH}.zip ${LOGOS_STORAGE_DOWNLOAD_URL}; \
+		unzip -o -qq $(LIBS_DIR)/logos-storage-${LOGOS_STORAGE_OS}-${LOGOS_STORAGE_ARCH}.zip -d $(LIBS_DIR); \
+		rm -f $(LIBS_DIR)/logos-storage*.zip; \
 	fi
 
-test-libcodex: generate |
-	$(CGO_ENV) go test -tags '$(BUILD_TAGS) use_codex' -run TestCodexStart ./codex/... -v -json -count=1 | jq -r '.Output'
+test-libstorage: generate |
+	$(CGO_ENV) go test -tags '$(BUILD_TAGS) use_logos_storage' -run TestLogosStorageStart ./services/logos-storage/... -v -json -count=1 | jq -r '.Output'
 
-clean-libcodex:
-	@echo "Removing libcodex"
+clean-libstorage:
+	@echo "Removing libstorage"
 	rm -Rf $(LIBS_DIR)/*
 
 # Status-go targets
@@ -476,7 +476,7 @@ generate: GO_GENERATE_CMD ?= go tool go-generate-fast
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 ifeq ($(NO_NETWORK),)
-generate: fetch-libcodex
+generate: fetch-libstorage
 endif
 generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
@@ -541,7 +541,7 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
-	CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lcodex -Wl,-rpath,$(LIBS_DIR)" ./_assets/scripts/run_functional_tests.sh
+	CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lstorage -Wl,-rpath,$(LIBS_DIR)" ./_assets/scripts/run_functional_tests.sh
 
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
@@ -555,7 +555,7 @@ lint: generate lint-panics
 lint:
 	$(CGO_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 
-clean: clean-libcodex | ##@other Cleanup
+clean: clean-libstorage | ##@other Cleanup
 	rm -fr build/bin/*
 
 git-clean:

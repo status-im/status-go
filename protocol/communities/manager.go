@@ -37,14 +37,14 @@ import (
 	"github.com/status-im/status-go/messaging"
 	messagingtypes "github.com/status-im/status-go/messaging/types"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
+	historyarchivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
@@ -175,93 +175,6 @@ func (c *CommunityLock) Unlock(communityID types.HexBytes) {
 
 func (c *CommunityLock) Init() {
 	c.locks = make(map[string]*sync.Mutex)
-}
-
-type HistoryArchiveDownloadTask struct {
-	CancelChan chan struct{}
-	Waiter     sync.WaitGroup
-	m          sync.RWMutex
-	Cancelled  bool
-}
-
-type HistoryArchiveDownloadTaskInfo struct {
-	TotalDownloadedArchivesCount int
-	TotalArchivesCount           int
-	Cancelled                    bool
-}
-
-type ArchiveFileService interface {
-	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
-	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
-	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
-	ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveID string) ([]*protobuf.WakuMessage, error)
-	GetHistoryArchiveMagnetlink(communityID types.HexBytes) (string, error)
-	LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID types.HexBytes) (*protobuf.WakuMessageArchiveIndex, error)
-}
-
-type ArchiveService interface {
-	ArchiveFileService
-
-	SetOnline(bool)
-	SetTorrentConfig(*params.TorrentConfig)
-	StartTorrentClient() error
-	Stop() error
-	IsReady() bool
-	IsTorrentReady() bool
-	GetCommunityChatsFilters(communityID types.HexBytes) (messagingtypes.ChatFilters, error)
-	GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error)
-	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
-	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
-	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
-	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
-	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
-	UnseedHistoryArchiveTorrent(communityID types.HexBytes)
-	IsSeedingHistoryArchiveTorrent(communityID types.HexBytes) bool
-	GetHistoryArchiveDownloadTask(communityID string) *HistoryArchiveDownloadTask
-	AddHistoryArchiveDownloadTask(communityID string, task *HistoryArchiveDownloadTask)
-	DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes, magnetlink string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
-	PublishHistoryArchivesSeedingSignal(communityID types.HexBytes, magnetLink bool, indexCid bool)
-	TorrentFileExists(communityID string) bool
-	GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error)
-
-	SetLogosStorageConfig(*params.LogosStorageConfig)
-	SetLogosStorageClient(client logosstorage.LogosStorageClientInterface)
-	StartLogosStorageClient() error
-	GetLogosStorageClient() logosstorage.LogosStorageClientInterface
-	IsLogosStorageReady() bool
-	SeedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string) error
-	UnseedHistoryArchiveIndexCid(communityID types.HexBytes, indexCid string)
-	IsSeedingHistoryArchiveLogosStorage(communityID types.HexBytes, indexCid string) bool
-	DownloadHistoryArchivesByIndexCid(communityID types.HexBytes, indexCid string, cancelTask chan struct{}) (*HistoryArchiveDownloadTaskInfo, error)
-	CreateHistoryArchiveLogosStorageFromMessages(communityID types.HexBytes, messages []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveLogosStorageFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	ExtractMessagesFromLogosStorageHistoryArchive(communityID types.HexBytes, archiveID string, logosStorageIndex *protobuf.LogosStorageWakuMessageArchiveIndex) ([]*protobuf.WakuMessage, error)
-	LogosStorageLoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID types.HexBytes, indexCid string, isLocal bool) (*protobuf.LogosStorageWakuMessageArchiveIndex, error)
-}
-
-type ArchiveManagerConfig struct {
-	TorrentConfig      *params.TorrentConfig
-	LogosStorageConfig *params.LogosStorageConfig
-	Logger             *zap.Logger
-	Persistence        *Persistence
-	Messaging          *messaging.API
-	Identity           *ecdsa.PrivateKey
-	Publisher          Publisher
-}
-
-func (t *HistoryArchiveDownloadTask) IsCancelled() bool {
-	t.m.RLock()
-	defer t.m.RUnlock()
-	return t.Cancelled
-}
-
-func (t *HistoryArchiveDownloadTask) Cancel() {
-	t.m.Lock()
-	defer t.m.Unlock()
-	t.Cancelled = true
-	close(t.CancelChan)
 }
 
 type membersReevaluationTask struct {
@@ -513,23 +426,13 @@ func (m *Manager) SetMediaServerProperties() {
 }
 
 type Subscription struct {
-	Community                                *Community
-	CreatingHistoryArchivesSignal            *signal.CreatingHistoryArchivesSignal
-	HistoryArchivesCreatedSignal             *signal.HistoryArchivesCreatedSignal
-	NoHistoryArchivesCreatedSignal           *signal.NoHistoryArchivesCreatedSignal
-	HistoryArchivesSeedingSignal             *signal.HistoryArchivesSeedingSignal
-	HistoryArchivesUnseededSignal            *signal.HistoryArchivesUnseededSignal
-	HistoryArchiveDownloadedSignal           *signal.HistoryArchiveDownloadedSignal
-	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
-	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
-	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
-	ManifestFetchedSignal                    *signal.ManifestFetchedSignal
-	IndexDownloadCompletedSignal             *signal.IndexDownloadCompletedSignal
-	CommunityEventsMessage                   *CommunityEventsMessage
-	AcceptedRequestsToJoin                   []types.HexBytes
-	RejectedRequestsToJoin                   []types.HexBytes
-	CommunityPrivilegedMemberSyncMessage     *CommunityPrivilegedMemberSyncMessage
-	TokenCommunityValidated                  *CommunityResponse
+	historyarchivetypes.HistoryArchiveSignals
+	Community                            *Community
+	CommunityEventsMessage               *CommunityEventsMessage
+	AcceptedRequestsToJoin               []types.HexBytes
+	RejectedRequestsToJoin               []types.HexBytes
+	CommunityPrivilegedMemberSyncMessage *CommunityPrivilegedMemberSyncMessage
+	TokenCommunityValidated              *CommunityResponse
 }
 
 type CommunityResponse struct {
@@ -767,6 +670,10 @@ func (m *Manager) publish(subscription *Subscription) {
 			m.logger.Warn("subscription channel full, dropping message")
 		}
 	}
+}
+
+func (m *Manager) Publish(subscription *archivetypes.HistoryArchiveSignals) {
+	m.publish(&Subscription{HistoryArchiveSignals: *subscription})
 }
 
 func (m *Manager) All() ([]*Community, error) {
@@ -2264,51 +2171,30 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		return nil, err
 	}
 
-	cdMagnetlinkClock := community.config.CommunityDescription.ArchiveMagnetlinkClock
-	cdIndexCidClock := community.config.CommunityDescription.ArchiveIndexCidClock
+	cdArchiveLinkClock := community.config.CommunityDescription.ArchiveLinkClock
 
 	m.logger.Debug("[LogosStorage][handleCommunityDescription] handling community description archive info",
 		zap.String("communityID", community.IDString()),
-		zap.Uint64("magnetlinkClock", cdMagnetlinkClock),
-		zap.Uint64("indexCidClock", cdIndexCidClock),
+		zap.Uint64("archiveLinkClock", cdArchiveLinkClock),
 	)
 
 	if !hasCommunityArchiveInfo {
 		m.logger.Debug("[LogosStorage][handleCommunityDescription] saving community archive info: hasCommunityArchiveInfo=false")
-		err = m.persistence.SaveCommunityArchiveInfo(community.ID(), cdMagnetlinkClock, 0, cdIndexCidClock)
+		err = m.persistence.SaveCommunityArchiveInfo(community.ID(), cdArchiveLinkClock, 0)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		magnetlinkClock, err := m.persistence.GetMagnetlinkMessageClock(community.ID())
+		archiveLinkClock, err := m.persistence.GetArchiveLinkMessageClock(community.ID())
 		if err != nil {
 			return nil, err
 		}
-		if cdMagnetlinkClock > magnetlinkClock {
-			err = m.persistence.UpdateMagnetlinkMessageClock(community.ID(), cdMagnetlinkClock)
+		if cdArchiveLinkClock > archiveLinkClock {
+			err = m.persistence.UpdateArchiveLinkMessageClock(community.ID(), cdArchiveLinkClock)
 			if err != nil {
 				return nil, err
 			}
 		}
-
-		// Handle index CID clock comparison - update if community description has newer clock
-		indexCidClock, err := m.persistence.GetIndexCidMessageClock(community.ID())
-		if err != nil {
-			return nil, err
-		}
-		m.logger.Debug("[LogosStorage][handleCommunityDescription] comparing index CID clocks",
-			zap.String("communityID", community.IDString()),
-			zap.Uint64("cdIndexCidClock", cdIndexCidClock),
-			zap.Uint64("indexCidClock", indexCidClock),
-		)
-		if cdIndexCidClock > indexCidClock {
-			m.logger.Debug("[LogosStorage][handleCommunityDescription] updating index CID clock (cdIndexCidClock > indexCidClock)")
-			err = m.persistence.UpdateIndexCidMessageClock(community.ID(), cdIndexCidClock)
-			if err != nil {
-				return nil, err
-			}
-		}
-
 	}
 
 	pkString := crypto.PubkeyToHex(&m.identity.PublicKey)
@@ -3632,8 +3518,8 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64, error) {
-	return m.persistence.GetMagnetlinkMessageClock(communityID)
+func (m *Manager) GetArchiveLinkMessageClock(communityID types.HexBytes) (uint64, error) {
+	return m.persistence.GetArchiveLinkMessageClock(communityID)
 }
 
 func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityID string) (uint64, error) {
@@ -3657,7 +3543,7 @@ func (m *Manager) GetRequestToJoinByPkAndCommunityID(pk *ecdsa.PublicKey, commun
 	return m.persistence.GetRequestToJoinByPkAndCommunityID(crypto.PubkeyToHex(pk), communityID)
 }
 
-func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
+func (m *Manager) UpdateCommunityDescriptionArchiveLinkMessageClock(communityID types.HexBytes, clock uint64) error {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
@@ -3665,81 +3551,21 @@ func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID t
 	if err != nil {
 		return err
 	}
-	community.config.CommunityDescription.ArchiveMagnetlinkClock = clock
+	community.config.CommunityDescription.ArchiveLinkClock = clock
 	return m.SaveCommunity(community)
 }
 
-func (m *Manager) UpdateCommunityDescriptionIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
-	m.communityLock.Lock(communityID)
-	defer m.communityLock.Unlock(communityID)
-
-	community, err := m.GetByIDString(communityID.String())
-	if err != nil {
-		return err
-	}
-	community.config.CommunityDescription.ArchiveIndexCidClock = clock
-	return m.SaveCommunity(community)
+func (m *Manager) UpdateArchiveLinkMessageClock(communityID types.HexBytes, clock uint64) error {
+	return m.persistence.UpdateArchiveLinkMessageClock(communityID, clock)
 }
 
-func (m *Manager) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
-	return m.persistence.UpdateMagnetlinkMessageClock(communityID, clock)
+func (m *Manager) UpdateLastSeenArchiveLink(communityID types.HexBytes, archiveLink string) error {
+	return m.persistence.UpdateLastSeenArchiveLink(communityID, archiveLink)
 }
 
-func (m *Manager) UpdateLastSeenMagnetlink(communityID types.HexBytes, magnetlinkURI string) error {
-	return m.persistence.UpdateLastSeenMagnetlink(communityID, magnetlinkURI)
+func (m *Manager) GetLastSeenArchiveLink(communityID types.HexBytes) (string, error) {
+	return m.persistence.GetLastSeenArchiveLink(communityID)
 }
-
-func (m *Manager) GetLastSeenMagnetlink(communityID types.HexBytes) (string, error) {
-	return m.persistence.GetLastSeenMagnetlink(communityID)
-}
-
-func (m *Manager) UpdateIndexCidMessageClock(communityID types.HexBytes, clock uint64) error {
-	return m.persistence.UpdateIndexCidMessageClock(communityID, clock)
-}
-
-func (m *Manager) GetIndexCidMessageClock(communityID types.HexBytes) (uint64, error) {
-	return m.persistence.GetIndexCidMessageClock(communityID)
-}
-
-func (m *Manager) UpdateLastSeenIndexCid(communityID types.HexBytes, indexCid string) error {
-	return m.persistence.UpdateLastSeenIndexCid(communityID, indexCid)
-}
-
-func (m *Manager) GetLastSeenIndexCid(communityID types.HexBytes) (string, error) {
-	return m.persistence.GetLastSeenIndexCid(communityID)
-}
-
-func (m *Manager) GetArchiveDistributionPreference() (string, error) {
-	return m.persistence.GetArchiveDistributionPreference()
-}
-
-// func (m *Manager) GetArchiveDistributionPreference(communityID types.HexBytes) (string, error) {
-// 	return m.persistence.GetArchiveDistributionPreference(communityID)
-// }
-
-func (m *Manager) SetArchiveDistributionPreference(preference string) error {
-	// Validate preference value
-	switch preference {
-	case ArchiveDistributionMethodTorrent, ArchiveDistributionMethodLogosStorage:
-		// Valid preference
-	default:
-		return errors.New("invalid archive distribution preference")
-	}
-
-	return m.persistence.SetArchiveDistributionPreference(preference)
-}
-
-// func (m *Manager) SetArchiveDistributionPreference(communityID types.HexBytes, preference string) error {
-// 	// Validate preference value
-// 	switch preference {
-// 	case ArchiveDistributionMethodTorrent, ArchiveDistributionMethodLogosStorage:
-// 		// Valid preference
-// 	default:
-// 		return errors.New("invalid archive distribution preference")
-// 	}
-
-// 	return m.persistence.SetArchiveDistributionPreference(communityID, preference)
-// }
 
 func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)

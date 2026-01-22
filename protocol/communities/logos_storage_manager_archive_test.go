@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex-storage/codex-go-bindings/codex"
+	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/archive"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -32,7 +33,7 @@ import (
 type LogosStorageArchiveManagerSuite struct {
 	suite.Suite
 	logosStorageClient logosstorage.LogosStorageClientInterface
-	archiveManager     *communities.ArchiveManager
+	archiveManager     *archive.ArchiveManager
 	manager            *communities.Manager
 	identity           *ecdsa.PrivateKey // Store identity for test access
 	uploadedCIDs       []string          // Track uploaded CIDs for cleanup
@@ -42,7 +43,7 @@ func buildLogosStorageConfig(t *testing.T) *params.LogosStorageConfig {
 	rootDir := t.TempDir()
 	return &params.LogosStorageConfig{
 		Enabled: true,
-		LogosStorageNodeConfig: codex.Config{
+		LogosStorageNodeConfig: storage.Config{
 			DataDir:      filepath.Join(rootDir, "logos-storage", "data"),
 			BlockRetries: 5,
 			LogLevel:     "ERROR",
@@ -51,7 +52,7 @@ func buildLogosStorageConfig(t *testing.T) *params.LogosStorageConfig {
 	}
 }
 
-func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *communities.ArchiveManager, *ecdsa.PrivateKey) {
+func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *archive.ArchiveManager, *ecdsa.PrivateKey) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -66,7 +67,7 @@ func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager,
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	amc := &communities.ArchiveManagerConfig{
+	amc := &archive.ArchiveManagerConfig{
 		TorrentConfig:      nil,
 		LogosStorageConfig: buildLogosStorageConfig(s.T()),
 		Logger:             logger,
@@ -75,7 +76,7 @@ func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager,
 		Identity:           key,
 		Publisher:          m,
 	}
-	t := communities.NewArchiveManager(amc)
+	t := archive.NewArchiveManager(amc)
 	s.Require().NoError(err)
 
 	return m, t, key
