@@ -7,7 +7,7 @@
       },
       "locked": {
         "lastModified": 1769109744,
-        "narHash": "sha256-vaBAz+iyyf2AhetJ74s+m8xBQUbDziAcYduM0z3hIY8=",
+        "narHash": "sha256-Nvu4gosma1gte7m2DDcidiWgdpMQZYIbmMfRncln9HA=",
         "ref": "v0.37.0-beta-with-nim-ffi",
         "rev": "20c3b97950fb365e2949c9f1e7e483dc6cd89b66",
         "revCount": 2198,
@@ -30,6 +30,7 @@
       "locked": {
         "lastModified": 1766504822,
         "narHash": "sha256-tWVLbYoi8/xNzsbJmzMBnuc4GsB7/4oH05yCwuokKT8=",
+        "ref": "refs/heads/master",
         "rev": "fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6",
         "revCount": 76,
         "submodules": true,
