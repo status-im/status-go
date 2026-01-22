@@ -6,17 +6,16 @@
         "zerokit": "zerokit"
       },
       "locked": {
-        "lastModified": 1767020554,
-        "narHash": "sha256-LvnMp8dcmznNk6rb8cVfqWmZCga9UG/NCMQxrj3riMQ=",
-        "ref": "refs/heads/master",
-        "rev": "33383fee2d1e5444947acbe7316d5d31221d2852",
-        "revCount": 2196,
+        "lastModified": 1767692116,
+        "narHash": "sha256-7WYAk9I8tuFEU0RQqIIXMpanfriUIbdhXQlag2cwj7s=",
+        "rev": "a4e44dbe05347197ba367f967aa99078814a80fc",
+        "revCount": 2197,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-messaging-nim"
       },
       "original": {
-        "rev": "33383fee2d1e5444947acbe7316d5d31221d2852",
+        "rev": "a4e44dbe05347197ba367f967aa99078814a80fc",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-messaging-nim"
@@ -29,7 +28,6 @@
       "locked": {
         "lastModified": 1766504822,
         "narHash": "sha256-tWVLbYoi8/xNzsbJmzMBnuc4GsB7/4oH05yCwuokKT8=",
-        "ref": "refs/heads/master",
         "rev": "fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6",
         "revCount": 76,
         "submodules": true,
