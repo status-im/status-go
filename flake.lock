@@ -6,16 +6,18 @@
         "zerokit": "zerokit"
       },
       "locked": {
-        "lastModified": 1767692116,
-        "narHash": "sha256-7WYAk9I8tuFEU0RQqIIXMpanfriUIbdhXQlag2cwj7s=",
-        "rev": "a4e44dbe05347197ba367f967aa99078814a80fc",
-        "revCount": 2197,
+        "lastModified": 1769109744,
+        "narHash": "sha256-vaBAz+iyyf2AhetJ74s+m8xBQUbDziAcYduM0z3hIY8=",
+        "ref": "v0.37.0-beta-with-nim-ffi",
+        "rev": "20c3b97950fb365e2949c9f1e7e483dc6cd89b66",
+        "revCount": 2198,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-messaging-nim"
       },
       "original": {
-        "rev": "a4e44dbe05347197ba367f967aa99078814a80fc",
+        "ref": "v0.37.0-beta-with-nim-ffi",
+        "rev": "20c3b97950fb365e2949c9f1e7e483dc6cd89b66",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-messaging-nim"
