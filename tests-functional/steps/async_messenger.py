@@ -1,5 +1,6 @@
 from clients.signals import SignalType
 from resources.enums import MessageContentType
+from utils import fake
 
 
 class AsyncMessengerSteps:
@@ -95,3 +96,9 @@ class AsyncMessengerSteps:
                 "Some Sender RPC responses are not matching the signals received by the receiver.\n"
                 "Details of mismatches:\n" + "\n".join(message_mismatch)
             )
+
+    def create_community(self, node) -> str:
+        """Create a community and store its ID."""
+        response = node.wakuext_service.create_community(fake.community_name(), fake.community_description())
+        self.community_id = response.get("communities", [{}])[0].get("id")
+        return self.community_id

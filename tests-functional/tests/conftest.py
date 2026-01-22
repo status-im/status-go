@@ -232,6 +232,47 @@ def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3
 
 
 @pytest_asyncio.fixture
+async def async_backend_factory(backend_factory):
+    """
+    Async fixture that creates bare backend (not logged in) with async signal support.
+
+    Useful for tests like local_pairing where receiver device starts without account.
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_pairing(async_backend_factory):
+            device = await async_backend_factory("device")
+            device.backend.init_status_backend()
+            # ... pairing flow ...
+            signal = await device.wait_for_signal(SignalType.LOCAL_PAIRING, ...)
+    """
+    async_backends: list[AsyncStatusBackend] = []
+
+    async def factory(name: str = "", **kwargs) -> AsyncStatusBackend:
+        logging.debug(f"[ASYNC SETUP] Creating bare {name} backend")
+
+        # Create sync backend (no login, just container)
+        sync_backend = backend_factory(name, **kwargs)
+
+        # Wrap with async backend for signal support
+        async_backend = AsyncStatusBackend(sync_backend)
+        await async_backend.start_signal_client()
+        async_backends.append(async_backend)
+
+        logging.debug(f"[ASYNC SETUP] {name.capitalize()} bare backend ready with signal client")
+        return async_backend
+
+    yield factory
+
+    # Cleanup: stop signal clients (sync backend cleanup handled by backend_factory)
+    for async_backend in async_backends:
+        try:
+            await async_backend.stop_signal_client()
+        except Exception as e:
+            logging.warning(f"Failed to stop signal client: {e}")
+
+
+@pytest_asyncio.fixture
 async def async_backend_new_profile(backend_new_profile):
     """
     Async fixture that creates backend with new profile and async signal support.
