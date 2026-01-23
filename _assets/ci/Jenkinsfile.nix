@@ -59,5 +59,5 @@ def getJobPathTokens() {
 }
 
 def getNWakuMode() {
-  return getJobPathTokens().contains('nwaku')
+  return getJobPathTokens().any { it.contains('nwaku') }
 }

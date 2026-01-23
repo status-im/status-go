@@ -18,7 +18,7 @@ DATA_DIR = "/usr/status-user"
 
 
 def _localhost(ipv6: bool):
-    return "::1" if ipv6 else "127.0.0.1"
+    return "[::1]" if ipv6 else "127.0.0.1"
 
 
 class StatusGoContainer:
