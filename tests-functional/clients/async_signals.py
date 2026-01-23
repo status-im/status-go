@@ -21,6 +21,7 @@ class Signal:
     signal_type: SignalType
     event: dict
     raw: dict
+    raw_json: str = ""  # Cached JSON string for O(1) pattern matching
     timestamp: float = field(default_factory=time.time)
     seq: int = 0
 
@@ -123,6 +124,7 @@ class SignalRouter:
         3. Match against registered waiters
         4. Complete matching futures
         """
+        logging.debug(f"[SignalRouter] Publishing signal: type={signal.signal_type}, seq={self._seq + 1}")
         async with self._lock:
             self._seq += 1
             # Create new Signal with updated seq (since Signal is frozen)
@@ -130,6 +132,7 @@ class SignalRouter:
                 signal_type=signal.signal_type,
                 event=signal.event,
                 raw=signal.raw,
+                raw_json=signal.raw_json,  # Preserve cached JSON
                 timestamp=signal.timestamp,
                 seq=self._seq,
             )
@@ -158,7 +161,7 @@ class SignalRouter:
         predicate: Optional[Callable[[Signal], bool]] = None,
         pattern: Optional[str] = None,
         timeout: float = 30.0,
-        check_buffer: bool = True,
+        check_buffer: bool = False,  # Default False to avoid O(N) buffer scan
     ) -> Signal:
         """
         Wait for a signal matching the criteria.
@@ -172,7 +175,10 @@ class SignalRouter:
             predicate: Optional function to filter signals
             pattern: Optional string pattern to search in signal JSON
             timeout: Maximum wait time in seconds
-            check_buffer: If True, check buffer before waiting
+            check_buffer: If True, check buffer before waiting (O(N) scan).
+                Default is False for performance - use True only when you need
+                to find signals that may have arrived before calling wait_for()
+                (e.g., startup signals like NODE_LOGIN).
 
         Returns:
             Matching Signal
@@ -180,10 +186,15 @@ class SignalRouter:
         Raises:
             asyncio.TimeoutError: If no matching signal within timeout
         """
+        logging.debug(f"[SignalRouter] Waiting for signal: type={signal_type}, pattern={pattern}, timeout={timeout}")
+
         # Build predicate from pattern if provided
         if pattern and not predicate:
 
             def pattern_predicate(s: Signal) -> bool:
+                # Use cached raw_json for O(1) lookup instead of O(n) json.dumps
+                if s.raw_json:
+                    return pattern in s.raw_json
                 return pattern in json.dumps(s.raw)
 
             predicate = pattern_predicate
@@ -361,7 +372,12 @@ class AsyncSignalClient:
 
         while not self._should_stop:
             try:
-                async with websockets.connect(self.url) as ws:
+                async with websockets.connect(
+                    self.url,
+                    ping_interval=None,  # Disable client-side pings (server manages keepalive)
+                    ping_timeout=None,
+                    close_timeout=1,
+                ) as ws:
                     self._ws = ws
                     self._connected.set()
                     reconnect_delay = 1.0  # Reset on successful connection
@@ -405,6 +421,7 @@ class AsyncSignalClient:
                 signal_type=signal_type,
                 event=data.get("event", {}),
                 raw=data,
+                raw_json=raw_message,  # Cache original JSON for O(1) pattern matching
             )
 
             await self.router.publish(signal)

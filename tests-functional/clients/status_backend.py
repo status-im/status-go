@@ -93,7 +93,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         self.wait_for_healthy()
 
-        SignalClient.connect(self)
+        # Skip sync signal client if we'll use async wrapper
+        if not kwargs.get("skip_signal_client", False):
+            SignalClient.connect(self)
 
         self.wallet_service = WalletService(self)
         self.wakuext_service = WakuextService(self)

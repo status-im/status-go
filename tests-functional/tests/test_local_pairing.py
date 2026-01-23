@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 import pytest
@@ -135,17 +136,20 @@ async def pair_server_as_sender(sender: AsyncStatusBackend, receiver: AsyncStatu
     assert response["error"] is None
     assert response["keyUID"] == sender.backend.key_uid
 
-    await wait_for_action_of_type(
-        sender,
-        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
-        LocalPairingEventType.EVENT_PROCESS_SUCCESS.value,
-        timeout=60,
-    )
-    await wait_for_action_of_type(
-        receiver,
-        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
-        LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value,
-        timeout=60,
+    # Wait for both signals concurrently (instead of sequential)
+    await asyncio.gather(
+        wait_for_action_of_type(
+            sender,
+            LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+            LocalPairingEventType.EVENT_PROCESS_SUCCESS.value,
+            timeout=60,
+        ),
+        wait_for_action_of_type(
+            receiver,
+            LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+            LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value,
+            timeout=60,
+        ),
     )
 
 
@@ -153,25 +157,28 @@ async def pair_server_as_receiver(sender: AsyncStatusBackend, receiver: AsyncSta
     connection_string = receiver.backend.get_connection_string_for_being_bootstrapped()
     sender.backend.input_connection_string_for_bootstrapping_another_device(connection_string)
 
-    await wait_for_action_of_type(
-        sender,
-        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
-        LocalPairingEventType.EVENT_PROCESS_SUCCESS.value,
-        timeout=60,
-    )
-    await wait_for_action_of_type(
-        receiver,
-        LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
-        LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value,
-        timeout=60,
+    # Wait for both signals concurrently (instead of sequential)
+    await asyncio.gather(
+        wait_for_action_of_type(
+            sender,
+            LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+            LocalPairingEventType.EVENT_PROCESS_SUCCESS.value,
+            timeout=60,
+        ),
+        wait_for_action_of_type(
+            receiver,
+            LocalPairingEventAction.ACTION_PAIRING_INSTALLATION.value,
+            LocalPairingEventType.EVENT_TRANSFER_SUCCESS.value,
+            timeout=60,
+        ),
     )
 
 
-def login_paired_device(backend: AsyncStatusBackend, key_uid, password):
-    """Login on a paired device (sync operations, no signal waiting needed here)."""
+async def login_paired_device(backend: AsyncStatusBackend, key_uid, password):
+    """Login on a paired device with async signal waiting."""
     backend.backend.init_status_backend()
     backend.backend.login(key_uid, password)
-    backend.backend.wait_for_login()
+    await backend.wait_for_login()  # async version - uses async signal client
     backend.backend.wakuext_service.start_messenger()
 
 
@@ -180,11 +187,11 @@ def login_paired_device(backend: AsyncStatusBackend, key_uid, password):
 class TestLocalPairing(AsyncMessengerSteps):
 
     async def test_pairing_server_as_sender(self, async_backend_new_profile, async_backend_factory):
-        # Create users
-        alice = await async_backend_new_profile()
-        bob = await async_backend_new_profile()
-
-        bob_second_device = await async_backend_factory()
+        alice, bob, bob_second_device = await asyncio.gather(
+            async_backend_new_profile("alice"),
+            async_backend_new_profile("bob"),
+            async_backend_factory("bob_second_device"),
+        )
         bob_second_device.backend.init_status_backend()
 
         # Make contacts before local pairing
@@ -201,7 +208,6 @@ class TestLocalPairing(AsyncMessengerSteps):
         # Send a message to Bob before local pairing
         response = alice.wakuext_service.send_one_to_one_message(bob.public_key, "hello bob")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-        self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id2, clock_2 = message["id"], message["clock"]
 
         response = bob.wakuext_service.send_emoji_reaction(alice.public_key, message_id2, "1f642")  # 🙂
@@ -233,7 +239,7 @@ class TestLocalPairing(AsyncMessengerSteps):
         check_client_receiver_events(events)
 
         # Login on the second device
-        login_paired_device(bob_second_device, bob.backend.key_uid, bob.backend.password)
+        await login_paired_device(bob_second_device, bob.backend.key_uid, bob.backend.password)
 
         # Check that contact is synced
         contacts = bob_second_device.wakuext_service.get_contacts()
@@ -265,10 +271,11 @@ class TestLocalPairing(AsyncMessengerSteps):
         assert len(result) == 1 and result[0].get("emoji") == "1f642", "Message emoji reaction was not restored correctly"
 
     async def test_pairing_server_as_receiver(self, async_backend_new_profile, async_backend_factory):
-        # Create users
-        alice = await async_backend_new_profile()
-        bob = await async_backend_new_profile()
-        bob_second_device = await async_backend_factory()
+        alice, bob, bob_second_device = await asyncio.gather(
+            async_backend_new_profile("alice"),
+            async_backend_new_profile("bob"),
+            async_backend_factory("bob_second_device"),
+        )
         bob_second_device.backend.init_status_backend()
 
         # Make contacts before local pairing
@@ -309,15 +316,16 @@ class TestLocalPairing(AsyncMessengerSteps):
         assert messages is None, "Messages found on paired device wrongly"
 
     async def test_pairing_three_devices(self, async_backend_new_profile, async_backend_factory):
-        # Create users
-        bob1 = await async_backend_new_profile()
-        bob2 = await async_backend_factory()
+        bob1, bob2, bob3, user_accepted, user_pending, user_declined = await asyncio.gather(
+            async_backend_new_profile("bob1"),
+            async_backend_factory("bob2"),
+            async_backend_factory("bob3"),
+            async_backend_new_profile("user_accepted"),
+            async_backend_new_profile("user_pending"),
+            async_backend_new_profile("user_declined"),
+        )
         bob2.backend.init_status_backend()
-        bob3 = await async_backend_factory()
         bob3.backend.init_status_backend()
-        user_accepted = await async_backend_new_profile()
-        user_pending = await async_backend_new_profile()
-        user_declined = await async_backend_new_profile()
 
         # Setup contacts before local pairing
         await self.make_contacts(user_accepted, bob1)
@@ -329,13 +337,13 @@ class TestLocalPairing(AsyncMessengerSteps):
         await pair_server_as_sender(bob1, bob2)
 
         # Login on the second device
-        login_paired_device(bob2, bob1.backend.key_uid, bob1.backend.password)
+        await login_paired_device(bob2, bob1.backend.key_uid, bob1.backend.password)
 
         # Pair third device from second device
         await pair_server_as_sender(bob2, bob3)
 
         # Login on the third device
-        login_paired_device(bob3, bob1.backend.key_uid, bob1.backend.password)
+        await login_paired_device(bob3, bob1.backend.key_uid, bob1.backend.password)
 
         # Check that contacts and notifications are synced on all devices
         for bob_another_device in [bob2, bob3]:
@@ -365,8 +373,10 @@ class TestLocalPairing(AsyncMessengerSteps):
             assert user_declined_notification["dismissed"] is True
 
     async def test_pairing_receiver_must_be_logged_out(self, async_backend_new_profile):
-        sender = await async_backend_new_profile()
-        receiver = await async_backend_new_profile()
+        sender, receiver = await asyncio.gather(
+            async_backend_new_profile("sender"),
+            async_backend_new_profile("receiver"),
+        )
 
         # Client receiver must be logged out
         connection_string = sender.backend.get_connection_string_for_bootstrapping_another_device()

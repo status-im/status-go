@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import TYPE_CHECKING, Callable, Optional
 
 from clients.async_signals import AsyncSignalClient, Signal, SignalRouter
@@ -77,6 +78,14 @@ class AsyncStatusBackend:
         if self._signal_client is not None:
             return
 
+        # Disconnect sync signal client to avoid duplicate WebSocket connections
+        # StatusBackend inherits from SignalClient and starts its own WS in __init__
+        # Note: disconnect() may fail if sync client was never connected (skip_signal_client=True)
+        try:
+            self._backend.disconnect()
+        except Exception:
+            pass  # Sync client may not have been connected
+
         await self._router.start()
 
         ws_url = self._backend.ws_url
@@ -101,7 +110,7 @@ class AsyncStatusBackend:
         pattern: Optional[str] = None,
         predicate: Optional[Callable[[Signal], bool]] = None,
         timeout: float = 30.0,
-        check_buffer: bool = True,
+        check_buffer: bool = False,  # Default False to avoid O(N) buffer scan
     ) -> Signal:
         """
         Wait for a signal.
@@ -111,7 +120,9 @@ class AsyncStatusBackend:
             pattern: Optional string pattern to match in signal
             predicate: Optional predicate function
             timeout: Timeout in seconds
-            check_buffer: If True, check buffered signals first
+            check_buffer: If True, check buffered signals first (O(N) scan).
+                Default is False for performance - use True only when you need
+                to find signals that may have arrived before calling wait_for_signal().
 
         Returns:
             Signal that matched criteria
@@ -131,6 +142,72 @@ class AsyncStatusBackend:
     ) -> list[Signal]:
         """Wait for a sequence of signals in order."""
         return await self._router.wait_for_sequence(signal_types, timeout=timeout)
+
+    async def wait_for_login(self, timeout: float = 60.0) -> dict:
+        """Wait until the backend has completed login.
+
+        Async version of StatusBackend.wait_for_login().
+        """
+
+        def _apply_login_signal(signal_data: dict) -> None:
+            if "error" in signal_data.get("event", {}):
+                error_details = signal_data["event"]["error"]
+                assert not error_details, f"Unexpected error during login: {error_details}"
+            self._backend.node_login_event = signal_data
+            logging.debug(f"Node login event: {self._backend.node_login_event}")
+            self._backend.public_key = signal_data.get("event", {}).get("settings", {}).get("public-key", "")
+            self._backend.mnemonic = signal_data.get("event", {}).get("settings", {}).get("mnemonic", "")
+            self._backend.key_uid = signal_data.get("event", {}).get("account", {}).get("key-uid", "")
+
+        # 1) Preferred path: wait for the `node.login` signal
+        try:
+            signal = await self.wait_for_signal(SignalType.NODE_LOGIN, timeout=timeout, check_buffer=True)
+            signal_data = signal.raw
+            assert isinstance(signal_data, dict), f"Unexpected NODE_LOGIN signal payload type: {type(signal_data)}"
+            _apply_login_signal(signal_data)
+            return signal_data
+        except asyncio.TimeoutError:
+            logging.warning("NODE_LOGIN signal was not received in time; falling back to RPC polling")
+
+        # 2) Fallback path: poll RPC state until it reflects a logged-in account
+        deadline = time.monotonic() + timeout
+        last_error = None
+
+        while time.monotonic() < deadline:
+            try:
+                # Check if signal arrived in buffer while we were polling
+                buffered = self._router.get_buffer_signals(SignalType.NODE_LOGIN)
+                if buffered:
+                    signal_data = buffered[-1].raw
+                    _apply_login_signal(signal_data)
+                    return signal_data
+
+                # Poll RPC state - use to_thread to avoid blocking event loop
+                last_settings = await asyncio.to_thread(self._backend.settings_service.get_settings)
+                public_key = (last_settings or {}).get("public-key", "")
+                mnemonic = (last_settings or {}).get("mnemonic", "")
+
+                last_keypairs = await asyncio.to_thread(self._backend.accounts_service.get_account_keypairs) or []
+                key_uid = ""
+                if isinstance(last_keypairs, list) and last_keypairs:
+                    key_uid = (last_keypairs[0] or {}).get("key-uid", "")
+
+                if public_key and key_uid:
+                    signal_data = {
+                        "type": SignalType.NODE_LOGIN.value,
+                        "event": {
+                            "settings": {"public-key": public_key, "mnemonic": mnemonic},
+                            "account": {"key-uid": key_uid},
+                        },
+                    }
+                    _apply_login_signal(signal_data)
+                    return signal_data
+            except Exception as e:
+                last_error = str(e)
+
+            await asyncio.sleep(0.5)
+
+        raise TimeoutError(f"Login did not complete within timeout. last_error={last_error}")
 
     # === Cleanup ===
 

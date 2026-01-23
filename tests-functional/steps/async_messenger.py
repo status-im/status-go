@@ -98,7 +98,15 @@ class AsyncMessengerSteps:
             )
 
     def create_community(self, node) -> str:
-        """Create a community and store its ID."""
-        response = node.wakuext_service.create_community(fake.community_name(), fake.community_description())
+        """Create a community using the given node.
+
+        This is a sync RPC call, no async needed.
+        """
+        # Handle both sync and async backends
+        wakuext = getattr(node, "wakuext_service", None)
+        if wakuext is None and hasattr(node, "backend"):
+            wakuext = node.backend.wakuext_service
+        assert wakuext is not None, "Node must have wakuext_service attribute"
+        response = wakuext.create_community(fake.community_name(), fake.community_description())
         self.community_id = response.get("communities", [{}])[0].get("id")
         return self.community_id
