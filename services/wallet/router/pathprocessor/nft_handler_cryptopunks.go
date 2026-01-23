@@ -48,17 +48,16 @@ func (h *CryptoPunksHandler) CanHandle(contractID thirdparty.ContractID) bool {
 }
 
 func (h *CryptoPunksHandler) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	if params.FromToken == nil || params.FromToken.CollectibleTokenID == nil {
+		return nil, ErrNoTokenSet
+	}
+
 	parsedABI, err := abi.JSON(strings.NewReader(cryptopunks.CryptoPunksMetaData.ABI))
 	if err != nil {
 		return nil, err
 	}
 
-	tokenID, err := walletCommon.GetTokenIdFromSymbol(params.FromToken.Symbol)
-	if err != nil {
-		return nil, err
-	}
-
-	return parsedABI.Pack(cryptoPunksHandlerFunctionNameTransferPunk, params.ToAddr, tokenID)
+	return parsedABI.Pack(cryptoPunksHandlerFunctionNameTransferPunk, params.ToAddr, params.FromToken.CollectibleTokenID.ToInt())
 }
 
 func (h *CryptoPunksHandler) BuildTransactionV2(

@@ -506,7 +506,7 @@ func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *re
 	}
 
 	// check token existence
-	token := findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, input.FromChainID, input.TokenKey)
+	token := findToken(input.SendType, r.tokenManager, r.collectiblesManager, input.TokenKey)
 	if token == nil {
 		err = errors.CreateErrorResponseFromError(ErrTokenNotFound)
 		return
@@ -637,13 +637,13 @@ func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputP
 	if testsMode {
 		fromToken = input.TestParams.TokenFrom
 	} else {
-		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, chainID, input.TokenKey)
+		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesManager, input.TokenKey)
 	}
 	if fromToken == nil {
 		return
 	}
 
-	toToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, common.Address{}, chainID, input.ToTokenKey)
+	toToken = findToken(input.SendType, r.tokenManager, r.collectiblesManager, input.ToTokenKey)
 	return
 }
 
@@ -679,7 +679,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		err = errors.CreateErrorResponseFromError(fmt.Errorf("from token not found for send type %d on chain %d", input.SendType, input.FromChainID))
 		return
 	}
-	if toToken == nil {
+	if !input.SendType.IsCollectiblesTransfer() && toToken == nil {
 		err = errors.CreateErrorResponseFromError(fmt.Errorf("to token not found for send type %d on chain %d", input.SendType, input.ToChainID))
 		return
 	}

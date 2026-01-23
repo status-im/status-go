@@ -94,7 +94,7 @@ func TestNFTProcessor_AvailableFor(t *testing.T) {
 
 	available, err = processor.AvailableFor(withToTokenParams)
 	require.NoError(t, err)
-	assert.False(t, available, "Should not be available when ToToken is specified")
+	assert.True(t, available, "Should be available when ToToken is specified")
 }
 
 func TestNFTProcessor_GetHandlerForContract(t *testing.T) {

@@ -97,13 +97,22 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 
 	fromAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	toAddr := common.HexToAddress("0x5678901234567890123456789012345678901234")
+	contractAddr := common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			parsed, ok := new(big.Int).SetString(tc.tokenID, 0)
+			require.True(t, ok)
+			assert.Equal(t, tc.expected, parsed)
+			collectibleTokenID := hexutil.Big(*parsed)
+
 			params := ProcessorInputParams{
-				FromToken: &tokentypes.Token{Token: &types.Token{Symbol: tc.tokenID}},
-				FromAddr:  fromAddr,
-				ToAddr:    toAddr,
+				FromToken: &tokentypes.Token{
+					Token:              &types.Token{Address: contractAddr},
+					CollectibleTokenID: &collectibleTokenID,
+				},
+				FromAddr: fromAddr,
+				ToAddr:   toAddr,
 			}
 
 			// Test safeTransferFrom
@@ -131,24 +140,33 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 	}
 
 	// Test error cases
-	errorCases := []string{"invalid_token", "", "abc123"}
-	for _, tokenID := range errorCases {
-		params := ProcessorInputParams{
-			FromToken: &tokentypes.Token{Token: &types.Token{Symbol: tokenID}},
-			FromAddr:  fromAddr,
-			ToAddr:    toAddr,
-		}
-		_, err := handler.packTxInputDataInternally(params, erc721FunctionNameSafeTransferFrom)
-		assert.Error(t, err)
-	}
-
-	// Test with invalid function name
-	validParams := ProcessorInputParams{
-		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: "123"}},
+	_, err := handler.packTxInputDataInternally(ProcessorInputParams{
+		FromToken: nil,
 		FromAddr:  fromAddr,
 		ToAddr:    toAddr,
+	}, erc721FunctionNameSafeTransferFrom)
+	assert.ErrorIs(t, err, ErrNoTokenSet)
+
+	_, err = handler.packTxInputDataInternally(ProcessorInputParams{
+		FromToken: &tokentypes.Token{Token: &types.Token{Address: contractAddr}},
+		FromAddr:  fromAddr,
+		ToAddr:    toAddr,
+	}, erc721FunctionNameSafeTransferFrom)
+	assert.ErrorIs(t, err, ErrNoTokenSet)
+
+	// Test with invalid function name
+	parsed, ok := new(big.Int).SetString("123", 0)
+	require.True(t, ok)
+	collectibleTokenID := hexutil.Big(*parsed)
+	validParams := ProcessorInputParams{
+		FromToken: &tokentypes.Token{
+			Token:              &types.Token{Address: contractAddr},
+			CollectibleTokenID: &collectibleTokenID,
+		},
+		FromAddr: fromAddr,
+		ToAddr:   toAddr,
 	}
-	_, err := handler.packTxInputDataInternally(validParams, "invalidFunction")
+	_, err = handler.packTxInputDataInternally(validParams, "invalidFunction")
 	assert.Error(t, err) // Should error because function doesn't exist in ABI
 }
 
@@ -157,15 +175,19 @@ func TestERC721Handler_Integration(t *testing.T) {
 
 	// Test complete flow for generic ERC721 transfer
 	contractAddr := common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+	parsed, ok := new(big.Int).SetString("789", 0)
+	require.True(t, ok)
+	collectibleTokenID := hexutil.Big(*parsed)
 	params := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
 		FromToken: &tokentypes.Token{Token: &types.Token{
 			Address: contractAddr,
-			Symbol:  "789",
 		}},
-		FromAddr: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-		ToAddr:   common.HexToAddress("0x5678901234567890123456789012345678901234"),
+		ToToken: nil,
 	}
+	params.FromToken.CollectibleTokenID = &collectibleTokenID
+	params.FromAddr = common.HexToAddress("0x1234567890123456789012345678901234567890")
+	params.ToAddr = common.HexToAddress("0x5678901234567890123456789012345678901234")
 
 	// 1. Verify handler can handle any contract (ERC721 is generic)
 	contractID := thirdparty.ContractID{

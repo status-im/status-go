@@ -2,16 +2,24 @@ package tokentypes
 
 import (
 	"math/big"
+	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+)
+
+const (
+	tokenKeySeparator = "-" // export this from wallet-sdk
 )
 
 type Token struct {
 	*types.Token
 
-	CommunityData *CommunityData `json:"communityData,omitempty"`
+	CollectibleTokenID *hexutil.Big   `json:"collectibleTokenID,omitempty"`
+	CommunityData      *CommunityData `json:"communityData,omitempty"`
 }
 
 // TODO: think about removing CommunityData field and fetch it when needed, that way `tokenlists.Token` can be used directly.
@@ -38,4 +46,20 @@ type TokenList struct {
 	*types.TokenList
 
 	Tokens []*Token `json:"tokens"` // tokens from the `types.TokenList` are shadowed by this field
+}
+
+func ParseCollectibleKey(tokenKey string) (chainID uint64, contractAddress common.Address, collectibleTokenID *big.Int, success bool) {
+	success = false
+
+	parts := strings.Split(tokenKey, tokenKeySeparator)
+	if len(parts) != 3 {
+		return
+	}
+	chainID, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		return
+	}
+	contractAddress = common.HexToAddress(parts[1])
+	collectibleTokenID, success = new(big.Int).SetString(parts[2], 10)
+	return
 }
