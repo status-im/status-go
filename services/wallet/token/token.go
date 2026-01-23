@@ -396,6 +396,53 @@ func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error)
 	return tm.GetTokensByChains(chainIDs)
 }
 
+// addTokensSharingCrossChainIDsToUsedTokenKeys adds all tokens that share the same cross chain id to the used tokens keys.
+func (tm *Manager) addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys map[string]interface{}, testnetMode bool) error {
+	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
+	if err != nil {
+		return err
+	}
+
+	crossChainIDs := make([]string, 0)
+	for _, token := range tokens {
+		if token.CrossChainID == "" {
+			continue
+		}
+		crossChainIDs = append(crossChainIDs, token.CrossChainID)
+	}
+
+	if len(crossChainIDs) == 0 {
+		return nil
+	}
+
+	tokensByCrossChainIDs := make(map[string][]*tokentypes.Token)
+	wsdkTokens := tm.tokensManager.UniqueTokens()
+
+	for _, token := range wsdkTokens {
+		if token.CrossChainID == "" ||
+			testnetMode && walletcommon.ChainID(token.ChainID).IsMainnet() ||
+			!testnetMode && !walletcommon.ChainID(token.ChainID).IsMainnet() {
+			continue
+		}
+		tokensByCrossChainIDs[token.CrossChainID] = append(tokensByCrossChainIDs[token.CrossChainID], &tokentypes.Token{Token: token})
+	}
+
+	for _, crossChainID := range crossChainIDs {
+		tokens, ok := tokensByCrossChainIDs[crossChainID]
+		if !ok {
+			continue
+		}
+		for _, token := range tokens {
+			if _, ok := usedTokensKeys[token.Key()]; ok {
+				continue
+			}
+			usedTokensKeys[token.Key()] = nil
+		}
+	}
+
+	return nil
+}
+
 // getTokenKeysForTokensOfInterestForActiveNetworksMode returns the token keys for the tokens of interest for the active networks mode (testnet or mainnet)
 // On top of the used tokens keys, it adds all tokens that share the same cross chain id (because of grouping) and all mandatory tokens.
 func (tm *Manager) getTokenKeysForTokensOfInterestForActiveNetworksMode() ([]string, error) {
@@ -409,17 +456,10 @@ func (tm *Manager) getTokenKeysForTokensOfInterestForActiveNetworksMode() ([]str
 		return nil, err
 	}
 
-	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
+	// Because of grouping it's important to add all tokens that share the same cross chain id to the used tokens keys.
+	err = tm.addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys, testnetMode)
 	if err != nil {
 		return nil, err
-	}
-
-	// Because of grouping it's important to add all tokens that share the same cross chain id to the used tokens keys
-	for _, token := range tokens {
-		if token.CrossChainID == "" {
-			continue
-		}
-		usedTokensKeys[token.Key()] = nil
 	}
 
 	// It's also important to add all mandatory tokens to the used tokens keys
