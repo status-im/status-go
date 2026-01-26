@@ -2,6 +2,7 @@ package token
 
 import (
 	"context"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -330,6 +331,91 @@ func Test_tokensListsValidity(t *testing.T) {
 				}
 			}
 			require.Equal(t, 1, numOfOccurrences)
+		}
+	}
+}
+
+func TestGetTokensOfInterestForActiveNetworksMode_AddsCrossChainAndMandatoryTokens(t *testing.T) {
+	manager, _, stop := setupTestTokenManager(t)
+	defer stop()
+
+	require.NoError(t, manager.Start(context.Background()))
+	defer manager.Stop()
+
+	testnetMode, err := manager.settings.GetTestNetworksEnabled()
+	require.NoError(t, err)
+	require.False(t, testnetMode)
+
+	// Cache some tokens that are not among mandatory tokens and have cross chain id
+	err = manager.CacheBalances(map[common.Address][]tokentypes.StorageToken{
+		common.HexToAddress("0x0000000000000000000000000000000000000001"): {
+			{
+				TokenAddress: common.HexToAddress("0x514910771af9ca656af840dff83e8264ecf986ca"), // chainlink
+				TokenChainID: 1,
+				RawBalance:   "1000000000000000000",
+				Balance:      big.NewFloat(1),
+				HasError:     false,
+			},
+			{
+				TokenAddress: common.HexToAddress("0x6fd9d7ad17242c41f7131d257212c54a0e816691"), // uniswap
+				TokenChainID: 10,
+				RawBalance:   "1000000000000000000",
+				Balance:      big.NewFloat(1),
+				HasError:     false,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// token keys from cache, all of them have cross chain id
+	cachedTokenKeys := []string{
+		types.TokenKey(1, common.HexToAddress("0x514910771af9ca656af840dff83e8264ecf986ca")),
+		types.TokenKey(10, common.HexToAddress("0x6fd9d7ad17242c41f7131d257212c54a0e816691")),
+	}
+
+	// mandatory token keys for the active networks mode, all of them have cross chain id
+	mandatoryTokenKeysForMode := []string{}
+	for _, tokenKey := range walletcommon.MandatoryTokens() {
+		chainID, _, ok := types.ChainAndAddressFromTokenKey(tokenKey)
+		if !ok {
+			continue
+		}
+		if walletcommon.ChainID(chainID).IsMainnet() == testnetMode {
+			continue
+		}
+		mandatoryTokenKeysForMode = append(mandatoryTokenKeysForMode, tokenKey)
+	}
+
+	tokens, err := manager.GetTokensByKeys(append(cachedTokenKeys, mandatoryTokenKeysForMode...))
+	require.NoError(t, err)
+	require.NotEmpty(t, tokens)
+	require.Equal(t, len(cachedTokenKeys)+len(mandatoryTokenKeysForMode), len(tokens))
+
+	expectedCrossChainIDs := make(map[string]int)
+	for _, token := range tokens {
+		expectedCrossChainIDs[token.CrossChainID] = 0
+	}
+
+	tokensForActiveNetworksMode, err := manager.GetTokensOfInterestForActiveNetworksMode()
+	require.NoError(t, err)
+	require.NotEmpty(t, tokensForActiveNetworksMode)
+
+	for _, token := range tokensForActiveNetworksMode {
+		_, ok := expectedCrossChainIDs[token.CrossChainID]
+		require.True(t, ok, "token with cross chain id %s is not in the expected cross chain ids", token.CrossChainID)
+		expectedCrossChainIDs[token.CrossChainID]++
+	}
+
+	const (
+		bscNativeTokenCrossChainID = "bsc-native"   // nolint: gosec
+		bscUsdcTokenCrossChainID   = "usd-coin-bsc" // nolint: gosec
+	)
+	for crossChainID, count := range expectedCrossChainIDs {
+		switch crossChainID {
+		case bscNativeTokenCrossChainID, bscUsdcTokenCrossChainID:
+			require.Equal(t, count, 1, "expected 1 token with cross chain id %s, got %d", crossChainID, count)
+		default:
+			require.Greater(t, count, 1, "expected more than 1 token with cross chain id %s, got %d", crossChainID, count)
 		}
 	}
 }

@@ -35,6 +35,10 @@ const (
 	ParaswapPartnerID = "status.app"
 )
 
+var (
+	paraswapNativeTokenAddress = common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+)
+
 func getPartnerAddressAndFeePcnt(chainID uint64) (common.Address, float64) {
 	const partnerFeePcnt = 0.7
 
@@ -134,22 +138,28 @@ func (s *SwapParaswapProcessor) CalculateFees(params ProcessorInputParams) (*big
 	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
+func getFromAndToTokenAddresses(params ProcessorInputParams) (common.Address, common.Address) {
+	fromTokenAddress := params.FromToken.Address
+	toTokenAddress := params.ToToken.Address
+	if params.FromToken.IsNative() {
+		fromTokenAddress = paraswapNativeTokenAddress
+	}
+	if params.ToToken.IsNative() {
+		toTokenAddress = paraswapNativeTokenAddress
+	}
+	return fromTokenAddress, toTokenAddress
+}
+
 func (s *SwapParaswapProcessor) fetchAndStorePriceRoute(params ProcessorInputParams) (*paraswap.Route, error) {
 	swapSide := paraswap.SellSide
 	if params.AmountOut != nil && params.AmountOut.Cmp(walletCommon.ZeroBigIntValue()) > 0 {
 		swapSide = paraswap.BuySide
 	}
 
-	// TODO: this is an extra check, we should remove it once we set the proper address for the native (ETH/BNB) token
-	if params.FromToken.IsNative() {
-		params.FromToken.Address = common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") // ETH address across all chains that we support
-	}
-	if params.ToToken.IsNative() {
-		params.ToToken.Address = common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") // ETH address across all chains that we support
-	}
+	fromTokenAddress, toTokenAddress := getFromAndToTokenAddresses(params)
 
-	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), params.FromToken.Address, params.FromToken.Decimals,
-		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr, swapSide)
+	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), fromTokenAddress, params.FromToken.Decimals,
+		toTokenAddress, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr, swapSide)
 	if err != nil {
 		return nil, createSwapParaswapErrorResponse(err)
 	}
