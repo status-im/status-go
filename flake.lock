@@ -31,7 +31,6 @@
       "locked": {
         "lastModified": 1766504822,
         "narHash": "sha256-tWVLbYoi8/xNzsbJmzMBnuc4GsB7/4oH05yCwuokKT8=",
-        "ref": "refs/heads/master",
         "rev": "fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6",
         "revCount": 76,
         "submodules": true,
