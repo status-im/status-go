@@ -44,7 +44,7 @@ func (s *ERC1155Processor) Name() string {
 }
 
 func (s *ERC1155Processor) AvailableFor(params ProcessorInputParams) (bool, error) {
-	return params.FromChain.ChainID == params.ToChain.ChainID && params.ToToken == nil, nil
+	return params.FromChain.ChainID == params.ToChain.ChainID, nil
 }
 
 func (s *ERC1155Processor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
@@ -52,12 +52,11 @@ func (s *ERC1155Processor) CalculateFees(params ProcessorInputParams) (*big.Int,
 }
 
 func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	abi, err := abi.JSON(strings.NewReader(ierc1155.Ierc1155ABI))
-	if err != nil {
-		return []byte{}, createERC1155ErrorResponse(err)
+	if params.FromToken == nil || params.FromToken.CollectibleTokenID == nil {
+		return nil, ErrNoTokenSet
 	}
 
-	id, err := walletCommon.GetTokenIdFromSymbol(params.FromToken.Symbol)
+	abi, err := abi.JSON(strings.NewReader(ierc1155.Ierc1155ABI))
 	if err != nil {
 		return []byte{}, createERC1155ErrorResponse(err)
 	}
@@ -65,7 +64,7 @@ func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte,
 	return abi.Pack("safeTransferFrom",
 		params.FromAddr,
 		params.ToAddr,
-		id,
+		params.FromToken.CollectibleTokenID.ToInt(),
 		params.AmountIn,
 		[]byte{},
 	)

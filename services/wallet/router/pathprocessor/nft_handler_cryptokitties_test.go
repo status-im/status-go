@@ -56,9 +56,16 @@ func TestCryptoKittiesHandler_Comprehensive(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		parsed, ok := new(big.Int).SetString(tc.tokenID, 0)
+		require.True(t, ok)
+		hb := hexutil.Big(*parsed)
+
 		params := ProcessorInputParams{
-			FromToken: &tokentypes.Token{Token: &types.Token{Symbol: tc.tokenID}},
-			ToAddr:    toAddr,
+			FromToken: &tokentypes.Token{
+				Token:              &types.Token{Symbol: "CK"},
+				CollectibleTokenID: &hb,
+			},
+			ToAddr: toAddr,
 		}
 		data, err := handler.PackTxInputData(params)
 		require.NoError(t, err)
@@ -71,15 +78,17 @@ func TestCryptoKittiesHandler_Comprehensive(t *testing.T) {
 	}
 
 	// Test PackTxInputData - error cases
-	errorCases := []string{"invalid_token", "", "abc123"}
-	for _, tokenID := range errorCases {
-		params := ProcessorInputParams{
-			FromToken: &tokentypes.Token{Token: &types.Token{Symbol: tokenID}},
-			ToAddr:    toAddr,
-		}
-		_, err := handler.PackTxInputData(params)
-		assert.Error(t, err)
-	}
+	_, err = handler.PackTxInputData(ProcessorInputParams{
+		FromToken: nil,
+		ToAddr:    toAddr,
+	})
+	assert.ErrorIs(t, err, ErrNoTokenSet)
+
+	_, err = handler.PackTxInputData(ProcessorInputParams{
+		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: "CK"}},
+		ToAddr:    toAddr,
+	})
+	assert.ErrorIs(t, err, ErrNoTokenSet)
 }
 
 func TestCryptoKittiesHandler_WithMocks(t *testing.T) {

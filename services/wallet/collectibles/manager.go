@@ -929,6 +929,18 @@ func (o *Manager) processCollectionData(_ context.Context, collections []thirdpa
 	return o.collectionsDataDB.SetData(collections, true)
 }
 
+func (o *Manager) GetCacheCollectibleData(uniqueID thirdparty.CollectibleUniqueID) (*thirdparty.CollectibleData, error) {
+	collectibleData, err := o.collectiblesDataDB.GetData([]thirdparty.CollectibleUniqueID{uniqueID})
+	if err != nil {
+		return nil, err
+	}
+	data, ok := collectibleData[uniqueID.HashKey()]
+	if !ok {
+		return nil, errors.New("collectible data not found")
+	}
+	return &data, nil
+}
+
 func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	ret := make([]thirdparty.FullCollectibleData, 0, len(uniqueIDs))
 

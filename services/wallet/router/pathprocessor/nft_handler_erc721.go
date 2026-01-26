@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/internal/contracts/erc721"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -54,12 +53,11 @@ func (h *ERC721Handler) PackTxInputData(params ProcessorInputParams) ([]byte, er
 }
 
 func (h *ERC721Handler) packTxInputDataInternally(params ProcessorInputParams, functionName string) ([]byte, error) {
-	abi, err := abi.JSON(strings.NewReader(erc721.Erc721MetaData.ABI))
-	if err != nil {
-		return []byte{}, err
+	if params.FromToken == nil || params.FromToken.CollectibleTokenID == nil {
+		return nil, ErrNoTokenSet
 	}
 
-	id, err := walletCommon.GetTokenIdFromSymbol(params.FromToken.Symbol)
+	abi, err := abi.JSON(strings.NewReader(erc721.Erc721MetaData.ABI))
 	if err != nil {
 		return []byte{}, err
 	}
@@ -67,7 +65,7 @@ func (h *ERC721Handler) packTxInputDataInternally(params ProcessorInputParams, f
 	return abi.Pack(functionName,
 		params.FromAddr,
 		params.ToAddr,
-		id,
+		params.FromToken.CollectibleTokenID.ToInt(),
 	)
 }
 

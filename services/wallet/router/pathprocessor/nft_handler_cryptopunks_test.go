@@ -43,9 +43,15 @@ func TestCryptoPunksHandler_Comprehensive(t *testing.T) {
 	assert.Equal(t, CryptoPunksContractID.Address, address)
 
 	// Test PackTxInputData - valid case
+	parsed, ok := new(big.Int).SetString("123", 0)
+	require.True(t, ok)
+	hb := hexutil.Big(*parsed)
 	validParams := ProcessorInputParams{
-		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: "123"}},
-		ToAddr:    common.HexToAddress("0x5678901234567890123456789012345678901234"),
+		FromToken: &tokentypes.Token{
+			Token:              &types.Token{Symbol: "PUNK"},
+			CollectibleTokenID: &hb,
+		},
+		ToAddr: common.HexToAddress("0x5678901234567890123456789012345678901234"),
 	}
 	data, err := handler.PackTxInputData(validParams)
 	require.NoError(t, err)
@@ -58,16 +64,16 @@ func TestCryptoPunksHandler_Comprehensive(t *testing.T) {
 
 	// Test PackTxInputData - error cases
 	_, err = handler.PackTxInputData(ProcessorInputParams{
-		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: "invalid"}},
+		FromToken: nil,
 		ToAddr:    validParams.ToAddr,
 	})
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrNoTokenSet)
 
 	_, err = handler.PackTxInputData(ProcessorInputParams{
-		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: ""}},
+		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: "PUNK"}},
 		ToAddr:    validParams.ToAddr,
 	})
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrNoTokenSet)
 }
 
 func TestCryptoPunksHandler_WithMocks(t *testing.T) {

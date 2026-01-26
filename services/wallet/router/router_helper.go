@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math/big"
 	"slices"
-	"strings"
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
@@ -111,9 +111,8 @@ func CalculateL1Fee(chainID uint64, data []byte, ethClient ethclient.EthClientIn
 }
 
 func (r *Router) getERC1155Balance(ctx context.Context, chainID uint64, token *tokentypes.Token, account common.Address) (*big.Int, error) {
-	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
-	if !success {
-		return nil, errors.New("failed to convert token symbol to big.Int")
+	if token == nil || token.CollectibleTokenID == nil {
+		return nil, errors.New("token or token ID is nil")
 	}
 
 	balances, err := r.collectiblesManager.FetchERC1155Balances(
@@ -121,7 +120,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, chainID uint64, token *t
 		account,
 		walletCommon.ChainID(chainID),
 		token.Address,
-		[]*bigint.BigInt{&bigint.BigInt{Int: tokenID}},
+		[]*bigint.BigInt{&bigint.BigInt{Int: token.CollectibleTokenID.ToInt()}},
 	)
 	if err != nil {
 		return nil, err
@@ -458,20 +457,8 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	return
 }
 
-func ParseCollectibleID(tokenKey string) (contractAddress common.Address, tokenID *big.Int, success bool) {
-	success = false
-
-	parts := strings.Split(tokenKey, ":")
-	if len(parts) != 2 {
-		return
-	}
-	contractAddress = common.HexToAddress(parts[0])
-	tokenID, success = new(big.Int).SetString(parts[1], 10)
-	return
-}
-
-func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibles *collectibles.Service,
-	account common.Address, chainID uint64, tokenKey string) *tokentypes.Token {
+func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectiblesManager *collectibles.Manager,
+	tokenKey string) *tokentypes.Token {
 	if !sendType.IsCollectiblesTransfer() {
 		token, err := tokenManager.GetTokenByKey(tokenKey)
 		if err != nil {
@@ -485,22 +472,30 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 		return nil
 	}
 
-	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenKey)
+	chainID, contractAddress, collectibleTokenID, success := tokentypes.ParseCollectibleKey(tokenKey)
 	if !success {
 		return nil
 	}
-	uniqueID, err := collectibles.GetOwnedCollectible(walletCommon.ChainID(chainID), account, contractAddress, collectibleTokenID)
-	if err != nil || uniqueID == nil {
+
+	collectibleData, err := collectiblesManager.GetCacheCollectibleData(thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: walletCommon.ChainID(chainID),
+			Address: contractAddress,
+		},
+		TokenID: &bigint.BigInt{Int: collectibleTokenID},
+	})
+	if err != nil {
 		return nil
 	}
 
 	return &tokentypes.Token{
 		Token: &types.Token{
 			Address:  contractAddress,
-			Symbol:   collectibleTokenID.String(),
 			Decimals: 0,
 			ChainID:  chainID,
+			Name:     collectibleData.Name,
 		},
+		CollectibleTokenID: (*hexutil.Big)(collectibleTokenID),
 	}
 }
 
