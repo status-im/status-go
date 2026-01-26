@@ -14,17 +14,12 @@ import (
 )
 
 func HexToPbHash(hexHash bindings.MessageHash) (pb.MessageHash, error) {
-	bytesHash, err := hexHash.Bytes()
-	if err != nil {
-		return pb.MessageHash{}, err
-	}
-
-	pbHash := pb.ToMessageHash(bytesHash)
+	pbHash := pb.ToMessageHash(hexHash.Bytes())
 	return pbHash, nil
 }
 
 func PbToHexHash(pbHash pb.MessageHash) (bindings.MessageHash, error) {
-	return bindings.ToMessageHash(pbHash.String())
+	return bindings.ToMessageHashFromStringFormat(pbHash.String())
 }
 
 func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*bindings.StoreQueryRequest, error) {
@@ -68,10 +63,7 @@ func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*bindi
 
 func BindingsToPbStoreResponse(bindingsStoreResponse *bindings.StoreQueryResponse) (*storepb.StoreQueryResponse, error) {
 
-	paginationCursor, err := bindingsStoreResponse.PaginationCursor.Bytes()
-	if err != nil {
-		return nil, err
-	}
+	paginationCursor := bindingsStoreResponse.PaginationCursor.Bytes()
 
 	pbQueryResponse := storepb.StoreQueryResponse{
 		RequestId:        bindingsStoreResponse.RequestId,
@@ -88,11 +80,7 @@ func BindingsToPbStoreResponse(bindingsStoreResponse *bindings.StoreQueryRespons
 
 	for _, message := range *bindingsStoreResponse.Messages {
 
-		msgHash, err := message.MessageHash.Bytes()
-
-		if err != nil {
-			return nil, err
-		}
+		msgHash := message.MessageHash.Bytes()
 
 		var pbMessage storepb.WakuMessageKeyValue
 		if message.WakuMessage == nil {
@@ -137,7 +125,18 @@ func BindingsToCommonEnvelope(bindingsEnv bindings.Envelope) (common.Envelope, e
 		return nil, err
 	}
 
-	env := common.NewWakuEnvelope(bindingsEnv.Message(), bindingsEnv.PubsubTopic(), hash)
+	// Temporary conversion between bindings WakuMessage and go-waku WakuMessage
+	goWakuMessage := &pb.WakuMessage{
+		Payload:        bindingsEnv.Message().Payload,
+		ContentTopic:   bindingsEnv.Message().ContentTopic,
+		Version:        bindingsEnv.Message().Version,
+		Timestamp:      bindingsEnv.Message().Timestamp,
+		Meta:           bindingsEnv.Message().Meta,
+		Ephemeral:      bindingsEnv.Message().Ephemeral,
+		RateLimitProof: bindingsEnv.Message().RateLimitProof,
+	}
+
+	env := common.NewWakuEnvelope(goWakuMessage, bindingsEnv.PubsubTopic(), hash)
 
 	return env, nil
 }
