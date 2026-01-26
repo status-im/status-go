@@ -1,3 +1,7 @@
+import asyncio
+import time
+from uuid import uuid4
+
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 from utils import fake
@@ -110,3 +114,209 @@ class AsyncMessengerSteps:
         response = wakuext.create_community(fake.community_name(), fake.community_description())
         self.community_id = response.get("communities", [{}])[0].get("id")
         return self.community_id
+
+    def fetch_community(self, node, community_id: str = "") -> dict:
+        """Fetch community info.
+
+        This is a sync RPC call, no async needed.
+        """
+        if not community_id:
+            community_id = self.community_id
+        wakuext = getattr(node, "wakuext_service", None)
+        if wakuext is None and hasattr(node, "backend"):
+            wakuext = node.backend.wakuext_service
+        if wakuext is None:
+            raise ValueError("Node must have wakuext_service attribute")
+        return wakuext.fetch_community(community_id)
+
+    async def join_private_group(self, admin, member) -> str:
+        """Create a private group and wait for member to receive the signal.
+
+        Returns:
+            str: The private group chat ID
+        """
+        private_group_name = f"private_group_{uuid4()}"
+        response = admin.wakuext_service.create_group_chat_with_members([member.public_key], private_group_name)
+        expected_group_creation_msg = f"@{admin.public_key} created the group {private_group_name}"
+        expected_message = self.get_message_by_content_type(
+            response,
+            content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+            message_pattern=expected_group_creation_msg,
+        )[0]
+        await member.wait_for_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, check_buffer=True)
+        return response.get("chats", [])[0].get("id")
+
+    async def _wait_for_community_sync(self, node, community_id: str, timeout: float = 60.0) -> dict:
+        """Wait for a node to have the community available locally.
+
+        Uses spectate_community to subscribe to the community first,
+        then polls fetch_community until data is available.
+
+        Args:
+            node: The node to check
+            community_id: The community ID to wait for
+            timeout: Maximum time to wait in seconds
+
+        Returns:
+            dict: The community data once available
+
+        Raises:
+            TimeoutError: If community not available within timeout
+        """
+        wakuext = getattr(node, "wakuext_service", None)
+        if wakuext is None and hasattr(node, "backend"):
+            wakuext = node.backend.wakuext_service
+
+        # Try to spectate the community first (subscribes node to community updates)
+        if wakuext:
+            try:
+                wakuext.spectate_community(community_id)
+            except Exception:
+                pass  # Spectate may fail if already spectating or is owner
+
+        deadline = time.monotonic() + timeout
+        last_error = None
+
+        while time.monotonic() < deadline:
+            try:
+                result = self.fetch_community(node, community_id)
+                if result and result.get("id"):
+                    return result
+            except Exception as e:
+                last_error = e
+
+            await asyncio.sleep(3.0)  # Longer delay to allow Waku network sync
+
+        raise TimeoutError(f"Node failed to sync community {community_id} within {timeout}s. " f"Last error: {last_error}")
+
+    async def join_community(self, member, admin) -> str:
+        """Join member to community created by admin.
+
+        Returns:
+            str: The community chat ID (community_id + chat_id)
+        """
+        # Wait for both nodes to have the community synced locally
+        await self._wait_for_community_sync(admin, self.community_id, timeout=30)
+        await self._wait_for_community_sync(member, self.community_id, timeout=30)
+
+        response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
+        join_req = (response_to_join.get("requestsToJoinCommunity") or [{}])[0]
+        join_id = join_req.get("id")
+        join_state = join_req.get("state")
+        assert join_id, f"Failed to request to join community: {response_to_join}"
+
+        def _pick_chat_id(chats: dict) -> str | None:
+            if not chats:
+                return None
+            try:
+                items = list(chats.items())
+                items.sort(key=lambda kv: (kv[1] or {}).get("position", 1_000_000))
+                for key, value in items:
+                    if isinstance(value, dict):
+                        chat_id = value.get("id") or key
+                    else:
+                        chat_id = key
+                    if chat_id:
+                        return chat_id
+                return items[0][0] if items else None
+            except Exception:
+                return next(iter(chats.keys()), None)
+
+        def _is_accepted(state) -> bool:
+            return state == 3 or str(state) == "3"
+
+        deadline = time.monotonic() + 60
+        last_accept_attempt_at = 0.0
+        accepted_seen = False
+
+        while time.monotonic() < deadline:
+            # Check if already accepted
+            if not accepted_seen:
+                if join_state is not None and _is_accepted(join_state):
+                    accepted_seen = True
+                try:
+                    last_member_latest = member.wakuext_service.latest_request_to_join_for_community(self.community_id)
+                    if last_member_latest and last_member_latest.get("id") == join_id:
+                        if _is_accepted(last_member_latest.get("state")):
+                            accepted_seen = True
+                except Exception:
+                    pass
+
+            # Admin accept if needed
+            if not accepted_seen and not _is_accepted(join_state):
+                admin_observed_ids: set[str] = set()
+                try:
+                    last_pending = admin.wakuext_service.pending_requests_to_join_for_community(self.community_id) or []
+                    admin_observed_ids.update([r.get("id") for r in last_pending if r.get("id")])
+                except Exception:
+                    pass
+                try:
+                    last_latest_admin = admin.wakuext_service.latest_request_to_join_for_community(self.community_id)
+                    if last_latest_admin and last_latest_admin.get("id"):
+                        admin_observed_ids.add(last_latest_admin.get("id"))
+                except Exception:
+                    pass
+                try:
+                    all_non_approved = admin.wakuext_service.all_non_approved_communities_requests_to_join() or []
+                    for r in all_non_approved:
+                        if r.get("communityId") == self.community_id and r.get("id"):
+                            admin_observed_ids.add(r.get("id"))
+                except Exception:
+                    pass
+
+                accept_id: str | None = None
+                if join_id and join_id in admin_observed_ids:
+                    accept_id = join_id
+                elif len(admin_observed_ids) == 1:
+                    accept_id = next(iter(admin_observed_ids))
+
+                if accept_id and (time.monotonic() - last_accept_attempt_at) >= 2.0:
+                    try:
+                        accept_resp = admin.wakuext_service.accept_request_to_join_community(accept_id)
+                        if accept_resp and _is_accepted((accept_resp.get("requestsToJoinCommunity") or [{}])[0].get("state")):
+                            accepted_seen = True
+                            join_state = 3
+                            if accept_id != join_id:
+                                join_id = accept_id
+                    except Exception:
+                        pass
+                    finally:
+                        last_accept_attempt_at = time.monotonic()
+
+            # Check completion
+            try:
+                last_member_comm = member.wakuext_service.fetch_community(self.community_id)
+                is_joined = last_member_comm and (last_member_comm.get("joined") is True or last_member_comm.get("isMember") is True)
+                chats = (last_member_comm.get("chats") or {}) if last_member_comm else {}
+                chat_id = _pick_chat_id(chats)
+                if chat_id:
+                    if is_joined:
+                        return self.community_id + chat_id
+                    if accepted_seen:
+                        try:
+                            resp = member.wakuext_service.chat_messages(self.community_id + chat_id, limit=1)
+                            if resp is not None and "messages" in resp:
+                                return self.community_id + chat_id
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            await asyncio.sleep(0.5)
+
+        raise Exception(f"Failed to join community within timeout. community_id={self.community_id}, join_id={join_id}")
+
+    def send_multiple_one_to_one_messages(self, message_count: int, sender, receiver) -> tuple[list[str], list[dict]]:
+        """Send multiple one-to-one messages.
+
+        Returns:
+            tuple: (list of sent texts, list of responses)
+        """
+        sent_texts = []
+        responses = []
+        for i in range(message_count):
+            message_text = f"test_message_{i}_{uuid4()}"
+            sent_texts.append(message_text)
+            response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
+            responses.append(response)
+        return sent_texts, responses

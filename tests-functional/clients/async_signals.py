@@ -162,6 +162,7 @@ class SignalRouter:
         pattern: Optional[str] = None,
         timeout: float = 30.0,
         check_buffer: bool = False,  # Default False to avoid O(N) buffer scan
+        after_seq: Optional[int] = None,  # Only match signals with seq > after_seq
     ) -> Signal:
         """
         Wait for a signal matching the criteria.
@@ -179,6 +180,9 @@ class SignalRouter:
                 Default is False for performance - use True only when you need
                 to find signals that may have arrived before calling wait_for()
                 (e.g., startup signals like NODE_LOGIN).
+            after_seq: If provided, only match signals with seq > after_seq.
+                Used by wait_for_sequence to preserve ordering when signals
+                arrive faster than sequential processing.
 
         Returns:
             Matching Signal
@@ -186,10 +190,11 @@ class SignalRouter:
         Raises:
             asyncio.TimeoutError: If no matching signal within timeout
         """
-        logging.debug(f"[SignalRouter] Waiting for signal: type={signal_type}, pattern={pattern}, timeout={timeout}")
+        logging.debug(f"[SignalRouter] Waiting for signal: type={signal_type}, pattern={pattern}, timeout={timeout}, after_seq={after_seq}")
 
-        # Build predicate from pattern if provided
-        if pattern and not predicate:
+        # Build combined predicate from pattern and after_seq
+        user_predicate = predicate
+        if pattern and not user_predicate:
 
             def pattern_predicate(s: Signal) -> bool:
                 # Use cached raw_json for O(1) lookup instead of O(n) json.dumps
@@ -197,19 +202,41 @@ class SignalRouter:
                     return pattern in s.raw_json
                 return pattern in json.dumps(s.raw)
 
-            predicate = pattern_predicate
+            user_predicate = pattern_predicate
+
+        # Wrap predicate to include after_seq filtering
+        if after_seq is not None:
+            original_predicate = user_predicate
+
+            def seq_predicate(s: Signal) -> bool:
+                if s.seq <= after_seq:
+                    return False
+                if original_predicate:
+                    return original_predicate(s)
+                return True
+
+            final_predicate = seq_predicate
+        else:
+            final_predicate = user_predicate
 
         matcher = SignalMatcher(
             signal_type=signal_type,
-            predicate=predicate,
+            predicate=final_predicate,
         )
 
         async with self._lock:
             # Check buffer first (for late waiters)
             if check_buffer:
-                for signal in reversed(self._buffer):
-                    if matcher.matches(signal):
-                        return signal
+                # When after_seq is set, we need the earliest matching signal (forward scan)
+                # Otherwise, for backwards compatibility, return most recent match (reverse scan)
+                if after_seq is not None:
+                    for signal in self._buffer:
+                        if matcher.matches(signal):
+                            return signal
+                else:
+                    for signal in reversed(self._buffer):
+                        if matcher.matches(signal):
+                            return signal
 
             # Register waiter
             loop = asyncio.get_running_loop()
@@ -243,6 +270,11 @@ class SignalRouter:
 
         Useful for multi-step operations producing multiple signals.
 
+        This method handles the case where signals arrive faster than
+        sequential processing by:
+        1. Checking the buffer for signals that already arrived
+        2. Using after_seq to ensure proper ordering (seq N+1 > seq N)
+
         Args:
             signal_types: List of signal types to expect in sequence
             timeout: Maximum time to wait for ALL signals
@@ -255,6 +287,7 @@ class SignalRouter:
         """
         results: list[Signal] = []
         deadline = time.time() + timeout
+        last_seq = 0  # Track sequence number for ordering
 
         for signal_type in signal_types:
             remaining = deadline - time.time()
@@ -264,8 +297,10 @@ class SignalRouter:
             signal = await self.wait_for(
                 signal_type,
                 timeout=remaining,
-                check_buffer=False,  # Only match signals after previous
+                check_buffer=True,  # Check buffer for signals that arrived before wait
+                after_seq=last_seq,  # Only match signals after the previous one
             )
+            last_seq = signal.seq
             results.append(signal)
 
         return results

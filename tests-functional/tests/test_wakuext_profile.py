@@ -1,38 +1,39 @@
 import logging
 import pytest
 from clients.signals import SignalType
-from steps.messenger import MessengerSteps
+from steps.async_messenger import AsyncMessengerSteps
 
 
+@pytest.mark.asyncio
 class TestProfile:
 
-    @pytest.fixture()
-    def rpc_client(self, backend_new_profile):
-        return backend_new_profile("rpc-client-backend")
+    @pytest.fixture
+    async def rpc_client(self, async_backend_new_profile):
+        return await async_backend_new_profile("rpc-client-backend")
 
-    def test_set_display_name(self, rpc_client):
+    async def test_set_display_name(self, rpc_client):
         rpc_client.wakuext_service.set_display_name("new valid username")
-        result = rpc_client.settings_service.get_settings()
+        result = rpc_client.backend.settings_service.get_settings()
         assert result.get("display-name") == "new valid username"
 
-    def test_set_bio(self, rpc_client):
+    async def test_set_bio(self, rpc_client):
         rpc_client.wakuext_service.set_bio("some valid bio")
-        result = rpc_client.settings_service.get_settings()
+        result = rpc_client.backend.settings_service.get_settings()
         assert result.get("bio") == "some valid bio"
 
-    def test_set_customization_color(self, rpc_client):
+    async def test_set_customization_color(self, rpc_client):
         result = rpc_client.wakuext_service.set_customization_color("magenta", "0xea42dd9a4e668b0b76c7a5210ca81576d51cd19cdd0f6a0c22196219dc423f29")
         assert result is None
 
-    def test_set_user_status(self, rpc_client):
+    async def test_set_user_status(self, rpc_client):
         status_type = 3
         status_text = "test"
         rpc_client.wakuext_service.set_user_status(status_type, status_text)
-        result = rpc_client.settings_service.get_settings()
+        result = rpc_client.backend.settings_service.get_settings()
         assert result.get("current-user-status").get("statusType") == status_type
         assert result.get("current-user-status").get("text") == status_text
 
-    def test_set_syncing_on_mobile_network(self, rpc_client):
+    async def test_set_syncing_on_mobile_network(self, rpc_client):
         rpc_client.wakuext_service.set_syncing_on_mobile_network(False)
 
     @pytest.mark.parametrize(
@@ -55,15 +56,15 @@ class TestProfile:
             ),  # obsolete from v1
         ],
     )
-    def test_settings_(self, rpc_client, setting_name, default_value, changed_value):
+    async def test_settings_(self, rpc_client, setting_name, default_value, changed_value):
         logging.info("Step: check that %s is %s by default " % (setting_name, default_value))
-        response = rpc_client.settings_service.get_settings()
+        response = rpc_client.backend.settings_service.get_settings()
         assert response[setting_name] == default_value
 
         logging.info("Step: change %s to %s and check it is updated" % (setting_name, changed_value))
         # settings_saveSetting -> settings_service.saveSetting
-        rpc_client.settings_service.save_setting(setting_name, changed_value)
-        response = rpc_client.settings_service.get_settings()
+        rpc_client.backend.settings_service.save_setting(setting_name, changed_value)
+        response = rpc_client.backend.settings_service.get_settings()
         assert response[setting_name] == changed_value
 
     # tests for `omitempty` params that are set to False or nil by default
@@ -88,15 +89,15 @@ class TestProfile:
             ("collectible-group-by-community?", True),
         ],
     )
-    def test_omitempty_false_(self, rpc_client, setting_name, set_value):
+    async def test_omitempty_false_(self, rpc_client, setting_name, set_value):
         logging.info("Step: assert that %s is not retrieved in settings before setting" % setting_name)
-        response = rpc_client.settings_service.get_settings()
+        response = rpc_client.backend.settings_service.get_settings()
         assert setting_name not in response
 
         logging.info("Step: change %s to %s and check it is updated" % (setting_name, set_value))
         # settings_saveSetting -> settings_service.saveSetting
-        rpc_client.settings_service.save_setting(setting_name, set_value)
-        response = rpc_client.settings_service.get_settings()
+        rpc_client.backend.settings_service.save_setting(setting_name, set_value)
+        response = rpc_client.backend.settings_service.get_settings()
         assert response[setting_name] == set_value
 
     # tests for `omitempty` params that are not nil by default
@@ -112,31 +113,32 @@ class TestProfile:
             ("url-unfurling-mode", 0),
         ],
     )
-    def test_omitempty_true_(self, rpc_client, setting_name, set_value):
+    async def test_omitempty_true_(self, rpc_client, setting_name, set_value):
         logging.info("Step: assert that %s is  retrieved in settings before unsetting" % setting_name)
-        response = rpc_client.settings_service.get_settings()
+        response = rpc_client.backend.settings_service.get_settings()
         assert setting_name in response
 
         logging.info("Step: change %s to %s and check it is updated and does not retrieve anymore" % (setting_name, set_value))
         # settings_saveSetting -> settings_service.saveSetting
-        rpc_client.settings_service.save_setting(setting_name, set_value)
-        response = rpc_client.settings_service.get_settings()
+        rpc_client.backend.settings_service.save_setting(setting_name, set_value)
+        response = rpc_client.backend.settings_service.get_settings()
         assert setting_name not in response
 
 
 @pytest.mark.rpc
-class TestUserStatus(MessengerSteps):
+@pytest.mark.asyncio
+class TestUserStatus(AsyncMessengerSteps):
 
-    @pytest.fixture()
-    def sender(self, backend_new_profile):
-        return backend_new_profile("sender")
+    @pytest.fixture
+    async def sender(self, async_backend_new_profile):
+        return await async_backend_new_profile("sender")
 
-    @pytest.fixture()
-    def receiver(self, backend_new_profile):
-        return backend_new_profile("receiver")
+    @pytest.fixture
+    async def receiver(self, async_backend_new_profile):
+        return await async_backend_new_profile("receiver")
 
-    def test_status_updates(self, sender, receiver):
-        self.make_contacts(sender=sender, receiver=receiver)
+    async def test_status_updates(self, sender, receiver):
+        await self.make_contacts(sender=sender, receiver=receiver)
 
         statuses = [[1, "text_1"], [2, "text_2"], [3, "text_3"], [4, "text_4"]]
 
@@ -144,8 +146,7 @@ class TestUserStatus(MessengerSteps):
             response = sender.wakuext_service.set_user_status(new_status, custom_text)
             # TODO: Add more assertions on response
 
-            with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=custom_text, timeout=10):
-                pass
+            await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=custom_text, timeout=10, check_buffer=True)
 
             response = receiver.wakuext_service.status_updates()
             # TODO: Add more assertions on response

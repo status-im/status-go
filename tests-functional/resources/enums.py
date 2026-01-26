@@ -54,3 +54,10 @@ class RequestToJoinState(Enum):
     RequestToJoinStateDeclined = 2
     RequestToJoinStateAccepted = 3
     RequestToJoinStateCanceled = 4
+
+
+class ContactVerificationState(Enum):
+    Pending = 1
+    Accepted = 2
+    Declined = 3
+    Canceled = 4

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from clients.async_signals import AsyncSignalClient, Signal, SignalRouter
 from clients.signals import SignalType
+from resources.enums import ContactVerificationState
 
 if TYPE_CHECKING:
     from clients.status_backend import StatusBackend
@@ -111,6 +112,7 @@ class AsyncStatusBackend:
         predicate: Optional[Callable[[Signal], bool]] = None,
         timeout: float = 30.0,
         check_buffer: bool = False,  # Default False to avoid O(N) buffer scan
+        after_seq: Optional[int] = None,  # Only match signals with seq > after_seq
     ) -> Signal:
         """
         Wait for a signal.
@@ -123,6 +125,8 @@ class AsyncStatusBackend:
             check_buffer: If True, check buffered signals first (O(N) scan).
                 Default is False for performance - use True only when you need
                 to find signals that may have arrived before calling wait_for_signal().
+            after_seq: If provided, only match signals with seq > after_seq.
+                Used to skip signals that have already been processed.
 
         Returns:
             Signal that matched criteria
@@ -133,6 +137,7 @@ class AsyncStatusBackend:
             predicate=predicate,
             timeout=timeout,
             check_buffer=check_buffer,
+            after_seq=after_seq,
         )
 
     async def wait_for_signals_sequence(
@@ -142,6 +147,34 @@ class AsyncStatusBackend:
     ) -> list[Signal]:
         """Wait for a sequence of signals in order."""
         return await self._router.wait_for_sequence(signal_types, timeout=timeout)
+
+    async def wait_for_verification_status(
+        self,
+        challenge: str,
+        status: ContactVerificationState,
+        timeout: float = 10.0,
+    ) -> Signal:
+        """Wait for a verification request with specific challenge and status.
+
+        Args:
+            challenge: The verification challenge string to match
+            status: Expected verification status
+            timeout: Timeout in seconds
+
+        Returns:
+            Signal containing the matching verification request
+        """
+
+        def predicate(s: Signal) -> bool:
+            reqs = s.raw.get("event", {}).get("verificationRequests") or []
+            return any(r.get("challenge") == challenge and r.get("verification_status") == status.value for r in reqs)
+
+        return await self.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=predicate,
+            timeout=timeout,
+            check_buffer=True,
+        )
 
     async def wait_for_login(self, timeout: float = 60.0) -> dict:
         """Wait until the backend has completed login.
