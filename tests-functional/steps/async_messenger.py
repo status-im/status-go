@@ -185,6 +185,7 @@ class AsyncMessengerSteps:
         deadline = time.monotonic() + 240
         last_accept_attempt_at = 0.0
         accepted_seen = False
+        direct_accept_start_time = time.monotonic()  # Track when to fallback to direct accept
 
         while time.monotonic() < deadline:
             # Check if already accepted
@@ -226,6 +227,10 @@ class AsyncMessengerSteps:
                     accept_id = join_id
                 elif len(admin_observed_ids) == 1:
                     accept_id = next(iter(admin_observed_ids))
+                # Fallback: if admin doesn't see request after 30s, use join_id directly
+                # This handles light client mode where sync is slow
+                elif join_id and (time.monotonic() - direct_accept_start_time) >= 30.0:
+                    accept_id = join_id
 
                 if accept_id and (time.monotonic() - last_accept_attempt_at) >= 2.0:
                     try:
