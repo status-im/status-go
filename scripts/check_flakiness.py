@@ -6,7 +6,7 @@ import concurrent.futures
 import time
 
 def run_single_test(package_name, test_name, suite_test_name, log_dir, timeout, iteration):
-    cmd = ["go", "test", package_name, "-tags=gowaku_skip_migrations,gowaku_no_rln", "-count=1", f"-timeout={timeout}s"]
+    cmd = ["go", "test", package_name, "-tags='gowaku_skip_migrations gowaku_no_rln'", "-count=1", f"-timeout={timeout}s"]
     if test_name:
         cmd.extend(["-run", f"^{test_name}$"])
     if suite_test_name:
