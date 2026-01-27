@@ -343,6 +343,15 @@ statusgo-c-bindings:
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
 	go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= build/bin
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= build/bin/libstatus.h
+statusgo-stub-bindings:
+	@## Generate stub bindings based on libstatus.h
+	mkdir -p $(STATUS_GO_STUB_BINDINGS_OUT)
+	go run ./tools/generate-stub-bindings \
+		--header $(STATUS_GO_STUB_BINDINGS_HEADER) \
+		--out-dir $(STATUS_GO_STUB_BINDINGS_OUT)
+
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate

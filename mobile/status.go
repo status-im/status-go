@@ -308,6 +308,37 @@ func getNodeConfig() string {
 	return string(respJSON)
 }
 
+func GetActiveAccount() string {
+	return callWithResponse(getActiveAccount)
+}
+
+func getActiveAccount() string {
+	acc, err := statusBackend.GetActiveAccount()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(acc)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
+func KeyUID() string {
+	return callWithResponse(keyUID)
+}
+
+func keyUID() string {
+	respJSON, err := json.Marshal(&APIKeyUIDResponse{KeyUID: statusBackend.KeyUID()})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
 func CallRPC(inputJSON string) string {
 	return callRPC(inputJSON)
 }
