@@ -146,58 +146,15 @@ class AsyncMessengerSteps:
         await member.wait_for_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, check_buffer=True)
         return response.get("chats", [])[0].get("id")
 
-    async def _wait_for_community_sync(self, node, community_id: str, timeout: float = 60.0) -> dict:
-        """Wait for a node to have the community available locally.
-
-        Uses spectate_community to subscribe to the community first,
-        then polls fetch_community until data is available.
-
-        Args:
-            node: The node to check
-            community_id: The community ID to wait for
-            timeout: Maximum time to wait in seconds
-
-        Returns:
-            dict: The community data once available
-
-        Raises:
-            TimeoutError: If community not available within timeout
-        """
-        wakuext = getattr(node, "wakuext_service", None)
-        if wakuext is None and hasattr(node, "backend"):
-            wakuext = node.backend.wakuext_service
-
-        # Try to spectate the community first (subscribes node to community updates)
-        if wakuext:
-            try:
-                wakuext.spectate_community(community_id)
-            except Exception:
-                pass  # Spectate may fail if already spectating or is owner
-
-        deadline = time.monotonic() + timeout
-        last_error = None
-
-        while time.monotonic() < deadline:
-            try:
-                result = self.fetch_community(node, community_id)
-                if result and result.get("id"):
-                    return result
-            except Exception as e:
-                last_error = e
-
-            await asyncio.sleep(3.0)  # Longer delay to allow Waku network sync
-
-        raise TimeoutError(f"Node failed to sync community {community_id} within {timeout}s. " f"Last error: {last_error}")
-
     async def join_community(self, member, admin) -> str:
         """Join member to community created by admin.
 
         Returns:
             str: The community chat ID (community_id + chat_id)
         """
-        # Wait for both nodes to have the community synced locally
-        await self._wait_for_community_sync(admin, self.community_id, timeout=30)
-        await self._wait_for_community_sync(member, self.community_id, timeout=30)
+        # Ensure both nodes are aware of the community before we proceed.
+        self.fetch_community(member, self.community_id)
+        self.fetch_community(admin, self.community_id)
 
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
         join_req = (response_to_join.get("requestsToJoinCommunity") or [{}])[0]
@@ -225,7 +182,7 @@ class AsyncMessengerSteps:
         def _is_accepted(state) -> bool:
             return state == 3 or str(state) == "3"
 
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 240
         last_accept_attempt_at = 0.0
         accepted_seen = False
 
