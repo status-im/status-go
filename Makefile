@@ -99,7 +99,7 @@ BUILD_TAGS ?= gowaku_no_rln
 
 ifeq ($(USE_NWAKU), true)
     BUILD_TAGS += use_nwaku
-    NWAKU_VERSION ?= v0.37.0-rc.3
+    NWAKU_VERSION ?= backport/nix/drop-android-sdk-assert
     NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
     LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIB_EXT)
     CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library
@@ -135,7 +135,7 @@ else
     NIM_SDS_BUILD_FROM_SOURCE := true
 endif
 
-LIBSDS := $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
+LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 

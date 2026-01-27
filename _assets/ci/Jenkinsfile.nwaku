@@ -73,60 +73,50 @@ pipeline {
 
   stages {
     stage('Setup') {
-        steps {
-          script {
-            if (!env.PLATFORM.startsWith('windows')) {
-                sh "mkdir -p \$(dirname ${REPO_SRC})"
-                sh "ln -s ${WORKSPACE} ${REPO_SRC}"
-              }
-          }
-      }
-  }
+      steps { script {
+        if (!env.PLATFORM.startsWith('windows')) {
+          sh "mkdir -p \$(dirname ${REPO_SRC})"
+          sh "ln -s ${WORKSPACE} ${REPO_SRC}"
+        }
+      } }
+    }
 
     stage('Deps') {
       steps { script {
         nix.develop('make status-go-deps', pure: false)
-      }
+      } }
     }
-  }
 
     stage('Generate') {
       steps { script {
         nix.develop('make generate', pure: false)
-      }
+      } }
     }
-  }
 
     stage('Build Static Lib') {
-        steps {
-            script {
-                nix.develop('make statusgo-library', pure: false)
-                }
-            }
-        }
+      steps { script {
+        nix.develop('make statusgo-library', pure: false)
+      } }
+    }
 
     stage('Build Shared Lib') {
-        steps {
-            script {
-                nix.develop('make statusgo-shared-library', pure: false)
-                }
-            }
-        }
+      steps { script {
+        nix.develop('make statusgo-shared-library', pure: false)
+      } }
+    }
 
     stage('Archive') {
-        steps {
-          zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
-            }
-        }
+      steps {
+        zip(zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin')
+      }
+    }
 
     stage('Upload') {
-        steps {
-            script {
-                env.PKG_URL = s5cmd.upload(ARTIFACT)
-            }
-        }
+      steps { script {
+        env.PKG_URL = s5cmd.upload(ARTIFACT)
+      } }
     }
-} // stages
+  } // stages
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
@@ -140,9 +130,9 @@ pipeline {
 /* We extract the name of the job from currentThread because
  * before an agent is picked env is not available. */
 def getJobPathTokens() {
-    return Thread.currentThread().getName().split('/')
+  return Thread.currentThread().getName().split('/')
 }
 
 def getNWakuMode() {
-    return getJobPathTokens().contains('nwaku')
+  return getJobPathTokens().contains('nwaku')
 }

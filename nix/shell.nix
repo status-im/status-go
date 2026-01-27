@@ -15,15 +15,14 @@ let
 in mkShell {
   name = "status-go-shell";
 
-  buildInputs = with pkgs;
-    lib.optionals (stdenv.isDarwin) [ xcodeWrapper ] ++ [
+  buildInputs = with pkgs; [
     git jq which
-    gcc go golangci-lint go-junit-report gopls codecov-cli
+    go golangci-lint go-junit-report gopls codecov-cli
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
-    rustc cargo
-    nim
-    lib-sds-pkg
-    libwaku
+    rustc cargo nim
+    lib-sds-pkg libwaku
+  ] ++ lib.optionals (stdenv.isDarwin) [
+    xcodeWrapper
   ];
 
   shellHook = ''
@@ -31,14 +30,11 @@ in mkShell {
 
     export LIBWAKU_PATH="${pkgs.libwaku}"
     export LIBSDS_PATH="${pkgs.lib-sds-pkg}"
+    export LIBWAKU="$(echo ${pkgs.libwaku}/lib/libwaku.*)"
+    export LIBSDS="$(echo ${pkgs.lib-sds-pkg}/lib/libsds.*)"
+    export NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include"
+    export NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib"
 
-    export LD_LIBRARY_PATH="${pkgs.libwaku}/bin:${pkgs.lib-sds-pkg}/lib:''${LD_LIBRARY_PATH:-}"
-
-    export CGO_CFLAGS="-I${pkgs.libwaku}/include -I${pkgs.lib-sds-pkg}/include"
-    export CGO_LDFLAGS="-L${pkgs.libwaku}/bin -L${pkgs.lib-sds-pkg}/lib"
-
-    echo "CGO_CFLAGS: $CGO_CFLAGS"
-    echo "CGO_LDFLAGS: $CGO_LDFLAGS"
   ''
   + lib.optionalString (!isMacM1) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/

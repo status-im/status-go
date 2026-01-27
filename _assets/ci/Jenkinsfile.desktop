@@ -67,6 +67,8 @@ pipeline {
 
       /* fixes nim cache collision */
       XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
+
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = 'C:\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\link.exe'
   }
 
   stages {
@@ -135,7 +137,11 @@ def getPlatformFromLabel(String label = params.AGENT_LABEL) {
 
 def shell(cmd) {
   if (env.PLATFORM.startsWith('windows')) {
-    sh "${cmd} SHELL=/bin/sh"
+    /* FIXME: Hardcode PATH for whole Jenkinsfile. */
+    bat """
+      call "C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
+      "C:\\ProgramData\\scoop\\apps\\git\\2.50.0.2\\bin\\bash.exe" -c "export SHELL='C:/ProgramData/scoop/apps/git/2.50.0.2/usr/bin/bash' && ${cmd.replace('"', '\\"')}"
+    """
   } else {
     nix.develop(cmd, pure: false) // Use nix.develop for Linux/macOS
   }
