@@ -5,7 +5,6 @@ from typing import Optional, List
 import pytest
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
 
-from clients.api import ApiResponseError
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
@@ -44,23 +43,14 @@ class TestCommunityTokenPermissions(MessengerSteps):
             return communities_response.get("communities", []) or []
         return communities_response or []
 
-    def _spectate_and_fetch_community(self, backend, community_id, attempts=10, delay=5):
-        """
-        Fetch community using polling approach with spectate subscription.
-        Each fetchCommunity call waits up to 60s for network response.
-        """
-        try:
-            backend.wakuext_service.spectate_community(community_id)
-        except ApiResponseError as exc:
-            logging.warning(f"Spectate community failed for {community_id}: {exc}")
-
-        for attempt in range(attempts):
-            community = self.fetch_community(backend, community_id)
-            if community:
-                return community
-            logging.info(f"Community {community_id} not found yet (attempt {attempt + 1}/{attempts})")
-            time.sleep(delay)
-        return None
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_fixed(5),
+        retry=retry_if_result(lambda r: r is None),
+    )
+    def _fetch_community_with_retry(self, backend, community_id):
+        """Fetch community with retry."""
+        return self.fetch_community(backend, community_id)
 
     def create_token_gated_community(
         self,
@@ -133,6 +123,9 @@ class TestCommunityTokenPermissions(MessengerSteps):
             retry=retry_if_result(lambda r: not r or not r.get("satisfied")),
         )
         def _check():
+            # Force refresh wallet balances before checking permissions.
+            # Without this, check_permissions_to_join_community may use stale cached balances
+            # and not see tokens that were just minted in fund_backend_account_with_snt.
             backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
             return backend.wakuext_service.check_permissions_to_join_community(community_id)
 
@@ -186,7 +179,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
 
         # Fetch community as member
-        community = self._spectate_and_fetch_community(member_with_snt_backend, community_id)
+        community = self._fetch_community_with_retry(member_with_snt_backend, community_id)
         assert community, f"Community {community_id} not found"
 
         # Member tries to join with their wallet address (should have tokens)
@@ -242,7 +235,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
 
         # Fetch community as member
-        response = self._spectate_and_fetch_community(member_with_snt_backend, community_id)
+        response = self._fetch_community_with_retry(member_with_snt_backend, community_id)
         assert response, "Community not found"
         assert response["tokenPermissions"], "No token permissions found"
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"

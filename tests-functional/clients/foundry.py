@@ -181,7 +181,7 @@ class Foundry:
         tar_bytes = io.BytesIO(b"".join(stream))
 
         with tarfile.open(fileobj=tar_bytes) as tar:
-            tar.extractall(path=temp_dir)
+            tar.extractall(path=temp_dir, filter="data")
             # If the tar contains a single file, return the path to that file
             # Otherwise it's a directory, just return temp_dir.
             if len(tar.getmembers()) == 1:
