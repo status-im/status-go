@@ -57,7 +57,7 @@ class AsyncMessengerSteps:
         """Accept contact request and wait for sender to get the acceptance signal."""
         accepted_signal = f"@{receiver.public_key} accepted your contact request"
         # Sync RPC call
-        receiver.wakuext_service.accept_contact_request(message_id)
+        receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
         # Async signal waiting
         await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=accepted_signal, timeout=60, check_buffer=True)
 
