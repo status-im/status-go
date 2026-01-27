@@ -8,66 +8,66 @@ pipeline {
 
   parameters {
     string(
-        name: 'BRANCH',
-        defaultValue: 'develop',
-        description: 'Name of branch to build.'
-        )
-      string(
-          name: 'AGENT_LABEL',
-          description: 'Label for targetted CI slave host.',
-          defaultValue: params.AGENT_LABEL ?: jenkins.getAgentLabelFromJob(),
-          )
-      booleanParam(
-          name: 'RELEASE',
-          defaultValue: false,
-          description: 'Enable to create build for release.',
-          )
-      booleanParam(
-          name: 'USE_NWAKU',
-          description: 'Whether to build with nwaku or not',
-          defaultValue: params.USE_NWAKU ?: getNWakuMode(),
-          )
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
+    string(
+      name: 'AGENT_LABEL',
+      description: 'Label for targetted CI slave host.',
+      defaultValue: params.AGENT_LABEL ?: jenkins.getAgentLabelFromJob(),
+    )
+    booleanParam(
+      name: 'RELEASE',
+      defaultValue: false,
+      description: 'Enable to create build for release.',
+    )
+    booleanParam(
+      name: 'USE_NWAKU',
+      description: 'Whether to build with nwaku or not',
+      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
+    )
   }
 
   options {
     timestamps()
-      ansiColor('xterm')
-      /* Prevent Jenkins jobs from running forever */
-      timeout(time: 30, unit: 'MINUTES')
-      disableConcurrentBuilds()
-      disableRestartFromStage()
-      /* manage how many builds we keep */
-      buildDiscarder(logRotator(
-        numToKeepStr: '5',
-        daysToKeepStr: '30',
-        artifactNumToKeepStr: '1',
-        artifactDaysToKeepStr: '30',
-      ))
+    ansiColor('xterm')
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 30, unit: 'MINUTES')
+    disableConcurrentBuilds()
+    disableRestartFromStage()
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '5',
+      daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
+      artifactDaysToKeepStr: '30',
+    ))
   }
 
   environment {
     PLATFORM = "${getPlatformFromLabel()}/${params.USE_NWAKU ? 'nwaku' : 'status-go'}"
-      TMPDIR   = "${WORKSPACE_TMP}"
-      GOPATH   = "${WORKSPACE_TMP}/go"
-      GOCACHE  = "${WORKSPACE_TMP}/gocache"
-      PATH     = "${PATH}:${GOPATH}/bin:/c/Users/jenkins/go/bin"
-      REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
-      VERSION  = sh(script: "./scripts/version.sh", returnStdout: true)
-      ARTIFACT = utils.pkgFilename(
-          name:    'status-go',
-          type:    env.PLATFORM,
-          version: env.VERSION,
-          ext:     'zip',
-          )
-      /* prevent sharing cache dir across different jobs */
-      GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
-      /* Ensure env var is set on first run. */
-      USE_NWAKU = "${params.USE_NWAKU}"
-      /* nwaku source directory */
-      NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
-
-      /* fixes nim cache collision */
-      XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
+    TMPDIR   = "${WORKSPACE_TMP}"
+    GOPATH   = "${WORKSPACE_TMP}/go"
+    GOBIN    = "${WORKSPACE_TMP}/go/bin"
+    GOCACHE  = "${WORKSPACE_TMP}/gocache"
+    PATH     = "${assembePath([env.GOBIN])}"
+    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
+    VERSION  = sh(script: "./scripts/version.sh", returnStdout: true)
+    ARTIFACT = utils.pkgFilename(
+      name:    'status-go',
+      type:    env.PLATFORM,
+      version: env.VERSION,
+      ext:     'zip',
+    )
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
+    /* Ensure env var is set on first run. */
+    USE_NWAKU = "${params.USE_NWAKU}"
+    /* nwaku source directory */
+    NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
+    /* fixes nim cache collision */
+    XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
   }
 
   stages {
@@ -81,25 +81,25 @@ pipeline {
 
     stage('Deps') {
       steps { script {
-        shell('make status-go-deps')
+        make('status-go-deps V=2')
       } }
     }
 
     stage('Generate') {
       steps { script {
-        shell('make generate')
+        make('generate V=2')
       } }
     }
 
     stage('Build Static Lib') {
       steps { script {
-        shell('make statusgo-library')
+        make('statusgo-library V=2')
       } }
     }
 
     stage('Build Shared Lib') {
       steps { script {
-        shell('make statusgo-shared-library')
+        make('statusgo-shared-library V=2')
       } }
     }
 
@@ -125,20 +125,57 @@ pipeline {
   } // post
 } // pipeline
 
+/* Windows cannot be trusted to set PATH with correct order. */
+def assembePath(List<String> extraPaths) {
+  if (isUnix()) {
+    return "${env.PATH}:${extraPaths.join(':')}"
+  } else {
+    /* WARNING: Remember to update versions in scripts/windows_build_setup.ps1 */
+    def binPaths = [
+      'C:/Windows/system32/WindowsPowerShell/v1.0',
+      'C:/Windows/system32',
+      'C:/Windows',
+      'C:/ProgramData/scoop/apps/go/1.24.7/bin',
+      'C:/ProgramData/scoop/apps/nim/2.2.6/bin',
+      'C:/ProgramData/scoop/apps/cmake/3.31.6/bin',
+      'C:/ProgramData/scoop/apps/python/3.13.5',
+      'C:/ProgramData/scoop/apps/python/3.13.5/Scripts',
+      'C:/ProgramData/scoop/apps/mingw-winlibs/15.2.0-13.0.0-r5/bin',
+      'C:/ProgramData/scoop/apps/msys2/current/mingw64/bin',
+      'C:/ProgramData/scoop/apps/msys2/current/mingw64/lib',
+      'C:/ProgramData/scoop/apps/vcredist2022/14.44.35211.0',
+      'C:/ProgramData/scoop/apps/openssl-lts/3.0.18/bin',
+      'C:/ProgramData/scoop/apps/protobuf/3.20.1/bin',
+      'C:/ProgramData/scoop/apps/inno-setup/6.5.4',
+      'C:/ProgramData/scoop/apps/git/current/bin',
+      'C:/ProgramData/scoop/shims',
+      'C:/BuildTools/MSBuild/Current/Bin',
+      'C:/BuildTools/VC/Auxiliary/Build',
+      'C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64',
+    ]
+    binPaths.each { dir -> if (!fileExists(dir)) { error("Missing PATH directory: '${dir}'") } }
+    /* These Git Bash paths can't be checked with fileExists(). */
+    return (['/mingw64/bin', '/usr/bin', '/bin'] + binPaths + extraPaths).join(';')
+  }
+}
+
+def make(target) {
+  if (env.PLATFORM.startsWith('windows')) {
+    bat """
+      call "C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
+      bash -c "make ${target} make=/bin/sh MINGW_PATH=C:/ProgramData/scoop/apps/msys2/current/mingw64"
+    """
+  } else { /* Use Nix for Linux/macOS. */
+    nix.develop("make ${target}", pure: false)
+  }
+}
+
 /* This function extracts the platform from the AGENT_LABEL */
 def getPlatformFromLabel(String label = params.AGENT_LABEL) {
   for (platform in ['linux', 'macos', 'windows']) {
     if (label.contains(platform)) {
       return platform
     }
-  }
-}
-
-def shell(cmd) {
-  if (env.PLATFORM.startsWith('windows')) {
-    sh "${cmd} SHELL=/bin/sh"
-  } else {
-    nix.develop(cmd, pure: false) // Use nix.develop for Linux/macOS
   }
 }
 
