@@ -23,8 +23,10 @@ pipeline {
     disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: '20',
+      numToKeepStr: '5',
       daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
+      artifactDaysToKeepStr: '30',
     ))
   }
 

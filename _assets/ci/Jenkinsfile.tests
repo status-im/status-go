@@ -67,8 +67,9 @@ pipeline {
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: getAmountToKeep(),
-      daysToKeepStr: '-1',
+      daysToKeepStr: '30',
       artifactNumToKeepStr: getAmountToKeep(),
+      artifactDaysToKeepStr: '30',
     ))
   }
 
