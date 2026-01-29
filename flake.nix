@@ -20,11 +20,15 @@
       url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=cccc8ab6fda0e54752936db0d5c80b02a2c34a3a";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    logos-storage-nim = {
+      url = "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&rev=3c09f008bb5266a669fd19f18368f9e8b861b664";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6";
   };
 
-  outputs = { self, nixpkgs, lmn, nim-sds }:
+  outputs = { self, nixpkgs, lmn, logos-storage-nim, nim-sds }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -44,6 +48,7 @@
           pkgsOverlay
           (final: prev: {
             libwaku        = lmn.packages.${system}.libwaku;
+            libstorage     = logos-storage-nim.packages.${system}.libstorage;
             lib-sds-pkg  = nim-sds.packages.${system}.libsds;
           })
         ];
@@ -59,6 +64,7 @@
       statusGo = import ./nix/pkgs/status-go { inherit self pkgs; };
     in {
       status-go-library = statusGo.library;
+    } // pkgs.lib.optionalAttrs (statusGo ? mobile) {
       status-go-mobile-android = statusGo.mobile.android {};
       status-go-mobile-ios = statusGo.mobile.ios {};
     });

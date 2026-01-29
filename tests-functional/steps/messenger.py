@@ -145,8 +145,10 @@ class MessengerSteps(NetworkConditionsSteps):
             pass
         return response.get("chats", [])[0].get("id")
 
-    def create_community(self, node):
-        response = node.wakuext_service.create_community(fake.community_name(), fake.community_description())
+    def create_community(self, node, history_archive_support_enabled=False):
+        response = node.wakuext_service.create_community(
+            fake.community_name(), fake.community_description(), history_archive_support_enabled=history_archive_support_enabled
+        )
         self.community_id = response.get("communities", [{}])[0].get("id")
         return self.community_id
 

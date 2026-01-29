@@ -34,6 +34,8 @@ import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	archivecommons "github.com/status-im/status-go/protocol/communities/archive/commons"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/syncing"
@@ -163,10 +165,6 @@ func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *Re
 		chat = &newChat
 
 		chat.updateChatFromGroupMembershipChanges(group)
-
-		if err != nil {
-			return errors.Wrap(err, "failed to get group creator")
-		}
 
 		publicKeys, err := group.MemberPublicKeys()
 		if err != nil {
@@ -1228,7 +1226,8 @@ func (m *Messenger) HandleSyncPairInstallation(ctx context.Context, state *Recei
 	return nil
 }
 
-func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, magnetlink string, clock uint64) error {
+func (m *Messenger) HandleHistoryArchiveLinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, archiveLink string, clock uint64) error {
+	m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] Handling history archive link message", zap.String("archiveLink", archiveLink))
 	id := types3.HexBytes(crypto.CompressPubkey(communityPubKey))
 
 	community, err := m.communitiesManager.GetByID(id)
@@ -1249,28 +1248,36 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		return nil
 	}
 
-	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
-		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
+	if m.archiveManager.IsStarted() && settings.HistoryArchiveSupportEnabled {
+		m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] ArchiveManager is started and history archive support is enabled", zap.String("communityID", community.IDString()))
+
+		lastArchiveLinkClock, err := m.communitiesManager.GetArchiveLinkMessageClock(id)
 		if err != nil {
 			return err
 		}
-		lastSeenMagnetlink, err := m.communitiesManager.GetLastSeenMagnetlink(id)
+
+		lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(id)
 		if err != nil {
 			return err
 		}
-		// We are only interested in a community archive magnet link
+		// We are only interested in a community archive archiveLink
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
-		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
-			if lastSeenMagnetlink == magnetlink {
-				m.logger.Debug("already processed this magnetlink")
+		m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] Checking community membership and lastArchiveLinkClock", zap.String("communityID", community.IDString()), zap.Uint64("lastArchiveLinkClock", lastArchiveLinkClock), zap.Uint64("messageClock", clock))
+
+		if !community.IsControlNode() && community.Joined() && clock >= lastArchiveLinkClock {
+			if lastSeenArchiveLink == archiveLink {
+				m.logger.Debug("already processed this archiveLink")
 				return nil
 			}
 
-			m.archiveManager.UnseedHistoryArchiveTorrent(id)
+			// All checks passed - proceed with download
+			m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] Unseeding existing history archive link for community (if any)", zap.String("communityID", community.IDString()))
+
+			m.archiveManager.UnseedHistoryArchive(id, lastSeenArchiveLink)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
-			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types3.HexBytes) {
+			go func(currentTask *archivetypes.HistoryArchiveDownloadTask, communityID types3.HexBytes) {
 				defer gocommon.LogOnPanic()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
@@ -1279,7 +1286,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				}
 
 				// Create new task
-				task := &communities.HistoryArchiveDownloadTask{
+				task := &archivetypes.HistoryArchiveDownloadTask{
 					CancelChan: make(chan struct{}),
 					Waiter:     *new(sync.WaitGroup),
 					Cancelled:  false,
@@ -1290,26 +1297,31 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				// this wait groups tracks the ongoing task for a particular community
 				task.Waiter.Add(1)
 				defer task.Waiter.Done()
+				defer m.archiveManager.RemoveHistoryArchiveDownloadTask(communityID.String())
 
 				// this wait groups tracks all ongoing tasks across communities
 				m.shutdownWaitGroup.Add(1)
 				defer m.shutdownWaitGroup.Done()
-				m.downloadAndImportHistoryArchives(communityID, magnetlink, task.CancelChan)
+
+				m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] Calling downloadAndImportHistoryArchives", zap.String("archiveLink", archiveLink))
+
+				m.downloadAndImportHistoryArchives(communityID, archiveLink, task.CancelChan)
 			}(currentTask, id)
 
-			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
+			m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] Updating archive link message clock", zap.String("communityID", community.IDString()), zap.Uint64("clock", clock))
+			return m.communitiesManager.UpdateArchiveLinkMessageClock(id, clock)
 		}
 	}
 	return nil
 }
 
-func (m *Messenger) downloadAndImportHistoryArchives(id types3.HexBytes, magnetlink string, cancel chan struct{}) {
-	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+func (m *Messenger) downloadAndImportHistoryArchives(id types3.HexBytes, archiveLink string, cancel chan struct{}) {
+	downloadTaskInfo, err := m.archiveManager.DownloadHistoryArchives(id, archiveLink, cancel)
 	if err != nil {
 		logMsg := "failed to download history archive data"
-		if err == communities.ErrTorrentTimedout {
-			m.logger.Debug("torrent has timed out, trying once more...")
-			downloadTaskInfo, err = m.archiveManager.DownloadHistoryArchivesByMagnetlink(id, magnetlink, cancel)
+		if err == archivecommons.ErrArchiveTimedout {
+			m.logger.Debug("archive has timed out, trying once more...")
+			downloadTaskInfo, err = m.archiveManager.DownloadHistoryArchives(id, archiveLink, cancel)
 			if err != nil {
 				m.logger.Error(logMsg, zap.Error(err))
 				return
@@ -1324,20 +1336,30 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types3.HexBytes, magnetl
 		if downloadTaskInfo.TotalDownloadedArchivesCount > 0 {
 			m.logger.Debug(fmt.Sprintf("downloaded %d of %d archives so far", downloadTaskInfo.TotalDownloadedArchivesCount, downloadTaskInfo.TotalArchivesCount))
 		}
+		// ToDo: check if this is correct for Torrent
+		m.archiveManager.UnseedHistoryArchive(id, archiveLink)
 		return
 	}
 
-	err = m.communitiesManager.UpdateLastSeenMagnetlink(id, magnetlink)
+	m.logger.Debug("[LogosStorage][download_and_import_history_archives] Updating last seen archiveLink",
+		zap.String("archiveLink", archiveLink))
+
+	err = m.communitiesManager.UpdateLastSeenArchiveLink(id, archiveLink)
 	if err != nil {
-		m.logger.Error("couldn't update last seen magnetlink", zap.Error(err))
+		m.logger.Error("couldn't update last seen archiveLink", zap.Error(err), zap.String("archiveLink", archiveLink))
 	}
+
+	// ToDo: check if this is correct for Torrent
+	m.archiveManager.PublishHistoryArchivesSeedingSignal(id)
 
 	err = m.checkIfIMemberOfCommunity(id)
 	if err != nil {
 		return
 	}
 
-	err = m.importHistoryArchives(id, cancel)
+	m.logger.Debug("[LogosStorage][download_and_import_history_archives] Importing history archives now")
+
+	err = m.importHistoryArchives(id, cancel, archiveLink)
 	if err != nil {
 		m.logger.Error("failed to import history archives", zap.Error(err))
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types3.EncodeHex(id))
@@ -1437,6 +1459,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(ctx context.Context, stat
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *common.StatusMessage) error {
+	m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] Handling community request to join")
 	signer := state.CurrentMessageState.PublicKey
 	community, requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, statusMessage.TransportLayer.Dst, requestToJoinProto)
 	if err != nil {
@@ -1476,6 +1499,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 		}
 
 	case communities.RequestToJoinStateDeclined:
+		m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] Community request to join declined")
 		response, err := m.declineRequestToJoinCommunity(requestToJoin)
 		if err == nil {
 			err := state.Response.Merge(response)
@@ -1487,6 +1511,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 		}
 
 	case communities.RequestToJoinStateAccepted:
+		m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] Community request to join accepted")
 		response, err := m.acceptRequestToJoinCommunity(requestToJoin)
 		if err == nil {
 			err := state.Response.Merge(response) // new member has been added
@@ -1494,6 +1519,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 				return err
 			}
 		} else if err == communities.ErrNoPermissionToJoin {
+			m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoin] No permission to join community")
 			// only control node will end up here as it's the only one that
 			// performed token permission checks
 			response, err = m.declineRequestToJoinCommunity(requestToJoin)
@@ -1546,6 +1572,7 @@ func (m *Messenger) HandleCommunityEditSharedAddresses(ctx context.Context, stat
 }
 
 func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, state *ReceivedMessageState, requestToJoinResponseProto *protobuf.CommunityRequestToJoinResponse, statusMessage *common.StatusMessage) error {
+	m.logger.Debug("[LogosStorage][HandleCommunityRequestToJoinResponse] Handling community request to join response")
 	signer := state.CurrentMessageState.PublicKey
 	if requestToJoinResponseProto.CommunityId == nil {
 		return ErrInvalidCommunityID
@@ -1624,15 +1651,18 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 		if communitySettings == nil {
 			communitySettings, err = m.communitiesManager.GetCommunitySettingsByID(requestToJoinResponseProto.CommunityId)
 			if err != nil {
-				return nil
+				return err
 			}
 		}
 
-		magnetlink := requestToJoinResponseProto.MagnetUri
-		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
+		archiveLink := requestToJoinResponseProto.ArchiveLink
+		if m.archiveManager.IsStarted() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && archiveLink != "" {
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
-			go func(currentTask *communities.HistoryArchiveDownloadTask) {
+			if err := m.communitiesManager.UpdateArchiveLinkMessageClock(requestToJoinResponseProto.CommunityId, requestToJoinResponseProto.Clock); err != nil {
+				return err
+			}
+			go func(currentTask *archivetypes.HistoryArchiveDownloadTask) {
 				defer gocommon.LogOnPanic()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
@@ -1640,7 +1670,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 					currentTask.Waiter.Wait()
 				}
 
-				task := &communities.HistoryArchiveDownloadTask{
+				task := &archivetypes.HistoryArchiveDownloadTask{
 					CancelChan: make(chan struct{}),
 					Waiter:     *new(sync.WaitGroup),
 					Cancelled:  false,
@@ -1649,11 +1679,14 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 
 				task.Waiter.Add(1)
 				defer task.Waiter.Done()
+				defer m.archiveManager.RemoveHistoryArchiveDownloadTask(community.IDString())
 
 				m.shutdownWaitGroup.Add(1)
 				defer m.shutdownWaitGroup.Done()
 
-				m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
+				m.logger.Debug("[LogosStorage][handle_community_request_to_join_response] Starting download and import of history archives", zap.String("archiveLink", archiveLink))
+
+				m.downloadAndImportHistoryArchives(community.ID(), archiveLink, task.CancelChan)
 			}(currentTask)
 		}
 	}
@@ -3559,8 +3592,11 @@ func (m *Messenger) HandleSyncTrustedUser(ctx context.Context, state *ReceivedMe
 
 	return nil
 }
-func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveMagnetlink, statusMessage *common.StatusMessage) error {
-	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)
+
+func (m *Messenger) HandleCommunityMessageArchiveLink(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveLink, statusMessage *common.StatusMessage) error {
+	m.logger.Debug("[LogosStorage][HandleCommunityMessageArchiveLink] received CommunityMessageArchiveLink", zap.String("archiveLink", message.ArchiveLink))
+
+	return m.HandleHistoryArchiveLinkMessage(state, state.CurrentMessageState.PublicKey, message.ArchiveLink, message.Clock)
 }
 
 func (m *Messenger) addNewKeypairAddedOnPairedDeviceACNotification(keyUID string, response *MessengerResponse) error {

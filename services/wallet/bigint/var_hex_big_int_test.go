@@ -65,7 +65,8 @@ func TestVarHexBigInt_UnmarshalJSON_ValidCases(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, result.Int)
-			require.Equal(t, tt.expected, result.Int, "expected %s, got %s", tt.expected.String(), result.Int.String())
+			// Use Cmp for big.Int comparison instead of Equal to avoid internal representation issues
+			require.Equal(t, 0, tt.expected.Cmp(result.Int), "expected %s, got %s", tt.expected.String(), result.Int.String())
 		})
 	}
 }

@@ -51,3 +51,4 @@ var ErrPermissionToJoinNotSatisfied = errors.New("permission to join not satisfi
 var ErrBannedMemberNotFound = errors.New("banned member not found")
 var ErrGrantMemberPublicKeyIsDifferent = errors.New("grant member public key is different")
 var ErrEditSharedAddressesRequestOutdated = errors.New("outdated edit shares addresses request")
+var ErrArchiveNotSupported = errors.New("archive processing not supported in this build")

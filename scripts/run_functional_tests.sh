@@ -2,12 +2,16 @@
 
 set -o nounset
 
+unset LD_LIBRARY_PATH
+
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/scripts/colors.sh"
 source "${GIT_ROOT}/scripts/codecov.sh"
 
 : "${FUNCTIONAL_TESTS_LOG_LEVEL:=INFO}"
 : "${FUNCTIONAL_TESTS_REPORT_CODECOV:=false}"
+: "${FUNCTIONAL_TESTS_BUILD_TAGS:=gowaku_no_rln}"
+: "${FUNCTIONAL_TESTS_USE_LOGOS_STORAGE:=false}"
 
 echo -e "${GRN}Running functional tests${RST}"
 
@@ -40,9 +44,25 @@ docker ps -a --filter "name=${project_name}" --filter "status=exited" -q | xargs
 
 # Build statusgo image
 echo -e "${GRN}Building status-go${RST}"
+build_tags="${FUNCTIONAL_TESTS_BUILD_TAGS}"
+pytest_marker_expr="rpc and not logos_storage"
+if [[ "${FUNCTIONAL_TESTS_USE_LOGOS_STORAGE}" == "true" ]]; then
+  build_tags="${build_tags} use_logos_storage"
+  pytest_marker_expr="rpc"
+  if [[ -n "${IN_NIX_SHELL:-}" && -n "${LIBSTORAGE_PATH:-}" ]]; then
+    mkdir -p "${GIT_ROOT}/libs"
+    if [[ -f "${LIBSTORAGE_PATH}/lib/libstorage.so" ]]; then
+      cp "${LIBSTORAGE_PATH}/lib/libstorage.so" "${GIT_ROOT}/libs/libstorage.so"
+      echo -e "${GRN}Prepared ./libs/libstorage.so from \$LIBSTORAGE_PATH${RST}"
+    else
+      echo -e "${YEL}No libstorage.so at ${LIBSTORAGE_PATH}/lib; Docker build will rely on make fetch-libstorage.${RST}"
+    fi
+  fi
+fi
 docker build . \
   --build-arg "build_flags=-cover" \
-  --build-arg "build_tags='gowaku_no_rln'" \
+  --build-arg "build_tags=${build_tags}" \
+  --build-arg "use_logos_storage=${FUNCTIONAL_TESTS_USE_LOGOS_STORAGE}" \
   --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 
@@ -96,7 +116,7 @@ pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" -n 12 \
+pytest --reruns 2 -m "${pytest_marker_expr}" -c "${root_path}/pytest.ini" -n 12 \
   --dist loadgroup\
   --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
   --docker_project_name="${project_name}" \

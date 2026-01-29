@@ -1,14 +1,28 @@
 {
-  "go.testTags": "gowaku_skip_migrations,gowaku_no_rln",
-  "cSpell.words": [
-    "unmarshalling"
-  ],
+  "go.testTags": "gowaku_skip_migrations,gowaku_no_rln,use_logos_storage,use_torrent",
+  "cSpell.words": ["unmarshalling"],
   "gopls": {
-    "formatting.local": "github.com/status-im/status-go"
+    "formatting.local": "github.com/status-im/status-go",
+    "build.buildFlags": [
+      "-tags=gowaku_skip_migrations,gowaku_no_rln,use_logos_storage,use_torrent"
+    ]
   },
   // format all files on save if a formatter is available
   "editor.formatOnSave": true,
-  // I use "goimports" instead of "gofmt"
+  // use "goimports" instead of "gofmt"
   // because it does the same thing but also formats imports
   "go.formatTool": "goimports",
+  "go.toolsEnvVars": {
+    "CGO_ENABLED": "1"
+  },
+  "go.testEnvVars": {
+    "CGO_CFLAGS": "-I${workspaceFolder}/libs -I${workspaceFolder}/../nim-sds/library",
+    "CGO_LDFLAGS": "-L${workspaceFolder}/libs -lstorage -Wl,-rpath,${workspaceFolder}/libs -L${workspaceFolder}/../nim-sds/build -lsds"
+  },
+  "go.buildFlags": [
+    "-tags=gowaku_skip_migrations,gowaku_no_rln,use_logos_storage,use_torrent"
+  ],
+  "go.testFlags": [
+    "-tags=gowaku_skip_migrations,gowaku_no_rln,use_logos_storage,use_torrent"
+  ]
 }

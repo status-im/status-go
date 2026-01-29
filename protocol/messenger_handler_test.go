@@ -1,15 +1,23 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/communities"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
@@ -172,4 +180,84 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 	s.Require().Len(state.Response.Notifications(), 0)
 	s.Require().Len(state.Response.Chats(), 1)
 	s.Require().False(state.Response.Chats()[0].Active)
+}
+
+func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithLogosStorage() {
+	adminPrivateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	contact, err := contacts.BuildContactFromPublicKey(&adminPrivateKey.PublicKey)
+	s.Require().NoError(err)
+
+	contact.ContactRequestLocalState = contacts.ContactRequestStateSent
+	currentMessageState := &CurrentMessageState{
+		Contact: contact,
+	}
+
+	state := &ReceivedMessageState{
+		Response:            &MessengerResponse{},
+		Timesource:          s.m.getTimesource(),
+		CurrentMessageState: currentMessageState,
+		ExistingMessagesMap: map[string]bool{},
+		AllChats:            s.m.allChats,
+	}
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	response, err := s.m.CreateCommunity(description, false)
+	s.Require().NoError(err)
+
+	logosStorageConfig := &params.LogosStorageConfig{
+		Enabled: true,
+		NodeConfig: params.LogosStorageNodeConfig{
+			DataDir:        filepath.Join(s.T().TempDir(), "logos-storage", "data"),
+			LogFormat:      "nocolors",
+			MetricsEnabled: false,
+			LogLevel:       "ERROR",
+			Nat:            "none",
+		},
+	}
+
+	amc := &archivetypes.ArchiveManagerConfig{
+		LogosStorageConfig: logosStorageConfig,
+	}
+
+	s.m.SetupArchiveManager(amc)
+
+	err = s.m.archiveManager.Start()
+	s.Require().NoError(err)
+	defer func() {
+		_ = s.m.archiveManager.Stop()
+	}()
+
+	s.Require().True(s.m.archiveManager.IsStarted())
+
+	community := response.Communities()[0]
+	err = s.m.communitiesManager.SaveCommunitySettings(communities.CommunitySettings{
+		CommunityID:                  community.IDString(),
+		HistoryArchiveSupportEnabled: true,
+	})
+	s.Require().NoError(err)
+
+	var buf bytes.Buffer
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(&buf), zap.DebugLevel)
+	s.m.logger = zap.New(core)
+
+	message := &protobuf.CommunityMessageArchiveLink{
+		ArchiveLink: "magnet:?xt=urn:btih:d58f7e0c4e3b3f1e8e4f8e4e8e4f8e4e8e4f8e4e",
+	}
+
+	state.CurrentMessageState.PublicKey = &community.PrivateKey().PublicKey
+
+	// detecting archive distribution preference now happens earlier
+	// err = s.m.HandleHistoryArchiveMagnetlinkMessage(state, &community.PrivateKey().PublicKey, "", 100)
+	err = s.m.HandleCommunityMessageArchiveLink(context.Background(), state, message, nil)
+	s.Require().NoError(err)
+	s.Require().Contains(buf.String(), "skipping magnetlink processing due to LogosStorage-only preference")
 }

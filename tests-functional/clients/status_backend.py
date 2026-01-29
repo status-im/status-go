@@ -152,7 +152,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             shutil.copy2(src_path, dst_path)
 
     @retry(
-        stop=stop_after_delay(10),
+        stop=stop_after_delay(20),
         wait=wait_exponential(multiplier=1, min=0.1, max=5),
         retry=retry_if_exception_type((ConnectionError, requests.RequestException)),
         reraise=True,
@@ -352,6 +352,12 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "wsHost": "0.0.0.0",
                 "wsPort": constants.STATUS_CONNECTOR_WS_PORT,
             },
+            "logosStorageConfigEnabled": kwargs.get("logos_storage_config_enabled", False),
+            "logosStorageConfigBootstrapNode": kwargs.get("logos_storage_config_bootstrap_node", None),
+            "importInitialDelay": kwargs.get("import_initial_delay", None),
+            "messageArchiveInterval": kwargs.get("message_archive_interval", None),
+            "torrentConfigEnabled": False,
+            "torrentConfigPort": 9025,
             "thirdpartyServicesEnabled": True,
         }
         if not Config.disable_override_networks:

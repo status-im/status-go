@@ -116,6 +116,7 @@ require (
 )
 
 require (
+	github.com/logos-storage/logos-storage-go-bindings v0.0.30
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.26.0

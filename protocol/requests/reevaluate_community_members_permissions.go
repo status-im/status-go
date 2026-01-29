@@ -11,7 +11,7 @@ type ReevaluateCommunityMembersPermissions struct {
 }
 
 func (r *ReevaluateCommunityMembersPermissions) Validate() error {
-	if r.CommunityID == nil || len(r.CommunityID) == 0 {
+	if len(r.CommunityID) == 0 {
 		return errors.New("reevaluate community members permissions does not contain communityID")
 	}
 

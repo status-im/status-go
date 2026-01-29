@@ -15,9 +15,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
@@ -25,8 +25,9 @@ import (
 	testutils2 "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/messaging/types"
+	"github.com/status-im/status-go/protocol/communities/archive"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -45,10 +46,19 @@ func TestManagerSuite(t *testing.T) {
 type ManagerSuite struct {
 	suite.Suite
 	manager        *Manager
-	archiveManager *ArchiveManager
+	archiveManager archive.ArchiveService
 }
 
-func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *ArchiveManager) {
+func buildTorrentConfig() *params.TorrentConfig {
+	return &params.TorrentConfig{
+		Enabled:    true,
+		DataDir:    os.TempDir() + "/archivedata",
+		TorrentDir: os.TempDir() + "/torrents",
+		Port:       0,
+	}
+}
+
+func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, archive.ArchiveService) {
 	db, err := testutils2.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -63,7 +73,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	amc := &ArchiveManagerConfig{
+	amc := &archivetypes.ArchiveManagerConfig{
 		TorrentConfig: buildTorrentConfig(),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
@@ -71,7 +81,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 		Identity:      key,
 		Publisher:     m,
 	}
-	t := NewArchiveManager(amc)
+	t := archive.NewArchiveManager(amc)
 	s.Require().NoError(err)
 
 	return m, t
@@ -97,16 +107,6 @@ func tokenBalance(tokenID uint64, balance uint64) thirdparty.TokenBalance {
 		TokenID: uintToDecBig(tokenID),
 		Balance: uintToDecBig(balance),
 	}
-}
-
-func (s *ManagerSuite) getHistoryTasksCount() int {
-	// sync.Map doesn't have a Len function, so we need to count manually
-	count := 0
-	s.archiveManager.historyArchiveTasks.Range(func(_, _ interface{}) bool {
-		count++
-		return true
-	})
-	return count
 }
 
 type testCollectiblesManager struct {
@@ -477,478 +477,6 @@ func (s *ManagerSuite) TestGetControlledCommunitiesChatIDs() {
 
 	s.Require().NoError(err)
 	s.Require().Len(controlledChatIDs, 1)
-}
-
-func (s *ManagerSuite) TestStartAndStopTorrentClient() {
-	err := s.archiveManager.StartTorrentClient()
-	s.Require().NoError(err)
-	s.Require().NotNil(s.archiveManager.torrentClient)
-	defer s.archiveManager.Stop() //nolint: errcheck
-
-	_, err = os.Stat(s.archiveManager.torrentConfig.DataDir)
-	s.Require().NoError(err)
-	s.Require().Equal(s.archiveManager.torrentClientStarted(), true)
-}
-
-func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
-	err := s.archiveManager.StartTorrentClient()
-	s.Require().NoError(err)
-	defer s.archiveManager.Stop() //nolint: errcheck
-
-	community, _, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	interval := 10 * time.Second
-	go s.archiveManager.StartHistoryArchiveTasksInterval(community, interval)
-	// Due to async exec we need to wait a bit until we check
-	// the task count.
-	time.Sleep(5 * time.Second)
-
-	count := s.getHistoryTasksCount()
-	s.Require().Equal(count, 1)
-
-	// We wait another 5 seconds to ensure the first tick has kicked in
-	time.Sleep(5 * time.Second)
-
-	_, err = os.Stat(torrentFile(s.archiveManager.torrentConfig.TorrentDir, community.IDString()))
-	s.Require().Error(err)
-
-	s.archiveManager.StopHistoryArchiveTasksInterval(community.ID())
-	s.archiveManager.historyArchiveTasksWaitGroup.Wait()
-	count = s.getHistoryTasksCount()
-	s.Require().Equal(count, 0)
-}
-
-func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
-	err := s.archiveManager.StartTorrentClient()
-	s.Require().NoError(err)
-	defer s.archiveManager.Stop() //nolint: errcheck
-
-	community, _, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	interval := 10 * time.Second
-	go s.archiveManager.StartHistoryArchiveTasksInterval(community, interval)
-
-	time.Sleep(2 * time.Second)
-
-	count := s.getHistoryTasksCount()
-	s.Require().Equal(count, 1)
-
-	s.archiveManager.stopHistoryArchiveTasksIntervals()
-
-	count = s.getHistoryTasksCount()
-	s.Require().Equal(count, 0)
-}
-
-func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
-	err := s.archiveManager.StartTorrentClient()
-	s.Require().NoError(err)
-	defer s.archiveManager.Stop() //nolint: errcheck
-
-	community, _, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	interval := 10 * time.Second
-	go s.archiveManager.StartHistoryArchiveTasksInterval(community, interval)
-	// Due to async exec we need to wait a bit until we check
-	// the task count.
-	time.Sleep(2 * time.Second)
-
-	count := s.getHistoryTasksCount()
-	s.Require().Equal(count, 1)
-
-	err = s.archiveManager.Stop()
-	s.Require().NoError(err)
-
-	count = s.getHistoryTasksCount()
-	s.Require().Equal(count, 0)
-}
-
-func (s *ManagerSuite) TestStartTorrentClient_DelayedUntilOnline() {
-	s.Require().False(s.archiveManager.torrentClientStarted())
-
-	s.archiveManager.SetOnline(true)
-	s.Require().True(s.archiveManager.torrentClientStarted())
-}
-
-func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	// Time range of 7 days
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	// Partition of 7 days
-	partition := 7 * 24 * time.Hour
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	// There are no waku messages in the database so we don't expect
-	// any archives to be created
-	_, err = os.Stat(s.archiveManager.archiveDataFile(community.IDString()))
-	s.Require().Error(err)
-	_, err = os.Stat(s.archiveManager.archiveIndexFile(community.IDString()))
-	s.Require().Error(err)
-	_, err = os.Stat(torrentFile(s.archiveManager.torrentConfig.TorrentDir, community.IDString()))
-	s.Require().Error(err)
-}
-
-func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateArchive() {
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	// Time range of 7 days
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	// Partition of 7 days, this should create a single archive
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-	message2 := buildMessage(startDate.Add(2*time.Hour), topic, []byte{2})
-	// This message is outside of the startDate-endDate range and should not
-	// be part of the archive
-	message3 := buildMessage(endDate.Add(2*time.Hour), topic, []byte{3})
-
-	err = s.manager.StoreWakuMessage(&message1)
-	s.Require().NoError(err)
-	err = s.manager.StoreWakuMessage(&message2)
-	s.Require().NoError(err)
-	err = s.manager.StoreWakuMessage(&message3)
-	s.Require().NoError(err)
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	_, err = os.Stat(s.archiveManager.archiveDataFile(community.IDString()))
-	s.Require().NoError(err)
-	_, err = os.Stat(s.archiveManager.archiveIndexFile(community.IDString()))
-	s.Require().NoError(err)
-	_, err = os.Stat(torrentFile(s.archiveManager.torrentConfig.TorrentDir, community.IDString()))
-	s.Require().NoError(err)
-
-	index, err := s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 1)
-
-	totalData, err := os.ReadFile(s.archiveManager.archiveDataFile(community.IDString()))
-	s.Require().NoError(err)
-
-	for _, metadata := range index.Archives {
-		archive := &protobuf.WakuMessageArchive{}
-		data := totalData[metadata.Offset : metadata.Offset+metadata.Size-metadata.Padding]
-
-		err = proto.Unmarshal(data, archive)
-		s.Require().NoError(err)
-
-		s.Require().Len(archive.Messages, 2)
-	}
-}
-
-func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateMultipleArchives() {
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	// Time range of 3 weeks
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 21, 00, 00, 00, 0, time.UTC)
-	// 7 days partition, this should create three archives
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-	message2 := buildMessage(startDate.Add(2*time.Hour), topic, []byte{2})
-	// We expect 2 archives to be created for startDate - endDate of each
-	// 7 days of data. This message should end up in the second archive
-	message3 := buildMessage(startDate.Add(8*24*time.Hour), topic, []byte{3})
-	// This one should end up in the third archive
-	message4 := buildMessage(startDate.Add(14*24*time.Hour), topic, []byte{4})
-
-	err = s.manager.StoreWakuMessage(&message1)
-	s.Require().NoError(err)
-	err = s.manager.StoreWakuMessage(&message2)
-	s.Require().NoError(err)
-	err = s.manager.StoreWakuMessage(&message3)
-	s.Require().NoError(err)
-	err = s.manager.StoreWakuMessage(&message4)
-	s.Require().NoError(err)
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	index, err := s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 3)
-
-	totalData, err := os.ReadFile(s.archiveManager.archiveDataFile(community.IDString()))
-	s.Require().NoError(err)
-
-	// First archive has 2 messages
-	// Second archive has 1 message
-	// Third archive has 1 message
-	fromMap := map[uint64]int{
-		uint64(startDate.Unix()):                    2,
-		uint64(startDate.Add(partition).Unix()):     1,
-		uint64(startDate.Add(partition * 2).Unix()): 1,
-	}
-
-	for _, metadata := range index.Archives {
-		archive := &protobuf.WakuMessageArchive{}
-		data := totalData[metadata.Offset : metadata.Offset+metadata.Size-metadata.Padding]
-
-		err = proto.Unmarshal(data, archive)
-		s.Require().NoError(err)
-		s.Require().Len(archive.Messages, fromMap[metadata.Metadata.From])
-	}
-}
-
-func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldAppendArchives() {
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	// Time range of 1 week
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	// 7 days partition, this should create one archive
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-	err = s.manager.StoreWakuMessage(&message1)
-	s.Require().NoError(err)
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	index, err := s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 1)
-
-	// Time range of next week
-	startDate = time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	endDate = time.Date(2020, 1, 14, 00, 00, 00, 0, time.UTC)
-
-	message2 := buildMessage(startDate.Add(2*time.Hour), topic, []byte{2})
-	err = s.manager.StoreWakuMessage(&message2)
-	s.Require().NoError(err)
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	index, err = s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 2)
-}
-
-func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages() {
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	// Time range of 7 days
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	// Partition of 7 days, this should create a single archive
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-	message2 := buildMessage(startDate.Add(2*time.Hour), topic, []byte{2})
-	// This message is outside of the startDate-endDate range and should not
-	// be part of the archive
-	message3 := buildMessage(endDate.Add(2*time.Hour), topic, []byte{3})
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.ReceivedMessage{&message1, &message2, &message3}, topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	_, err = os.Stat(s.archiveManager.archiveDataFile(community.IDString()))
-	s.Require().NoError(err)
-	_, err = os.Stat(s.archiveManager.archiveIndexFile(community.IDString()))
-	s.Require().NoError(err)
-	_, err = os.Stat(torrentFile(s.archiveManager.torrentConfig.TorrentDir, community.IDString()))
-	s.Require().NoError(err)
-
-	index, err := s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 1)
-
-	totalData, err := os.ReadFile(s.archiveManager.archiveDataFile(community.IDString()))
-	s.Require().NoError(err)
-
-	for _, metadata := range index.Archives {
-		archive := &protobuf.WakuMessageArchive{}
-		data := totalData[metadata.Offset : metadata.Offset+metadata.Size-metadata.Padding]
-
-		err = proto.Unmarshal(data, archive)
-		s.Require().NoError(err)
-
-		s.Require().Len(archive.Messages, 2)
-	}
-}
-
-func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldCreateMultipleArchives() {
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	// Time range of 3 weeks
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 21, 00, 00, 00, 0, time.UTC)
-	// 7 days partition, this should create three archives
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-	message2 := buildMessage(startDate.Add(2*time.Hour), topic, []byte{2})
-	// We expect 2 archives to be created for startDate - endDate of each
-	// 7 days of data. This message should end up in the second archive
-	message3 := buildMessage(startDate.Add(8*24*time.Hour), topic, []byte{3})
-	// This one should end up in the third archive
-	message4 := buildMessage(startDate.Add(14*24*time.Hour), topic, []byte{4})
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.ReceivedMessage{&message1, &message2, &message3, &message4}, topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	index, err := s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 3)
-
-	totalData, err := os.ReadFile(s.archiveManager.archiveDataFile(community.IDString()))
-	s.Require().NoError(err)
-
-	// First archive has 2 messages
-	// Second archive has 1 message
-	// Third archive has 1 message
-	fromMap := map[uint64]int{
-		uint64(startDate.Unix()):                    2,
-		uint64(startDate.Add(partition).Unix()):     1,
-		uint64(startDate.Add(partition * 2).Unix()): 1,
-	}
-
-	for _, metadata := range index.Archives {
-		archive := &protobuf.WakuMessageArchive{}
-		data := totalData[metadata.Offset : metadata.Offset+metadata.Size-metadata.Padding]
-
-		err = proto.Unmarshal(data, archive)
-		s.Require().NoError(err)
-		s.Require().Len(archive.Messages, fromMap[metadata.Metadata.From])
-	}
-}
-
-func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldAppendArchives() {
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	// Time range of 1 week
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	// 7 days partition, this should create one archive
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.ReceivedMessage{&message1}, topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	index, err := s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 1)
-
-	// Time range of next week
-	startDate = time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	endDate = time.Date(2020, 1, 14, 00, 00, 00, 0, time.UTC)
-
-	message2 := buildMessage(startDate.Add(2*time.Hour), topic, []byte{2})
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromMessages(community.ID(), []*types.ReceivedMessage{&message2}, topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	index, err = s.archiveManager.LoadHistoryArchiveIndexFromFile(s.manager.identity, community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(index.Archives, 2)
-}
-
-func (s *ManagerSuite) TestSeedHistoryArchiveTorrent() {
-	err := s.archiveManager.StartTorrentClient()
-	s.Require().NoError(err)
-	defer s.archiveManager.Stop() //nolint: errcheck
-
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-	err = s.manager.StoreWakuMessage(&message1)
-	s.Require().NoError(err)
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	err = s.archiveManager.SeedHistoryArchiveTorrent(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(s.archiveManager.torrentTasks, 1)
-
-	metaInfoHash := s.archiveManager.torrentTasks[community.IDString()]
-	torrent, ok := s.archiveManager.torrentClient.Torrent(metaInfoHash)
-	defer torrent.Drop()
-
-	s.Require().Equal(ok, true)
-	s.Require().Equal(torrent.Seeding(), true)
-}
-
-func (s *ManagerSuite) TestUnseedHistoryArchiveTorrent() {
-	err := s.archiveManager.StartTorrentClient()
-	s.Require().NoError(err)
-	defer s.archiveManager.Stop() //nolint: errcheck
-
-	community, chatID, err := s.buildCommunityWithChat()
-	s.Require().NoError(err)
-
-	topic := types.BytesToContentTopic(messaging.ToContentTopic(chatID))
-	topics := []types.ContentTopic{topic}
-
-	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
-	endDate := time.Date(2020, 1, 7, 00, 00, 00, 0, time.UTC)
-	partition := 7 * 24 * time.Hour
-
-	message1 := buildMessage(startDate.Add(1*time.Hour), topic, []byte{1})
-	err = s.manager.StoreWakuMessage(&message1)
-	s.Require().NoError(err)
-
-	_, err = s.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, false)
-	s.Require().NoError(err)
-
-	err = s.archiveManager.SeedHistoryArchiveTorrent(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(s.archiveManager.torrentTasks, 1)
-
-	metaInfoHash := s.archiveManager.torrentTasks[community.IDString()]
-
-	s.archiveManager.UnseedHistoryArchiveTorrent(community.ID())
-	_, ok := s.archiveManager.torrentClient.Torrent(metaInfoHash)
-	s.Require().Equal(ok, false)
 }
 
 func (s *ManagerSuite) TestCheckChannelPermissions_NoPermissions() {
@@ -1632,15 +1160,6 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 
 	s.Require().False(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
 	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 0)
-}
-
-func buildTorrentConfig() *params.TorrentConfig {
-	return &params.TorrentConfig{
-		Enabled:    true,
-		DataDir:    os.TempDir() + "/archivedata",
-		TorrentDir: os.TempDir() + "/torrents",
-		Port:       0,
-	}
 }
 
 func buildMessage(timestamp time.Time, topic types.ContentTopic, hash []byte) types.ReceivedMessage {

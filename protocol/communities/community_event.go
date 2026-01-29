@@ -94,7 +94,7 @@ func communityEventFromProtobuf(msg *protobuf.SignedCommunityEvent) (*CommunityE
 }
 
 func (e *CommunityEvent) RecoverSigner() (*ecdsa.PublicKey, error) {
-	if e.Signature == nil || len(e.Signature) == 0 {
+	if len(e.Signature) == 0 {
 		return nil, errors.New("missing signature")
 	}
 

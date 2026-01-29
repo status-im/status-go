@@ -32,6 +32,7 @@ import (
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/discord"
@@ -39,6 +40,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -57,13 +59,14 @@ var grantUpdateInterval = 24 * time.Hour
 // 4 hours interval
 var grantInvokesProfileDispatchInterval = 4 * time.Hour
 
+var importInitialDelay = time.Minute * 5
+
 const discordTimestampLayout = time.RFC3339
 
 const (
 	importSlowRate          = time.Second / 1
 	importFastRate          = time.Second / 100
 	importMessagesChunkSize = 10
-	importInitialDelay      = time.Minute * 5
 )
 
 const (
@@ -257,7 +260,9 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 
 				if sub.HistoryArchivesSeedingSignal != nil {
 
-					m.config.messengerSignalsHandler.HistoryArchivesSeeding(sub.HistoryArchivesSeedingSignal.CommunityID)
+					m.config.messengerSignalsHandler.HistoryArchivesSeeding(
+						sub.HistoryArchivesSeedingSignal.CommunityID,
+					)
 
 					c, err := m.communitiesManager.GetByIDString(sub.HistoryArchivesSeedingSignal.CommunityID)
 					if err != nil {
@@ -265,9 +270,9 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 					}
 
 					if c.IsControlNode() {
-						err := m.dispatchMagnetlinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
+						err := m.dispatchArchiveLinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
 						if err != nil {
-							m.logger.Debug("failed to dispatch magnetlink message", zap.Error(err))
+							m.logger.Debug("failed to dispatch archiveLink message", zap.Error(err))
 						}
 					}
 				}
@@ -281,6 +286,20 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 						sub.HistoryArchiveDownloadedSignal.CommunityID,
 						sub.HistoryArchiveDownloadedSignal.From,
 						sub.HistoryArchiveDownloadedSignal.To,
+					)
+				}
+
+				if sub.ManifestFetchedSignal != nil {
+					m.config.messengerSignalsHandler.ManifestFetched(
+						sub.ManifestFetchedSignal.CommunityID,
+						sub.ManifestFetchedSignal.IndexCid,
+					)
+				}
+
+				if sub.IndexDownloadCompletedSignal != nil {
+					m.config.messengerSignalsHandler.IndexDownloadCompleted(
+						sub.IndexDownloadCompletedSignal.CommunityID,
+						sub.IndexDownloadCompletedSignal.IndexCid,
 					)
 				}
 
@@ -1937,7 +1956,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 }
 
 func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) (*MessengerResponse, error) {
-	m.logger.Debug("accept request to join community",
+	m.logger.Debug("[LogosStorage][acceptRequestToJoinCommunity] accept request to join community",
 		zap.String("community", requestToJoin.CommunityID.String()),
 		zap.String("pubkey", requestToJoin.PublicKey))
 
@@ -1980,14 +1999,17 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			CommunityDescriptionProtocolMessage: descriptionMessage,
 		}
 
-		// The purpose of this torrent code is to get the 'magnetlink' to populate 'requestToJoinResponseProto.MagnetUri'
-		if m.archiveManager.IsReady() && m.archiveManager.TorrentFileExists(community.IDString()) {
-			magnetlink, err := m.archiveManager.GetHistoryArchiveMagnetlink(community.ID())
+		if m.archiveManager.IsStarted() {
+			m.logger.Debug("[Messenger][acceptRequestToJoinCommunity] checking if currently seeding", zap.String("communityID", community.IDString()))
+			archiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(community.ID())
 			if err != nil {
-				m.logger.Warn("couldn't get magnet link for community", zap.Error(err))
+				m.logger.Warn("couldn't get archive link for community", zap.Error(err))
 				return nil, err
 			}
-			requestToJoinResponseProto.MagnetUri = magnetlink
+			if m.archiveManager.IsSeedingHistoryArchive(community.ID(), archiveLink) {
+				m.logger.Debug("[Messenger][acceptRequestToJoinCommunity] setting requestToJoinResponseProto.ArchiveLink", zap.String("communityID", community.IDString()), zap.String("archiveLink", archiveLink))
+				requestToJoinResponseProto.ArchiveLink = archiveLink
+			}
 		}
 
 		payload, err := proto.Marshal(requestToJoinResponseProto)
@@ -2523,8 +2545,8 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 		return nil, err
 	}
 
-	if m.config.torrentConfig != nil && m.config.torrentConfig.Enabled && communitySettings.HistoryArchiveSupportEnabled {
-		go m.archiveManager.StartHistoryArchiveTasksInterval(community, messageArchiveInterval)
+	if m.archiveManager.IsStarted() && communitySettings.HistoryArchiveSupportEnabled {
+		go m.archiveManager.StartHistoryArchiveTasksInterval(community.ID(), community.UniversalChatID(), community.Encrypted(), messageArchiveInterval)
 	}
 
 	return response, nil
@@ -2702,10 +2724,14 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 
 	id := community.ID()
 
-	if m.archiveManager.IsReady() {
+	if m.archiveManager.IsStarted() {
+		lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(id)
+		if err != nil {
+			return nil, err
+		}
 		if !communitySettings.HistoryArchiveSupportEnabled {
 			m.archiveManager.StopHistoryArchiveTasksInterval(id)
-		} else if !m.archiveManager.IsSeedingHistoryArchiveTorrent(id) {
+		} else if !m.archiveManager.IsSeedingHistoryArchive(id, lastSeenArchiveLink) {
 			var communities []*communities.Community
 			communities = append(communities, community)
 			go m.InitHistoryArchiveTasks(communities)
@@ -2782,7 +2808,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	if m.archiveManager.IsReady() {
+	if m.archiveManager.IsStarted() {
 		var communities []*communities.Community
 		communities = append(communities, community)
 		go m.InitHistoryArchiveTasks(communities)
@@ -3565,12 +3591,14 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
-			// Check if there's already a torrent file for this community and seed it
-			if m.archiveManager.TorrentFileExists(c.IDString()) {
-				err = m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
+			lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(c.ID())
+			if err == nil {
+				err = m.archiveManager.SeedHistoryArchive(c.ID(), lastSeenArchiveLink)
 				if err != nil {
-					m.logger.Error("failed to seed history archive", zap.Error(err))
+					m.logger.Error("[LogosStorage][init_history_archive_tasks] failed to seed history archive", zap.Error(err))
 				}
+			} else {
+				m.logger.Error("[LogosStorage][init_history_archive_tasks] failed to get last seen archive link", zap.Error(err))
 			}
 
 			filters, err := m.archiveManager.GetCommunityChatsFilters(c.ID())
@@ -3579,9 +3607,14 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				continue
 			}
 
+			filter := m.messaging.ChatFilterByChatID(c.UniversalChatID())
+			if filter != nil {
+				filters = append(filters, filter)
+			}
+
 			if len(filters) == 0 {
 				m.logger.Debug("no filters or chats for this community starting interval", zap.String("id", c.IDString()))
-				go m.archiveManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
+				go m.archiveManager.StartHistoryArchiveTasksInterval(c.ID(), c.UniversalChatID(), c.Encrypted(), messageArchiveInterval)
 				continue
 			}
 
@@ -3589,11 +3622,6 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic())
-			}
-
-			filter := m.messaging.ChatFilterByChatID(c.UniversalChatID())
-			if filter != nil {
-				filters = append(filters, filter)
 			}
 
 			// First we need to know the timestamp of the latest waku message
@@ -3638,15 +3666,23 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			if lastArchiveEndDateTimestamp == 0 {
 				// No prior messages to be archived, so we just kick off the archive creation loop
 				// for future archives
-				go m.archiveManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
+				go m.archiveManager.StartHistoryArchiveTasksInterval(c.ID(), c.UniversalChatID(), c.Encrypted(), messageArchiveInterval)
 			} else if durationSinceLastArchive < messageArchiveInterval {
 				// Last archive is less than `interval` old, wait until `interval` is complete,
 				// then create archive and kick off archive creation loop for future archives
 				// Seed current archive in the meantime
-				err := m.archiveManager.SeedHistoryArchiveTorrent(c.ID())
-				if err != nil {
-					m.logger.Error("failed to seed history archive", zap.Error(err))
+				lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(c.ID())
+				if err == nil {
+					err := m.archiveManager.SeedHistoryArchive(c.ID(), lastSeenArchiveLink)
+					if err != nil {
+						m.logger.Error("[LogosStorage][init_history_archive_tasks] failed to seed history archive", zap.Error(err))
+					}
+				} else {
+					m.logger.Error("[LogosStorage][init_history_archive_tasks] failed to get last seen archive link", zap.Error(err))
 				}
+				// we do not have to explicitly seed to LogosStorage. If LogosStorage is enabled
+				// and the index cid was not explicitly removed, it will be
+				// advertised automatically => or maybe we do?
 				timeToNextInterval := messageArchiveInterval - durationSinceLastArchive
 
 				m.logger.Debug("starting history archive tasks interval in", zap.Any("timeLeft", timeToNextInterval))
@@ -3655,7 +3691,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 					if err != nil {
 						m.logger.Error("failed to get create and seed history archive", zap.Error(err))
 					}
-					go m.archiveManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
+					go m.archiveManager.StartHistoryArchiveTasksInterval(c.ID(), c.UniversalChatID(), c.Encrypted(), messageArchiveInterval)
 				})
 			} else {
 				// Looks like the last archive was generated more than `interval`
@@ -3666,7 +3702,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 					m.logger.Error("failed to get create and seed history archive", zap.Error(err))
 				}
 
-				go m.archiveManager.StartHistoryArchiveTasksInterval(c, messageArchiveInterval)
+				go m.archiveManager.StartHistoryArchiveTasksInterval(c.ID(), c.UniversalChatID(), c.Encrypted(), messageArchiveInterval)
 			}
 		}
 	}
@@ -3676,6 +3712,7 @@ func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	go func() {
 		defer gocommon.LogOnPanic()
 		time.Sleep(importInitialDelay)
+
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
 		})
@@ -3719,7 +3756,7 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types3.HexBytes) err
 	}
 
 	// Create new task
-	task := &communities.HistoryArchiveDownloadTask{
+	task := &archivetypes.HistoryArchiveDownloadTask{
 		CancelChan: make(chan struct{}),
 		Waiter:     *new(sync.WaitGroup),
 		Cancelled:  false,
@@ -3733,7 +3770,13 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types3.HexBytes) err
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer task.Waiter.Done()
-		err := m.importHistoryArchives(communityID, task.CancelChan)
+		defer m.archiveManager.RemoveHistoryArchiveDownloadTask(communityID.String())
+		lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(communityID)
+		if err != nil {
+			m.logger.Error("failed to get last seen archive link", zap.Error(err))
+			return
+		}
+		err = m.importHistoryArchives(communityID, task.CancelChan, lastSeenArchiveLink)
 		if err != nil {
 			m.logger.Error("failed to import history archives", zap.Error(err))
 		}
@@ -3750,7 +3793,7 @@ func (m *Messenger) SlowdownArchivesImport() {
 	m.importRateLimiter.SetLimit(rate.Every(importSlowRate))
 }
 
-func (m *Messenger) importHistoryArchives(communityID types3.HexBytes, cancel chan struct{}) error {
+func (m *Messenger) importHistoryArchives(communityID types3.HexBytes, cancel chan struct{}, archiveLink string) error {
 	importTicker := time.NewTicker(100 * time.Millisecond)
 	defer importTicker.Stop()
 
@@ -3761,6 +3804,8 @@ func (m *Messenger) importHistoryArchives(communityID types3.HexBytes, cancel ch
 		cancelFunc()
 	}()
 
+	m.logger.Debug("[LogosStorage][importHistoryArchives] waiting to start importing history archive messages (importDelayer.wait)", zap.String("communityID", types3.EncodeHex(communityID)))
+
 	// don't proceed until initial import delay has passed
 	select {
 	case <-m.importDelayer.wait:
@@ -3770,21 +3815,23 @@ func (m *Messenger) importHistoryArchives(communityID types3.HexBytes, cancel ch
 
 	delayImport := false
 
+	m.logger.Info("[LogosStorage][importHistoryArchives] starting to import history archive messages", zap.String("communityID", types3.EncodeHex(communityID)))
+
 importMessageArchivesLoop:
 	for {
 		if delayImport {
 			select {
 			case <-ctx.Done():
-				m.logger.Debug("interrupted importing history archive messages")
+				m.logger.Debug("[LogosStorage][importHistoryArchives] interrupted importing history archive messages")
 				return nil
-			case <-time.After(1 * time.Hour):
+			case <-time.After(m.ratchetNotFoundDelay):
 				delayImport = false
 			}
 		}
 
 		select {
 		case <-ctx.Done():
-			m.logger.Debug("interrupted importing history archive messages")
+			m.logger.Debug("[LogosStorage][importHistoryArchives] interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
 			err := m.checkIfIMemberOfCommunity(communityID)
@@ -3793,30 +3840,32 @@ importMessageArchivesLoop:
 			}
 			archiveIDsToImport, err := m.archiveManager.GetMessageArchiveIDsToImport(communityID)
 			if err != nil {
-				m.logger.Error("couldn't get message archive IDs to import", zap.Error(err))
+				m.logger.Error("[LogosStorage][importHistoryArchives] couldn't get message archive IDs to import", zap.Error(err))
 				return err
 			}
 
 			if len(archiveIDsToImport) == 0 {
-				m.logger.Debug("no message archives to import")
+				m.logger.Debug("[LogosStorage][importHistoryArchives] no message archives to import")
 				break importMessageArchivesLoop
 			}
 
-			m.logger.Info("importing message archive", zap.Int("left", len(archiveIDsToImport)))
+			m.logger.Info("[LogosStorage][importHistoryArchives] importing message archive", zap.Int("left", len(archiveIDsToImport)))
 
 			// only process one archive at a time, so in case of cancel we don't
 			// wait for all archives to be processed first
 			downloadedArchiveID := archiveIDsToImport[0]
 
-			archiveMessages, err := m.archiveManager.ExtractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
+			archiveMessages, err := m.archiveManager.LoadArchiveMessages(ctx, communityID, archiveLink, downloadedArchiveID)
+
 			if err != nil {
 				if errors.Is(err, types2.ErrHashRatchetGroupIDNotFound) {
+					m.logger.Error("[LogosStorage][importHistoryArchives] ErrHashRatchetGroupIDNotFound", zap.Error(err))
 					// In case we're missing hash ratchet keys, best we can do is
 					// to wait for them to be received and try import again.
 					delayImport = true
 					continue
 				}
-				m.logger.Error("failed to extract history archive messages", zap.Error(err))
+				m.logger.Error("[LogosStorage][importHistoryArchives] failed to extract history archive messages", zap.Error(err))
 				continue
 			}
 
@@ -3825,14 +3874,14 @@ importMessageArchivesLoop:
 			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
 				if err := m.importRateLimiter.Wait(ctx); err != nil {
 					if !errors.Is(err, context.Canceled) {
-						m.logger.Error("rate limiter error when handling archive messages", zap.Error(err))
+						m.logger.Error("[LogosStorage][importHistoryArchives] rate limiter error when handling archive messages", zap.Error(err))
 					}
 					continue importMessageArchivesLoop
 				}
 
 				response, err := m.handleArchiveMessages(messagesChunk)
 				if err != nil {
-					m.logger.Error("failed to handle archive messages", zap.Error(err))
+					m.logger.Error("[LogosStorage][importHistoryArchives] failed to handle archive messages", zap.Error(err))
 					continue importMessageArchivesLoop
 				}
 
@@ -3846,7 +3895,7 @@ importMessageArchivesLoop:
 
 			err = m.archiveManager.SetMessageArchiveIDImported(communityID, downloadedArchiveID, true)
 			if err != nil {
-				m.logger.Error("failed to mark history message archive as imported", zap.Error(err))
+				m.logger.Error("[LogosStorage][importHistoryArchives] failed to mark history message archive as imported", zap.Error(err))
 				continue
 			}
 		}
@@ -3854,34 +3903,34 @@ importMessageArchivesLoop:
 	return nil
 }
 
-func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
+func (m *Messenger) dispatchArchiveLinkMessage(communityID string) error {
 
 	community, err := m.communitiesManager.GetByIDString(communityID)
 	if err != nil {
 		return err
 	}
 
-	magnetlink, err := m.archiveManager.GetHistoryArchiveMagnetlink(community.ID())
+	archiveLink, err := m.archiveManager.GetHistoryArchiveLink(community.ID())
 	if err != nil {
 		return err
 	}
 
-	magnetLinkMessage := &protobuf.CommunityMessageArchiveMagnetlink{
-		Clock:     m.getTimesource().GetCurrentTime(),
-		MagnetUri: magnetlink,
+	archiveLinkMessage := &protobuf.CommunityMessageArchiveLink{
+		Clock:       m.getTimesource().GetCurrentTime(),
+		ArchiveLink: archiveLink,
 	}
 
-	encodedMessage, err := proto.Marshal(magnetLinkMessage)
+	encodedMessage, err := proto.Marshal(archiveLinkMessage)
 	if err != nil {
 		return err
 	}
 
-	chatID := community.MagnetlinkMessageChannelID()
+	chatID := community.UniversalChatID()
 	rawMessage := common.RawMessage{
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
 		Payload:              encodedMessage,
-		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_MAGNETLINK,
+		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_LINK,
 		SkipGroupMessageWrap: true,
 		PubsubTopic:          community.PubsubTopic(),
 		Priority:             &types2.LowPriority,
@@ -3892,23 +3941,32 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		return err
 	}
 
-	err = m.communitiesManager.UpdateCommunityDescriptionMagnetlinkMessageClock(community.ID(), magnetLinkMessage.Clock)
+	err = m.communitiesManager.UpdateCommunityDescriptionArchiveLinkMessageClock(community.ID(), archiveLinkMessage.Clock)
 	if err != nil {
 		return err
 	}
-	return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), magnetLinkMessage.Clock)
+	return m.communitiesManager.UpdateArchiveLinkMessageClock(community.ID(), archiveLinkMessage.Clock)
 }
 
 func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
+	m.logger.Info("enabling community history archive protocol")
+
 	nodeConfig, err := m.settings.GetNodeConfig()
 	if err != nil {
 		return err
 	}
 
+	if nodeConfig.LogosStorageConfig.Enabled {
+		m.logger.Info("LogosStorage archive distribution is enabled")
+		return fmt.Errorf("cannot enable Torrent archive distribution when LogosStorage archive distribution is already enabled")
+	}
+
 	if nodeConfig.TorrentConfig.Enabled {
+		m.logger.Info("Torrent archive distribution is already enabled")
 		return nil
 	}
 
+	m.logger.Info("enabling torrent archive distribution")
 	nodeConfig.TorrentConfig.Enabled = true
 	err = m.settings.SaveSetting("node-config", nodeConfig)
 	if err != nil {
@@ -3916,8 +3974,14 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	}
 
 	m.config.torrentConfig = &nodeConfig.TorrentConfig
-	m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
-	err = m.archiveManager.StartTorrentClient()
+
+	amc := &archivetypes.ArchiveManagerConfig{
+		TorrentConfig: &nodeConfig.TorrentConfig,
+	}
+
+	m.SetupArchiveManager(amc)
+
+	err = m.archiveManager.Start()
 	if err != nil {
 		return err
 	}
@@ -3928,6 +3992,73 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	}
 
 	if len(controlledCommunities) > 0 {
+		m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] initializing history archive tasks for controlled communities", zap.Int("count", len(controlledCommunities)))
+		go m.InitHistoryArchiveTasks(controlledCommunities)
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
+	}
+	return nil
+}
+
+func (m *Messenger) EnableLogosStorageCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] enabling community history archive protocol")
+
+	nodeConfig, err := m.settings.GetNodeConfig()
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] current LogosStorageConfig for history archive protocol", zap.Any("LogosStorageConfig", nodeConfig.LogosStorageConfig))
+
+	if nodeConfig.TorrentConfig.Enabled {
+		m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] torrent archive distribution is enabled")
+		return fmt.Errorf("cannot enable LogosStorage archive distribution when Torrent archive distribution is already enabled")
+	}
+
+	if nodeConfig.LogosStorageConfig.Enabled {
+		m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] LogosStorage archive distribution is already enabled")
+		return nil
+	}
+
+	if len(overrides) > 0 {
+		m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] applying LogosStorageConfig overrides", zap.Any("overrides", overrides))
+		if err := logosstorage.ApplyLogosStorageConfigOverrides(&nodeConfig.LogosStorageConfig, overrides); err != nil {
+			return err
+		}
+	}
+
+	m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] enabling LogosStorage archive distribution")
+	nodeConfig.LogosStorageConfig.Enabled = true
+
+	err = m.settings.SaveSetting("node-config", nodeConfig)
+	if err != nil {
+		return err
+	}
+
+	m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] LogosStorageConfig (with potential overrides)", zap.Any("LogosStorageConfig", nodeConfig.LogosStorageConfig))
+
+	m.config.logosStorageConfig = &nodeConfig.LogosStorageConfig
+
+	amc := &archivetypes.ArchiveManagerConfig{
+		LogosStorageConfig: &nodeConfig.LogosStorageConfig,
+	}
+
+	m.SetupArchiveManager(amc)
+
+	err = m.archiveManager.Start()
+
+	if err != nil {
+		return err
+	}
+
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return err
+	}
+
+	if len(controlledCommunities) > 0 {
+		m.logger.Info("[LogosStorage][enable_community_history_archive_protocol] initializing history archive tasks for controlled communities", zap.Int("count", len(controlledCommunities)))
 		go m.InitHistoryArchiveTasks(controlledCommunities)
 	}
 	if m.config.messengerSignalsHandler != nil {
@@ -3942,7 +4073,7 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 	if err != nil {
 		return err
 	}
-	if !nodeConfig.TorrentConfig.Enabled {
+	if !nodeConfig.TorrentConfig.Enabled && !nodeConfig.LogosStorageConfig.Enabled {
 		return nil
 	}
 
@@ -3951,13 +4082,39 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		m.logger.Error("failed to stop torrent manager", zap.Error(err))
 	}
 
-	nodeConfig.TorrentConfig.Enabled = false
-	err = m.settings.SaveSetting("node-config", nodeConfig)
-	m.config.torrentConfig = &nodeConfig.TorrentConfig
-	m.archiveManager.SetTorrentConfig(&nodeConfig.TorrentConfig)
-	if err != nil {
-		return err
+	if nodeConfig.TorrentConfig.Enabled {
+		nodeConfig.TorrentConfig.Enabled = false
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+
+		if err != nil {
+			return err
+		}
+
+		m.config.torrentConfig = &nodeConfig.TorrentConfig
+		amc := &archivetypes.ArchiveManagerConfig{
+			TorrentConfig: &nodeConfig.TorrentConfig,
+		}
+
+		m.SetupArchiveManager(amc)
 	}
+
+	if nodeConfig.LogosStorageConfig.Enabled {
+		nodeConfig.LogosStorageConfig.Enabled = false
+		err = m.settings.SaveSetting("node-config", nodeConfig)
+
+		if err != nil {
+			return err
+		}
+
+		m.config.logosStorageConfig = &nodeConfig.LogosStorageConfig
+
+		amc := &archivetypes.ArchiveManagerConfig{
+			LogosStorageConfig: &nodeConfig.LogosStorageConfig,
+		}
+
+		m.SetupArchiveManager(amc)
+	}
+
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryArchivesProtocolDisabled()
 	}
@@ -4812,4 +4969,12 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
+}
+
+func (m *Messenger) IsSeedingHistoryArchive(communityID types3.HexBytes) bool {
+	lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(communityID)
+	if err != nil {
+		return false
+	}
+	return m.archiveManager.IsSeedingHistoryArchive(communityID, lastSeenArchiveLink)
 }

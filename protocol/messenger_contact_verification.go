@@ -601,10 +601,6 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 		return nil, err
 	}
 
-	if verifRequest == nil {
-		return nil, errors.New("no contact verification found")
-	}
-
 	chat, ok := m.allChats.Load(verifRequest.From)
 	if !ok {
 		publicKey, err := contact.PublicKey()

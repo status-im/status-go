@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -112,7 +113,17 @@ func TestVerifyAccountPassword(t *testing.T) {
 		require.NoError(t, err)
 
 		if testCase.importToLocation {
-			err = os.Link(filename, filepath.Join(keystore.KeystorePath(), filepath.Base(filename)))
+			// Copy file instead of hard link to support cross-filesystem operations
+			src, err := os.Open(filename)
+			require.NoError(t, err)
+			defer src.Close()
+
+			dstPath := filepath.Join(keystore.KeystorePath(), filepath.Base(filename))
+			dst, err := os.Create(dstPath)
+			require.NoError(t, err)
+			defer dst.Close()
+
+			_, err = io.Copy(dst, src)
 			require.NoError(t, err)
 
 			// now we need to re-create the keystore in order to make the get-keystore aware of the copied account1
@@ -183,8 +194,17 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	keystore, err := accManager.createKeystore(account3.KeyUID)
 	require.NoError(t, err)
 
-	// Copy file to keystore directory (simplest way is to make a link)
-	err = os.Link(testKeyFile, filepath.Join(keystore.KeystorePath(), filepath.Base(testKeyFile)))
+	// Copy file to keystore directory
+	src, err := os.Open(testKeyFile)
+	require.NoError(t, err)
+	defer src.Close()
+
+	dstPath := filepath.Join(keystore.KeystorePath(), filepath.Base(testKeyFile))
+	dst, err := os.Create(dstPath)
+	require.NoError(t, err)
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
 	require.NoError(t, err)
 
 	// now we need to reload the keystore (re-create it) in order to make the get-keystore aware of the copied account

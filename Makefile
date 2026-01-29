@@ -2,6 +2,8 @@
 .PHONY: statusgo-ios-library statusgo-android-library
 .PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 .PHONY: build-libsds clean-libsds rebuild-libsds
+.PHONY: fetch-libstorage clean-libstorage test-logosstorage test-logos-storage test-libstorage test-torrent
+.PHONY: logos-storage-help history-archive-help
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -34,6 +36,7 @@ help: ##@other Show this help
 RELEASE_TAG ?= $(shell ./scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
+LIBS_DIR := $(abspath ./libs)
 
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
  detected_OS := Windows
@@ -88,10 +91,11 @@ ifeq ($(detected_OS),Darwin)
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
  LIB_EXT := dll
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-L$(LIBS_DIR) -lstorage -Wl,-rpath,$(LIBS_DIR)"
 else ifeq ($(detected_OS),Linux)
  GOBIN_SHARED_LIB_EXT := so
  LIB_EXT := so
- CGO_LDFLAGS += "-Wl,-soname,libstatus.so.0"
+ GOBIN_SHARED_LIB_CGO_LDFLAGS :=  CGO_ENABLED=1 CGO_CFLAGS=-I$(LIBS_DIR) CGO_LDFLAGS="-Wl,-soname,libstatus.so.0 -L$(LIBS_DIR) -lstorage -Wl,-rpath,$(LIBS_DIR)"
 endif
 export GOPATH ?= $(HOME)/go
 
@@ -142,8 +146,110 @@ else
 endif
 
 LIBSDS := $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR) -I$(LIBS_DIR)
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -L$(LIBS_DIR) -lstorage
+
+# `logos-storage` variables (opt-in)
+USE_LOGOS_STORAGE ?= false
+USE_TORRENT ?= false
+LIBS_DIR ?= $(GIT_ROOT)/libs
+
+# If running in nix shell, these may already be exported by shellHook.
+LOGOS_STORAGE_LIB_DIR ?= $(if $(LIBSTORAGE_PATH),$(LIBSTORAGE_PATH)/lib,$(LIBS_DIR))
+LOGOS_STORAGE_INC_DIR ?= $(if $(LIBSTORAGE_PATH),$(LIBSTORAGE_PATH)/include,$(LOGOS_STORAGE_LIB_DIR))
+LOGOS_STORAGE_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/logos-storage/logos-storage-go-bindings 2>/dev/null)
+LOGOS_STORAGE_ARCH := $(shell uname -m)
+ifeq ($(LOGOS_STORAGE_ARCH),x86_64)
+  LOGOS_STORAGE_ARCH := amd64
+else ifeq ($(LOGOS_STORAGE_ARCH),aarch64)
+  LOGOS_STORAGE_ARCH := arm64
+endif
+ifeq ($(detected_OS),Darwin)
+  LOGOS_STORAGE_OS := macos
+else ifeq ($(detected_OS),Linux)
+  LOGOS_STORAGE_OS := linux
+else
+  LOGOS_STORAGE_OS := $(shell echo $(detected_OS) | tr A-Z a-z)
+endif
+LOGOS_STORAGE_DOWNLOAD_URL := https://github.com/logos-storage/logos-storage-go-bindings/releases/download/$(LOGOS_STORAGE_VERSION)/storage-$(LOGOS_STORAGE_OS)-$(LOGOS_STORAGE_ARCH).zip
+
+ifeq ($(USE_LOGOS_STORAGE),true)
+	BUILD_TAGS += use_logos_storage
+	CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
+	CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
+endif
+
+ifeq ($(USE_TORRENT),true)
+	BUILD_TAGS += use_torrent
+endif
+
+RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
+ifeq ($(USE_LOGOS_STORAGE),true)
+	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
+endif
+
+fetch-libstorage: ##@build Fetch libstorage for native non-Nix workflows
+ifdef LIBSTORAGE_PATH
+	@echo "Using libstorage from Nix shell: $(LIBSTORAGE_PATH)"
+else
+	@if [ -f "$(LIBS_DIR)/libstorage.so" ] || [ -f "$(LIBS_DIR)/libstorage.dylib" ] || [ -f "$(LIBS_DIR)/libstorage.dll" ]; then \
+		echo "libstorage already present in $(LIBS_DIR); skipping download"; \
+	else \
+		echo "Fetching libstorage from: $(LOGOS_STORAGE_DOWNLOAD_URL)"; \
+		mkdir -p "$(LIBS_DIR)"; \
+		curl -fSL --create-dirs -o "$(LIBS_DIR)/logos-storage-$(LOGOS_STORAGE_OS)-$(LOGOS_STORAGE_ARCH).zip" "$(LOGOS_STORAGE_DOWNLOAD_URL)"; \
+		unzip -o -qq "$(LIBS_DIR)/logos-storage-$(LOGOS_STORAGE_OS)-$(LOGOS_STORAGE_ARCH).zip" -d "$(LIBS_DIR)"; \
+		rm -f "$(LIBS_DIR)"/logos-storage-*.zip; \
+	fi
+endif
+
+clean-libstorage: ##@other Remove downloaded native libstorage artifacts
+	@echo "Removing local libstorage artifacts from $(LIBS_DIR)"
+	@rm -f "$(LIBS_DIR)"/libstorage.so "$(LIBS_DIR)"/libstorage.dylib "$(LIBS_DIR)"/libstorage.dll "$(LIBS_DIR)"/libstorage.h
+
+test-logosstorage: fetch-libstorage $(LIBSDS) ##@tests Run logosstorage-related package tests via gotestsum
+	go generate -tags "$(BUILD_TAGS) use_logos_storage" ./services/logosstorage
+	LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
+	gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_logos_storage gowaku_skip_migrations"
+	LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
+	gotestsum --packages="./protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_logos_storage gowaku_skip_migrations"
+
+test-logos-storage: test-logosstorage ##@tests Alias for test-logosstorage
+
+test-libstorage: test-logosstorage ##@tests Alias for test-logosstorage
+
+test-torrent: $(LIBSDS) ##@tests Run torrent archive package tests via gotestsum
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations"
+
+history-archive-help: ##@build Show history archive build/test toggles and env vars
+	@echo "History archive build toggles:"
+	@echo "  USE_TORRENT=true enables build tag: use_torrent"
+	@echo "  USE_LOGOS_STORAGE=true enables build tag: use_logos_storage"
+	@echo "  USE_LOGOS_STORAGE=true also wires libstorage include/lib/runtime paths"
+	@echo ""
+	@echo "Variables:"
+	@echo "  USE_LOGOS_STORAGE          (default: false)"
+	@echo "  USE_TORRENT                (default: false)"
+	@echo "  LOGOS_STORAGE_LIB_DIR      (default: \$$LIBSTORAGE_PATH/lib or ./libs)"
+	@echo "  LOGOS_STORAGE_INC_DIR      (default: \$$LIBSTORAGE_PATH/include or LOGOS_STORAGE_LIB_DIR)"
+	@echo "  FUNCTIONAL_TESTS_USE_LOGOS_STORAGE (default: false)"
+	@echo "  FUNCTIONAL_TESTS_BUILD_TAGS        (default: gowaku_no_rln)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make test-unit USE_LOGOS_STORAGE=true"
+	@echo "  make test-unit USE_TORRENT=true"
+	@echo "  make test-unit USE_LOGOS_STORAGE=true USE_TORRENT=true"
+	@echo "  make fetch-libstorage"
+	@echo "  make test-torrent"
+	@echo "  make test-logosstorage"
+	@echo "  FUNCTIONAL_TESTS_USE_LOGOS_STORAGE=true ./scripts/run_functional_tests.sh"
+
+logos-storage-help: history-archive-help ##@build Alias for history-archive-help
 
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
@@ -222,11 +328,17 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 #----------------
 all: $(GO_CMD_NAMES)
 
+CGO_ENV := CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="-Wl,-rpath,$(LIBS_DIR) $(CGO_LDFLAGS)"
+ifeq ($(detected_OS),Darwin)
+CGO_ENV += DYLD_LIBRARY_PATH=$(LIBS_DIR):$(NIM_SDS_LIB_DIR):$$DYLD_LIBRARY_PATH
+else
+CGO_ENV += LD_LIBRARY_PATH=$(LIBS_DIR):$(NIM_SDS_LIB_DIR):$$LD_LIBRARY_PATH
+endif
+
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate $(LIBWAKU) $(LIBSDS)
+$(GO_CMD_BUILDS): generate fetch-libstorage $(LIBWAKU) $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -v \
+	$(CGO_ENV) go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
@@ -313,6 +425,28 @@ rebuild-libsds: | clean-libsds $(LIBSDS)
 
 # Status-go targets
 
+# Add rpath to libstdc++ to avoid runtime errors with NIX
+ifeq ($(detected_OS),Darwin)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libc++.1.dylib)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(DYLD_LIBRARY_PATH)
+    LD_NAME := DYLD_LIBRARY_PATH
+else ifeq ($(detected_OS),Windows)
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++-6.dll)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR);$(CXXLIB_DIR);$(PATH)
+    LD_NAME := PATH
+else
+	CXXLIB      := $(shell $(CXX) -print-file-name=libstdc++.so.6)
+	CXXLIB_DIR  := $(dir $(CXXLIB))
+	LD_PATH := $(LIBS_DIR):$(CXXLIB_DIR):$(LD_LIBRARY_PATH)
+    LD_NAME := LD_LIBRARY_PATH
+endif
+
+#----------------
+# LogosStorage
+# Status-go targets
+
 statusgo: ##@build Build status-go as status-backend server
 statusgo: build/bin/status-backend
 
@@ -348,8 +482,7 @@ statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build \
+	$(CGO_ENV) go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-archive \
@@ -379,8 +512,7 @@ endif
 
 statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
-	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(ANDROID_BUILD_FLAGS) $(CGO_ENV) go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
@@ -390,8 +522,7 @@ statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-ios #
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
-	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(IOS_BUILD_FLAGS) $(CGO_ENV) go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
 	@echo "iOS library built"
@@ -431,13 +562,16 @@ clean-generated: ##@generate Remove orphaned generated files
 	fi
 
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
-generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
 generate: GO_GENERATE_CMD ?= go tool go-generate-fast
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
+ifeq ($(NO_NETWORK),)
+generate: fetch-libstorage
+endif
 generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
+	@go generate -tags "use_logos_storage $(BUILD_TAGS)" ./services/logosstorage
 
 generate-contracts:
 	go generate ./contracts
@@ -463,7 +597,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit-prep: $(LIBSDS)
+test-unit-prep: fetch-libstorage $(LIBSDS)
 test-unit-prep: generate
 test-unit-prep: export BUILD_TAGS ?=
 test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
@@ -480,11 +614,11 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /transactions/fake | \
 	grep -v /tests-unit-network)
 test-unit: ##@tests Run unit and integration tests
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	./scripts/run_unit_tests.sh
 
 test-single: test-unit-prep
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go test -v $(PKG) -testify.m $(TEST)
 
 test-unit-network: test-unit-prep
@@ -512,12 +646,12 @@ lint-panics: generate
 
 lint: generate lint-panics
 lint:
-	golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
+	$(CGO_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 
 lint-fix: generate
 	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
 
-clean: ##@other Cleanup
+clean: clean-libstorage ##@other Cleanup
 	rm -fr build/bin/*
 
 git-clean:
@@ -589,5 +723,5 @@ pytest-lint:
 	$(MAKE) -C tests-functional lint
 
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go run tools/generate-db/main.go -out-dir build/db

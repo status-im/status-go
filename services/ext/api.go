@@ -2,6 +2,7 @@ package ext
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,6 +17,7 @@ import (
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/browsers"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -1071,6 +1073,10 @@ func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings,
 	return api.service.messenger.GetCommunitiesSettings()
 }
 
+func (api *PublicAPI) EnableLogosStorageCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	return api.service.messenger.EnableLogosStorageCommunityHistoryArchiveProtocol(overrides)
+}
+
 func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.EnableCommunityHistoryArchiveProtocol()
 }
@@ -1424,4 +1430,37 @@ func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteComm
 
 func (api *PublicAPI) PeerID() string {
 	return api.service.messaging.PeerID().String()
+}
+
+func (m *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
+	return m.service.messenger.IsSeedingHistoryArchive(communityID)
+}
+
+func (m *PublicAPI) Connect(peerId string, addrs []string) error {
+	return m.service.messenger.Connect(peerId, addrs)
+}
+
+func (m *PublicAPI) Debug() (logosstorage.LogosStorageDebugInfo, error) {
+	return m.service.messenger.Debug()
+}
+
+func (m *PublicAPI) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+	return m.service.messenger.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (m *PublicAPI) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+	return m.service.messenger.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	if duration <= 0 {
+		return 0, errors.New("duration must be greater than zero")
+	}
+
+	d := duration * time.Second
+	updatedInterval, err := api.service.messenger.UpdateMessageArchiveInterval(d)
+	if err != nil {
+		return 0, err
+	}
+	return updatedInterval / time.Second, nil
 }

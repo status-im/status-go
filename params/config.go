@@ -210,12 +210,18 @@ type NodeConfig struct {
 	// WalletConnectProjectID is the project ID for WalletConnect relay authentication
 	WalletConnectProjectID string
 
+	// TorrentConfig provides configuration for the BitTorrent client used for message history archives.
 	TorrentConfig TorrentConfig
 
 	// OTELConfig provides configuration for OpenTelemetry tracing
 	OTELConfig OTELConfig
 
+	LogosStorageConfig LogosStorageConfig
+
 	OutputMessageCSVEnabled bool
+
+	ImportInitialDelay     int
+	MessageArchiveInterval int
 }
 
 // WalletConfig extra configuration for wallet.Service.
@@ -381,13 +387,18 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		c.APIModules = "net,web3,eth"
 	}
 
-	// Ensure TorrentConfig is valid
 	if c.TorrentConfig.Enabled {
 		if c.TorrentConfig.DataDir == "" {
 			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
 		}
 		if c.TorrentConfig.TorrentDir == "" {
 			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
+		}
+	}
+
+	if c.LogosStorageConfig.Enabled {
+		if c.LogosStorageConfig.NodeConfig.DataDir == "" {
+			c.LogosStorageConfig.NodeConfig.DataDir = filepath.Join(c.RootDataDir, "logos-storage", "data")
 		}
 	}
 
@@ -423,6 +434,15 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			Port:       9025,
 			DataDir:    dataDir + "/archivedata",
 			TorrentDir: dataDir + "/torrents",
+		},
+		LogosStorageConfig: LogosStorageConfig{
+			Enabled: false,
+			NodeConfig: LogosStorageNodeConfig{
+				BlockRetries:   BlockRetries,
+				DataDir:        filepath.Join(dataDir, "logos-storage", "data"),
+				MetricsEnabled: false,
+				LogFormat:      "nocolors",
+			},
 		},
 	}
 
@@ -502,6 +522,9 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	if err := c.TorrentConfig.Validate(validate); err != nil {
 		return err
 	}
+	if err := Validate(c.LogosStorageConfig, validate); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -530,6 +553,19 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 	if c.Enabled && (c.DataDir == "" || c.TorrentDir == "") {
 		return fmt.Errorf("TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be \"\"")
 	}
+	return nil
+}
+
+func Validate(c LogosStorageConfig, validate *validator.Validate) error {
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+
+	// TODO uncomment when DataDir is mandatory
+	// Need to check if the logos-storage config should be saved in db
+	// if c.DataDir == "" {
+	// 	return fmt.Errorf("LogosStorageConfig.DataDir cannot be \"\"")
+	// }
 	return nil
 }
 

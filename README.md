@@ -8,7 +8,7 @@ A comprehensive list of `status-go` functionality can be found in [Brief overvie
 
 # Docs
 
-- [How to Build](./building.md)
+- [How to Build](docs/building.md)
 - [How to Contribute](CONTRIBUTING.md)
 - [How to Release](docs/RELEASING.md)
 - [How to run status-go as HTTP server](/cmd/status-backend/README.md)
