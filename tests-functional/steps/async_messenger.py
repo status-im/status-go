@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 from uuid import uuid4
 
@@ -152,8 +153,27 @@ class AsyncMessengerSteps:
         Returns:
             str: The community chat ID (community_id + chat_id)
         """
-        # Ensure both nodes are aware of the community before we proceed.
-        self.fetch_community(member, self.community_id)
+        # First, have member spectate the community to subscribe to updates.
+        # This helps light client nodes receive community data faster.
+        try:
+            member.wakuext_service.spectate_community(self.community_id)
+        except Exception as exc:
+            logging.warning(f"Spectate community failed for {self.community_id}: {exc}")
+
+        # Wait for member to see the community with retry logic.
+        # Light client nodes need more time to sync community data.
+        community = None
+        for attempt in range(12):  # 12 attempts * 5s = 60s max
+            community = self.fetch_community(member, self.community_id)
+            if community:
+                break
+            logging.info(f"Community {self.community_id} not found yet on member (attempt {attempt + 1}/12)")
+            await asyncio.sleep(5)
+
+        if not community:
+            raise Exception(f"Community {self.community_id} not visible to member after retries")
+
+        # Ensure admin also has the community data
         self.fetch_community(admin, self.community_id)
 
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
