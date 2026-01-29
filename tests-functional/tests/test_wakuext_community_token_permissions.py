@@ -6,7 +6,7 @@ import pytest
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
 
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
-from clients.signals import SignalType
+from clients.signals import SignalType, WalletEventType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
 from steps.messenger import MessengerSteps
@@ -113,23 +113,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert balance_result.exit_code == 0, "Balance check command failed"
         balance = int(balance_result.output.decode().strip(), 16)
         assert balance >= min_wei, f"Insufficient SNT balance: {balance}, expected at least 1 token"
-
-    def _wait_for_permissions_satisfied(self, backend, community_id, member_address, attempts=3, wait_sec=2):
-        """Wait for permission check to see the balance and return satisfied response."""
-
-        @retry(
-            stop=stop_after_attempt(attempts),
-            wait=wait_fixed(wait_sec),
-            retry=retry_if_result(lambda r: not r or not r.get("satisfied")),
-        )
-        def _check():
-            # Force refresh wallet balances before checking permissions.
-            # Without this, check_permissions_to_join_community may use stale cached balances
-            # and not see tokens that were just minted in fund_backend_account_with_snt.
-            backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
-            return backend.wakuext_service.check_permissions_to_join_community(community_id)
-
-        return _check()
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
@@ -240,8 +223,16 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert response["tokenPermissions"], "No token permissions found"
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
 
-        # Wait for permission check to see the balance
-        permissions_resp = self._wait_for_permissions_satisfied(member_with_snt_backend, community_id, member_address)
+        # Wait for balance to be fetched (request to join uses cached balances)
+        member_with_snt_backend.wallet_service.restart_wallet_reload_timer()  # Force balance fetch
+        member_with_snt_backend.wait_for_signal_predicate(
+            SignalType.WALLET,
+            lambda signal: signal["event"]["type"] == WalletEventType.WALLET_TICK_RELOAD.value,
+            timeout=20,  # 10 seconds backoff + timeout
+        )
+
+        permissions_resp = member_with_snt_backend.wakuext_service.check_permissions_to_join_community(community_id)
+        assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
         # Member with tokens requests to join community
