@@ -45,6 +45,8 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/archive"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
@@ -104,7 +106,7 @@ type Messenger struct {
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    PushNotificationServer
 	communitiesManager        *communities.Manager
-	archiveManager            communities.ArchiveService
+	archiveManager            archive.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
 	accountsManager           AccountsManager
 	mentionsManager           *MentionManager
@@ -369,7 +371,7 @@ func NewMessenger(
 		return nil, err
 	}
 
-	amc := &communities.ArchiveManagerConfig{
+	amc := &archivetypes.ArchiveManagerConfig{
 		TorrentConfig: c.torrentConfig,
 		Logger:        logger,
 		Persistence:   communitiesManager.GetPersistence(),
@@ -381,7 +383,7 @@ func NewMessenger(
 	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
 	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
-	archiveManager := communities.NewArchiveManager(amc)
+	archiveManager := archive.NewArchiveManager(amc)
 
 	settings, err := accounts.NewDB(database)
 	if err != nil {
@@ -491,6 +493,26 @@ func NewMessenger(
 	}
 
 	return messenger, nil
+}
+
+func (m *Messenger) SetupArchiveManager(amc *archivetypes.ArchiveManagerConfig) {
+	if amc.Logger == nil {
+		amc.Logger = m.logger
+	}
+	if amc.Persistence == nil {
+		amc.Persistence = m.communitiesManager.GetPersistence()
+	}
+	if amc.Messaging == nil {
+		amc.Messaging = m.messaging
+	}
+	if amc.Identity == nil {
+		amc.Identity = m.identity
+	}
+	if amc.Publisher == nil {
+		amc.Publisher = m.communitiesManager
+	}
+
+	m.archiveManager = archive.NewArchiveManager(amc)
 }
 
 func (m *Messenger) processSentMessage(id string) error {
@@ -782,9 +804,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Update torrent manager
-	if m.archiveManager != nil {
-		m.archiveManager.SetOnline(online)
-	}
+	m.archiveManager.SetOnline(online)
 
 	// Publish contact code
 	if online && m.shouldPublishContactCode {

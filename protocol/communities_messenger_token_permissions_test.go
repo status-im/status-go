@@ -29,6 +29,8 @@ import (
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/archive"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -2208,12 +2210,24 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	}
 
 	// Share archive directory between all users
-	s.owner.archiveManager.SetTorrentConfig(&torrentConfig)
-	s.bob.archiveManager.SetTorrentConfig(&torrentConfig)
+	amc := &archivetypes.ArchiveManagerConfig{
+		TorrentConfig: &torrentConfig,
+	}
+
+	s.owner.SetupArchiveManager(amc)
+	s.bob.SetupArchiveManager(amc)
+
 	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 	s.bob.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
 
-	archiveIDs, err := s.owner.archiveManager.CreateHistoryArchiveTorrentFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
+	archiveManager, ok := s.owner.archiveManager.(*archive.ArchiveManager)
+	s.Require().True(ok)
+
+	torrentBackend, err := archiveManager.GetTorrentBackend()
+	s.Require().NoError(err)
+	s.Require().NotNil(torrentBackend)
+
+	archiveIDs, err := torrentBackend.CreateHistoryArchiveFromDB(community.ID(), topics, startDate, endDate, partition, community.Encrypted())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIDs, 1)
 
@@ -2245,12 +2259,27 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	// https://github.com/status-im/status-go/blob/6c82a6c2be7ebed93bcae3b9cf5053da3820de50/protocol/communities/manager.go#L4403
 
 	// Ensure owner has archive
-	archiveIndex, err := s.owner.archiveManager.LoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
+
+	archiveManager, ok = s.owner.archiveManager.(*archive.ArchiveManager)
+	s.Require().True(ok)
+
+	torrentBackend, err = archiveManager.GetTorrentBackend()
+	s.Require().NoError(err)
+	s.Require().NotNil(torrentBackend)
+
+	archiveIndex, err := torrentBackend.LoadHistoryArchiveIndexFromFile(s.owner.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
 	// Ensure bob has archive (because they share same local directory)
-	archiveIndex, err = s.bob.archiveManager.LoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
+	archiveManager, ok = s.bob.archiveManager.(*archive.ArchiveManager)
+	s.Require().True(ok)
+
+	torrentBackend, err = archiveManager.GetTorrentBackend()
+	s.Require().NoError(err)
+	s.Require().NotNil(torrentBackend)
+
+	archiveIndex, err = torrentBackend.LoadHistoryArchiveIndexFromFile(s.bob.identity, community.ID())
 	s.Require().NoError(err)
 	s.Require().Len(archiveIndex.Archives, 1)
 
@@ -2266,7 +2295,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		close(s.bob.importDelayer.wait)
 	})
 	cancel := make(chan struct{})
-	err = s.bob.importHistoryArchives(community.ID(), cancel)
+	err = s.bob.importHistoryArchives(community.ID(), cancel, "")
 	s.Require().NoError(err)
 
 	// Ensure message1 wasn't imported, as it's encrypted, and we don't have access to the channel
