@@ -14,8 +14,42 @@ TOKENS_KEYS = [
 @pytest.mark.rpc
 class TestRpc:
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile):
-        self.rpc_client = backend_recovered_profile(name="main_user", user=user_1)
+    def setup_backend(self, request, backend_recovered_profile):
+        # Add Ethereum mainnet alongside Anvil so token keys like `1-0x...` can be resolved by the token manager.
+        extra_kwargs = {}
+        if request.node.name in (
+            "test_fetch_prices",
+            "test_fetch_market_values",
+            "test_fetch_token_details",
+        ):
+            extra_kwargs["extra_networks_override"] = [
+                {
+                    "chainID": 1,
+                    "chainName": "Ethereum Mainnet",
+                    "rpcProviders": [
+                        {
+                            "chainId": 1,
+                            "name": "Mainnet Dummy",
+                            "url": "http://localhost:0",
+                            "enableRpsLimiter": False,
+                            "type": "embedded-direct",
+                            "enabled": True,
+                            "authType": "no-auth",
+                        }
+                    ],
+                    "shortName": "eth",
+                    "nativeCurrencyName": "Ether",
+                    "nativeCurrencySymbol": "ETH",
+                    "nativeCurrencyDecimals": 18,
+                    "isTest": False,
+                    "layer": 1,
+                    "enabled": True,
+                    "isActive": True,
+                    "isDeactivatable": True,
+                }
+            ]
+
+        self.rpc_client = backend_recovered_profile(name="main_user", user=user_1, **extra_kwargs)
 
     def test_start_wallet(self):
         result = self.rpc_client.wallet_service.start_wallet()

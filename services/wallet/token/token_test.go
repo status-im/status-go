@@ -3,6 +3,7 @@ package token
 import (
 	"context"
 	"math/big"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -13,13 +14,16 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/rpc"
-	"github.com/status-im/status-go/internal/rpc/network"
+	network_mock "github.com/status-im/status-go/internal/rpc/network/mock"
 	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -72,7 +76,17 @@ func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
 	}
 	rpcClient, _ := rpc.NewClient(config)
 
-	nm := network.NewManager(appDB, nil)
+	mockCtrl := gomock.NewController(t)
+	nm := network_mock.NewMockManagerInterface(mockCtrl)
+	nm.EXPECT().GetActiveNetworks().Return([]*params.Network{
+		{ChainID: walletcommon.EthereumMainnet},
+		{ChainID: walletcommon.OptimismMainnet},
+		{ChainID: walletcommon.ArbitrumMainnet},
+		{ChainID: walletcommon.BaseMainnet},
+		{ChainID: walletcommon.BSCMainnet},
+	}, nil).AnyTimes()
+	nm.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+	nm.EXPECT().GetTestNetworksEnabled().Return(false, nil).AnyTimes()
 
 	manager, err := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, nil, nil, accountsPublisher,
 		accountsDB, 1*time.Hour, 1*time.Hour)
@@ -80,11 +94,14 @@ func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
 
 	lastTokensUpdate := time.Time{}
 
-	tokensManager, err := setUpTokenListsManager(manager, walletDB, lastTokensUpdate, 1*time.Hour, 1*time.Hour)
+	activeChains, err := getEnabledChains(nm)
+	require.NoError(t, err)
+	tokensManager, err := setUpTokenListsManager(manager, walletDB, activeChains, lastTokensUpdate, 1*time.Hour, 1*time.Hour)
 	require.NoError(t, err)
 	manager.tokensManager = tokensManager
 
 	return manager, accountsPublisher, func() {
+		mockCtrl.Finish()
 		require.NoError(t, appDB.Close())
 		require.NoError(t, walletDB.Close())
 	}
@@ -373,6 +390,9 @@ func TestGetTokensOfInterestForActiveNetworksMode_AddsCrossChainAndMandatoryToke
 		types.TokenKey(10, common.HexToAddress("0x6fd9d7ad17242c41f7131d257212c54a0e816691")),
 	}
 
+	activeNetworks, err := manager.networkManager.GetActiveNetworks()
+	require.NoError(t, err)
+
 	// mandatory token keys for the active networks mode, all of them have cross chain id
 	mandatoryTokenKeysForMode := []string{}
 	for _, tokenKey := range walletcommon.MandatoryTokens() {
@@ -381,6 +401,11 @@ func TestGetTokensOfInterestForActiveNetworksMode_AddsCrossChainAndMandatoryToke
 			continue
 		}
 		if walletcommon.ChainID(chainID).IsMainnet() == testnetMode {
+			continue
+		}
+		if !slices.ContainsFunc(activeNetworks, func(network *params.Network) bool {
+			return network.ChainID == chainID
+		}) {
 			continue
 		}
 		mandatoryTokenKeysForMode = append(mandatoryTokenKeysForMode, tokenKey)

@@ -191,6 +191,13 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def _set_networks(self, data, **kwargs):
         self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
+
+        # Allow callers (fixtures/tests) to add additional networks on top of the default Anvil network.
+        # - networks_override: full replacement for networksOverride (list[dict])
+        # - extra_networks_override: appended to the default Anvil network (list[dict])
+        networks_override = kwargs.get("networks_override", None)
+        extra_networks_override = kwargs.get("extra_networks_override", []) or []
+
         anvil_network = {
             "chainID": self.network_id,
             "chainName": "Anvil",
@@ -219,7 +226,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         data["testNetworksEnabled"] = False
         data["networkId"] = self.network_id
-        data["networksOverride"] = [anvil_network]
+        if networks_override is not None:
+            data["networksOverride"] = networks_override
+        else:
+            data["networksOverride"] = [anvil_network, *extra_networks_override]
 
     def _set_proxy_credentials(self, data):
         if "STATUS_BUILD_PROXY_USER" not in os.environ:
