@@ -111,7 +111,7 @@ class AsyncStatusBackend:
         pattern: Optional[str] = None,
         predicate: Optional[Callable[[Signal], bool]] = None,
         timeout: float = 30.0,
-        check_buffer: bool = False,  # Default False to avoid O(N) buffer scan
+        check_buffer: bool = True,  # Default True - always check buffer first
         after_seq: Optional[int] = None,  # Only match signals with seq > after_seq
     ) -> Signal:
         """
@@ -123,8 +123,9 @@ class AsyncStatusBackend:
             predicate: Optional predicate function
             timeout: Timeout in seconds
             check_buffer: If True, check buffered signals first (O(N) scan).
-                Default is False for performance - use True only when you need
-                to find signals that may have arrived before calling wait_for_signal().
+                Default is True for robustness in async/Docker scenarios where
+                signals may arrive before wait_for_signal() is called. Set to False
+                only when you're certain the signal hasn't arrived yet.
             after_seq: If provided, only match signals with seq > after_seq.
                 Used to skip signals that have already been processed.
 

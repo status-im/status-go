@@ -80,10 +80,12 @@ class SignalRouter:
         self,
         buffer_size: int = 1000,
         buffer_ttl: float = 300.0,
+        cleanup_interval: float = 10.0,
     ):
         self._waiters: dict[SignalType, list[PendingWaiter]] = {}
         self._buffer: deque[Signal] = deque(maxlen=buffer_size)
         self._buffer_ttl = buffer_ttl
+        self._cleanup_interval = cleanup_interval
         self._seq = 0
         self._lock = asyncio.Lock()
         self._cleanup_task: Optional[asyncio.Task[None]] = None
@@ -161,7 +163,7 @@ class SignalRouter:
         predicate: Optional[Callable[[Signal], bool]] = None,
         pattern: Optional[str] = None,
         timeout: float = 30.0,
-        check_buffer: bool = False,  # Default False to avoid O(N) buffer scan
+        check_buffer: bool = True,  # Default True - always check buffer first for robustness
         after_seq: Optional[int] = None,  # Only match signals with seq > after_seq
     ) -> Signal:
         """
@@ -177,9 +179,10 @@ class SignalRouter:
             pattern: Optional string pattern to search in signal JSON
             timeout: Maximum wait time in seconds
             check_buffer: If True, check buffer before waiting (O(N) scan).
-                Default is False for performance - use True only when you need
-                to find signals that may have arrived before calling wait_for()
-                (e.g., startup signals like NODE_LOGIN).
+                Default is True for robustness in async/Docker scenarios where
+                signals may arrive before wait_for() is called. Set to False
+                only when you're certain the signal hasn't arrived yet and want
+                to avoid the buffer scan.
             after_seq: If provided, only match signals with seq > after_seq.
                 Used by wait_for_sequence to preserve ordering when signals
                 arrive faster than sequential processing.
@@ -308,7 +311,7 @@ class SignalRouter:
     async def _cleanup_loop(self) -> None:
         """Periodically clean up expired buffer entries and timed-out waiters."""
         while self._started:
-            await asyncio.sleep(10.0)
+            await asyncio.sleep(self._cleanup_interval)
 
             async with self._lock:
                 # Clean expired buffer entries
@@ -321,6 +324,10 @@ class SignalRouter:
                 for signal_type, waiters in list(self._waiters.items()):
                     expired = [w for w in waiters if now - w.created_at > w.timeout and not w.future.done()]
                     for waiter in expired:
+                        logging.debug(
+                            f"[SignalRouter] Removing expired waiter: type={signal_type}, "
+                            f"age={now - waiter.created_at:.1f}s, timeout={waiter.timeout}s"
+                        )
                         waiter.future.set_exception(asyncio.TimeoutError(f"Signal wait timed out: {signal_type}"))
                         waiters.remove(waiter)
 
