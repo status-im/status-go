@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 // vim: ft=groovy
-library 'status-jenkins-lib@v1.9.39'
+library 'status-jenkins-lib@github/drop-pr-cmnt-fallback'
 
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */

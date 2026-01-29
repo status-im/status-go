@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.39'
+library 'status-jenkins-lib@github/drop-pr-cmnt-fallback'
 
 pipeline {
   agent { label 'linux' }
