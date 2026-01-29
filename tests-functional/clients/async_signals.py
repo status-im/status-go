@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 import websockets
-from websockets.exceptions import ConnectionClosed
 
 from clients.signals import SignalType
 
@@ -409,41 +408,30 @@ class AsyncSignalClient:
         return self._connected.is_set()
 
     async def _reader_loop(self) -> None:
-        """Main WebSocket reader loop with reconnection."""
-        reconnect_delay = 1.0
+        """Main WebSocket reader loop."""
+        try:
+            async with websockets.connect(
+                self.url,
+                ping_interval=None,  # Disable client-side pings (server manages keepalive)
+                ping_timeout=None,
+                close_timeout=1,
+            ) as ws:
+                self._ws = ws
+                self._connected.set()
+                logging.debug(f"AsyncSignalClient connected to {self.url}")
 
-        while not self._should_stop:
-            try:
-                async with websockets.connect(
-                    self.url,
-                    ping_interval=None,  # Disable client-side pings (server manages keepalive)
-                    ping_timeout=None,
-                    close_timeout=1,
-                ) as ws:
-                    self._ws = ws
-                    self._connected.set()
-                    reconnect_delay = 1.0  # Reset on successful connection
-                    logging.debug(f"AsyncSignalClient connected to {self.url}")
+                async for message in ws:
+                    if self._should_stop:
+                        break
+                    await self._handle_message(message)
 
-                    async for message in ws:
-                        if self._should_stop:
-                            break
-                        await self._handle_message(message)
-
-            except ConnectionClosed as e:
-                if not self._should_stop:
-                    logging.warning(f"WebSocket connection closed (code={e.code}), reconnecting...")
-                    self._connected.clear()
-                    await asyncio.sleep(reconnect_delay)
-                    reconnect_delay = min(reconnect_delay * 2, 30.0)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                if not self._should_stop:
-                    logging.error(f"WebSocket error: {e}")
-                    self._connected.clear()
-                    await asyncio.sleep(reconnect_delay)
-                    reconnect_delay = min(reconnect_delay * 2, 30.0)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            if not self._should_stop:
+                logging.error(f"WebSocket connection error: {e}")
+        finally:
+            self._connected.clear()
 
     async def _handle_message(self, raw_message: str | bytes) -> None:
         """Parse and publish signal to router."""
