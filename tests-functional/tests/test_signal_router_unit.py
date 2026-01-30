@@ -430,3 +430,301 @@ class TestSignal:
 
         with pytest.raises(FrozenInstanceError):
             signal.signal_type = SignalType.NODE_LOGIN  # type: ignore[misc]
+
+
+class TestSignalRouterExpect:
+    """Tests for SignalRouter.expect() context manager - race-condition-free waiting."""
+
+    @pytest.mark.asyncio
+    async def test_expect_basic_flow(self):
+        """Test basic expect() flow - waiter registered before action."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            async with router.expect(SignalType.NODE_READY) as future:
+                # Waiter is registered here - publish signal
+                signal = _make_signal(SignalType.NODE_READY, {"ok": True})
+                await router.publish(signal)
+
+            # Await the future outside the context
+            result = await asyncio.wait_for(future, timeout=5.0)
+            assert result.signal_type == SignalType.NODE_READY
+            assert result.event["ok"] is True
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_signal_already_in_buffer(self):
+        """Test expect() finds signal that's already in buffer."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            # Publish signal BEFORE expect()
+            await router.publish(_make_signal(SignalType.NODE_READY, {"ok": True}))
+
+            async with router.expect(SignalType.NODE_READY) as future:
+                # Signal already in buffer - future should be resolved
+                pass
+
+            result = await asyncio.wait_for(future, timeout=1.0)
+            assert result.signal_type == SignalType.NODE_READY
+            assert result.event["ok"] is True
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_with_pattern(self):
+        """Test expect() with pattern matching."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-123") as future:
+                # Publish non-matching signal first
+                await router.publish(
+                    _make_signal(
+                        SignalType.MESSAGES_NEW,
+                        {"id": "msg-456"},
+                        {"type": "messages.new", "event": {"id": "msg-456"}},
+                    )
+                )
+                # Publish matching signal
+                await router.publish(
+                    _make_signal(
+                        SignalType.MESSAGES_NEW,
+                        {"id": "msg-123"},
+                        {"type": "messages.new", "event": {"id": "msg-123"}},
+                    )
+                )
+
+            result = await asyncio.wait_for(future, timeout=5.0)
+            assert result.event["id"] == "msg-123"
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_with_predicate(self):
+        """Test expect() with predicate filtering."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            async with router.expect(
+                SignalType.NODE_LOGIN,
+                predicate=lambda s: s.event.get("success") is True,
+            ) as future:
+                # Publish non-matching
+                await router.publish(_make_signal(SignalType.NODE_LOGIN, {"success": False}))
+                # Publish matching
+                await router.publish(_make_signal(SignalType.NODE_LOGIN, {"success": True}))
+
+            result = await asyncio.wait_for(future, timeout=5.0)
+            assert result.event["success"] is True
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_timeout_on_await(self):
+        """Test that timeout is applied by caller, not expect()."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            async with router.expect(SignalType.NODE_READY) as future:
+                # Don't publish anything
+                pass
+
+            # Timeout should be applied here
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(future, timeout=0.1)
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_cleanup_on_normal_exit(self):
+        """Test that waiter is cleaned up after context exit."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            async with router.expect(SignalType.NODE_READY) as future:
+                await router.publish(_make_signal(SignalType.NODE_READY, {"ok": True}))
+
+            await asyncio.wait_for(future, timeout=1.0)
+
+            # Verify waiter was cleaned up
+            assert SignalType.NODE_READY not in router._waiters or len(router._waiters[SignalType.NODE_READY]) == 0
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_cleanup_on_exception(self):
+        """Test that waiter is cleaned up even if exception occurs inside context."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            with pytest.raises(RuntimeError, match="Test error"):
+                async with router.expect(SignalType.NODE_READY) as future:  # noqa: F841
+                    raise RuntimeError("Test error")
+
+            # Verify waiter was cleaned up despite exception
+            assert SignalType.NODE_READY not in router._waiters or len(router._waiters[SignalType.NODE_READY]) == 0
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_no_race_condition(self):
+        """
+        Test that expect() eliminates race condition.
+
+        This is the key test - verifies that signal published immediately
+        after context entry is NOT missed.
+        """
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            # Run multiple iterations to increase confidence
+            for i in range(10):
+                async with router.expect(SignalType.MESSAGES_NEW, pattern=f"msg-{i}") as future:
+                    # Publish immediately - no sleep!
+                    await router.publish(
+                        _make_signal(
+                            SignalType.MESSAGES_NEW,
+                            {"id": f"msg-{i}"},
+                            {"type": "messages.new", "event": {"id": f"msg-{i}"}},
+                        )
+                    )
+
+                result = await asyncio.wait_for(future, timeout=1.0)
+                assert result.event["id"] == f"msg-{i}"
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_multiple_concurrent(self):
+        """Test multiple concurrent expect() contexts."""
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            # Use nested expects (both waiters registered before any publish)
+            async with router.expect(SignalType.NODE_READY) as future1:
+                async with router.expect(SignalType.NODE_LOGIN) as future2:
+                    # Both waiters registered - publish signals
+                    await router.publish(_make_signal(SignalType.NODE_LOGIN, {"uid": "123"}))
+                    await router.publish(_make_signal(SignalType.NODE_READY, {"ok": True}))
+
+                result2 = await asyncio.wait_for(future2, timeout=1.0)
+                assert result2.signal_type == SignalType.NODE_LOGIN
+
+            result1 = await asyncio.wait_for(future1, timeout=1.0)
+            assert result1.signal_type == SignalType.NODE_READY
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_same_pattern_all_receive(self):
+        """Test that when multiple expects match same signal, ALL receive it.
+
+        This documents the current behavior: all matching waiters get the same signal.
+        This is useful for scenarios where multiple parts of code need the same notification.
+        """
+        router = SignalRouter()
+        await router.start()
+
+        try:
+            async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-X") as future1:
+                async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-X") as future2:
+                    # Publish one signal matching both waiters
+                    await router.publish(
+                        _make_signal(
+                            SignalType.MESSAGES_NEW,
+                            {"id": "msg-X"},
+                            {"type": "messages.new", "event": {"id": "msg-X"}},
+                        )
+                    )
+
+                    # BOTH waiters should receive the same signal
+                    result1 = await asyncio.wait_for(future1, timeout=1.0)
+                    result2 = await asyncio.wait_for(future2, timeout=1.0)
+
+                    assert result1.event["id"] == "msg-X"
+                    assert result2.event["id"] == "msg-X"
+                    # Both should have the same seq number (same signal)
+                    assert result1.seq == result2.seq
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_cleanup_on_cancellation(self):
+        """Test that waiter is cleaned up when task is cancelled."""
+        router = SignalRouter()
+        await router.start()
+
+        async def expect_and_wait():
+            async with router.expect(SignalType.NODE_READY) as future:
+                await asyncio.sleep(10)  # Will be cancelled here
+            return await future
+
+        try:
+            task = asyncio.create_task(expect_and_wait())
+            await asyncio.sleep(0.05)  # Let the expect register
+
+            # Verify waiter is registered
+            assert SignalType.NODE_READY in router._waiters
+            assert len(router._waiters[SignalType.NODE_READY]) == 1
+
+            # Cancel the task
+            task.cancel()
+
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+            # Give cleanup time to run
+            await asyncio.sleep(0.05)
+
+            # Verify waiter was cleaned up
+            assert SignalType.NODE_READY not in router._waiters or len(router._waiters[SignalType.NODE_READY]) == 0
+
+        finally:
+            await router.stop()
+
+    @pytest.mark.asyncio
+    async def test_expect_predicate_exception_in_buffer(self):
+        """Test that exception in predicate during buffer check is handled gracefully."""
+        router = SignalRouter()
+        await router.start()
+
+        def bad_predicate(s: Signal) -> bool:
+            if s.event.get("trigger_error"):
+                raise ValueError("Predicate failed!")
+            return s.event.get("match", False)
+
+        try:
+            # Publish signals: one will trigger error, one will match
+            await router.publish(_make_signal(SignalType.NODE_READY, {"trigger_error": True}))
+            await router.publish(_make_signal(SignalType.NODE_READY, {"match": True}))
+
+            # Should skip the error-causing signal and find the matching one
+            async with router.expect(SignalType.NODE_READY, predicate=bad_predicate) as future:
+                pass  # Should find in buffer
+
+            result = await asyncio.wait_for(future, timeout=1.0)
+            assert result.event.get("match") is True
+
+        finally:
+            await router.stop()

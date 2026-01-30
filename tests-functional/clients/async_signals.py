@@ -5,8 +5,9 @@ import json
 import logging
 import time
 from collections import deque
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, AsyncIterator, Callable, Optional
 
 import websockets
 
@@ -306,6 +307,140 @@ class SignalRouter:
             results.append(signal)
 
         return results
+
+    def _build_matcher(
+        self,
+        signal_type: SignalType,
+        predicate: Optional[Callable[[Signal], bool]] = None,
+        pattern: Optional[str] = None,
+        after_seq: Optional[int] = None,
+    ) -> SignalMatcher:
+        """
+        Build a SignalMatcher from the given criteria.
+
+        Extracted for reuse between wait_for() and expect().
+
+        Args:
+            signal_type: Type of signal to match
+            predicate: Optional custom predicate function
+            pattern: Optional string pattern to search in signal JSON
+            after_seq: If provided, only match signals with seq > after_seq
+
+        Returns:
+            Configured SignalMatcher
+        """
+        user_predicate = predicate
+        if pattern and not user_predicate:
+
+            def pattern_predicate(s: Signal) -> bool:
+                if s.raw_json:
+                    return pattern in s.raw_json
+                return pattern in json.dumps(s.raw)
+
+            user_predicate = pattern_predicate
+
+        if after_seq is not None:
+            original_predicate = user_predicate
+
+            def seq_predicate(s: Signal) -> bool:
+                if s.seq <= after_seq:
+                    return False
+                if original_predicate:
+                    return original_predicate(s)
+                return True
+
+            final_predicate = seq_predicate
+        else:
+            final_predicate = user_predicate
+
+        return SignalMatcher(
+            signal_type=signal_type,
+            predicate=final_predicate,
+        )
+
+    @asynccontextmanager
+    async def expect(
+        self,
+        signal_type: SignalType,
+        *,
+        predicate: Optional[Callable[[Signal], bool]] = None,
+        pattern: Optional[str] = None,
+    ) -> AsyncIterator[asyncio.Future[Signal]]:
+        """
+        Context manager for race-condition-free signal waiting.
+
+        Registers the waiter BEFORE yielding control, ensuring no signals
+        are missed between action and wait. This solves the race condition
+        where a signal arrives before wait_for() is called.
+
+        Usage:
+            async with router.expect(SignalType.MESSAGES_NEW, pattern=msg_id) as future:
+                # Waiter is already registered here
+                sender.send_message(receiver)
+            # Apply timeout on the caller side
+            signal = await asyncio.wait_for(future, timeout=30)
+
+        Args:
+            signal_type: Type of signal to wait for
+            predicate: Optional custom predicate function
+            pattern: Optional string pattern (substring search) in signal JSON
+
+        Yields:
+            asyncio.Future[Signal] that will be resolved when signal arrives.
+            Caller should await this future with their own timeout.
+
+        Note:
+            Unlike wait_for(), this method does NOT handle timeout internally.
+            The caller must wrap the await in asyncio.wait_for() if timeout
+            is needed. This gives caller full control over timeout scope.
+
+        Warning:
+            If multiple expect() calls match the same signal, only ONE will
+            receive the signal (first registered waiter wins). Use unique
+            patterns or predicates to avoid this.
+        """
+        matcher = self._build_matcher(signal_type, predicate, pattern)
+        waiter: Optional[PendingWaiter] = None
+        future: asyncio.Future[Signal]
+
+        async with self._lock:
+            # Check buffer first - signal may have arrived already
+            # Wrap in try/except to handle predicate exceptions gracefully
+            for sig in reversed(self._buffer):
+                try:
+                    if matcher.matches(sig):
+                        # Signal already in buffer - return completed future
+                        loop = asyncio.get_running_loop()
+                        future = loop.create_future()
+                        future.set_result(sig)
+                        logging.debug(f"[SignalRouter.expect] Found signal in buffer: " f"type={signal_type}, pattern={pattern}")
+                        yield future
+                        return  # Early exit - no waiter was registered, no cleanup needed
+                except Exception as e:
+                    logging.warning(f"[SignalRouter.expect] Predicate error on buffer signal: {e}")
+                    continue  # Skip this signal, try next
+
+            # Register waiter for incoming signals
+            loop = asyncio.get_running_loop()
+            future = loop.create_future()
+            waiter = PendingWaiter(
+                matcher=matcher,
+                future=future,
+                timeout=300.0,  # Long timeout for cleanup task; caller handles real timeout
+            )
+            self._waiters.setdefault(signal_type, []).append(waiter)
+            logging.debug(f"[SignalRouter.expect] Registered waiter: " f"type={signal_type}, pattern={pattern}")
+
+        try:
+            yield future
+        finally:
+            # Cleanup: remove waiter if it wasn't consumed by publish()
+            # waiter is guaranteed to be set here (early return handled above)
+            async with self._lock:
+                waiters = self._waiters.get(signal_type, [])
+                if waiter in waiters:
+                    waiters.remove(waiter)
+                    logging.debug(f"[SignalRouter.expect] Cleaned up waiter: " f"type={signal_type}, pattern={pattern}")
 
     async def _cleanup_loop(self) -> None:
         """Periodically clean up expired buffer entries and timed-out waiters."""
