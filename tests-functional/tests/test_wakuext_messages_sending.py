@@ -1,4 +1,6 @@
+import asyncio
 from time import sleep, time
+from uuid import uuid4
 import pytest
 
 from clients.services.wakuext import SendChatMessagePayload
@@ -21,18 +23,34 @@ class TestSendingChatMessages(AsyncMessengerSteps):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     async def test_send_one_to_one_message(self, sender, receiver):
-        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
-        # TODO: Add more assertions on response
+        # Generate unique message text BEFORE registering waiter for race-free waiting
+        message_text = f"test_message_0_{uuid4()}"
 
-        chat = responses[0]["chats"][0]
+        # Register signal waiter BEFORE sending to eliminate race condition
+        async with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=message_text,
+        ) as signal_future:
+            # Send message while waiter is already registered
+            response = sender.wakuext_service.send_one_to_one_message(
+                receiver.public_key,
+                message_text,
+            )
+
+        # Wait for receiver to get the signal
+        await asyncio.wait_for(signal_future, timeout=60)
+
+        # Original assertions on response
+        chat = response["chats"][0]
         assert chat["id"] == receiver.public_key
         assert chat["lastMessage"]["displayName"] == sender.display_name
 
-        response = sender.wakuext_service.chat_messages(receiver.public_key)
-        messages = response.get("messages", [])
+        # Verify message in sender's chat history
+        chat_response = sender.wakuext_service.chat_messages(receiver.public_key)
+        messages = chat_response.get("messages", [])
         assert len(messages) == 1
         actual_text = messages[0].get("text", "")
-        assert actual_text == sent_texts[0]
+        assert actual_text == message_text
 
     async def test_send_chat_message_community(self, sender, receiver):
         self.create_community(sender)
