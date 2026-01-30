@@ -378,7 +378,7 @@ statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-a
 	@echo "Android library built"
 	@file build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
