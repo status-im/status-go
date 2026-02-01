@@ -9,8 +9,7 @@
       },
       "locked": {
         "lastModified": 1769507691,
-        "narHash": "sha256-NDWEPV5t9KKVrfn7X924Bf+cNXFj0Cqp6rx2h+TQt5M=",
-        "ref": "refs/heads/master",
+        "narHash": "sha256-+OWq0G/Q5UvYAMG908cu1qpHGNuLvrezMbI1vOymWL0=",
         "rev": "cccc8ab6fda0e54752936db0d5c80b02a2c34a3a",
         "revCount": 2196,
         "submodules": true,
