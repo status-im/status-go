@@ -21,7 +21,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?ref=refs/heads/start-using-nimble&submodules=1&rev=f1cfb160c4000561d8a968b58e079b2d726ca65a";
+    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?ref=refs/heads/start-using-nimble&submodules=1&rev=2d6e1fcd5b70c0a9cf5befab14a359a13a69c8cc";
   };
 
   outputs = { self, nixpkgs, lmn, nim-sds }:
