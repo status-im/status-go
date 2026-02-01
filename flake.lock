@@ -34,14 +34,12 @@
         "ref": "refs/heads/start-using-nimble",
         "rev": "1c904d7d8840bd03233db6e02dceb86b263d7bdb",
         "revCount": 85,
-        "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
       },
       "original": {
         "ref": "refs/heads/start-using-nimble",
         "rev": "1c904d7d8840bd03233db6e02dceb86b263d7bdb",
-        "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
       }
