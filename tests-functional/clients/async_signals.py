@@ -55,6 +55,27 @@ class PendingWaiter:
     timeout: float = 30.0
 
 
+@dataclass
+class AsyncSignalExpectation:
+    """Result container for expect_signal context manager.
+
+    This class is yielded by the expect() context manager and provides
+    access to both the raw future (for advanced use cases) and the
+    result after the context exits.
+
+    Attributes:
+        future: The underlying asyncio.Future that will be resolved when
+            the signal arrives. Can be awaited directly if needed.
+        timeout: The timeout in seconds for waiting for the signal.
+        result: The matched Signal, available after the context manager exits.
+            Will be None if the signal hasn't arrived yet.
+    """
+
+    future: asyncio.Future[Signal]
+    timeout: float = 30.0
+    result: Optional[Signal] = None
+
+
 class SignalRouter:
     """
     Central signal distribution hub.
@@ -365,34 +386,41 @@ class SignalRouter:
         *,
         predicate: Optional[Callable[[Signal], bool]] = None,
         pattern: Optional[str] = None,
-    ) -> AsyncIterator[asyncio.Future[Signal]]:
+        timeout: float = 30.0,
+    ) -> AsyncIterator[AsyncSignalExpectation]:
         """
         Context manager for race-condition-free signal waiting.
 
         Registers the waiter BEFORE yielding control, ensuring no signals
-        are missed between action and wait. This solves the race condition
-        where a signal arrives before wait_for() is called.
+        are missed between action and wait. The signal is automatically
+        awaited when the context exits, with the result stored in exp.result.
 
         Usage:
-            async with router.expect(SignalType.MESSAGES_NEW, pattern=msg_id) as future:
+            async with router.expect(SignalType.MESSAGES_NEW, pattern=msg_id, timeout=30) as exp:
                 # Waiter is already registered here
                 sender.send_message(receiver)
-            # Apply timeout on the caller side
-            signal = await asyncio.wait_for(future, timeout=30)
+            # Signal is now available after context exits
+            signal = exp.result
+
+            # Alternative: await the future directly inside the context
+            async with router.expect(SignalType.MESSAGES_NEW, pattern=msg_id, timeout=30) as exp:
+                sender.send_message(receiver)
+                signal = await asyncio.wait_for(exp.future, timeout=30)
 
         Args:
             signal_type: Type of signal to wait for
             predicate: Optional custom predicate function
             pattern: Optional string pattern (substring search) in signal JSON
+            timeout: Timeout in seconds for waiting for the signal (default: 30.0)
 
         Yields:
-            asyncio.Future[Signal] that will be resolved when signal arrives.
-            Caller should await this future with their own timeout.
+            AsyncSignalExpectation with:
+                - future: The raw asyncio.Future (can be awaited directly if needed)
+                - result: The matched Signal (available after context exits)
+                - timeout: The configured timeout
 
-        Note:
-            Unlike wait_for(), this method does NOT handle timeout internally.
-            The caller must wrap the await in asyncio.wait_for() if timeout
-            is needed. This gives caller full control over timeout scope.
+        Raises:
+            asyncio.TimeoutError: If signal doesn't arrive within timeout
 
         Warning:
             If multiple expect() calls match the same signal, only ONE will
@@ -401,44 +429,60 @@ class SignalRouter:
         """
         matcher = self._build_matcher(signal_type, predicate, pattern)
         waiter: Optional[PendingWaiter] = None
-        future: asyncio.Future[Signal]
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[Signal] = loop.create_future()
+        expectation = AsyncSignalExpectation(future=future, timeout=timeout)
 
         async with self._lock:
             # Check buffer first - signal may have arrived already
-            # Wrap in try/except to handle predicate exceptions gracefully
             for sig in reversed(self._buffer):
                 try:
                     if matcher.matches(sig):
-                        # Signal already in buffer - return completed future
-                        loop = asyncio.get_running_loop()
-                        future = loop.create_future()
+                        # Signal already in buffer - set result immediately
                         future.set_result(sig)
+                        expectation.result = sig
                         logging.debug(f"[SignalRouter.expect] Found signal in buffer: " f"type={signal_type}, pattern={pattern}")
-                        yield future
-                        return  # Early exit - no waiter was registered, no cleanup needed
+                        yield expectation
+                        return  # Early exit - no waiter registered, no cleanup needed
                 except Exception as e:
                     logging.warning(f"[SignalRouter.expect] Predicate error on buffer signal: {e}")
-                    continue  # Skip this signal, try next
+                    continue
 
             # Register waiter for incoming signals
-            loop = asyncio.get_running_loop()
-            future = loop.create_future()
             waiter = PendingWaiter(
                 matcher=matcher,
                 future=future,
-                timeout=300.0,  # Long timeout for cleanup task; caller handles real timeout
+                timeout=timeout,
             )
             self._waiters.setdefault(signal_type, []).append(waiter)
-            logging.debug(f"[SignalRouter.expect] Registered waiter: " f"type={signal_type}, pattern={pattern}")
+            logging.debug(f"[SignalRouter.expect] Registered waiter: " f"type={signal_type}, pattern={pattern}, timeout={timeout}")
 
+        exception_raised = False
         try:
-            yield future
+            yield expectation
+        except BaseException:
+            # Mark that an exception is being propagated
+            exception_raised = True
+            raise
         finally:
-            # Cleanup: remove waiter if it wasn't consumed by publish()
-            # waiter is guaranteed to be set here (early return handled above)
+            # Only wait for signal if no exception was raised inside the context
+            # If user code failed, just cleanup without waiting
+            if not exception_raised:
+                try:
+                    if future.done():
+                        # Signal already arrived (via publish())
+                        expectation.result = future.result()
+                    else:
+                        # Wait for signal with timeout
+                        expectation.result = await asyncio.wait_for(future, timeout=timeout)
+                except asyncio.TimeoutError:
+                    logging.warning(f"[SignalRouter.expect] Timeout waiting for signal: " f"type={signal_type}, pattern={pattern}, timeout={timeout}")
+                    raise
+
+            # Always clean up waiter
             async with self._lock:
                 waiters = self._waiters.get(signal_type, [])
-                if waiter in waiters:
+                if waiter and waiter in waiters:
                     waiters.remove(waiter)
                     logging.debug(f"[SignalRouter.expect] Cleaned up waiter: " f"type={signal_type}, pattern={pattern}")
 

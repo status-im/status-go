@@ -6,7 +6,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, AsyncIterator, Callable, Optional
 
-from clients.async_signals import AsyncSignalClient, Signal, SignalRouter
+from clients.async_signals import AsyncSignalClient, AsyncSignalExpectation, Signal, SignalRouter
 from clients.signals import SignalType
 from resources.enums import ContactVerificationState
 
@@ -149,20 +149,26 @@ class AsyncStatusBackend:
         *,
         pattern: Optional[str] = None,
         predicate: Optional[Callable[[Signal], bool]] = None,
-    ) -> AsyncIterator[asyncio.Future[Signal]]:
+        timeout: float = 30.0,
+    ) -> AsyncIterator[AsyncSignalExpectation]:
         """
         Context manager for race-condition-free signal waiting.
 
         Registers the waiter BEFORE yielding control, ensuring no signals
-        are missed between action and wait. Use this when you need to
-        guarantee that the signal won't be missed.
+        are missed between action and wait. The signal is automatically
+        awaited when the context exits, with the result stored in exp.result.
 
         Usage:
-            async with backend.expect_signal(SignalType.MESSAGES_NEW, pattern=msg_id) as future:
+            async with backend.expect_signal(SignalType.MESSAGES_NEW, pattern=msg_id, timeout=30) as exp:
                 # Waiter is already registered here - signal won't be missed
                 response = sender.wakuext_service.send_message(receiver.public_key, text)
-            # Apply timeout when awaiting the future
-            signal = await asyncio.wait_for(future, timeout=30)
+            # Signal is automatically awaited when context exits
+            signal = exp.result
+
+            # Alternative: await the future directly inside the context
+            async with backend.expect_signal(SignalType.MESSAGES_NEW, pattern=msg_id, timeout=30) as exp:
+                response = sender.wakuext_service.send_message(receiver.public_key, text)
+                signal = await asyncio.wait_for(exp.future, timeout=30)
 
         Comparison with wait_for_signal():
             # wait_for_signal() - simpler but has race condition window:
@@ -170,28 +176,32 @@ class AsyncStatusBackend:
             await receiver.wait_for_signal(...)  # Too late - signal missed!
 
             # expect_signal() - race-condition-free:
-            async with receiver.expect_signal(...) as future:
+            async with receiver.expect_signal(..., timeout=30) as exp:
                 response = sender.send_message(...)  # Waiter already registered
-            signal = await asyncio.wait_for(future, timeout=30)
+            signal = exp.result  # Signal available after context exits
 
         Args:
             signal_type: Type of signal to wait for
             pattern: Optional string pattern to match in signal JSON
             predicate: Optional custom predicate function
+            timeout: Timeout in seconds for waiting for the signal (default: 30.0)
 
         Yields:
-            asyncio.Future[Signal] that resolves when matching signal arrives.
+            AsyncSignalExpectation with:
+                - future: The raw asyncio.Future (can be awaited directly if needed)
+                - result: The matched Signal (available after context exits)
+                - timeout: The configured timeout
 
-        Note:
-            Timeout is NOT handled by this method. Wrap the await in
-            asyncio.wait_for() to apply timeout.
+        Raises:
+            asyncio.TimeoutError: If signal doesn't arrive within timeout
         """
         async with self._router.expect(
             signal_type,
             pattern=pattern,
             predicate=predicate,
-        ) as future:
-            yield future
+            timeout=timeout,
+        ) as exp:
+            yield exp
 
     async def wait_for_signals_sequence(
         self,

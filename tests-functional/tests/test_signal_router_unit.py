@@ -442,15 +442,15 @@ class TestSignalRouterExpect:
         await router.start()
 
         try:
-            async with router.expect(SignalType.NODE_READY) as future:
+            async with router.expect(SignalType.NODE_READY, timeout=5.0) as exp:
                 # Waiter is registered here - publish signal
                 signal = _make_signal(SignalType.NODE_READY, {"ok": True})
                 await router.publish(signal)
 
-            # Await the future outside the context
-            result = await asyncio.wait_for(future, timeout=5.0)
-            assert result.signal_type == SignalType.NODE_READY
-            assert result.event["ok"] is True
+            # Signal is automatically awaited when context exits
+            assert exp.result is not None
+            assert exp.result.signal_type == SignalType.NODE_READY
+            assert exp.result.event["ok"] is True
 
         finally:
             await router.stop()
@@ -465,13 +465,13 @@ class TestSignalRouterExpect:
             # Publish signal BEFORE expect()
             await router.publish(_make_signal(SignalType.NODE_READY, {"ok": True}))
 
-            async with router.expect(SignalType.NODE_READY) as future:
-                # Signal already in buffer - future should be resolved
+            async with router.expect(SignalType.NODE_READY, timeout=1.0) as exp:
+                # Signal already in buffer - result should be set immediately
                 pass
 
-            result = await asyncio.wait_for(future, timeout=1.0)
-            assert result.signal_type == SignalType.NODE_READY
-            assert result.event["ok"] is True
+            assert exp.result is not None
+            assert exp.result.signal_type == SignalType.NODE_READY
+            assert exp.result.event["ok"] is True
 
         finally:
             await router.stop()
@@ -483,7 +483,7 @@ class TestSignalRouterExpect:
         await router.start()
 
         try:
-            async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-123") as future:
+            async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-123", timeout=5.0) as exp:
                 # Publish non-matching signal first
                 await router.publish(
                     _make_signal(
@@ -501,8 +501,8 @@ class TestSignalRouterExpect:
                     )
                 )
 
-            result = await asyncio.wait_for(future, timeout=5.0)
-            assert result.event["id"] == "msg-123"
+            assert exp.result is not None
+            assert exp.result.event["id"] == "msg-123"
 
         finally:
             await router.stop()
@@ -517,32 +517,31 @@ class TestSignalRouterExpect:
             async with router.expect(
                 SignalType.NODE_LOGIN,
                 predicate=lambda s: s.event.get("success") is True,
-            ) as future:
+                timeout=5.0,
+            ) as exp:
                 # Publish non-matching
                 await router.publish(_make_signal(SignalType.NODE_LOGIN, {"success": False}))
                 # Publish matching
                 await router.publish(_make_signal(SignalType.NODE_LOGIN, {"success": True}))
 
-            result = await asyncio.wait_for(future, timeout=5.0)
-            assert result.event["success"] is True
+            assert exp.result is not None
+            assert exp.result.event["success"] is True
 
         finally:
             await router.stop()
 
     @pytest.mark.asyncio
     async def test_expect_timeout_on_await(self):
-        """Test that timeout is applied by caller, not expect()."""
+        """Test that timeout is applied when context exits."""
         router = SignalRouter()
         await router.start()
 
         try:
-            async with router.expect(SignalType.NODE_READY) as future:
-                # Don't publish anything
-                pass
-
-            # Timeout should be applied here
+            # Timeout should be raised when context exits (auto-await in finally)
             with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(future, timeout=0.1)
+                async with router.expect(SignalType.NODE_READY, timeout=0.1):
+                    # Don't publish anything - will timeout on exit
+                    pass
 
         finally:
             await router.stop()
@@ -554,10 +553,11 @@ class TestSignalRouterExpect:
         await router.start()
 
         try:
-            async with router.expect(SignalType.NODE_READY) as future:
+            async with router.expect(SignalType.NODE_READY, timeout=1.0) as exp:
                 await router.publish(_make_signal(SignalType.NODE_READY, {"ok": True}))
 
-            await asyncio.wait_for(future, timeout=1.0)
+            # Verify result is populated
+            assert exp.result is not None
 
             # Verify waiter was cleaned up
             assert SignalType.NODE_READY not in router._waiters or len(router._waiters[SignalType.NODE_READY]) == 0
@@ -573,7 +573,7 @@ class TestSignalRouterExpect:
 
         try:
             with pytest.raises(RuntimeError, match="Test error"):
-                async with router.expect(SignalType.NODE_READY) as future:  # noqa: F841
+                async with router.expect(SignalType.NODE_READY, timeout=1.0):
                     raise RuntimeError("Test error")
 
             # Verify waiter was cleaned up despite exception
@@ -596,7 +596,7 @@ class TestSignalRouterExpect:
         try:
             # Run multiple iterations to increase confidence
             for i in range(10):
-                async with router.expect(SignalType.MESSAGES_NEW, pattern=f"msg-{i}") as future:
+                async with router.expect(SignalType.MESSAGES_NEW, pattern=f"msg-{i}", timeout=1.0) as exp:
                     # Publish immediately - no sleep!
                     await router.publish(
                         _make_signal(
@@ -606,8 +606,8 @@ class TestSignalRouterExpect:
                         )
                     )
 
-                result = await asyncio.wait_for(future, timeout=1.0)
-                assert result.event["id"] == f"msg-{i}"
+                assert exp.result is not None
+                assert exp.result.event["id"] == f"msg-{i}"
 
         finally:
             await router.stop()
@@ -620,17 +620,19 @@ class TestSignalRouterExpect:
 
         try:
             # Use nested expects (both waiters registered before any publish)
-            async with router.expect(SignalType.NODE_READY) as future1:
-                async with router.expect(SignalType.NODE_LOGIN) as future2:
+            async with router.expect(SignalType.NODE_READY, timeout=1.0) as exp1:
+                async with router.expect(SignalType.NODE_LOGIN, timeout=1.0) as exp2:
                     # Both waiters registered - publish signals
                     await router.publish(_make_signal(SignalType.NODE_LOGIN, {"uid": "123"}))
                     await router.publish(_make_signal(SignalType.NODE_READY, {"ok": True}))
 
-                result2 = await asyncio.wait_for(future2, timeout=1.0)
-                assert result2.signal_type == SignalType.NODE_LOGIN
+                # exp2 result is available after inner context exits
+                assert exp2.result is not None
+                assert exp2.result.signal_type == SignalType.NODE_LOGIN
 
-            result1 = await asyncio.wait_for(future1, timeout=1.0)
-            assert result1.signal_type == SignalType.NODE_READY
+            # exp1 result is available after outer context exits
+            assert exp1.result is not None
+            assert exp1.result.signal_type == SignalType.NODE_READY
 
         finally:
             await router.stop()
@@ -646,8 +648,8 @@ class TestSignalRouterExpect:
         await router.start()
 
         try:
-            async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-X") as future1:
-                async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-X") as future2:
+            async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-X", timeout=1.0) as exp1:
+                async with router.expect(SignalType.MESSAGES_NEW, pattern="msg-X", timeout=1.0) as exp2:
                     # Publish one signal matching both waiters
                     await router.publish(
                         _make_signal(
@@ -657,14 +659,16 @@ class TestSignalRouterExpect:
                         )
                     )
 
-                    # BOTH waiters should receive the same signal
-                    result1 = await asyncio.wait_for(future1, timeout=1.0)
-                    result2 = await asyncio.wait_for(future2, timeout=1.0)
+                # exp2 result available after inner context exits
+                assert exp2.result is not None
+                assert exp2.result.event["id"] == "msg-X"
 
-                    assert result1.event["id"] == "msg-X"
-                    assert result2.event["id"] == "msg-X"
-                    # Both should have the same seq number (same signal)
-                    assert result1.seq == result2.seq
+            # exp1 result available after outer context exits
+            assert exp1.result is not None
+            assert exp1.result.event["id"] == "msg-X"
+
+            # Both should have the same seq number (same signal)
+            assert exp1.result.seq == exp2.result.seq
 
         finally:
             await router.stop()
@@ -676,9 +680,9 @@ class TestSignalRouterExpect:
         await router.start()
 
         async def expect_and_wait():
-            async with router.expect(SignalType.NODE_READY) as future:
+            async with router.expect(SignalType.NODE_READY, timeout=10.0) as exp:
                 await asyncio.sleep(10)  # Will be cancelled here
-            return await future
+            return exp.result
 
         try:
             task = asyncio.create_task(expect_and_wait())
@@ -720,11 +724,11 @@ class TestSignalRouterExpect:
             await router.publish(_make_signal(SignalType.NODE_READY, {"match": True}))
 
             # Should skip the error-causing signal and find the matching one
-            async with router.expect(SignalType.NODE_READY, predicate=bad_predicate) as future:
+            async with router.expect(SignalType.NODE_READY, predicate=bad_predicate, timeout=1.0) as exp:
                 pass  # Should find in buffer
 
-            result = await asyncio.wait_for(future, timeout=1.0)
-            assert result.event.get("match") is True
+            assert exp.result is not None
+            assert exp.result.event.get("match") is True
 
         finally:
             await router.stop()

@@ -1,4 +1,3 @@
-import asyncio
 from time import sleep, time
 from uuid import uuid4
 import pytest
@@ -27,18 +26,18 @@ class TestSendingChatMessages(AsyncMessengerSteps):
         message_text = f"test_message_0_{uuid4()}"
 
         # Register signal waiter BEFORE sending to eliminate race condition
+        # The signal is automatically awaited when the context exits
         async with receiver.expect_signal(
             SignalType.MESSAGES_NEW,
             pattern=message_text,
-        ) as signal_future:
+            timeout=60,
+        ):
             # Send message while waiter is already registered
             response = sender.wakuext_service.send_one_to_one_message(
                 receiver.public_key,
                 message_text,
             )
-
-        # Wait for receiver to get the signal
-        await asyncio.wait_for(signal_future, timeout=60)
+        # Signal is automatically awaited when context exits
 
         # Original assertions on response
         chat = response["chats"][0]
