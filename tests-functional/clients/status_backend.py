@@ -121,7 +121,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         if Config.logs_dir:
             try:
-                self._export_logs(Config.logs_dir, log_sufix)
+                # Check if base_url was initialized (may be missing if __init__ failed early)
+                if hasattr(self, "base_url") and hasattr(self, "data_dir"):
+                    self._export_logs(Config.logs_dir, log_sufix)
             except Exception as e:
                 logging.warning(f"Failed to export logs: {e}")
 

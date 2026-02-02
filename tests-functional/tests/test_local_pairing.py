@@ -178,7 +178,7 @@ async def login_paired_device(backend: AsyncStatusBackend, key_uid, password):
     """Login on a paired device with async signal waiting."""
     backend.backend.init_status_backend()
     backend.backend.login(key_uid, password)
-    await backend.wait_for_login()  # async version - uses async signal client
+    await backend.wait_for_login(timeout=120.0)
     backend.backend.wakuext_service.start_messenger()
 
 

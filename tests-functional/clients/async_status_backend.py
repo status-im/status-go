@@ -262,6 +262,9 @@ class AsyncStatusBackend:
             assert isinstance(signal_data, dict), f"Unexpected NODE_LOGIN signal payload type: {type(signal_data)}"
             _apply_login_signal(signal_data)
             return signal_data
+        except asyncio.CancelledError:
+            # Handle CancelledError the same as TimeoutError - can happen when tasks are cancelled
+            logging.warning("NODE_LOGIN signal wait was cancelled; falling back to RPC polling")
         except asyncio.TimeoutError:
             logging.warning("NODE_LOGIN signal was not received in time; falling back to RPC polling")
 

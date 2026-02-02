@@ -202,10 +202,12 @@ class AsyncMessengerSteps:
         def _is_accepted(state) -> bool:
             return state == 3 or str(state) == "3"
 
-        deadline = time.monotonic() + 240
+        # Increased timeout for light client mode (was 240s)
+        deadline = time.monotonic() + 360
         last_accept_attempt_at = 0.0
         accepted_seen = False
         direct_accept_start_time = time.monotonic()  # Track when to fallback to direct accept
+        accept_retry_count = 0  # Track accept retries for light client
 
         while time.monotonic() < deadline:
             # Check if already accepted
@@ -260,8 +262,24 @@ class AsyncMessengerSteps:
                             join_state = 3
                             if accept_id != join_id:
                                 join_id = accept_id
-                    except Exception:
-                        pass
+                            # After accept, wait for membership reevaluation signal (light client optimization)
+                            try:
+                                await member.wait_for_signal(
+                                    SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS,
+                                    predicate=lambda s: s.raw.get("event", {}).get("communityId") == self.community_id,
+                                    timeout=15,
+                                    check_buffer=True,
+                                )
+                                logging.debug(f"Received COMMUNITY_MEMBER_REEVALUATION_STATUS for {self.community_id}")
+                            except asyncio.TimeoutError:
+                                logging.debug(f"No COMMUNITY_MEMBER_REEVALUATION_STATUS signal for {self.community_id}")
+                    except Exception as exc:
+                        # In light client mode, retry accept with exponential backoff
+                        accept_retry_count += 1
+                        if accept_retry_count < 5:
+                            backoff = min(5.0 * accept_retry_count, 20.0)
+                            logging.debug(f"Accept failed (attempt {accept_retry_count}), retrying in {backoff}s: {exc}")
+                            await asyncio.sleep(backoff)
                     finally:
                         last_accept_attempt_at = time.monotonic()
 

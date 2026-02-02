@@ -125,8 +125,9 @@ class SignalRouter:
         if self._cleanup_task:
             self._cleanup_task.cancel()
             try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
+                # Add timeout to prevent hanging during shutdown
+                await asyncio.wait_for(self._cleanup_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             self._cleanup_task = None
 
