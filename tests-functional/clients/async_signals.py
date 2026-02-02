@@ -283,6 +283,22 @@ class SignalRouter:
                 if signal_type in self._waiters and waiter in self._waiters[signal_type]:
                     self._waiters[signal_type].remove(waiter)
             raise
+        except asyncio.CancelledError:
+            # CancelledError can occur in several scenarios:
+            # 1. Python's asyncio.wait_for() cancels the future when timeout expires,
+            #    but in some edge cases it propagates CancelledError instead of TimeoutError
+            # 2. Test teardown (e.g., pytest reruns) may cancel pending tasks
+            # 3. WebSocket disconnect in light client mode can trigger task cancellation
+            #
+            # We convert CancelledError to TimeoutError to:
+            # - Maintain consistent error semantics for callers
+            # - Allow pytest-rerun to properly retry the test
+            # - Avoid unexpected CancelledError propagation in test code
+            async with self._lock:
+                if signal_type in self._waiters and waiter in self._waiters[signal_type]:
+                    self._waiters[signal_type].remove(waiter)
+            logging.warning(f"[SignalRouter.wait_for] Future was cancelled: type={signal_type}, pattern={pattern}")
+            raise asyncio.TimeoutError(f"Signal wait cancelled: {signal_type}")
 
     async def wait_for_sequence(
         self,
