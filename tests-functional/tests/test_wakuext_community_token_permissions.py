@@ -3,6 +3,7 @@ import time
 from typing import Optional, List
 
 import pytest
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
 
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
 from clients.signals import SignalType, WalletEventType
@@ -41,6 +42,15 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if isinstance(communities_response, dict):
             return communities_response.get("communities", []) or []
         return communities_response or []
+
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_fixed(5),
+        retry=retry_if_result(lambda r: r is None),
+    )
+    def _fetch_community_with_retry(self, backend, community_id):
+        """Fetch community with retry."""
+        return self.fetch_community(backend, community_id)
 
     def create_token_gated_community(
         self,
@@ -152,7 +162,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
 
         # Fetch community as member
-        self.fetch_community(member_with_snt_backend, community_id)
+        community = self._fetch_community_with_retry(member_with_snt_backend, community_id)
+        assert community, f"Community {community_id} not found"
 
         # Member tries to join with their wallet address (should have tokens)
         join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
@@ -166,7 +177,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Wait for the request to join to be received
         owner_backend.wait_for_signal_predicate(
             signal_type=SignalType.MESSAGES_NEW,
-            predicate=lambda s: (s.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
+            predicate=lambda s: ((s.get("event", {}).get("requestsToJoinCommunity") or [{}])[0].get("id") == req_id),
         )
 
         # Accept request to join
@@ -207,7 +218,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
 
         # Fetch community as member
-        response = self.fetch_community(member_with_snt_backend, community_id)
+        response = self._fetch_community_with_retry(member_with_snt_backend, community_id)
         assert response, "Community not found"
         assert response["tokenPermissions"], "No token permissions found"
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
@@ -236,7 +247,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Wait for request to join to get received
         owner_backend.wait_for_signal_predicate(
             SignalType.MESSAGES_NEW,
-            lambda signal: (signal.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
+            lambda signal: ((signal.get("event", {}).get("requestsToJoinCommunity") or [{}])[0].get("id") == req_id),
         )
 
         accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)

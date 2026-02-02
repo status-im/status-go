@@ -10,4 +10,7 @@ echo "Starting Foundry"
 echo "Deploying Multicall3"
 forge create $CONTRACTS_PATH/Multicall3.sol:Multicall3 --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY --broadcast | tee $CONTRACTS_PATH/Multicall3.sol.log
 
+echo "Deploying SNT and Communities contracts"
+/app/deploy_contracts.sh
+
 tail -F /dev/null # Keep container running indefinitely
