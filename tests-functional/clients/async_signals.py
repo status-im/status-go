@@ -485,6 +485,10 @@ class SignalRouter:
                 except asyncio.TimeoutError:
                     logging.warning(f"[SignalRouter.expect] Timeout waiting for signal: " f"type={signal_type}, pattern={pattern}, timeout={timeout}")
                     raise
+                except asyncio.CancelledError:
+                    # Python sometimes propagates CancelledError instead of TimeoutError
+                    logging.warning(f"[SignalRouter.expect] Future was cancelled: " f"type={signal_type}, pattern={pattern}, timeout={timeout}")
+                    raise asyncio.TimeoutError(f"Signal wait cancelled in expect(): {signal_type}")
 
             # Always clean up waiter
             async with self._lock:
@@ -572,7 +576,14 @@ class AsyncSignalClient:
         self._should_stop = False
         self._reader_task = asyncio.create_task(self._reader_loop())
         # Wait for connection to be established
-        await asyncio.wait_for(self._connected.wait(), timeout=30.0)
+        # Increased timeout from 30s to 60s for CI with high load (e.g., test_pairing_three_devices
+        # creates 6 backends in parallel, each starting a Docker container)
+        try:
+            await asyncio.wait_for(self._connected.wait(), timeout=60.0)
+        except asyncio.CancelledError:
+            # Python sometimes propagates CancelledError instead of TimeoutError
+            # when asyncio.wait_for() times out on Event.wait()
+            raise asyncio.TimeoutError("WebSocket connection cancelled (timeout)")
 
     async def disconnect(self) -> None:
         """Close connection and stop reader."""
