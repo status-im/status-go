@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from uuid import uuid4
 
 from clients.signals import SignalType
@@ -147,164 +146,104 @@ class AsyncMessengerSteps:
         await member.wait_for_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, check_buffer=True)
         return response.get("chats", [])[0].get("id")
 
+    async def _async_retry_call(self, func, *args, max_attempts: int = 40, retry_interval: float = 0.5):
+        """Async version of retry_call - simple RPC-level retry.
+
+        This mirrors the sync retry_call from develop branch which works reliably
+        for both full node and light client modes.
+
+        Args:
+            func: RPC function to call
+            *args: Arguments to pass to the function
+            max_attempts: Maximum number of retry attempts (default: 40)
+            retry_interval: Seconds between retries (default: 0.5)
+
+        Returns:
+            Response from the function
+
+        Raises:
+            Exception: If all retries fail
+        """
+        for attempt in range(max_attempts):
+            try:
+                response = func(*args)
+                if response is not None:  # Check for None, not truthiness (empty dict is valid)
+                    return response
+            except Exception as e:
+                logging.debug(f"Attempt {attempt + 1}/{max_attempts} for {func.__name__} failed: {e}")
+            await asyncio.sleep(retry_interval)
+        raise Exception(f"Failed to execute {func.__name__} within {max_attempts * retry_interval}s")
+
+    def _pick_chat_id(self, chats: dict) -> str | None:
+        """Pick the first valid chat ID from community chats, sorted by position.
+
+        Communities have multiple chats, we want the "general" chat which typically
+        has position=0. This matches the logic from the original implementation.
+        """
+        if not chats:
+            return None
+        try:
+            items = list(chats.items())
+            items.sort(key=lambda kv: (kv[1] or {}).get("position", 1_000_000))
+            for key, value in items:
+                if isinstance(value, dict):
+                    chat_id = value.get("id") or key
+                else:
+                    chat_id = key
+                if chat_id:
+                    return chat_id
+            return items[0][0] if items else None
+        except Exception:
+            return next(iter(chats.keys()), None)
+
     async def join_community(self, member, admin) -> str:
         """Join member to community created by admin.
+
+        Simplified implementation based on develop branch - uses simple RPC retry
+        instead of complex polling with spectate/reevaluation signals.
 
         Returns:
             str: The community chat ID (community_id + chat_id)
         """
-        # First, have member spectate the community to subscribe to updates.
-        # This helps light client nodes receive community data faster.
-        try:
-            member.wakuext_service.spectate_community(self.community_id)
-        except Exception as exc:
-            logging.warning(f"Spectate community failed for {self.community_id}: {exc}")
-
-        # Wait for member to see the community with retry logic.
-        # Light client nodes need more time to sync community data.
+        # Fetch community with retry for light client (may need time to sync)
         community = None
-        for attempt in range(12):  # 12 attempts * 5s = 60s max
+        for attempt in range(12):  # 12 attempts × 5s = 60s max
             community = self.fetch_community(member, self.community_id)
-            if community:
+            if community and community.get("chats"):
                 break
-            logging.info(f"Community {self.community_id} not found yet on member (attempt {attempt + 1}/12)")
+            logging.debug(f"Community {self.community_id} not ready on member (attempt {attempt + 1}/12)")
             await asyncio.sleep(5)
 
         if not community:
             raise Exception(f"Community {self.community_id} not visible to member after retries")
 
-        # Ensure admin also has the community data
+        # Ensure admin has community data
         self.fetch_community(admin, self.community_id)
 
+        # Request to join
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
-        join_req = (response_to_join.get("requestsToJoinCommunity") or [{}])[0]
-        join_id = join_req.get("id")
-        join_state = join_req.get("state")
+        join_id = (response_to_join.get("requestsToJoinCommunity") or [{}])[0].get("id")
         assert join_id, f"Failed to request to join community: {response_to_join}"
 
-        def _pick_chat_id(chats: dict) -> str | None:
-            if not chats:
-                return None
-            try:
-                items = list(chats.items())
-                items.sort(key=lambda kv: (kv[1] or {}).get("position", 1_000_000))
-                for key, value in items:
-                    if isinstance(value, dict):
-                        chat_id = value.get("id") or key
-                    else:
-                        chat_id = key
-                    if chat_id:
-                        return chat_id
-                return items[0][0] if items else None
-            except Exception:
-                return next(iter(chats.keys()), None)
+        # Simple async retry for accept (like retry_call in develop: 40 attempts × 0.5s = 20s max)
+        response = await self._async_retry_call(
+            admin.wakuext_service.accept_request_to_join_community,
+            join_id,
+            max_attempts=40,
+            retry_interval=0.5,
+        )
 
-        def _is_accepted(state) -> bool:
-            return state == 3 or str(state) == "3"
+        # Validate accept was successful (state=3 means accepted)
+        accept_state = (response.get("requestsToJoinCommunity") or [{}])[0].get("state")
+        if accept_state != 3 and str(accept_state) != "3":
+            raise Exception(f"Accept request failed. State: {accept_state}, Response: {response}")
 
-        # Increased timeout for light client mode (was 240s)
-        deadline = time.monotonic() + 360
-        last_accept_attempt_at = 0.0
-        accepted_seen = False
-        direct_accept_start_time = time.monotonic()  # Track when to fallback to direct accept
-        accept_retry_count = 0  # Track accept retries for light client
-
-        while time.monotonic() < deadline:
-            # Check if already accepted
-            if not accepted_seen:
-                if join_state is not None and _is_accepted(join_state):
-                    accepted_seen = True
-                try:
-                    last_member_latest = member.wakuext_service.latest_request_to_join_for_community(self.community_id)
-                    if last_member_latest and last_member_latest.get("id") == join_id:
-                        if _is_accepted(last_member_latest.get("state")):
-                            accepted_seen = True
-                except Exception:
-                    pass
-
-            # Admin accept if needed
-            if not accepted_seen and not _is_accepted(join_state):
-                admin_observed_ids: set[str] = set()
-                try:
-                    last_pending = admin.wakuext_service.pending_requests_to_join_for_community(self.community_id) or []
-                    admin_observed_ids.update([r.get("id") for r in last_pending if r.get("id")])
-                except Exception:
-                    pass
-                try:
-                    last_latest_admin = admin.wakuext_service.latest_request_to_join_for_community(self.community_id)
-                    if last_latest_admin and last_latest_admin.get("id"):
-                        admin_observed_ids.add(last_latest_admin.get("id"))
-                except Exception:
-                    pass
-                try:
-                    all_non_approved = admin.wakuext_service.all_non_approved_communities_requests_to_join() or []
-                    for r in all_non_approved:
-                        if r.get("communityId") == self.community_id and r.get("id"):
-                            admin_observed_ids.add(r.get("id"))
-                except Exception:
-                    pass
-
-                accept_id: str | None = None
-                if join_id and join_id in admin_observed_ids:
-                    accept_id = join_id
-                elif len(admin_observed_ids) == 1:
-                    accept_id = next(iter(admin_observed_ids))
-                # Fallback: if admin doesn't see request after 30s, use join_id directly
-                # This handles light client mode where sync is slow
-                elif join_id and (time.monotonic() - direct_accept_start_time) >= 30.0:
-                    accept_id = join_id
-
-                if accept_id and (time.monotonic() - last_accept_attempt_at) >= 2.0:
-                    try:
-                        accept_resp = admin.wakuext_service.accept_request_to_join_community(accept_id)
-                        if accept_resp and _is_accepted((accept_resp.get("requestsToJoinCommunity") or [{}])[0].get("state")):
-                            accepted_seen = True
-                            join_state = 3
-                            if accept_id != join_id:
-                                join_id = accept_id
-                            # After accept, wait for membership reevaluation signal (light client optimization)
-                            try:
-                                await member.wait_for_signal(
-                                    SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS,
-                                    predicate=lambda s: s.raw.get("event", {}).get("communityId") == self.community_id,
-                                    timeout=15,
-                                    check_buffer=True,
-                                )
-                                logging.debug(f"Received COMMUNITY_MEMBER_REEVALUATION_STATUS for {self.community_id}")
-                            except asyncio.TimeoutError:
-                                logging.debug(f"No COMMUNITY_MEMBER_REEVALUATION_STATUS signal for {self.community_id}")
-                    except Exception as exc:
-                        # In light client mode, retry accept with exponential backoff
-                        accept_retry_count += 1
-                        if accept_retry_count < 5:
-                            backoff = min(5.0 * accept_retry_count, 20.0)
-                            logging.debug(f"Accept failed (attempt {accept_retry_count}), retrying in {backoff}s: {exc}")
-                            await asyncio.sleep(backoff)
-                    finally:
-                        last_accept_attempt_at = time.monotonic()
-
-            # Check completion
-            try:
-                last_member_comm = member.wakuext_service.fetch_community(self.community_id)
-                is_joined = last_member_comm and (last_member_comm.get("joined") is True or last_member_comm.get("isMember") is True)
-                chats = (last_member_comm.get("chats") or {}) if last_member_comm else {}
-                chat_id = _pick_chat_id(chats)
-                if chat_id:
-                    if is_joined:
-                        return self.community_id + chat_id
-                    if accepted_seen:
-                        try:
-                            resp = member.wakuext_service.chat_messages(self.community_id + chat_id, limit=1)
-                            if resp is not None and "messages" in resp:
-                                return self.community_id + chat_id
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-
-            await asyncio.sleep(0.5)
-
-        raise Exception(f"Failed to join community within timeout. community_id={self.community_id}, join_id={join_id}")
+        # Extract chat_id from response (sorted by position, pick first valid)
+        chats = response.get("communities", [{}])[0].get("chats", {})
+        chat_id = self._pick_chat_id(chats)
+        if not chat_id:
+            raise Exception(f"No valid chat found in community response: {response}")
+        return self.community_id + chat_id
 
     def send_multiple_one_to_one_messages(self, message_count: int, sender, receiver) -> tuple[list[str], list[dict]]:
         """Send multiple one-to-one messages.
