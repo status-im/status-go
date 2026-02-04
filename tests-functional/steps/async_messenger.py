@@ -212,7 +212,7 @@ class AsyncMessengerSteps:
             if community and community.get("chats"):
                 break
             logging.debug(f"Community {self.community_id} not ready on member (attempt {attempt + 1}/12)")
-            await asyncio.sleep(2)
+            await asyncio.sleep(5)
 
         if not community:
             raise Exception(f"Community {self.community_id} not visible to member after retries")
