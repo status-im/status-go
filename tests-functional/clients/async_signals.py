@@ -640,6 +640,7 @@ class AsyncSignalClient:
                 # Connection closed normally — clear state before retry
                 self._connected.clear()
                 self._ws = None
+                await asyncio.sleep(0.5)
 
             except asyncio.CancelledError:
                 break

@@ -207,12 +207,12 @@ class AsyncMessengerSteps:
         """
         # Fetch community with retry for light client (may need time to sync)
         community = None
-        for attempt in range(12):  # 12 attempts × 5s = 60s max
+        for attempt in range(12):
             community = self.fetch_community(member, self.community_id)
             if community and community.get("chats"):
                 break
             logging.debug(f"Community {self.community_id} not ready on member (attempt {attempt + 1}/12)")
-            await asyncio.sleep(5)
+            await asyncio.sleep(2)
 
         if not community:
             raise Exception(f"Community {self.community_id} not visible to member after retries")
