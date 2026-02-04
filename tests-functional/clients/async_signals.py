@@ -580,10 +580,17 @@ class AsyncSignalClient:
         # creates 6 backends in parallel, each starting a Docker container)
         try:
             await asyncio.wait_for(self._connected.wait(), timeout=60.0)
-        except asyncio.CancelledError:
-            # Python sometimes propagates CancelledError instead of TimeoutError
-            # when asyncio.wait_for() times out on Event.wait()
-            raise asyncio.TimeoutError("WebSocket connection cancelled (timeout)")
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            # Cancel the reader task to prevent it from retrying in the background
+            self._should_stop = True
+            if self._reader_task:
+                self._reader_task.cancel()
+                try:
+                    await self._reader_task
+                except asyncio.CancelledError:
+                    pass
+                self._reader_task = None
+            raise asyncio.TimeoutError("WebSocket connection timed out")
 
     async def disconnect(self) -> None:
         """Close connection and stop reader."""
@@ -605,30 +612,47 @@ class AsyncSignalClient:
         return self._connected.is_set()
 
     async def _reader_loop(self) -> None:
-        """Main WebSocket reader loop."""
-        try:
-            async with websockets.connect(
-                self.url,
-                ping_interval=None,  # Disable client-side pings (server manages keepalive)
-                ping_timeout=None,
-                close_timeout=1,
-            ) as ws:
-                self._ws = ws
-                self._connected.set()
-                logging.debug(f"AsyncSignalClient connected to {self.url}")
+        """Main WebSocket reader loop with connection retry.
 
-                async for message in ws:
-                    if self._should_stop:
-                        break
-                    await self._handle_message(message)
+        Retries the WebSocket connection with exponential backoff when it fails.
+        """
+        retry_delay = 0.5
+        max_delay = 5.0
+        while not self._should_stop:
+            try:
+                async with websockets.connect(
+                    self.url,
+                    ping_interval=None,  # Disable client-side pings (server manages keepalive)
+                    ping_timeout=None,
+                    close_timeout=1,
+                    open_timeout=10,
+                ) as ws:
+                    self._ws = ws
+                    retry_delay = 0.5  # Reset on successful connect
+                    self._connected.set()
+                    logging.debug(f"AsyncSignalClient connected to {self.url}")
 
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            if not self._should_stop:
-                logging.error(f"WebSocket connection error: {e}")
-        finally:
-            self._connected.clear()
+                    async for message in ws:
+                        if self._should_stop:
+                            break
+                        await self._handle_message(message)
+
+                # Connection closed normally — clear state before retry
+                self._connected.clear()
+                self._ws = None
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                if self._should_stop:
+                    break
+                logging.warning(f"WebSocket connection error (retrying in {retry_delay}s): {e}")
+                self._connected.clear()
+                self._ws = None
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, max_delay)
+
+        self._connected.clear()
 
     async def _handle_message(self, raw_message: str | bytes) -> None:
         """Parse and publish signal to router."""
