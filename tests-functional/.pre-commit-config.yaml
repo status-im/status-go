@@ -23,7 +23,7 @@ repos:
   rev: 7.1.1  # Latest version of Flake8
   hooks:
     - id: flake8
-      args: ["--max-line-length=150"]
+      args: ["--max-line-length=150", "--extend-ignore=E203"]
       files: ^tests-functional/.*\.py$
       # Flake8: A lightweight Python linter for style and syntax checking.
       # - Detects unused imports, undefined variables, and redefined functions (e.g., F811).
