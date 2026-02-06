@@ -14,12 +14,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/waku-go-bindings/waku"
+	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
 
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 // var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -166,6 +168,9 @@ func newTestStorenodeConfigProvider(storenode peer.AddrInfo) history.StorenodeCo
 // 	--nat=extip:${IP_ADDRESS} --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646 \
 
 func TestBasicWakuV2(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
 	extNodeRestPort := 8646
 	storeNodeInfo, err := GetNwakuInfo(nil, &extNodeRestPort)
 	require.NoError(t, err)
@@ -175,22 +180,21 @@ func TestBasicWakuV2(t *testing.T) {
 	wakuConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
+		NwakuConfig: &bindingscommon.WakuConfig{
+			TcpPort:         30303,
+			Nodekey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
+			Relay:           true,
+			LogLevel:        "DEBUG",
+			DnsDiscoveryUrl: "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
+			DnsDiscovery:    true,
+			Discv5Discovery: true,
+			Staticnodes:     []string{storeNodeInfo.ListenAddresses[0]},
+			ClusterID:       16,
+			Shards:          []uint16{64},
+		},
 	}
 
-	nwakuConfig := waku.WakuConfig{
-		TcpPort:         30303,
-		Nodekey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
-		Relay:           true,
-		LogLevel:        "DEBUG",
-		DnsDiscoveryUrl: "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
-		DnsDiscovery:    true,
-		Discv5Discovery: true,
-		Staticnodes:     []string{storeNodeInfo.ListenAddresses[0]},
-		ClusterID:       16,
-		Shards:          []uint16{64},
-	}
-
-	w, err := New(nil, "", &wakuConfig, &nwakuConfig, nil, nil, nil, nil, nil)
+	w, err := New(nil, &wakuConfig, logger.Named("waku"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -347,24 +351,23 @@ func TestPeerExchange(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
+	// start node that will be discovered by PeerExchange
 	discV5NodeConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
+		NwakuConfig: &bindingscommon.WakuConfig{
+			Relay:           true,
+			LogLevel:        "DEBUG",
+			Discv5Discovery: true,
+			ClusterID:       16,
+			Shards:          []uint16{64},
+			PeerExchange:    false,
+			Discv5UdpPort:   9001,
+			TcpPort:         60010,
+		},
 	}
 
-	// start node that will be discovered by PeerExchange
-	discV5NodeWakuConfig := waku.WakuConfig{
-		Relay:           true,
-		LogLevel:        "DEBUG",
-		Discv5Discovery: true,
-		ClusterID:       16,
-		Shards:          []uint16{64},
-		PeerExchange:    false,
-		Discv5UdpPort:   9001,
-		TcpPort:         60010,
-	}
-
-	discV5Node, err := New(nil, "", &discV5NodeConfig, &discV5NodeWakuConfig, logger.Named("discV5Node"), nil, nil, nil, nil)
+	discV5Node, err := New(nil, &discV5NodeConfig, logger.Named("waku"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
 
@@ -376,25 +379,24 @@ func TestPeerExchange(t *testing.T) {
 	discv5NodeEnr, err := discV5Node.node.ENR()
 	require.NoError(t, err)
 
+	// start node which serves as PeerExchange server
 	pxServerConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
+		NwakuConfig: &bindingscommon.WakuConfig{
+			Relay:                true,
+			LogLevel:             "DEBUG",
+			Discv5Discovery:      true,
+			ClusterID:            16,
+			Shards:               []uint16{64},
+			PeerExchange:         true,
+			Discv5UdpPort:        9000,
+			Discv5BootstrapNodes: []string{discv5NodeEnr.String()},
+			TcpPort:              60011,
+		},
 	}
 
-	// start node which serves as PeerExchange server
-	pxServerWakuConfig := waku.WakuConfig{
-		Relay:                true,
-		LogLevel:             "DEBUG",
-		Discv5Discovery:      true,
-		ClusterID:            16,
-		Shards:               []uint16{64},
-		PeerExchange:         true,
-		Discv5UdpPort:        9000,
-		Discv5BootstrapNodes: []string{discv5NodeEnr.String()},
-		TcpPort:              60011,
-	}
-
-	pxServerNode, err := New(nil, "", &pxServerConfig, &pxServerWakuConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	pxServerNode, err := New(nil, &pxServerConfig, logger.Named("waku"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
@@ -426,25 +428,24 @@ func TestPeerExchange(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 
+	// start light node which uses PeerExchange to discover peers
 	pxClientConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
+		NwakuConfig: &bindingscommon.WakuConfig{
+			Relay:            false,
+			LogLevel:         "DEBUG",
+			Discv5Discovery:  false,
+			ClusterID:        16,
+			Shards:           []uint16{64},
+			PeerExchange:     true,
+			Discv5UdpPort:    9002,
+			TcpPort:          60012,
+			PeerExchangeNode: serverNodeMa[0].String(),
+		},
 	}
 
-	// start light node which uses PeerExchange to discover peers
-	pxClientWakuConfig := waku.WakuConfig{
-		Relay:            false,
-		LogLevel:         "DEBUG",
-		Discv5Discovery:  false,
-		ClusterID:        16,
-		Shards:           []uint16{64},
-		PeerExchange:     true,
-		Discv5UdpPort:    9002,
-		TcpPort:          60012,
-		PeerExchangeNode: serverNodeMa[0].String(),
-	}
-
-	lightNode, err := New(nil, "", &pxClientConfig, &pxClientWakuConfig, logger.Named("lightNode"), nil, nil, nil, nil)
+	lightNode, err := New(nil, &pxClientConfig, logger.Named("waku"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
 
@@ -562,16 +563,16 @@ func TestDnsDiscover(t *testing.T) {
 		UseThrottledPublish: true,
 		ClusterID:           16,
 		Nameserver:          "8.8.8.8",
+		NwakuConfig: &bindingscommon.WakuConfig{
+			Relay:         true,
+			LogLevel:      "DEBUG",
+			ClusterID:     16,
+			Shards:        []uint16{64},
+			Discv5UdpPort: 9040,
+			TcpPort:       60040,
+		},
 	}
-	nodeWakuConfig := waku.WakuConfig{
-		Relay:         true,
-		LogLevel:      "DEBUG",
-		ClusterID:     16,
-		Shards:        []uint16{64},
-		Discv5UdpPort: 9040,
-		TcpPort:       60040,
-	}
-	node, err := New(nil, "", &nodeConfig, &nodeWakuConfig, logger.Named("node"), nil, nil, nil, nil)
+	node, err := New(nil, &nodeConfig, logger.Named("waku"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, node.Start())
 	time.Sleep(1 * time.Second)
@@ -592,36 +593,34 @@ func TestDial(t *testing.T) {
 	dialerNodeConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
+		NwakuConfig: &bindingscommon.WakuConfig{
+			Relay:           true,
+			LogLevel:        "DEBUG",
+			Discv5Discovery: false,
+			ClusterID:       16,
+			Shards:          []uint16{64},
+			Discv5UdpPort:   9020,
+			TcpPort:         60020,
+		},
 	}
-	// start node that will initiate the dial
-	dialerNodeWakuConfig := waku.WakuConfig{
-		Relay:           true,
-		LogLevel:        "DEBUG",
-		Discv5Discovery: false,
-		ClusterID:       16,
-		Shards:          []uint16{64},
-		Discv5UdpPort:   9020,
-		TcpPort:         60020,
-	}
-	dialerNode, err := New(nil, "", &dialerNodeConfig, &dialerNodeWakuConfig, logger.Named("dialerNode"), nil, nil, nil, nil)
+	dialerNode, err := New(nil, &dialerNodeConfig, logger.Named("waku"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, dialerNode.Start())
 	time.Sleep(1 * time.Second)
 	receiverNodeConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
+		NwakuConfig: &bindingscommon.WakuConfig{
+			Relay:           true,
+			LogLevel:        "DEBUG",
+			Discv5Discovery: false,
+			ClusterID:       16,
+			Shards:          []uint16{64},
+			Discv5UdpPort:   9021,
+			TcpPort:         60021,
+		},
 	}
-	// start node that will receive the dial
-	receiverNodeWakuConfig := waku.WakuConfig{
-		Relay:           true,
-		LogLevel:        "DEBUG",
-		Discv5Discovery: false,
-		ClusterID:       16,
-		Shards:          []uint16{64},
-		Discv5UdpPort:   9021,
-		TcpPort:         60021,
-	}
-	receiverNode, err := New(nil, "", &receiverNodeConfig, &receiverNodeWakuConfig, logger.Named("receiverNode"), nil, nil, nil, nil)
+	receiverNode, err := New(nil, &receiverNodeConfig, logger.Named("waku"), nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, receiverNode.Start())
 	time.Sleep(1 * time.Second)
