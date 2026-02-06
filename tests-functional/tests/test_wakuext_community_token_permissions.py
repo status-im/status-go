@@ -15,6 +15,7 @@ from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
 from utils import fake
 from utils.retry_utils import retry_call
+from utils.keys import change_community_key_compression
 
 logger = logging.getLogger(__name__)
 
@@ -153,13 +154,17 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Generate deployment signature
         chain_id = owner_backend.network_id
         signature = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
+        logger.info(f"Community token deployment signature: {signature}")
+
+        token_uri = change_community_key_compression(community_id) + "/"
 
         # Owner and master token parameters for deployment
         owner_token_parameters = {
             "name": "TestOwnerToken",
             "symbol": "TOT",
-            "tokenUri": "",
-            "infiniteSupply": True,
+            "tokenUri": token_uri,
+            "supply": 1,
+            "infiniteSupply": False,
             "decimals": 0,
             "transferable": True,
             "remoteSelfDestruct": False,
@@ -168,11 +173,11 @@ class TestCommunityTokenPermissions(MessengerSteps):
         master_token_parameters = {
             "name": "TestMasterToken",
             "symbol": "TMT",
-            "tokenUri": "",
+            "tokenUri": token_uri,
             "infiniteSupply": True,
             "decimals": 0,
             "transferable": True,
-            "remoteSelfDestruct": False,
+            "remoteSelfDestruct": True,
             "base64image": "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=",
         }
 
@@ -185,7 +190,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Get suggested routes for deploying tokens
         signer_pub_key = owner_backend.public_key
 
-        owner_backend.wallet_service.suggested_community_routes(
+        routes_result = owner_backend.wallet_service.suggested_community_routes(
             uuid=transaction_uuid,
             send_type=COMMUNITY_DEPLOY_OWNER_TOKEN,
             chain_id=chain_id,
@@ -201,11 +206,30 @@ class TestCommunityTokenPermissions(MessengerSteps):
             master_token_parameters=master_token_parameters,
         )
 
-        # Build transactions from route
-        transaction_data = owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
+        assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
 
-        # Sign the transaction
-        signatures = owner_backend.wallet_service.sign_message(address_from, owner_backend.password, transaction_data["message"])
+        # Build transactions from route (async, sends SignRouterTransactions signal)
+        owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
+
+        # Wait for SignRouterTransactions signal
+        signal_data = owner_backend.wait_for_signal_predicate(
+            signal_type=SignalType.WALLET,
+            predicate=lambda s: s.get("event", {}).get("type") == "SignRouterTransactions"
+            and s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
+        )
+
+        if signal_data.get("event", {}).get("sendDetails", {}).get("errorResponse"):
+            raise Exception(f"Build transactions failed: {signal_data['event']['sendDetails']['errorResponse']}")
+
+        signing_details = signal_data.get("event", {}).get("signingDetails", {})
+        if not signing_details or not signing_details.get("hashes"):
+            raise Exception("No signing details available")
+
+        # Sign the transaction hashes
+        signatures = {}
+        for hash_to_sign in signing_details["hashes"]:
+            signature = owner_backend.wallet_service.sign_message(address_from, owner_backend.password, hash_to_sign)
+            signatures[hash_to_sign] = signature
 
         # Send the transaction
         owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
