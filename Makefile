@@ -101,6 +101,7 @@ ifeq ($(USE_NWAKU), true)
     BUILD_TAGS += use_nwaku
     NWAKU_VERSION ?= v0.37.0-rc.3
     NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
+    NWAKU_LIB_DIR ?= $(NWAKU_SOURCE_DIR)/build
     LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIB_EXT)
     CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library
 	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
@@ -455,7 +456,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit-prep: $(LIBSDS)
+test-unit-prep: $(LIBSDS) build-libwaku
 test-unit-prep: generate
 test-unit-prep: export BUILD_TAGS ?=
 test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
@@ -472,11 +473,11 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /transactions/fake | \
 	grep -v /tests-unit-network)
 test-unit: ##@tests Run unit and integration tests
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR):$(NWAKU_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	./scripts/run_unit_tests.sh
 
 test-single: test-unit-prep
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR):$(NWAKU_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go test -v $(PKG) -testify.m $(TEST)
 
 test-unit-network: test-unit-prep
@@ -581,5 +582,5 @@ pytest-lint:
 	$(MAKE) -C tests-functional lint
 
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR):$(NWAKU_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go run tools/generate-db/main.go -out-dir build/db
