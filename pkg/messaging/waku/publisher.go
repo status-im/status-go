@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/logos-messaging/logos-messaging-go-bindings/waku"
-	"github.com/logos-messaging/logos-messaging-go-bindings/waku/common"
+	nimpb "github.com/logos-messaging/logos-messaging-go-bindings/waku/pb"
 
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -34,7 +34,7 @@ func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessa
 	// TODO-nwaku improve this workaround to use the pb definition of the hash
 
 	// Temporary conversion to "nwaku" WakuMessage
-	nwakuWakuMessage := &common.WakuMessage{
+	nwakuWakuMessage := &nimpb.WakuMessage{
 		Payload:    message.Payload,
 		ContentTopic:   message.ContentTopic,
 		Version:        message.Version,
@@ -50,7 +50,11 @@ func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessa
 	}
 
 	// Notice the simple conversion. Same definition but different packages.
-	return pb.ToMessageHash(hexHash.Bytes()), nil
+	hexHashBytes, err := hexHash.Bytes()
+	if err != nil {
+		return pb.MessageHash{}, err
+	}
+	return pb.ToMessageHash(hexHashBytes), nil
 }
 
 // LightpushPublish publishes a message via WakuLightPush

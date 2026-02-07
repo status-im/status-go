@@ -14,12 +14,15 @@ import (
 )
 
 func HexToPbHash(hexHash bindings.MessageHash) (pb.MessageHash, error) {
-	pbHash := pb.ToMessageHash(hexHash.Bytes())
-	return pbHash, nil
+	hexHashBytes, err := hexHash.Bytes()
+	if err != nil {
+		return pb.MessageHash{}, err
+	}
+	return pb.ToMessageHash(hexHashBytes), nil
 }
 
 func PbToHexHash(pbHash pb.MessageHash) (bindings.MessageHash, error) {
-	return bindings.ToMessageHashFromStringFormat(pbHash.String())
+	return bindings.ToMessageHash(pbHash.String())
 }
 
 func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*bindings.StoreQueryRequest, error) {
@@ -63,7 +66,10 @@ func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*bindi
 
 func BindingsToPbStoreResponse(bindingsStoreResponse *bindings.StoreQueryResponse) (*storepb.StoreQueryResponse, error) {
 
-	paginationCursor := bindingsStoreResponse.PaginationCursor.Bytes()
+	paginationCursor, err := bindingsStoreResponse.PaginationCursor.Bytes()
+	if err != nil {
+		return nil, err
+	}
 
 	pbQueryResponse := storepb.StoreQueryResponse{
 		RequestId:        bindingsStoreResponse.RequestId,
@@ -80,7 +86,10 @@ func BindingsToPbStoreResponse(bindingsStoreResponse *bindings.StoreQueryRespons
 
 	for _, message := range *bindingsStoreResponse.Messages {
 
-		msgHash := message.MessageHash.Bytes()
+		msgHash, err := message.MessageHash.Bytes()
+		if err != nil {
+			return nil, err
+		}
 
 		var pbMessage storepb.WakuMessageKeyValue
 		if message.WakuMessage == nil {

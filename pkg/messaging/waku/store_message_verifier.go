@@ -44,7 +44,7 @@ func (d *storenodeMessageVerifier) MessageHashesExist(ctx context.Context, reque
 	}
 
 	for i, mhash := range messageHashes {
-		hexHash, err := common.ToMessageHashFromStringFormat(mhash.String())
+		hexHash, err := common.ToMessageHash(mhash.String())
 		if err != nil {
 			return nil, err
 		}
