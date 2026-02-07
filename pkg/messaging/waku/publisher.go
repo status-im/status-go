@@ -12,7 +12,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
 type nwakuPublisher struct {
@@ -34,7 +33,7 @@ func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessa
 	// TODO-nwaku improve this workaround to use the pb definition of the hash
 
 	// Temporary conversion to "nwaku" WakuMessage
-	nwakuWakuMessage := &nimpb.WakuMessage{
+	nwakuWakuMessage := &pb.WakuMessage{
 		Payload:    message.Payload,
 		ContentTopic:   message.ContentTopic,
 		Version:        message.Version,
