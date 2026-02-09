@@ -1,10 +1,13 @@
+import asyncio
 import logging
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 from requests import ReadTimeout
 
 from clients.anvil import Anvil
+from clients.async_status_backend import AsyncStatusBackend
 from clients.contract_deployers.multicall3 import Multicall3Deployer
 from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
@@ -225,3 +228,98 @@ def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3
         token_overrides=snt_token_overrides,
         multicall_contract_address=multicall3_deployer.contract_address,
     )
+
+
+@pytest_asyncio.fixture
+async def async_backend_factory(backend_factory):
+    """
+    Async fixture that creates bare backend (not logged in) with async signal support.
+
+    Useful for tests like local_pairing where receiver device starts without account.
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_pairing(async_backend_factory):
+            device = await async_backend_factory("device")
+            device.backend.init_status_backend()
+            # ... pairing flow ...
+            signal = await device.wait_for_signal(SignalType.LOCAL_PAIRING, ...)
+    """
+    async_backends: list[AsyncStatusBackend] = []
+
+    async def factory(name: str = "", **kwargs) -> AsyncStatusBackend:
+        logging.debug(f"[ASYNC SETUP] Creating bare {name} backend")
+
+        # Create sync backend in thread pool to avoid blocking event loop
+        # Skip sync signal client - we'll use async one instead
+        sync_backend = await asyncio.to_thread(lambda: backend_factory(name, skip_signal_client=True, **kwargs))
+
+        # Wrap with async backend for signal support
+        async_backend = AsyncStatusBackend(sync_backend)
+        await async_backend.start_signal_client()
+        async_backends.append(async_backend)
+
+        logging.debug(f"[ASYNC SETUP] {name.capitalize()} bare backend ready with signal client")
+        return async_backend
+
+    yield factory
+
+    # Cleanup: stop signal clients in parallel (sync backend cleanup handled by backend_factory)
+    if async_backends:
+        results = await asyncio.gather(
+            *[ab.stop_signal_client() for ab in async_backends],
+            return_exceptions=True,
+        )
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logging.warning(f"Failed to stop signal client {i}: {result}")
+
+
+@pytest_asyncio.fixture
+async def async_backend_new_profile(backend_new_profile):
+    """
+    Async fixture that creates backend with new profile and async signal support.
+
+    Uses sync backend_new_profile for RPC, wraps with AsyncStatusBackend for signals.
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_something(async_backend_new_profile):
+            backend = await async_backend_new_profile("sender")
+            # RPC calls are sync: backend.wakuext_service.send_contact_request(...)
+            # Signal waiting is async: await backend.wait_for_signal(...)
+    """
+    async_backends: list[AsyncStatusBackend] = []
+
+    async def factory(
+        name: str = "",
+        waku_light_client: bool = False,
+        **kwargs,
+    ) -> AsyncStatusBackend:
+        logging.debug(f"[ASYNC SETUP] Creating {name} with wakuV2LightClient={waku_light_client}")
+
+        # Create sync backend in thread pool to avoid blocking event loop
+        # NOTE: We do NOT pass skip_signal_client=True here because backend_new_profile
+        # calls wait_for_login() which needs the sync signal client to receive NODE_LOGIN.
+        # The async wrapper will disconnect sync client later in start_signal_client().
+        sync_backend = await asyncio.to_thread(lambda: backend_new_profile(name, waku_light_client=waku_light_client, **kwargs))
+
+        # Wrap with async backend for signal support
+        async_backend = AsyncStatusBackend(sync_backend)
+        await async_backend.start_signal_client()
+        async_backends.append(async_backend)
+
+        logging.debug(f"[ASYNC SETUP] {name.capitalize()} backend ready with signal client")
+        return async_backend
+
+    yield factory
+
+    # Cleanup: stop signal clients in parallel (sync backend cleanup handled by backend_new_profile)
+    if async_backends:
+        results = await asyncio.gather(
+            *[ab.stop_signal_client() for ab in async_backends],
+            return_exceptions=True,
+        )
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logging.warning(f"Failed to stop signal client {i}: {result}")

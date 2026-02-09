@@ -55,7 +55,8 @@ class TestEditCommunity:
         return backend_new_profile("sender")
 
     def test_edit_community_image(self, backend):
-        backend.wait_for_signal(SignalType.MEDIASERVER_STARTED.value)
+        with backend.expect_signal(SignalType.MEDIASERVER_STARTED, timeout=60, start="beginning"):
+            pass
 
         # Save certificate to temporary file
         certificate = backend.image_server_tls_cert()

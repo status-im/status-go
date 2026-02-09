@@ -37,7 +37,13 @@ class TestCreatePrivateGroups(MessengerSteps):
                 private_group_name,
             )
             sleep(30)
-        community_member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)
+        with community_member.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=private_group_name,
+            start="beginning",
+            timeout=60,
+        ):
+            pass
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_create_private_groups_with_ip_change(self, community_admin, community_member):
@@ -46,4 +52,10 @@ class TestCreatePrivateGroups(MessengerSteps):
 
         private_group_name = f"private_group_{uuid4()}"
         community_admin.wakuext_service.create_group_chat_with_members([community_member.public_key], private_group_name)
-        community_member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)
+        with community_member.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=private_group_name,
+            start="beginning",
+            timeout=60,
+        ):
+            pass

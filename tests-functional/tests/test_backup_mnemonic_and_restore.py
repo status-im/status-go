@@ -135,8 +135,9 @@ class TestBackupMnemonicAndRestore:
     def test_restored_on_existing_restored_account_fails(self, backend_recovered_profile):
         user = copy.deepcopy(user_mnemonic_12)
         restored_account = backend_recovered_profile("restored", user=user)
-        restored_account.restore_account_and_login(user=user)
-        signal = restored_account.wait_for_signal(SignalType.NODE_LOGIN.value)
+        with restored_account.expect_signal(SignalType.NODE_LOGIN) as exp:
+            restored_account.restore_account_and_login(user=user)
+        signal = exp.result
 
         assert user.profile_data is not None, "User profile_data should not be None"
         key_uid = user.profile_data.get("key-uid", "")

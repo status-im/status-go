@@ -46,8 +46,10 @@ class TestOneToOneMessages(MessengerSteps):
             message_text = f"test_message_{uuid4()}"
             sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
             sleep(30)
-        receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
-        sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=message_text):
+            pass
+        with sender.expect_signal(SignalType.MESSAGE_DELIVERED):
+            pass
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_one_to_one_messages_with_ip_change(self, sender, receiver):

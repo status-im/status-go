@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Callable, Literal
 
 import websocket
 
@@ -71,24 +72,105 @@ class LocalPairingEventAction(Enum):
     ACTION_KEYSTORE_FILES_TRANSFER = 6
 
 
+class SignalExpectation:
+    """Context manager for expecting signals.
+
+    By default waits only for signals that arrive AFTER entering the context (race-safe).
+    If you need to match already received signals, use `start="beginning"` or `start=<index>`.
+    """
+
+    def __init__(
+        self,
+        signal_client: "SignalClient",
+        signal_type: SignalType,
+        *,
+        count: int = 1,
+        accept_fn: Callable[[dict], bool] | None = None,
+        pattern: str | None = None,
+        predicate: Callable[[dict], bool] | None = None,
+        timeout: float = 20,
+        start: Literal["now", "beginning"] | int = "now",
+    ):
+        self.signal_client = signal_client
+        self.signal_type = signal_type
+        self.count = count
+        self.timeout = timeout
+        self.start = start
+
+        self.result: dict | list[dict] | None = None
+        self.results: list[dict] | None = None
+        self._start_index = 0
+
+        filters_set = sum(1 for v in (accept_fn, pattern, predicate) if v is not None)
+        if filters_set > 1:
+            raise ValueError("Only one of accept_fn, pattern, predicate can be specified")
+
+        if pattern is not None:
+            self.accept_fn: Callable[[dict], bool] | None = lambda s: pattern in json.dumps(s)
+        elif predicate is not None:
+            self.accept_fn = predicate
+        else:
+            self.accept_fn = accept_fn
+
+        if self.count < 1:
+            raise ValueError("count must be >= 1")
+
+    def __enter__(self):
+        with self.signal_client._cond:
+            received = self.signal_client._received_by_type[self.signal_type]
+            if self.start == "now":
+                self._start_index = len(received)
+            elif self.start == "beginning":
+                self._start_index = 0
+            elif isinstance(self.start, int):
+                if self.start < 0:
+                    raise ValueError("start index must be >= 0")
+                self._start_index = self.start
+            else:
+                raise ValueError(f"Unsupported start mode: {self.start}")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            return False
+
+        deadline = time.time() + float(self.timeout)
+        with self.signal_client._cond:
+            while True:
+                received = self.signal_client._received_by_type[self.signal_type]
+                candidates = received[self._start_index :]
+
+                if self.accept_fn is not None:
+                    candidates = [s for s in candidates if self.accept_fn(s)]
+
+                if len(candidates) >= self.count:
+                    selected = candidates[: self.count]
+                    self.results = selected
+                    self.result = selected[0] if self.count == 1 else selected
+                    return False
+
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"Expected {self.count} signal(s) of type {self.signal_type}, " f"but got {len(candidates)} in {self.timeout} seconds"
+                    )
+
+                self.signal_client._cond.wait(timeout=remaining)
+
+
 class SignalClient:
     def __init__(self, ws_url):
         self.url = f"{ws_url}/signals"
 
-        self.received_signals = {
-            # For each signal type, store:
-            # - list of received signals
-            # - expected received event delta count (resets to 1 after each wait_for_event call)
-            # - expected received event count
-            # - a function that takes the received signal as an argument and returns True if the signal is accepted (counted) or discarded
-            signal: {
-                "received": [],
-                "delta_count": 1,
-                "expected_count": 1,
-                "accept_fn": None,
-            }
-            for signal in SignalType
-        }
+        self._cond = threading.Condition()
+        self._seq = 0
+        self._received_by_type: dict[SignalType, list[dict]] = {signal: [] for signal in SignalType}
+        # Global ordered stream: (seq, signal_type, signal_dict)
+        self._received_all: list[tuple[int, SignalType, dict]] = []
+
+        # Public attribute for debugging/inspection in tests if needed.
+        # Do NOT mutate it directly.
+        self.received_signals = self._received_by_type
         if LOG_SIGNALS_TO_FILE:
             self.signal_file_path = os.path.join(
                 SIGNALS_DIR,
@@ -112,9 +194,12 @@ class SignalClient:
             # This should never happen, as we register all signal types from SignalType enum
             raise ValueError(f"Signal type {signal_type} is not registered")
 
-        accept_fn = self.received_signals[signal_type]["accept_fn"]
-        if not accept_fn or accept_fn(signal_data):
-            self.received_signals[signal_type]["received"].append(signal_data)
+        with self._cond:
+            self._seq += 1
+            seq = self._seq
+            self._received_by_type[signal_type].append(signal_data)
+            self._received_all.append((seq, signal_type, signal_data))
+            self._cond.notify_all()
 
     # TODO: This is a temporary workaround until all tests are migrated to use SignalType enum
     @staticmethod
@@ -124,74 +209,11 @@ class SignalClient:
         if isinstance(signal_type, str):
             return SignalType(signal_type)
 
-    # Used to set up how many instances of a signal to wait for, before triggering the actions
-    # that cause them to be emitted.
-    def prepare_wait_for_signal(self, signal_type: SignalType, delta_count: int, accept_fn=None):
-        signal_type = self._convert_signal_type(signal_type)
-
-        if delta_count < 1:
-            raise ValueError("delta_count must be greater than 0")
-        self.received_signals[signal_type]["delta_count"] = delta_count
-        self.received_signals[signal_type]["expected_count"] = len(self.received_signals[signal_type]["received"]) + delta_count
-        self.received_signals[signal_type]["accept_fn"] = accept_fn
-
-    def wait_for_signal(self, signal_type: SignalType | str, timeout: int | None = 20):
-        signal_type = self._convert_signal_type(signal_type)
-
-        start_time = time.time()
-        received_signals = self.received_signals.get(signal_type)
-        while (not received_signals) or len(received_signals["received"]) < received_signals["expected_count"]:
-            if timeout is not None and time.time() - start_time >= timeout:
-                raise TimeoutError(f"Signal {signal_type} is not received in {timeout} seconds")
-            time.sleep(0.2)
-        logging.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
-        delta_count = received_signals["delta_count"]
-        self.prepare_wait_for_signal(signal_type, 1)
-        if delta_count == 1:
-            return self.received_signals[signal_type]["received"][-1]
-        return self.received_signals[signal_type]["received"][-delta_count:]
-
-    def wait_for_signal_predicate(self, signal_type: SignalType | str, predicate=lambda signal: True, timeout=40):
-        signal_type = self._convert_signal_type(signal_type)
-        start_time = time.time()
-        while True:
-            elapsed_time = time.time() - start_time
-            if elapsed_time >= timeout:
-                break
-            remaining_time = int(timeout - elapsed_time)
-            signal = self.wait_for_signal(signal_type, remaining_time)
-            try:
-                if predicate(signal):
-                    return signal
-            except Exception as ex:
-                logging.warning(f"Could not filter signal by predicate because of error: {str(ex)}")
-                continue
-        raise TimeoutError(f"Signal {signal_type} satisfying the predicate is not received in {timeout} seconds")
-
-    def wait_for_logout(self):
-        signal = self.wait_for_signal(SignalType.NODE_STOPPED)
-        return signal
-
-    def find_signal_containing_pattern(self, signal_type: SignalType | str, event_pattern, timeout=20):
-        signal_type = self._convert_signal_type(signal_type)
-
-        start_time = time.time()
-        while True:
-            if time.time() - start_time >= timeout:
-                raise TimeoutError(f"Signal {signal_type} containing {event_pattern} is not received in {timeout} seconds")
-            if not self.received_signals.get(signal_type):
-                time.sleep(0.2)
-                continue
-            for event in self.received_signals[signal_type]["received"]:
-                if event_pattern in json.dumps(event):
-                    logging.debug(f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds")
-                    return event
-            time.sleep(0.2)
-
     def get_all_events(self, signal_type: SignalType | str):
         signal_type = self._convert_signal_type(signal_type)
-        signals = self.received_signals.get(signal_type, {}).get("received", [])
-        return [signal.get("event") for signal in signals]
+        with self._cond:
+            signals = self._received_by_type.get(signal_type, [])
+            return [signal.get("event") for signal in signals]
 
     def _on_error(self, ws, error):
         logging.error(f"SignalClient [{self.url}]: websocket error: {error}")
@@ -225,3 +247,130 @@ class SignalClient:
         with open(self.signal_file_path, "a+") as file:
             json.dump(signal_data, file)
             file.write("\n")
+
+    def expect_signal(
+        self,
+        signal_type,
+        count: int = 1,
+        accept_fn: Callable[[dict], bool] | None = None,
+        pattern: str | None = None,
+        predicate: Callable[[dict], bool] | None = None,
+        timeout: float = 20,
+        start: Literal["now", "beginning"] | int = "now",
+    ):
+        """
+        Create a context manager for expecting signals.
+
+        By default (`start="now"`) it waits only for signals that arrive AFTER entering the context.
+        This is the recommended race-safe usage.
+
+        If you need to match signals that could have already arrived (e.g. startup signals),
+        pass `start="beginning"` (or an explicit index).
+
+        Args:
+            signal_type: The type of signal to expect (SignalType enum or string)
+            count: Number of signals to expect (default: 1)
+            accept_fn: Optional filter function that takes signal and returns True if accepted
+            pattern: Optional string pattern to search for in signal JSON (alternative to accept_fn)
+            predicate: Optional predicate function (alternative to accept_fn)
+            timeout: Maximum time to wait for signals in seconds (default: 20)
+            start: Where to start searching in the per-type signal list:
+                - "now" (default): from current end (only new signals)
+                - "beginning": from index 0 (includes already received)
+                - int: explicit start index
+
+        Returns:
+            SignalExpectation context manager
+
+        Example:
+            with backend.expect_signal(SignalType.MESSAGES_NEW) as exp:
+                sender.send_message(...)
+            signal = exp.result
+        """
+        signal_type = self._convert_signal_type(signal_type)
+        return SignalExpectation(
+            self,
+            signal_type,
+            count=count,
+            accept_fn=accept_fn,
+            pattern=pattern,
+            predicate=predicate,
+            timeout=timeout,
+            start=start,
+        )
+
+    def expect_signals_sequence(self, signal_types, timeout: float = 60):
+        """
+        Create a context manager for expecting multiple signals from a single action.
+
+        This is a convenience method for cases where one action triggers multiple
+        sequential signals. It's equivalent to nested expect_signal contexts but
+        more readable.
+
+        Args:
+            signal_types: List of signal types to expect in sequence
+            timeout: Maximum time to wait for ALL signals (default: 60)
+
+        Returns:
+            Context manager that waits for all signals
+
+        Example:
+            with backend.expect_signals_sequence([
+                SignalType.DB_REENCRYPTION_STARTED,
+                SignalType.DB_REENCRYPTION_FINISHED,
+                SignalType.NODE_STOPPED,
+                SignalType.NODE_STARTED,
+                SignalType.NODE_READY
+            ]):
+                backend.change_password(old, new)
+        """
+
+        class SequenceExpectation:
+            def __init__(self, signal_client, signal_types, timeout):
+                self.signal_client = signal_client
+                self.signal_types = [signal_client._convert_signal_type(st) for st in signal_types]
+                self.timeout = timeout
+                self.results: list[dict] = []
+                self._start_pos = 0
+
+            def __enter__(self):
+                with self.signal_client._cond:
+                    self._start_pos = len(self.signal_client._received_all)
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                if exc_type is not None:
+                    return False
+
+                deadline = time.time() + float(self.timeout)
+                pos = self._start_pos
+                expected = list(self.signal_types)
+
+                with self.signal_client._cond:
+                    for expected_type in expected:
+                        while True:
+                            # Scan global ordered stream from current position
+                            stream = self.signal_client._received_all
+                            found = None
+                            for i in range(pos, len(stream)):
+                                _seq, st, data = stream[i]
+                                if st == expected_type:
+                                    found = (i, data)
+                                    break
+
+                            if found is not None:
+                                i, data = found
+                                self.results.append(data)
+                                pos = i + 1
+                                break
+
+                            remaining = deadline - time.time()
+                            if remaining <= 0:
+                                raise TimeoutError(
+                                    f"Expected signal sequence {expected} but did not receive {expected_type} " f"within {self.timeout} seconds"
+                                )
+                            self.signal_client._cond.wait(timeout=remaining)
+
+                return False
+
+        return SequenceExpectation(self, signal_types, timeout)

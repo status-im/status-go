@@ -23,10 +23,9 @@ def get_suggested_routes(rpc_client, **kwargs):
 
     params = [input_params]
 
-    rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-    _ = rpc_client.wallet_service.get_suggested_routes_async(params)
-
-    routes_signal = rpc_client.wait_for_signal("wallet.suggested.routes")
+    with rpc_client.expect_signal("wallet.suggested.routes") as exp:
+        _ = rpc_client.wallet_service.get_suggested_routes_async(params)
+    routes_signal = exp.result
     routes = routes_signal["event"]
 
     return routes
@@ -36,9 +35,9 @@ def build_transactions_from_route(rpc_client, uuid):
     if uuid is None or uuid == "":
         logging.info(f"Warning: provided '{uuid}' does not exist or is empty")
 
-    _ = rpc_client.wallet_service.build_transactions_from_route(uuid)
-
-    wallet_router_sign_transactions_signal = rpc_client.wait_for_signal("wallet.router.sign-transactions")
+    with rpc_client.expect_signal("wallet.router.sign-transactions") as exp:
+        _ = rpc_client.wallet_service.build_transactions_from_route(uuid)
+    wallet_router_sign_transactions_signal = exp.result
     wallet_router_sign_transactions = wallet_router_sign_transactions_signal["event"]
 
     assert "signingDetails" in wallet_router_sign_transactions
@@ -125,13 +124,12 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
 
 
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
-    rpc_client.prepare_wait_for_signal(
-        SignalType.WALLET.value,
-        1,
-        lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
-    )
-    _ = rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
-    event_response = rpc_client.wait_for_signal(SignalType.WALLET.value)["event"]
+    with rpc_client.expect_signal(
+        SignalType.WALLET,
+        accept_fn=lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
+    ) as exp:
+        _ = rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
+    event_response = exp.result["event"]
     tx_status = json.loads(event_response["message"].replace("'", '"'))
 
     assert tx_status["status"] == "Success"

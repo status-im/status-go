@@ -13,3 +13,6 @@ matplotlib>=3.5.0
 eth-typing~=5.2.1
 faker~=37.6.0
 filelock~=3.20.0
+aiohttp~=3.9.0
+websockets~=12.0
+pytest-asyncio~=0.23.0

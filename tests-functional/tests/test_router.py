@@ -108,18 +108,18 @@ class TestRouter:
             "chainID": routes["Route"][0]["FromChain"]["chainId"],
             "isApprovalTx": routes["Route"][0]["ApprovalRequired"],
         }
-        self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-        _ = self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
-        response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
+        with self.rpc_client.expect_signal("wallet.suggested.routes") as exp:
+            _ = self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
+        response = exp.result
         routes = response["event"]
         assert len(routes["Route"]) > 0
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
 
         # Step: update gas fee mode to high
         gas_fee_mode = constants.gas_fee_mode_high
-        self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-        _ = self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
-        response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
+        with self.rpc_client.expect_signal("wallet.suggested.routes") as exp:
+            _ = self.rpc_client.wallet_service.set_fee_mode(tx_identity_params, gas_fee_mode)
+        response = exp.result
         routes = response["event"]
         assert len(routes["Route"]) > 0
         wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Route"][0]["ApprovalRequired"], routes["Route"])
@@ -213,9 +213,9 @@ class TestRouter:
             "maxFeesPerGas": tx_max_fees_per_gas,
             "priorityFee": tx_priority_fee,
         }
-        self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
-        _ = self.rpc_client.wallet_service.set_custom_tx_details(tx_identity_params, tx_custom_params)
-        response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
+        with self.rpc_client.expect_signal("wallet.suggested.routes") as exp:
+            _ = self.rpc_client.wallet_service.set_custom_tx_details(tx_identity_params, tx_custom_params)
+        response = exp.result
         routes = response["event"]
         assert len(routes["Route"]) > 0
         tx_nonce_int = int(routes["Route"][0]["TxNonce"], 16)
