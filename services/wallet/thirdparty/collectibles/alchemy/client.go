@@ -10,20 +10,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
-	"go.uber.org/zap"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
+	"github.com/status-im/status-go/services/wallet/puzzleauth"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 const nftMetadataBatchLimit = 100
 const contractMetadataBatchLimit = 100
+
+type Params struct {
+	IsProxy          bool
+	ProxyCustomURL   string
+	ProxyStageName   string
+	APIKey           security.SensitiveString
+	Creds            *thirdparty.BasicCreds
+	PuzzleAuthClient *puzzleauth.Client
+}
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
@@ -53,10 +60,16 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 }
 
 func (o *Client) ID() string {
-	return AlchemyID
+	return o.id
 }
 
 func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
+	// Check if using proxy with puzzle auth or basic auth
+	if o.isProxy {
+		_, err := GetNftProxyBaseURL(o.proxyCustomURL, o.proxyStageName, chainID)
+		return err == nil
+	}
+	// Check if using direct Alchemy API
 	_, err := getBaseURL(chainID)
 	return err == nil
 }
@@ -82,10 +95,26 @@ func getNFTBaseURL(chainID walletCommon.ChainID, apiKey security.SensitiveString
 	return fmt.Sprintf("%s/nft/v3/%s", baseURL, getAPIKeySubpath(apiKey).Reveal()), nil
 }
 
+func (o *Client) getNFTBaseURL(chainID walletCommon.ChainID) (string, error) {
+	// When using proxy (with puzzle auth or basic auth), use proxy URL
+	if o.isProxy {
+		return GetNftProxyBaseURL(o.proxyCustomURL, o.proxyStageName, chainID)
+	}
+
+	// When using direct Alchemy API, construct URL with API key
+	return getNFTBaseURL(chainID, o.apiKey)
+}
+
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider
+	id               string
+	isProxy          bool
 	client           *http.Client
 	apiKey           security.SensitiveString
+	proxyCustomURL   string
+	proxyStageName   string
+	creds            *thirdparty.BasicCreds
+	puzzleAuthClient *puzzleauth.Client
 	connectionStatus *connection.Status
 }
 
@@ -95,8 +124,36 @@ func NewClient(apiKey security.SensitiveString) *Client {
 	}
 
 	return &Client{
+		id:               AlchemyID,
+		isProxy:          false,
 		client:           &http.Client{Timeout: time.Minute},
 		apiKey:           apiKey,
+		proxyCustomURL:   "",
+		proxyStageName:   "",
+		creds:            nil,
+		connectionStatus: connection.NewStatus(),
+	}
+}
+
+func NewClientWithParams(params Params) *Client {
+	if params.APIKey.Empty() && params.Creds == nil && params.PuzzleAuthClient == nil {
+		logutils.ZapLogger().Warn("Alchemy API key, credentials, and puzzle auth not available")
+	}
+
+	clientID := AlchemyID
+	if params.IsProxy {
+		clientID = AlchemyProxyID
+	}
+
+	return &Client{
+		id:               clientID,
+		isProxy:          params.IsProxy,
+		client:           &http.Client{Timeout: time.Minute},
+		apiKey:           params.APIKey,
+		proxyCustomURL:   params.ProxyCustomURL,
+		proxyStageName:   params.ProxyStageName,
+		creds:            params.Creds,
+		puzzleAuthClient: params.PuzzleAuthClient,
 		connectionStatus: connection.NewStatus(),
 	}
 }
@@ -105,6 +162,10 @@ func (o *Client) doQuery(ctx context.Context, url string) (*http.Response, error
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if o.creds != nil {
+		req.SetBasicAuth(o.creds.User.Reveal(), o.creds.Password.Reveal())
 	}
 
 	return o.doWithRetries(req)
@@ -127,42 +188,21 @@ func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any) (*
 	req.Header.Add("accept", "application/json")
 	req.Header.Add("content-type", "application/json")
 
+	if o.creds != nil {
+		req.SetBasicAuth(o.creds.User.Reveal(), o.creds.Password.Reveal())
+	}
+
 	return o.doWithRetries(req)
 }
 
 func (o *Client) doWithRetries(req *http.Request) (*http.Response, error) {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = time.Millisecond * 1000
-	b.RandomizationFactor = 0.1
-	b.Multiplier = 1.5
-	b.MaxInterval = time.Second * 32
-	b.MaxElapsedTime = time.Second * 70
-
-	b.Reset()
-
-	op := func() (*http.Response, error) {
-		resp, err := o.client.Do(req)
-		if err != nil {
-			return nil, backoff.Permanent(err)
-		}
-
-		if resp.StatusCode == http.StatusOK {
-			return resp, nil
-		}
-
-		err = fmt.Errorf("unsuccessful request: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
-		if resp.StatusCode == http.StatusTooManyRequests {
-			logutils.ZapLogger().Error("doWithRetries failed with http.StatusTooManyRequests",
-				zap.String("provider", o.ID()),
-				zap.Duration("elapsed time", b.GetElapsedTime()),
-				zap.Duration("next backoff", b.NextBackOff()),
-			)
-			return nil, err
-		}
-		return nil, backoff.Permanent(err)
+	// If puzzle auth client is available, use it
+	if o.puzzleAuthClient != nil {
+		return o.puzzleAuthClient.DoRequest(req)
 	}
 
-	return backoff.RetryWithData(op, b)
+	// Otherwise use the shared backoff retry logic
+	return thirdparty.DoWithExponentialBackoff(o.client, req, o.ID())
 }
 
 func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
@@ -176,7 +216,7 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, ch
 		"withTokenBalances": {"true"},
 	}
 
-	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
+	baseURL, err := o.getNFTBaseURL(chainID)
 
 	if err != nil {
 		return nil, err
@@ -248,7 +288,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	}
 	assets.Provider = o.ID()
 
-	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
+	baseURL, err := o.getNFTBaseURL(chainID)
 
 	if err != nil {
 		return nil, err
@@ -330,7 +370,7 @@ func getCollectibleUniqueIDBatches(ids []thirdparty.CollectibleUniqueID) []Batch
 }
 
 func (o *Client) fetchAssetsByBatchTokenIDs(ctx context.Context, chainID walletCommon.ChainID, batchIDs BatchTokenIDs) ([]thirdparty.FullCollectibleData, error) {
-	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
+	baseURL, err := o.getNFTBaseURL(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +461,7 @@ func getContractAddressBatches(ids []thirdparty.ContractID) []BatchContractAddre
 }
 
 func (o *Client) fetchCollectionsDataByBatchContractAddresses(ctx context.Context, chainID walletCommon.ChainID, batchAddresses BatchContractAddresses) ([]thirdparty.CollectionData, error) {
-	baseURL, err := getNFTBaseURL(chainID, o.apiKey)
+	baseURL, err := o.getNFTBaseURL(chainID)
 	if err != nil {
 		return nil, err
 	}
