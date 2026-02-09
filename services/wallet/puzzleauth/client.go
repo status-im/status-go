@@ -1,6 +1,7 @@
 package puzzleauth
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -37,7 +38,7 @@ func NewClient(origin string, httpClient *http.Client) *Client {
 	return &Client{
 		httpClient:  httpClient,
 		authService: NewService(origin, httpClient),
-		maxRetries:  2, // Original attempt + 1 retry after auth
+		maxRetries:  2, // Original attempt + 2 retries after auth
 	}
 }
 
@@ -45,15 +46,29 @@ func NewClient(origin string, httpClient *http.Client) *Client {
 func (c *Client) DoRequest(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
+		req.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read request body: %w", err)
+		}
+	}
+
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
-		// Try to get a token and add it to the request
-		token := c.authService.GetToken()
-		if token != "" {
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		clonedReq := req.Clone(ctx)
+		if bodyBytes != nil {
+			clonedReq.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			clonedReq.ContentLength = int64(len(bodyBytes))
 		}
 
-		// Execute the request
-		resp, err := c.httpClient.Do(req)
+		token := c.authService.GetToken()
+		if token != "" {
+			clonedReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		}
+
+		resp, err := c.httpClient.Do(clonedReq)
 		if err != nil {
 			return nil, err
 		}
@@ -68,27 +83,23 @@ func (c *Client) DoRequest(req *http.Request) (*http.Response, error) {
 				zap.Int("statusCode", resp.StatusCode),
 				zap.Int("attempt", attempt+1))
 
-			// Invalidate current token
 			c.authService.InvalidateToken()
 
-			// Get a new token
 			token, err := c.authService.EnsureToken(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get auth token: %w", err)
 			}
 
-			// Update the request header with new token
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
-			// Retry the request
 			continue
 		}
 
-		// Success or non-retryable error
 		return resp, nil
 	}
 
-	return nil, fmt.Errorf("max retries exceeded")
+	// This should never be reached
+	return nil, fmt.Errorf("puzzle auth: unexpected state after %d attempts", c.maxRetries+1)
 }
 
 // DoGetRequest performs a GET request with puzzle authentication

@@ -53,7 +53,7 @@ func TestClient_DoRequest_Success(t *testing.T) {
 	resourceHandler := func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&resourceReq, 1)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/resource", nil)
@@ -61,8 +61,10 @@ func TestClient_DoRequest_Success(t *testing.T) {
 
 	server2 := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
 	defer server2.Close()
-	req.URL.Host = server2.URL[7:]
-	req.URL.Scheme = "http"
+	parsedURL, err := netUrl.Parse(server2.URL)
+	require.NoError(t, err)
+	req.URL.Host = parsedURL.Host
+	req.URL.Scheme = parsedURL.Scheme
 
 	resp, err := client.DoRequest(req)
 	require.NoError(t, err)
@@ -81,11 +83,11 @@ func TestClient_DoRequest_AuthRetry(t *testing.T) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("unauthorized"))
+			_, _ = w.Write([]byte("unauthorized"))
 		} else {
 			tokenProvided = true
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success"))
+			_, _ = w.Write([]byte("success"))
 		}
 	}
 
@@ -246,10 +248,10 @@ func TestClient_DoGetRequest(t *testing.T) {
 				if tt.params != nil {
 					require.Equal(t, "value1", r.URL.Query().Get("param1"))
 					require.Equal(t, "value2", r.URL.Query().Get("param2"))
-					w.Write([]byte(`{"result": "success"}`))
+					_, _ = w.Write([]byte(`{"result": "success"}`))
 				} else {
 					require.Empty(t, r.URL.RawQuery)
-					w.Write([]byte("success"))
+					_, _ = w.Write([]byte("success"))
 				}
 			}
 
@@ -269,7 +271,7 @@ func TestClient_DoGetRequest(t *testing.T) {
 func TestClient_DoGetRequest_NonOK(t *testing.T) {
 	resourceHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("not found"))
+		_, _ = w.Write([]byte("not found"))
 	}
 
 	server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))

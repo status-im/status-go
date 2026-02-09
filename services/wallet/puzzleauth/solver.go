@@ -1,6 +1,7 @@
 package puzzleauth
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 
@@ -11,9 +12,25 @@ const maxAttempts = 1000000
 
 // Solve attempts to solve the puzzle by finding a nonce that produces
 // a hash with the required number of leading zeros
-func Solve(puzzle *Puzzle) (*Solution, error) {
+func Solve(ctx context.Context, puzzle *Puzzle) (*Solution, error) {
 	if puzzle == nil {
 		return nil, fmt.Errorf("puzzle cannot be nil")
+	}
+
+	if puzzle.Difficulty < 0 {
+		return nil, fmt.Errorf("invalid difficulty: %d", puzzle.Difficulty)
+	}
+	if puzzle.Argon2Params.MemoryKB <= 0 || puzzle.Argon2Params.MemoryKB > 4*1024*1024 { // max 4GB
+		return nil, fmt.Errorf("invalid memory_kb: %d", puzzle.Argon2Params.MemoryKB)
+	}
+	if puzzle.Argon2Params.Time <= 0 || puzzle.Argon2Params.Time > 100 {
+		return nil, fmt.Errorf("invalid time: %d", puzzle.Argon2Params.Time)
+	}
+	if puzzle.Argon2Params.Threads <= 0 || puzzle.Argon2Params.Threads > 255 {
+		return nil, fmt.Errorf("invalid threads: %d", puzzle.Argon2Params.Threads)
+	}
+	if puzzle.Argon2Params.KeyLen <= 0 || puzzle.Argon2Params.KeyLen > 1024 {
+		return nil, fmt.Errorf("invalid key_len: %d", puzzle.Argon2Params.KeyLen)
 	}
 
 	saltBytes, err := hex.DecodeString(puzzle.Salt)
@@ -28,6 +45,14 @@ func Solve(puzzle *Puzzle) (*Solution, error) {
 
 	// Try different nonces until we find one that meets the difficulty requirement
 	for nonce := uint64(0); nonce < maxAttempts; nonce++ {
+		if nonce%1000 == 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+			}
+		}
+
 		// Create input: challenge + salt + nonce
 		input := fmt.Sprintf("%s%s%d", puzzle.Challenge, puzzle.Salt, nonce)
 

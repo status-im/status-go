@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	netUrl "net/url"
 	"sync"
 	"time"
 
@@ -63,7 +64,6 @@ func (s *Service) InvalidateToken() {
 
 // EnsureToken returns a valid token, refreshing if necessary
 func (s *Service) EnsureToken(ctx context.Context) (string, error) {
-	// Check if we have a valid token
 	if token := s.GetToken(); token != "" {
 		return token, nil
 	}
@@ -77,7 +77,6 @@ func (s *Service) EnsureToken(ctx context.Context) (string, error) {
 		return token, nil
 	}
 
-	// Refresh the token
 	return s.refreshToken(ctx)
 }
 
@@ -95,7 +94,7 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 	}
 
 	// Step 2: Solve puzzle
-	solution, err := Solve(puzzle)
+	solution, err := Solve(ctx, puzzle)
 	if err != nil {
 		return "", fmt.Errorf("failed to solve puzzle: %w", err)
 	}
@@ -112,7 +111,6 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to submit solution: %w", err)
 	}
 
-	// Parse expires_at
 	expiresAt, err := time.Parse(time.RFC3339, tokenResp.ExpiresAt)
 	if err != nil {
 		logutils.ZapLogger().Warn("Failed to parse token expiry, using 1 hour default",
@@ -120,7 +118,6 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 		expiresAt = time.Now().Add(1 * time.Hour)
 	}
 
-	// Cache the token
 	s.mu.Lock()
 	s.tokenCache = &TokenData{
 		Token:     tokenResp.Token,
@@ -138,7 +135,10 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 
 // getPuzzle fetches a puzzle from the auth server
 func (s *Service) getPuzzle(ctx context.Context) (*Puzzle, error) {
-	url := fmt.Sprintf("%s/auth/puzzle", s.origin)
+	url, err := netUrl.JoinPath(s.origin, "auth", "puzzle")
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct puzzle URL: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -166,7 +166,10 @@ func (s *Service) getPuzzle(ctx context.Context) (*Puzzle, error) {
 
 // submitSolution submits a solved puzzle to get a JWT token
 func (s *Service) submitSolution(ctx context.Context, solution *Solution) (*TokenResponse, error) {
-	url := fmt.Sprintf("%s/auth/solve", s.origin)
+	url, err := netUrl.JoinPath(s.origin, "auth", "solve")
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct solve URL: %w", err)
+	}
 
 	jsonData, err := json.Marshal(solution)
 	if err != nil {

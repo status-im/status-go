@@ -110,16 +110,16 @@ func newPuzzleAuthServer(t *testing.T, opts ...authServerOption) *httptest.Serve
 			}
 			if cfg.puzzleStatus != http.StatusOK {
 				w.WriteHeader(cfg.puzzleStatus)
-				w.Write([]byte(cfg.puzzleBody))
+				_, _ = w.Write([]byte(cfg.puzzleBody))
 				return
 			}
 			if cfg.puzzleBody != "" {
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(cfg.puzzleBody))
+				_, _ = w.Write([]byte(cfg.puzzleBody))
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(testPuzzle())
+			_ = json.NewEncoder(w).Encode(testPuzzle())
 
 		case "/auth/solve":
 			if cfg.solveCounter != nil {
@@ -127,23 +127,23 @@ func newPuzzleAuthServer(t *testing.T, opts ...authServerOption) *httptest.Serve
 			}
 			if cfg.solveStatus != http.StatusOK {
 				w.WriteHeader(cfg.solveStatus)
-				w.Write([]byte(cfg.solveBody))
+				_, _ = w.Write([]byte(cfg.solveBody))
 				return
 			}
 			if cfg.solveBody != "" {
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(cfg.solveBody))
+				_, _ = w.Write([]byte(cfg.solveBody))
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(testTokenResponse(""))
+			_ = json.NewEncoder(w).Encode(testTokenResponse(""))
 
 		case "/resource":
 			if cfg.resourceFunc != nil {
 				cfg.resourceFunc(w, r)
 			} else {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("success"))
+				_, _ = w.Write([]byte("success"))
 			}
 
 		default:

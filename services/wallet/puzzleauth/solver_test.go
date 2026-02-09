@@ -1,6 +1,7 @@
 package puzzleauth
 
 import (
+	"context"
 	"encoding/hex"
 	"testing"
 
@@ -107,7 +108,7 @@ func TestSolve(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			solution, err := Solve(tt.puzzle)
+			solution, err := Solve(context.Background(), tt.puzzle)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -149,7 +150,7 @@ func TestSolve_HighDifficulty(t *testing.T) {
 		},
 	}
 
-	solution, err := Solve(puzzle)
+	solution, err := Solve(context.Background(), puzzle)
 	require.NoError(t, err)
 	require.NotNil(t, solution)
 	require.True(t, checkDifficulty(solution.ArgonHash, puzzle.Difficulty))
