@@ -10,7 +10,6 @@
       "locked": {
         "lastModified": 1769507691,
         "narHash": "sha256-NDWEPV5t9KKVrfn7X924Bf+cNXFj0Cqp6rx2h+TQt5M=",
-        "ref": "refs/heads/master",
         "rev": "cccc8ab6fda0e54752936db0d5c80b02a2c34a3a",
         "revCount": 2196,
         "submodules": true,
@@ -29,17 +28,18 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1766504822,
-        "narHash": "sha256-tWVLbYoi8/xNzsbJmzMBnuc4GsB7/4oH05yCwuokKT8=",
-        "ref": "refs/heads/master",
-        "rev": "fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6",
-        "revCount": 76,
+        "lastModified": 1769965422,
+        "narHash": "sha256-W1m8Y17+gQ26Hgha5UBECNjTlFzX3Of6ldAOcSzYyXs=",
+        "ref": "refs/heads/start-using-nimble",
+        "rev": "0454556582583031218e393398185c0012583148",
+        "revCount": 89,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
       },
       "original": {
-        "rev": "fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6",
+        "ref": "refs/heads/start-using-nimble",
+        "rev": "0454556582583031218e393398185c0012583148",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"

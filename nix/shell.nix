@@ -22,6 +22,7 @@ in mkShell {
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
     nim
+    nimble
     lib-sds-pkg
     libwaku
   ];
