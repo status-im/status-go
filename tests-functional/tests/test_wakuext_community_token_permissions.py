@@ -139,7 +139,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             member_community and member_community.get("name") == expected_name and member_community.get("description") == expected_description
         )
 
-    def deploy_owner_token(self, owner_backend, community_id, foundry_client):
+    def deploy_owner_token(self, owner_backend, community_id, foundry_client, waiting_time=5):
         """Deploy and mint owner token for the community in one step"""
         address_from = os.environ["ARBITRUM_OWNER_ADDRESS"]
 
@@ -208,31 +208,44 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
 
+        # Set fee mode for the route
+        path_tx_identity = {
+            "routerInputParamsUuid": transaction_uuid,
+            "pathName": "CommunityDeployOwnerToken",
+            "chainID": chain_id,
+            "isApprovalTx": False,
+            "communityId": community_id,
+        }
+        owner_backend.wallet_service.set_fee_mode(path_tx_identity, 0)
+
         # Build transactions from route (async, sends SignRouterTransactions signal)
         owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
 
-        # Wait for SignRouterTransactions signal
-        signal_data = owner_backend.wait_for_signal_predicate(
+        # Wait for the SignRouterTransactions signal
+        sign_signal = owner_backend.wait_for_signal_predicate(
             signal_type=SignalType.WALLET,
             predicate=lambda s: s.get("event", {}).get("type") == "SignRouterTransactions"
-            and s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
+            and s.get("event", {}).get("message", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
         )
 
-        if signal_data.get("event", {}).get("sendDetails", {}).get("errorResponse"):
-            raise Exception(f"Build transactions failed: {signal_data['event']['sendDetails']['errorResponse']}")
+        signing_details = sign_signal["event"]["message"]["signingDetails"]
 
-        signing_details = signal_data.get("event", {}).get("signingDetails", {})
-        if not signing_details or not signing_details.get("hashes"):
-            raise Exception("No signing details available")
+        sign_params = [{"address": address_from, "password": owner_backend.password, "data": hash} for hash in signing_details["hashes"]]
+        signatures_data = owner_backend.wakuext_service.sign_data(sign_params)
 
-        # Sign the transaction hashes
         signatures = {}
-        for hash_to_sign in signing_details["hashes"]:
-            signature = owner_backend.wallet_service.sign_message(address_from, owner_backend.password, hash_to_sign)
-            signatures[hash_to_sign] = signature
+        for i, sig_hex in enumerate(signatures_data):
+            hash = signing_details["hashes"][i]
+            sig_bytes = bytes.fromhex(sig_hex[2:])  # remove 0x
+            r = sig_bytes[:32].hex()
+            s = sig_bytes[32:64].hex()
+            v = "00" if sig_bytes[64] == 0 else "01"
+            signatures[hash] = {"r": r, "s": s, "v": v}
 
-        # Send the transaction
+        # Send the signed transactions
         owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+
+        logger.info(f"Sent router transactions for UUID {transaction_uuid}")
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
