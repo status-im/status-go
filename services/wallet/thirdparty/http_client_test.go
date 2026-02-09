@@ -315,7 +315,7 @@ func gzipEncode(data []byte) ([]byte, error) {
 func TestDoWithExponentialBackoff_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	}))
 	defer server.Close()
 
@@ -338,7 +338,7 @@ func TestDoWithExponentialBackoff_RateLimit(t *testing.T) {
 			w.WriteHeader(http.StatusTooManyRequests)
 		} else {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success after retry"))
+			_, _ = w.Write([]byte("success after retry"))
 		}
 	}))
 	defer server.Close()

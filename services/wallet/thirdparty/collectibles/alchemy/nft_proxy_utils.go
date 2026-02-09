@@ -14,9 +14,9 @@ const (
 )
 
 // GetNftProxyHost creates NFT proxy base URL based on stage name
-func GetNftProxyHost(customUrl, stageName string) string {
-	if customUrl != "" {
-		return strings.TrimRight(customUrl, "/")
+func GetNftProxyHost(customURL, stageName string) string {
+	if customURL != "" {
+		return strings.TrimRight(customURL, "/")
 	}
 	if stageName == "" {
 		stageName = "test"
@@ -25,8 +25,8 @@ func GetNftProxyHost(customUrl, stageName string) string {
 }
 
 // GetNftProxyBaseURL creates NFT proxy URL for a specific chain
-func GetNftProxyBaseURL(customUrl, stageName string, chainID walletCommon.ChainID) (string, error) {
-	host := GetNftProxyHost(customUrl, stageName)
+func GetNftProxyBaseURL(customURL, stageName string, chainID walletCommon.ChainID) (string, error) {
+	host := GetNftProxyHost(customURL, stageName)
 
 	chainPath, networkPath, err := networkhelper.ChainIDToChainAndNetwork(uint64(chainID))
 	if err != nil {

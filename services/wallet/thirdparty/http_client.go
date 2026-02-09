@@ -298,8 +298,21 @@ func (c *HTTPClient) BuildURL(proxyURL, endpoint string) string {
 }
 
 // DoWithExponentialBackoff executes an HTTP request with exponential backoff retry logic
-// for handling rate limiting and transient errors
+// for handling rate limiting responses (HTTP 429)
 func DoWithExponentialBackoff(client *http.Client, req *http.Request, providerID string) (*http.Response, error) {
+	// Ensure request body can be replayed for retries by setting up GetBody if needed
+	if req.Body != nil && req.GetBody == nil {
+		bodyBytes, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
+		req.Body.Close()
+		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+		}
+	}
+
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = time.Millisecond * 1000
 	b.RandomizationFactor = 0.1
@@ -310,7 +323,16 @@ func DoWithExponentialBackoff(client *http.Client, req *http.Request, providerID
 	b.Reset()
 
 	op := func() (*http.Response, error) {
-		resp, err := client.Do(req)
+		attemptReq := req.Clone(req.Context())
+		if req.GetBody != nil && attemptReq.Body == nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return nil, backoff.Permanent(err)
+			}
+			attemptReq.Body = body
+		}
+
+		resp, err := client.Do(attemptReq)
 		if err != nil {
 			return nil, backoff.Permanent(err)
 		}
@@ -319,12 +341,14 @@ func DoWithExponentialBackoff(client *http.Client, req *http.Request, providerID
 			return resp, nil
 		}
 
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
 		err = fmt.Errorf("unsuccessful request: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 		if resp.StatusCode == http.StatusTooManyRequests {
-			logutils.ZapLogger().Error("doWithRetries failed with http.StatusTooManyRequests",
+			logutils.ZapLogger().Warn("request throttled with http.StatusTooManyRequests; will retry",
 				zap.String("provider", providerID),
 				zap.Duration("elapsed time", b.GetElapsedTime()),
-				zap.Duration("next backoff", b.NextBackOff()),
 			)
 			return nil, err
 		}

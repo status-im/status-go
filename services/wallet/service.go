@@ -91,7 +91,6 @@ func createAlchemyProxyClient(config params.NftProxyConfig) *alchemy.Client {
 	var puzzleClient *puzzleauth.Client
 	if config.UsePuzzleAuth {
 		origin := alchemy.GetNftProxyHost(config.UrlOverride.Reveal(), config.StageName)
-		// Share the http.Client with the alchemy client
 		httpClient := &http.Client{Timeout: time.Minute}
 		puzzleClient = puzzleauth.NewClient(origin, httpClient)
 	}
