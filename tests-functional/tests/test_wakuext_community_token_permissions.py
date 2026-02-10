@@ -208,29 +208,21 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
 
-        # Set fee mode for the route
-        path_tx_identity = {
-            "routerInputParamsUuid": transaction_uuid,
-            "pathName": "CommunityDeployOwnerToken",
-            "chainID": chain_id,
-            "isApprovalTx": False,
-            "communityId": community_id,
-        }
-        owner_backend.wallet_service.set_fee_mode(path_tx_identity, 0)
-
         # Build transactions from route (async, sends SignRouterTransactions signal)
-        owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
+        build_result = owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
 
-        # Wait for the SignRouterTransactions signal
+        logger.info(f"Build TX result {build_result}")
+
         sign_signal = owner_backend.wait_for_signal_predicate(
-            signal_type=SignalType.WALLET,
-            predicate=lambda s: s.get("event", {}).get("type") == "SignRouterTransactions"
-            and s.get("event", {}).get("message", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
+            signal_type=SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
+            predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
         )
 
-        signing_details = sign_signal["event"]["message"]["signingDetails"]
+        logger.info(f"Sign signal {sign_signal}")
 
-        sign_params = [{"address": address_from, "password": owner_backend.password, "data": hash} for hash in signing_details["hashes"]]
+        signing_details = sign_signal["event"]["signingDetails"]
+
+        sign_params = [{"account": address_from, "password": owner_backend.password, "data": hash} for hash in signing_details["hashes"]]
         signatures_data = owner_backend.wakuext_service.sign_data(sign_params)
 
         signatures = {}
@@ -242,10 +234,18 @@ class TestCommunityTokenPermissions(MessengerSteps):
             v = "00" if sig_bytes[64] == 0 else "01"
             signatures[hash] = {"r": r, "s": s, "v": v}
 
+        accounts = owner_backend.accounts_service.get_accounts()
+        logger.info(f"Accounts before sending router transactions: {accounts}")
+        logger.info(f"Address from: {address_from}")
+
         # Send the signed transactions
         owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
 
-        logger.info(f"Sent router transactions for UUID {transaction_uuid}")
+        sent_signal = owner_backend.wait_for_signal_predicate(
+            signal_type=SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
+        )
+
+        logger.info(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
