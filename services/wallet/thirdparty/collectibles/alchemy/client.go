@@ -32,89 +32,23 @@ type Params struct {
 	PuzzleAuthClient *puzzleauth.Client
 }
 
-func getBaseURL(chainID walletCommon.ChainID) (string, error) {
-	switch uint64(chainID) {
-	case walletCommon.EthereumMainnet:
-		return "https://eth-mainnet.g.alchemy.com", nil
-	case walletCommon.EthereumSepolia:
-		return "https://eth-sepolia.g.alchemy.com", nil
-	case walletCommon.OptimismMainnet:
-		return "https://opt-mainnet.g.alchemy.com", nil
-	case walletCommon.OptimismSepolia:
-		return "https://opt-sepolia.g.alchemy.com", nil
-	case walletCommon.ArbitrumMainnet:
-		return "https://arb-mainnet.g.alchemy.com", nil
-	case walletCommon.ArbitrumSepolia:
-		return "https://arb-sepolia.g.alchemy.com", nil
-	case walletCommon.BaseMainnet:
-		return "https://base-mainnet.g.alchemy.com", nil
-	case walletCommon.BaseSepolia:
-		return "https://base-sepolia.g.alchemy.com", nil
-	case walletCommon.LineaMainnet:
-		return "https://linea-mainnet.g.alchemy.com", nil
-	case walletCommon.LineaSepolia:
-		return "https://linea-sepolia.g.alchemy.com", nil
-	}
-
-	return "", thirdparty.ErrChainIDNotSupported
-}
-
 func (o *Client) ID() string {
 	return o.id
 }
 
 func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
-	// Check if using proxy with puzzle auth or basic auth
-	if o.isProxy {
-		_, err := GetNftProxyBaseURL(o.proxyCustomURL, o.proxyStageName, chainID)
-		return err == nil
-	}
-	// Check if using direct Alchemy API
-	_, err := getBaseURL(chainID)
-	return err == nil
+	return o.urlResolver.IsChainSupported(chainID)
 }
 
 func (o *Client) IsConnected() bool {
 	return o.connectionStatus.IsConnected()
 }
 
-func getAPIKeySubpath(apiKey security.SensitiveString) security.SensitiveString {
-	if apiKey.Empty() {
-		return security.NewSensitiveString("demo")
-	}
-	return apiKey
-}
-
-func getNFTBaseURL(chainID walletCommon.ChainID, apiKey security.SensitiveString) (string, error) {
-	baseURL, err := getBaseURL(chainID)
-
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s/nft/v3/%s", baseURL, getAPIKeySubpath(apiKey).Reveal()), nil
-}
-
-func (o *Client) getNFTBaseURL(chainID walletCommon.ChainID) (string, error) {
-	// When using proxy (with puzzle auth or basic auth), use proxy URL
-	if o.isProxy {
-		return GetNftProxyBaseURL(o.proxyCustomURL, o.proxyStageName, chainID)
-	}
-
-	// When using direct Alchemy API, construct URL with API key
-	return getNFTBaseURL(chainID, o.apiKey)
-}
-
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider
 	id               string
-	isProxy          bool
-	client           *http.Client
-	apiKey           security.SensitiveString
-	proxyCustomURL   string
-	proxyStageName   string
-	creds            *thirdparty.BasicCreds
-	puzzleAuthClient *puzzleauth.Client
+	urlResolver      URLResolver
+	authTransport    *thirdparty.AuthTransport
 	connectionStatus *connection.Status
 }
 
@@ -123,14 +57,15 @@ func NewClient(apiKey security.SensitiveString) *Client {
 		logutils.ZapLogger().Warn("Alchemy API key not available")
 	}
 
+	authParams := thirdparty.AuthParams{
+		Type:   thirdparty.AuthTypeAPIKey,
+		APIKey: apiKey,
+	}
+
 	return &Client{
 		id:               AlchemyID,
-		isProxy:          false,
-		client:           &http.Client{Timeout: time.Minute},
-		apiKey:           apiKey,
-		proxyCustomURL:   "",
-		proxyStageName:   "",
-		creds:            nil,
+		urlResolver:      &directURLResolver{apiKey: apiKey},
+		authTransport:    thirdparty.NewAuthTransport(&http.Client{Timeout: time.Minute}, authParams, AlchemyID),
 		connectionStatus: connection.NewStatus(),
 	}
 }
@@ -140,20 +75,38 @@ func NewClientWithParams(params Params) *Client {
 		logutils.ZapLogger().Warn("Alchemy API key, credentials, and puzzle auth not available")
 	}
 
+	authParams := thirdparty.AuthParams{
+		APIKey:           params.APIKey,
+		Creds:            params.Creds,
+		PuzzleAuthClient: params.PuzzleAuthClient,
+	}
+	switch {
+	case params.PuzzleAuthClient != nil:
+		authParams.Type = thirdparty.AuthTypePOW
+	case params.Creds != nil:
+		authParams.Type = thirdparty.AuthTypeBasic
+	case params.IsProxy:
+		authParams.Type = thirdparty.AuthTypeNone
+	default:
+		authParams.Type = thirdparty.AuthTypeAPIKey
+	}
+
 	clientID := AlchemyID
 	if params.IsProxy {
 		clientID = AlchemyProxyID
 	}
 
+	var resolver URLResolver
+	if params.IsProxy {
+		resolver = &proxyURLResolver{customURL: params.ProxyCustomURL, stageName: params.ProxyStageName}
+	} else {
+		resolver = &directURLResolver{apiKey: params.APIKey}
+	}
+
 	return &Client{
 		id:               clientID,
-		isProxy:          params.IsProxy,
-		client:           &http.Client{Timeout: time.Minute},
-		apiKey:           params.APIKey,
-		proxyCustomURL:   params.ProxyCustomURL,
-		proxyStageName:   params.ProxyStageName,
-		creds:            params.Creds,
-		puzzleAuthClient: params.PuzzleAuthClient,
+		urlResolver:      resolver,
+		authTransport:    thirdparty.NewAuthTransport(&http.Client{Timeout: time.Minute}, authParams, clientID),
 		connectionStatus: connection.NewStatus(),
 	}
 }
@@ -163,12 +116,7 @@ func (o *Client) doQuery(ctx context.Context, url string) (*http.Response, error
 	if err != nil {
 		return nil, err
 	}
-
-	if o.creds != nil {
-		req.SetBasicAuth(o.creds.User.Reveal(), o.creds.Password.Reveal())
-	}
-
-	return o.doWithRetries(req)
+	return o.authTransport.Do(req)
 }
 
 func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any) (*http.Response, error) {
@@ -177,10 +125,7 @@ func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any) (*
 		return nil, err
 	}
 
-	payloadString := string(payloadJSON)
-	payloadReader := strings.NewReader(payloadString)
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, payloadReader)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(payloadJSON)))
 	if err != nil {
 		return nil, err
 	}
@@ -188,21 +133,7 @@ func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any) (*
 	req.Header.Add("accept", "application/json")
 	req.Header.Add("content-type", "application/json")
 
-	if o.creds != nil {
-		req.SetBasicAuth(o.creds.User.Reveal(), o.creds.Password.Reveal())
-	}
-
-	return o.doWithRetries(req)
-}
-
-func (o *Client) doWithRetries(req *http.Request) (*http.Response, error) {
-	// If puzzle auth client is available, use it
-	if o.puzzleAuthClient != nil {
-		return o.puzzleAuthClient.DoRequest(req)
-	}
-
-	// Otherwise use the shared backoff retry logic
-	return thirdparty.DoWithExponentialBackoff(o.client, req, o.ID())
+	return o.authTransport.Do(req)
 }
 
 func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
@@ -216,8 +147,7 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, ch
 		"withTokenBalances": {"true"},
 	}
 
-	baseURL, err := o.getNFTBaseURL(chainID)
-
+	baseURL, err := o.urlResolver.GetNFTBaseURL(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -288,8 +218,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	}
 	assets.Provider = o.ID()
 
-	baseURL, err := o.getNFTBaseURL(chainID)
-
+	baseURL, err := o.urlResolver.GetNFTBaseURL(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +299,7 @@ func getCollectibleUniqueIDBatches(ids []thirdparty.CollectibleUniqueID) []Batch
 }
 
 func (o *Client) fetchAssetsByBatchTokenIDs(ctx context.Context, chainID walletCommon.ChainID, batchIDs BatchTokenIDs) ([]thirdparty.FullCollectibleData, error) {
-	baseURL, err := o.getNFTBaseURL(chainID)
+	baseURL, err := o.urlResolver.GetNFTBaseURL(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +390,7 @@ func getContractAddressBatches(ids []thirdparty.ContractID) []BatchContractAddre
 }
 
 func (o *Client) fetchCollectionsDataByBatchContractAddresses(ctx context.Context, chainID walletCommon.ChainID, batchAddresses BatchContractAddresses) ([]thirdparty.CollectionData, error) {
-	baseURL, err := o.getNFTBaseURL(chainID)
+	baseURL, err := o.urlResolver.GetNFTBaseURL(chainID)
 	if err != nil {
 		return nil, err
 	}

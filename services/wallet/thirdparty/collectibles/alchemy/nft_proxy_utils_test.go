@@ -66,12 +66,12 @@ func TestGetNftProxyBaseURL(t *testing.T) {
 		{
 			name:     "Supported chain - Ethereum mainnet",
 			chainID:  walletCommon.ChainID(walletCommon.EthereumMainnet),
-			expected: "https://test.nft.status.im/ethereum/mainnet",
+			expected: "https://test.nft.status.im/ethereum/mainnet/nft/v3",
 		},
 		{
 			name:     "Supported chain - Arbitrum Sepolia",
 			chainID:  walletCommon.ChainID(walletCommon.ArbitrumSepolia),
-			expected: "https://test.nft.status.im/arbitrum/sepolia",
+			expected: "https://test.nft.status.im/arbitrum/sepolia/nft/v3",
 		},
 		{
 			name:    "Unsupported chain ID",

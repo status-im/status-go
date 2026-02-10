@@ -33,5 +33,5 @@ func GetNftProxyBaseURL(customURL, stageName string, chainID walletCommon.ChainI
 		return "", thirdparty.ErrChainIDNotSupported
 	}
 
-	return fmt.Sprintf("%s/%s/%s", host, chainPath, networkPath), nil
+	return fmt.Sprintf("%s/%s/%s/nft/v3", host, chainPath, networkPath), nil
 }
