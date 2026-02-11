@@ -155,3 +155,40 @@ func TestSolve_HighDifficulty(t *testing.T) {
 	require.NotNil(t, solution)
 	require.True(t, checkDifficulty(solution.ArgonHash, puzzle.Difficulty))
 }
+
+func TestSolve_ParamValidation(t *testing.T) {
+	salt := hex.EncodeToString([]byte("testsalt"))
+	tests := []struct {
+		name   string
+		puzzle *Puzzle
+	}{
+		{"negative difficulty", &Puzzle{Difficulty: -1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 64, Time: 1, Threads: 1, KeyLen: 32}}},
+		{"zero memory", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 0, Time: 1, Threads: 1, KeyLen: 32}}},
+		{"excessive memory", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 5000000, Time: 1, Threads: 1, KeyLen: 32}}},
+		{"zero time", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 64, Time: 0, Threads: 1, KeyLen: 32}}},
+		{"excessive time", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 64, Time: 101, Threads: 1, KeyLen: 32}}},
+		{"zero threads", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 64, Time: 1, Threads: 0, KeyLen: 32}}},
+		{"excessive threads", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 64, Time: 1, Threads: 256, KeyLen: 32}}},
+		{"zero keylen", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 64, Time: 1, Threads: 1, KeyLen: 0}}},
+		{"excessive keylen", &Puzzle{Difficulty: 1, Salt: salt, Argon2Params: Argon2Params{MemoryKB: 64, Time: 1, Threads: 1, KeyLen: 1025}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Solve(context.Background(), tt.puzzle)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestSolve_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	puzzle := &Puzzle{
+		Challenge:    "test",
+		Salt:         hex.EncodeToString([]byte("testsalt")),
+		Difficulty:   5,
+		Argon2Params: Argon2Params{MemoryKB: 64, Time: 1, Threads: 1, KeyLen: 32},
+	}
+	_, err := Solve(ctx, puzzle)
+	require.ErrorIs(t, err, context.Canceled)
+}

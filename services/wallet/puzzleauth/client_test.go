@@ -293,3 +293,12 @@ func TestClient_GetAuthService(t *testing.T) {
 	require.NotNil(t, service)
 	require.Equal(t, "https://test.nft.status.im", service.origin)
 }
+
+func TestClient_DoRequest_ContextCancelled(t *testing.T) {
+	client := NewClient("https://test.nft.status.im", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:1", nil)
+	_, err := client.DoRequest(req)
+	require.Error(t, err)
+}

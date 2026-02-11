@@ -199,3 +199,11 @@ func TestService_RefreshToken_InvalidExpiry(t *testing.T) {
 	require.True(t, timeDiff > 55*time.Minute && timeDiff < 65*time.Minute,
 		fmt.Sprintf("Expected expiry around 1 hour, got %v", timeDiff))
 }
+
+func TestService_EnsureToken_ContextCancelled(t *testing.T) {
+	service := NewService("https://test.nft.status.im", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := service.EnsureToken(ctx)
+	require.Error(t, err)
+}

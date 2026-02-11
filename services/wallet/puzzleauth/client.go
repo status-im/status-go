@@ -46,21 +46,27 @@ func NewClient(origin string, httpClient *http.Client) *Client {
 func (c *Client) DoRequest(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 
-	var bodyBytes []byte
-	if req.Body != nil {
-		var err error
-		bodyBytes, err = io.ReadAll(req.Body)
-		req.Body.Close()
+	// Ensure request body can be replayed for retries by setting up GetBody if needed
+	if req.Body != nil && req.GetBody == nil {
+		bodyBytes, err := io.ReadAll(req.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
+		}
+		req.Body.Close()
+		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 		}
 	}
 
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
 		clonedReq := req.Clone(ctx)
-		if bodyBytes != nil {
-			clonedReq.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-			clonedReq.ContentLength = int64(len(bodyBytes))
+		if req.GetBody != nil && clonedReq.Body == nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return nil, fmt.Errorf("failed to recreate request body: %w", err)
+			}
+			clonedReq.Body = body
 		}
 
 		token := c.authService.GetToken()
