@@ -374,6 +374,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def login(self, key_uid, password: str, kdf_iterations=256000):
         self.password = password
+        # Reconnect to signals before login to avoid missing node.login after logout.
+        SignalClient.disconnect(self)
+        SignalClient.connect(self)
+        self.prepare_wait_for_signal(SignalType.NODE_LOGIN, 1)
         method = "LoginAccount"
         data = {
             "password": self.password,
