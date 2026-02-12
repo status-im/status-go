@@ -139,7 +139,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             member_community and member_community.get("name") == expected_name and member_community.get("description") == expected_description
         )
 
-    def deploy_owner_token(self, owner_backend, community_id, foundry_client, waiting_time=5):
+    def deploy_owner_token(self, owner_backend, community_id):
         """Deploy and mint owner token for the community in one step"""
         address_from = os.environ["ARBITRUM_OWNER_ADDRESS"]
 
@@ -209,34 +209,24 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
 
         # Build transactions from route (async, sends SignRouterTransactions signal)
-        build_result = owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
-
-        logger.info(f"Build TX result {build_result}")
+        owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
 
         sign_signal = owner_backend.wait_for_signal_predicate(
             signal_type=SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
             predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
         )
 
-        logger.info(f"Sign signal {sign_signal}")
-
         signing_details = sign_signal["event"]["signingDetails"]
-
-        sign_params = [{"account": address_from, "password": owner_backend.password, "data": hash} for hash in signing_details["hashes"]]
-        signatures_data = owner_backend.wakuext_service.sign_data(sign_params)
-
         signatures = {}
-        for i, sig_hex in enumerate(signatures_data):
-            hash = signing_details["hashes"][i]
-            sig_bytes = bytes.fromhex(sig_hex[2:])  # remove 0x
-            r = sig_bytes[:32].hex()
-            s = sig_bytes[32:64].hex()
-            v = "00" if sig_bytes[64] == 0 else "01"
-            signatures[hash] = {"r": r, "s": s, "v": v}
-
-        accounts = owner_backend.accounts_service.get_accounts()
-        logger.info(f"Accounts before sending router transactions: {accounts}")
-        logger.info(f"Address from: {address_from}")
+        for tx_hash in signing_details["hashes"]:
+            sig_hex = owner_backend.wallet_service.sign_message(tx_hash, address_from, owner_backend.password)
+            assert sig_hex and sig_hex.startswith("0x"), f"Invalid transaction signature for hash {tx_hash}: {sig_hex}"
+            tx_signature = sig_hex[2:]
+            signatures[tx_hash] = {
+                "r": tx_signature[:64],
+                "s": tx_signature[64:128],
+                "v": tx_signature[128:],
+            }
 
         # Send the signed transactions
         owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
@@ -245,7 +235,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
             signal_type=SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
         )
 
-        logger.info(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
+        logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
@@ -457,7 +447,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # When the Owner mints the owner token
         arbitrum_owner_backend.wallet_service.restart_wallet_reload_timer()
         time.sleep(2)  # Sync metadata
-        self.deploy_owner_token(arbitrum_owner_backend, community_id, foundry_client)
+        self.deploy_owner_token(arbitrum_owner_backend, community_id)
 
         # And the Owner edits the community again
         new_name2, new_description2 = self.edit_community(arbitrum_owner_backend, community_id)
