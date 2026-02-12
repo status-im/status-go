@@ -54,8 +54,8 @@ class WalletService(Service):
         params = [uuid]
         return self.rpc_request("buildTransactionsFromRoute", params)
 
-    def sign_message(self, address: str, password: str, message: str):
-        params = [address, password, message]
+    def sign_message(self, message: str, address: str, password: str):
+        params = [message, address, password]
         return self.rpc_request("signMessage", params)
 
     def get_ethereum_chain(
