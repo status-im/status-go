@@ -326,6 +326,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def _create_account_request(self, password: str, **kwargs):
         self.password = password
+        self.waku_light_client = kwargs.get("waku_light_client", False)
         data = {
             "rootDataDir": self.data_dir,
             "kdfIterations": 256000,

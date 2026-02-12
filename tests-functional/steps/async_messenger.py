@@ -221,8 +221,13 @@ class AsyncMessengerSteps:
         if not community:
             raise Exception(f"Community {self.community_id} not visible to member after retries")
 
-        # Ensure admin has community data
+        # Ensure admin has community data (triggers filter subscriptions for community topics)
         self.fetch_community(admin, self.community_id)
+        # In light client mode, filter subscriptions are async and take several seconds.
+        # If the member sends the join request before the admin subscribes,
+        # the message is lost (filter protocol doesn't deliver historical messages).
+        if getattr(admin, "waku_light_client", False):
+            await asyncio.sleep(10)
 
         # Request to join
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
@@ -264,16 +269,16 @@ class AsyncMessengerSteps:
                 last_latest = admin.wakuext_service.latest_request_to_join_for_community(self.community_id)
                 if last_latest and last_latest.get("id"):
                     admin_observed_ids.add(last_latest["id"])
-            except Exception:
-                pass
+            except Exception as e:
+                logging.debug(f"Attempt {attempt + 1}/120 latest_request check failed: {e}")
 
             try:
                 all_non_approved = admin.wakuext_service.all_non_approved_communities_requests_to_join() or []
                 for r in all_non_approved:
                     if r.get("communityId") == self.community_id and r.get("id"):
                         admin_observed_ids.add(r["id"])
-            except Exception:
-                pass
+            except Exception as e:
+                logging.debug(f"Attempt {attempt + 1}/120 all_non_approved check failed: {e}")
 
             if join_id in admin_observed_ids:
                 accept_id = join_id
@@ -281,6 +286,18 @@ class AsyncMessengerSteps:
             elif len(admin_observed_ids) == 1:
                 accept_id = next(iter(admin_observed_ids))
                 break
+
+            # Re-send the join request periodically in case the original was lost
+            # (e.g. published before admin's filter subscription was active)
+            if attempt > 0 and attempt % 30 == 0:
+                logging.debug(f"Re-sending join request (attempt {attempt}/120)")
+                try:
+                    retry_resp = member.wakuext_service.request_to_join_community(self.community_id)
+                    retry_req = (retry_resp.get("requestsToJoinCommunity") or [{}])[0]
+                    if retry_req.get("id"):
+                        join_id = retry_req["id"]
+                except Exception as e:
+                    logging.debug(f"Re-send join request failed: {e}")
 
             await asyncio.sleep(1)
 
@@ -301,7 +318,7 @@ class AsyncMessengerSteps:
 
         # Validate accept was successful (state=3 means accepted)
         accept_state = (response.get("requestsToJoinCommunity") or [{}])[0].get("state")
-        if accept_state != 3 and str(accept_state) != "3":
+        if not _is_accepted(accept_state):
             raise Exception(f"Accept request failed. State: {accept_state}, Response: {response}")
 
         # Extract chat_id from response (sorted by position, pick first valid)
