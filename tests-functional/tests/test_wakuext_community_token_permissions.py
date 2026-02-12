@@ -7,8 +7,9 @@ import os
 
 import pytest
 
+from clients.api import ApiResponseError
 from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenPermissionType, CommunityTokenType, CommunityRoles
-from clients.signals import SignalType, WalletEventType
+from clients.signals import SignalType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
 from resources.enums import RequestToJoinState
@@ -49,6 +50,22 @@ class TestCommunityTokenPermissions(MessengerSteps):
         if isinstance(communities_response, dict):
             return communities_response.get("communities", []) or []
         return communities_response or []
+
+    def _spectate_and_fetch_community(self, backend, community_id, attempts=10, delay=5):
+        try:
+            backend.wakuext_service.spectate_community(community_id)
+        except ApiResponseError as exc:
+            logging.warning(f"Spectate community failed for {community_id}: {exc}")
+
+        community = None
+        for attempt in range(attempts):
+            community = self.fetch_community(backend, community_id)
+            if community:
+                break
+            logging.info(f"Community {community_id} not found yet (attempt {attempt + 1}/{attempts})")
+            time.sleep(delay)
+
+        return community
 
     def create_token_gated_community(
         self,
@@ -284,23 +301,23 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # TODO: Remove this sleep somehow
         time.sleep(2)
 
-        # Fetch community as member
-        self.fetch_community(member_with_snt_backend, community_id)
+        member_community = self._spectate_and_fetch_community(member_with_snt_backend, community_id)
+        assert member_community, "Community not found on member"
 
+        req_id = None
         # Member tries to join with their wallet address (should have tokens)
-        join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
-        requests = join_req.get("requestsToJoinCommunity", [])
-        assert requests, "No requests to join community"
-        assert len(requests) == 1, "Unexpected multiple requests to join community"
+        with owner_backend.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda s: ((s.get("event", {}).get("requestsToJoinCommunity") or [{}])[0].get("id") == req_id),
+            timeout=60,
+        ):
+            join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
+            requests = join_req.get("requestsToJoinCommunity", [])
+            assert requests, "No requests to join community"
+            assert len(requests) == 1, "Unexpected multiple requests to join community"
 
-        req_id = requests[0].get("id")
-        logger.info(f"Sent request to join community {community_id} with id {req_id}")
-
-        # Wait for the request to join to be received
-        owner_backend.wait_for_signal_predicate(
-            signal_type=SignalType.MESSAGES_NEW,
-            predicate=lambda s: (s.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
-        )
+            req_id = requests[0].get("id")
+            logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
         # Accept request to join
         owner_backend.wakuext_service.accept_request_to_join_community(req_id)
@@ -340,37 +357,41 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
 
         # Fetch community as member
-        response = self.fetch_community(member_with_snt_backend, community_id)
+        response = self._spectate_and_fetch_community(member_with_snt_backend, community_id)
         assert response, "Community not found"
         assert response["tokenPermissions"], "No token permissions found"
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
 
         # Wait for balance to be fetched (request to join uses cached balances)
-        member_with_snt_backend.wallet_service.restart_wallet_reload_timer()  # Force balance fetch
-        member_with_snt_backend.wait_for_signal_predicate(
-            SignalType.WALLET,
-            lambda signal: signal["event"]["type"] == WalletEventType.WALLET_TICK_RELOAD.value,
-            timeout=20,  # 10 seconds backoff + timeout
-        )
+        # Trigger explicit refresh and wait until permission check sees the balance
+        member_with_snt_backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
+        permissions_resp = None
+        for attempt in range(3):
+            time.sleep(2)
+            permissions_resp = member_with_snt_backend.wakuext_service.check_permissions_to_join_community(community_id)
+            if permissions_resp and permissions_resp.get("satisfied"):
+                break
 
-        permissions_resp = member_with_snt_backend.wakuext_service.check_permissions_to_join_community(community_id)
+            # Retry by forcing refresh again (balance update is async)
+            member_with_snt_backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
+
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
+        req_id = None
         # Member with tokens requests to join community
-        join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
-        requests = join_req.get("requestsToJoinCommunity", [])
-        assert requests, "No requests to join community"
-        assert len(requests) == 1, "Unexpected multiple requests to join community"
-
-        req_id = requests[0].get("id")
-        logger.info(f"Sent request to join community {community_id} with id {req_id}")
-
-        # Wait for request to join to get received
-        owner_backend.wait_for_signal_predicate(
+        with owner_backend.expect_signal(
             SignalType.MESSAGES_NEW,
-            lambda signal: (signal.get("event", {})["requestsToJoinCommunity"][0]["id"] == req_id),
-        )
+            predicate=lambda signal: ((signal.get("event", {}).get("requestsToJoinCommunity") or [{}])[0].get("id") == req_id),
+            timeout=60,
+        ):
+            join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
+            requests = join_req.get("requestsToJoinCommunity", [])
+            assert requests, "No requests to join community"
+            assert len(requests) == 1, "Unexpected multiple requests to join community"
+
+            req_id = requests[0].get("id")
+            logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
         accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
         assert accept_resp is not None, f"Failed to accept request: {accept_resp}"

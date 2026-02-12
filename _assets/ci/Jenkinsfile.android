@@ -37,6 +37,7 @@ pipeline {
       numToKeepStr: '5',
       daysToKeepStr: '30',
       artifactNumToKeepStr: '1',
+      artifactDaysToKeepStr: '30',
     ))
   }
 

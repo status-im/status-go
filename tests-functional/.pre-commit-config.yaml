@@ -29,3 +29,4 @@ repos:
       # - Detects unused imports, undefined variables, and redefined functions (e.g., F811).
       # - Checks for adherence to Python coding standards (PEP 8).
       # - Helps maintain clean, bug-free code.
+      # Note: E203 (whitespace before ':') is ignored as it conflicts with Black formatting.

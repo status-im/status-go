@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 )
@@ -16,6 +17,10 @@ import (
 func TestStatusNodeStart(t *testing.T) {
 	config, err := params.NewNodeConfig("", params.StatusChainNetworkID)
 	require.NoError(t, err)
+
+	// StatusNode startup always creates & starts TokenManager, which requires at least one active network.
+	config.Networks = testutil.MinimalActiveNetworks()
+
 	n := New(nil, nil, testutils.MustCreateTestLogger())
 
 	// checks before node is started
@@ -61,8 +66,10 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	err := os.MkdirAll(keyStoreDir, os.ModePerm)
 	require.NoError(t, err)
 
+	// Start requires at least one active network because TokenManager is started during node startup.
 	config := params.NodeConfig{
 		RootDataDir: dir,
+		Networks:    testutil.MinimalActiveNetworks(),
 	}
 
 	n, stop1, stop2, err := createStatusNode()

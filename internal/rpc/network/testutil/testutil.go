@@ -118,3 +118,17 @@ func ConvertNetworksToPointers(networks []params.Network) []*params.Network {
 	}
 	return result
 }
+
+func MinimalActiveNetworks() []params.Network {
+	return []params.Network{
+		*CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+			CreateProvider(
+				common.EthereumMainnet,
+				"Dummy Provider",
+				params.EmbeddedProxyProviderType,
+				true,
+				security.NewSensitiveString("http://localhost:0"),
+			),
+		}),
+	}
+}

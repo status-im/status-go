@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/rpc/network"
+	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	messaging2 "github.com/status-im/status-go/pkg/messaging"
@@ -166,7 +167,14 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 		"",
 	)
 
-	tokenManager, err := token.NewTokenManager(walletDb, nil, nil, network.NewManager(appDb, nil), appDb, nil, nil, nil,
+	// TokenManager requires at least one active network.
+	nm := network.NewManager(appDb, nil)
+	err = nm.InitEmbeddedNetworks(networktestutil.MinimalActiveNetworks())
+	if err != nil {
+		return nil, err
+	}
+
+	tokenManager, err := token.NewTokenManager(walletDb, nil, nil, nm, appDb, nil, nil, nil,
 		nil, time.Hour, time.Hour)
 	if err != nil {
 		return nil, err

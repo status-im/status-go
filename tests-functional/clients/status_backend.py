@@ -94,7 +94,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         self.wait_for_healthy()
 
-        SignalClient.connect(self)
+        # Skip sync signal client if we'll use async wrapper
+        if not kwargs.get("skip_signal_client", False):
+            SignalClient.connect(self)
 
         self.wallet_service = WalletService(self)
         self.wakuext_service = WakuextService(self)
@@ -120,7 +122,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         if Config.logs_dir:
             try:
-                self._export_logs(Config.logs_dir, log_sufix)
+                # Check if base_url was initialized (may be missing if __init__ failed early)
+                if hasattr(self, "base_url") and hasattr(self, "data_dir"):
+                    self._export_logs(Config.logs_dir, log_sufix)
             except Exception as e:
                 logging.warning(f"Failed to export logs: {e}")
 
@@ -192,7 +196,14 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def _set_networks(self, data, **kwargs):
         self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
-        network = {
+
+        # Allow callers (fixtures/tests) to add additional networks on top of the default Anvil network.
+        # - networks_override: full replacement for networksOverride (list[dict])
+        # - extra_networks_override: appended to the default Anvil network (list[dict])
+        networks_override = kwargs.get("networks_override", None)
+        extra_networks_override = kwargs.get("extra_networks_override", []) or []
+
+        anvil_network = {
             "chainID": self.network_id,
             "chainName": "Anvil",
             "rpcProviders": [
@@ -220,7 +231,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         data["testNetworksEnabled"] = True
         data["networkId"] = self.network_id
-        data["networksOverride"] = [network]
+        if networks_override is not None:
+            data["networksOverride"] = networks_override
+        else:
+            data["networksOverride"] = [anvil_network, *extra_networks_override]
 
     def _set_proxy_credentials(self, data):
         if "STATUS_BUILD_PROXY_USER" not in os.environ:
@@ -393,19 +407,130 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return self.api_request_json(method, {}, **kwargs)
 
     def wait_for_login(self):
-        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
-        if "error" in signal["event"]:
-            error_details = signal["event"]["error"]
-            assert not error_details, f"Unexpected error during login: {error_details}"
-        self.node_login_event = signal
-        logging.debug(f"Node login event: {self.node_login_event}")
-        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
-        self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic")
-        self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
-        return signal
+        """Wait until the backend has completed login.
+
+        Historically we relied on the `node.login` signal.
+        In some environments (notably `wakuV2LightClient=true`) this signal can be delayed or
+        occasionally missed by the websocket client. To keep tests stable we:
+        - try to wait for `node.login` first
+        - if it doesn't arrive, fall back to polling RPC state and extracting the same fields
+        """
+
+        def _apply_login_signal(signal: dict):
+            if "error" in signal.get("event", {}):
+                error_details = signal["event"]["error"]
+                assert not error_details, f"Unexpected error during login: {error_details}"
+            self.node_login_event = signal
+            logging.debug(f"Node login event: {self.node_login_event}")
+            self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key", "")
+            self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic", "")
+            self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid", "")
+
+        # 1) Preferred path: wait for the `node.login` signal (race-safe with backlog).
+        try:
+            with self.expect_signal(SignalType.NODE_LOGIN, timeout=60, start="beginning") as exp:
+                pass
+            signal = exp.result
+            assert isinstance(signal, dict), f"Unexpected NODE_LOGIN signal payload type: {type(signal)}"
+            _apply_login_signal(signal)
+            return signal
+        except TimeoutError:
+            logging.warning("NODE_LOGIN signal was not received in time; falling back to RPC polling to confirm login")
+
+        # 2) Fallback path: poll RPC state until it reflects a logged-in account.
+        # We keep this bounded to avoid hiding real hangs.
+        deadline = time.monotonic() + 60
+        last_settings = None
+        last_keypairs = None
+        last_error = None
+
+        while time.monotonic() < deadline:
+            try:
+                # If the signal arrived late while we were falling back, prefer it.
+                buffered = self.received_signals.get(SignalType.NODE_LOGIN, [])
+                if buffered:
+                    signal = buffered[-1]
+                    assert isinstance(signal, dict), f"Unexpected buffered NODE_LOGIN payload type: {type(signal)}"
+                    _apply_login_signal(signal)
+                    return signal
+
+                last_settings = self.settings_service.get_settings()
+                public_key = (last_settings or {}).get("public-key", "")
+                mnemonic = (last_settings or {}).get("mnemonic", "")
+
+                last_keypairs = self.accounts_service.get_account_keypairs() or []
+                key_uid = ""
+                if isinstance(last_keypairs, list) and last_keypairs:
+                    # The profile keypair is expected to be present as the first entry in most setups.
+                    key_uid = (last_keypairs[0] or {}).get("key-uid", "")
+
+                if public_key and key_uid:
+                    signal = {
+                        "type": SignalType.NODE_LOGIN.value,
+                        "event": {
+                            "settings": {
+                                "public-key": public_key,
+                                "mnemonic": mnemonic,
+                            },
+                            "account": {
+                                "key-uid": key_uid,
+                            },
+                        },
+                    }
+                    _apply_login_signal(signal)
+                    return signal
+            except Exception as e:
+                last_error = str(e)
+
+            time.sleep(0.5)
+
+        raise TimeoutError(
+            "Login did not complete within timeout: NODE_LOGIN not received and RPC state did not converge. "
+            f"last_error={last_error}, last_settings_keys={list((last_settings or {}).keys()) if isinstance(last_settings, dict) else None}, "
+            f"last_keypairs_len={len(last_keypairs) if isinstance(last_keypairs, list) else None}"
+        )
+
+    def wait_for_wakuext_ready(self, timeout: float = 30, poll_interval: float = 0.5, *, start_messenger: bool = True):
+        """Wait until `wakuext_*` RPC namespace is available after login.
+
+        In some environments `wait_for_login()` can complete before the `wakuext` RPC namespace is fully
+        registered/ready, so the first `wakuext_*` call may fail with `-32601`.
+
+        This helper keeps the waiting logic out of tests.
+
+        Args:
+            timeout: Total time in seconds.
+            poll_interval: Sleep interval between attempts.
+            start_messenger: If True, try to call `wakuext_startMessenger` while waiting.
+
+        Raises:
+            TimeoutError: if `wakuext` does not become ready within the given timeout.
+        """
+
+        deadline = time.monotonic() + float(timeout)
+        last_error = None
+        messenger_started = False
+
+        while time.monotonic() < deadline:
+            try:
+                if start_messenger and not messenger_started:
+                    # Best-effort: this itself can fail with -32601 if the namespace isn't ready yet.
+                    self.wakuext_service.start_messenger()
+                    messenger_started = True
+
+                # Probe a lightweight wakuext call that doesn't produce log noise.
+                _ = self.wakuext_service.chats()
+                return
+            except Exception as e:
+                last_error = str(e)
+                time.sleep(poll_interval)
+
+        raise TimeoutError(f"wakuext RPC namespace did not become ready in {timeout} seconds: {last_error}")
 
     def wait_for_messages(self, timeout: int | None = 20):
-        return self.wait_for_signal(SignalType.MESSAGES_NEW, timeout)
+        with self.expect_signal(SignalType.MESSAGES_NEW, timeout=timeout or 20) as exp:
+            pass
+        return exp.result
 
     def container_pause(self):
         if not self.container:
@@ -436,7 +561,12 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def wait_for_online(self, timeout=10):
         start_time = time.time()
         while time.time() - start_time <= timeout:
-            response = self.wakuext_service.peers()
+            try:
+                response = self.wakuext_service.peers()
+            except Exception as ex:
+                logging.debug(f"StatusBackend peers() check failed: {ex}")
+                time.sleep(0.5)
+                continue
             if len(response.keys()) == 0:
                 time.sleep(0.5)
                 continue

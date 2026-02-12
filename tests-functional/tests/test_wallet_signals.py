@@ -28,8 +28,9 @@ class TestWalletSignals:
             1,
             {"fetch-type": 2, "max-cache-age-seconds": 3600},
         ]
-        self.rpc_client.wallet_service.get_owned_collectibles_async(params)
-        signal_response = self.rpc_client.wait_for_signal(SignalType.WALLET.value, timeout=60)
+        with self.rpc_client.expect_signal(SignalType.WALLET, timeout=60) as exp:
+            self.rpc_client.wallet_service.get_owned_collectibles_async(params)
+        signal_response = exp.result
         # TODO: Add more assertions on response
         assert signal_response["event"]["type"] == "wallet-owned-collectibles-filtering-done"
         message = json.loads(signal_response["event"]["message"].replace("'", '"'))

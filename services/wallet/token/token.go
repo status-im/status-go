@@ -135,7 +135,13 @@ func NewTokenManager(
 		tokenBalancesStorage:       balanceStorage{walletDB: walletDB},
 	}
 
-	tokensManager, err := setUpTokenListsManager(manager, walletDB, lastTokensUpdate, autoRefreshInterval, autoRefreshCheckInterval)
+	enabledChains, err := getEnabledChains(networkManager)
+	if err != nil {
+		return nil, err
+	}
+
+	tokensManager, err := setUpTokenListsManager(manager, walletDB, enabledChains, lastTokensUpdate, autoRefreshInterval,
+		autoRefreshCheckInterval)
 	if err != nil {
 		logutils.ZapLogger().Error("Failed to create token lists manager", zap.Error(err))
 		return nil, err
@@ -147,8 +153,58 @@ func NewTokenManager(
 
 }
 
-func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time, autoRefreshInterval time.Duration,
-	autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
+func getEnabledChains(networkManager network.ManagerInterface) ([]uint64, error) {
+	if networkManager == nil {
+		return walletcommon.AllChainIDsAsUint64(), nil
+	}
+
+	enabledNetworks, err := networkManager.GetActiveNetworks()
+	if err != nil {
+		return nil, err
+	}
+	enabledChains := make([]uint64, 0)
+	for _, network := range enabledNetworks {
+		enabledChains = append(enabledChains, network.ChainID)
+	}
+	return enabledChains, nil
+}
+
+func initialListProviderFromEmbedded(id string) ([]byte, error) {
+	var data []byte
+
+	switch id {
+	case walletcommon.StatusTokenListID:
+		data = defaulttokenlists.StatusTokenList.JsonData
+	case walletcommon.UniswapTokenListID:
+		data = defaulttokenlists.UniswapTokenList.JsonData
+	case walletcommon.CoingeckoEthereumTokenListID:
+		data = defaulttokenlists.CoingeckoEthereumTokenList.JsonData
+	case walletcommon.CoingeckoOptimismTokenListID:
+		data = defaulttokenlists.CoingeckoOptimismTokenList.JsonData
+	case walletcommon.CoingeckoArbitrumTokenListID:
+		data = defaulttokenlists.CoingeckoArbitrumTokenList.JsonData
+	case walletcommon.CoingeckoBSCTokenListID:
+		data = defaulttokenlists.CoingeckoBscTokenList.JsonData
+	case walletcommon.CoingeckoBaseTokenListID:
+		data = defaulttokenlists.CoingeckoBaseTokenList.JsonData
+	case walletcommon.CoingeckoLineaTokenListID:
+		data = defaulttokenlists.CoingeckoLineaTokenList.JsonData
+	default:
+		return nil, fmt.Errorf("initial token list %q not found", id)
+	}
+
+	if len(data) == 0 {
+		return nil, fmt.Errorf("initial token list %q is empty", id)
+	}
+	return data, nil
+}
+
+func initialListIDsFromEmbedded() []string {
+	return maps.Keys(defaulttokenlists.TokensSources)
+}
+
+func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint64, lastUpdate time.Time,
+	autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
 
 	wsdkFetcher := fetcher.New(fetcher.DefaultConfig())
 
@@ -173,29 +229,16 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time
 
 		MainListID: walletcommon.StatusTokenListID,
 
-		InitialLists: map[string][]byte{
-			walletcommon.StatusTokenListID:            defaulttokenlists.StatusTokenList.JsonData,
-			walletcommon.UniswapTokenListID:           defaulttokenlists.UniswapTokenList.JsonData,
-			walletcommon.CoingeckoEthereumTokenListID: defaulttokenlists.CoingeckoEthereumTokenList.JsonData,
-			walletcommon.CoingeckoOptimismTokenListID: defaulttokenlists.CoingeckoOptimismTokenList.JsonData,
-			walletcommon.CoingeckoArbitrumTokenListID: defaulttokenlists.CoingeckoArbitrumTokenList.JsonData,
-			walletcommon.CoingeckoBSCTokenListID:      defaulttokenlists.CoingeckoBscTokenList.JsonData,
-			walletcommon.CoingeckoBaseTokenListID:     defaulttokenlists.CoingeckoBaseTokenList.JsonData,
-			walletcommon.CoingeckoLineaTokenListID:    defaulttokenlists.CoingeckoLineaTokenList.JsonData,
-		},
+		InitialListIDs:      initialListIDsFromEmbedded(),
+		InitialListProvider: initialListProviderFromEmbedded,
+
 		CustomParsers: map[string]parsers.TokenListParser{
 			walletcommon.StatusTokenListID: &parsers.StatusTokenListParser{},
 		},
 
-		Chains: walletcommon.AllChainIDsAsUint64(),
+		Chains: enabledChains,
 
 		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
-	}
-
-	for key, data := range config.InitialLists {
-		if len(data) == 0 {
-			delete(config.InitialLists, key)
-		}
 	}
 
 	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)
@@ -204,6 +247,7 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, lastUpdate time.Time
 func (tm *Manager) Start(ctx context.Context) error {
 	tm.stopCh = make(chan struct{})
 	tm.startAccountsWatcher()
+	tm.startNetworksWatcher()
 
 	tm.notifyCh = make(chan struct{})
 	return tm.startTokenListsNotifier(ctx)
@@ -273,6 +317,43 @@ func (tm *Manager) startAccountsWatcher() {
 			}
 		}
 	}()
+}
+
+func (tm *Manager) startNetworksWatcher() {
+	if tm.networkManager == nil {
+		return
+	}
+
+	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](tm.networkManager.GetPublisher(), 10)
+
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsubFn()
+		for {
+			select {
+			case <-tm.stopCh:
+				return
+			case _, ok := <-ch:
+				if !ok {
+					return
+				}
+				tm.onActiveNetworksChanged()
+			}
+		}
+	}()
+}
+
+func (tm *Manager) onActiveNetworksChanged() {
+	enabledChains, err := getEnabledChains(tm.networkManager)
+	if err != nil {
+		logutils.ZapLogger().Error("failed to get enabled chains", zap.Error(err))
+		return
+	}
+
+	err = tm.tokensManager.SetChains(enabledChains)
+	if err != nil {
+		logutils.ZapLogger().Error("failed to set chains", zap.Error(err))
+	}
 }
 
 func (tm *Manager) Stop() {
@@ -380,20 +461,67 @@ func (tm *Manager) GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, er
 }
 
 func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error) {
-	testnetMode, err := tm.settings.GetTestNetworksEnabled()
+	if tm.networkManager == nil {
+		return nil, fmt.Errorf("network manager is nil")
+	}
+	enabledNetworks, err := tm.networkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, err
 	}
 
 	chainIDs := make([]uint64, 0)
-	for _, chainID := range walletcommon.AllChainIDs() {
-		if chainID.IsMainnet() == testnetMode {
-			continue
-		}
-		chainIDs = append(chainIDs, uint64(chainID))
+	for _, network := range enabledNetworks {
+		chainIDs = append(chainIDs, network.ChainID)
 	}
 
 	return tm.GetTokensByChains(chainIDs)
+}
+
+// addTokensSharingCrossChainIDsToUsedTokenKeys adds all tokens that share the same cross chain id to the used tokens keys.
+func (tm *Manager) addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys map[string]interface{}, testnetMode bool) error {
+	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
+	if err != nil {
+		return err
+	}
+
+	crossChainIDs := make([]string, 0)
+	for _, token := range tokens {
+		if token.CrossChainID == "" {
+			continue
+		}
+		crossChainIDs = append(crossChainIDs, token.CrossChainID)
+	}
+
+	if len(crossChainIDs) == 0 {
+		return nil
+	}
+
+	tokensByCrossChainIDs := make(map[string][]*tokentypes.Token)
+	wsdkTokens := tm.tokensManager.UniqueTokens()
+
+	for _, token := range wsdkTokens {
+		if token.CrossChainID == "" ||
+			testnetMode && walletcommon.ChainID(token.ChainID).IsMainnet() ||
+			!testnetMode && !walletcommon.ChainID(token.ChainID).IsMainnet() {
+			continue
+		}
+		tokensByCrossChainIDs[token.CrossChainID] = append(tokensByCrossChainIDs[token.CrossChainID], &tokentypes.Token{Token: token})
+	}
+
+	for _, crossChainID := range crossChainIDs {
+		tokens, ok := tokensByCrossChainIDs[crossChainID]
+		if !ok {
+			continue
+		}
+		for _, token := range tokens {
+			if _, ok := usedTokensKeys[token.Key()]; ok {
+				continue
+			}
+			usedTokensKeys[token.Key()] = nil
+		}
+	}
+
+	return nil
 }
 
 // getTokenKeysForTokensOfInterestForActiveNetworksMode returns the token keys for the tokens of interest for the active networks mode (testnet or mainnet)
@@ -409,17 +537,10 @@ func (tm *Manager) getTokenKeysForTokensOfInterestForActiveNetworksMode() ([]str
 		return nil, err
 	}
 
-	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
+	// Because of grouping it's important to add all tokens that share the same cross chain id to the used tokens keys.
+	err = tm.addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys, testnetMode)
 	if err != nil {
 		return nil, err
-	}
-
-	// Because of grouping it's important to add all tokens that share the same cross chain id to the used tokens keys
-	for _, token := range tokens {
-		if token.CrossChainID == "" {
-			continue
-		}
-		usedTokensKeys[token.Key()] = nil
 	}
 
 	// It's also important to add all mandatory tokens to the used tokens keys

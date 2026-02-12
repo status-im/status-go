@@ -20,6 +20,24 @@ class SNTDeployer:
         self.snt_contract_address = self._get_snt_contract_address(self.deploy_output)
         self.snt_token_controller_address = self._get_snt_token_controller_address(self.deploy_output)
 
+    @classmethod
+    def from_file(cls, foundry: Foundry, container_file_path: str):
+        """Load SNT addresses from a JSON file in the foundry container."""
+        import json
+
+        instance = cls.__new__(cls)
+        instance.deploy_output = None
+
+        # Read the JSON file from the container
+        host_file_path = foundry.get_archive(container_file_path)
+        with open(host_file_path, "r") as f:
+            addresses = json.load(f)
+
+        instance.snt_contract_address = addresses["snt"]
+        instance.snt_token_controller_address = addresses["controller"]
+
+        return instance
+
     def _get_snt_contract_address(self, deploy_output):
         for deployment in deploy_output.values():
             if deployment["internal_type"] == "contract SNTV2":

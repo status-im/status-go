@@ -15,7 +15,7 @@ if [[ $UNIT_TEST_USE_DEVELOPMENT_LOGGER == 'false' ]]; then
   if [[ -z $BUILD_TAGS ]]; then
     BUILD_TAGS="test_silent"
   else
-    BUILD_TAGS="${BUILD_TAGS},test_silent"
+    BUILD_TAGS="${BUILD_TAGS} test_silent"
   fi
 fi
 

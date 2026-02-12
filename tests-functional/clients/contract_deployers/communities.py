@@ -13,3 +13,10 @@ class CommunitiesDeployer:
             private_key=DEPLOYER_ACCOUNT.private_key,
             sender_address=DEPLOYER_ACCOUNT.address,
         )
+
+    @classmethod
+    def from_file(cls, foundry: Foundry, container_file_path: str):
+        """Load Communities contract addresses from a JSON file in the foundry container."""
+        instance = cls.__new__(cls)
+        instance.deploy_output = foundry.load_json(container_file_path)
+        return instance

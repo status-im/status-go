@@ -311,6 +311,11 @@ class WakuextService(Service):
         response = self.rpc_request("fetchCommunity", params)
         return response
 
+    def spectate_community(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("spectateCommunity", params)
+        return response
+
     def request_to_join_community(
         self,
         community_id: str,
@@ -437,9 +442,9 @@ class WakuextService(Service):
         response = self.rpc_request("setLightClient", params)
         return response
 
-    def peers(self):
+    def peers(self, timeout=5):
         params = []
-        response = self.rpc_request("peers", params)
+        response = self.rpc_request("peers", params, timeout=timeout)
         return response
 
     def chat_messages(self, chat_id: str, cursor="", limit=10):

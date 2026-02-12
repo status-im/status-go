@@ -2,13 +2,13 @@ from typing import Union
 
 import pytest
 
-from clients.status_backend import StatusBackend
-from steps.messenger import MessengerSteps
+from clients.async_status_backend import AsyncStatusBackend
 from clients.services.wakuext import ActivityCenterNotificationType
+from steps.async_messenger import AsyncMessengerSteps
 
 
 def _get_activity_center_notifications(
-    backend_instance: StatusBackend,
+    backend_instance: AsyncStatusBackend,
     activity_types: Union[list, None] = None,
     read_type: Union[int, None] = None,
 ):
@@ -21,18 +21,19 @@ def _get_activity_center_notifications(
 
 
 @pytest.mark.rpc
-class TestActivityCenterNotifications(MessengerSteps):
+@pytest.mark.asyncio
+class TestActivityCenterNotifications(AsyncMessengerSteps):
 
-    @pytest.fixture()
-    def sender(self, backend_new_profile):
-        return backend_new_profile("sender")
+    @pytest.fixture
+    async def sender(self, async_backend_new_profile):
+        return await async_backend_new_profile("sender")
 
-    @pytest.fixture()
-    def receiver(self, backend_new_profile):
-        return backend_new_profile("receiver")
+    @pytest.fixture
+    async def receiver(self, async_backend_new_profile):
+        return await async_backend_new_profile("receiver")
 
-    def test_activity_center_notifications(self, sender, receiver):
-        message_id = self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
+    async def test_activity_center_notifications(self, sender, receiver):
+        message_id = await self.send_contact_request_and_wait(sender, receiver)
         response = _get_activity_center_notifications(
             backend_instance=receiver,
             activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_CONTACT_REQUEST],
@@ -50,7 +51,7 @@ class TestActivityCenterNotifications(MessengerSteps):
             )
         )
 
-        self.accept_contact_request_and_wait_for_signal_to_be_received(message_id, sender=sender, receiver=receiver)
+        await self.accept_contact_request_and_wait(message_id, sender=sender, receiver=receiver)
         response = _get_activity_center_notifications(backend_instance=sender)
         notification = response["notifications"][0]
         assert all(
@@ -65,13 +66,13 @@ class TestActivityCenterNotifications(MessengerSteps):
             )
         )
 
-    def test_activity_center_notifications_count(self, sender, receiver):
-        self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
+    async def test_activity_center_notifications_count(self, sender, receiver):
+        await self.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.activity_center_notifications_count([1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24], 2)
         assert response["5"] == 1
 
-    def test_seen_unseen_activity_center_notifications(self, sender, receiver):
-        self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
+    async def test_seen_unseen_activity_center_notifications(self, sender, receiver):
+        await self.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.has_unseen_activity_center_notifications()
         assert response is True
 
@@ -82,8 +83,8 @@ class TestActivityCenterNotifications(MessengerSteps):
         response = receiver.wakuext_service.has_unseen_activity_center_notifications()
         assert response is False
 
-    def test_get_activity_center_state(self, sender, receiver):
-        self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
+    async def test_get_activity_center_state(self, sender, receiver):
+        await self.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.get_activity_center_state()
         assert response["hasSeen"] is False
 
@@ -92,8 +93,8 @@ class TestActivityCenterNotifications(MessengerSteps):
         response = receiver.wakuext_service.get_activity_center_state()
         assert response["hasSeen"] is True
 
-    def test_mark_all_activity_center_notifications_read(self, sender, receiver):
-        message_id = self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
+    async def test_mark_all_activity_center_notifications_read(self, sender, receiver):
+        message_id = await self.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.mark_all_activity_center_notifications_read()
         assert all(
             (
@@ -106,8 +107,8 @@ class TestActivityCenterNotifications(MessengerSteps):
         response = receiver.wakuext_service.has_unseen_activity_center_notifications()
         assert response is False
 
-    def test_mark_activity_center_notifications_read_unread(self, sender, receiver):
-        message_id = self.make_contacts(sender, receiver)
+    async def test_mark_activity_center_notifications_read_unread(self, sender, receiver):
+        message_id = await self.make_contacts(sender, receiver)
         response = sender.wakuext_service.mark_activity_center_notifications_read([message_id])
         assert all(
             (
@@ -137,24 +138,24 @@ class TestActivityCenterNotifications(MessengerSteps):
         )
         assert result["notifications"][0]["read"] is False
 
-    def test_accept_activity_center_notifications(self, sender, receiver):
-        message_id = self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
+    async def test_accept_activity_center_notifications(self, sender, receiver):
+        message_id = await self.send_contact_request_and_wait(sender, receiver)
         result = receiver.wakuext_service.accept_activity_center_notifications([message_id])
         assert result.get("activityCenterState").get("hasSeen") is True
 
         result = _get_activity_center_notifications(backend_instance=receiver)
         assert all((result["notifications"][0]["accepted"] is True, result["notifications"][0]["id"] == message_id))
 
-    def test_dismiss_activity_center_notifications(self, sender, receiver):
-        message_id = self.send_contact_request_and_wait_for_signal_to_be_received(sender, receiver)
+    async def test_dismiss_activity_center_notifications(self, sender, receiver):
+        message_id = await self.send_contact_request_and_wait(sender, receiver)
         result = receiver.wakuext_service.dismiss_activity_center_notifications([message_id])
         assert result is None
 
         result = _get_activity_center_notifications(backend_instance=receiver)
         assert all((result["notifications"][0]["dismissed"] is True, result["notifications"][0]["id"] == message_id))
 
-    def test_delete_activity_center_notifications(self, sender, receiver):
-        message_id = self.make_contacts(sender, receiver)
+    async def test_delete_activity_center_notifications(self, sender, receiver):
+        message_id = await self.make_contacts(sender, receiver)
         result = _get_activity_center_notifications(backend_instance=sender)
         assert len(result["notifications"]) == 1
         result = sender.wakuext_service.delete_activity_center_notifications([message_id])

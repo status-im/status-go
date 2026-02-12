@@ -32,11 +32,14 @@ class TestLightClientRateLimiting(MessengerSteps):
         count = 0
         for i, expected_message in enumerate(sent_messages):
             try:
-                messages_new_event = light_receiver.find_signal_containing_pattern(
-                    SignalType.MESSAGES_NEW.value,
-                    event_pattern=expected_message.get("id"),
+                with light_receiver.expect_signal(
+                    SignalType.MESSAGES_NEW,
+                    pattern=expected_message.get("id"),
                     timeout=120,
-                )
+                    start="beginning",
+                ) as exp:
+                    pass
+                messages_new_event = exp.result
                 self.validate_signal_event_against_response(
                     signal_event=messages_new_event,
                     fields_to_validate={"text": "text"},

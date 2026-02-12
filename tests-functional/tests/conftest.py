@@ -1,64 +1,24 @@
-import json
+import asyncio
 import logging
-import os
 from uuid import uuid4
 
 import pytest
-from dotenv import load_dotenv
-from filelock import FileLock
+import pytest_asyncio
 from requests import ReadTimeout
 
 from clients.anvil import Anvil
+from clients.async_status_backend import AsyncStatusBackend
 from clients.contract_deployers.multicall3 import Multicall3Deployer
-from clients.contract_deployers.snt import SNTDeployer
 from clients.foundry import Foundry
 from clients.status_backend import StatusBackend
-from resources.constants import USE_IPV6, Account
+from resources.constants import (
+    USE_IPV6,
+    SNT_ADDRESSES_CONTAINER_PATH,
+    COMMUNITIES_ADDRESSES_CONTAINER_PATH,
+)
 from utils import fake
 
 logger = logging.getLogger(__name__)
-
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
-
-
-def get_sepolia_user(name: str) -> Account:
-    address_env = f"SEPOLIA_{name.upper()}_ADDRESS"
-    private_key_env = f"SEPOLIA_{name.upper()}_PRIVATE_KEY"
-    mnemonic_env = f"SEPOLIA_{name.upper()}_MNEMONIC"
-    password_env = "SEPOLIA_TEST_PASSWORD"
-    address = os.getenv(address_env)
-    private_key = os.getenv(private_key_env)
-    mnemonic = os.getenv(mnemonic_env)
-    password = os.getenv(password_env)
-    if not address or not private_key or not mnemonic or not password:
-        raise ValueError(f"Environment variables {address_env}, {private_key_env}, {mnemonic_env}, and {password_env} must be set for Sepolia {name}")
-    return Account(
-        address=address,
-        private_key=private_key,
-        password=password,
-        passphrase=mnemonic,
-    )
-
-
-def get_arbitrum_user(name: str) -> Account:
-    address_env = f"ARBITRUM_{name.upper()}_ADDRESS"
-    private_key_env = f"ARBITRUM_{name.upper()}_PRIVATE_KEY"
-    mnemonic_env = f"ARBITRUM_{name.upper()}_MNEMONIC"
-    password_env = "ARBITRUM_TEST_PASSWORD"
-    address = os.getenv(address_env)
-    private_key = os.getenv(private_key_env)
-    mnemonic = os.getenv(mnemonic_env)
-    password = os.getenv(password_env)
-    if not address or not private_key or not mnemonic or not password:
-        raise ValueError(
-            f"Environment variables {address_env}, {private_key_env}, {mnemonic_env}, and {password_env} must be set for Arbitrum {name}"
-        )
-    return Account(
-        address=address,
-        private_key=private_key,
-        password=password,
-        passphrase=mnemonic,
-    )
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -211,35 +171,32 @@ def multicall3_deployer(foundry_client):
 
 @pytest.fixture(scope="session")
 def snt_addresses(foundry_client):
-    addresses_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "snt_addresses.json")
-    lock_path = addresses_file + ".lock"  # Lock file next to JSON
-
-    with FileLock(lock_path, timeout=120):  # Acquire lock (120s timeout for deploy)
-        data = None
-        if os.path.exists(addresses_file):
-            try:
-                with open(addresses_file, "r") as f:
-                    data = json.load(f)
-                # Re-check contracts INSIDE lock (critical for races)
-                if foundry_client.check_contract_exists(data["snt"]) and foundry_client.check_contract_exists(data["controller"]):
-                    logger.info("Using existing SNT deployment addresses")
-                    return data
-                else:
-                    logger.warning("Existing SNT addresses invalid (no code), will redeploy")
-            except (json.JSONDecodeError, KeyError, IOError) as e:
-                logger.warning(f"Failed to load existing addresses: {e}, will redeploy")
-
-        # Deploy (now EXCLUSIVE due to lock)
-        logger.info("Deploying new SNT token...")
-        deployer = SNTDeployer(foundry_client)
-        data = {
-            "snt": deployer.snt_contract_address,
-            "controller": deployer.snt_token_controller_address,
-        }
-        with open(addresses_file, "w") as f:
-            json.dump(data, f, indent=2)
-        logger.info(f"New SNT deployed: token={data['snt']}, controller={data['controller']}")
+    try:
+        data = foundry_client.load_json(SNT_ADDRESSES_CONTAINER_PATH)
+        logger.info(f"Using pre-deployed SNT contracts: token={data['snt']}, controller={data['controller']}")
         return data
+    except Exception as e:
+        logger.error(f"Failed to load SNT addresses from container: {e}")
+        logger.error("SNT contracts should be deployed as part of docker-compose startup")
+        raise RuntimeError(
+            "SNT contracts not found. Make sure the foundry container has deployed contracts during startup. "
+            "This should happen automatically in entrypoint.sh"
+        ) from e
+
+
+@pytest.fixture(scope="session")
+def communities_addresses(foundry_client):
+    try:
+        data = foundry_client.load_json(COMMUNITIES_ADDRESSES_CONTAINER_PATH)
+        logger.info("Using pre-deployed Communities contracts")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to load Communities addresses from container: {e}")
+        logger.error("Communities contracts should be deployed as part of docker-compose startup")
+        raise RuntimeError(
+            "Communities contracts not found. Make sure the foundry container has deployed contracts during startup. "
+            "This should happen automatically in entrypoint.sh"
+        ) from e
 
 
 @pytest.fixture(scope="function")
@@ -273,65 +230,96 @@ def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3
     )
 
 
-@pytest.fixture(scope="function", autouse=False)
-def sepolia_owner_backend(backend_recovered_profile):
-    user = get_sepolia_user("owner")
-    return backend_recovered_profile(
-        name="sepolia_owner",
-        user=user,
-        disable_override_networks=True,
-        network_id=11155111,
-        token_overrides=[{"symbol": "ETH", "name": "Sepolia Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18}],
-    )
+@pytest_asyncio.fixture
+async def async_backend_factory(backend_factory):
+    """
+    Async fixture that creates bare backend (not logged in) with async signal support.
+
+    Useful for tests like local_pairing where receiver device starts without account.
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_pairing(async_backend_factory):
+            device = await async_backend_factory("device")
+            device.backend.init_status_backend()
+            # ... pairing flow ...
+            signal = await device.wait_for_signal(SignalType.LOCAL_PAIRING, ...)
+    """
+    async_backends: list[AsyncStatusBackend] = []
+
+    async def factory(name: str = "", **kwargs) -> AsyncStatusBackend:
+        logging.debug(f"[ASYNC SETUP] Creating bare {name} backend")
+
+        # Create sync backend in thread pool to avoid blocking event loop
+        # Skip sync signal client - we'll use async one instead
+        sync_backend = await asyncio.to_thread(lambda: backend_factory(name, skip_signal_client=True, **kwargs))
+
+        # Wrap with async backend for signal support
+        async_backend = AsyncStatusBackend(sync_backend)
+        await async_backend.start_signal_client()
+        async_backends.append(async_backend)
+
+        logging.debug(f"[ASYNC SETUP] {name.capitalize()} bare backend ready with signal client")
+        return async_backend
+
+    yield factory
+
+    # Cleanup: stop signal clients in parallel (sync backend cleanup handled by backend_factory)
+    if async_backends:
+        results = await asyncio.gather(
+            *[ab.stop_signal_client() for ab in async_backends],
+            return_exceptions=True,
+        )
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logging.warning(f"Failed to stop signal client {i}: {result}")
 
 
-@pytest.fixture(scope="function", autouse=False)
-def sepolia_member_backend(backend_recovered_profile):
-    user = get_sepolia_user("member")
-    return backend_recovered_profile(
-        name="sepolia_member",
-        user=user,
-        disable_override_networks=True,
-        network_id=11155111,
-        token_overrides=[{"symbol": "ETH", "name": "Sepolia Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18}],
-    )
+@pytest_asyncio.fixture
+async def async_backend_new_profile(backend_new_profile):
+    """
+    Async fixture that creates backend with new profile and async signal support.
 
+    Uses sync backend_new_profile for RPC, wraps with AsyncStatusBackend for signals.
 
-@pytest.fixture(scope="function", autouse=False)
-def arbitrum_owner_backend(backend_recovered_profile):
-    user = get_arbitrum_user("owner")
-    return backend_recovered_profile(
-        name="arbitrum_owner",
-        user=user,
-        disable_override_networks=False,
-        network_id=42161,
-        token_overrides=[
-            {"symbol": "ETH", "name": "Arbitrum Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18},
-            {
-                "symbol": "CommunityTokenDeployer",
-                "name": "CommunityTokenDeployer",
-                "address": "0x744Fd6e98dad09Fb8CCF530B5aBd32B56D64943b",
-                "decimals": 0,
-            },
-        ],
-    )
+    Usage:
+        @pytest.mark.asyncio
+        async def test_something(async_backend_new_profile):
+            backend = await async_backend_new_profile("sender")
+            # RPC calls are sync: backend.wakuext_service.send_contact_request(...)
+            # Signal waiting is async: await backend.wait_for_signal(...)
+    """
+    async_backends: list[AsyncStatusBackend] = []
 
+    async def factory(
+        name: str = "",
+        waku_light_client: bool = False,
+        **kwargs,
+    ) -> AsyncStatusBackend:
+        logging.debug(f"[ASYNC SETUP] Creating {name} with wakuV2LightClient={waku_light_client}")
 
-@pytest.fixture(scope="function", autouse=False)
-def arbitrum_member_backend(backend_recovered_profile):
-    user = get_arbitrum_user("member")
-    return backend_recovered_profile(
-        name="arbitrum_member",
-        user=user,
-        disable_override_networks=False,
-        network_id=42161,
-        token_overrides=[
-            {"symbol": "ETH", "name": "Arbitrum Ether", "address": "0x0000000000000000000000000000000000000000", "decimals": 18},
-            {
-                "symbol": "CommunityTokenDeployer",
-                "name": "CommunityTokenDeployer",
-                "address": "0x744Fd6e98dad09Fb8CCF530B5aBd32B56D64943b",
-                "decimals": 0,
-            },
-        ],
-    )
+        # Create sync backend in thread pool to avoid blocking event loop
+        # NOTE: We do NOT pass skip_signal_client=True here because backend_new_profile
+        # calls wait_for_login() which needs the sync signal client to receive NODE_LOGIN.
+        # The async wrapper will disconnect sync client later in start_signal_client().
+        sync_backend = await asyncio.to_thread(lambda: backend_new_profile(name, waku_light_client=waku_light_client, **kwargs))
+
+        # Wrap with async backend for signal support
+        async_backend = AsyncStatusBackend(sync_backend)
+        await async_backend.start_signal_client()
+        async_backends.append(async_backend)
+
+        logging.debug(f"[ASYNC SETUP] {name.capitalize()} backend ready with signal client")
+        return async_backend
+
+    yield factory
+
+    # Cleanup: stop signal clients in parallel (sync backend cleanup handled by backend_new_profile)
+    if async_backends:
+        results = await asyncio.gather(
+            *[ab.stop_signal_client() for ab in async_backends],
+            return_exceptions=True,
+        )
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logging.warning(f"Failed to stop signal client {i}: {result}")

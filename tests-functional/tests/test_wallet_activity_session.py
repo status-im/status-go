@@ -4,12 +4,15 @@ import uuid as uuid_lib
 import pytest
 from web3 import Web3
 
-from clients.contract_deployers.communities import CommunitiesDeployer
 from clients.contract_deployers.snt import (
     SNTV2_ABI,
     SNT_TOKEN_CONTROLLER_ABI,
 )
-from resources.constants import DEPLOYER_ACCOUNT, ANVIL_NETWORK_ID, NATIVE_TOKEN_ADDRESS
+from resources.constants import (
+    DEPLOYER_ACCOUNT,
+    ANVIL_NETWORK_ID,
+    NATIVE_TOKEN_ADDRESS,
+)
 from resources.constants import user_1, user_2
 from utils import wallet_utils
 
@@ -53,13 +56,12 @@ class TestWalletActivitySession:
         self.anvil_client.eth.wait_for_transaction_receipt(tx_hash)
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile, anvil_client, foundry_client, multicall3_deployer, snt_addresses):
+    def setup_backend(self, backend_recovered_profile, anvil_client, multicall3_deployer, snt_addresses):
         # Setup contracts and deployers
         self.anvil_client = anvil_client
         self.anvil_client.eth.default_account = Web3.to_checksum_address(DEPLOYER_ACCOUNT.address)
         self.snt_address = snt_addresses["snt"]
         self.snt_controller_address = snt_addresses["controller"]
-        self.communities_deployer = CommunitiesDeployer(foundry_client)
         self.erc20_token_list = {ANVIL_NETWORK_ID: self.snt_address}
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
 
@@ -112,13 +114,11 @@ class TestWalletActivitySession:
             },
             10,
         ]
-        self.rpc_client.prepare_wait_for_signal(
-            "wallet",
-            1,
-            lambda signal: signal["event"]["type"] == EventActivityFilteringDone,
-        )
-        response = self.rpc_client.wallet_service.start_activity_filter_session_v2(params)
-        event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
+        with self.rpc_client.expect_signal(
+            "wallet", accept_fn=lambda signal: signal["event"]["type"] == EventActivityFilteringDone, timeout=10
+        ) as exp:
+            response = self.rpc_client.wallet_service.start_activity_filter_session_v2(params)
+        event_response = exp.result["event"]
 
         # Check response
         sessionID = int(response)
@@ -136,13 +136,13 @@ class TestWalletActivitySession:
         uuid = str(uuid_lib.uuid4())
         input_params["uuid"] = uuid
 
-        self.rpc_client.prepare_wait_for_signal(
+        with self.rpc_client.expect_signal(
             "wallet",
-            1,
-            lambda signal: signal["event"]["type"] == EventActivitySessionUpdated and signal["event"]["requestId"] == sessionID,
-        )
-        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
-        event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
+            accept_fn=lambda signal: signal["event"]["type"] == EventActivitySessionUpdated and signal["event"]["requestId"] == sessionID,
+            timeout=10,
+        ) as exp:
+            tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
+        event_response = exp.result["event"]
 
         # Check response event
         assert int(event_response["requestId"]) == sessionID
@@ -153,13 +153,13 @@ class TestWalletActivitySession:
         uuid = str(uuid_lib.uuid4())
         input_params["uuid"] = uuid
         input_params["tokenID"] = "SNT"
-        self.rpc_client.prepare_wait_for_signal(
+        with self.rpc_client.expect_signal(
             "wallet",
-            1,
-            lambda signal: signal["event"]["type"] == EventActivitySessionUpdated and signal["event"]["requestId"] == sessionID,
-        )
-        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
-        event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
+            accept_fn=lambda signal: signal["event"]["type"] == EventActivitySessionUpdated and signal["event"]["requestId"] == sessionID,
+            timeout=10,
+        ) as exp:
+            tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
+        event_response = exp.result["event"]
 
         # Check response event
         assert int(event_response["requestId"]) == sessionID
@@ -167,14 +167,13 @@ class TestWalletActivitySession:
         assert message["hasNewOnTop"]  # New entries reported
 
         # Reset activity session
-        params = [sessionID]
-        self.rpc_client.prepare_wait_for_signal(
+        with self.rpc_client.expect_signal(
             "wallet",
-            1,
-            lambda signal: signal["event"]["type"] == EventActivityFilteringDone and signal["event"]["requestId"] == sessionID,
-        )
-        response = self.rpc_client.wallet_service.reset_activity_filter_session(sessionID)
-        event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
+            accept_fn=lambda signal: signal["event"]["type"] == EventActivityFilteringDone and signal["event"]["requestId"] == sessionID,
+            timeout=10,
+        ) as exp:
+            self.rpc_client.wallet_service.reset_activity_filter_session(sessionID)
+        event_response = exp.result["event"]
 
         # Check response event
         assert int(event_response["requestId"]) == sessionID

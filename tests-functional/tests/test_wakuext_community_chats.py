@@ -131,7 +131,8 @@ class TestCommunityChats(MessengerSteps):
     def test_mute_types_are_applied(self, creator, member, community_id, chat_payload, muted_type):
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=10):
+            pass
 
         mute_resp = member.wakuext_service.mute_community_chats(community_id, muted_type)
         community_after_mute = member.wakuext_service.fetch_community(community_id)
@@ -175,7 +176,8 @@ class TestCommunityChats(MessengerSteps):
     def test_send_community_chat_message_with_mention(self, creator, member, community_id, chat_payload):
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=10):
+            pass
 
         text = f"Hi @{member.public_key}"
         # creator sends a chat message with a mention to trigger a notification
@@ -184,7 +186,8 @@ class TestCommunityChats(MessengerSteps):
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # member receives that message even if chat is muted
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10):
+            pass
         member_msgs_resp = member.wakuext_service.chat_messages(chat_id)
         assert member_msgs_resp.get("messages")[0].get("text") == text
         assert member_msgs_resp.get("messages")[0].get("mentioned") is True
@@ -200,7 +203,8 @@ class TestCommunityChats(MessengerSteps):
     def test_send_community_chat_message_while_chat_is_muted_and_then_unmuted(self, creator, member, community_id, chat_payload):
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=chat_id, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=10):
+            pass
 
         # muting the community chats
         member.wakuext_service.mute_community_chats(community_id, MuteType.MUTE_FOR15_MIN.value)
@@ -212,7 +216,8 @@ class TestCommunityChats(MessengerSteps):
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # member receives that message even if chat is muted
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10):
+            pass
         member_msgs_resp = member.wakuext_service.chat_messages(chat_id)
         assert member_msgs_resp.get("messages")[0].get("text") == text
         assert member_msgs_resp.get("messages")[0].get("mentioned") is True
@@ -230,7 +235,8 @@ class TestCommunityChats(MessengerSteps):
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # member receives that message even if chat is muted
-        member.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=10)
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10):
+            pass
         member_msgs_resp = member.wakuext_service.chat_messages(chat_id)
         assert member_msgs_resp.get("messages")[0].get("text") == text
         assert member_msgs_resp.get("messages")[0].get("mentioned") is True

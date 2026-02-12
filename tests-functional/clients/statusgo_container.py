@@ -24,6 +24,7 @@ def _localhost(ipv6: bool):
 class StatusGoContainer:
     all_containers = []
     container = None
+    _port_lock = threading.Lock()  # Thread-safe port allocation for parallel backend creation
 
     def __init__(self, cmd, ports=None, privileged=False, container_name_suffix=""):
         if ports is None:
@@ -315,11 +316,12 @@ class StatusGoContainer:
             logs = self.container.logs()
             f.write(logs)
 
-    @staticmethod
-    def acquire_port():
-        host_port = random.choice(Config.status_backend_port_range)
-        Config.status_backend_port_range.remove(host_port)
-        return host_port
+    @classmethod
+    def acquire_port(cls):
+        with cls._port_lock:
+            host_port = random.choice(Config.status_backend_port_range)
+            Config.status_backend_port_range.remove(host_port)
+            return host_port
 
     def connect_to_bridge_network(self):
         if not self.container:

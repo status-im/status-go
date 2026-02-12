@@ -16,8 +16,11 @@
     # We are pinning the commit because ultimately we want to use same commit across different projects.
     # A commit from nixpkgs 24.11 release : https://github.com/NixOS/nixpkgs/tree/release-24.11
     nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
+    lmn = {
+      url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=cccc8ab6fda0e54752936db0d5c80b02a2c34a3a";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    lmn.url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=fb4a112407460534a9154f3aaee8888045dc6852";
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6";
   };
 

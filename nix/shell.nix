@@ -18,7 +18,7 @@ in mkShell {
   buildInputs = with pkgs;
     lib.optionals (stdenv.isDarwin) [ xcodeWrapper ] ++ [
     git jq which
-    go golangci-lint go-junit-report gopls codecov-cli
+    gcc go golangci-lint go-junit-report gopls codecov-cli
     protobuf3_24 protoc-gen-go gotestsum openjdk openssl
     rustc cargo
     nim
@@ -28,15 +28,15 @@ in mkShell {
 
   shellHook = ''
     export USE_SYSTEM_NIM=1
-    
+
     export LIBWAKU_PATH="${pkgs.libwaku}"
     export LIBSDS_PATH="${pkgs.lib-sds-pkg}"
-    
+
     export LD_LIBRARY_PATH="${pkgs.libwaku}/bin:${pkgs.lib-sds-pkg}/lib:''${LD_LIBRARY_PATH:-}"
-    
+
     export CGO_CFLAGS="-I${pkgs.libwaku}/include -I${pkgs.lib-sds-pkg}/include"
     export CGO_LDFLAGS="-L${pkgs.libwaku}/bin -L${pkgs.lib-sds-pkg}/lib"
-    
+
     echo "CGO_CFLAGS: $CGO_CFLAGS"
     echo "CGO_LDFLAGS: $CGO_LDFLAGS"
   ''
@@ -53,4 +53,3 @@ in mkShell {
   # https://github.com/status-im/status-mobile/pull/13912
   __noChroot = stdenv.isDarwin;
 }
-

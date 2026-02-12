@@ -142,3 +142,7 @@ STATUS_CONNECTOR_WS_PORT = 8586
 STATUS_MEDIA_SERVER_PORT = 8587
 
 NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+# Container paths for pre-deployed contracts
+SNT_ADDRESSES_CONTAINER_PATH = "/app/contracts/snt_addresses.json"
+COMMUNITIES_ADDRESSES_CONTAINER_PATH = "/app/contracts/communities_addresses.json"

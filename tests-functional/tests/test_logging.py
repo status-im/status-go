@@ -52,6 +52,7 @@ class TestLogging:
         backend_client.logout()
         backend_client.login(key_uid, password=backend_client.password)
         backend_client.wait_for_login()
+        backend_client.wait_for_wakuext_ready(timeout=30)
         backend_client.wakuext_service.log_test()
         profile_log = backend_client.extract_data(log_path)
         self.expect_logs(profile_log, "test message", log_pattern, count=3)

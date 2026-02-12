@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/rpc"
+	network_mock "github.com/status-im/status-go/internal/rpc/network/mock"
 	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
@@ -74,13 +75,24 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
 
-	tokenManager, err := token.NewTokenManager(db, c, nil, nil, appDB, nil, nil, nil, accountsDb, 0, 0)
+	mockCtrl := gomock.NewController(t)
+	mockNetworkManager := network_mock.NewMockManagerInterface(mockCtrl)
+	mockNetworkManager.EXPECT().GetActiveNetworks().DoAndReturn(func() ([]*params.Network, error) {
+		active := make([]*params.Network, 0, len(networks))
+		for i := range networks {
+			active = append(active, &networks[i])
+		}
+		return active, nil
+	}).AnyTimes()
+	mockNetworkManager.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+	mockNetworkManager.EXPECT().GetTestNetworksEnabled().Return(false, nil).AnyTimes()
+
+	tokenManager, err := token.NewTokenManager(db, c, nil, mockNetworkManager, appDB, nil, nil, nil, accountsDb, 0, 0)
 	require.NoError(t, err)
 
 	service, err := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
 	require.NoError(t, err)
 
-	mockCtrl := gomock.NewController(t)
 	tokenbalancesFetcher := mock_tokenbalances.NewMockFetcherIface(mockCtrl)
 
 	service.tokenBalancesFetcher = tokenbalancesFetcher
