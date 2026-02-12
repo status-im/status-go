@@ -199,8 +199,12 @@ class AsyncMessengerSteps:
     async def join_community(self, member, admin) -> str:
         """Join member to community created by admin.
 
-        Simplified implementation based on develop branch - uses simple RPC retry
-        instead of complex polling with spectate/reevaluation signals.
+        Uses a two-phase approach:
+        1. Wait for the admin to see the pending join request (propagation via Waku)
+        2. Accept the request once visible
+
+        This is critical for light client mode where Waku message propagation
+        can take significantly longer than in relay mode.
 
         Returns:
             str: The community chat ID (community_id + chat_id)
@@ -222,15 +226,77 @@ class AsyncMessengerSteps:
 
         # Request to join
         response_to_join = member.wakuext_service.request_to_join_community(self.community_id)
-        join_id = (response_to_join.get("requestsToJoinCommunity") or [{}])[0].get("id")
+        join_req = (response_to_join.get("requestsToJoinCommunity") or [{}])[0]
+        join_id = join_req.get("id")
+        join_state = join_req.get("state")
         assert join_id, f"Failed to request to join community: {response_to_join}"
 
-        # Simple async retry for accept (like retry_call in develop: 40 attempts × 0.5s = 20s max)
+        def _is_accepted(state) -> bool:
+            return state == 3 or str(state) == "3"
+
+        # Auto-accept: if state is already accepted, skip admin accept phase
+        if _is_accepted(join_state):
+            community = self.fetch_community(member, self.community_id)
+            chats = community.get("chats", {}) if community else {}
+            chat_id = self._pick_chat_id(chats)
+            if chat_id:
+                return self.community_id + chat_id
+
+        # Phase 1: Wait for admin to see the pending request.
+        # In light client mode, the join request propagates via Waku filter protocol
+        # and can take much longer than in relay mode.
+        # Check multiple endpoints (like sync version) since the request may appear
+        # in one before the others due to eventual consistency.
+        accept_id = None
+        last_pending = None
+        last_latest = None
+        for attempt in range(120):
+            admin_observed_ids: set[str] = set()
+            try:
+                last_pending = admin.wakuext_service.pending_requests_to_join_for_community(self.community_id) or []
+                for req in last_pending:
+                    if req.get("id"):
+                        admin_observed_ids.add(req["id"])
+            except Exception as e:
+                logging.debug(f"Attempt {attempt + 1}/120 pending_requests check failed: {e}")
+
+            try:
+                last_latest = admin.wakuext_service.latest_request_to_join_for_community(self.community_id)
+                if last_latest and last_latest.get("id"):
+                    admin_observed_ids.add(last_latest["id"])
+            except Exception:
+                pass
+
+            try:
+                all_non_approved = admin.wakuext_service.all_non_approved_communities_requests_to_join() or []
+                for r in all_non_approved:
+                    if r.get("communityId") == self.community_id and r.get("id"):
+                        admin_observed_ids.add(r["id"])
+            except Exception:
+                pass
+
+            if join_id in admin_observed_ids:
+                accept_id = join_id
+                break
+            elif len(admin_observed_ids) == 1:
+                accept_id = next(iter(admin_observed_ids))
+                break
+
+            await asyncio.sleep(1)
+
+        if not accept_id:
+            raise Exception(
+                f"Admin never saw pending request for community {self.community_id} "
+                f"(join_id={join_id}) after 120s. "
+                f"last_pending={last_pending}, last_latest={last_latest}"
+            )
+
+        # Phase 2: Accept the request (should succeed quickly now that it's visible)
         response = await self._async_retry_call(
             admin.wakuext_service.accept_request_to_join_community,
-            join_id,
-            max_attempts=40,
-            retry_interval=0.5,
+            accept_id,
+            max_attempts=20,
+            retry_interval=1.0,
         )
 
         # Validate accept was successful (state=3 means accepted)
