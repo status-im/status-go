@@ -8,10 +8,10 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/waku-org/waku-go-bindings/waku"
+	"github.com/logos-messaging/logos-messaging-go-bindings/waku"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
 type nwakuPublisher struct {
@@ -31,12 +31,29 @@ func (p *nwakuPublisher) RelayListPeers(pubsubTopic string) ([]peer.ID, error) {
 
 func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string) (pb.MessageHash, error) {
 	// TODO-nwaku improve this workaround to use the pb definition of the hash
-	hexHash, err := p.node.RelayPublish(ctx, message, pubsubTopic)
+
+	// Temporary conversion to "nwaku" WakuMessage
+	nwakuWakuMessage := &pb.WakuMessage{
+		Payload:    message.Payload,
+		ContentTopic:   message.ContentTopic,
+		Version:        message.Version,
+		Timestamp:      message.Timestamp,
+		Meta:           message.Meta,
+		Ephemeral:      message.Ephemeral,
+		RateLimitProof: message.RateLimitProof,
+	}
+
+	hexHash, err := p.node.RelayPublish(ctx, nwakuWakuMessage, pubsubTopic)
 	if err != nil {
 		return pb.MessageHash{}, err
 	}
 
-	return HexToPbHash(hexHash)
+	// Notice the simple conversion. Same definition but different packages.
+	hexHashBytes, err := hexHash.Bytes()
+	if err != nil {
+		return pb.MessageHash{}, err
+	}
+	return pb.ToMessageHash(hexHashBytes), nil
 }
 
 // LightpushPublish publishes a message via WakuLightPush

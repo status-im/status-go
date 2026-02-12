@@ -11,7 +11,7 @@ let
 in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
-  vendorHash = "sha256-is6SmKVHD5SX+5WKPxOjXS7i53xzAr994Pb2m1PWAZs=";
+  vendorHash = "sha256-/7BVpA++muClbLl74y3T/WcYU5B5up9qBk2xoBhhrBg=";
 
   inherit meta version;
 
@@ -48,6 +48,10 @@ in pkgs.buildGoModule {
         NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \
         NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib" \
         GO_GENERATE_CMD='go generate'
+  '';
+
+  postPatch = ''
+    patchShebangs scripts/cleanup_generated_files.sh
   '';
 
   # Build the Go library

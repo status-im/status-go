@@ -105,7 +105,7 @@ BUILD_TAGS ?= gowaku_no_rln
 
 ifeq ($(USE_NWAKU), true)
     BUILD_TAGS += use_nwaku
-    NWAKU_VERSION ?= v0.37.0-rc.3
+    NWAKU_VERSION ?= v0.37-with-ffi
     NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
     LIBWAKU := $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIB_EXT)
     CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library

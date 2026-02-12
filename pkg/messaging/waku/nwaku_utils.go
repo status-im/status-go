@@ -5,7 +5,7 @@ package wakuv2
 
 // TODO-nwaku remove this entire file once go-waku is removed from status-go
 import (
-	bindings "github.com/waku-org/waku-go-bindings/waku/common"
+	bindings "github.com/logos-messaging/logos-messaging-go-bindings/waku/common"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
@@ -14,13 +14,11 @@ import (
 )
 
 func HexToPbHash(hexHash bindings.MessageHash) (pb.MessageHash, error) {
-	bytesHash, err := hexHash.Bytes()
+	hexHashBytes, err := hexHash.Bytes()
 	if err != nil {
 		return pb.MessageHash{}, err
 	}
-
-	pbHash := pb.ToMessageHash(bytesHash)
-	return pbHash, nil
+	return pb.ToMessageHash(hexHashBytes), nil
 }
 
 func PbToHexHash(pbHash pb.MessageHash) (bindings.MessageHash, error) {
@@ -89,7 +87,6 @@ func BindingsToPbStoreResponse(bindingsStoreResponse *bindings.StoreQueryRespons
 	for _, message := range *bindingsStoreResponse.Messages {
 
 		msgHash, err := message.MessageHash.Bytes()
-
 		if err != nil {
 			return nil, err
 		}
@@ -137,7 +134,18 @@ func BindingsToCommonEnvelope(bindingsEnv bindings.Envelope) (common.Envelope, e
 		return nil, err
 	}
 
-	env := common.NewWakuEnvelope(bindingsEnv.Message(), bindingsEnv.PubsubTopic(), hash)
+	// Temporary conversion between bindings WakuMessage and go-waku WakuMessage
+	goWakuMessage := &pb.WakuMessage{
+		Payload:        bindingsEnv.Message().Payload,
+		ContentTopic:   bindingsEnv.Message().ContentTopic,
+		Version:        bindingsEnv.Message().Version,
+		Timestamp:      bindingsEnv.Message().Timestamp,
+		Meta:           bindingsEnv.Message().Meta,
+		Ephemeral:      bindingsEnv.Message().Ephemeral,
+		RateLimitProof: bindingsEnv.Message().RateLimitProof,
+	}
+
+	env := common.NewWakuEnvelope(goWakuMessage, bindingsEnv.PubsubTopic(), hash)
 
 	return env, nil
 }

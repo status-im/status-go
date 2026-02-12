@@ -25,7 +25,7 @@ import (
 
 	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
-	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
+	bindingscommon "github.com/logos-messaging/logos-messaging-go-bindings/waku/common"
 
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
 )
