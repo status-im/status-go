@@ -8,7 +8,6 @@ import tempfile
 import time
 import uuid
 
-from eth_keys.main import KeyAPI
 import requests
 from tenacity import retry, stop_after_delay, wait_fixed, wait_exponential, retry_if_exception_type
 
@@ -227,9 +226,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "isActive": True,
             "isDeactivatable": False,
         }
-        network = self._set_token_overrides(network, kwargs.get("token_overrides", []))
+        anvil_network = self._set_token_overrides(anvil_network, kwargs.get("token_overrides", []))
 
-        data["testNetworksEnabled"] = True
+        data["testNetworksEnabled"] = False
         data["networkId"] = self.network_id
         if networks_override is not None:
             data["networksOverride"] = networks_override
@@ -296,10 +295,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data["customTokens"] = tokens
         return data
 
-    def enable_test_networks(self):
-        """Enable test networks via settings service."""
-        self.settings_service.save_setting("test-networks-enabled?", True)
-
     def extract_data(self, path: str):
         if self.container:
             return self.container.extract_data(path)
@@ -331,7 +326,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def _create_account_request(self, password: str, **kwargs):
         self.password = password
-        self.network_id = kwargs.get("network_id", self.network_id)
         data = {
             "rootDataDir": self.data_dir,
             "kdfIterations": 256000,
@@ -359,11 +353,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             },
             "thirdpartyServicesEnabled": True,
         }
-        disable_override = Config.disable_override_networks or kwargs.get("disable_override_networks", False)
-        if not disable_override:
+        if not Config.disable_override_networks:
             self._set_networks(data, **kwargs)
-        else:
-            data["testNetworksEnabled"] = True
 
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
@@ -391,7 +382,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         # Reconnect to signals before login to avoid missing node.login after logout.
         SignalClient.disconnect(self)
         SignalClient.connect(self)
-        self.prepare_wait_for_signal(SignalType.NODE_LOGIN, 1)
         method = "LoginAccount"
         data = {
             "password": self.password,
@@ -685,8 +675,3 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         # Use client.post directly, because this method is old and has json-incompatible arguments
         response = self.client.post(self.method_url(method), data=key)
         return response.content.decode()
-
-    def get_compressed_pubkey(self):
-        uncompressed_bytes = bytes.fromhex(self.public_key[4:])
-        pubkey = KeyAPI.PublicKey(uncompressed_bytes)
-        return "0x" + pubkey.to_compressed_bytes().hex()
