@@ -43,6 +43,12 @@ else
  detected_OS := $(strip $(shell uname))
 endif
 
+ifeq ($(detected_OS),Windows)
+    MAKE_SHELL := bash
+else
+    MAKE_SHELL := /bin/bash
+endif
+
 ifeq ($(MAKECMDGOALS),statusgo-android-library)
     ARCH ?= arm64
     ANDROID_NDK_ROOT ?= $(shell find /nix/store -path "*android-sdk-ndk-27.2.12479018/libexec/android-sdk/ndk/27.2.12479018" -type d 2>/dev/null | head -1)
@@ -244,7 +250,7 @@ clone-nwaku: $(NWAKU_SOURCE_DIR)
 $(LIBWAKU): clone-nwaku
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku" $(LIBWAKU)
-	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=/bin/bash
+	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
 endif
 
 build-libwaku: $(LIBWAKU)
@@ -276,7 +282,7 @@ $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=/bin/bash
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
 endif
@@ -293,11 +299,11 @@ build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
 build-libsds-android: clone-nim-sds
 	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=/bin/bash
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=$(MAKE_SHELL)
 
 build-libsds-ios: clone-nim-sds
 	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=/bin/bash
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
 
 clean-libsds:
 	@echo "Removing libsds"
