@@ -2,7 +2,6 @@ import logging
 import time
 import uuid
 from typing import Optional, List
-import os
 
 
 import pytest
@@ -12,7 +11,6 @@ from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenP
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
-from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
 from utils import fake
 from utils.retry_utils import retry_call
@@ -45,6 +43,12 @@ class TestCommunityTokenPermissions(MessengerSteps):
     def setup_tokens(self, snt_addresses):
         self.snt_address = snt_addresses["snt"]
         self.snt_controller_address = snt_addresses["controller"]
+
+    @pytest.fixture(autouse=True)
+    def get_communities_contracts(self, communities_addresses):
+        self.community_token_deployer = next(
+            info["value"] for info in communities_addresses.values() if info["internal_type"] == "contract CommunityTokenDeployer"
+        )
 
     def _communities_list(self, communities_response):
         if isinstance(communities_response, dict):
@@ -157,20 +161,22 @@ class TestCommunityTokenPermissions(MessengerSteps):
         )
 
     def deploy_owner_token(self, owner_backend, community_id):
-        """Deploy and mint owner token for the community in one step"""
-        address_from = os.environ["ARBITRUM_OWNER_ADDRESS"]
+        """Deploy and mint owner token for the community"""
 
-        chain_id = owner_backend.network_id
-        # CommunityTokenDeployer contract addresses by chain
-        contract_addresses = {
-            11155111: "0xCDE984e57cdb88c70b53437cc694345B646371f9",  # Ethereum Sepolia
-            42161: "0x744Fd6e98dad09Fb8CCF530B5aBd32B56D64943b",  # Arbitrum Mainnet
-        }
-        contract_address = contract_addresses.get(chain_id, "0x744Fd6e98dad09Fb8CCF530B5aBd32B56D64943b")  # Default to Arbitrum Mainnet
+        accounts = owner_backend.accounts_service.get_accounts()
+        assert accounts, "No accounts found"
+        wallet_account = next(a for a in accounts if not a.get("chat"))
+        assert wallet_account, "No wallet account found"
+        address_from = wallet_account["address"]
+
+        # CommunityTokenDeployer contract address
+        contract_address = self.community_token_deployer
 
         # Generate deployment signature
         chain_id = owner_backend.network_id
-        signature = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
+        signature = owner_backend.wakuext_service.create_community_token_deployment_signature(
+            chain_id, address_from, community_id, deployer_address=contract_address
+        )
         logger.info(f"Community token deployment signature: {signature}")
 
         token_uri = change_community_key_compression(community_id) + "/"
@@ -201,7 +207,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Generate UUID for the transaction
         transaction_uuid = str(uuid.uuid4())
 
-        # Fetch balances specifically for Arbitrum Mainnet to ensure they are available for route calculation
+        # Fetch balances
         owner_backend.wallet_service.get_balances_at_by_chain([chain_id], [address_from], [])
 
         # Get suggested routes for deploying tokens
@@ -382,7 +388,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Member with tokens requests to join community
         with owner_backend.expect_signal(
             SignalType.MESSAGES_NEW,
-            predicate=lambda signal: ((signal.get("event", {}).get("requestsToJoinCommunity") or [{}])[0].get("id") == req_id),
+            predicate=lambda signal: any(r.get("id") == req_id for r in (signal.get("event", {}).get("requestsToJoinCommunity") or [])),
             timeout=60,
         ):
             join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
@@ -415,76 +421,85 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
-    def test_owner_edits_visible_before_and_after_minting_owner_token(self, arbitrum_owner_backend, arbitrum_member_backend, foundry_client):
-        """Test that owner edits are visible before and after minting the owner token on Arbitrum Mainnet"""
+    def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client):
+        """Test that owner edits are visible before and after minting the owner token on Anvil"""
 
         # Owner creates a token-gated community
         community_id = self.create_token_gated_community(
-            arbitrum_owner_backend,
+            owner_backend,
             permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
         # Fetch community as member
-        response = self.fetch_community(arbitrum_member_backend, community_id)
+        response = self.fetch_community(member_backend, community_id)
         assert response, "Community not found"
 
-        permissions_resp = arbitrum_member_backend.wakuext_service.check_permissions_to_join_community(community_id)
+        permissions_resp = member_backend.wakuext_service.check_permissions_to_join_community(community_id)
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
-        # Member requests to join community
-        join_resp = arbitrum_member_backend.wakuext_service.request_to_join_community(community_id, [fake.address()])
-        requests = join_resp.get("requestsToJoinCommunity", [])
-        assert requests, "No requests to join community"
-        assert len(requests) == 1, "Unexpected multiple requests to join community"
+        req_id = None
 
-        req_id = requests[0].get("id")
         # Wait for member validation
-        arbitrum_owner_backend.wait_for_signal(
+        with owner_backend.expect_signal(
             SignalType.MESSAGES_NEW,
-            lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
-            == RequestToJoinState.RequestToJoinStatePending.value,
-        )
+            predicate=lambda signal: any(r.get("id") == req_id for r in (signal.get("event", {}).get("requestsToJoinCommunity") or [])),
+            timeout=60,
+        ):
+            accounts = member_backend.accounts_service.get_accounts()
+            assert accounts, "No accounts found"
+            wallet_account = next(a for a in accounts if not a.get("chat"))
+            assert wallet_account, "No wallet account found"
+            member_address = wallet_account["address"]
+
+            join_resp = request_to_join_with_signatures(member_backend, community_id, [member_address])
+            requests = join_resp.get("requestsToJoinCommunity", [])
+
+            assert requests, "No requests to join community"
+            assert len(requests) == 1, "Unexpected multiple requests to join community"
+
+            req_id = requests[0].get("id")
+            logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
         time.sleep(2)
 
-        accept_resp = arbitrum_owner_backend.wakuext_service.accept_request_to_join_community(req_id)
+        accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
         assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
         # Verify member is in community
-        communities = arbitrum_owner_backend.wakuext_service.communities()
+        communities = owner_backend.wakuext_service.communities()
         owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
-        assert arbitrum_member_backend.public_key in owner_community.get("members", {})
+        assert member_backend.public_key in owner_community.get("members", {})
 
         # When the Owner edits the community
-        new_name, new_description = self.edit_community(arbitrum_owner_backend, community_id)
+        new_name, new_description = self.edit_community(owner_backend, community_id)
         logger.info(f"New name: {new_name}, new description2: {new_description}")
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, arbitrum_member_backend, community_id, new_name, new_description)
+        retry_call(self.check_member_community_updated, member_backend, community_id, new_name, new_description)
 
         # When the Owner mints the owner token
-        arbitrum_owner_backend.wallet_service.restart_wallet_reload_timer()
+        owner_backend.wallet_service.restart_wallet_reload_timer()
         time.sleep(2)  # Sync metadata
-        self.deploy_owner_token(arbitrum_owner_backend, community_id)
+        self.deploy_owner_token(owner_backend, community_id)
 
         # And the Owner edits the community again
-        new_name2, new_description2 = self.edit_community(arbitrum_owner_backend, community_id)
+        new_name2, new_description2 = self.edit_community(owner_backend, community_id)
         logger.info(f"New name2: {new_name2}, new description2: {new_description2}")
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, arbitrum_member_backend, community_id, new_name2, new_description2)
+        retry_call(self.check_member_community_updated, member_backend, community_id, new_name2, new_description2)
 
         # When the Owner logouts and logs back in
-        arbitrum_owner_backend.logout()
-        arbitrum_owner_backend.login(arbitrum_owner_backend.key_uid, arbitrum_owner_backend.password)
-        arbitrum_owner_backend.wait_for_login()
-        arbitrum_owner_backend.wakuext_service.start_messenger()
+        owner_backend.logout()
+        owner_backend.login(owner_backend.key_uid, owner_backend.password)
+        owner_backend.wait_for_login()
+        owner_backend.wakuext_service.start_messenger()
 
         # And the Owner edits the community again
-        new_name3, new_description3 = self.edit_community(arbitrum_owner_backend, community_id)
+        new_name3, new_description3 = self.edit_community(owner_backend, community_id)
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, arbitrum_member_backend, community_id, new_name3, new_description3)
+        retry_call(self.check_member_community_updated, member_backend, community_id, new_name3, new_description3)
