@@ -224,6 +224,21 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.EthRpcProxyPassword = request.EthRpcProxyPassword
 	}
 
+	// NftProxyConfig
+	if !request.NftProxyUrl.Empty() {
+		walletConfig.NftProxyConfig.UrlOverride = request.NftProxyUrl
+	}
+	if request.NftProxyStageName != "" {
+		walletConfig.NftProxyConfig.StageName = request.NftProxyStageName
+	}
+	if !request.NftProxyUser.Empty() {
+		walletConfig.NftProxyConfig.User = request.NftProxyUser
+	}
+	if !request.NftProxyPassword.Empty() {
+		walletConfig.NftProxyConfig.Password = request.NftProxyPassword
+	}
+	walletConfig.NftProxyConfig.UsePuzzleAuth = request.NftProxyUsePuzzleAuth
+
 	return walletConfig
 }
 

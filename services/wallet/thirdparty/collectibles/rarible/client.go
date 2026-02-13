@@ -11,9 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
-	"go.uber.org/zap"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/logutils"
@@ -147,40 +144,11 @@ func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any, ap
 }
 
 func (o *Client) doWithRetries(req *http.Request, apiKey security.SensitiveString) (*http.Response, error) {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = time.Millisecond * 1000
-	b.RandomizationFactor = 0.1
-	b.Multiplier = 1.5
-	b.MaxInterval = time.Second * 32
-	b.MaxElapsedTime = time.Second * 70
-
-	b.Reset()
-
+	// Set API key header before making the request
 	req.Header.Set("X-API-KEY", apiKey.Reveal())
 
-	op := func() (*http.Response, error) {
-		resp, err := o.client.Do(req)
-		if err != nil {
-			return nil, backoff.Permanent(err)
-		}
-
-		if resp.StatusCode == http.StatusOK {
-			return resp, nil
-		}
-
-		err = fmt.Errorf("unsuccessful request: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
-		if resp.StatusCode == http.StatusTooManyRequests {
-			logutils.ZapLogger().Error("doWithRetries failed with http.StatusTooManyRequests",
-				zap.String("provider", o.ID()),
-				zap.Duration("elapsed time", b.GetElapsedTime()),
-				zap.Duration("next backoff", b.NextBackOff()),
-			)
-			return nil, err
-		}
-		return nil, backoff.Permanent(err)
-	}
-
-	return backoff.RetryWithData(op, b)
+	// Use the shared backoff retry logic
+	return thirdparty.DoWithExponentialBackoff(o.client, req, o.ID())
 }
 
 func (o *Client) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {

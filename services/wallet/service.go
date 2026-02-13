@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/backupsync"
 	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -47,6 +49,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
+	"github.com/status-im/status-go/services/wallet/puzzleauth"
 	"github.com/status-im/status-go/services/wallet/routeexecution"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -72,6 +75,33 @@ func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.
 		URL:      baseURL,
 		User:     config.User,
 		Password: config.Password,
+	})
+}
+
+func createAlchemyProxyClient(config params.NftProxyConfig) *alchemy.Client {
+	var creds *thirdparty.BasicCreds
+	if !config.User.Empty() {
+		creds = &thirdparty.BasicCreds{
+			User:     config.User,
+			Password: config.Password,
+		}
+	}
+
+	// Create puzzle auth client if enabled
+	var puzzleClient *puzzleauth.Client
+	if config.UsePuzzleAuth {
+		origin := alchemy.GetNftProxyHost(config.UrlOverride.Reveal(), config.StageName)
+		httpClient := &http.Client{Timeout: time.Minute}
+		puzzleClient = puzzleauth.NewClient(origin, httpClient)
+	}
+
+	return alchemy.NewClientWithParams(alchemy.Params{
+		IsProxy:          true,
+		ProxyCustomURL:   config.UrlOverride.Reveal(),
+		ProxyStageName:   config.StageName,
+		APIKey:           security.SensitiveString{},
+		Creds:            creds,
+		PuzzleAuthClient: puzzleClient,
 	})
 }
 
@@ -141,24 +171,29 @@ func NewService(
 
 		raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)
 		alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKey)
+		alchemyProxy := createAlchemyProxyClient(config.WalletConfig.NftProxyConfig)
 
 		// Collectible providers in priority order (i.e. provider N+1 will be tried only if provider N fails)
 		contractOwnershipProviders := []thirdparty.CollectibleContractOwnershipProvider{
+			alchemyProxy,
 			raribleClient,
 			alchemyClient,
 		}
 
 		accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
+			alchemyProxy,
 			raribleClient,
 			alchemyClient,
 		}
 
 		collectibleDataProviders := []thirdparty.CollectibleDataProvider{
+			alchemyProxy,
 			raribleClient,
 			alchemyClient,
 		}
 
 		collectionDataProviders := []thirdparty.CollectionDataProvider{
+			alchemyProxy,
 			raribleClient,
 			alchemyClient,
 		}

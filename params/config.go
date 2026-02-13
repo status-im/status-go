@@ -226,6 +226,7 @@ type WalletConfig struct {
 	StatusProxyMarketUser     security.SensitiveString `json:"StatusProxyMarketUser"`
 	StatusProxyMarketPassword security.SensitiveString `json:"StatusProxyMarketPassword"`
 	MarketDataProxyConfig     MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
+	NftProxyConfig            NftProxyConfig           `json:"NftProxyConfig"`
 
 	StatusProxyUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
 	StatusProxyPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
@@ -251,6 +252,14 @@ type MarketDataProxyConfig struct {
 	Password                security.SensitiveString `json:"Password"`
 	FullDataRefreshInterval int                      `json:"FullDataRefreshInterval"`
 	PriceRefreshInterval    int                      `json:"PriceRefreshInterval"`
+}
+
+type NftProxyConfig struct {
+	UrlOverride   security.SensitiveString `json:"UrlOverride"`
+	StageName     string                   `json:"StageName"`
+	User          security.SensitiveString `json:"User"`
+	Password      security.SensitiveString `json:"Password"`
+	UsePuzzleAuth bool                     `json:"UsePuzzleAuth"`
 }
 
 // MarshalJSON custom marshalling to avoid exposing sensitive data in log,

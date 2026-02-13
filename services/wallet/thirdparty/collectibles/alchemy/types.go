@@ -18,6 +18,7 @@ import (
 )
 
 const AlchemyID = "alchemy"
+const AlchemyProxyID = "alchemy-proxy"
 
 type TokenBalance struct {
 	TokenID *bigint.BigInt `json:"tokenId"`
