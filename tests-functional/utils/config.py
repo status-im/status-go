@@ -3,6 +3,7 @@ from typing import List, Iterator
 
 
 class Config:
+    executor_number: int = 5
     status_backend_port_range: List[int] = field(default_factory=list)
     base_dir: str = ""
 
