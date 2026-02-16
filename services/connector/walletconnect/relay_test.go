@@ -32,10 +32,8 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestPayloadID(t *testing.T) {
-	id1, err := payloadID()
-	require.NoError(t, err)
-	id2, err := payloadID()
-	require.NoError(t, err)
+	id1 := payloadID()
+	id2 := payloadID()
 
 	require.NotEqual(t, id1, id2)
 	require.Greater(t, id1, int64(0))
@@ -45,8 +43,7 @@ func TestPayloadID(t *testing.T) {
 }
 
 func TestPayloadID_Format(t *testing.T) {
-	id, err := payloadID()
-	require.NoError(t, err)
+	id := payloadID()
 	idStr := fmt.Sprintf("%d", id)
 	require.GreaterOrEqual(t, len(idStr), 19)
 }
@@ -205,8 +202,7 @@ func TestPayloadID_UniqueAcrossCalls(t *testing.T) {
 	seen := make(map[int64]bool)
 
 	for i := 0; i < 1000; i++ {
-		id, err := payloadID()
-		require.NoError(t, err)
+		id := payloadID()
 		require.False(t, seen[id], "duplicate ID generated")
 		seen[id] = true
 	}

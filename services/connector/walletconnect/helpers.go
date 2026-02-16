@@ -181,10 +181,7 @@ func (c *Client) sendSessionSettle(keys *sessionKeys, proposal *ProposalParams, 
 		Expiry:             expiry,
 	}
 
-	settleID, err := payloadID()
-	if err != nil {
-		return fmt.Errorf("generate settle ID: %w", err)
-	}
+	settleID := payloadID()
 	settlePayload := JSONRPCRequest{
 		ID:      settleID,
 		JSONRPC: "2.0",

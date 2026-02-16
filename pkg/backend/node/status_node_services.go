@@ -3,7 +3,6 @@ package node
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"

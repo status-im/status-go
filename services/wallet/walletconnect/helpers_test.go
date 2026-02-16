@@ -1,7 +1,6 @@
 package walletconnect
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"

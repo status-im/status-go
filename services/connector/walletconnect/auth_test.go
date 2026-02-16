@@ -150,10 +150,8 @@ func TestAuth_GenerateJWT_DifferentAud(t *testing.T) {
 	require.NoError(t, err)
 
 	var p1, p2 map[string]interface{}
-	err = json.Unmarshal(payload1, &p1)
-	require.NoError(t, err)
-	err = json.Unmarshal(payload2, &p2)
-	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(payload1, &p1))
+	require.NoError(t, json.Unmarshal(payload2, &p2))
 
 	require.Equal(t, "wss://relay1.com", p1["aud"])
 	require.Equal(t, "wss://relay2.com", p2["aud"])
