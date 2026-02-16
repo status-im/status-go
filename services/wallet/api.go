@@ -754,34 +754,6 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	return client.ChainID(ctx)
 }
 
-// AddWalletConnectSession adds or updates a session wallet connect session
-func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) error {
-	logutils.ZapLogger().Debug("wallet.api.AddWalletConnectSession", zap.Int("rpcURL", len(session_json)))
-	return walletconnect.AddSession(api.s.db, api.s.config.Networks, session_json)
-}
-
-// DisconnectWalletConnectSession removes a wallet connect session
-func (api *API) DisconnectWalletConnectSession(ctx context.Context, topic walletconnect.Topic) error {
-	logutils.ZapLogger().Debug("wallet.api.DisconnectWalletConnectSession", zap.String("topic", string(topic)))
-	return walletconnect.DisconnectSession(api.s.db, topic)
-}
-
-// GetWalletConnectActiveSessions returns all active wallet connect sessions
-func (api *API) GetWalletConnectActiveSessions(ctx context.Context, validAtTimestamp int64) ([]walletconnect.DBSession, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetWalletConnectActiveSessions")
-	return walletconnect.GetActiveSessions(api.s.db, validAtTimestamp)
-}
-
-// GetWalletConnectDapps returns all active wallet connect dapps
-// Active dApp are those having active sessions (not expired and not disconnected)
-func (api *API) GetWalletConnectDapps(ctx context.Context, validAtTimestamp int64, testChains bool) ([]walletconnect.DBDApp, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetWalletConnectDapps",
-		zap.Int64("validAtTimestamp", validAtTimestamp),
-		zap.Bool("testChains", testChains),
-	)
-	return walletconnect.GetActiveDapps(api.s.db, validAtTimestamp, testChains)
-}
-
 // HashMessageEIP191 is used for hashing dApps requests for "personal_sign" and "eth_sign"
 // in a safe manner following the EIP-191 version 0x45 for signing on the client side.
 func (api *API) HashMessageEIP191(ctx context.Context, message types2.HexBytes) types2.Hash {

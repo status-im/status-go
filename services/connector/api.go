@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/services/connector/walletconnect"
 )
 
 var (
@@ -18,10 +21,17 @@ var (
 )
 
 type API struct {
-	s                    *Service
-	r                    *CommandRegistry
-	c                    *commands.ClientSideHandler
-	changeAccountCommand *commands.ChangeAccountCommand
+	s                          *Service
+	r                          *CommandRegistry
+	c                          *commands.ClientSideHandler
+	changeAccountCommand       *commands.ChangeAccountCommand
+	pairWCCommand              *commands.PairWCCommand
+	disconnectWCSessionCommand *commands.DisconnectWCSessionCommand
+	getWCActiveSessionsCommand *commands.GetWCActiveSessionsCommand
+	approveWCSessionCommand    *commands.ApproveWCSessionCommand
+	rejectWCSessionCommand     *commands.RejectWCSessionCommand
+	approveWCSessionRequestCmd *commands.ApproveWCSessionRequestCommand
+	rejectWCSessionRequestCmd  *commands.RejectWCSessionRequestCommand
 }
 
 func NewAPI(s *Service) *API {
@@ -54,11 +64,23 @@ func NewAPI(s *Service) *API {
 
 	changeAccountCommand := commands.NewChangeAccountCommand(s.db)
 
+	wcClient, err := walletconnect.NewClient(s.config.ProjectID)
+	if err != nil {
+		s.logger.Error("failed to create WalletConnect client", zap.Error(err))
+	}
+
 	return &API{
-		s:                    s,
-		r:                    r,
-		c:                    c,
-		changeAccountCommand: changeAccountCommand,
+		s:                          s,
+		r:                          r,
+		c:                          c,
+		changeAccountCommand:       changeAccountCommand,
+		pairWCCommand:              commands.NewPairWCCommand(wcClient),
+		disconnectWCSessionCommand: commands.NewDisconnectWCSessionCommand(s.db, wcClient),
+		getWCActiveSessionsCommand: commands.NewGetWCActiveSessionsCommand(s.db),
+		approveWCSessionCommand:    commands.NewApproveWCSessionCommand(s.db, wcClient),
+		rejectWCSessionCommand:     commands.NewRejectWCSessionCommand(wcClient),
+		approveWCSessionRequestCmd: commands.NewApproveWCSessionRequestCommand(wcClient),
+		rejectWCSessionRequestCmd:  commands.NewRejectWCSessionRequestCommand(wcClient),
 	}
 }
 
@@ -154,4 +176,32 @@ func (api *API) ChangeAccount(ctx context.Context, args commands.ChangeAccountAr
 		return ErrNotAllowedForUntrustedConnection
 	}
 	return api.changeAccountCommand.Execute(args)
+}
+
+func (api *API) PairWalletConnect(ctx context.Context, uri string) error {
+	return api.pairWCCommand.Execute(ctx, uri)
+}
+
+func (api *API) DisconnectWCSession(ctx context.Context, topic string) error {
+	return api.disconnectWCSessionCommand.Execute(ctx, topic)
+}
+
+func (api *API) GetWCActiveSessions(ctx context.Context, validAtTimestamp int64) ([]persistence.WCSession, error) {
+	return api.getWCActiveSessionsCommand.Execute(ctx, validAtTimestamp)
+}
+
+func (api *API) ApproveWCSession(ctx context.Context, proposalID, account string, chainID uint64, dappURL, dappName, dappIcon string) (string, error) {
+	return api.approveWCSessionCommand.Execute(ctx, proposalID, account, chainID, dappURL, dappName, dappIcon)
+}
+
+func (api *API) RejectWCSession(ctx context.Context, proposalID string) error {
+	return api.rejectWCSessionCommand.Execute(ctx, proposalID)
+}
+
+func (api *API) ApproveWCSessionRequest(ctx context.Context, topic, requestIDStr, signature string) error {
+	return api.approveWCSessionRequestCmd.Execute(ctx, topic, requestIDStr, signature)
+}
+
+func (api *API) RejectWCSessionRequest(ctx context.Context, topic, requestIDStr string, code int, message string) error {
+	return api.rejectWCSessionRequestCmd.Execute(ctx, topic, requestIDStr, code, message)
 }
