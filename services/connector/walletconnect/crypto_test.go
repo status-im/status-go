@@ -107,7 +107,7 @@ func TestEncryptDecryptRoundtrip(t *testing.T) {
 		name      string
 		plaintext []byte
 	}{
-		{"empty", []byte("")},
+		{"empty", []byte(nil)},
 		{"short", []byte("x")},
 		{"json", []byte(`{"id":123,"method":"test"}`)},
 		{"long", []byte(string(make([]byte, 10000)))},

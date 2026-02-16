@@ -70,9 +70,9 @@ func TestDeriveSharedSecret_ZeroKeys(t *testing.T) {
 	priv := make([]byte, 32)
 	pub := make([]byte, 32)
 
-	secret, err := DeriveSharedSecret(priv, pub)
-	require.NoError(t, err)
-	require.Len(t, secret, 32)
+	_, err := DeriveSharedSecret(priv, pub)
+	require.Error(t, err, "should reject low-order point (all-zero public key)")
+	require.Contains(t, err.Error(), "low order point")
 }
 
 func TestDeriveSymmetricKey(t *testing.T) {
