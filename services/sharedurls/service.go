@@ -468,8 +468,10 @@ func prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
 		return "", "", err
 	}
 
-	if contact.DisplayName == "" && contact.Bio == "" {
-		return "", shortKey, nil
+	if contact.DisplayName == "" {
+		// We always want to have some display name in the URL
+		// So if the contact doesn't have a display name, we use the alias
+		contact.DisplayName = contact.Alias
 	}
 
 	userProto := &protobuf.User{
