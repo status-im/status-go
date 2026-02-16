@@ -1,9 +1,10 @@
 package walletconnect
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"net/url"
 	"sync"
 	"time"
@@ -36,8 +37,17 @@ func truncate(s string, maxLen int) string {
 // payloadID generates a WalletConnect-compliant JSON-RPC request ID with 19 digits of entropy.
 // It combines the current Unix millisecond timestamp with 6 digits of random entropy,
 // matching the WalletConnect specification for relay communication.
-func payloadID() int64 {
-	return time.Now().UnixMilli()*1_000_000 + rand.Int64N(1_000_000)
+func payloadID() (int64, error) {
+	randomBytes := make([]byte, 8)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return 0, err
+	}
+	randomInt := int64(binary.BigEndian.Uint64(randomBytes)) % 1_000_000
+	if randomInt < 0 {
+		randomInt = -randomInt
+	}
+	return time.Now().UnixMilli()*1_000_000 + randomInt, nil
 }
 
 type (
@@ -250,7 +260,10 @@ func (r *RelayClient) SetMessageHandler(handler MessageHandler) {
 
 func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 	// Generate WalletConnect-compliant numeric ID with 19 digits of entropy
-	id := payloadID()
+	id, err := payloadID()
+	if err != nil {
+		return nil, fmt.Errorf("generate payload ID: %w", err)
+	}
 	idStr := fmt.Sprintf("%d", id)
 
 	r.mu.Lock()

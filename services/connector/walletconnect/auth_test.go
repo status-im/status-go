@@ -144,12 +144,16 @@ func TestAuth_GenerateJWT_DifferentAud(t *testing.T) {
 
 	parts1 := strings.Split(jwt1, ".")
 	parts2 := strings.Split(jwt2, ".")
-	payload1, _ := base64.RawURLEncoding.DecodeString(parts1[1])
-	payload2, _ := base64.RawURLEncoding.DecodeString(parts2[1])
+	payload1, err := base64.RawURLEncoding.DecodeString(parts1[1])
+	require.NoError(t, err)
+	payload2, err := base64.RawURLEncoding.DecodeString(parts2[1])
+	require.NoError(t, err)
 
 	var p1, p2 map[string]interface{}
-	json.Unmarshal(payload1, &p1)
-	json.Unmarshal(payload2, &p2)
+	err = json.Unmarshal(payload1, &p1)
+	require.NoError(t, err)
+	err = json.Unmarshal(payload2, &p2)
+	require.NoError(t, err)
 
 	require.Equal(t, "wss://relay1.com", p1["aud"])
 	require.Equal(t, "wss://relay2.com", p2["aud"])
