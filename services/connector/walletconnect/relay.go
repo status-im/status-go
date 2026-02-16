@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
 )
 
@@ -298,6 +300,7 @@ func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 }
 
 func (r *RelayClient) readLoop() {
+	defer common.LogOnPanic()
 	defer r.wg.Done()
 
 	for {
