@@ -3,7 +3,7 @@ from typing import List, Iterator
 
 
 class Config:
-    executor_number: int = 5
+    executor_number: int = 0  # Always overwritten by _calculate_port_range() in conftest.py
     status_backend_port_range: List[int] = field(default_factory=list)
     base_dir: str = ""
 
