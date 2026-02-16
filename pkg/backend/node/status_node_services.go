@@ -3,6 +3,7 @@ package node
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -183,6 +184,7 @@ func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 func (b *StatusNode) connectorService() *connector.Service {
 	if b.connectorSrvc == nil {
 		logger := b.logger.Named("connector")
+
 		b.connectorSrvc = connector.NewService(
 			logger,
 			b.walletDB,
@@ -190,8 +192,9 @@ func (b *StatusNode) connectorService() *connector.Service {
 			fees.NewFeeManager(b.rpcClient, logger.Named("feeManager")),
 			b.rpcClient.GetNetworkManager(),
 			&connector.Config{
-				WSHost: b.config.WSHost,
-				WSPort: b.config.WSPort,
+				WSHost:    b.config.WSHost,
+				WSPort:    b.config.WSPort,
+				ProjectID: b.config.WalletConnectProjectID,
 			},
 		)
 	}

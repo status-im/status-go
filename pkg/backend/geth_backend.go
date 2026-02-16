@@ -686,6 +686,8 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 		overrideApiConfig(b.config, request.APIConfig)
 	}
 
+	b.config.WalletConnectProjectID = request.WalletConnectProjectID
+
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return errors.Wrap(err, "failed to create accounts db")

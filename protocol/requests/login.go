@@ -39,8 +39,9 @@ type Login struct {
 	WalletConfig
 	WalletSecretsConfig
 
-	APIConfig          *APIConfig `json:"apiConfig"`
-	StatusProxyEnabled bool       `json:"statusProxyEnabled"`
+	APIConfig              *APIConfig `json:"apiConfig"`
+	StatusProxyEnabled     bool       `json:"statusProxyEnabled"`
+	WalletConnectProjectID string     `json:"walletConnectProjectID"`
 }
 
 func (c *Login) Validate() error {

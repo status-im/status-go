@@ -207,6 +207,9 @@ type NodeConfig struct {
 	// ConnectorConfig extra configuration for connector.Service
 	ConnectorConfig ConnectorConfig
 
+	// WalletConnectProjectID is the project ID for WalletConnect relay authentication
+	WalletConnectProjectID string
+
 	TorrentConfig TorrentConfig
 
 	// OTELConfig provides configuration for OpenTelemetry tracing

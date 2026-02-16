@@ -387,3 +387,12 @@ func TestDisconnectSession(t *testing.T) {
 	require.Equal(t, 1, len(dapps))
 	require.Equal(t, entries[0].Name, dapps[0].Name)
 }
+
+func TestDisconnectSession_NotFound(t *testing.T) {
+	db, close := SetupTestDB(t)
+	defer close()
+
+	err := DisconnectSession(db, Topic("non-existent-topic"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not found")
+}

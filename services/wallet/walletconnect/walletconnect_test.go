@@ -314,6 +314,193 @@ func Test_supportedChainInSession(t *testing.T) {
 	}
 }
 
+func Test_supportedChainsInSession_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name           string
+		session        Session
+		expectedChains []uint64
+	}{
+		{
+			name: "empty_namespaces",
+			session: Session{
+				Namespaces: map[string]Namespace{},
+			},
+			expectedChains: []uint64{},
+		},
+		{
+			name: "missing_eip155_namespace",
+			session: Session{
+				Namespaces: map[string]Namespace{
+					"cosmos": {Chains: []string{"cosmos:cosmoshub-4"}},
+				},
+			},
+			expectedChains: []uint64{},
+		},
+		{
+			name: "empty_chains",
+			session: Session{
+				Namespaces: map[string]Namespace{
+					"eip155": {Chains: []string{}},
+				},
+			},
+			expectedChains: []uint64{},
+		},
+		{
+			name: "invalid_caip2_skipped",
+			session: Session{
+				Namespaces: map[string]Namespace{
+					"eip155": {
+						Chains: []string{"eip155:1", "eip155:invalid", "eip155:3"},
+					},
+				},
+			},
+			expectedChains: []uint64{1, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotChains := supportedChainsInSession(tt.session)
+			if !reflect.DeepEqual(gotChains, tt.expectedChains) {
+				t.Errorf("supportedChainsInSession() = %v, want %v", gotChains, tt.expectedChains)
+			}
+		})
+	}
+}
+
+func Test_areTestChains(t *testing.T) {
+	networks := []params.Network{
+		{ChainID: 1, IsTest: false},
+		{ChainID: 11155111, IsTest: true},
+		{ChainID: 42161, IsTest: false},
+	}
+	tests := []struct {
+		name     string
+		networks []params.Network
+		chainIDs []uint64
+		wantTest bool
+		wantErr  bool
+	}{
+		{
+			name:     "mainnet_chain",
+			networks: networks,
+			chainIDs: []uint64{1},
+			wantTest: false,
+			wantErr:  false,
+		},
+		{
+			name:     "testnet_chain",
+			networks: networks,
+			chainIDs: []uint64{11155111},
+			wantTest: true,
+			wantErr:  false,
+		},
+		{
+			name:     "arbitrum_mainnet",
+			networks: networks,
+			chainIDs: []uint64{42161},
+			wantTest: false,
+			wantErr:  false,
+		},
+		{
+			name:     "chain_not_found",
+			networks: networks,
+			chainIDs: []uint64{999999},
+			wantTest: false,
+			wantErr:  true,
+		},
+		{
+			name:     "empty_chains",
+			networks: networks,
+			chainIDs: []uint64{},
+			wantTest: false,
+			wantErr:  true,
+		},
+		{
+			name:     "multiple_chains_first_match",
+			networks: networks,
+			chainIDs: []uint64{999999, 1},
+			wantTest: false,
+			wantErr:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotTest, err := areTestChains(tt.networks, tt.chainIDs)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("areTestChains() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && gotTest != tt.wantTest {
+				t.Errorf("areTestChains() = %v, want %v", gotTest, tt.wantTest)
+			}
+		})
+	}
+}
+
+func Test_Namespace_Valid(t *testing.T) {
+	tests := []struct {
+		name          string
+		namespace     Namespace
+		namespaceName string
+		chainID       *uint64
+		want          bool
+	}{
+		{
+			name: "nil_chainID_empty_chains",
+			namespace: Namespace{
+				Chains: []string{},
+			},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          false,
+		},
+		{
+			name: "nil_chainID_valid_chains",
+			namespace: Namespace{
+				Chains: []string{"eip155:1", "eip155:137"},
+			},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          true,
+		},
+		{
+			name: "nil_chainID_namespace_mismatch",
+			namespace: Namespace{
+				Chains: []string{"eip155:1", "cosmos:cosmoshub-4"},
+			},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          false,
+		},
+		{
+			name: "nil_chainID_invalid_caip2",
+			namespace: Namespace{
+				Chains: []string{"eip155:1", "invalid"},
+			},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          false,
+		},
+		{
+			name: "chainID_provided_returns_true",
+			namespace: Namespace{
+				Chains: []string{"eip155:1"},
+			},
+			namespaceName: "eip155",
+			chainID:       func() *uint64 { v := uint64(1); return &v }(),
+			want:          true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.namespace.Valid(tt.namespaceName, tt.chainID)
+			if got != tt.want {
+				t.Errorf("Namespace.Valid() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_caip10Accounts(t *testing.T) {
 	type args struct {
 		accounts []*accsmanagementtypes.Account

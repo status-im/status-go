@@ -153,3 +153,59 @@ func DeletePermissions(db *sql.DB, url string, clientID string) error {
 	_, err := db.Exec(deletePermissionsQuery, normalizedURL, clientID)
 	return err
 }
+
+const (
+	wcClientID            = "walletconnect"
+	upsertWCSessionQuery  = "INSERT INTO connector_wc_sessions (topic, session_json, expiry, pairing_topic, dapp_url, client_id, created_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(topic) DO UPDATE SET session_json = excluded.session_json, expiry = excluded.expiry, pairing_topic = excluded.pairing_topic, dapp_url = excluded.dapp_url"
+	selectWCSessionQuery  = "SELECT topic, session_json, expiry, pairing_topic, dapp_url, client_id FROM connector_wc_sessions WHERE topic = ?"
+	deleteWCSessionQuery  = "DELETE FROM connector_wc_sessions WHERE topic = ?"
+	selectWCSessionsQuery = "SELECT topic, session_json, expiry, pairing_topic, dapp_url, client_id FROM connector_wc_sessions WHERE expiry >= ? ORDER BY created_timestamp DESC"
+)
+
+type WCSession struct {
+	Topic        string `json:"topic"`
+	SessionJSON  string `json:"sessionJson"`
+	Expiry       int64  `json:"expiry"`
+	PairingTopic string `json:"pairingTopic"`
+	DAppURL      string `json:"dappUrl"`
+	ClientID     string `json:"clientId"`
+}
+
+func UpsertWCSession(db *sql.DB, topic, sessionJSON string, expiry int64, pairingTopic, dappURL string, createdAt int64) error {
+	normalizedURL := NormalizeURL(dappURL)
+	_, err := db.Exec(upsertWCSessionQuery, topic, sessionJSON, expiry, pairingTopic, normalizedURL, wcClientID, createdAt)
+	return err
+}
+
+func SelectWCSession(db *sql.DB, topic string) (*WCSession, error) {
+	s := &WCSession{Topic: topic}
+	err := db.QueryRow(selectWCSessionQuery, topic).Scan(&s.Topic, &s.SessionJSON, &s.Expiry, &s.PairingTopic, &s.DAppURL, &s.ClientID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return s, err
+}
+
+func DeleteWCSession(db *sql.DB, topic string) error {
+	_, err := db.Exec(deleteWCSessionQuery, topic)
+	return err
+}
+
+func SelectActiveWCSessions(db *sql.DB, validAtTimestamp int64) ([]WCSession, error) {
+	rows, err := db.Query(selectWCSessionsQuery, validAtTimestamp)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []WCSession
+	for rows.Next() {
+		var s WCSession
+		err = rows.Scan(&s.Topic, &s.SessionJSON, &s.Expiry, &s.PairingTopic, &s.DAppURL, &s.ClientID)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions, nil
+}

@@ -20,8 +20,9 @@ import (
 const serviceName = "connector"
 
 type Config struct {
-	WSHost string
-	WSPort int
+	WSHost    string
+	WSPort    int
+	ProjectID string
 }
 
 func NewService(
