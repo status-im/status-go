@@ -188,9 +188,12 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID cr
 	}
 
 	universalChatID := archiveutils.UniversalChatIDFromCommunityID(communityID)
-	filter := m.messaging.ChatFilterByChatID(universalChatID)
-	if filter != nil {
-		filters = append(filters, filter)
+
+	if m.messaging != nil {
+		filter := m.messaging.ChatFilterByChatID(universalChatID)
+		if filter != nil {
+			filters = append(filters, filter)
+		}
 	}
 
 	if len(filters) == 0 {

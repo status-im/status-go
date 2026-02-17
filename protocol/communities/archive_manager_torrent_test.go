@@ -66,30 +66,14 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, arc
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	messagingEnv, err := messaging.NewTestMessagingEnvironment()
-	s.Require().NoError(err)
-
-	appDb, err := testutils2.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-
-	err = messaging.SQLiteMigrate(appDb, 0)
-	s.Require().NoError(err)
-
-	core, err := messagingEnv.NewTestCore(
-		messaging.CoreParams{
-			Identity: key, // recommended
-		},
-		messaging.WithSQLitePersistence(appDb),
-	)
-	s.Require().NoError(err)
-
 	amc := &archivetypes.ArchiveManagerConfig{
 		TorrentConfig: buildTorrentConfig(),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
-		Messaging:     core.API(),
-		Identity:      key,
-		Publisher:     m,
+		// Messaging:     core.API(),
+		Messaging: nil,
+		Identity:  key,
+		Publisher: m,
 	}
 	t := archive.NewArchiveManager(amc)
 	s.Require().NoError(err)

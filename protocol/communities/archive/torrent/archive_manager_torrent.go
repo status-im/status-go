@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -65,6 +66,7 @@ type ArchiveManagerTorrent struct {
 	torrentConfig *params.TorrentConfig
 	torrentClient *torrent.Client
 	torrentTasks  map[string]metainfo.Hash
+	torrentMu     sync.RWMutex
 
 	logger      *zap.Logger
 	persistence archivetypes.PersistenceProvider
@@ -114,7 +116,10 @@ func (m *ArchiveManagerTorrent) SetOnline(online bool) {
 }
 
 func (m *ArchiveManagerTorrent) Start() error {
-	if m.torrentClientStarted() {
+	m.torrentMu.Lock()
+	defer m.torrentMu.Unlock()
+
+	if m.torrentClientStartedLocked() {
 		return nil
 	}
 
@@ -148,7 +153,10 @@ func (m *ArchiveManagerTorrent) Start() error {
 }
 
 func (m *ArchiveManagerTorrent) Stop() error {
-	if m.torrentClientStarted() {
+	m.torrentMu.Lock()
+	defer m.torrentMu.Unlock()
+
+	if m.torrentClientStartedLocked() {
 		m.logger.Info("Stopping torrent client")
 		errs := m.torrentClient.Close()
 		if len(errs) > 0 {
@@ -160,18 +168,20 @@ func (m *ArchiveManagerTorrent) Stop() error {
 }
 
 func (m *ArchiveManagerTorrent) IsStarted() bool {
+	m.torrentMu.RLock()
+	defer m.torrentMu.RUnlock()
 	return m.torrentClient != nil
 }
 
 func (m *ArchiveManagerTorrent) IsReady() bool {
 	// Check if the torrent client is actually started
 	// (it might not be in case of port conflicts, etc.)
-	return m.torrentClientStarted()
+	return m.IsStarted()
 }
 
 func (m *ArchiveManagerTorrent) SeedHistoryArchive(communityID cryptotypes.HexBytes, archiveLink string) error {
-	// NOTE: archiveLink is not currently used. We the underlying torrent client
-	// to make sure we are seeding.
+	// NOTE: archiveLink is not currently used. We simply use the underlying
+	// torrent client to make sure we are seeding.
 	m.UnseedHistoryArchive(communityID, archiveLink)
 
 	id := communityID.String()
@@ -188,13 +198,18 @@ func (m *ArchiveManagerTorrent) SeedHistoryArchive(communityID cryptotypes.HexBy
 	}
 
 	hash := metaInfo.HashInfoBytes()
-	m.torrentTasks[id] = hash
+	m.setTorrentTask(id, hash)
 
 	if err != nil {
 		return err
 	}
 
-	torrent, err := m.torrentClient.AddTorrent(metaInfo)
+	client := m.getTorrentClient()
+	if client == nil {
+		return errors.New("torrent client is not started")
+	}
+
+	torrent, err := client.AddTorrent(metaInfo)
 	if err != nil {
 		return err
 	}
@@ -218,14 +233,18 @@ func (m *ArchiveManagerTorrent) UnseedHistoryArchive(communityID cryptotypes.Hex
 	// the torrent corresponding to the communityID.
 	id := communityID.String()
 
-	hash, exists := m.torrentTasks[id]
+	hash, exists := m.getTorrentTask(id)
 
 	if exists {
-		torrent, ok := m.torrentClient.Torrent(hash)
+		client := m.getTorrentClient()
+		if client == nil {
+			return
+		}
+		torrent, ok := client.Torrent(hash)
 		if ok {
 			m.logger.Debug("Unseeding and dropping torrent for community: ", zap.Any("id", id))
 			torrent.Drop()
-			delete(m.torrentTasks, id)
+			m.deleteTorrentTask(id)
 
 			m.publisher.Publish(&archivetypes.HistoryArchiveSignals{
 				HistoryArchivesUnseededSignal: &signal.HistoryArchivesUnseededSignal{
@@ -240,8 +259,16 @@ func (m *ArchiveManagerTorrent) IsSeedingHistoryArchive(communityID cryptotypes.
 	// NOTE: archiveLink is not currently used. We simply use torrentClient to get
 	// the torrent corresponding to the communityID and check if it's seeding.
 	id := communityID.String()
-	hash := m.torrentTasks[id]
-	torrent, ok := m.torrentClient.Torrent(hash)
+	hash, exists := m.getTorrentTask(id)
+	if !exists {
+		return false
+	}
+
+	client := m.getTorrentClient()
+	if client == nil {
+		return false
+	}
+	torrent, ok := client.Torrent(hash)
 	return ok && torrent.Seeding()
 }
 
@@ -254,7 +281,12 @@ func (m *ArchiveManagerTorrent) DownloadHistoryArchives(communityID cryptotypes.
 	}
 
 	m.logger.Debug("adding torrent via magnetlink for community", zap.String("id", id), zap.String("magnetlink", archiveLink))
-	torrent, err := m.torrentClient.AddMagnet(archiveLink)
+	client := m.getTorrentClient()
+	if client == nil {
+		return nil, errors.New("torrent client is not started")
+	}
+
+	torrent, err := client.AddMagnet(archiveLink)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +297,7 @@ func (m *ArchiveManagerTorrent) DownloadHistoryArchives(communityID cryptotypes.
 		Cancelled:                    false,
 	}
 
-	m.torrentTasks[id] = ml.InfoHash
+	m.setTorrentTask(id, ml.InfoHash)
 	timeout := time.After(20 * time.Second)
 
 	m.logger.Debug("fetching torrent info", zap.String("magnetlink", archiveLink))
@@ -450,23 +482,6 @@ func (m *ArchiveManagerTorrent) LoadArchiveMessages(ctx context.Context, communi
 	return m.extractMessagesFromHistoryArchive(communityID, downloadedArchiveID)
 }
 
-// func (m *ArchiveManagerTorrent) GetHistoryArchiveLink(communityID cryptotypes.HexBytes) (string, error) {
-// 	id := communityID.String()
-// 	torrentFile := torrentFile(m.torrentConfig.TorrentDir, id)
-
-// 	metaInfo, err := metainfo.LoadFromFile(torrentFile)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	info, err := metaInfo.UnmarshalInfo()
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	return metaInfo.Magnet(nil, &info).String(), nil
-// }
-
 // private methods
 func (m *ArchiveManagerTorrent) archiveDataFile(communityID string) string {
 	return filepath.Join(m.torrentConfig.DataDir, communityID, "data")
@@ -531,7 +546,39 @@ func (m *ArchiveManagerTorrent) extractMessagesFromHistoryArchive(communityID cr
 }
 
 func (m *ArchiveManagerTorrent) torrentClientStarted() bool {
+	m.torrentMu.RLock()
+	defer m.torrentMu.RUnlock()
+	return m.torrentClientStartedLocked()
+}
+
+// Caller must hold m.torrentMu.
+func (m *ArchiveManagerTorrent) torrentClientStartedLocked() bool {
 	return m.torrentClient != nil
+}
+
+func (m *ArchiveManagerTorrent) getTorrentClient() *torrent.Client {
+	m.torrentMu.RLock()
+	defer m.torrentMu.RUnlock()
+	return m.torrentClient
+}
+
+func (m *ArchiveManagerTorrent) getTorrentTask(communityID string) (metainfo.Hash, bool) {
+	m.torrentMu.RLock()
+	defer m.torrentMu.RUnlock()
+	hash, exists := m.torrentTasks[communityID]
+	return hash, exists
+}
+
+func (m *ArchiveManagerTorrent) setTorrentTask(communityID string, hash metainfo.Hash) {
+	m.torrentMu.Lock()
+	defer m.torrentMu.Unlock()
+	m.torrentTasks[communityID] = hash
+}
+
+func (m *ArchiveManagerTorrent) deleteTorrentTask(communityID string) {
+	m.torrentMu.Lock()
+	defer m.torrentMu.Unlock()
+	delete(m.torrentTasks, communityID)
 }
 
 // getTCPandUDPport will return the same port number given if != 0,
@@ -967,18 +1014,25 @@ func (m *ArchiveManagerTorrent) GetTorrentConfig() *params.TorrentConfig {
 }
 
 func (m *ArchiveManagerTorrent) GetTorrentTasksCount() int {
+	m.torrentMu.RLock()
+	defer m.torrentMu.RUnlock()
 	return len(m.torrentTasks)
 }
 
 func (m *ArchiveManagerTorrent) GetMetaInfoHashForCommunity(communityID string) metainfo.Hash {
-	return m.torrentTasks[communityID]
+	hash, _ := m.getTorrentTask(communityID)
+	return hash
 }
 
 func (m *ArchiveManagerTorrent) GetTorrentForCommunity(communityID string) (*torrent.Torrent, bool) {
-	hash, exists := m.torrentTasks[communityID]
+	hash, exists := m.getTorrentTask(communityID)
 	if !exists {
 		return nil, false
 	}
-	torrent, ok := m.torrentClient.Torrent(hash)
+	client := m.getTorrentClient()
+	if client == nil {
+		return nil, false
+	}
+	torrent, ok := client.Torrent(hash)
 	return torrent, ok
 }
