@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -488,8 +489,8 @@ func (s *ShareUrlsSuite) TestPrepareEncodedUserDataWithEmptyAccount() {
 
 	userData, chatKey, err := prepareEncodedUserData(contact)
 	s.Require().NoError(err)
-	// The data should be empty if no display name or bio is set
-	s.Require().Empty(userData)
+	// The data should still have a basic alias as display name, so it should not be empty
+	s.Require().NotEmpty(userData)
 	s.Require().NotEmpty(chatKey)
 }
 
@@ -510,5 +511,31 @@ func (s *ShareUrlsSuite) TestShareAndParseUserURLWithData() {
 
 	s.Require().NotNil(urlData.Contact)
 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
+	s.Require().Equal(shortKey, urlData.Contact.PublicKey)
+}
+
+func (s *ShareUrlsSuite) TestParseUserURLWithNonExistingContact() {
+	contact := s.fakeContact()
+
+	// Fake not known contact by returning nil
+	s.provider.EXPECT().GetContactByID(contact.ID).Return(nil, nil).Times(1)
+
+	url, err := s.service.ShareUserURLWithData(contact.ID)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(url)
+
+	urlData, err := ParseSharedURL(url)
+	s.Require().NoError(err)
+
+	shortKey, err := multiformat.SerializeLegacyKey(contact.ID)
+	s.Require().NoError(err)
+
+	publicKey, err := crypto.HexToPubkey(contact.ID)
+	s.Require().NoError(err)
+	contact, err = contacts.BuildContact(contact.ID, publicKey)
+	s.Require().NoError(err)
+
+	s.Require().NotNil(urlData.Contact)
+	s.Require().Equal(contact.Alias, urlData.Contact.DisplayName)
 	s.Require().Equal(shortKey, urlData.Contact.PublicKey)
 }
