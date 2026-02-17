@@ -85,11 +85,13 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	err := networkManager.InitEmbeddedNetworks(initNetworks)
 	require.NoError(t, err)
 
-	state.handler = NewClientSideHandler(state.db)
+	state.handler = NewClientSideHandler(state.db, nil)
 
 	state.mockCtrl = gomock.NewController(t)
 	state.ethClientGetter = mock_chainutils.NewMockEthClientGetter(state.mockCtrl)
 	state.feeManager = mock_chainutils.NewMockFeeManager(state.mockCtrl)
+
+	wcSessionDisconnector := NewWCSessionDisconnector(state.walletDb, nil)
 
 	switch method {
 	case Method_EthAccounts:
@@ -111,7 +113,7 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	case Method_RequestPermissions:
 		state.cmd = NewRequestPermissionsCommand(state.walletDb)
 	case Method_RevokePermissions:
-		state.cmd = NewRevokePermissionsCommand(state.walletDb)
+		state.cmd = NewRevokePermissionsCommand(state.walletDb, wcSessionDisconnector)
 	case Method_SwitchEthereumChain:
 		state.cmd = NewSwitchEthereumChainCommand(state.walletDb, networkManager)
 	}

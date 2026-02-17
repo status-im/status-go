@@ -155,11 +155,34 @@ func DeletePermissions(db *sql.DB, url string, clientID string) error {
 }
 
 const (
-	wcClientID            = "walletconnect"
-	upsertWCSessionQuery  = "INSERT INTO connector_wc_sessions (topic, session_json, expiry, pairing_topic, dapp_url, client_id, created_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(topic) DO UPDATE SET session_json = excluded.session_json, expiry = excluded.expiry, pairing_topic = excluded.pairing_topic, dapp_url = excluded.dapp_url"
-	selectWCSessionQuery  = "SELECT topic, session_json, expiry, pairing_topic, dapp_url, client_id FROM connector_wc_sessions WHERE topic = ?"
-	deleteWCSessionQuery  = "DELETE FROM connector_wc_sessions WHERE topic = ?"
-	selectWCSessionsQuery = "SELECT topic, session_json, expiry, pairing_topic, dapp_url, client_id FROM connector_wc_sessions WHERE expiry >= ? ORDER BY created_timestamp DESC"
+	// WCClientID is the client ID used for WalletConnect sessions
+	WCClientID = "walletconnect"
+
+	upsertWCSessionQuery = `INSERT INTO connector_wc_sessions 
+		(topic, session_json, expiry, pairing_topic, dapp_url, client_id, created_timestamp, sym_key) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?) 
+		ON CONFLICT(topic) DO UPDATE SET 
+			session_json = excluded.session_json, 
+			expiry = excluded.expiry, 
+			pairing_topic = excluded.pairing_topic, 
+			dapp_url = excluded.dapp_url, 
+			sym_key = excluded.sym_key`
+
+	selectWCSessionQuery = `SELECT topic, session_json, expiry, pairing_topic, dapp_url, client_id, sym_key 
+		FROM connector_wc_sessions 
+		WHERE topic = ?`
+
+	deleteWCSessionQuery = `DELETE FROM connector_wc_sessions 
+		WHERE topic = ?`
+
+	selectWCSessionsQuery = `SELECT topic, session_json, expiry, pairing_topic, dapp_url, client_id, sym_key 
+		FROM connector_wc_sessions 
+		WHERE expiry >= ? 
+		ORDER BY created_timestamp DESC`
+
+	selectWCSessionsByDAppURLQuery = `SELECT topic, session_json, expiry, pairing_topic, dapp_url, client_id, sym_key 
+		FROM connector_wc_sessions 
+		WHERE dapp_url = ?`
 )
 
 type WCSession struct {
@@ -169,17 +192,18 @@ type WCSession struct {
 	PairingTopic string `json:"pairingTopic"`
 	DAppURL      string `json:"dappUrl"`
 	ClientID     string `json:"clientId"`
+	SymKey       string `json:"symKey"`
 }
 
-func UpsertWCSession(db *sql.DB, topic, sessionJSON string, expiry int64, pairingTopic, dappURL string, createdAt int64) error {
+func UpsertWCSession(db *sql.DB, topic, sessionJSON string, expiry int64, pairingTopic, dappURL, symKey string, createdAt int64) error {
 	normalizedURL := NormalizeURL(dappURL)
-	_, err := db.Exec(upsertWCSessionQuery, topic, sessionJSON, expiry, pairingTopic, normalizedURL, wcClientID, createdAt)
+	_, err := db.Exec(upsertWCSessionQuery, topic, sessionJSON, expiry, pairingTopic, normalizedURL, WCClientID, createdAt, symKey)
 	return err
 }
 
 func SelectWCSession(db *sql.DB, topic string) (*WCSession, error) {
 	s := &WCSession{Topic: topic}
-	err := db.QueryRow(selectWCSessionQuery, topic).Scan(&s.Topic, &s.SessionJSON, &s.Expiry, &s.PairingTopic, &s.DAppURL, &s.ClientID)
+	err := db.QueryRow(selectWCSessionQuery, topic).Scan(&s.Topic, &s.SessionJSON, &s.Expiry, &s.PairingTopic, &s.DAppURL, &s.ClientID, &s.SymKey)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -201,7 +225,27 @@ func SelectActiveWCSessions(db *sql.DB, validAtTimestamp int64) ([]WCSession, er
 	var sessions []WCSession
 	for rows.Next() {
 		var s WCSession
-		err = rows.Scan(&s.Topic, &s.SessionJSON, &s.Expiry, &s.PairingTopic, &s.DAppURL, &s.ClientID)
+		err = rows.Scan(&s.Topic, &s.SessionJSON, &s.Expiry, &s.PairingTopic, &s.DAppURL, &s.ClientID, &s.SymKey)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions, nil
+}
+
+func SelectWCSessionsByDAppURL(db *sql.DB, dappURL string) ([]WCSession, error) {
+	normalizedURL := NormalizeURL(dappURL)
+	rows, err := db.Query(selectWCSessionsByDAppURLQuery, normalizedURL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []WCSession
+	for rows.Next() {
+		var s WCSession
+		err = rows.Scan(&s.Topic, &s.SessionJSON, &s.Expiry, &s.PairingTopic, &s.DAppURL, &s.ClientID, &s.SymKey)
 		if err != nil {
 			return nil, err
 		}

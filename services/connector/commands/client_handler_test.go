@@ -14,7 +14,7 @@ func TestClientHandlerTimeout(t *testing.T) {
 	db, cleanup := createWalletDB(t)
 	t.Cleanup(cleanup)
 
-	clientHandler := NewClientSideHandler(db)
+	clientHandler := NewClientSideHandler(db, nil)
 
 	backupWalletResponseMaxInterval := WalletResponseMaxInterval
 	WalletResponseMaxInterval = 1 * time.Millisecond
@@ -28,7 +28,7 @@ func TestRequestRejectedWhileWaiting(t *testing.T) {
 	db, cleanup := createWalletDB(t)
 	t.Cleanup(cleanup)
 
-	clientHandler := NewClientSideHandler(db)
+	clientHandler := NewClientSideHandler(db, nil)
 
 	clientHandler.setRequestRunning()
 
@@ -56,7 +56,7 @@ func TestRecallDAppPermission(t *testing.T) {
 	assert.Equal(t, persistedDapp, &dapp)
 	assert.NoError(t, err)
 
-	clientHandler := NewClientSideHandler(db)
+	clientHandler := NewClientSideHandler(db, nil)
 	err = clientHandler.RecallDAppPermissions(RecallDAppPermissionsArgs{URL: dapp.URL, ClientID: dapp.ClientID})
 	assert.NoError(t, err)
 

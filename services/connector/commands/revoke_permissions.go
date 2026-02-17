@@ -9,12 +9,14 @@ import (
 )
 
 type RevokePermissionsCommand struct {
-	db *sql.DB
+	db                    *sql.DB
+	wcSessionDisconnector WCSessionDisconnector
 }
 
-func NewRevokePermissionsCommand(db *sql.DB) *RevokePermissionsCommand {
+func NewRevokePermissionsCommand(db *sql.DB, wcSessionDisconnector WCSessionDisconnector) *RevokePermissionsCommand {
 	return &RevokePermissionsCommand{
-		db: db,
+		db:                    db,
+		wcSessionDisconnector: wcSessionDisconnector,
 	}
 }
 
@@ -33,7 +35,16 @@ func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCReque
 		return "", ErrDAppIsNotPermittedByUser
 	}
 
-	// Delete the dApp entry (CASCADE will automatically delete permissions)
+	// If this is a WalletConnect DApp, disconnect all WC sessions first
+	if c.wcSessionDisconnector != nil && dApp.ClientID == persistence.WCClientID {
+		sessions, err := persistence.SelectWCSessionsByDAppURL(c.db, dApp.URL)
+		if err == nil && len(sessions) > 0 {
+			for _, session := range sessions {
+				_ = c.wcSessionDisconnector.DisconnectSession(ctx, session.Topic)
+			}
+		}
+	}
+
 	err = persistence.DeleteDApp(c.db, dApp.URL, dApp.ClientID)
 	if err != nil {
 		return "", err

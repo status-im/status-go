@@ -82,6 +82,12 @@ type Session struct {
 	RequiredNamespaces map[string]Namespace `json:"requiredNamespaces"`
 }
 
+// SessionEvent represents a WC session event (e.g., accountsChanged, chainChanged).
+type SessionEvent struct {
+	Name string `json:"name"`
+	Data any    `json:"data"`
+}
+
 // JSONRPCRequest represents a JSON-RPC 2.0 request
 type JSONRPCRequest struct {
 	JSONRPC string `json:"jsonrpc"`
