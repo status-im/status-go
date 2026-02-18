@@ -978,7 +978,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				m.logger.Error("Failed to get community settings", zap.Error(err))
 				continue
 			}
-			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsStarted() && communitySettings.HistoryArchiveSupportEnabled {
 				lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(request.CommunityID)
 				if err == nil {
 					err = m.archiveManager.SeedHistoryArchive(request.CommunityID, lastSeenArchiveLink)
@@ -1751,7 +1751,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				continue
 			}
 
-			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsStarted() && communitySettings.HistoryArchiveSupportEnabled {
 				lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(discordCommunity.ID())
 				if err == nil {
 					err = m.archiveManager.SeedHistoryArchive(discordCommunity.ID(), lastSeenArchiveLink)

@@ -1255,8 +1255,8 @@ func (m *Messenger) HandleHistoryArchiveLinkMessage(state *ReceivedMessageState,
 		return nil
 	}
 
-	if m.archiveManager.IsReady() && settings.HistoryArchiveSupportEnabled {
-		m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] ArchiveManager is ready and history archive support is enabled", zap.String("communityID", community.IDString()))
+	if m.archiveManager.IsStarted() && settings.HistoryArchiveSupportEnabled {
+		m.logger.Debug("[LogosStorage][HandleHistoryArchiveLinkMessage] ArchiveManager is started and history archive support is enabled", zap.String("communityID", community.IDString()))
 
 		lastArchiveLinkClock, err := m.communitiesManager.GetArchiveLinkMessageClock(id)
 		if err != nil {
@@ -1660,7 +1660,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 		}
 
 		archiveLink := requestToJoinResponseProto.ArchiveLink
-		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && archiveLink != "" {
+		if m.archiveManager.IsStarted() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && archiveLink != "" {
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			if err := m.communitiesManager.UpdateArchiveLinkMessageClock(requestToJoinResponseProto.CommunityId, requestToJoinResponseProto.Clock); err != nil {

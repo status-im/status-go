@@ -673,7 +673,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.archiveManager.IsReady() {
+	if m.archiveManager.IsStarted() {
 		m.shutdownWaitGroup.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()

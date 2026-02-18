@@ -32,10 +32,6 @@ func (m *ArchiveManagerNop) IsStarted() bool {
 	return false
 }
 
-func (m *ArchiveManagerNop) IsReady() bool {
-	return false
-}
-
 func (m *ArchiveManagerNop) SeedHistoryArchive(communityID cryptotypes.HexBytes, archiveLink string) error {
 	return nil
 }

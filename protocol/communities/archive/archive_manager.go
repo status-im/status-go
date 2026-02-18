@@ -101,10 +101,6 @@ func (m *ArchiveManager) IsStarted() bool {
 	return m.backend.IsStarted()
 }
 
-func (m *ArchiveManager) IsReady() bool {
-	return m.backend.IsReady()
-}
-
 func (m *ArchiveManager) SeedHistoryArchive(communityID cryptotypes.HexBytes, archiveLink string) error {
 	return m.backend.SeedHistoryArchive(communityID, archiveLink)
 }

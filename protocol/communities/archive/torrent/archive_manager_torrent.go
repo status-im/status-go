@@ -173,12 +173,6 @@ func (m *ArchiveManagerTorrent) IsStarted() bool {
 	return m.torrentClient != nil
 }
 
-func (m *ArchiveManagerTorrent) IsReady() bool {
-	// Check if the torrent client is actually started
-	// (it might not be in case of port conflicts, etc.)
-	return m.IsStarted()
-}
-
 func (m *ArchiveManagerTorrent) SeedHistoryArchive(communityID cryptotypes.HexBytes, archiveLink string) error {
 	// NOTE: archiveLink is not currently used. We simply use the underlying
 	// torrent client to make sure we are seeding.

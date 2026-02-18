@@ -17,7 +17,6 @@ type ArchiveServiceBackend interface {
 	Start() error
 	Stop() error
 	IsStarted() bool
-	IsReady() bool
 	SeedHistoryArchive(communityID types.HexBytes, archiveLink string) error
 	UnseedHistoryArchive(communityID types.HexBytes, archiveLink string)
 	IsSeedingHistoryArchive(communityID types.HexBytes, archiveLink string) bool
