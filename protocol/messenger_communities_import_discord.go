@@ -983,7 +983,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				continue
 			}
 
-			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsStarted() && communitySettings.HistoryArchiveSupportEnabled {
 				// Below is the old way of handling torrent. Because now we are aligning
 				// the interface of various archive storage providers, this part needs
 				// to change a bit.
@@ -1764,7 +1764,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				continue
 			}
 
-			if m.archiveManager.IsReady() && communitySettings.HistoryArchiveSupportEnabled {
+			if m.archiveManager.IsStarted() && communitySettings.HistoryArchiveSupportEnabled {
 				lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(discordCommunity.ID())
 				if err == nil {
 					err = m.archiveManager.SeedHistoryArchive(discordCommunity.ID(), lastSeenArchiveLink)

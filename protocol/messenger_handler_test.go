@@ -236,7 +236,7 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithL
 		_ = s.m.archiveManager.Stop()
 	}()
 
-	s.Require().True(s.m.archiveManager.IsReady())
+	s.Require().True(s.m.archiveManager.IsStarted())
 
 	community := response.Communities()[0]
 	err = s.m.communitiesManager.SaveCommunitySettings(communities.CommunitySettings{

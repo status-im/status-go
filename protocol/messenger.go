@@ -495,19 +495,19 @@ func NewMessenger(
 }
 
 func (m *Messenger) SetupArchiveManager(amc *archivetypes.ArchiveManagerConfig) {
-	if (amc.Logger == nil) {
+	if amc.Logger == nil {
 		amc.Logger = m.logger
 	}
-	if (amc.Persistence == nil) {
+	if amc.Persistence == nil {
 		amc.Persistence = m.communitiesManager.GetPersistence()
 	}
-	if (amc.Messaging == nil) {
+	if amc.Messaging == nil {
 		amc.Messaging = m.messaging
 	}
-	if (amc.Identity == nil) {
+	if amc.Identity == nil {
 		amc.Identity = m.identity
 	}
-	if (amc.Publisher == nil) {
+	if amc.Publisher == nil {
 		amc.Publisher = m.communitiesManager
 	}
 
@@ -647,7 +647,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.archiveManager.IsReady() {
+	if m.archiveManager.IsStarted() {
 		go func() {
 			defer gocommon.LogOnPanic()
 

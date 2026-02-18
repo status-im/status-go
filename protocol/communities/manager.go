@@ -39,7 +39,6 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
-	historyarchivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -426,7 +425,7 @@ func (m *Manager) SetMediaServerProperties() {
 }
 
 type Subscription struct {
-	historyarchivetypes.HistoryArchiveSignals
+	archivetypes.HistoryArchiveSignals
 	Community                            *Community
 	CommunityEventsMessage               *CommunityEventsMessage
 	AcceptedRequestsToJoin               []types.HexBytes

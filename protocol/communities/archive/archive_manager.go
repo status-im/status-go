@@ -112,18 +112,6 @@ func (m *ArchiveManager) IsStarted() bool {
 	return m.backend.IsStarted()
 }
 
-func (m *ArchiveManager) IsReady() bool {
-	return m.backend.IsReady()
-}
-
-// GetLogosStorageBackend returns the LogosStorage backend if available, for test purposes
-func (m *ArchiveManager) GetLogosStorageBackend() (*archivelogosstorage.ArchiveManagerLogosStorage, error) {
-	if logosStorageBackend, ok := m.backend.(*archivelogosstorage.ArchiveManagerLogosStorage); ok {
-		return logosStorageBackend, nil
-	}
-	return nil, errors.New("backend is not ArchiveManagerLogosStorage")
-}
-
 func (m *ArchiveManager) SeedHistoryArchive(communityID cryptotypes.HexBytes, archiveLink string) error {
 	return m.backend.SeedHistoryArchive(communityID, archiveLink)
 }
@@ -414,4 +402,25 @@ func (m *ArchiveManager) getOldestWakuMessageTimestamp(topics []messagingtypes.C
 
 func (m *ArchiveManager) getLastMessageArchiveEndDate(communityID cryptotypes.HexBytes) (uint64, error) {
 	return m.persistence.GetLastMessageArchiveEndDate(communityID)
+}
+
+// Special functions
+// These functions are not part of the ArchiveServiceBackend interface.
+// Some legacy tests are accessing implementation details and for this reason
+// we need to expose these special accessors.
+
+// GetLogosStorageBackend returns the LogosStorage backend if available, for test purposes
+func (m *ArchiveManager) GetLogosStorageBackend() (*archivelogosstorage.ArchiveManagerLogosStorage, error) {
+	if logosStorageBackend, ok := m.backend.(*archivelogosstorage.ArchiveManagerLogosStorage); ok {
+		return logosStorageBackend, nil
+	}
+	return nil, errors.New("backend is not ArchiveManagerLogosStorage")
+}
+
+// GetTorrentBackend returns the Torrent backend if available, for test purposes
+func (m *ArchiveManager) GetTorrentBackend() (*archivetorrent.ArchiveManagerTorrent, error) {
+	if torrentBackend, ok := m.backend.(*archivetorrent.ArchiveManagerTorrent); ok {
+		return torrentBackend, nil
+	}
+	return nil, errors.New("backend is not ArchiveManagerTorrent")
 }

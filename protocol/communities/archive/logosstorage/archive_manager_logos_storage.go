@@ -33,11 +33,10 @@ import (
 )
 
 type ArchiveManagerLogosStorage struct {
-	logosStorageConfig          *params.LogosStorageConfig
-	logosStorageClient          logosstorage.LogosStorageClientInterface
-	isLogosStorageClientStarted bool
-	logosStorageClientMu        sync.RWMutex
-	downloadTimeout             time.Duration // timeout for archive downloads, defaults to 20s
+	logosStorageConfig   *params.LogosStorageConfig
+	logosStorageClient   logosstorage.LogosStorageClientInterface
+	logosStorageClientMu sync.RWMutex
+	downloadTimeout      time.Duration // timeout for archive downloads, defaults to 20s
 
 	logger      *zap.Logger
 	persistence archivetypes.PersistenceProvider
@@ -74,13 +73,10 @@ func (m *ArchiveManagerLogosStorage) SetOnline(online bool) {
 	m.logger.Info("[LogosStorage][set_online] testing online status:", zap.Bool("online", online))
 	if online {
 		m.logger.Info("[LogosStorage][set_online] Online: checking if LogosStorage client needs to be started...")
-		m.logosStorageClientMu.RLock()
-		logosStorageStarted := m.isLogosStorageClientStarted
-		m.logosStorageClientMu.RUnlock()
 
-		m.logger.Info("[LogosStorage][set_online]", zap.Bool("logosStorageStarted", logosStorageStarted))
+		m.logger.Info("[LogosStorage][set_online]", zap.Bool("logosStorageStarted", m.IsStarted()))
 
-		if !logosStorageStarted {
+		if !m.IsStarted() {
 			m.logger.Info("[LogosStorage][set_online] Starting LogosStorage client...")
 			err := m.Start()
 			if err != nil {
@@ -98,7 +94,7 @@ func (m *ArchiveManagerLogosStorage) Start() error {
 		return fmt.Errorf("can't start LogosStorage client: missing LogosStorageConfig")
 	}
 
-	if m.isLogosStorageClientStarted {
+	if m.logosStorageClient != nil {
 		return nil
 	}
 
@@ -115,12 +111,9 @@ func (m *ArchiveManagerLogosStorage) Start() error {
 	m.logosStorageClient = client
 
 	if err := m.logosStorageClient.Start(); err != nil {
-		m.isLogosStorageClientStarted = false
 		m.logosStorageClient = nil
 		return err
 	}
-
-	m.isLogosStorageClientStarted = true
 
 	return nil
 }
@@ -130,7 +123,7 @@ func (m *ArchiveManagerLogosStorage) Stop() error {
 	defer m.logosStorageClientMu.Unlock()
 
 	errs := []error{}
-	if m.isLogosStorageClientStarted {
+	if m.logosStorageClient != nil {
 		m.logger.Info("[LogosStorage] Stopping LogosStorage client")
 
 		e := m.logosStorageClient.Stop()
@@ -143,7 +136,6 @@ func (m *ArchiveManagerLogosStorage) Stop() error {
 			errs = append(errs, e)
 		}
 
-		m.isLogosStorageClientStarted = false
 		m.logosStorageClient = nil
 	}
 
@@ -155,16 +147,9 @@ func (m *ArchiveManagerLogosStorage) Stop() error {
 }
 
 func (m *ArchiveManagerLogosStorage) IsStarted() bool {
-	return m.logosStorageClient != nil
-}
-
-func (m *ArchiveManagerLogosStorage) IsReady() bool {
 	m.logosStorageClientMu.RLock()
 	defer m.logosStorageClientMu.RUnlock()
-
-	// Check if the LogosStorage client is actually started
-	// (it might not be in case of port conflicts, etc.)
-	return m.isLogosStorageClientStarted
+	return m.logosStorageClient != nil
 }
 
 func (m *ArchiveManagerLogosStorage) GetLogosStorageClient() logosstorage.LogosStorageClientInterface {
@@ -177,7 +162,7 @@ func (m *ArchiveManagerLogosStorage) SeedHistoryArchive(communityID cryptotypes.
 	if archiveLink == "" {
 		return nil
 	}
-	if !m.IsReady() {
+	if !m.IsStarted() {
 		return nil
 	}
 	// do not seed if already seeding
@@ -198,7 +183,7 @@ func (m *ArchiveManagerLogosStorage) UnseedHistoryArchive(communityID cryptotype
 	if archiveLink == "" {
 		return
 	}
-	if !m.IsReady() {
+	if !m.IsStarted() {
 		return
 	}
 	if !m.IsSeedingHistoryArchive(communityID, archiveLink) {
@@ -216,7 +201,7 @@ func (m *ArchiveManagerLogosStorage) IsSeedingHistoryArchive(communityID cryptot
 	if archiveLink == "" {
 		return false
 	}
-	if !m.IsReady() {
+	if !m.IsStarted() {
 		return false
 	}
 	hasCid, err := m.logosStorageClient.HasCid(archiveLink)
