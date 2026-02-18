@@ -174,9 +174,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Generate deployment signature
         chain_id = owner_backend.network_id
-        signature = owner_backend.wakuext_service.create_community_token_deployment_signature(
-            chain_id, address_from, community_id, deployer_address=contract_address
-        )
+        signature = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
         logger.info(f"Community token deployment signature: {signature}")
 
         token_uri = change_community_key_compression(community_id) + "/"
