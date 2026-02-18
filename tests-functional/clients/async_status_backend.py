@@ -69,6 +69,10 @@ class AsyncStatusBackend:
         return self._backend.data_dir
 
     @property
+    def waku_light_client(self) -> bool:
+        return getattr(self._backend, "waku_light_client", False)
+
+    @property
     def router(self) -> SignalRouter:
         """Access signal router."""
         return self._router

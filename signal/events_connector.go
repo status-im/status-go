@@ -12,7 +12,39 @@ const (
 	EventConnectorDAppPermissionRevoked = "connector.dAppPermissionRevoked"
 	EventConnectorDAppChainIdSwitched   = "connector.dAppChainIdSwitched"
 	EventConnectorAccountChanged        = "connector.dAppAccountChanged"
+
+	// WalletConnect (via connector)
+	EventWCSessionProposal = "connector.wcSessionProposal"
+	EventWCSessionRequest  = "connector.wcSessionRequest"
 )
+
+type WCSessionProposalSignal struct {
+	RequestID string `json:"requestId"`
+	URI       string `json:"uri"`
+	Proposal  string `json:"proposal"` // JSON-encoded session proposal
+}
+
+func SendWCSessionProposal(requestID, uri, proposalJSON string) {
+	send(EventWCSessionProposal, WCSessionProposalSignal{
+		RequestID: requestID,
+		URI:       uri,
+		Proposal:  proposalJSON,
+	})
+}
+
+type WCSessionRequestSignal struct {
+	Topic       string `json:"topic"`
+	RequestID   int64  `json:"requestId"`
+	RequestJSON string `json:"requestJson"`
+}
+
+func SendWCSessionRequest(topic string, requestID int64, requestJSON string) {
+	send(EventWCSessionRequest, WCSessionRequestSignal{
+		Topic:       topic,
+		RequestID:   requestID,
+		RequestJSON: requestJSON,
+	})
+}
 
 type ConnectorDApp struct {
 	URL      string `json:"url"`

@@ -319,8 +319,11 @@ class StatusGoContainer:
     @classmethod
     def acquire_port(cls):
         with cls._port_lock:
+            if not Config.status_backend_port_range:
+                raise RuntimeError("Port pool exhausted: no more ports available. " "Consider increasing range_size in _calculate_port_range().")
             host_port = random.choice(Config.status_backend_port_range)
             Config.status_backend_port_range.remove(host_port)
+            logging.debug(f"Acquired port {host_port} ({len(Config.status_backend_port_range)} remaining)")
             return host_port
 
     def connect_to_bridge_network(self):

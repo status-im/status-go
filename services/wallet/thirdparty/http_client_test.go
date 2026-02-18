@@ -6,9 +6,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -310,4 +312,136 @@ func gzipEncode(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func TestDoWithExponentialBackoff_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("success"))
+	}))
+	defer server.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+
+	resp, err := DoWithExponentialBackoff(client, req, "test-provider")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+}
+
+func TestDoWithExponentialBackoff_RateLimit(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("success after retry"))
+		}
+	}))
+	defer server.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+
+	resp, err := DoWithExponentialBackoff(client, req, "test-provider")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.GreaterOrEqual(t, attempts, 3, "Should have retried at least twice before succeeding")
+	resp.Body.Close()
+}
+
+func TestDoWithExponentialBackoff_PermanentErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+	}{
+		{"400 error", http.StatusBadRequest},
+		{"404 error", http.StatusNotFound},
+		{"500 error", http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var attempts int
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				attempts++
+				w.WriteHeader(tt.statusCode)
+			}))
+			defer server.Close()
+
+			client := &http.Client{}
+			req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+			require.NoError(t, err)
+
+			resp, err := DoWithExponentialBackoff(client, req, "test-provider")
+			require.Error(t, err)
+			require.Nil(t, resp)
+			require.Contains(t, err.Error(), "unsuccessful request")
+			require.Equal(t, 1, attempts)
+		})
+	}
+}
+
+func TestDoWithExponentialBackoff_NetworkError(t *testing.T) {
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodGet, "http://localhost:1", nil)
+	require.NoError(t, err)
+
+	resp, err := DoWithExponentialBackoff(client, req, "test-provider")
+	require.Error(t, err)
+	require.Nil(t, resp)
+}
+
+func TestDoWithExponentialBackoff_RetryExhaustion(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+
+	resp, err := DoWithExponentialBackoff(client, req, "test-provider")
+	require.Error(t, err)
+	require.Nil(t, resp)
+	require.Contains(t, err.Error(), "unsuccessful request")
+	require.Greater(t, attempts, 1)
+}
+
+func TestDoWithExponentialBackoff_WithBody(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, "test-body", string(body))
+		if attempts < 2 {
+			w.WriteHeader(http.StatusTooManyRequests)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("success"))
+		}
+	}))
+	defer server.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPost, server.URL, strings.NewReader("test-body"))
+	require.NoError(t, err)
+
+	resp, err := DoWithExponentialBackoff(client, req, "test-provider")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.GreaterOrEqual(t, attempts, 2)
+	resp.Body.Close()
 }

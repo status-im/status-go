@@ -108,10 +108,6 @@ class TestRpc:
         for key in TOKENS_KEYS:
             assert key.lower() in result
 
-    def test_get_wallet_connect_active_sessions(self):
-        result = self.rpc_client.wallet_service.get_wallet_connect_active_sessions(1728995277)
-        assert result is None
-
     def test_stop_suggested_routes_async_calculation(self):
         result = self.rpc_client.wallet_service.stop_suggested_routes_async_calculation()
         assert result is None

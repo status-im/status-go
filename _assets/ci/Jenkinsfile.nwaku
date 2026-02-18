@@ -26,7 +26,7 @@ pipeline {
     booleanParam(
       name: 'USE_NWAKU',
       description: 'Whether to build with nwaku or not',
-      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
+      defaultValue: getNWakuMode(),
     )
   }
 

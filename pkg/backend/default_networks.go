@@ -42,8 +42,7 @@ func smartProxyUrlWithProvider(proxyHost, chainName, networkName, provider strin
 
 func mainnet(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.EthereumMainnet
-	const chainName = "ethereum"
-	const networkName = "mainnet"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -82,8 +81,7 @@ func mainnet(proxyHost, stageName string, enableRpcProviders bool) params.Networ
 
 func sepolia(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.EthereumSepolia
-	const chainName = "ethereum"
-	const networkName = "sepolia"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -122,8 +120,7 @@ func sepolia(proxyHost, stageName string, enableRpcProviders bool) params.Networ
 
 func optimism(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.OptimismMainnet
-	const chainName = "optimism"
-	const networkName = "mainnet"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -162,8 +159,7 @@ func optimism(proxyHost, stageName string, enableRpcProviders bool) params.Netwo
 
 func optimismSepolia(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.OptimismSepolia
-	const chainName = "optimism"
-	const networkName = "sepolia"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -202,8 +198,7 @@ func optimismSepolia(proxyHost, stageName string, enableRpcProviders bool) param
 
 func arbitrum(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.ArbitrumMainnet
-	const chainName = "arbitrum"
-	const networkName = "mainnet"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -242,8 +237,7 @@ func arbitrum(proxyHost, stageName string, enableRpcProviders bool) params.Netwo
 
 func arbitrumSepolia(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.ArbitrumSepolia
-	const chainName = "arbitrum"
-	const networkName = "sepolia"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -282,8 +276,7 @@ func arbitrumSepolia(proxyHost, stageName string, enableRpcProviders bool) param
 
 func base(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.BaseMainnet
-	const chainName = "base"
-	const networkName = "mainnet"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -322,8 +315,7 @@ func base(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 
 func baseSepolia(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.BaseSepolia
-	const chainName = "base"
-	const networkName = "sepolia"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -362,8 +354,7 @@ func baseSepolia(proxyHost, stageName string, enableRpcProviders bool) params.Ne
 
 func statusNetworkSepolia(proxyHost string, enableRpcProviders bool) params.Network {
 	const chainID = common.StatusNetworkSepolia
-	const chainName = "status"
-	const networkName = "sepolia"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -398,8 +389,7 @@ func statusNetworkSepolia(proxyHost string, enableRpcProviders bool) params.Netw
 
 func bnbSmartChain(proxyHost string, enableRpcProviders bool) params.Network {
 	const chainID = common.BSCMainnet
-	const chainName = "bsc"
-	const networkName = "mainnet"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -436,8 +426,7 @@ func bnbSmartChain(proxyHost string, enableRpcProviders bool) params.Network {
 
 func linea(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.LineaMainnet
-	const chainName = "linea"
-	const networkName = "mainnet"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -476,8 +465,7 @@ func linea(proxyHost, stageName string, enableRpcProviders bool) params.Network 
 
 func lineaSepolia(proxyHost, stageName string, enableRpcProviders bool) params.Network {
 	const chainID = common.LineaSepolia
-	const chainName = "linea"
-	const networkName = "sepolia"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {
@@ -516,8 +504,7 @@ func lineaSepolia(proxyHost, stageName string, enableRpcProviders bool) params.N
 
 func bnbSmartChainTestnet(proxyHost string, enableRpcProviders bool) params.Network {
 	const chainID = common.BSCTestnet
-	const chainName = "bsc"
-	const networkName = "testnet"
+	chainName, networkName, _ := networkhelper.ChainIDToChainAndNetwork(chainID)
 
 	var rpcProviders []params.RpcProvider = []params.RpcProvider{}
 	if enableRpcProviders {

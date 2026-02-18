@@ -2,24 +2,18 @@ package walletconnect
 
 import (
 	"crypto/ecdsa"
-	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
-	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -191,81 +185,6 @@ func (p *Params) ValidateForProposal() bool {
 // https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#controller-side-validation-of-incoming-proposal-namespaces-wallet
 func (p *SessionProposal) ValidateProposal() bool {
 	return p.Params.ValidateForProposal()
-}
-
-// AddSession adds a new active session to the database
-func AddSession(db *sql.DB, networks []params.Network, session_json string) error {
-	var session Session
-	err := json.Unmarshal([]byte(session_json), &session)
-	if err != nil {
-		return fmt.Errorf("unmarshal session: %v", err)
-	}
-
-	chains := supportedChainsInSession(session)
-	testChains, err := areTestChains(networks, chains)
-	if err != nil {
-		return fmt.Errorf("areTestChains: %v", err)
-	}
-
-	rowEntry := DBSession{
-		Topic:            session.Topic,
-		Disconnected:     false,
-		SessionJSON:      session_json,
-		Expiry:           session.Expiry,
-		CreatedTimestamp: time.Now().Unix(),
-		PairingTopic:     session.PairingTopic,
-		TestChains:       testChains,
-		DBDApp: DBDApp{
-			URL:  session.Peer.Metadata.URL,
-			Name: session.Peer.Metadata.Name,
-		},
-	}
-	if len(session.Peer.Metadata.Icons) > 0 {
-		rowEntry.IconURL = session.Peer.Metadata.Icons[0]
-	}
-
-	return UpsertSession(db, rowEntry)
-}
-
-// areTestChains assumes chains to tests are all testnets or all mainnets
-func areTestChains(networks []params.Network, chainIDs []uint64) (isTest bool, err error) {
-	for _, n := range networks {
-		for _, chainID := range chainIDs {
-			if n.ChainID == chainID {
-				return n.IsTest, nil
-			}
-		}
-	}
-
-	return false, fmt.Errorf("no network found for chainIDs %v", chainIDs)
-}
-
-func supportedChainsInSession(session Session) []uint64 {
-	caipChains := session.Namespaces[SupportedEip155Namespace].Chains
-	chains := make([]uint64, 0, len(caipChains))
-	for _, caip2Str := range caipChains {
-		_, chainID, err := parseCaip2ChainID(caip2Str)
-		if err != nil {
-			logutils.ZapLogger().Warn("Failed parsing CAIP-2",
-				zap.String("str", caip2Str),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		chains = append(chains, chainID)
-	}
-	return chains
-}
-
-func caip10Accounts(accounts []*accsmanagementtypes.Account, chains []uint64) []string {
-	addresses := make([]string, 0, len(accounts)*len(chains))
-	for _, acc := range accounts {
-		for _, chainID := range chains {
-			addresses = append(addresses, fmt.Sprintf("%s:%s:%s", SupportedEip155Namespace, strconv.FormatUint(chainID, 10), acc.Address.Hex()))
-		}
-	}
-	return addresses
 }
 
 func SafeSignTypedDataForDApps(typedJson string, privateKey *ecdsa.PrivateKey, chainID uint64, legacy bool) (types.HexBytes, error) {

@@ -3,102 +3,14 @@ package walletconnect
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"reflect"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/params"
 )
-
-func getSessionJSONFor(chains []int, expiry int) string {
-	chainsStr := "["
-	for i, chain := range chains {
-		chainsStr += `"eip155:` + strconv.Itoa(chain) + `"`
-		if i != len(chains)-1 {
-			chainsStr += ","
-		}
-	}
-	chainsStr += "]"
-	expiryStr := strconv.Itoa(expiry)
-
-	return `{
-		"expiry": ` + expiryStr + `,
-		"namespaces": {
-			"eip155": {
-				"accounts": [
-					"eip155:1:0x7F47C2e18a4BBf5487E6fb082eC2D9Ab0E6d7240",
-					"eip155:10:0x7F47C2e18a4BBf5487E6fb082eC2D9Ab0E6d7240",
-					"eip155:42161:0x7F47C2e18a4BBf5487E6fb082eC2D9Ab0E6d7240"
-				],
-				"chains": ` + chainsStr + `,
-				"events": [
-					"accountsChanged",
-					"chainChanged"
-				],
-				"methods": [
-					"eth_sendTransaction",
-					"personal_sign"
-				]
-			}
-		},
-		"optionalNamespaces": {
-			"eip155": {
-				"chains": [],
-				"events": [],
-				"methods": [],
-				"rpcMap": {}
-			}
-		},
-		"pairingTopic": "50fba141cdb5c015493c2907c46bacf9f7cbd7c8e3d4e97df891f18dddcff69c",
-		"peer": {
-			"metadata": {
-				"description": "Test Dapp Description",
-				"icons": [ "https://test.org/test.png"],
-				"name": "Test Dapp",
-				"url": "https://dapp.test.org"
-			},
-			"publicKey": "1234567890aeb6081cabed26faf48919162fd70cc66d639f118a60507ae0463d"
-		},
-		"relay": { "protocol": "irn"},
-		"requiredNamespaces": {
-			"eip155": {
-				"chains": [
-					"eip155:1"
-				],
-				"events": [
-					"chainChanged",
-					"accountsChanged"
-				],
-				"methods": [
-					"eth_sendTransaction",
-					"personal_sign"
-				],
-				"rpcMap": {
-					"1": "https://mainnet.infura.io/v3/099fc58e0de9451d80b18d7c74caa7c1"
-				}
-			}
-		},
-		"self": {
-			"metadata": {
-				"description": "Test Wallet Description",
-				"icons": [
-					"https://wallet.test.org/test.svg"
-				],
-				"name": "Test Wallet",
-				"url": "http://localhost"
-			},
-			"publicKey": "da4a87d5f0f54951afe870ebf020cf03f8a3522fbd219398c3fa159a37e16d54"
-		},
-		"topic": "e39e1f435a46b5ee6b31484d1751cfbc35be1275653af2ea340974a7592f1a19"
-	}`
-}
 
 func Test_sessionProposalValidity(t *testing.T) {
 	tests := []struct {
@@ -281,151 +193,68 @@ func Test_sessionProposalValidity(t *testing.T) {
 	}
 }
 
-func Test_supportedChainInSession(t *testing.T) {
-	type args struct {
-		sessionProposal Session
-	}
+func Test_Namespace_Valid(t *testing.T) {
 	tests := []struct {
-		name           string
-		args           args
-		expectedChains []uint64
+		name          string
+		namespace     Namespace
+		namespaceName string
+		chainID       *uint64
+		want          bool
 	}{
 		{
-			name: "supported_chain",
-			args: args{
-				sessionProposal: Session{
-					Namespaces: map[string]Namespace{
-						"eip155": {
-							Chains: []string{"eip155:1", "eip155:2", "eip155:3", "eip155:4", "eip155:5"},
-						},
-					},
-				},
+			name: "nil_chainID_empty_chains",
+			namespace: Namespace{
+				Chains: []string{},
 			},
-			expectedChains: []uint64{1, 2, 3, 4, 5},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          false,
+		},
+		{
+			name: "nil_chainID_valid_chains",
+			namespace: Namespace{
+				Chains: []string{"eip155:1", "eip155:137"},
+			},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          true,
+		},
+		{
+			name: "nil_chainID_namespace_mismatch",
+			namespace: Namespace{
+				Chains: []string{"eip155:1", "cosmos:cosmoshub-4"},
+			},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          false,
+		},
+		{
+			name: "nil_chainID_invalid_caip2",
+			namespace: Namespace{
+				Chains: []string{"eip155:1", "invalid"},
+			},
+			namespaceName: "eip155",
+			chainID:       nil,
+			want:          false,
+		},
+		{
+			name: "chainID_provided_returns_true",
+			namespace: Namespace{
+				Chains: []string{"eip155:1"},
+			},
+			namespaceName: "eip155",
+			chainID:       func() *uint64 { v := uint64(1); return &v }(),
+			want:          true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotChains := supportedChainsInSession(tt.args.sessionProposal)
-			if !reflect.DeepEqual(gotChains, tt.expectedChains) {
-				t.Errorf("supportedChainInSessionProposal() gotChains = %v, want %v", gotChains, tt.expectedChains)
+			got := tt.namespace.Valid(tt.namespaceName, tt.chainID)
+			if got != tt.want {
+				t.Errorf("Namespace.Valid() = %v, want %v", got, tt.want)
 			}
 		})
 	}
-}
-
-func Test_caip10Accounts(t *testing.T) {
-	type args struct {
-		accounts []*accsmanagementtypes.Account
-		chains   []uint64
-	}
-	tests := []struct {
-		name string
-		args args
-		want []string
-	}{
-		{
-			name: "generate_caip10_accounts",
-			args: args{
-				accounts: []*accsmanagementtypes.Account{
-					{
-						Address: types.HexToAddress("0x1"),
-						Type:    accsmanagementtypes.AccountTypeWatch,
-					},
-					{
-						Address: types.HexToAddress("0x2"),
-						Type:    accsmanagementtypes.AccountTypeSeed,
-					},
-				},
-				chains: []uint64{1, 2},
-			},
-			want: []string{
-				"eip155:1:0x0000000000000000000000000000000000000001",
-				"eip155:2:0x0000000000000000000000000000000000000001",
-				"eip155:1:0x0000000000000000000000000000000000000002",
-				"eip155:2:0x0000000000000000000000000000000000000002",
-			},
-		},
-		{
-			name: "empty_addresses",
-			args: args{
-				accounts: []*accsmanagementtypes.Account{},
-				chains:   []uint64{1, 2},
-			},
-			want: []string{},
-		},
-		{
-			name: "empty_chains",
-			args: args{
-				accounts: []*accsmanagementtypes.Account{
-					{
-						Address: types.HexToAddress("0x1"),
-						Type:    accsmanagementtypes.AccountTypeWatch,
-					},
-					{
-						Address: types.HexToAddress("0x2"),
-						Type:    accsmanagementtypes.AccountTypeSeed,
-					},
-				},
-				chains: []uint64{},
-			},
-			want: []string{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := caip10Accounts(tt.args.accounts, tt.args.chains); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("caip10Accounts() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// Test_AddSession validates that the new added session is active (not expired and not disconnected)
-func Test_AddSession(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	// Add session for testnet
-	expiry := 1716581732
-	chainID := 11155111
-	sessionJSON := getSessionJSONFor([]int{chainID}, expiry)
-	networks := []params.Network{
-		{ChainID: 1, IsTest: false},
-		{ChainID: uint64(chainID), IsTest: true},
-	}
-	timestampBeforeAddSession := time.Now().Unix()
-	err := AddSession(db, networks, sessionJSON)
-	assert.NoError(t, err)
-
-	// Validate that session was written correctly to the database
-	sessions, err := GetSessions(db)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(sessions))
-
-	sessJSONObj := map[string]interface{}{}
-	err = json.Unmarshal([]byte(sessionJSON), &sessJSONObj)
-	assert.NoError(t, err)
-
-	assert.Equal(t, false, sessions[0].Disconnected)
-	assert.Equal(t, sessionJSON, sessions[0].SessionJSON)
-	assert.Equal(t, int64(expiry), sessions[0].Expiry)
-	assert.GreaterOrEqual(t, sessions[0].CreatedTimestamp, timestampBeforeAddSession)
-	assert.Equal(t, sessJSONObj["pairingTopic"], string(sessions[0].PairingTopic))
-	assert.Equal(t, sessJSONObj["topic"], string(sessions[0].Topic))
-	assert.Equal(t, true, sessions[0].TestChains)
-
-	metadata := sessJSONObj["peer"].(map[string]interface{})["metadata"].(map[string]interface{})
-	assert.Equal(t, metadata["url"], sessions[0].URL)
-	assert.Equal(t, metadata["name"], sessions[0].Name)
-	assert.Equal(t, metadata["icons"].([]interface{})[0], sessions[0].IconURL)
-
-	dapps, err := GetActiveDapps(db, int64(expiry-1), true)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(dapps))
-	assert.Equal(t, sessions[0].URL, dapps[0].URL)
-	assert.Equal(t, sessions[0].Name, dapps[0].Name)
-	assert.Equal(t, sessions[0].IconURL, dapps[0].IconURL)
 }
 
 type typedDataParams struct {

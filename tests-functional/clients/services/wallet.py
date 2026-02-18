@@ -90,10 +90,6 @@ class WalletService(Service):
         params = [tokens_keys]
         return self.rpc_request("fetchTokenDetails", params)
 
-    def get_wallet_connect_active_sessions(self, timestamp: int):
-        params = [timestamp]
-        return self.rpc_request("getWalletConnectActiveSessions", params)
-
     def stop_suggested_routes_async_calculation(self):
         return self.rpc_request("stopSuggestedRoutesAsyncCalculation")
 

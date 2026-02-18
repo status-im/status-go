@@ -124,6 +124,12 @@ type WalletSecretsConfig struct {
 	EthRpcProxyUrl      security.SensitiveString `json:"ethRpcProxyUrl"`
 	EthRpcProxyUser     security.SensitiveString `json:"ethRpcProxyUser"`
 	EthRpcProxyPassword security.SensitiveString `json:"ethRpcProxyPassword"`
+
+	NftProxyUrl           security.SensitiveString `json:"nftProxyUrl"`
+	NftProxyStageName     string                   `json:"nftProxyStageName"`
+	NftProxyUser          security.SensitiveString `json:"nftProxyUser"`
+	NftProxyPassword      security.SensitiveString `json:"nftProxyPassword"`
+	NftProxyUsePuzzleAuth bool                     `json:"nftProxyUsePuzzleAuth"`
 }
 
 func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
