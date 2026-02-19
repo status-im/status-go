@@ -4,8 +4,10 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-export NIM_SDS_LIB_DIR="$(realpath "$SCRIPT_DIR/../nim-sds/build")"
-export NIM_SDS_INC_DIR="$(realpath "$SCRIPT_DIR/../nim-sds/library")"
+echo $SCRIPT_DIR
+
+export NIM_SDS_LIB_DIR="$(realpath "$SCRIPT_DIR/../../nim-sds/build")"
+export NIM_SDS_INC_DIR="$(realpath "$SCRIPT_DIR/../../nim-sds/library")"
 export CGO_CFLAGS="-I$NIM_SDS_INC_DIR"
 export CGO_LDFLAGS="-L$NIM_SDS_LIB_DIR -lsds"
 
