@@ -56,14 +56,6 @@ type Publisher interface {
 	publish(subscription *Subscription)
 }
 
-var defaultAnnounceList = [][]string{
-	{"udp://tracker.opentrackr.org:1337/announce"},
-	{"udp://tracker.openbittorrent.com:6969/announce"},
-}
-var pieceLength = 100 * 1024
-
-const maxArchiveSizeInBytes = 30000000
-
 var maxNbMembers = 5000
 var maxNbPendingRequestedMembers = 100
 
