@@ -8,6 +8,8 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 
 : "${FUNCTIONAL_TESTS_LOG_LEVEL:=INFO}"
 : "${FUNCTIONAL_TESTS_REPORT_CODECOV:=false}"
+: "${FUNCTIONAL_TESTS_BUILD_TAGS:=gowaku_no_rln}"
+: "${FUNCTIONAL_TESTS_USE_LOGOS_STORAGE:=false}"
 
 echo -e "${GRN}Running functional tests${RST}"
 
@@ -40,9 +42,17 @@ docker ps -a --filter "name=${project_name}" --filter "status=exited" -q | xargs
 
 # Build statusgo image
 echo -e "${GRN}Building status-go${RST}"
+build_tags="${FUNCTIONAL_TESTS_BUILD_TAGS}"
+if [[ "${FUNCTIONAL_TESTS_USE_LOGOS_STORAGE}" == "true" ]]; then
+  build_tags="${build_tags} use_logos_storage"
+  if [[ -n "${LOGOS_STORAGE_LIB_DIR:-}" && ! -f "${LOGOS_STORAGE_LIB_DIR}/libstorage.so" ]]; then
+    echo -e "${YEL}No libstorage.so at ${LOGOS_STORAGE_LIB_DIR}; build it first with make build-storage.${RST}"
+  fi
+fi
 docker build . \
   --build-arg "build_flags=-cover" \
-  --build-arg "build_tags='gowaku_no_rln'" \
+  --build-arg "build_tags=${build_tags}" \
+  --build-arg "use_logos_storage=${FUNCTIONAL_TESTS_USE_LOGOS_STORAGE}" \
   --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 
