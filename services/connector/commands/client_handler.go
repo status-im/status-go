@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -11,6 +12,7 @@ import (
 
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/services/connector/walletconnect"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
@@ -44,16 +46,18 @@ type Message struct {
 }
 
 type ClientSideHandler struct {
-	Db               *sql.DB
-	responseChannel  chan Message
-	isRequestRunning int32
+	Db                    *sql.DB
+	wcSessionDisconnector WCSessionDisconnector
+	responseChannel       chan Message
+	isRequestRunning      int32
 }
 
-func NewClientSideHandler(db *sql.DB) *ClientSideHandler {
+func NewClientSideHandler(db *sql.DB, wcClient *walletconnect.Client) *ClientSideHandler {
 	return &ClientSideHandler{
-		Db:               db,
-		responseChannel:  make(chan Message, 1), // Buffer of 1 to avoid blocking
-		isRequestRunning: 0,
+		Db:                    db,
+		wcSessionDisconnector: NewWCSessionDisconnector(db, wcClient),
+		responseChannel:       make(chan Message, 1),
+		isRequestRunning:      0,
 	}
 }
 
@@ -133,6 +137,16 @@ func (c *ClientSideHandler) RecallDAppPermissions(args RecallDAppPermissionsArgs
 
 	if dApp == nil {
 		return ErrDAppDoesNotHavePermissions
+	}
+
+	// If this is a WalletConnect DApp, disconnect all WC sessions first
+	if c.wcSessionDisconnector != nil && dApp.ClientID == persistence.WCClientID {
+		sessions, err := persistence.SelectWCSessionsByDAppURL(c.Db, dApp.URL)
+		if err == nil && len(sessions) > 0 {
+			for _, session := range sessions {
+				_ = c.wcSessionDisconnector.DisconnectSession(context.Background(), session.Topic)
+			}
+		}
 	}
 
 	err = persistence.DeleteDApp(c.Db, dApp.URL, dApp.ClientID)
