@@ -91,18 +91,23 @@ func (r *jsonRPCResponse) idString() string {
 // MessageHandler is called when a subscription message is received.
 type MessageHandler func(topic, message string, tag int)
 
+// ReconnectedHandler is called after a successful reconnection.
+type ReconnectedHandler func()
+
 // RelayClient implements the WalletConnect IRN relay protocol over WebSocket.
 type RelayClient struct {
-	url            string
-	conn           *websocket.Conn
-	mu             sync.Mutex
-	pending        map[string]chan *jsonRPCResponse
-	messageHandler MessageHandler
-	logger         *zap.Logger
-	projectID      string
-	auth           *Auth
-	done           chan struct{}  // signals shutdown
-	wg             sync.WaitGroup // tracks active goroutines
+	url                 string
+	conn                *websocket.Conn
+	mu                  sync.Mutex
+	pending             map[string]chan *jsonRPCResponse
+	messageHandler      MessageHandler
+	reconnectedHandler  ReconnectedHandler
+	logger              *zap.Logger
+	projectID           string
+	auth                *Auth
+	done                chan struct{}  // signals shutdown
+	disconnectRequested bool           // true if Close() was called intentionally
+	wg                  sync.WaitGroup // tracks active goroutines
 }
 
 // NewRelayClient creates a new relay client.
@@ -149,7 +154,6 @@ func (r *RelayClient) Connect() error {
 	if err != nil {
 		return fmt.Errorf("dial relay: %w", err)
 	}
-
 	r.conn = conn
 
 	r.wg.Add(1)
@@ -161,11 +165,13 @@ func (r *RelayClient) Connect() error {
 func (r *RelayClient) Close() error {
 	r.mu.Lock()
 	if r.conn == nil {
+		r.disconnectRequested = true
 		r.mu.Unlock()
 		return nil
 	}
 	conn := r.conn
 	r.conn = nil
+	r.disconnectRequested = true
 	r.mu.Unlock()
 
 	// Signal shutdown
@@ -250,6 +256,14 @@ func (r *RelayClient) SetMessageHandler(handler MessageHandler) {
 	r.messageHandler = handler
 }
 
+// SetReconnectedHandler sets the callback that is invoked after a successful reconnection.
+// The handler should re-subscribe to all active topics.
+func (r *RelayClient) SetReconnectedHandler(handler ReconnectedHandler) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.reconnectedHandler = handler
+}
+
 func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 	// Generate WalletConnect-compliant numeric ID with 19 digits of entropy
 	id := payloadID()
@@ -308,15 +322,39 @@ func (r *RelayClient) readLoop() {
 	for {
 		r.mu.Lock()
 		conn := r.conn
+		disconnectRequested := r.disconnectRequested
 		r.mu.Unlock()
-		if conn == nil {
+
+		if conn == nil || disconnectRequested {
 			return
 		}
 
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			r.logger.Debug("relay read error", zap.Error(err))
-			return
+
+			r.mu.Lock()
+			wasIntentional := r.disconnectRequested
+			r.mu.Unlock()
+
+			if wasIntentional {
+				return
+			}
+
+			r.mu.Lock()
+			if r.conn != nil {
+				r.conn.Close()
+				r.conn = nil
+			}
+			r.mu.Unlock()
+
+			r.logger.Info("attempting to reconnect to relay")
+			if reconnectErr := r.reconnect(); reconnectErr != nil {
+				r.logger.Error("failed to reconnect, exiting readLoop", zap.Error(reconnectErr))
+				return
+			}
+
+			continue
 		}
 
 		var resp jsonRPCResponse
@@ -355,4 +393,66 @@ func (r *RelayClient) readLoop() {
 		}
 		r.mu.Unlock()
 	}
+}
+
+// reconnect attempts to reconnect to the relay with exponential backoff.
+func (r *RelayClient) reconnect() error {
+	backoff := 1 * time.Second
+	maxBackoff := 60 * time.Second
+	maxAttempts := 10
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		r.logger.Info("reconnect attempt", zap.Int("attempt", attempt), zap.Duration("backoff", backoff))
+
+		r.mu.Lock()
+		if r.disconnectRequested {
+			r.mu.Unlock()
+			return fmt.Errorf("disconnect requested during reconnect")
+		}
+		r.mu.Unlock()
+
+		select {
+		case <-time.After(backoff):
+		case <-r.done:
+			return fmt.Errorf("disconnect requested during reconnect")
+		}
+
+		jwt, err := r.auth.GenerateJWT(r.url)
+		if err != nil {
+			r.logger.Debug("failed to generate JWT for reconnect", zap.Error(err))
+			backoff = min(backoff*2, maxBackoff)
+			continue
+		}
+
+		u, err := url.Parse(r.url)
+		if err != nil {
+			r.logger.Error("failed to parse relay URL", zap.Error(err))
+			return fmt.Errorf("parse relay url: %w", err)
+		}
+		q := u.Query()
+		q.Set("auth", jwt)
+		q.Set("projectId", r.projectID)
+		u.RawQuery = q.Encode()
+
+		conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+		if err != nil {
+			r.logger.Debug("failed to dial relay", zap.Error(err), zap.Int("attempt", attempt))
+			backoff = min(backoff*2, maxBackoff)
+			continue
+		}
+
+		r.mu.Lock()
+		r.conn = conn
+		reconnectedHandler := r.reconnectedHandler
+		r.mu.Unlock()
+
+		r.logger.Info("successfully reconnected to relay")
+
+		if reconnectedHandler != nil {
+			reconnectedHandler()
+		}
+
+		return nil
+	}
+	return fmt.Errorf("failed to reconnect after %d attempts", maxAttempts)
 }

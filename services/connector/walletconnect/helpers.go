@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // sessionKeys holds the cryptographic keys for a session
@@ -80,8 +82,9 @@ func (c *Client) sendProposalResponse(pc *pairingContext, keys *sessionKeys) err
 	return c.relay.Publish(pc.PairingTopic, encrypted, tagSessionProposeResult)
 }
 
-// buildNamespaces constructs the session namespaces from metadata and proposal
-func buildNamespaces(meta SessionMetadata, proposal *ProposalParams) (map[string]Namespace, []string, []string) {
+// BuildNamespaces constructs the session namespaces from metadata and proposal.
+// Exported for use in session updates.
+func BuildNamespaces(meta SessionMetadata, proposal *ProposalParams) (map[string]Namespace, []string, []string) {
 	// Deduplicate chain IDs
 	chainIDsSet := make(map[int64]bool)
 	for _, id := range meta.Chains {
@@ -172,6 +175,7 @@ func (c *Client) sendSessionSettle(keys *sessionKeys, proposal *ProposalParams, 
 		Namespaces: map[string]Namespace{
 			"eip155": {
 				Accounts: eip155Ns.Accounts,
+				Chains:   eip155Ns.Chains,
 				Methods:  eip155Ns.Methods,
 				Events:   eip155Ns.Events,
 			},
@@ -182,6 +186,7 @@ func (c *Client) sendSessionSettle(keys *sessionKeys, proposal *ProposalParams, 
 	}
 
 	settleID := payloadID()
+	ch := c.registerPending(settleID)
 	settlePayload := JSONRPCRequest{
 		ID:      settleID,
 		JSONRPC: "2.0",
@@ -199,7 +204,21 @@ func (c *Client) sendSessionSettle(keys *sessionKeys, proposal *ProposalParams, 
 		return fmt.Errorf("encrypt settle: %w", err)
 	}
 
-	return c.relay.Publish(keys.SessionTopic, encrypted, tagSessionSettle)
+	if err := c.relay.Publish(keys.SessionTopic, encrypted, tagSessionSettle); err != nil {
+		return err
+	}
+
+	select {
+	case resp := <-ch:
+		if resp.Error != nil {
+			c.logger.Warn("dapp rejected settle", zap.Int("code", resp.Error.Code), zap.String("message", resp.Error.Message))
+			return fmt.Errorf("settle rejected: %s", resp.Error.Message)
+		}
+	case <-time.After(15 * time.Second):
+		c.cancelPending(settleID)
+		c.logger.Debug("settle response timeout (non-fatal)")
+	}
+	return nil
 }
 
 // buildSessionObject creates the final Session object for persistence

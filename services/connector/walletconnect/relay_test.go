@@ -207,3 +207,37 @@ func TestPayloadID_UniqueAcrossCalls(t *testing.T) {
 		seen[id] = true
 	}
 }
+
+func TestRelayClient_SetReconnectedHandler(t *testing.T) {
+	client, _ := NewRelayClient("test")
+
+	called := false
+	handler := func() {
+		called = true
+	}
+
+	client.SetReconnectedHandler(handler)
+
+	client.mu.Lock()
+	h := client.reconnectedHandler
+	client.mu.Unlock()
+
+	require.NotNil(t, h)
+	h()
+	require.True(t, called)
+}
+
+func TestRelayClient_DisconnectRequested(t *testing.T) {
+	client, _ := NewRelayClient("test")
+
+	require.False(t, client.disconnectRequested)
+
+	err := client.Close()
+	require.NoError(t, err)
+
+	client.mu.Lock()
+	requested := client.disconnectRequested
+	client.mu.Unlock()
+
+	require.True(t, requested)
+}
