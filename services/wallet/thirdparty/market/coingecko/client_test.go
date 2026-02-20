@@ -67,8 +67,12 @@ func TestGetTokensSuccess(t *testing.T) {
 	for _, chainID := range common.AllChains {
 		token := tokentypes.Token{Token: &types.Token{ChainID: chainID}}
 
-		// native token for BSC chain doesn't have the coingecko ID, so skip it
 		if chainID == common.BSCMainnet || chainID == common.BSCTestnet {
+			expectedMap[token.Key()] = GeckoToken{
+				ID:     nativeBNBTokenID,
+				Name:   builder.BinanceSmartChainNativeName,
+				Symbol: builder.BinanceSmartChainNativeSymbol,
+			}
 			continue
 		}
 
