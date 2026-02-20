@@ -96,8 +96,12 @@ func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
 	for _, chainID := range walletcommon.AllChainIDsAsUint64() {
 		token := tokentypes.Token{Token: &types.Token{ChainID: chainID}}
 
-		// native token for BSC chain doesn't have the coingecko ID, so skip it
 		if chainID == walletcommon.BSCMainnet || chainID == walletcommon.BSCTestnet {
+			coingeckoTokensByTokenKey[token.Key()] = GeckoToken{
+				ID:     nativeBNBTokenID,
+				Name:   builder.BinanceSmartChainNativeName,
+				Symbol: builder.BinanceSmartChainNativeSymbol,
+			}
 			continue
 		}
 

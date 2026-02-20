@@ -15,7 +15,9 @@ import (
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 )
 
-const DefaultBatchSize = 10000
+// DefaultBatchSize is the maximum number of Multicall3 calls per RPC request.
+// More than 2700 calls produces >1MB request body and proxy returns 413
+const DefaultBatchSize = 2500
 
 type EthClientGetter interface {
 	EthClient(chainID uint64) (ethclient.EthClientInterface, error)
