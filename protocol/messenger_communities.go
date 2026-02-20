@@ -2530,39 +2530,6 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	return response, nil
 }
 
-func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
-	defaultFilters := m.DefaultFilters(community)
-	publicFiltersToInit := make(types2.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
-
-	publicFiltersToInit = append(publicFiltersToInit, defaultFilters...)
-	for _, filter := range defaultFilters {
-		_, err := m.messaging.RemoveFilterByChatID(filter.ChatID)
-		if err != nil {
-			return err
-		}
-	}
-	_, err := m.messaging.InitPublicChats(publicFiltersToInit)
-	if err != nil {
-		return err
-	}
-
-	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters(types2.CommunitiesToInitialize{{
-		PrivKey: community.PrivateKey(),
-	}})
-	if err != nil {
-		return err
-	}
-
-	// Init the default community filters
-	_, err = m.messaging.InitPublicChats(publicFiltersToInit)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*MessengerResponse, error) {
 	request.FillDeprecatedAmount()
 
