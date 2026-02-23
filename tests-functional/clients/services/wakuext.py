@@ -831,11 +831,6 @@ class WakuextService(Service):
         response = self.rpc_request("hasCommunityArchive", params)
         return response
 
-    def set_archive_distribution_preference(self, preference: str):
-        params = [{"preference": preference}]
-        response = self.rpc_request("setArchiveDistributionPreference", params)
-        return response
-
     def connect(self, peerId: str, addrs: list = []):
         params = [peerId, addrs]
         response = self.rpc_request("connect", params)

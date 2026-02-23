@@ -160,7 +160,7 @@ run_tests() {
   local selected_test="${1:+-k $1}"
 
   # Run with dynamic parallelization
-  pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" $parallel_opts \
+  pytest --reruns 0 -m rpc -c "${root_path}/pytest.ini" $parallel_opts \
     --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
     --docker_project_name="${project_name}" \
     --docker-image=${image_name} \

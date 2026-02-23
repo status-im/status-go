@@ -251,11 +251,7 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID cryptotypes.Hex
 	}
 
 	// one way of publishing index succeeded - we can publish the seeding signal
-	m.publisher.Publish(&archivetypes.HistoryArchiveSignals{
-		HistoryArchivesSeedingSignal: &signal.HistoryArchivesSeedingSignal{
-			CommunityID: communityID.String(),
-		},
-	})
+	m.PublishHistoryArchivesSeedingSignal(communityID)
 
 	return nil
 }

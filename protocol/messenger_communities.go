@@ -289,6 +289,20 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 					)
 				}
 
+				if sub.ManifestFetchedSignal != nil {
+					m.config.messengerSignalsHandler.ManifestFetched(
+						sub.ManifestFetchedSignal.CommunityID,
+						sub.ManifestFetchedSignal.IndexCid,
+					)
+				}
+
+				if sub.IndexDownloadCompletedSignal != nil {
+					m.config.messengerSignalsHandler.IndexDownloadCompleted(
+						sub.IndexDownloadCompletedSignal.CommunityID,
+						sub.IndexDownloadCompletedSignal.IndexCid,
+					)
+				}
+
 				if sub.DownloadingHistoryArchivesFinishedSignal != nil {
 					m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(sub.DownloadingHistoryArchivesFinishedSignal.CommunityID)
 				}
@@ -4980,7 +4994,12 @@ func (m *Messenger) Connect(peerId string, addrs []string) error {
 	if err != nil {
 		return err
 	}
-	return logosStorageManager.GetLogosStorageClient().Connect(peerId, addrs)
+	client := logosStorageManager.GetLogosStorageClient()
+	if client == nil {
+		return errors.New("logosStorage client is not initialized")
+	}
+
+	return client.Connect(peerId, addrs)
 }
 
 func (m *Messenger) Debug() (storage.DebugInfo, error) {
@@ -4992,5 +5011,9 @@ func (m *Messenger) Debug() (storage.DebugInfo, error) {
 	if err != nil {
 		return storage.DebugInfo{}, err
 	}
-	return logosStorageManager.GetLogosStorageClient().Debug()
+	client := logosStorageManager.GetLogosStorageClient()
+	if client == nil {
+		return storage.DebugInfo{}, errors.New("logosStorage client is not initialized")
+	}
+	return client.Debug()
 }

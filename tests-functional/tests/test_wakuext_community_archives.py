@@ -15,8 +15,6 @@ class TestCommunityArchives(MessengerSteps):
 
         # Community owner
         self.creator = backend_new_profile("creator")
-        # Define LogosStorage as archive distribution preference
-        self.creator.wakuext_service.set_archive_distribution_preference("LogosStorage")
         # Enable community history archive protocol
         self.creator.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
@@ -28,8 +26,6 @@ class TestCommunityArchives(MessengerSteps):
 
         # Create a first member that will join the community first
         self.member = backend_new_profile("member", import_initial_delay=5)
-        # Define LogosStorage as archive distribution preference
-        self.member.wakuext_service.set_archive_distribution_preference("LogosStorage")
         self.member.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
                 "LogosStorageNodeConfig.DiscoveryPort": 8092,
@@ -39,8 +35,6 @@ class TestCommunityArchives(MessengerSteps):
 
         # Create another member that will join the community later after the first message is sent
         self.another_member = backend_new_profile("member", import_initial_delay=5)
-        # Define LogosStorage as archive distribution preference
-        self.another_member.wakuext_service.set_archive_distribution_preference("LogosStorage")
         self.another_member.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
                 "LogosStorageNodeConfig.DiscoveryPort": 8093,
