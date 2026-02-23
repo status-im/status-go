@@ -58,8 +58,7 @@ func setupTests(t *testing.T) (state testState) {
 	state.walletDb = createWalletDB(t)
 
 	config := params.NodeConfig{
-		NetworkID:                            10,
-		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
+		NetworkID: 10,
 	}
 	networks := json.RawMessage("{}")
 	settingsObj := settings.Settings{

@@ -1,4 +1,4 @@
-package communities_test
+package logosstorage_test
 
 import (
 	"bytes"
@@ -20,20 +20,21 @@ import (
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/archive"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
-type LogosStorageArchiveManagerSuite struct {
+type ArchiveManagerLogosStorageSuite struct {
 	suite.Suite
 	logosStorageClient logosstorage.LogosStorageClientInterface
-	archiveManager     *archive.ArchiveManager
+	archiveService     archive.ArchiveService
 	manager            *communities.Manager
 	identity           *ecdsa.PrivateKey // Store identity for test access
 	uploadedCIDs       []string          // Track uploaded CIDs for cleanup
@@ -52,7 +53,7 @@ func buildLogosStorageConfig(t *testing.T) *params.LogosStorageConfig {
 	}
 }
 
-func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *archive.ArchiveManager, *ecdsa.PrivateKey) {
+func (s *ArchiveManagerLogosStorageSuite) buildManagers() (*communities.Manager, archive.ArchiveService, *ecdsa.PrivateKey) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -63,11 +64,11 @@ func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager,
 
 	logger := testutils.MustCreateTestLogger()
 
-	m, err := communities.NewManager(key, "", db, logger, nil, nil, nil, &communities.TimeSourceStub{}, nil, nil)
+	m, err := communities.NewManager(key, "", db, logger, nil, nil, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	amc := &archive.ArchiveManagerConfig{
+	amc := &archivetypes.ArchiveManagerConfig{
 		TorrentConfig:      nil,
 		LogosStorageConfig: buildLogosStorageConfig(s.T()),
 		Logger:             logger,
@@ -82,7 +83,13 @@ func (s *LogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager,
 	return m, t, key
 }
 
-func (s *LogosStorageArchiveManagerSuite) CreateCommunity() *communities.Community {
+func (s *ArchiveManagerLogosStorageSuite) getArchiveManager() *archive.ArchiveManager {
+	archiveManager, ok := s.archiveService.(*archive.ArchiveManager)
+	s.Require().True(ok)
+	return archiveManager
+}
+
+func (s *ArchiveManagerLogosStorageSuite) CreateCommunity() *communities.Community {
 	request := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "token membership description",
@@ -97,20 +104,24 @@ func (s *LogosStorageArchiveManagerSuite) CreateCommunity() *communities.Communi
 }
 
 // SetupSuite runs once before all tests in the suite
-func (s *LogosStorageArchiveManagerSuite) SetupTest() {
+func (s *ArchiveManagerLogosStorageSuite) SetupTest() {
 	m, t, key := s.buildManagers()
 	communities.SetValidateInterval(30 * time.Millisecond)
 	s.manager = m
-	s.archiveManager = t
+	s.archiveService = t
 	s.identity = key
-	s.Require().NoError(s.archiveManager.StartLogosStorageClient())
-	client := s.archiveManager.GetLogosStorageClient()
+	s.Require().NoError(s.archiveService.Start())
+	archiveManager := s.getArchiveManager()
+	backend, err := archiveManager.GetLogosStorageBackend()
+	s.Require().NoError(err)
+	s.Require().NotNil(backend)
+	client := backend.GetClient()
 	s.Require().NotNil(client)
 	s.logosStorageClient = client
 }
 
 // TearDownSuite runs once after each test in the suite
-func (s *LogosStorageArchiveManagerSuite) TearDownTest() {
+func (s *ArchiveManagerLogosStorageSuite) TearDownTest() {
 	// Clean up all uploaded CIDs
 	for _, cid := range s.uploadedCIDs {
 		if err := s.logosStorageClient.RemoveCid(cid); err != nil {
@@ -119,11 +130,11 @@ func (s *LogosStorageArchiveManagerSuite) TearDownTest() {
 			s.T().Logf("Successfully removed CID: %s", cid)
 		}
 	}
-	s.Require().NoError(s.archiveManager.StopLogosStorageClient())
+	s.Require().NoError(s.archiveService.Stop())
 	s.Require().NoError(s.manager.Stop())
 }
 
-func (s *LogosStorageArchiveManagerSuite) TestDownloadingArchivesFromLogosStorage() {
+func (s *ArchiveManagerLogosStorageSuite) TestDownloadingArchivesFromLogosStorage() {
 	// Subscribe to signals before starting the test
 	subscription := s.manager.Subscribe()
 
@@ -238,7 +249,7 @@ func (s *LogosStorageArchiveManagerSuite) TestDownloadingArchivesFromLogosStorag
 		}
 	}()
 
-	taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, cid, cancelChan)
+	taskInfo, err := s.archiveService.DownloadHistoryArchives(communityID, cid, cancelChan)
 	s.Require().NoError(err, "Failed to download archives")
 	s.Require().NotNil(taskInfo, "Download task info should not be nil")
 	s.Require().Equal(len(archives), taskInfo.TotalArchivesCount, "Unexpected total archives count")
@@ -274,7 +285,10 @@ func (s *LogosStorageArchiveManagerSuite) TestDownloadingArchivesFromLogosStorag
 	// Verify that the index file exists and has correct content
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	loadedIndex, err := s.archiveManager.LogosStorageLoadHistoryArchiveIndex(ctx, s.identity, communityID, cid, true)
+	archiveManager := s.getArchiveManager()
+	backend, err := archiveManager.GetLogosStorageBackend()
+	s.Require().NoError(err, "Failed to get LogosStorage backend")
+	loadedIndex, err := backend.LoadHistoryArchiveIndex(ctx, s.identity, communityID, cid, true)
 	s.Require().NoError(err, "Failed to load index file from disk")
 	s.Require().NotNil(loadedIndex, "Loaded index should not be nil")
 	s.Require().Equal(len(archives), len(loadedIndex.Archives), "Loaded index should contain all archives")
@@ -293,6 +307,6 @@ func (s *LogosStorageArchiveManagerSuite) TestDownloadingArchivesFromLogosStorag
 }
 
 // Run the integration test suite
-func TestLogosStorageArchiveManagerSuite(t *testing.T) {
-	suite.Run(t, new(LogosStorageArchiveManagerSuite))
+func TestArchiveManagerLogosStorageSuite(t *testing.T) {
+	suite.Run(t, new(ArchiveManagerLogosStorageSuite))
 }

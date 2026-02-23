@@ -140,10 +140,6 @@ func (m *ArchiveManager) LoadArchiveMessages(ctx context.Context, communityID cr
 	return m.backend.LoadArchiveMessages(ctx, communityID, archiveLink, downloadedArchiveID)
 }
 
-// func (m *ArchiveManager) GetHistoryArchiveId(communityID cryptotypes.HexBytes) (string, error) {
-// 	return m.backend.GetHistoryArchiveId(communityID)
-// }
-
 // ArchiveService interface implementation - storage-agnostic operations
 
 func (m *ArchiveManager) GetHistoryArchiveLink(communityID cryptotypes.HexBytes) (string, error) {
@@ -199,9 +195,12 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID cr
 	}
 
 	universalChatID := archiveutils.UniversalChatIDFromCommunityID(communityID)
-	filter := m.messaging.ChatFilterByChatID(universalChatID)
-	if filter != nil {
-		filters = append(filters, filter)
+
+	if m.messaging != nil {
+		filter := m.messaging.ChatFilterByChatID(universalChatID)
+		if filter != nil {
+			filters = append(filters, filter)
+		}
 	}
 
 	if len(filters) == 0 {
@@ -384,6 +383,16 @@ func (m *ArchiveManager) SetMessageArchiveIDImported(communityID cryptotypes.Hex
 	return m.persistence.SetMessageArchiveIDImported(communityID, hash, imported)
 }
 
+func (m *ArchiveManager) GetHistoryTasksCount() int {
+	// sync.Map doesn't have a Len function, so we need to count manually
+	count := 0
+	m.historyArchiveTasks.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 // private methods
 func (m *ArchiveManager) stopHistoryArchiveTasksIntervals() {
 	m.historyArchiveTasks.Range(func(_, task interface{}) bool {
@@ -405,7 +414,7 @@ func (m *ArchiveManager) getLastMessageArchiveEndDate(communityID cryptotypes.He
 }
 
 // Special functions
-// These functions are not part of the ArchiveServiceBackend interface.
+// These functions are not part of the ArchiveService interface.
 // Some legacy tests are accessing implementation details and for this reason
 // we need to expose these special accessors.
 
@@ -423,4 +432,12 @@ func (m *ArchiveManager) GetTorrentBackend() (*archivetorrent.ArchiveManagerTorr
 		return torrentBackend, nil
 	}
 	return nil, errors.New("backend is not ArchiveManagerTorrent")
+}
+
+func (m *ArchiveManager) Wait() {
+	m.historyArchiveTasksWaitGroup.Wait()
+}
+
+func (m *ArchiveManager) StopHistoryArchiveTasksIntervalsAndWait() {
+	m.stopHistoryArchiveTasksIntervals()
 }

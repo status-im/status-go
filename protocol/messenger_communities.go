@@ -42,7 +42,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/wallet/bigint"

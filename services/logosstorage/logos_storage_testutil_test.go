@@ -7,7 +7,7 @@ import (
 	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	"github.com/status-im/status-go/params"
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 )
 
 func NewLogosStorageClientTest(t *testing.T) logosstorage.LogosStorageClientInterface {

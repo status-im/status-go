@@ -25,11 +25,6 @@ type ArchiveServiceBackend interface {
 	CreateHistoryArchiveFromDB(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
 	LoadArchiveMessages(ctx context.Context, communityID types.HexBytes, archiveLink string, downloadedArchiveID string) ([]*protobuf.WakuMessage, error)
-
-	// GetHistoryArchiveLink(communityID types.HexBytes) (string, error)
-	// Those will be private methods in the concrete implementations
-	// ExtractMessagesFromHistoryArchive(communityID types.HexBytes, archiveLink string, logosStorageIndex *protobuf.LogosStorageWakuMessageArchiveIndex) ([]*protobuf.WakuMessage, error)
-	// LoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID types.HexBytes, indexCid string, isLocal bool) (*protobuf.LogosStorageWakuMessageArchiveIndex, error)
 }
 
 type ArchiveService interface {
@@ -42,7 +37,6 @@ type ArchiveService interface {
 	GetCommunityChatsTopics(communityID types.HexBytes) ([]messagingtypes.ContentTopic, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
 	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
-	// StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
 	StartHistoryArchiveTasksInterval(communityID types.HexBytes, chatID string, encrypted bool, interval time.Duration)
 	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
 	GetHistoryArchiveDownloadTask(communityID string) *archivetypes.HistoryArchiveDownloadTask
@@ -53,4 +47,5 @@ type ArchiveService interface {
 	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
 	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
 	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
+	GetHistoryTasksCount() int
 }

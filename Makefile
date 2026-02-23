@@ -350,7 +350,7 @@ fetch-libstorage:
 	fi
 
 test-libstorage: generate |
-	$(CGO_ENV) go test -tags '$(BUILD_TAGS) use_logos_storage' -run TestLogosStorageStart ./services/logos-storage/... -v -json -count=1 | jq -r '.Output'
+	$(CGO_ENV) go test -tags '$(BUILD_TAGS) use_logos_storage' -run TestLogosStorageStart ./services/logosstorage/... -v -json -count=1 | jq -r '.Output'
 
 clean-libstorage:
 	@echo "Removing libstorage"

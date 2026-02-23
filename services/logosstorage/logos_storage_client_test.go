@@ -15,7 +15,7 @@ import (
 
 	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 )
 
 type LogosStorageClientTestSuite struct {

@@ -25,4 +25,4 @@ echo "  NIM_SDS_LIB_DIR=$NIM_SDS_LIB_DIR"
 echo "  NIM_SDS_INC_DIR=$NIM_SDS_INC_DIR"
 echo ""
 echo "You can now run tests with gotestsum, for example:"
-echo '  gotestsum --packages="./services/logos-storage" -f testname -- -count 1 -tags "gowaku_no_rln gowaku_skip_migrations" -run LogosStorageArchiveDownloaderSuite'
+echo '  gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "gowaku_no_rln gowaku_skip_migrations" -run LogosStorageArchiveDownloaderSuite'

@@ -1,4 +1,4 @@
-package communities_test
+package logosstorage_test
 
 import (
 	"context"
@@ -18,24 +18,25 @@ import (
 	"github.com/status-im/status-go/pkg/testutils"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/archive"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	mock_logosstorage "github.com/status-im/status-go/services/logos-storage/mock"
+	mock_logosstorage "github.com/status-im/status-go/services/logosstorage/mock"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/suite"
 )
 
-// MockLogosStorageArchiveManagerSuite contains deterministic unit tests using mocked LogosStorageClient
-type MockLogosStorageArchiveManagerSuite struct {
+// ArchiveManagerLogosStorageCancellationSuite contains deterministic unit tests using mocked LogosStorageClient
+type ArchiveManagerLogosStorageCancellationSuite struct {
 	suite.Suite
 	ctrl             *gomock.Controller
 	mockLogosStorage *mock_logosstorage.MockLogosStorageClientInterface
-	archiveManager   *archive.ArchiveManager
+	archiveService   archive.ArchiveService
 	manager          *communities.Manager
 }
 
-func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Manager, *archive.ArchiveManager) {
+func (s *ArchiveManagerLogosStorageCancellationSuite) buildManagers() (*communities.Manager, archive.ArchiveService) {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -46,7 +47,7 @@ func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Mana
 
 	logger := testutils.MustCreateTestLogger()
 
-	m, err := communities.NewManager(key, "", db, logger, nil, nil, nil, &communities.TimeSourceStub{}, nil, nil)
+	m, err := communities.NewManager(key, "", db, logger, nil, nil, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
@@ -54,7 +55,7 @@ func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Mana
 		Enabled: true,
 	}
 
-	amc := &archive.ArchiveManagerConfig{
+	amc := &archivetypes.ArchiveManagerConfig{
 		TorrentConfig:      nil,
 		LogosStorageConfig: logosStorageConfig,
 		Logger:             logger,
@@ -68,26 +69,42 @@ func (s *MockLogosStorageArchiveManagerSuite) buildManagers() (*communities.Mana
 	return m, archiveManager
 }
 
-func (s *MockLogosStorageArchiveManagerSuite) SetupTest() {
+func (s *ArchiveManagerLogosStorageCancellationSuite) getArchiveManager() *archive.ArchiveManager {
+	archiveManager, ok := s.archiveService.(*archive.ArchiveManager)
+	s.Require().True(ok)
+	return archiveManager
+}
+
+func (s *ArchiveManagerLogosStorageCancellationSuite) setDownloadTimeout(timeout time.Duration) {
+	archiveManager := s.getArchiveManager()
+	backend, err := archiveManager.GetLogosStorageBackend()
+	s.Require().NoError(err, "Failed to get LogosStorage backend")
+	backend.SetDownloadTimeout(timeout)
+}
+
+func (s *ArchiveManagerLogosStorageCancellationSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
 	s.mockLogosStorage = mock_logosstorage.NewMockLogosStorageClientInterface(s.ctrl)
 
 	m, am := s.buildManagers()
 	communities.SetValidateInterval(30 * time.Millisecond)
 	s.manager = m
-	s.archiveManager = am
+	s.archiveService = am
 
 	// Inject the mock LogosStorageClient into the ArchiveManager
-	s.archiveManager.SetLogosStorageClient(s.mockLogosStorage)
+	archiveManager := s.getArchiveManager()
+	backend, err := archiveManager.GetLogosStorageBackend()
+	s.Require().NoError(err, "Failed to get LogosStorage backend")
+	backend.SetLogosStorageClient(s.mockLogosStorage)
 }
 
-func (s *MockLogosStorageArchiveManagerSuite) TearDownTest() {
+func (s *ArchiveManagerLogosStorageCancellationSuite) TearDownTest() {
 	s.ctrl.Finish()
 	s.Require().NoError(s.manager.Stop())
 }
 
 // TestMockDownloadCancellationBeforeIndexIsDownloaded tests cancellation before index is downloaded
-func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationBeforeIndexIsDownloaded() {
+func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellationBeforeIndexIsDownloaded() {
 	// Subscribe to signals
 	subscription := s.manager.Subscribe()
 
@@ -129,10 +146,10 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationBefore
 	close(cancelChan)
 
 	// Set short timeout for test
-	s.archiveManager.SetDownloadTimeout(1 * time.Second)
+	s.setDownloadTimeout(1 * time.Second)
 
 	// Start download - should return immediately due to cancellation
-	taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)
+	taskInfo, err := s.archiveService.DownloadHistoryArchives(communityID, indexCid, cancelChan)
 	s.Require().NoError(err)
 	s.Require().NotNil(taskInfo)
 	s.Require().True(taskInfo.Cancelled, "Download should be marked as cancelled")
@@ -147,29 +164,14 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationBefore
 
 // TestMockDownloadCancellationDuringIndexDownload tests cancellation during index download
 // Uses mock to control exact timing of index download completion
-func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuringIndexDownload() {
+func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellationDuringIndexDownload() {
 	subscription := s.manager.Subscribe()
 
 	archiveData := make([]byte, 1024)
 	_, err := rand.Read(archiveData)
 	s.Require().NoError(err)
 
-	// archiveCid := "test-archive-cid-def456"
 	indexCid := "test-index-cid-uvw123"
-
-	// index := &protobuf.LogosStorageWakuMessageArchiveIndex{
-	// 	Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
-	// 		"test-hash-large": {
-	// 			Cid: archiveCid,
-	// 			Metadata: &protobuf.WakuMessageArchiveMetadata{
-	// 				From: 1000,
-	// 				To:   2000,
-	// 			},
-	// 		},
-	// 	},
-	// }
-
-	// _ = index // Index created but not used in this test (would be marshaled on successful download)
 
 	communityID := types.HexBytes("mock-cancel-test-2")
 	cancelChan := make(chan struct{})
@@ -218,10 +220,10 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuring
 	}()
 
 	// Set short timeout for test
-	s.archiveManager.SetDownloadTimeout(1 * time.Second)
+	s.setDownloadTimeout(1 * time.Second)
 
 	// Start download
-	taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)
+	taskInfo, err := s.archiveService.DownloadHistoryArchives(communityID, indexCid, cancelChan)
 	s.Require().NoError(err)
 	s.Require().NotNil(taskInfo)
 	s.Require().True(taskInfo.Cancelled, "Download should be marked as cancelled")
@@ -236,7 +238,7 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuring
 }
 
 // TestMockDownloadCancellationDuringArchiveDownload tests cancellation during archive downloads
-func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuringArchiveDownload() {
+func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellationDuringArchiveDownload() {
 	subscription := s.manager.Subscribe()
 
 	// Create multiple archives
@@ -360,10 +362,10 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuring
 	}()
 
 	// Set longer timeout for test to avoid timeout issues
-	s.archiveManager.SetDownloadTimeout(5 * time.Second)
+	s.setDownloadTimeout(5 * time.Second)
 
 	// Start download
-	taskInfo, err := s.archiveManager.DownloadHistoryArchivesByIndexCid(communityID, indexCid, cancelChan)
+	taskInfo, err := s.archiveService.DownloadHistoryArchives(communityID, indexCid, cancelChan)
 	s.Require().NoError(err)
 	s.Require().NotNil(taskInfo)
 	s.Require().True(taskInfo.Cancelled, "Download should be marked as cancelled")
@@ -385,6 +387,6 @@ func (s *MockLogosStorageArchiveManagerSuite) TestMockDownloadCancellationDuring
 }
 
 // Run the mock-based unit test suite
-func TestMockLogosStorageArchiveManagerSuite(t *testing.T) {
-	suite.Run(t, new(MockLogosStorageArchiveManagerSuite))
+func TestArchiveManagerLogosStorageCancellationSuite(t *testing.T) {
+	suite.Run(t, new(ArchiveManagerLogosStorageCancellationSuite))
 }

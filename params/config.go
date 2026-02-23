@@ -207,9 +207,6 @@ type NodeConfig struct {
 	// ConnectorConfig extra configuration for connector.Service
 	ConnectorConfig ConnectorConfig
 
-	// node-wide selection for history archive distribution preference
-	HistoryArchiveDistributionPreference string
-
 	// TorrentConfig provides configuration for the BitTorrent client used for message history archives.
 	TorrentConfig TorrentConfig
 
@@ -349,12 +346,6 @@ type LogosStorageConfig struct {
 	LogosStorageNodeConfig storage.Config
 }
 
-const (
-	ArchiveDistributionMethodTorrent            = "torrent"
-	ArchiveDistributionMethodLogosStorage       = "LogosStorage"
-	DefaultHistoryArchiveDistributionPreference = ArchiveDistributionMethodLogosStorage
-)
-
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
@@ -385,32 +376,18 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		c.APIModules = "net,web3,eth"
 	}
 
-	if c.HistoryArchiveDistributionPreference == "" {
-		c.HistoryArchiveDistributionPreference = DefaultHistoryArchiveDistributionPreference
-	}
-
 	if c.TorrentConfig.Enabled {
-		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodTorrent
-	} else if c.LogosStorageConfig.Enabled {
-		c.HistoryArchiveDistributionPreference = ArchiveDistributionMethodLogosStorage
-	}
-
-	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodTorrent {
-		if c.TorrentConfig.Enabled {
-			if c.TorrentConfig.DataDir == "" {
-				c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
-			}
-			if c.TorrentConfig.TorrentDir == "" {
-				c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
-			}
+		if c.TorrentConfig.DataDir == "" {
+			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
+		}
+		if c.TorrentConfig.TorrentDir == "" {
+			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
 		}
 	}
 
-	if c.HistoryArchiveDistributionPreference == ArchiveDistributionMethodLogosStorage {
-		if c.LogosStorageConfig.Enabled {
-			if c.LogosStorageConfig.LogosStorageNodeConfig.DataDir == "" {
-				c.LogosStorageConfig.LogosStorageNodeConfig.DataDir = filepath.Join(c.RootDataDir, "logos-storage", "data")
-			}
+	if c.LogosStorageConfig.Enabled {
+		if c.LogosStorageConfig.LogosStorageNodeConfig.DataDir == "" {
+			c.LogosStorageConfig.LogosStorageNodeConfig.DataDir = filepath.Join(c.RootDataDir, "logos-storage", "data")
 		}
 	}
 
@@ -427,16 +404,15 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	}
 
 	config := &NodeConfig{
-		NetworkID:                            networkID,
-		RootDataDir:                          dataDir,
-		KeycardPairingDataFile:               keycardPairingDataFile,
-		HTTPHost:                             "localhost",
-		HTTPPort:                             8545,
-		HTTPVirtualHosts:                     []string{"localhost"},
-		APIModules:                           "eth,net,web3,peer,wallet",
-		LogFile:                              "",
-		LogLevel:                             "ERROR",
-		HistoryArchiveDistributionPreference: DefaultHistoryArchiveDistributionPreference,
+		NetworkID:              networkID,
+		RootDataDir:            dataDir,
+		KeycardPairingDataFile: keycardPairingDataFile,
+		HTTPHost:               "localhost",
+		HTTPPort:               8545,
+		HTTPVirtualHosts:       []string{"localhost"},
+		APIModules:             "eth,net,web3,peer,wallet",
+		LogFile:                "",
+		LogLevel:               "ERROR",
 		WakuV2Config: WakuV2Config{
 			Host: "0.0.0.0",
 			Port: 0,

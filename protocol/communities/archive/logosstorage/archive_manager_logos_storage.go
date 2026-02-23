@@ -28,7 +28,7 @@ import (
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	archiveutils "github.com/status-im/status-go/protocol/communities/archive/utils"
 	"github.com/status-im/status-go/protocol/protobuf"
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -236,7 +236,7 @@ func (m *ArchiveManagerLogosStorage) DownloadHistoryArchives(communityID cryptot
 		}
 	}()
 
-	index, err := m.logosStorageLoadHistoryArchiveIndex(indexCtx,
+	index, err := m.loadHistoryArchiveIndex(indexCtx,
 		m.identity, communityID, archiveLink, false)
 	close(done)
 	if err != nil {
@@ -420,7 +420,7 @@ func (m *ArchiveManagerLogosStorage) CreateAndSeedHistoryArchive(communityID cry
 }
 
 func (m *ArchiveManagerLogosStorage) LoadArchiveMessages(ctx context.Context, communityID cryptotypes.HexBytes, archiveLink string, downloadedArchiveID string) ([]*protobuf.WakuMessage, error) {
-	logosStorageIndex, err := m.logosStorageLoadHistoryArchiveIndex(
+	logosStorageIndex, err := m.loadHistoryArchiveIndex(
 		ctx, m.identity, communityID, archiveLink, true)
 	if err != nil {
 		return nil, err
@@ -479,7 +479,7 @@ func (m *ArchiveManagerLogosStorage) extractMessagesFromHistoryArchive(community
 	return archive.Messages, nil
 }
 
-func (m *ArchiveManagerLogosStorage) logosStorageLoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID cryptotypes.HexBytes, indexCid string, isLocal bool) (*protobuf.LogosStorageWakuMessageArchiveIndex, error) {
+func (m *ArchiveManagerLogosStorage) loadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID cryptotypes.HexBytes, indexCid string, isLocal bool) (*protobuf.LogosStorageWakuMessageArchiveIndex, error) {
 	logosStorageWakuMessageArchiveIndexProto := &protobuf.LogosStorageWakuMessageArchiveIndex{}
 
 	indexDownloader := logosstorage.NewLogosStorageIndexDownloader(m.logosStorageClient, m.logger)
@@ -552,7 +552,7 @@ func (m *ArchiveManagerLogosStorage) createHistoryArchiveLogosStorage(communityI
 		m.logger.Debug("[LogosStorage][createHistoryArchiveLogosStorage] LogosStorage index file exists, loading from file")
 		ctx, cancel := context.WithTimeout(context.Background(), m.downloadTimeout)
 		defer cancel()
-		logosStorageWakuMessageArchiveIndexProto, err = m.logosStorageLoadHistoryArchiveIndex(ctx, m.identity, communityID, lastSeenArchiveLink, true)
+		logosStorageWakuMessageArchiveIndexProto, err = m.loadHistoryArchiveIndex(ctx, m.identity, communityID, lastSeenArchiveLink, true)
 		if err != nil {
 			return logosStorageArchiveIDs, err
 		}
@@ -769,4 +769,26 @@ func (m *ArchiveManagerLogosStorage) createWakuMessageArchive(from time.Time, to
 		Messages: wakuMessages,
 	}
 	return wakuMessageArchive
+}
+
+// Special functions
+// These functions are not part of the ArchiveServiceBackend interface.
+// We still have some tests that are accessing implementation details and for this reason
+// we need to expose these special accessors.
+func (m *ArchiveManagerLogosStorage) GetClient() logosstorage.LogosStorageClientInterface {
+	return m.GetLogosStorageClient()
+}
+
+func (m *ArchiveManagerLogosStorage) LoadHistoryArchiveIndex(ctx context.Context, myKey *ecdsa.PrivateKey, communityID cryptotypes.HexBytes, indexCid string, isLocal bool) (*protobuf.LogosStorageWakuMessageArchiveIndex, error) {
+	return m.loadHistoryArchiveIndex(ctx, myKey, communityID, indexCid, isLocal)
+}
+
+func (m *ArchiveManagerLogosStorage) SetLogosStorageClient(client logosstorage.LogosStorageClientInterface) {
+	m.logosStorageClientMu.Lock()
+	defer m.logosStorageClientMu.Unlock()
+	m.logosStorageClient = client
+}
+
+func (m *ArchiveManagerLogosStorage) SetDownloadTimeout(timeout time.Duration) {
+	m.downloadTimeout = timeout
 }

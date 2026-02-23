@@ -599,8 +599,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg := &params.NodeConfig{
 		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
-		KeycardPairingDataFile:               filepath.Join(b.rootDataDir, DefaultKeycardPairingDataFileRelativePath),
-		HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference,
+		KeycardPairingDataFile: filepath.Join(b.rootDataDir, DefaultKeycardPairingDataFileRelativePath),
 	}
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)

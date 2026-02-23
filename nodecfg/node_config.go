@@ -22,38 +22,7 @@ func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 
 type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 
-const historyArchiveDistributionPreferenceColumn = "history_archive_distribution_preference"
-
-func nodeConfigHasArchivePreferenceColumn(tx *sql.Tx) bool {
-	rows, err := tx.Query(`PRAGMA table_info(node_config)`)
-	if err != nil {
-		return false
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			cid       int
-			name      string
-			dataType  string
-			notNull   int
-			dfltValue sql.NullString
-			pk        int
-		)
-		if err := rows.Scan(&cid, &name, &dataType, &notNull, &dfltValue, &pk); err != nil {
-			return false
-		}
-		if name == historyArchiveDistributionPreferenceColumn {
-			return true
-		}
-	}
-
-	return false
-}
-
 func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig) error {
-	hasPreferenceColumn := nodeConfigHasArchivePreferenceColumn(tx)
-
 	query := `
 	INSERT OR REPLACE INTO node_config (
 		network_id, data_dir, keystore_dir, node_key,
@@ -64,15 +33,6 @@ func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig) error {
 		c.NetworkID, "", "", c.NodeKey, c.APIModules, true,
 		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
 		c.PermissionsConfig.Enabled, c.ConnectorConfig.Enabled,
-	}
-
-	preference := c.HistoryArchiveDistributionPreference
-	if preference == "" {
-		preference = params.DefaultHistoryArchiveDistributionPreference
-	}
-	if hasPreferenceColumn {
-		query += `, history_archive_distribution_preference`
-		args = append(args, preference)
 	}
 
 	query += `, synthetic_id) VALUES (?` + strings.Repeat(",?", len(args)) + `)`
@@ -303,8 +263,6 @@ func migrateNodeConfig(tx *sql.Tx) error {
 func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodecfg := &params.NodeConfig{}
 
-	hasPreferenceColumn := nodeConfigHasArchivePreferenceColumn(tx)
-
 	query := `
     SELECT
         network_id, node_key, api_modules,
@@ -315,11 +273,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
 	}
 
-	if hasPreferenceColumn {
-		query += `, history_archive_distribution_preference`
-		scanArgs = append(scanArgs, &nodecfg.HistoryArchiveDistributionPreference)
-	}
-
 	query += `, connector_enabled FROM node_config
         WHERE synthetic_id = 'id'`
 	scanArgs = append(scanArgs, &nodecfg.ConnectorConfig.Enabled)
@@ -327,10 +280,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err := tx.QueryRow(query).Scan(scanArgs...)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
-	}
-
-	if nodecfg.HistoryArchiveDistributionPreference == "" {
-		nodecfg.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
 	}
 
 	// Load logos_storage_config

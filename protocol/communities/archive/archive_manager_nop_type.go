@@ -114,3 +114,7 @@ func (m *ArchiveManagerNop) GetMessageArchiveIDsToImport(communityID cryptotypes
 func (m *ArchiveManagerNop) SetMessageArchiveIDImported(communityID cryptotypes.HexBytes, hash string, imported bool) error {
 	return nil
 }
+
+func (m *ArchiveManagerNop) GetHistoryTasksCount() int {
+	return 0
+}

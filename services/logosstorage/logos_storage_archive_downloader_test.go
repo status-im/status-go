@@ -14,9 +14,9 @@ import (
 
 	"github.com/status-im/status-go/protocol/protobuf"
 
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 
-	mock_logosstorage "github.com/status-im/status-go/services/logos-storage/mock"
+	mock_logosstorage "github.com/status-im/status-go/services/logosstorage/mock"
 
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"

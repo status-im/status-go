@@ -68,7 +68,7 @@ func (tmc *testMessengerConfig) complete() error {
 	}
 
 	if tmc.nodeConfig == nil {
-		tmc.nodeConfig = &params.NodeConfig{HistoryArchiveDistributionPreference: params.DefaultHistoryArchiveDistributionPreference}
+		tmc.nodeConfig = &params.NodeConfig{}
 	}
 
 	return nil

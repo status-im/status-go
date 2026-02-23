@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/params"
-	. "github.com/status-im/status-go/services/logos-storage"
+	. "github.com/status-im/status-go/services/logosstorage"
 )
 
 type LogosStorageConfigOverridesTestSuite struct {

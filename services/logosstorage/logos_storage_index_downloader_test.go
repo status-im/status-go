@@ -16,8 +16,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	logosstorage "github.com/status-im/status-go/services/logos-storage"
-	mock_logosstorage "github.com/status-im/status-go/services/logos-storage/mock"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
+	mock_logosstorage "github.com/status-im/status-go/services/logosstorage/mock"
 )
 
 // ============================================================================

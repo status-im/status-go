@@ -277,8 +277,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.LogEnabled = false
 	}
 
-	nodeConfig.HistoryArchiveDistributionPreference = params.DefaultHistoryArchiveDistributionPreference
-
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
