@@ -391,6 +391,10 @@ func NewManager(
 	return manager, nil
 }
 
+func (m *Manager) GetIdentity() *ecdsa.PrivateKey {
+	return m.identity
+}
+
 func (m *Manager) SetMediaServerProperties() {
 	m.mediaServer.SetCommunityImageVersionReader(func(communityID string) uint32 {
 		return m.communityImageVersions[communityID]
