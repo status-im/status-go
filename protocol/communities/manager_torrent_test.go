@@ -70,10 +70,9 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, arc
 		TorrentConfig: buildTorrentConfig(),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
-		// Messaging:     core.API(),
-		Messaging: nil,
-		Identity:  key,
-		Publisher: m,
+		Messaging:     nil,
+		Identity:      key,
+		Publisher:     m,
 	}
 	t := archive.NewArchiveManager(amc)
 	s.Require().NoError(err)
