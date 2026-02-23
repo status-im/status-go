@@ -403,7 +403,7 @@ func (m *ArchiveManager) getLastMessageArchiveEndDate(communityID cryptotypes.He
 }
 
 // Special functions
-// These functions are not part of the ArchiveServiceBackend interface.
+// These functions are not part of the ArchiveService interface.
 // Some legacy tests are accessing implementation details and for this reason
 // we need to expose these special accessors.
 
