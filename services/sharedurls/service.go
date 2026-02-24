@@ -468,8 +468,10 @@ func prepareEncodedUserData(contact *contacts.Contact) (string, string, error) {
 		return "", "", err
 	}
 
-	if contact.DisplayName == "" && contact.Bio == "" {
-		return "", shortKey, nil
+	if contact.DisplayName == "" {
+		// We always want to have some display name in the URL
+		// So if the contact doesn't have a display name, we use the alias
+		contact.DisplayName = contact.Alias
 	}
 
 	userProto := &protobuf.User{
@@ -505,7 +507,15 @@ func (s *Service) ShareUserURLWithData(contactID string) (string, error) {
 		return "", errors.Wrap(err, "failed to get contact")
 	}
 	if contact == nil {
-		return "", ErrContactNotFound
+		// For unknown contacts, we can still generate a URL with the chat key, but without additional data
+		publicKey, err := crypto.HexToPubkey(contactID)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to convert contact ID to public key")
+		}
+		contact, err = contacts.BuildContact(contactID, publicKey)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to build contact")
+		}
 	}
 	return ShareUserURLWithData(contact)
 }
