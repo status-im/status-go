@@ -445,7 +445,12 @@ func NewMessenger(
 		shutdownTasks: []func() error{
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
-			archiveManager.Stop,
+			func() error {
+				if messenger.archiveManager == nil {
+					return nil
+				}
+				return messenger.archiveManager.Stop()
+			},
 		},
 		logger:                           logger,
 		tracer:                           c.tracer,
