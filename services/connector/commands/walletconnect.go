@@ -28,11 +28,6 @@ func NewWCSessionDisconnector(db *sql.DB, wcClient *walletconnect.Client) WCSess
 // It sends a wc_sessionDelete message to the dApp and removes the session from the local DB.
 // Relay notification failures are non-fatal: the session is always cleaned up locally.
 func (d *wcSessionDisconnector) DisconnectSession(ctx context.Context, topic string) error {
-	if d.wcClient != nil {
-		// Notify the dApp via the relay before cleaning up locally.
-		// Non-fatal: the dApp will discover the session is gone on its next interaction.
-		_ = d.wcClient.SendSessionDelete(ctx, topic)
-	}
 	session, err := persistence.SelectWCSession(d.db, topic)
 	if err == nil && session != nil {
 		_ = persistence.DeleteWCSession(d.db, topic)
@@ -40,9 +35,18 @@ func (d *wcSessionDisconnector) DisconnectSession(ctx context.Context, topic str
 		if len(remaining) == 0 {
 			_ = persistence.DeleteDApp(d.db, session.DAppURL, session.ClientID)
 		}
-		return nil
+	} else {
+		_ = persistence.DeleteWCSession(d.db, topic)
 	}
-	return persistence.DeleteWCSession(d.db, topic)
+
+	if d.wcClient != nil {
+		go func() {
+			if err := d.wcClient.SendSessionDelete(context.Background(), topic); err != nil {
+				fmt.Println("[WC Connector] DisconnectSession: relay send failed (non-fatal):", err)
+			}
+		}()
+	}
+	return nil
 }
 
 type PairWCCommand struct {
