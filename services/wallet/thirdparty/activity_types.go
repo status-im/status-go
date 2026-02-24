@@ -72,6 +72,7 @@ type ActivityFetcher interface {
 	ActivityProvider
 	FetchActivity(ctx context.Context, chainID uint64, parameters ActivityFetchParameters, cursor string, limit int) (ActivityEntryContainer, error)
 	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*rpc.BlockNumber, *time.Time, error)
+	GetActivityTokens(ctx context.Context, chainID uint64, address common.Address) ([]ac.Token, error)
 	ClearAll(ctx context.Context) error
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	wc "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	alchemy "github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
@@ -67,4 +68,34 @@ func (m *Manager) FetchActivity(ctx context.Context, chainID uint64, parameters 
 
 func (m *Manager) ClearAll(ctx context.Context) error {
 	return m.persistence.ClearAll(ctx)
+}
+
+// GetActivityTokens returns unique tokens from activity transfers for a given account and chain
+func (m *Manager) GetActivityTokens(ctx context.Context, chainID uint64, address common.Address) ([]ac.Token, error) {
+	tokens, err := m.persistence.GetActivityTokens(chainID, address)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert alchemy.TokenInfo to activity common.Token
+	result := make([]ac.Token, 0, len(tokens))
+	for _, token := range tokens {
+		var tokenType ac.TokenType
+		if token.Category == alchemy.TransferCategoryExternal || token.Category == alchemy.TransferCategoryInternal {
+			tokenType = ac.Native
+		} else if token.Category == alchemy.TransferCategoryErc20 {
+			tokenType = ac.Erc20
+		} else {
+			// Skip non-native, non-ERC20 tokens
+			continue
+		}
+
+		result = append(result, ac.Token{
+			TokenType: tokenType,
+			ChainID:   wc.ChainID(chainID),
+			Address:   token.Address,
+		})
+	}
+
+	return result, nil
 }
