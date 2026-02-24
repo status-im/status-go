@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/connector/walletconnect"
@@ -40,11 +41,10 @@ func (d *wcSessionDisconnector) DisconnectSession(ctx context.Context, topic str
 	}
 
 	if d.wcClient != nil {
-		go func() {
-			if err := d.wcClient.SendSessionDelete(context.Background(), topic); err != nil {
-				fmt.Println("[WC Connector] DisconnectSession: relay send failed (non-fatal):", err)
-			}
-		}()
+		go func(ctx context.Context, topic string) {
+			defer common.LogOnPanic()
+			_ = d.wcClient.SendSessionDelete(ctx, topic)
+		}(ctx, topic)
 	}
 	return nil
 }
