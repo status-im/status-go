@@ -468,3 +468,179 @@ func TestSelectPermissionsReturnsNilForNonExistent(t *testing.T) {
 	require.Nil(t, permissions)
 	require.Len(t, permissions, 0)
 }
+
+func TestSelectWCSessionsByDAppURL(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	dappURL := "https://test-dapp.com"
+	wcDApp := DApp{URL: dappURL, Name: "Test", IconURL: "", ClientID: WCClientID, SharedAccount: types.HexToAddress("0x0"), ChainID: 0x1}
+	require.NoError(t, UpsertDApp(db, &wcDApp))
+
+	err := UpsertWCSession(db, "topic1", `{"session":"data1"}`, 9999999999, "pairing1", dappURL, "symkey1", 100)
+	require.NoError(t, err)
+
+	err = UpsertWCSession(db, "topic2", `{"session":"data2"}`, 9999999999, "pairing2", dappURL, "symkey2", 200)
+	require.NoError(t, err)
+
+	err = UpsertWCSession(db, "topic3", `{"session":"data3"}`, 9999999999, "pairing3", dappURL, "symkey3", 300)
+	require.NoError(t, err)
+
+	otherDApp := DApp{URL: "https://other-dapp.com", Name: "Other", IconURL: "", ClientID: WCClientID, SharedAccount: types.HexToAddress("0x0"), ChainID: 0x1}
+	require.NoError(t, UpsertDApp(db, &otherDApp))
+	err = UpsertWCSession(db, "topic4", `{"session":"data4"}`, 9999999999, "pairing4", "https://other-dapp.com", "symkey4", 400)
+	require.NoError(t, err)
+
+	// Test: Select sessions by DApp URL
+	sessions, err := SelectWCSessionsByDAppURL(db, dappURL)
+	require.NoError(t, err)
+	require.Len(t, sessions, 3, "Should return all 3 sessions for the DApp")
+
+	// Verify topics
+	topics := make(map[string]bool)
+	for _, s := range sessions {
+		topics[s.Topic] = true
+		require.Equal(t, dappURL, s.DAppURL)
+		require.Equal(t, WCClientID, s.ClientID)
+	}
+	require.True(t, topics["topic1"])
+	require.True(t, topics["topic2"])
+	require.True(t, topics["topic3"])
+	require.False(t, topics["topic4"])
+}
+
+func TestSelectWCSessionsByDAppURLNormalization(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	wcDApp := DApp{URL: "https://test-dapp.com", Name: "Test", IconURL: "", ClientID: WCClientID, SharedAccount: types.HexToAddress("0x0"), ChainID: 0x1}
+	require.NoError(t, UpsertDApp(db, &wcDApp))
+
+	err := UpsertWCSession(db, "topic1", `{"session":"data1"}`, 9999999999, "pairing1", "https://test-dapp.com/", "symkey", 100)
+	require.NoError(t, err)
+
+	// Query without trailing slash (should normalize and find it)
+	sessions, err := SelectWCSessionsByDAppURL(db, "https://test-dapp.com")
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	require.Equal(t, "topic1", sessions[0].Topic)
+}
+
+func TestSelectWCSessionsByDAppURLReturnsEmpty(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	sessions, err := SelectWCSessionsByDAppURL(db, "https://nonexistent-dapp.com")
+	require.NoError(t, err)
+	require.Len(t, sessions, 0)
+}
+
+func TestUpsertWCSessionWithSymKey(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	dappURL := "https://test-dapp.com"
+	wcDApp := DApp{URL: dappURL, Name: "Test", IconURL: "", ClientID: WCClientID, SharedAccount: types.HexToAddress("0x0"), ChainID: 0x1}
+	require.NoError(t, UpsertDApp(db, &wcDApp))
+
+	topic := "test-topic"
+	sessionJSON := `{"session":"data"}`
+	expiry := int64(9999999999)
+	pairingTopic := "pairing-topic"
+	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	createdAt := int64(100)
+
+	// Insert session with sym_key
+	err := UpsertWCSession(db, topic, sessionJSON, expiry, pairingTopic, dappURL, symKey, createdAt)
+	require.NoError(t, err)
+
+	// Select and verify sym_key is stored
+	session, err := SelectWCSession(db, topic)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	require.Equal(t, topic, session.Topic)
+	require.Equal(t, sessionJSON, session.SessionJSON)
+	require.Equal(t, expiry, session.Expiry)
+	require.Equal(t, pairingTopic, session.PairingTopic)
+	require.Equal(t, dappURL, session.DAppURL)
+	require.Equal(t, WCClientID, session.ClientID)
+	require.Equal(t, symKey, session.SymKey)
+}
+
+func TestDeleteWCSession(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	dappURL := "https://test-dapp.com"
+	wcDApp := DApp{URL: dappURL, Name: "Test", IconURL: "", ClientID: WCClientID, SharedAccount: types.HexToAddress("0x0"), ChainID: 0x1}
+	require.NoError(t, UpsertDApp(db, &wcDApp))
+
+	topic := "test-topic-delete"
+	require.NoError(t, UpsertWCSession(db, topic, `{"session":"data"}`, 9999999999, "pairing1", dappURL, "symkey", 100))
+
+	session, err := SelectWCSession(db, topic)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	err = DeleteWCSession(db, topic)
+	require.NoError(t, err)
+
+	session, err = SelectWCSession(db, topic)
+	require.NoError(t, err)
+	require.Nil(t, session)
+}
+
+func TestDeleteWCSessionIdempotent(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	// Deleting non-existent session should not error
+	err := DeleteWCSession(db, "non-existent-topic")
+	require.NoError(t, err)
+}
+
+func TestSelectWCSessionReturnsNilForNonExistent(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	session, err := SelectWCSession(db, "non-existent-topic")
+	require.NoError(t, err)
+	require.Nil(t, session)
+}
+
+func TestSelectActiveWCSessionsWithSymKey(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	dappURL := "https://test-dapp.com"
+	wcDApp := DApp{URL: dappURL, Name: "Test", IconURL: "", ClientID: WCClientID, SharedAccount: types.HexToAddress("0x0"), ChainID: 0x1}
+	require.NoError(t, UpsertDApp(db, &wcDApp))
+
+	symKey1 := "key1111111111111111111111111111111111111111111111111111111111111"
+	symKey2 := "key2222222222222222222222222222222222222222222222222222222222222"
+
+	// Insert active sessions
+	err := UpsertWCSession(db, "topic1", `{"session":"data1"}`, 9999999999, "pairing1", dappURL, symKey1, 100)
+	require.NoError(t, err)
+
+	err = UpsertWCSession(db, "topic2", `{"session":"data2"}`, 9999999999, "pairing2", dappURL, symKey2, 200)
+	require.NoError(t, err)
+
+	// Insert expired session (should not be returned)
+	err = UpsertWCSession(db, "topic3", `{"session":"data3"}`, 100, "pairing3", dappURL, "oldkey", 300)
+	require.NoError(t, err)
+
+	// Select active sessions
+	validAt := int64(1000)
+	sessions, err := SelectActiveWCSessions(db, validAt)
+	require.NoError(t, err)
+	require.Len(t, sessions, 2)
+
+	// Verify sym_keys are included
+	symKeys := make(map[string]string)
+	for _, s := range sessions {
+		symKeys[s.Topic] = s.SymKey
+	}
+	require.Equal(t, symKey1, symKeys["topic1"])
+	require.Equal(t, symKey2, symKeys["topic2"])
+}

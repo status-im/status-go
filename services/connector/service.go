@@ -109,6 +109,12 @@ func (s *Service) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
+	if s.api != nil && s.api.wcClient != nil {
+		if err := s.api.wcClient.Close(); err != nil {
+			s.logger.Error("failed to close WalletConnect client", zap.Error(err))
+		}
+	}
+
 	if s.wsServer == nil {
 		return nil
 	}
