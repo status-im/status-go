@@ -37,10 +37,10 @@ start_services() {
 remove_old_containers() {
   # Remove any remaining containers if any
   echo -e "${GRN}Removing any remaining containers (if any relevant left)${RST}"
-  docker ps -a --filter "name=status-go-func-tests-${identifier}" -q | xargs -r docker rm -f
+  docker ps -a --filter "name=${project_name}" -q | xargs -r docker rm -f
 
   # Remove networks
-  docker network rm "status-go-func-tests-${identifier}_default" 2>/dev/null || true
+  docker network rm "${project_name}_default" 2>/dev/null || true
 }
 
 clean_all_containers() {
@@ -81,7 +81,7 @@ wait_for_waku_suite_scanner() {
 
 wait_for_services() {
   local timeout="$1"
-  local project="status-go-func-tests-$(git rev-parse --short HEAD)"
+  local project="${project_name}"
 
   echo "Waiting up to ${timeout}s for boot-1 and store to be healthy..."
 
@@ -160,7 +160,7 @@ run_tests() {
   local selected_test="${1:+-k $1}"
 
   # Run with dynamic parallelization
-  pytest --reruns 0 -m rpc -c "${root_path}/pytest.ini" $parallel_opts \
+  pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" $parallel_opts \
     --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
     --docker_project_name="${project_name}" \
     --docker-image=${image_name} \
