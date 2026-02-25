@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -215,9 +214,9 @@ func (s *EventToSystemMessageSuite) TestHandleHistoryArchiveIndexCidMessageWithL
 
 	logosStorageConfig := &params.LogosStorageConfig{
 		Enabled: true,
-		LogosStorageNodeConfig: storage.Config{
+		NodeConfig: params.LogosStorageNodeConfig{
 			DataDir:        filepath.Join(s.T().TempDir(), "logos-storage", "data"),
-			LogFormat:      storage.LogFormatNoColors,
+			LogFormat:      "nocolors",
 			MetricsEnabled: false,
 			LogLevel:       "ERROR",
 			Nat:            "none",

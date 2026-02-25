@@ -25,13 +25,14 @@ type LogosStorageClient struct {
 
 // NewLogosStorageClient creates a new LogosStorage client
 func NewLogosStorageClient(config params.LogosStorageConfig) (LogosStorageClientInterface, error) {
-	node, err := storage.New(config.LogosStorageNodeConfig)
+	storageConfig := toStorageConfig(config.NodeConfig)
+	node, err := storage.New(storageConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &LogosStorageClient{
-		config:  config.LogosStorageNodeConfig,
+		config:  storageConfig,
 		node:    node,
 		enabled: config.Enabled,
 	}, nil

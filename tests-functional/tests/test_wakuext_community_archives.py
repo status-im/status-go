@@ -18,7 +18,7 @@ class TestCommunityArchives(MessengerSteps):
         # Enable community history archive protocol
         self.creator.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
-                "LogosStorageNodeConfig.DiscoveryPort": 8091,
+                "NodeConfig.DiscoveryPort": 8091,
             }
         )
 
@@ -28,8 +28,8 @@ class TestCommunityArchives(MessengerSteps):
         self.member = backend_new_profile("member", import_initial_delay=5)
         self.member.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
-                "LogosStorageNodeConfig.DiscoveryPort": 8092,
-                "LogosStorageNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
+                "NodeConfig.DiscoveryPort": 8092,
+                "NodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
             }
         )
 
@@ -37,8 +37,8 @@ class TestCommunityArchives(MessengerSteps):
         self.another_member = backend_new_profile("member", import_initial_delay=5)
         self.another_member.wakuext_service.enable_logos_storage_community_history_archive_protocol(
             {
-                "LogosStorageNodeConfig.DiscoveryPort": 8093,
-                "LogosStorageNodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
+                "NodeConfig.DiscoveryPort": 8093,
+                "NodeConfig.BootstrapNodes": f'["{info["spr"]}"]',
             }
         )
 

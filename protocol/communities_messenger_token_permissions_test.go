@@ -163,8 +163,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) defaultNodeCfg(tempDir strin
 
 	// false is default, but being explicit here for clarity
 	nodeCfg.LogosStorageConfig.Enabled = false
-	nodeCfg.LogosStorageConfig.LogosStorageNodeConfig.Nat = "none"
-	// nodeCfg.LogosStorageConfig.LogosStorageNodeConfig.LogLevel = "TRACE"
+	nodeCfg.LogosStorageConfig.NodeConfig.Nat = "none"
+	// nodeCfg.LogosStorageConfig.NodeConfig.LogLevel = "TRACE"
 	nodeCfg.TorrentConfig.Enabled = false
 
 	return nodeCfg

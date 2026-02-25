@@ -9,7 +9,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/nodecfg"
@@ -58,7 +57,7 @@ func randomNodeConfig() *params.NodeConfig {
 		},
 		LogosStorageConfig: params.LogosStorageConfig{
 			Enabled: randomBool(),
-			LogosStorageNodeConfig: storage.Config{
+			NodeConfig: params.LogosStorageNodeConfig{
 				DataDir:       randomString(),
 				DiscoveryPort: randomInt(65535),
 				BlockRetries:  randomInt(10),

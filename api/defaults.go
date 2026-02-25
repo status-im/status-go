@@ -7,8 +7,6 @@ import (
 	"math/big"
 	"path/filepath"
 
-	"github.com/logos-storage/logos-storage-go-bindings/storage"
-
 	accscommon "github.com/status-im/status-go/accounts-management/common"
 	"github.com/status-im/status-go/accounts-management/generator"
 	gocommon "github.com/status-im/status-go/common"
@@ -357,7 +355,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	}
 
 	if request.LogosStorageConfigBootstrapNode != nil {
-		nodeConfig.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes = []string{*request.LogosStorageConfigBootstrapNode}
+		nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes = []string{*request.LogosStorageConfigBootstrapNode}
 	}
 
 	if request.ImportInitialDelay != nil {
@@ -370,12 +368,12 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	nodeConfig.LogosStorageConfig = params.LogosStorageConfig{
 		Enabled: nodeConfig.LogosStorageConfig.Enabled,
-		LogosStorageNodeConfig: storage.Config{
+		NodeConfig: params.LogosStorageNodeConfig{
 			DataDir:        filepath.Join(nodeConfig.RootDataDir, "logos-storage", "data"),
 			BlockRetries:   params.BlockRetries,
 			MetricsEnabled: false,
-			LogFormat:      storage.LogFormatNoColors,
-			BootstrapNodes: nodeConfig.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes,
+			LogFormat:      "nocolors",
+			BootstrapNodes: nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes,
 		},
 	}
 

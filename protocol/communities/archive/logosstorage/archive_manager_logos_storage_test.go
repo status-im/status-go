@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -44,7 +43,7 @@ func buildLogosStorageConfig(t *testing.T) *params.LogosStorageConfig {
 	rootDir := t.TempDir()
 	return &params.LogosStorageConfig{
 		Enabled: true,
-		LogosStorageNodeConfig: storage.Config{
+		NodeConfig: params.LogosStorageNodeConfig{
 			DataDir:      filepath.Join(rootDir, "logos-storage", "data"),
 			BlockRetries: 5,
 			LogLevel:     "ERROR",

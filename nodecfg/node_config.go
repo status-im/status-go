@@ -91,11 +91,11 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 
 // Insert or update logos_storage_config table
 func insertLogosStorageConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	listenAddrsJSON, err := json.Marshal(c.LogosStorageConfig.LogosStorageNodeConfig.ListenAddrs)
+	listenAddrsJSON, err := json.Marshal(c.LogosStorageConfig.NodeConfig.ListenAddrs)
 	if err != nil {
 		return err
 	}
-	bootstrapNodesJSON, err := json.Marshal(c.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes)
+	bootstrapNodesJSON, err := json.Marshal(c.LogosStorageConfig.NodeConfig.BootstrapNodes)
 	if err != nil {
 		return err
 	}
@@ -107,28 +107,28 @@ func insertLogosStorageConfig(tx *sql.Tx, c *params.NodeConfig) error {
 			block_retries, cache_size, log_file, synthetic_id
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
 		c.LogosStorageConfig.Enabled,
-		c.LogosStorageConfig.LogosStorageNodeConfig.LogLevel,
-		c.LogosStorageConfig.LogosStorageNodeConfig.LogFormat,
-		c.LogosStorageConfig.LogosStorageNodeConfig.MetricsEnabled,
-		c.LogosStorageConfig.LogosStorageNodeConfig.MetricsAddress,
-		c.LogosStorageConfig.LogosStorageNodeConfig.MetricsPort,
-		c.LogosStorageConfig.LogosStorageNodeConfig.DataDir,
+		c.LogosStorageConfig.NodeConfig.LogLevel,
+		c.LogosStorageConfig.NodeConfig.LogFormat,
+		c.LogosStorageConfig.NodeConfig.MetricsEnabled,
+		c.LogosStorageConfig.NodeConfig.MetricsAddress,
+		c.LogosStorageConfig.NodeConfig.MetricsPort,
+		c.LogosStorageConfig.NodeConfig.DataDir,
 		string(listenAddrsJSON),
-		c.LogosStorageConfig.LogosStorageNodeConfig.Nat,
-		c.LogosStorageConfig.LogosStorageNodeConfig.DiscoveryPort,
-		c.LogosStorageConfig.LogosStorageNodeConfig.NetPrivKeyFile,
+		c.LogosStorageConfig.NodeConfig.Nat,
+		c.LogosStorageConfig.NodeConfig.DiscoveryPort,
+		c.LogosStorageConfig.NodeConfig.NetPrivKeyFile,
 		string(bootstrapNodesJSON),
-		c.LogosStorageConfig.LogosStorageNodeConfig.MaxPeers,
-		c.LogosStorageConfig.LogosStorageNodeConfig.NumThreads,
-		c.LogosStorageConfig.LogosStorageNodeConfig.AgentString,
-		c.LogosStorageConfig.LogosStorageNodeConfig.RepoKind,
-		c.LogosStorageConfig.LogosStorageNodeConfig.StorageQuota,
-		c.LogosStorageConfig.LogosStorageNodeConfig.BlockTtl,
-		c.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceInterval,
-		c.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceNumberOfBlocks,
-		c.LogosStorageConfig.LogosStorageNodeConfig.BlockRetries,
-		c.LogosStorageConfig.LogosStorageNodeConfig.CacheSize,
-		c.LogosStorageConfig.LogosStorageNodeConfig.LogFile,
+		c.LogosStorageConfig.NodeConfig.MaxPeers,
+		c.LogosStorageConfig.NodeConfig.NumThreads,
+		c.LogosStorageConfig.NodeConfig.AgentString,
+		c.LogosStorageConfig.NodeConfig.RepoKind,
+		c.LogosStorageConfig.NodeConfig.StorageQuota,
+		c.LogosStorageConfig.NodeConfig.BlockTtl,
+		c.LogosStorageConfig.NodeConfig.BlockMaintenanceInterval,
+		c.LogosStorageConfig.NodeConfig.BlockMaintenanceNumberOfBlocks,
+		c.LogosStorageConfig.NodeConfig.BlockRetries,
+		c.LogosStorageConfig.NodeConfig.CacheSize,
+		c.LogosStorageConfig.NodeConfig.LogFile,
 	)
 	return err
 }
@@ -292,40 +292,40 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	  FROM logos_storage_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.LogosStorageConfig.Enabled,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.LogLevel,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.LogFormat,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MetricsEnabled,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MetricsAddress,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MetricsPort,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.DataDir,
+		&nodecfg.LogosStorageConfig.NodeConfig.LogLevel,
+		&nodecfg.LogosStorageConfig.NodeConfig.LogFormat,
+		&nodecfg.LogosStorageConfig.NodeConfig.MetricsEnabled,
+		&nodecfg.LogosStorageConfig.NodeConfig.MetricsAddress,
+		&nodecfg.LogosStorageConfig.NodeConfig.MetricsPort,
+		&nodecfg.LogosStorageConfig.NodeConfig.DataDir,
 		&listenAddrsStr,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.Nat,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.DiscoveryPort,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.NetPrivKeyFile,
+		&nodecfg.LogosStorageConfig.NodeConfig.Nat,
+		&nodecfg.LogosStorageConfig.NodeConfig.DiscoveryPort,
+		&nodecfg.LogosStorageConfig.NodeConfig.NetPrivKeyFile,
 		&bootstrapNodesStr,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.MaxPeers,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.NumThreads,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.AgentString,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.RepoKind,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.StorageQuota,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockTtl,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceInterval,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockMaintenanceNumberOfBlocks,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BlockRetries,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.CacheSize,
-		&nodecfg.LogosStorageConfig.LogosStorageNodeConfig.LogFile,
+		&nodecfg.LogosStorageConfig.NodeConfig.MaxPeers,
+		&nodecfg.LogosStorageConfig.NodeConfig.NumThreads,
+		&nodecfg.LogosStorageConfig.NodeConfig.AgentString,
+		&nodecfg.LogosStorageConfig.NodeConfig.RepoKind,
+		&nodecfg.LogosStorageConfig.NodeConfig.StorageQuota,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockTtl,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockMaintenanceInterval,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockMaintenanceNumberOfBlocks,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockRetries,
+		&nodecfg.LogosStorageConfig.NodeConfig.CacheSize,
+		&nodecfg.LogosStorageConfig.NodeConfig.LogFile,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 	// Unmarshal JSON fields
 	if listenAddrsStr != "" {
-		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.LogosStorageConfig.LogosStorageNodeConfig.ListenAddrs); err != nil {
+		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.LogosStorageConfig.NodeConfig.ListenAddrs); err != nil {
 			return nil, err
 		}
 	}
 	if bootstrapNodesStr != "" {
-		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.LogosStorageConfig.LogosStorageNodeConfig.BootstrapNodes); err != nil {
+		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.LogosStorageConfig.NodeConfig.BootstrapNodes); err != nil {
 			return nil, err
 		}
 	}

@@ -10,7 +10,6 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/logos-storage/logos-storage-go-bindings/storage"
 
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
@@ -341,11 +340,6 @@ type TorrentConfig struct {
 	TorrentDir string
 }
 
-type LogosStorageConfig struct {
-	Enabled                bool
-	LogosStorageNodeConfig storage.Config
-}
-
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
@@ -386,8 +380,8 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 	}
 
 	if c.LogosStorageConfig.Enabled {
-		if c.LogosStorageConfig.LogosStorageNodeConfig.DataDir == "" {
-			c.LogosStorageConfig.LogosStorageNodeConfig.DataDir = filepath.Join(c.RootDataDir, "logos-storage", "data")
+		if c.LogosStorageConfig.NodeConfig.DataDir == "" {
+			c.LogosStorageConfig.NodeConfig.DataDir = filepath.Join(c.RootDataDir, "logos-storage", "data")
 		}
 	}
 
@@ -426,11 +420,11 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		},
 		LogosStorageConfig: LogosStorageConfig{
 			Enabled: false,
-			LogosStorageNodeConfig: storage.Config{
+			NodeConfig: LogosStorageNodeConfig{
 				BlockRetries:   BlockRetries,
 				DataDir:        filepath.Join(dataDir, "logos-storage", "data"),
 				MetricsEnabled: false,
-				LogFormat:      storage.LogFormatNoColors,
+				LogFormat:      "nocolors",
 			},
 		},
 	}

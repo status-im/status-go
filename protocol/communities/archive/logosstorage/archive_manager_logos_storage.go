@@ -100,9 +100,9 @@ func (m *ArchiveManagerLogosStorage) Start() error {
 
 	var err error
 	cfgCopy := *m.logosStorageConfig
-	cfgCopy.LogosStorageNodeConfig = m.logosStorageConfig.LogosStorageNodeConfig
+	cfgCopy.NodeConfig = m.logosStorageConfig.NodeConfig
 
-	m.logger.Info("[LogosStorage][start_logosstorage_client] Using the following LogosStorageNodeConfig", zap.Any("config", cfgCopy.LogosStorageNodeConfig))
+	m.logger.Info("[LogosStorage][start_logosstorage_client] Using the following NodeConfig", zap.Any("config", cfgCopy.NodeConfig))
 
 	client, err := logosstorage.NewLogosStorageClient(cfgCopy)
 	if err != nil {

@@ -32,7 +32,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 		},
 		"LogosStorageConfig": {
 			"Enabled": false,
-			"LogosStorageNodeConfig": {
+			"NodeConfig": {
 				"data-dir": "` + tmpDir + `/logos-storage/data",
 				"block-retries": 5
 			}
@@ -48,8 +48,8 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
 	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
-	require.Equal(t, filepath.Join(tmpDir, "logos-storage", "data"), c.LogosStorageConfig.LogosStorageNodeConfig.DataDir)
-	require.Equal(t, 5, c.LogosStorageConfig.LogosStorageNodeConfig.BlockRetries)
+	require.Equal(t, filepath.Join(tmpDir, "logos-storage", "data"), c.LogosStorageConfig.NodeConfig.DataDir)
+	require.Equal(t, 5, c.LogosStorageConfig.NodeConfig.BlockRetries)
 }
 
 // TestNodeConfigValidate checks validation of individual fields.
