@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transferdetector"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -210,7 +211,7 @@ func NewService(
 			SearchProviders:            collectibleSearchProviders,
 		}
 
-		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
+		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags, config.WalletConfig.CommunityTokenDeployerOverrides)
 
 		leaderboardConfig = leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
 
@@ -365,6 +366,7 @@ func buildPathProcessors(
 	tokenManager *token.Manager,
 	ensResolver *ensresolver.EnsResolver,
 	featureFlags *protocolCommon.FeatureFlags,
+	deployerOverrides map[uint64]ethCommon.Address,
 ) []pathprocessor.PathProcessor {
 	ret := make([]pathprocessor.PathProcessor, 0)
 
@@ -398,13 +400,13 @@ func buildPathProcessors(
 	communityBurn := pathprocessor.NewCommunityBurnProcessor(rpcClient, transactor)
 	ret = append(ret, communityBurn)
 
-	communityDeployAssets := pathprocessor.NewCommunityDeployAssetsProcessor(rpcClient, transactor)
+	communityDeployAssets := pathprocessor.NewCommunityDeployAssetsProcessor(rpcClient, transactor, deployerOverrides)
 	ret = append(ret, communityDeployAssets)
 
-	communityDeployCollectibles := pathprocessor.NewCommunityDeployCollectiblesProcessor(rpcClient, transactor)
+	communityDeployCollectibles := pathprocessor.NewCommunityDeployCollectiblesProcessor(rpcClient, transactor, deployerOverrides)
 	ret = append(ret, communityDeployCollectibles)
 
-	communityDeployOwnerToken := pathprocessor.NewCommunityDeployOwnerTokenProcessor(rpcClient, transactor)
+	communityDeployOwnerToken := pathprocessor.NewCommunityDeployOwnerTokenProcessor(rpcClient, transactor, deployerOverrides)
 	ret = append(ret, communityDeployOwnerToken)
 
 	communityMintTokens := pathprocessor.NewCommunityMintTokensProcessor(rpcClient, transactor)

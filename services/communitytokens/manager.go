@@ -26,13 +26,19 @@ import (
 )
 
 type Manager struct {
-	contractMaker *communitytokens.CommunityTokensContractMaker
+	contractMaker     *communitytokens.CommunityTokensContractMaker
+	deployerOverrides map[uint64]common.Address
 }
 
-func NewManager(rpcClient *rpc.Client) *Manager {
+func NewManager(rpcClient *rpc.Client, deployerOverrides map[uint64]common.Address) *Manager {
 	return &Manager{
-		contractMaker: communitytokens.NewCommunityTokensContractMakerMaker(rpcClient),
+		contractMaker:     communitytokens.NewCommunityTokensContractMakerMaker(rpcClient),
+		deployerOverrides: deployerOverrides,
 	}
+}
+
+func (m *Manager) DeployerContractAddress(chainID uint64) (common.Address, error) {
+	return communitytokendeployer.ContractAddressWithOverrides(chainID, m.deployerOverrides)
 }
 
 func (m *Manager) NewCollectiblesInstance(chainID uint64, contractAddress common.Address) (*collectibles.Collectibles, error) {
@@ -40,7 +46,7 @@ func (m *Manager) NewCollectiblesInstance(chainID uint64, contractAddress common
 }
 
 func (m *Manager) NewCommunityTokenDeployerInstance(chainID uint64) (*communitytokendeployer2.CommunityTokenDeployer, error) {
-	deployerAddr, err := communitytokendeployer.ContractAddress(chainID)
+	deployerAddr, err := m.DeployerContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +179,7 @@ func (m *Manager) DeploymentSignatureDigest(chainID uint64, addressFrom string, 
 		return nil, err
 	}
 
-	deployerAddr, err := communitytokendeployer.ContractAddress(chainID)
+	deployerAddr, err := m.DeployerContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
