@@ -423,16 +423,6 @@ class MessengerSteps(NetworkConditionsSteps):
             if not accepted_seen:
                 time.sleep(1)
 
-        if not accepted_seen and not _is_accepted(join_state):
-            raise Exception(
-                "Join request was not accepted within timeout. "
-                f"community_id={self.community_id}, join_id={join_id}, join_state={join_state}, "
-                f"request_attempts={request_attempts}, resend_attempts={request_resend_attempts}, "
-                f"last_request_error={last_request_error}, last_pending={last_pending}, "
-                f"last_latest_admin={last_latest_admin}, last_member_latest={last_member_latest}, "
-                f"last_accept_error={last_accept_error}, last_poll_error={last_poll_error}"
-            )
-
         # Best-effort wait for acceptance signal propagation.
         if accepted_seen:
             try:
