@@ -230,12 +230,14 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
 
         # Build transactions from route (async, sends SignRouterTransactions signal)
-        owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
-
-        sign_signal = owner_backend.wait_for_signal_predicate(
-            signal_type=SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
+        with owner_backend.expect_signal(
+            SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
             predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
-        )
+            timeout=60,
+        ) as sign_exp:
+            owner_backend.wallet_service.build_transactions_from_route(transaction_uuid)
+
+        sign_signal = sign_exp.result
 
         signing_details = sign_signal["event"]["signingDetails"]
         signatures = {}
@@ -250,11 +252,13 @@ class TestCommunityTokenPermissions(MessengerSteps):
             }
 
         # Send the signed transactions
-        owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+        with owner_backend.expect_signal(
+            SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
+            timeout=60,
+        ) as sent_exp:
+            owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
 
-        sent_signal = owner_backend.wait_for_signal_predicate(
-            signal_type=SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
-        )
+        sent_signal = sent_exp.result
 
         logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
 
@@ -419,7 +423,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
-    def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client):
+    def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client, anvil_client):
         """Test that owner edits are visible before and after minting the owner token on Anvil"""
 
         # Owner creates a token-gated community
@@ -429,11 +433,28 @@ class TestCommunityTokenPermissions(MessengerSteps):
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
-        # Fetch community as member
-        response = self.fetch_community(member_backend, community_id)
+        # Fetch/spectate community as member and wait until it is available with propagated metadata
+        time.sleep(2)
+        response = self._spectate_and_fetch_community(member_backend, community_id)
         assert response, "Community not found"
 
-        permissions_resp = member_backend.wakuext_service.check_permissions_to_join_community(community_id)
+        # Fund member and verify token balance so member satisfies token-gated permission
+        member_address = self.fund_backend_account_with_tokens(member_backend, foundry_client)
+        self.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
+
+        # Balance and permission checks are async/cached, force refresh and retry
+        member_backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
+        permissions_resp = None
+        for _ in range(10):
+            time.sleep(2)
+            # Refresh community view too, token-permission propagation can lag behind fetchCommunity
+            self.fetch_community(member_backend, community_id)
+            permissions_resp = member_backend.wakuext_service.check_permissions_to_join_community(community_id)
+            if permissions_resp and permissions_resp.get("satisfied"):
+                break
+
+            member_backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
+
         assert permissions_resp, "Failed to check permissions to join community"
         assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
 
@@ -445,12 +466,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
             predicate=lambda signal: any(r.get("id") == req_id for r in (signal.get("event", {}).get("requestsToJoinCommunity") or [])),
             timeout=60,
         ):
-            accounts = member_backend.accounts_service.get_accounts()
-            assert accounts, "No accounts found"
-            wallet_account = next(a for a in accounts if not a.get("chat"))
-            assert wallet_account, "No wallet account found"
-            member_address = wallet_account["address"]
-
             join_resp = request_to_join_with_signatures(member_backend, community_id, [member_address])
             requests = join_resp.get("requestsToJoinCommunity", [])
 
@@ -478,6 +493,20 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Then the Member sees the updated community
         retry_call(self.check_member_community_updated, member_backend, community_id, new_name, new_description)
 
+        # Fund owner wallet with native token on Anvil to cover gas for owner-token deployment
+        owner_accounts = owner_backend.accounts_service.get_accounts()
+        assert owner_accounts, "No owner accounts found"
+        owner_wallet_account = next(a for a in owner_accounts if not a.get("chat"))
+        assert owner_wallet_account, "No owner wallet account found"
+        owner_address = owner_wallet_account["address"]
+
+        ten_native_tokens_in_wei = 10 * 10**18
+        anvil_client.set_balance(owner_address, ten_native_tokens_in_wei)
+
+        # Refresh wallet balances cache after forcing Anvil balance
+        owner_backend.wallet_service.fetch_or_get_cached_wallet_balances([owner_address], True)
+        owner_backend.wallet_service.get_balances_at_by_chain([owner_backend.network_id], [owner_address], [])
+
         # When the Owner mints the owner token
         owner_backend.wallet_service.restart_wallet_reload_timer()
         time.sleep(2)  # Sync metadata
@@ -494,7 +523,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         owner_backend.logout()
         owner_backend.login(owner_backend.key_uid, owner_backend.password)
         owner_backend.wait_for_login()
-        owner_backend.wakuext_service.start_messenger()
+        owner_backend.wait_for_wakuext_ready(timeout=60, start_messenger=True)
 
         # And the Owner edits the community again
         new_name3, new_description3 = self.edit_community(owner_backend, community_id)
