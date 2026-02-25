@@ -18,7 +18,10 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
@@ -239,6 +242,24 @@ func (c *Controller) startWalletEventsWatcher() {
 				}
 				c.TriggerFetchWithConfig(fetchConfig)
 			}
+		case pendingtxtracker.EventPendingTransactionStatusChanged:
+			var p pendingtxtracker.StatusChangedPayload
+			err := json.Unmarshal([]byte(event.Message), &p)
+			if err != nil {
+				return
+			}
+			if p.Status != ac.Success {
+				return
+			}
+
+			fetchConfig, err := c.buildFetchConfigFromTransactionStatus(&p)
+			if err != nil {
+				c.logger.Error("failed to build fetch config from transaction status", zap.Error(err))
+				return
+			}
+			if len(fetchConfig) > 0 {
+				c.fetchImmediatelyWithConfig(fetchConfig)
+			}
 		default:
 			// Unrelated event, do not trigger a fetch
 			return
@@ -414,18 +435,7 @@ func (c *Controller) popPendingFetchValues() (bool, FetchConfig) {
 	return fullFetch, fetchConfig
 }
 
-func (c *Controller) fetchNow() {
-	c.logger.Debug("starting fetch")
-	// Get the fullFetch flag + fetchConfig and reset them
-	fullFetch, fetchConfig := c.popPendingFetchValues()
-
-	balancesToFetch := c.computeBalancesToFetch(fullFetch, fetchConfig)
-	fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(balancesToFetch)
-
-	if len(fetchConfigs) == 0 {
-		return
-	}
-
+func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfetcher.FetchConfig) {
 	for chainID, chainFetchConfig := range fetchConfigs {
 		for _, address := range chainFetchConfig.Native {
 			c.logger.Debug(
@@ -489,4 +499,103 @@ func (c *Controller) fetchNow() {
 			}
 		}()
 	}
+}
+
+func (c *Controller) fetchNow() {
+	c.logger.Debug("starting fetch")
+	// Get the fullFetch flag + fetchConfig and reset them
+	fullFetch, fetchConfig := c.popPendingFetchValues()
+
+	balancesToFetch := c.computeBalancesToFetch(fullFetch, fetchConfig)
+	fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(balancesToFetch)
+
+	if len(fetchConfigs) == 0 {
+		return
+	}
+
+	c.executeFetchConfigs(fetchConfigs)
+}
+
+// fetchImmediatelyWithConfig triggers a balance fetch for specific accounts/chains immediately,
+// bypassing the debounce. Used when a transaction has just confirmed and we need fresh balances now.
+func (c *Controller) fetchImmediatelyWithConfig(fetchConfig FetchConfig) {
+	go func() {
+		defer gocommon.LogOnPanic()
+		fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(fetchConfig)
+		if len(fetchConfigs) == 0 {
+			return
+		}
+		c.executeFetchConfigs(fetchConfigs)
+	}()
+}
+
+// buildFetchConfigFromTransactionStatus builds a FetchConfig for the from/to addresses and chains
+// from a successful transaction's SendDetails.
+func (c *Controller) buildFetchConfigFromTransactionStatus(p *pendingtxtracker.StatusChangedPayload) (FetchConfig, error) {
+	fetchConfig := make(FetchConfig)
+
+	addBalanceKeyToFetchConfig := func(addr common.Address, chainID uint64, includeCollectibles bool) {
+		if chainID == 0 || addr == walletcommon.ZeroAddress() {
+			return
+		}
+		key := BalancesKey{Account: addr, ChainID: chainID}
+		fetchConfig[key] = []multistandardfetcher.ResultType{
+			multistandardfetcher.ResultTypeNative,
+			multistandardfetcher.ResultTypeERC20,
+		}
+		if includeCollectibles {
+			fetchConfig[key] = append(fetchConfig[key], multistandardfetcher.ResultTypeERC721, multistandardfetcher.ResultTypeERC1155)
+		}
+	}
+
+	addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty := func(addr common.Address, chainID uint64, includeCollectibles bool) error {
+		var (
+			addresses []common.Address
+			chainIDs  []uint64
+			err       error
+		)
+		if addr == walletcommon.ZeroAddress() {
+			addresses, err = c.getAllAccounts()
+			if err != nil {
+				return err
+			}
+		} else {
+			addresses = []common.Address{addr}
+		}
+
+		if chainID == 0 {
+			chainIDs, err = c.getAllNetworks()
+			if err != nil {
+				return err
+			}
+		} else {
+			chainIDs = []uint64{chainID}
+		}
+
+		for _, address := range addresses {
+			for _, chainID := range chainIDs {
+				addBalanceKeyToFetchConfig(address, chainID, includeCollectibles)
+			}
+		}
+		return nil
+	}
+
+	if p.SendDetails != nil {
+		includeCollectibles := sendtype.SendType(p.SendDetails.SendType).IsCollectiblesTransfer()
+		err := addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty(common.Address(p.SendDetails.FromAddress), p.SendDetails.FromChain, includeCollectibles)
+		if err != nil {
+			return nil, err
+		}
+		err = addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty(common.Address(p.SendDetails.ToAddress), p.SendDetails.ToChain, includeCollectibles)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty(walletcommon.ZeroAddress(), 0, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return fetchConfig, nil
 }

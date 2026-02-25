@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -50,10 +51,11 @@ type Service struct {
 	cancelFnMap      map[fetcherID]context.CancelFunc
 	cancelFnMapMutex sync.RWMutex
 
-	logger        *zap.Logger
-	stopCh        chan struct{}
-	subscriptions event.Subscription
-	ch            chan walletevent.Event
+	logger          *zap.Logger
+	stopCh          chan struct{}
+	subscriptions   event.Subscription
+	ch              chan walletevent.Event
+	targetedFetchCh chan []fetcherID
 }
 
 func NewService(
@@ -76,6 +78,7 @@ func NewService(
 		eventFeed:              eventFeed,
 		checkRefetchCh:         make(chan bool),
 		cancelFnMap:            make(map[fetcherID]context.CancelFunc),
+		targetedFetchCh:        make(chan []fetcherID),
 		logger:                 logger,
 		ch:                     make(chan walletevent.Event, 100),
 	}
@@ -139,7 +142,17 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 
 		// Trigger immediate fetch when transaction succeeds - bypass interval check
 		if payload.Status == ac.Success {
-			s.triggerRefetch(true)
+			// Instead of triggering a refetch for all accounts and chains, we trigger a fetch for the specific fetcher IDs
+			// This approach saves a lot of rpc calls and speeds up the fetch process
+			ids, err := s.buildFetcherIDsFromTransactionStatus(&payload)
+			if err != nil {
+				s.logger.Error("Failed to build fetcher IDs from transaction status", zap.Error(err))
+				return
+			}
+			if len(ids) > 0 {
+				s.targetedFetchCh <- ids
+				return
+			}
 		}
 	}
 }
@@ -207,6 +220,8 @@ func (s *Service) Start(ctx context.Context) {
 				s.fetchActivityForAllAccountsAndChains(ctx, false)
 			case bypassIntervalCheck := <-s.checkRefetchCh:
 				s.fetchActivityForAllAccountsAndChains(ctx, !bypassIntervalCheck)
+			case ids := <-s.targetedFetchCh:
+				s.fetchActivityForSpecificFetcherIDs(ctx, ids)
 			}
 		}
 	}()
@@ -217,6 +232,79 @@ func (s *Service) Start(ctx context.Context) {
 
 func (s *Service) triggerRefetch(bypassIntervalCheck bool) {
 	s.checkRefetchCh <- bypassIntervalCheck
+}
+
+func (s *Service) buildFetcherIDsFromTransactionStatus(payload *pendingtxtracker.StatusChangedPayload) ([]fetcherID, error) {
+	if payload.SendDetails == nil {
+		return s.getDesiredFetcherIDs() // if no send details, fetch for all accounts and chains, this should never happen
+	}
+
+	alreadyAdded := make(map[fetcherID]struct{}) // avoid duplicates, in case the tx was sent to the same account and chain
+	result := make([]fetcherID, 0)
+
+	addFetcherIDIfNotAlreadyAdded := func(addr gethcommon.Address, chainID uint64) {
+		if chainID == 0 || addr == common.ZeroAddress() {
+			return
+		}
+		id := fetcherID{account: addr, chainID: chainID}
+		if _, ok := alreadyAdded[id]; !ok {
+			alreadyAdded[id] = struct{}{}
+			result = append(result, id)
+		}
+	}
+
+	addFetcherIDOrIDsIfParamsAreEmpty := func(addr gethcommon.Address, chainID uint64) error {
+		var (
+			addresses []gethcommon.Address
+			chainIDs  []uint64
+			err       error
+		)
+		if addr == common.ZeroAddress() {
+			addresses, err = s.getCurrentAccountsAddresses()
+			if err != nil {
+				return err
+			}
+		} else {
+			addresses = []gethcommon.Address{addr}
+		}
+
+		if chainID == 0 {
+			chainIDs, err = s.getCurrentChainIDs()
+			if err != nil {
+				return err
+			}
+		} else {
+			chainIDs = []uint64{chainID}
+		}
+
+		for _, address := range addresses {
+			for _, chainID := range chainIDs {
+				addFetcherIDIfNotAlreadyAdded(address, chainID)
+			}
+		}
+		return nil
+	}
+
+	err := addFetcherIDOrIDsIfParamsAreEmpty(gethcommon.Address(payload.SendDetails.FromAddress), payload.SendDetails.FromChain)
+	if err != nil {
+		return nil, err
+	}
+	err = addFetcherIDOrIDsIfParamsAreEmpty(gethcommon.Address(payload.SendDetails.ToAddress), payload.SendDetails.ToChain)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (s *Service) fetchActivityForSpecificFetcherIDs(ctx context.Context, ids []fetcherID) {
+	for _, id := range ids {
+		if !s.activityFetcherManager.IsChainSupported(id.chainID) {
+			s.logger.Debug("Activity fetcher does not support chain", zap.Uint64("chainID", id.chainID))
+			continue
+		}
+		s.startFetchActivity(ctx, id)
+	}
 }
 
 func (s *Service) stop() {
@@ -404,17 +492,19 @@ func (s *Service) runAndRemoveCancelFn(fetcherID fetcherID) {
 
 	// Check if all fetchers have completed
 	if len(s.cancelFnMap) == 0 {
-		s.emitFetchComplete()
+		s.emitFetchComplete(fetcherID)
 	}
 }
 
-func (s *Service) emitFetchComplete() {
+func (s *Service) emitFetchComplete(fetcherID fetcherID) {
 	// Emit event to notify that activity fetch is complete
 	// This happens both on initial fetch and periodic fetches
 	if s.eventFeed != nil {
 		s.eventFeed.Send(walletevent.Event{
-			Type:    EventActivityFetchComplete,
-			Message: "{}",
+			Type:     EventActivityFetchComplete,
+			Message:  "{}",
+			ChainID:  fetcherID.chainID,
+			Accounts: []gethcommon.Address{fetcherID.account},
 		})
 	}
 }
