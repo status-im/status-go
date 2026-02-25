@@ -1,3 +1,6 @@
+//go:build use_logos_storage
+// +build use_logos_storage
+
 package logosstorage_test
 
 import (
@@ -70,11 +73,21 @@ func (suite *LogosStorageClientTestSuite) TearDownTest() {
 }
 
 func (suite *LogosStorageClientTestSuite) TestUpload_Success() {
-	cid, err := suite.client.Upload(bytes.NewReader([]byte("payload")), "hello.txt")
+	payload := []byte("payload")
+	cid, err := suite.client.Upload(bytes.NewReader(payload), "hello.txt")
 
 	require.NoError(suite.T(), err)
+	require.NotEmpty(suite.T(), cid)
 	// LogosStorage uses CIDv1 with base58btc encoding (prefix: zDv)
-	assert.Equal(suite.T(), "zDvZRwzm199EVdjriqwtmzdqrTfSJ5W6jsXZbeNVyKnZybnMdpRs", cid)
+	assert.True(suite.T(), len(cid) > 0 && cid[:3] == "zDv", "CID should use CIDv1 base58btc encoding")
+
+	// Note: We don't assert the exact CID value because it may differ between library versions
+	// (nix shell vs native environments may use different logos-storage versions).
+	// Instead, verify we can download the content back and it matches the original.
+	var buf bytes.Buffer
+	err = suite.client.Download(cid, &buf)
+	require.NoError(suite.T(), err)
+	assert.Equal(suite.T(), payload, buf.Bytes(), "downloaded content should match uploaded content")
 }
 
 func (suite *LogosStorageClientTestSuite) TestDownload_Success() {

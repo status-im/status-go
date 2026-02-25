@@ -3,7 +3,9 @@
   "cSpell.words": ["unmarshalling"],
   "gopls": {
     "formatting.local": "github.com/status-im/status-go",
-    "build.buildFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln"]
+    "build.buildFlags": [
+      "-tags=gowaku_skip_migrations,gowaku_no_rln,use_logos_storage"
+    ]
   },
   // format all files on save if a formatter is available
   "editor.formatOnSave": true,
@@ -14,12 +16,13 @@
     "CGO_ENABLED": "1"
   },
   "go.testEnvVars": {
-    "CGO_CFLAGS": "-I${workspaceFolder}/libs",
-    "CGO_LDFLAGS": "-L${workspaceFolder}/libs -lstorage -Wl,-rpath,${workspaceFolder}/libs"
+    "CGO_CFLAGS": "-I${workspaceFolder}/libs -I${workspaceFolder}/../nim-sds/library",
+    "CGO_LDFLAGS": "-L${workspaceFolder}/libs -lstorage -Wl,-rpath,${workspaceFolder}/libs -L${workspaceFolder}/../nim-sds/build -lsds"
   },
-  "go.buildFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln"],
-  "go.testFlags": [
+  "go.buildFlags": [
     "-tags=gowaku_skip_migrations,gowaku_no_rln,use_logos_storage"
   ],
-  "idf.pythonInstallPath": "/usr/bin/python"
+  "go.testFlags": [
+    "-tags=gowaku_skip_migrations,gowaku_no_rln,use_logos_storage"
+  ]
 }
