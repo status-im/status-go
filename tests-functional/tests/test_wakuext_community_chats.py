@@ -187,12 +187,13 @@ class TestCommunityChats(MessengerSteps):
 
         text = f"Hi @{member.public_key}"
         # creator sends a chat message with a mention to trigger a notification
+        msg_start = len(member.received_signals[SignalType.MESSAGES_NEW])
         send_resp = creator.wakuext_service.send_chat_message(chat_id, text)
         assert send_resp.get("chats")[0].get("lastMessage").get("text") == text
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # member receives that message even if chat is muted
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10):
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10, start=msg_start):
             pass
         member_msgs_resp = member.wakuext_service.chat_messages(chat_id)
         assert member_msgs_resp.get("messages")[0].get("text") == text
@@ -218,12 +219,13 @@ class TestCommunityChats(MessengerSteps):
 
         text = f"Hi @{member.public_key}"
         # creator sends a chat message with a mention to trigger a notification
+        msg_start = len(member.received_signals[SignalType.MESSAGES_NEW])
         send_resp = creator.wakuext_service.send_chat_message(chat_id, text)
         assert send_resp.get("chats")[0].get("lastMessage").get("text") == text
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # member receives that message even if chat is muted
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10):
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10, start=msg_start):
             pass
         member_msgs_resp = member.wakuext_service.chat_messages(chat_id)
         assert member_msgs_resp.get("messages")[0].get("text") == text
@@ -237,12 +239,13 @@ class TestCommunityChats(MessengerSteps):
 
         member.wakuext_service.un_mute_community_chats(community_id)
 
+        msg_start = len(member.received_signals[SignalType.MESSAGES_NEW])
         send_resp = creator.wakuext_service.send_chat_message(chat_id, text)
         assert send_resp.get("chats")[0].get("lastMessage").get("text") == text
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # member receives that message even if chat is muted
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10):
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=10, start=msg_start):
             pass
         member_msgs_resp = member.wakuext_service.chat_messages(chat_id)
         assert member_msgs_resp.get("messages")[0].get("text") == text
