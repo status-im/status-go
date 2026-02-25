@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/logos-storage/logos-storage-go-bindings/storage"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/protobuf/proto"
 
@@ -21,6 +20,7 @@ import (
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	logosstorage "github.com/status-im/status-go/services/logosstorage"
 	mock_logosstorage "github.com/status-im/status-go/services/logosstorage/mock"
 	"github.com/status-im/status-go/t/helpers"
 
@@ -296,8 +296,8 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellati
 	// First archive download succeeds
 	s.mockLogosStorage.EXPECT().
 		TriggerDownloadWithContext(gomock.Any(), archives[0].cid).
-		DoAndReturn(func(ctx context.Context, cid string) (storage.Manifest, error) {
-			return storage.Manifest{Cid: cid, DatasetSize: len(archives[0].data)}, nil
+		DoAndReturn(func(ctx context.Context, cid string) (logosstorage.LogosStorageManifest, error) {
+			return logosstorage.LogosStorageManifest{Cid: cid, DatasetSize: len(archives[0].data)}, nil
 		}).
 		Times(1)
 
@@ -313,10 +313,10 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellati
 	for i := 1; i < len(archives); i++ {
 		s.mockLogosStorage.EXPECT().
 			TriggerDownloadWithContext(gomock.Any(), archives[i].cid).
-			DoAndReturn(func(ctx context.Context, cid string) (storage.Manifest, error) {
+			DoAndReturn(func(ctx context.Context, cid string) (logosstorage.LogosStorageManifest, error) {
 				// Block until context is cancelled
 				<-ctx.Done()
-				return storage.Manifest{}, ctx.Err()
+				return logosstorage.LogosStorageManifest{}, ctx.Err()
 			}).
 			Times(1)
 	}

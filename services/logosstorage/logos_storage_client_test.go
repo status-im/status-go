@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/logos-storage/logos-storage-go-bindings/storage"
-
 	logosstorage "github.com/status-im/status-go/services/logosstorage"
 )
 
@@ -225,7 +223,7 @@ func (suite *LogosStorageClientTestSuite) TestTriggerDownloadWithContext_Cancell
 	defer safeCancel(ctx, cancel)
 
 	channelError := make(chan error, 1)
-	var manifest storage.Manifest
+	var manifest logosstorage.LogosStorageManifest
 	go func() {
 		var err error
 		manifest, err = suite.client.TriggerDownloadWithContext(ctx, cid)
@@ -240,7 +238,7 @@ func (suite *LogosStorageClientTestSuite) TestTriggerDownloadWithContext_Cancell
 	case err := <-channelError:
 		require.Error(suite.T(), err)
 		assert.ErrorIs(suite.T(), err, context.Canceled)
-		assert.Equal(suite.T(), storage.Manifest{}, manifest, "expected zero value manifest on cancellation")
+		assert.Equal(suite.T(), logosstorage.LogosStorageManifest{}, manifest, "expected zero value manifest on cancellation")
 	case <-time.After(5 * time.Second):
 		suite.T().Fatal("Test timed out - trigger download didn't respond to cancellation")
 	}
@@ -325,7 +323,7 @@ func (suite *LogosStorageClientTestSuite) TestFetchManifestWithContext_Cancellat
 	defer safeCancel(ctx, cancel)
 
 	channelError := make(chan error, 1)
-	var manifest storage.Manifest
+	var manifest logosstorage.LogosStorageManifest
 	go func() {
 		var err error
 		manifest, err = suite.client.FetchManifestWithContext(ctx, cid)
@@ -338,7 +336,7 @@ func (suite *LogosStorageClientTestSuite) TestFetchManifestWithContext_Cancellat
 	case err := <-channelError:
 		require.Error(suite.T(), err)
 		assert.ErrorIs(suite.T(), err, context.Canceled)
-		assert.Nil(suite.T(), manifest, "expected nil manifest on cancellation")
+		assert.Equal(suite.T(), logosstorage.LogosStorageManifest{}, manifest, "expected zero value manifest on cancellation")
 	case <-time.After(5 * time.Second):
 		suite.T().Fatal("Test timed out - fetch manifest didn't respond to cancellation")
 	}

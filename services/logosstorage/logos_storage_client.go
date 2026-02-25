@@ -91,7 +91,7 @@ func (c *LogosStorageClient) Download(cid string, output io.Writer) error {
 	return c.DownloadWithContext(context.Background(), cid, output)
 }
 
-func (c *LogosStorageClient) TriggerDownload(cid string) (storage.Manifest, error) {
+func (c *LogosStorageClient) TriggerDownload(cid string) (LogosStorageManifest, error) {
 	return c.TriggerDownloadWithContext(context.Background(), cid)
 }
 
@@ -123,12 +123,17 @@ func (c *LogosStorageClient) LocalDownloadWithContext(ctx context.Context, cid s
 	})
 }
 
-func (c *LogosStorageClient) FetchManifestWithContext(ctx context.Context, cid string) (storage.Manifest, error) {
+func (c *LogosStorageClient) FetchManifestWithContext(ctx context.Context, cid string) (LogosStorageManifest, error) {
 	return c.DownloadManifest(cid)
 }
 
-func (c *LogosStorageClient) TriggerDownloadWithContext(ctx context.Context, cid string) (storage.Manifest, error) {
-	return c.node.Fetch(cid)
+func (c *LogosStorageClient) TriggerDownloadWithContext(ctx context.Context, cid string) (LogosStorageManifest, error) {
+	manifest, err := c.node.Fetch(cid)
+	if err != nil {
+		return LogosStorageManifest{}, err
+	}
+
+	return toLogosStorageManifest(manifest), nil
 }
 
 // UploadArchive is a convenience method for uploading archive data
@@ -136,8 +141,13 @@ func (c *LogosStorageClient) UploadArchive(encodedArchive []byte) (string, error
 	return c.Upload(bytes.NewReader(encodedArchive), "archive-data.bin")
 }
 
-func (c *LogosStorageClient) DownloadManifest(cid string) (storage.Manifest, error) {
-	return c.node.DownloadManifest(cid)
+func (c *LogosStorageClient) DownloadManifest(cid string) (LogosStorageManifest, error) {
+	manifest, err := c.node.DownloadManifest(cid)
+	if err != nil {
+		return LogosStorageManifest{}, err
+	}
+
+	return toLogosStorageManifest(manifest), nil
 }
 
 func (c *LogosStorageClient) PeerId() (string, error) {

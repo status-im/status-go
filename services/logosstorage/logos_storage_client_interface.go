@@ -25,11 +25,11 @@ type LogosStorageClientInterface interface {
 	LocalDownloadWithContext(ctx context.Context, cid string, output io.Writer) error
 
 	// Async download methods
-	TriggerDownload(cid string) (storage.Manifest, error)
-	TriggerDownloadWithContext(ctx context.Context, cid string) (storage.Manifest, error)
+	TriggerDownload(cid string) (LogosStorageManifest, error)
+	TriggerDownloadWithContext(ctx context.Context, cid string) (LogosStorageManifest, error)
 
 	// Manifest methods
-	FetchManifestWithContext(ctx context.Context, cid string) (storage.Manifest, error)
+	FetchManifestWithContext(ctx context.Context, cid string) (LogosStorageManifest, error)
 	// CID management methods
 	HasCid(cid string) (bool, error)
 	RemoveCid(cid string) error
