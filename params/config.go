@@ -244,6 +244,7 @@ type WalletConfig struct {
 	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
 
 	MulticallOverrides map[uint64]common.Address `json:"MulticallOverrides"` // map[chainID]multicall3 contract address
+	CommunityTokenDeployerOverrides map[uint64]common.Address `json:"CommunityTokenDeployerOverrides"` // map[chainID]CommunityTokenDeployer contract address
 
 	CustomTokens []*tokentypes.Token `json:"CustomTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
 }
@@ -274,6 +275,7 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 		TokensListsAutoRefreshInterval      int                       `json:"TokensListsAutoRefreshInterval"`
 		TokensListsAutoRefreshCheckInterval int                       `json:"TokensListsAutoRefreshCheckInterval"`
 		MulticallOverrides                  map[uint64]common.Address `json:"MulticallOverrides"`
+		CommunityTokenDeployerOverrides     map[uint64]common.Address `json:"CommunityTokenDeployerOverrides"`
 		CustomTokens                        []*tokentypes.Token       `json:"CustomTokens"`
 	}{
 		Enabled:                             wc.Enabled,
@@ -281,6 +283,7 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
 		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
 		MulticallOverrides:                  wc.MulticallOverrides,
+		CommunityTokenDeployerOverrides:     wc.CommunityTokenDeployerOverrides,
 		CustomTokens:                        wc.CustomTokens,
 	})
 }

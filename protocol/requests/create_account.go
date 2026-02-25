@@ -99,6 +99,7 @@ type WalletConfig struct {
 	MarketDataPriceRefreshInterval      int `json:"marketDataPriceRefreshInterval"`      // in seconds
 
 	MulticallOverrides map[uint64]common.Address `json:"multicallOverrides"` // map[chainID]multicall3 contract address
+	CommunityTokenDeployerOverrides map[uint64]common.Address `json:"communityTokenDeployerOverrides"` // map[chainID]CommunityTokenDeployer contract address
 
 	CustomTokens []*tokentypes.Token `json:"customTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
 }
