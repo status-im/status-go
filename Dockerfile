@@ -10,20 +10,27 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Nim using choosenim
+# Install Nim - use choosenim on amd64, build from source on arm64
 ARG NIM_VERSION=2.2.4
 ENV CHOOSENIM_NO_ANALYTICS=1
-RUN curl https://nim-lang.org/choosenim/init.sh -sSf | sh -s -- -y \
-    && /root/.nimble/bin/choosenim ${NIM_VERSION}
-
-ENV PATH="/root/.nimble/bin:${PATH}"
-
-# Create system-wide symlinks for Nim binaries
-RUN ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nim /usr/local/bin/nim \
-    && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nimble /usr/local/bin/nimble \
-    && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/choosenim /usr/local/bin/choosenim \
-    && chmod 755 /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/* \
+RUN ARCH="$(dpkg --print-architecture)" && \
+    if [ "$ARCH" = "amd64" ]; then \
+        curl https://nim-lang.org/choosenim/init.sh -sSf | sh -s -- -y \
+        && /root/.nimble/bin/choosenim ${NIM_VERSION} \
+        && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nim /usr/local/bin/nim \
+        && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nimble /usr/local/bin/nimble \
+        && chmod 755 /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/*; \
+    else \
+        git clone --depth 1 --branch v${NIM_VERSION} https://github.com/nim-lang/Nim.git /tmp/nim \
+        && cd /tmp/nim \
+        && sh build_all.sh \
+        && ln -sf /tmp/nim/bin/nim /usr/local/bin/nim \
+        && ln -sf /tmp/nim/bin/nimble /usr/local/bin/nimble \
+        && ln -sf /tmp/nim/bin/nimgrep /usr/local/bin/nimgrep; \
+    fi \
     && nim --version
+
+ENV PATH="/root/.nimble/bin:/tmp/nim/bin:${PATH}"
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
