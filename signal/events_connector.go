@@ -16,6 +16,7 @@ const (
 	// WalletConnect (via connector)
 	EventWCSessionProposal = "connector.wcSessionProposal"
 	EventWCSessionRequest  = "connector.wcSessionRequest"
+	EventWCSessionDelete   = "connector.wcSessionDelete"
 )
 
 type WCSessionProposalSignal struct {
@@ -43,6 +44,18 @@ func SendWCSessionRequest(topic string, requestID int64, requestJSON string) {
 		Topic:       topic,
 		RequestID:   requestID,
 		RequestJSON: requestJSON,
+	})
+}
+
+type WCSessionDeleteSignal struct {
+	Topic   string `json:"topic"`
+	DAppURL string `json:"dappUrl"`
+}
+
+func SendWCSessionDelete(topic, dappURL string) {
+	send(EventWCSessionDelete, WCSessionDeleteSignal{
+		Topic:   topic,
+		DAppURL: dappURL,
 	})
 }
 

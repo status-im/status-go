@@ -18,6 +18,7 @@ const (
 	coinsListURL = "%s/coins/list"
 
 	nativeEthTokenID = "ethereum"
+	nativeBNBTokenID = "binancecoin"
 )
 
 type GeckoToken struct {

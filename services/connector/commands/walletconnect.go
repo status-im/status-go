@@ -11,6 +11,40 @@ import (
 	"github.com/status-im/status-go/services/connector/walletconnect"
 )
 
+type wcSessionDisconnector struct {
+	db       *sql.DB
+	wcClient *walletconnect.Client
+}
+
+// NewWCSessionDisconnector creates a new WCSessionDisconnector
+func NewWCSessionDisconnector(db *sql.DB, wcClient *walletconnect.Client) WCSessionDisconnector {
+	return &wcSessionDisconnector{
+		db:       db,
+		wcClient: wcClient,
+	}
+}
+
+// DisconnectSession disconnects a WalletConnect session by topic.
+// It sends a wc_sessionDelete message to the dApp and removes the session from the local DB.
+// Relay notification failures are non-fatal: the session is always cleaned up locally.
+func (d *wcSessionDisconnector) DisconnectSession(ctx context.Context, topic string) error {
+	if d.wcClient != nil {
+		// Notify the dApp via the relay before cleaning up locally.
+		// Non-fatal: the dApp will discover the session is gone on its next interaction.
+		_ = d.wcClient.SendSessionDelete(ctx, topic)
+	}
+	session, err := persistence.SelectWCSession(d.db, topic)
+	if err == nil && session != nil {
+		_ = persistence.DeleteWCSession(d.db, topic)
+		remaining, _ := persistence.SelectWCSessionsByDAppURL(d.db, session.DAppURL)
+		if len(remaining) == 0 {
+			_ = persistence.DeleteDApp(d.db, session.DAppURL, session.ClientID)
+		}
+		return nil
+	}
+	return persistence.DeleteWCSession(d.db, topic)
+}
+
 type PairWCCommand struct {
 	wcClient *walletconnect.Client
 }
@@ -23,29 +57,6 @@ func NewPairWCCommand(wcClient *walletconnect.Client) *PairWCCommand {
 
 func (c *PairWCCommand) Execute(ctx context.Context, uri string) error {
 	return c.wcClient.Pair(ctx, uri)
-}
-
-type DisconnectWCSessionCommand struct {
-	db       *sql.DB
-	wcClient *walletconnect.Client
-}
-
-func NewDisconnectWCSessionCommand(db *sql.DB, wcClient *walletconnect.Client) *DisconnectWCSessionCommand {
-	return &DisconnectWCSessionCommand{
-		db:       db,
-		wcClient: wcClient,
-	}
-}
-
-func (c *DisconnectWCSessionCommand) Execute(ctx context.Context, topic string) error {
-	if c.wcClient != nil {
-		c.wcClient.RemoveSession(topic)
-	}
-	session, err := persistence.SelectWCSession(c.db, topic)
-	if err == nil && session != nil {
-		_ = persistence.DeleteDApp(c.db, session.DAppURL, session.ClientID)
-	}
-	return persistence.DeleteWCSession(c.db, topic)
 }
 
 type GetWCActiveSessionsCommand struct {
@@ -74,7 +85,7 @@ func NewApproveWCSessionCommand(db *sql.DB, wcClient *walletconnect.Client) *App
 	}
 }
 
-func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, account string, chainID uint64, dappURL, dappName, dappIcon string) (string, error) {
+func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, account string, dappURL, dappName, dappIcon string, supportedChains []uint64) (string, error) {
 	if !types.IsHexAddress(account) {
 		return "", fmt.Errorf("invalid account address: %s", account)
 	}
@@ -83,10 +94,20 @@ func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, accou
 		return "", fmt.Errorf("WalletConnect client not initialized")
 	}
 
+	if len(supportedChains) == 0 {
+		return "", fmt.Errorf("supportedChains must not be empty")
+	}
+	chainID := supportedChains[0]
+
+	chains := make([]int64, 0, len(supportedChains))
+	for _, ch := range supportedChains {
+		chains = append(chains, int64(ch))
+	}
+
 	meta := walletconnect.SessionMetadata{
 		Account:   account,
 		ChainID:   chainID,
-		Chains:    []int64{int64(chainID)},
+		Chains:    chains,
 		DAppURL:   dappURL,
 		DAppName:  dappName,
 		DAppIcon:  dappIcon,
@@ -112,10 +133,9 @@ func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, accou
 	}
 
 	createdAt := time.Now().Unix()
-	if err := persistence.UpsertWCSession(c.db, result.Topic, result.SessionJSON, result.Expiry, result.PairingTopic, dappURL, createdAt); err != nil {
+	if err := persistence.UpsertWCSession(c.db, result.Topic, result.SessionJSON, result.Expiry, result.PairingTopic, dappURL, result.SymKey, createdAt); err != nil {
 		return "", fmt.Errorf("upsert session: %w", err)
 	}
-
 	return result.SessionJSON, nil
 }
 
