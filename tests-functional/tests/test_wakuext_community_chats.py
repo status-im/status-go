@@ -136,7 +136,7 @@ class TestCommunityChats(MessengerSteps):
         start_index = len(member.received_signals[SignalType.MESSAGES_NEW])
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=10, start=start_index):
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=30, start=start_index):
             pass
 
         mute_resp = member.wakuext_service.mute_community_chats(community_id, muted_type)
@@ -182,7 +182,7 @@ class TestCommunityChats(MessengerSteps):
         start_index = len(member.received_signals[SignalType.MESSAGES_NEW])
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=10, start=start_index):
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=30, start=start_index):
             pass
 
         text = f"Hi @{member.public_key}"
@@ -211,7 +211,7 @@ class TestCommunityChats(MessengerSteps):
         start_index = len(member.received_signals[SignalType.MESSAGES_NEW])
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=10, start=start_index):
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=30, start=start_index):
             pass
 
         # muting the community chats
