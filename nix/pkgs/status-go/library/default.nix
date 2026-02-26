@@ -68,14 +68,8 @@ in pkgs.buildGoModule {
   # Also set CLEANUP_GENERATED_FILES_DRY_RUN=true to avoid running cleanup_generated_files.sh script,
   # which is not available at this phase, because buildGoModule only copies Go files.
   buildPhase = ''
-    runHook preBuild
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
-    export NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include"
-    export NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib"
-    CGO_ENABLED=1 \
-    CGO_CFLAGS="-I$LIBS_DIR -I$NIM_SDS_INC_DIR" \
-    CGO_LDFLAGS="-L$LIBS_DIR -lstorage -Wl,-rpath,$LIBS_DIR -L$NIM_SDS_LIB_DIR -lsds" \
     make statusgo-library \
         NO_NETWORK=1 \
         NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \
