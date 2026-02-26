@@ -45,14 +45,15 @@ type pairingContext struct {
 
 // Client handles WalletConnect protocol operations via the relay.
 type Client struct {
-	relay            Relay
-	logger           *zap.Logger
-	mu               sync.Mutex
-	handlers         *clientHandlers
-	pendingProposals map[string]*pairingContext // key = fmt.Sprintf("%d", jsonRpcId)
-	pendingRequests  map[int64]chan *JSONRPCResponse
-	pairingTopics    map[string]string // topic -> pairing symKey (hex), set on Pair()
-	activeSessions   map[string]string // topic -> session symKey (hex), set on ApproveSession
+	relay                  Relay
+	logger                 *zap.Logger
+	mu                     sync.Mutex
+	handlers               *clientHandlers
+	pendingProposals       map[string]*pairingContext // key = fmt.Sprintf("%d", jsonRpcId)
+	pendingRequests        map[int64]chan *JSONRPCResponse
+	pendingSessionRequests map[int64]bool    // tracks in-flight wc_sessionRequests for deduplication
+	pairingTopics          map[string]string // topic -> pairing symKey (hex), set on Pair()
+	activeSessions         map[string]string // topic -> session symKey (hex), set on ApproveSession
 }
 
 type clientHandlers struct {
@@ -70,13 +71,14 @@ func NewClient(projectID string) (*Client, error) {
 	}
 
 	c := &Client{
-		relay:            relay,
-		logger:           logutils.ZapLogger(),
-		handlers:         &clientHandlers{},
-		pendingProposals: make(map[string]*pairingContext),
-		pendingRequests:  make(map[int64]chan *JSONRPCResponse),
-		pairingTopics:    make(map[string]string),
-		activeSessions:   make(map[string]string),
+		relay:                  relay,
+		logger:                 logutils.ZapLogger(),
+		handlers:               &clientHandlers{},
+		pendingProposals:       make(map[string]*pairingContext),
+		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
+		pendingSessionRequests: make(map[int64]bool),
+		pairingTopics:          make(map[string]string),
+		activeSessions:         make(map[string]string),
 	}
 
 	// Set reconnection handler to re-subscribe to all active sessions
@@ -271,6 +273,15 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		requestID := fmt.Sprintf("%d", msgID)
 		paramsStr := string(payload.Params)
 
+		c.mu.Lock()
+		_, alreadyPending := c.pendingProposals[requestID]
+		c.mu.Unlock()
+
+		if alreadyPending {
+			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID))
+			return
+		}
+
 		var proposalParams struct {
 			Proposer struct {
 				PublicKey string `json:"publicKey"`
@@ -304,8 +315,20 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		}
 	case "wc_sessionRequest":
 		c.mu.Lock()
+		_, alreadyPendingReq := c.pendingSessionRequests[msgID]
+		if !alreadyPendingReq {
+			c.pendingSessionRequests[msgID] = true
+		}
 		handler := c.handlers.onSessionRequest
 		c.mu.Unlock()
+
+		// Deduplicate: relay may deliver the same request both via FetchMessages
+		// and via an irn_subscription push
+		if alreadyPendingReq {
+			c.logger.Info("wc_sessionRequest duplicate ignored", zap.String("topic", topic), zap.Int64("msgID", msgID))
+			return
+		}
+
 		if handler != nil {
 			handler(topic, string(payload.Params))
 		} else {
@@ -326,11 +349,16 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 			updateHandler(topic, string(payload.Params))
 		}
 	case "wc_sessionDelete":
-		// Remove session immediately then attempt to ack
+		// Remove session atomically; if it was already gone this is a duplicate delivery.
 		c.mu.Lock()
+		_, sessionExisted := c.activeSessions[topic]
 		delete(c.activeSessions, topic)
 		deleteHandler := c.handlers.onSessionDelete
 		c.mu.Unlock()
+		if !sessionExisted {
+			c.logger.Info("wc_sessionDelete duplicate ignored", zap.String("topic", topic))
+			return
+		}
 		if deleteHandler != nil {
 			deleteHandler(topic)
 		}
@@ -533,6 +561,7 @@ func (c *Client) SendSessionDelete(ctx context.Context, topic string) error {
 func (c *Client) RespondToWCSessionRequest(topic string, requestID int64, result any) error {
 	c.mu.Lock()
 	symKey, ok := c.activeSessions[topic]
+	delete(c.pendingSessionRequests, requestID)
 	c.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, topic)
@@ -560,6 +589,7 @@ func (c *Client) RespondToWCSessionRequest(topic string, requestID int64, result
 func (c *Client) RejectWCSessionRequest(topic string, requestID int64, code int, message string) error {
 	c.mu.Lock()
 	symKey, ok := c.activeSessions[topic]
+	delete(c.pendingSessionRequests, requestID)
 	c.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, topic)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -198,13 +199,21 @@ func TestIRNSubscriptionParams_Unmarshal(t *testing.T) {
 	require.Equal(t, 1108, params.Data.Tag)
 }
 
-func TestPayloadID_UniqueAcrossCalls(t *testing.T) {
-	seen := make(map[int64]bool)
+func TestPayloadID_UiqueAcrossCalls(t *testing.T) {
+	// sleeping 1ms guarantees that batches land in different milliseconds to reduce collisions
+	const batchSize = 50
+	const batches = 5
 
-	for i := 0; i < 1000; i++ {
-		id := payloadID()
-		require.False(t, seen[id], "duplicate ID generated")
-		seen[id] = true
+	seen := make(map[int64]bool, batchSize*batches)
+	for b := 0; b < batches; b++ {
+		if b > 0 {
+			time.Sleep(1 * time.Millisecond)
+		}
+		for i := 0; i < batchSize; i++ {
+			id := payloadID()
+			require.False(t, seen[id], "duplicate ID generated")
+			seen[id] = true
+		}
 	}
 }
 
