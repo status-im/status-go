@@ -538,6 +538,8 @@ class MessengerSteps(NetworkConditionsSteps):
         relay.  This method bypasses relay by polling the store node directly
         (tryDatabase=False forces a network fetch through the store protocol).
         """
+        # Normalize: strip community prefix if chat_id is the full form
+        short_chat_id = chat_id[len(community_id) :] if chat_id.startswith(community_id) else chat_id
         deadline = time.time() + timeout
         last_error = None
         last_chats_keys = None
@@ -561,7 +563,7 @@ class MessengerSteps(NetworkConditionsSteps):
                 last_chats_keys = list(chats.keys())
                 last_joined = comm.get("joined")
                 last_is_member = comm.get("isMember")
-                if chat_id in chats or any(v.get("id") == chat_id for v in chats.values() if isinstance(v, dict)):
+                if short_chat_id in chats or any(v.get("id") == chat_id for v in chats.values() if isinstance(v, dict)):
                     return
             time.sleep(2)
         raise TimeoutError(
