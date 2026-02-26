@@ -50,7 +50,7 @@ func newTestClient(relay Relay) *Client {
 		handlers:               &clientHandlers{},
 		pendingProposals:       make(map[string]*pairingContext),
 		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
-		pendingSessionRequests: make(map[int64]bool),
+		pendingSessionRequests: make(map[int64]string),
 		pairingTopics:          make(map[string]string),
 		activeSessions:         make(map[string]string),
 	}
@@ -700,7 +700,7 @@ func TestClient_RespondToWCSessionRequest_Success(t *testing.T) {
 
 	addActiveSession(client, "topic", testSymKey)
 	client.mu.Lock()
-	client.pendingSessionRequests[999] = true
+	client.pendingSessionRequests[999] = "topic"
 	client.mu.Unlock()
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionRequestResponse).Return(nil)
@@ -730,7 +730,7 @@ func TestClient_RejectWCSessionRequest_Success(t *testing.T) {
 
 	addActiveSession(client, "topic", testSymKey)
 	client.mu.Lock()
-	client.pendingSessionRequests[999] = true
+	client.pendingSessionRequests[999] = "topic"
 	client.mu.Unlock()
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionRequestResponse).Return(nil)
@@ -1200,7 +1200,7 @@ func TestClient_HandleRelayMessage_SessionRequest_Deduplication(t *testing.T) {
 		client.mu.Lock()
 		tracked := client.pendingSessionRequests[456]
 		client.mu.Unlock()
-		require.True(t, tracked)
+		require.NotEmpty(t, tracked)
 	})
 
 	t.Run("DifferentIDsBothDelivered", func(t *testing.T) {

@@ -199,7 +199,7 @@ func TestIRNSubscriptionParams_Unmarshal(t *testing.T) {
 	require.Equal(t, 1108, params.Data.Tag)
 }
 
-func TestPayloadID_UiqueAcrossCalls(t *testing.T) {
+func TestPayloadID_UniqueAcrossCalls(t *testing.T) {
 	// sleeping 1ms guarantees that batches land in different milliseconds to reduce collisions
 	const batchSize = 50
 	const batches = 5

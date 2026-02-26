@@ -51,7 +51,7 @@ type Client struct {
 	handlers               *clientHandlers
 	pendingProposals       map[string]*pairingContext // key = fmt.Sprintf("%d", jsonRpcId)
 	pendingRequests        map[int64]chan *JSONRPCResponse
-	pendingSessionRequests map[int64]bool    // tracks in-flight wc_sessionRequests for deduplication
+	pendingSessionRequests map[int64]string  // requestID -> topic; tracks in-flight wc_sessionRequests for deduplication
 	pairingTopics          map[string]string // topic -> pairing symKey (hex), set on Pair()
 	activeSessions         map[string]string // topic -> session symKey (hex), set on ApproveSession
 }
@@ -76,7 +76,7 @@ func NewClient(projectID string) (*Client, error) {
 		handlers:               &clientHandlers{},
 		pendingProposals:       make(map[string]*pairingContext),
 		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
-		pendingSessionRequests: make(map[int64]bool),
+		pendingSessionRequests: make(map[int64]string),
 		pairingTopics:          make(map[string]string),
 		activeSessions:         make(map[string]string),
 	}
@@ -182,6 +182,16 @@ func (c *Client) cancelPending(id int64) {
 	c.mu.Unlock()
 }
 
+// clearSessionRequests removes all in-flight wc_sessionRequest entries for the
+// given topic. Must be called with c.mu held.
+func (c *Client) clearSessionRequestsLocked(topic string) {
+	for id, t := range c.pendingSessionRequests {
+		if t == topic {
+			delete(c.pendingSessionRequests, id)
+		}
+	}
+}
+
 // sendAckResponse sends a JSON-RPC success response with result: true.
 func (c *Client) sendAckResponse(topic, symKey string, id int64, tag int) error {
 	response := JSONRPCResponse{JSONRPC: "2.0", ID: id, Result: true}
@@ -273,15 +283,6 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		requestID := fmt.Sprintf("%d", msgID)
 		paramsStr := string(payload.Params)
 
-		c.mu.Lock()
-		_, alreadyPending := c.pendingProposals[requestID]
-		c.mu.Unlock()
-
-		if alreadyPending {
-			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID))
-			return
-		}
-
 		var proposalParams struct {
 			Proposer struct {
 				PublicKey string `json:"publicKey"`
@@ -304,9 +305,17 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 			ProposalParams: payload.Params,
 		}
 		c.mu.Lock()
-		c.pendingProposals[requestID] = ctx
+		_, alreadyPending := c.pendingProposals[requestID]
+		if !alreadyPending {
+			c.pendingProposals[requestID] = ctx
+		}
 		handler := c.handlers.onSessionProposal
 		c.mu.Unlock()
+
+		if alreadyPending {
+			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID))
+			return
+		}
 
 		if handler != nil {
 			handler(paramsStr)
@@ -317,7 +326,7 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		c.mu.Lock()
 		_, alreadyPendingReq := c.pendingSessionRequests[msgID]
 		if !alreadyPendingReq {
-			c.pendingSessionRequests[msgID] = true
+			c.pendingSessionRequests[msgID] = topic
 		}
 		handler := c.handlers.onSessionRequest
 		c.mu.Unlock()
@@ -353,17 +362,20 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		c.mu.Lock()
 		_, sessionExisted := c.activeSessions[topic]
 		delete(c.activeSessions, topic)
+		c.clearSessionRequestsLocked(topic)
 		deleteHandler := c.handlers.onSessionDelete
 		c.mu.Unlock()
+
+		if err := c.sendAckResponse(topic, symKey, msgID, tagSessionDeleteResponse); err != nil {
+			c.logger.Debug("failed to send session delete ack", zap.Error(err))
+		}
+
 		if !sessionExisted {
 			c.logger.Info("wc_sessionDelete duplicate ignored", zap.String("topic", topic))
 			return
 		}
 		if deleteHandler != nil {
 			deleteHandler(topic)
-		}
-		if err := c.sendAckResponse(topic, symKey, msgID, tagSessionDeleteResponse); err != nil {
-			c.logger.Debug("failed to send session delete ack", zap.Error(err))
 		}
 	default:
 	}
@@ -498,6 +510,7 @@ func (c *Client) RemoveSession(topic string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.activeSessions, topic)
+	c.clearSessionRequestsLocked(topic)
 }
 
 // SendSessionDelete sends a wc_sessionDelete request to the dApp and removes the session from activeSessions
@@ -561,7 +574,6 @@ func (c *Client) SendSessionDelete(ctx context.Context, topic string) error {
 func (c *Client) RespondToWCSessionRequest(topic string, requestID int64, result any) error {
 	c.mu.Lock()
 	symKey, ok := c.activeSessions[topic]
-	delete(c.pendingSessionRequests, requestID)
 	c.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, topic)
@@ -582,14 +594,20 @@ func (c *Client) RespondToWCSessionRequest(topic string, requestID int64, result
 	if err != nil {
 		return fmt.Errorf("encrypt response: %w", err)
 	}
-	return c.relay.Publish(topic, encrypted, tagSessionRequestResponse)
+
+	if err := c.relay.Publish(topic, encrypted, tagSessionRequestResponse); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	delete(c.pendingSessionRequests, requestID)
+	c.mu.Unlock()
+	return nil
 }
 
 // RejectWCSessionRequest sends a JSON-RPC error response for a wc_sessionRequest.
 func (c *Client) RejectWCSessionRequest(topic string, requestID int64, code int, message string) error {
 	c.mu.Lock()
 	symKey, ok := c.activeSessions[topic]
-	delete(c.pendingSessionRequests, requestID)
 	c.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, topic)
@@ -613,7 +631,14 @@ func (c *Client) RejectWCSessionRequest(topic string, requestID int64, code int,
 	if err != nil {
 		return fmt.Errorf("encrypt error response: %w", err)
 	}
-	return c.relay.Publish(topic, encrypted, tagSessionRequestResponse)
+
+	if err := c.relay.Publish(topic, encrypted, tagSessionRequestResponse); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	delete(c.pendingSessionRequests, requestID)
+	c.mu.Unlock()
+	return nil
 }
 
 // RejectSession sends a JSON-RPC error response to the relay when the user rejects a session proposal.
