@@ -2,6 +2,7 @@ package multistandardbalance_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sync"
@@ -9,14 +10,20 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	mock_multistandardbalance "github.com/status-im/status-go/services/wallet/multistandardbalance/mock"
+	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/services/wallet/responses"
+	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 
 	"github.com/stretchr/testify/require"
 
@@ -804,4 +811,214 @@ func TestController_BasicFlow(t *testing.T) {
 	require.Len(t, config2Forced.Native, 2, "Chain 2 should have 2 native accounts with TriggerFullFetch")
 	require.Contains(t, config2Forced.Native, common.BytesToAddress(address1.Bytes()), "Chain 2 should include address1 with TriggerFullFetch")
 	require.Contains(t, config2Forced.Native, common.BytesToAddress(address2.Bytes()), "Chain 2 should include address2 with TriggerFullFetch")
+}
+
+func newTestController(
+	t *testing.T,
+	walletFeed *event.Feed,
+	cfg multistandardbalance.ControllerConfig,
+) (
+	controller *multistandardbalance.Controller,
+	fetchCalls *[]FetchCallRecord,
+	fetchMutex *sync.Mutex,
+	fromAddr types.Address,
+	toAddr types.Address,
+) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	storage := mock_multistandardbalance.NewMockStorage(ctrl)
+	balanceFetcher := mock_multistandardbalance.NewMockBalanceFetcher(ctrl)
+	accountsProvider := mock_multistandardbalance.NewMockAccountsProvider(ctrl)
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_multistandardbalance.NewMockNetworksProvider(ctrl)
+	tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
+	collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
+	lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+
+	fromAddr = types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
+	toAddr = types.Address{0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22}
+
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{fromAddr, toAddr}, nil).AnyTimes()
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{{ChainID: 1}, {ChainID: 10}}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+
+	recentState := multistandardbalance.State{FetchedAt: time.Now().Unix()}
+	storage.EXPECT().GetNativeBalance(gomock.Any(), gomock.Any()).Return(big.NewInt(0), recentState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), gomock.Any()).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), gomock.Any()).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), gomock.Any()).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, recentState, nil).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
+	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
+
+	tokenListProvider.EXPECT().GetTokenContractAddresses(gomock.Any()).Return([]common.Address{}, nil).AnyTimes()
+	collectibleListProvider.EXPECT().GetCollectiblesList(gomock.Any(), gomock.Any()).Return([]multistandardbalance.CollectibleID{}, []multistandardbalance.CollectibleID{}, nil).AnyTimes()
+	lastBlockManager.EXPECT().SetLatestBlockNumber(gomock.Any(), gomock.Any()).AnyTimes()
+
+	calls := make([]FetchCallRecord, 0)
+	mu := &sync.Mutex{}
+	balanceFetcher.EXPECT().FetchBalances(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, chainID uint64, fetchCfg multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
+			mu.Lock()
+			calls = append(calls, FetchCallRecord{ChainID: chainID, Config: fetchCfg})
+			mu.Unlock()
+			ch := make(chan multistandardfetcher.FetchResult)
+			close(ch)
+			return ch, nil
+		},
+	).AnyTimes()
+
+	controller = multistandardbalance.NewController(
+		cfg, storage, balanceFetcher, accountsProvider, accountsPublisher,
+		networksProvider, tokenListProvider, collectibleListProvider,
+		lastBlockManager, walletFeed, zap.NewNop(),
+	)
+
+	return controller, &calls, mu, fromAddr, toAddr
+}
+
+type FetchCallRecord struct {
+	ChainID uint64
+	Config  multistandardfetcher.FetchConfig
+}
+
+func getFetchCallsCopy(calls *[]FetchCallRecord, mu *sync.Mutex) []FetchCallRecord {
+	mu.Lock()
+	defer mu.Unlock()
+	result := make([]FetchCallRecord, len(*calls))
+	copy(result, *calls)
+	return result
+}
+
+func resetFetchCallsShared(calls *[]FetchCallRecord, mu *sync.Mutex) {
+	mu.Lock()
+	*calls = nil
+	mu.Unlock()
+}
+
+// TestController_FetchImmediatelyWithConfig verifies that a successful EventPendingTransactionStatusChanged event
+// triggers an immediate balance fetch for the fromAddress/fromChain and toAddress/toChain in SendDetails,
+// bypassing the debounce, and only fetches Native + ERC20 for a regular transfer.
+func TestController_FetchImmediatelyWithConfig(t *testing.T) {
+	const fromChain = uint64(1)
+	const toChain = uint64(10)
+
+	walletFeed := new(event.Feed)
+	// 0ms debounce lets the initial TriggerFullFetch fire immediately.
+	// 1-hour period prevents periodic fetches from interfering.
+	cfg := multistandardbalance.ControllerConfig{
+		FetchDebounceTime: 0,
+		FetchPeriod:       1 * time.Hour,
+	}
+	controller, fetchCalls, fetchMutex, fromAddr, toAddr := newTestController(t, walletFeed, cfg)
+
+	controller.Start()
+	defer controller.Stop()
+
+	// Wait for the initial full fetch (2 active chains) to complete.
+	require.Eventually(t, func() bool {
+		return len(getFetchCallsCopy(fetchCalls, fetchMutex)) >= 2
+	}, 500*time.Millisecond, 10*time.Millisecond, "initial fetch should complete")
+	resetFetchCallsShared(fetchCalls, fetchMutex)
+
+	// Send a success event for a regular token transfer.
+	payload := pendingtxtracker.StatusChangedPayload{
+		Status: ac.Success,
+		TxDetails: pendingtxtracker.TxDetails{
+			SendDetails: &responses.SendDetails{
+				FromAddress: fromAddr,
+				FromChain:   fromChain,
+				ToAddress:   toAddr,
+				ToChain:     toChain,
+				SendType:    int(sendtype.Transfer), // not a collectibles transfer
+			},
+		},
+	}
+	payloadJSON, err := json.Marshal(payload)
+	require.NoError(t, err)
+	walletFeed.Send(walletevent.Event{
+		Type:    pendingtxtracker.EventPendingTransactionStatusChanged,
+		Message: string(payloadJSON),
+	})
+
+	// Fetch must happen immediately — no debounce involved.
+	require.Eventually(t, func() bool {
+		return len(getFetchCallsCopy(fetchCalls, fetchMutex)) >= 2
+	}, 500*time.Millisecond, 10*time.Millisecond, "immediate fetch should happen for both chains")
+
+	calls := getFetchCallsCopy(fetchCalls, fetchMutex)
+	require.Len(t, calls, 2, "expected exactly one fetch call per chain")
+
+	callsByChain := make(map[uint64]multistandardfetcher.FetchConfig, 2)
+	for _, c := range calls {
+		callsByChain[c.ChainID] = c.Config
+	}
+
+	// fromChain: only fromAddress, Native + ERC20, no collectibles.
+	fromCfg, ok := callsByChain[fromChain]
+	require.True(t, ok, "expected a fetch call for fromChain %d", fromChain)
+	require.Contains(t, fromCfg.Native, common.Address(fromAddr), "fromChain should fetch fromAddress natively")
+	require.NotContains(t, fromCfg.Native, common.Address(toAddr), "fromChain should NOT fetch toAddress")
+	require.Empty(t, fromCfg.ERC721, "no ERC721 for a regular transfer")
+	require.Empty(t, fromCfg.ERC1155, "no ERC1155 for a regular transfer")
+
+	// toChain: only toAddress, Native + ERC20, no collectibles.
+	toCfg, ok := callsByChain[toChain]
+	require.True(t, ok, "expected a fetch call for toChain %d", toChain)
+	require.Contains(t, toCfg.Native, common.Address(toAddr), "toChain should fetch toAddress natively")
+	require.NotContains(t, toCfg.Native, common.Address(fromAddr), "toChain should NOT fetch fromAddress")
+	require.Empty(t, toCfg.ERC721, "no ERC721 for a regular transfer")
+	require.Empty(t, toCfg.ERC1155, "no ERC1155 for a regular transfer")
+}
+
+// TestController_FetchImmediatelyWithConfig_IgnoresNonSuccessStatus verifies that
+// Pending and Failed events do NOT trigger an immediate balance fetch.
+func TestController_FetchImmediatelyWithConfig_IgnoresNonSuccessStatus(t *testing.T) {
+	const fromChain = uint64(1)
+	const toChain = uint64(10)
+
+	walletFeed := new(event.Feed)
+	cfg := multistandardbalance.ControllerConfig{
+		FetchDebounceTime: 0,
+		FetchPeriod:       1 * time.Hour,
+	}
+	controller, fetchCalls, fetchMutex, fromAddr, toAddr := newTestController(t, walletFeed, cfg)
+
+	controller.Start()
+	defer controller.Stop()
+
+	// Wait for the initial full fetch to complete, then reset.
+	require.Eventually(t, func() bool {
+		return len(getFetchCallsCopy(fetchCalls, fetchMutex)) >= 2
+	}, 500*time.Millisecond, 10*time.Millisecond, "initial fetch should complete")
+	resetFetchCallsShared(fetchCalls, fetchMutex)
+
+	for _, status := range []ac.TxStatus{ac.Pending, ac.Failed} {
+		resetFetchCallsShared(fetchCalls, fetchMutex)
+
+		payload := pendingtxtracker.StatusChangedPayload{
+			Status: status,
+			TxDetails: pendingtxtracker.TxDetails{
+				SendDetails: &responses.SendDetails{
+					FromAddress: fromAddr,
+					FromChain:   fromChain,
+					ToAddress:   toAddr,
+					ToChain:     toChain,
+					SendType:    int(sendtype.Transfer),
+				},
+			},
+		}
+		payloadJSON, err := json.Marshal(payload)
+		require.NoError(t, err)
+		walletFeed.Send(walletevent.Event{
+			Type:    pendingtxtracker.EventPendingTransactionStatusChanged,
+			Message: string(payloadJSON),
+		})
+
+		// Give the watcher goroutine time to process the event.
+		time.Sleep(100 * time.Millisecond)
+		require.Empty(t, getFetchCallsCopy(fetchCalls, fetchMutex),
+			"status %q should NOT trigger an immediate fetch", status)
+	}
 }
