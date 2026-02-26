@@ -279,6 +279,27 @@ func (c *Client) FetchTokenMarketValues(tokens []*tokentypes.Token, currency str
 	return result, nil
 }
 
+// aggregatePrices groups a slice of HistoricalPrice by the given aggregate factor,
+// averaging values within each group and using the last timestamp of the group.
+func aggregatePrices(prices []thirdparty.HistoricalPrice, aggregate int) []thirdparty.HistoricalPrice {
+	if aggregate <= 1 || len(prices) == 0 {
+		return prices
+	}
+	result := make([]thirdparty.HistoricalPrice, 0, len(prices)/aggregate+1)
+	for i := 0; i < len(prices); i += aggregate {
+		chunk := prices[i:min(i+aggregate, len(prices))]
+		var sum float64
+		for _, p := range chunk {
+			sum += p.Value
+		}
+		result = append(result, thirdparty.HistoricalPrice{
+			Timestamp: chunk[len(chunk)-1].Timestamp,
+			Value:     sum / float64(len(chunk)),
+		})
+	}
+	return result
+}
+
 // FetchHistoricalHourlyPrices fetches the hourly prices for the given token and currency
 // returns a list of HistoricalPrice
 func (c *Client) FetchHistoricalHourlyPrices(token *tokentypes.Token, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
@@ -321,12 +342,12 @@ func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency st
 	result := make([]thirdparty.HistoricalPrice, 0)
 	for _, price := range container.Prices {
 		result = append(result, thirdparty.HistoricalPrice{
-			Timestamp: int64(price[0]),
+			Timestamp: int64(price[0]) / 1000, // CoinGecko returns ms; convert to seconds
 			Value:     price[1],
 		})
 	}
 
-	return result, nil
+	return aggregatePrices(result, aggregate), nil
 }
 
 // doGetRequestWithOptionalAuth performs a GET request, using credentials if they are available
