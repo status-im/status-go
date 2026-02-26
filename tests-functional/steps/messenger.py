@@ -1,5 +1,6 @@
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportAttributeAccessIssue=false
+import logging
 import time
 from uuid import uuid4
 
@@ -11,6 +12,8 @@ from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps.network_conditions import NetworkConditionsSteps
 from utils import fake
+
+logger = logging.getLogger(__name__)
 
 
 class MessengerSteps(NetworkConditionsSteps):
@@ -196,6 +199,7 @@ class MessengerSteps(NetworkConditionsSteps):
 
         # Keep a single budget for all phases.
         deadline = time.monotonic() + 120
+        logger.info("join_community: starting for community_id=%s", self.community_id)
         member_messages_start = len(member.received_signals[SignalType.MESSAGES_NEW])
 
         member_warmup_attempts = 0
@@ -225,8 +229,7 @@ class MessengerSteps(NetworkConditionsSteps):
         accepted_seen = False
         accepted_via = None
 
-        # Phase A: member visibility warm-up.
-        # Keep this phase bounded so request/accept phases always get time from the same 120s budget.
+        logger.info("join_community: Phase A — member visibility warm-up")
         phase_a_deadline = min(deadline, time.monotonic() + 50.0)
         warmup_timed_out = False
         while time.monotonic() < phase_a_deadline:
@@ -241,6 +244,7 @@ class MessengerSteps(NetworkConditionsSteps):
                 member_last_fetch = None
 
             if member_last_fetch:
+                logger.info("join_community: Phase A — community visible after %d fast-fetch attempts", member_warmup_attempts)
                 break
 
             remaining_phase_a = phase_a_deadline - time.monotonic()
@@ -263,6 +267,7 @@ class MessengerSteps(NetworkConditionsSteps):
                     member_last_fetch = None
 
                 if member_last_fetch:
+                    logger.info("join_community: Phase A — community visible after blocking fetch (attempt %d)", member_blocking_fetch_attempts)
                     break
 
             try:
@@ -276,11 +281,14 @@ class MessengerSteps(NetworkConditionsSteps):
 
         if not member_last_fetch:
             warmup_timed_out = True
+            logger.warning(
+                "join_community: Phase A — warm-up timed out after %d attempts (last_error=%s)", member_warmup_attempts, member_last_fetch_error
+            )
 
         # Ensure admin is aware of the community before handling membership updates.
         self.fetch_community(admin)
 
-        # Phase B: request-to-join loop with transient retry every 20-30s.
+        logger.info("join_community: Phase B — requesting to join")
         request_retry_interval = 25.0
         next_request_at = time.monotonic()
         while time.monotonic() < deadline and not join_id:
@@ -293,18 +301,22 @@ class MessengerSteps(NetworkConditionsSteps):
                     join_id = join_req.get("id")
                     join_state = join_req.get("state")
                     if join_id:
+                        logger.info("join_community: Phase B — got join_id=%s, state=%s (attempt %d)", join_id, join_state, request_attempts)
                         if _is_accepted(join_state):
                             accepted_seen = True
                             accepted_via = "rpc_response"
                         break
                     last_request_error = f"Missing join id in response: {response_to_join}"
+                    logger.debug("join_community: Phase B — no join_id in response (attempt %d)", request_attempts)
                 except ApiResponseError as e:
                     if _is_already_joined(e):
                         accepted_seen = True
                         accepted_via = "request_already_joined"
+                        logger.info("join_community: Phase B — already joined")
                         break
                     elif _is_community_not_found(e):
                         last_request_error = str(e)
+                        logger.debug("join_community: Phase B — community not found (attempt %d): %s", request_attempts, e)
                     else:
                         raise
                 finally:
@@ -342,7 +354,7 @@ class MessengerSteps(NetworkConditionsSteps):
 
         last_resend_at = time.monotonic()
 
-        # Phase C: observe/accept request (manual accept flow) and periodically re-send join request.
+        logger.info("join_community: Phase C — waiting for admin to accept join request (join_id=%s)", join_id)
         while time.monotonic() < deadline and not accepted_seen:
             try:
                 last_member_latest = member.wakuext_service.latest_request_to_join_for_community(self.community_id)
@@ -350,6 +362,7 @@ class MessengerSteps(NetworkConditionsSteps):
                     accepted_seen = True
                     accepted_via = "member_latest"
                     join_state = last_member_latest.get("state")
+                    logger.info("join_community: Phase C — member sees accepted state via latest_request")
                     break
             except Exception as e:
                 last_poll_error = f"member_latest: {e}"
@@ -382,6 +395,8 @@ class MessengerSteps(NetworkConditionsSteps):
             elif len(admin_observed_ids) == 1:
                 accept_id = next(iter(admin_observed_ids))
 
+            logger.debug("join_community: Phase C — admin observed request ids: %s, will accept: %s", admin_observed_ids, accept_id)
+
             if accept_id and (time.monotonic() - last_accept_attempt_at) >= 2.0:
                 try:
                     accept_resp = admin.wakuext_service.accept_request_to_join_community(accept_id)
@@ -390,15 +405,18 @@ class MessengerSteps(NetworkConditionsSteps):
                         accepted_seen = True
                         accepted_via = "admin_accept"
                         join_state = accept_state
+                        logger.info("join_community: Phase C — admin accepted request %s", accept_id)
                         if accept_id != join_id:
                             join_id = accept_id
                 except Exception as e:
                     last_accept_error = str(e)
+                    logger.debug("join_community: Phase C — accept failed for %s: %s", accept_id, e)
                 finally:
                     last_accept_attempt_at = time.monotonic()
 
             # Re-send join request every ~25 seconds while waiting for acceptance.
             if not accepted_seen and (time.monotonic() - last_resend_at) >= 25.0:
+                logger.debug("join_community: Phase C — re-sending join request (resend attempt %d)", request_resend_attempts + 1)
                 request_resend_attempts += 1
                 try:
                     retry_resp = member.wakuext_service.request_to_join_community(self.community_id)
@@ -424,6 +442,7 @@ class MessengerSteps(NetworkConditionsSteps):
                 time.sleep(1)
 
         # Best-effort wait for acceptance signal propagation.
+        logger.info("join_community: accepted_seen=%s, accepted_via=%s", accepted_seen, accepted_via)
         if accepted_seen:
             try:
                 with member.expect_signal(
@@ -441,6 +460,7 @@ class MessengerSteps(NetworkConditionsSteps):
                 pass
 
         # Phase D: completion condition.
+        logger.info("join_community: Phase D — waiting for member to see community as joined")
         completion_attempt = 0
         while time.monotonic() < deadline:
             completion_attempt += 1
@@ -465,14 +485,28 @@ class MessengerSteps(NetworkConditionsSteps):
             chats = (last_member_comm.get("chats") or {}) if last_member_comm else {}
             chat_id = _pick_chat_id(chats)
 
+            if completion_attempt % 5 == 0:
+                logger.debug(
+                    "join_community: Phase D — attempt %d, community_found=%s, is_joined=%s, chats=%d, chat_id=%s",
+                    completion_attempt,
+                    last_member_comm is not None,
+                    is_joined,
+                    len(chats),
+                    chat_id,
+                )
+
             if chat_id:
                 full_chat_id = self.community_id + chat_id
                 if is_joined:
+                    logger.info("join_community: Phase D — member joined, chat_id=%s (attempt %d)", full_chat_id, completion_attempt)
                     return full_chat_id
                 if accepted_seen:
                     try:
                         response = member.wakuext_service.chat_messages(full_chat_id, limit=1)
                         if response is not None and "messages" in response:
+                            logger.info(
+                                "join_community: Phase D — member can access chat messages, chat_id=%s (attempt %d)", full_chat_id, completion_attempt
+                            )
                             return full_chat_id
                     except Exception as e:
                         last_chat_messages_error = str(e)
