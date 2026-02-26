@@ -496,6 +496,47 @@ class MessengerSteps(NetworkConditionsSteps):
             f"last_chat_messages_error={last_chat_messages_error}, last_poll_error={last_poll_error}"
         )
 
+    def wait_for_community_chat_visible(self, member, community_id, chat_id, timeout=60):
+        """Force member to sync community from store node until the new chat appears.
+
+        After join_community, Waku relay subscriptions may be in a transitional
+        state and the member can miss community description updates published via
+        relay.  This method bypasses relay by polling the store node directly
+        (tryDatabase=False forces a network fetch through the store protocol).
+        """
+        deadline = time.time() + timeout
+        last_error = None
+        last_chats_keys = None
+        last_joined = None
+        last_is_member = None
+        while time.time() < deadline:
+            try:
+                comm = self.fetch_community(
+                    member,
+                    community_id,
+                    wait_for_response=True,
+                    try_database=False,
+                    timeout=10,
+                )
+            except ApiResponseError as e:
+                last_error = e
+                time.sleep(2)
+                continue
+            if comm:
+                chats = comm.get("chats") or {}
+                last_chats_keys = list(chats.keys())
+                last_joined = comm.get("joined")
+                last_is_member = comm.get("isMember")
+                if chat_id in chats or any(v.get("id") == chat_id for v in chats.values() if isinstance(v, dict)):
+                    return
+            time.sleep(2)
+        raise TimeoutError(
+            f"Member did not see chat {chat_id} in community {community_id} "
+            f"within {timeout}s. last_error={last_error}, "
+            f"last_chats_keys={last_chats_keys}, "
+            f"last_joined={last_joined}, last_is_member={last_is_member}"
+        )
+
     @retry(stop=stop_after_delay(20), wait=wait_fixed(0.5), reraise=True)
     def leave_the_community(self, node, community_id=None):
         if not community_id:

@@ -133,11 +133,7 @@ class TestCommunityChats(MessengerSteps):
 
     @pytest.mark.parametrize("muted_type", [mt.value for mt in MuteType])
     def test_mute_types_are_applied(self, creator, member, community_id, chat_payload, muted_type):
-        start_index = len(member.received_signals[SignalType.MESSAGES_NEW])
-        create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
-        chat_id = create_resp.get("chats")[0].get("id")
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=30, start=start_index):
-            pass
+        creator.wakuext_service.create_community_chat(community_id, chat_payload)
 
         mute_resp = member.wakuext_service.mute_community_chats(community_id, muted_type)
         community_after_mute = member.wakuext_service.fetch_community(community_id)
@@ -179,11 +175,9 @@ class TestCommunityChats(MessengerSteps):
             assert comm_mute_till == "0001-01-01T00:00:00Z"
 
     def test_send_community_chat_message_with_mention(self, creator, member, community_id, chat_payload):
-        start_index = len(member.received_signals[SignalType.MESSAGES_NEW])
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=30, start=start_index):
-            pass
+        self.wait_for_community_chat_visible(member, community_id, chat_id)
 
         text = f"Hi @{member.public_key}"
         # creator sends a chat message with a mention to trigger a notification
@@ -208,11 +202,9 @@ class TestCommunityChats(MessengerSteps):
         assert notifications[0].get("message").get("text") == text
 
     def test_send_community_chat_message_while_chat_is_muted_and_then_unmuted(self, creator, member, community_id, chat_payload):
-        start_index = len(member.received_signals[SignalType.MESSAGES_NEW])
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=chat_id, timeout=30, start=start_index):
-            pass
+        self.wait_for_community_chat_visible(member, community_id, chat_id)
 
         # muting the community chats
         member.wakuext_service.mute_community_chats(community_id, MuteType.MUTE_FOR15_MIN.value)
