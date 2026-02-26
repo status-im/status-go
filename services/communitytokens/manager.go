@@ -26,13 +26,13 @@ import (
 )
 
 type Manager struct {
-	contractMaker *communitytokens.CommunityTokensContractMaker
+	contractMaker     *communitytokens.CommunityTokensContractMaker
 	deployerOverrides map[uint64]common.Address
 }
 
 func NewManager(rpcClient *rpc.Client, deployerOverrides map[uint64]common.Address) *Manager {
 	return &Manager{
-		contractMaker: communitytokens.NewCommunityTokensContractMakerMaker(rpcClient),
+		contractMaker:     communitytokens.NewCommunityTokensContractMakerMaker(rpcClient),
 		deployerOverrides: deployerOverrides,
 	}
 }
