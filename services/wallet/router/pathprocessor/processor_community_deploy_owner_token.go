@@ -29,17 +29,17 @@ import (
 )
 
 type CommunityDeployOwnerTokenProcessor struct {
-	contractMaker   *communitytokens.CommunityTokensContractMaker
-	ethClientGetter rpc.EthClientGetter
-	transactor      transactions.TransactorIface
+	contractMaker     *communitytokens.CommunityTokensContractMaker
+	ethClientGetter   rpc.EthClientGetter
+	transactor        transactions.TransactorIface
 	deployerOverrides map[uint64]common.Address
 }
 
 func NewCommunityDeployOwnerTokenProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, deployerOverrides map[uint64]common.Address) *CommunityDeployOwnerTokenProcessor {
 	return &CommunityDeployOwnerTokenProcessor{
-		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
-		ethClientGetter: ethClientGetter,
-		transactor:      transactor,
+		contractMaker:     communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter:   ethClientGetter,
+		transactor:        transactor,
 		deployerOverrides: deployerOverrides,
 	}
 }
