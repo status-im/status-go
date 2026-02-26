@@ -56,11 +56,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         return communities_response or []
 
     def _spectate_and_fetch_community(self, backend, community_id, attempts=10, delay=5):
-        try:
-            backend.wakuext_service.spectate_community(community_id)
-        except ApiResponseError as exc:
-            logging.warning(f"Spectate community failed for {community_id}: {exc}")
-
+        # Fetch first so community exists in local DB before spectating.
+        # `wakuext_spectateCommunity` returns "community not found" when called before fetch/sync.
         community = None
         for attempt in range(attempts):
             community = self.fetch_community(backend, community_id)
@@ -68,6 +65,14 @@ class TestCommunityTokenPermissions(MessengerSteps):
                 break
             logging.info(f"Community {community_id} not found yet (attempt {attempt + 1}/{attempts})")
             time.sleep(delay)
+
+        if not community:
+            return None
+
+        try:
+            backend.wakuext_service.spectate_community(community_id)
+        except ApiResponseError as exc:
+            logging.warning(f"Spectate community failed for {community_id}: {exc}")
 
         return community
 
