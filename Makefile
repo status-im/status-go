@@ -217,6 +217,11 @@ test-logosstorage: fetch-libstorage $(LIBSDS) ##@tests Run logosstorage-related 
 	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
 	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
 	gotestsum --packages="./protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_logos_storage gowaku_skip_migrations"
+	LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
+	gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_logos_storage gowaku_skip_migrations" \
+	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
 
 test-logos-storage: test-logosstorage ##@tests Alias for test-logosstorage
 
@@ -225,6 +230,9 @@ test-libstorage: test-logosstorage ##@tests Alias for test-logosstorage
 test-torrent: $(LIBSDS) ##@tests Run torrent archive package tests via gotestsum
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations"
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations" \
+	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
 
 history-archive-help: ##@build Show history archive build/test toggles and env vars
 	@echo "History archive build toggles:"
