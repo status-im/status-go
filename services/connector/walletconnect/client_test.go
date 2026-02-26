@@ -15,17 +15,44 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 )
 
+// testSymKey is a 64-hex-char (32-byte) symmetric key used across tests.
+const testSymKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+// newMockClient creates a gomock controller, a MockRelay, and a test Client in one call.
+// The controller is registered for automatic cleanup via t.Cleanup.
+func newMockClient(t *testing.T) (*gomock.Controller, *MockRelay, *Client) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	relay := NewMockRelay(ctrl)
+	return ctrl, relay, newTestClient(relay)
+}
+
+// addActiveSession registers symKey for topic in client.activeSessions under the client mutex.
+func addActiveSession(client *Client, topic, symKey string) {
+	client.mu.Lock()
+	client.activeSessions[topic] = symKey
+	client.mu.Unlock()
+}
+
+// addPairingTopic registers symKey for topic in client.pairingTopics under the client mutex.
+func addPairingTopic(client *Client, topic, symKey string) {
+	client.mu.Lock()
+	client.pairingTopics[topic] = symKey
+	client.mu.Unlock()
+}
+
 // newTestClient creates a Client with the supplied relay, bypassing NewClient.
 // Use this to inject a MockRelay in tests.
 func newTestClient(relay Relay) *Client {
 	return &Client{
-		relay:            relay,
-		logger:           logutils.ZapLogger(),
-		handlers:         &clientHandlers{},
-		pendingProposals: make(map[string]*pairingContext),
-		pendingRequests:  make(map[int64]chan *JSONRPCResponse),
-		pairingTopics:    make(map[string]string),
-		activeSessions:   make(map[string]string),
+		relay:                  relay,
+		logger:                 logutils.ZapLogger(),
+		handlers:               &clientHandlers{},
+		pendingProposals:       make(map[string]*pairingContext),
+		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
+		pendingSessionRequests: make(map[int64]string),
+		pairingTopics:          make(map[string]string),
+		activeSessions:         make(map[string]string),
 	}
 }
 
@@ -61,85 +88,106 @@ func TestNewClient(t *testing.T) {
 	require.NotNil(t, client.activeSessions)
 }
 
-func TestClient_SetSessionProposalHandler(t *testing.T) {
-	client, _ := NewClient("test")
+func TestClient_SetHandlers(t *testing.T) {
+	t.Run("SessionProposal", func(t *testing.T) {
+		client, _ := NewClient("test")
+		called := false
+		client.SetSessionProposalHandler(func(string) { called = true })
+		client.mu.Lock()
+		h := client.handlers.onSessionProposal
+		client.mu.Unlock()
+		h("test")
+		require.True(t, called)
+	})
 
-	called := false
-	handler := func(proposalJSON string) {
-		called = true
+	t.Run("SessionRequest", func(t *testing.T) {
+		client, _ := NewClient("test")
+		called := false
+		client.SetSessionRequestHandler(func(_, _ string) { called = true })
+		client.mu.Lock()
+		h := client.handlers.onSessionRequest
+		client.mu.Unlock()
+		h("topic", "request")
+		require.True(t, called)
+	})
+
+	t.Run("SessionUpdate", func(t *testing.T) {
+		client, _ := NewClient("test")
+		called := false
+		client.SetSessionUpdateHandler(func(_, _ string) { called = true })
+		client.mu.Lock()
+		h := client.handlers.onSessionUpdate
+		client.mu.Unlock()
+		h("topic", `{"namespaces":{}}`)
+		require.True(t, called)
+	})
+
+	t.Run("SessionDelete", func(t *testing.T) {
+		client, _ := NewClient("test")
+		called := false
+		client.SetSessionDeleteHandler(func(string) { called = true })
+		client.mu.Lock()
+		h := client.handlers.onSessionDelete
+		client.mu.Unlock()
+		require.NotNil(t, h)
+		h("topic")
+		require.True(t, called)
+	})
+}
+
+func TestClient_GetSymKeyForTopic(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupPairing map[string]string
+		setupSession map[string]string
+		topic        string
+		wantKey      string
+		wantFound    bool
+	}{
+		{
+			name:         "PairingTopic",
+			setupPairing: map[string]string{"topic1": "key1"},
+			topic:        "topic1",
+			wantKey:      "key1",
+			wantFound:    true,
+		},
+		{
+			name:         "SessionTopic",
+			setupSession: map[string]string{"topic2": "key2"},
+			topic:        "topic2",
+			wantKey:      "key2",
+			wantFound:    true,
+		},
+		{
+			name:      "NotFound",
+			topic:     "nonexistent",
+			wantFound: false,
+		},
+		{
+			name:         "SessionPriority",
+			setupPairing: map[string]string{"topic": "pairing-key"},
+			setupSession: map[string]string{"topic": "session-key"},
+			topic:        "topic",
+			wantKey:      "session-key",
+			wantFound:    true,
+		},
 	}
-
-	client.SetSessionProposalHandler(handler)
-
-	client.mu.Lock()
-	h := client.handlers.onSessionProposal
-	client.mu.Unlock()
-
-	h("test")
-	require.True(t, called)
-}
-
-func TestClient_SetSessionRequestHandler(t *testing.T) {
-	client, _ := NewClient("test")
-
-	called := false
-	handler := func(topic, requestJSON string) {
-		called = true
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, _ := NewClient("test")
+			client.mu.Lock()
+			for k, v := range tt.setupPairing {
+				client.pairingTopics[k] = v
+			}
+			for k, v := range tt.setupSession {
+				client.activeSessions[k] = v
+			}
+			client.mu.Unlock()
+			key, ok := client.getSymKeyForTopic(tt.topic)
+			require.Equal(t, tt.wantFound, ok)
+			require.Equal(t, tt.wantKey, key)
+		})
 	}
-
-	client.SetSessionRequestHandler(handler)
-
-	client.mu.Lock()
-	h := client.handlers.onSessionRequest
-	client.mu.Unlock()
-
-	h("topic", "request")
-	require.True(t, called)
-}
-
-func TestClient_GetSymKeyForTopic_PairingTopic(t *testing.T) {
-	client, _ := NewClient("test")
-
-	client.mu.Lock()
-	client.pairingTopics["topic1"] = "key1"
-	client.mu.Unlock()
-
-	key, ok := client.getSymKeyForTopic("topic1")
-	require.True(t, ok)
-	require.Equal(t, "key1", key)
-}
-
-func TestClient_GetSymKeyForTopic_SessionTopic(t *testing.T) {
-	client, _ := NewClient("test")
-
-	client.mu.Lock()
-	client.activeSessions["topic2"] = "key2"
-	client.mu.Unlock()
-
-	key, ok := client.getSymKeyForTopic("topic2")
-	require.True(t, ok)
-	require.Equal(t, "key2", key)
-}
-
-func TestClient_GetSymKeyForTopic_NotFound(t *testing.T) {
-	client, _ := NewClient("test")
-
-	key, ok := client.getSymKeyForTopic("nonexistent")
-	require.False(t, ok)
-	require.Empty(t, key)
-}
-
-func TestClient_GetSymKeyForTopic_SessionPriority(t *testing.T) {
-	client, _ := NewClient("test")
-
-	client.mu.Lock()
-	client.pairingTopics["topic"] = "pairing-key"
-	client.activeSessions["topic"] = "session-key"
-	client.mu.Unlock()
-
-	key, ok := client.getSymKeyForTopic("topic")
-	require.True(t, ok)
-	require.Equal(t, "session-key", key)
 }
 
 func TestClient_RemoveSession(t *testing.T) {
@@ -168,10 +216,7 @@ func TestClient_HandleRelayMessage_NoSymKey(t *testing.T) {
 func TestClient_HandleRelayMessage_InvalidEncryption(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.pairingTopics["topic"] = symKey
-	client.mu.Unlock()
+	addPairingTopic(client, "topic", testSymKey)
 
 	client.handleRelayMessage("topic", "invalid-base64", 1100)
 }
@@ -179,10 +224,7 @@ func TestClient_HandleRelayMessage_InvalidEncryption(t *testing.T) {
 func TestClient_HandleRelayMessage_SessionProposal(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.pairingTopics["topic"] = symKey
-	client.mu.Unlock()
+	addPairingTopic(client, "topic", testSymKey)
 
 	receivedProposal := ""
 	client.SetSessionProposalHandler(func(proposalJSON string) {
@@ -199,7 +241,7 @@ func TestClient_HandleRelayMessage_SessionProposal(t *testing.T) {
 		},
 	}
 	proposalJSON, _ := json.Marshal(proposal)
-	encryptedProposal, _ := EncryptType0Envelope(symKey, proposalJSON)
+	encryptedProposal, _ := EncryptType0Envelope(testSymKey, proposalJSON)
 
 	client.handleRelayMessage("topic", encryptedProposal, tagSessionPropose)
 
@@ -215,10 +257,7 @@ func TestClient_HandleRelayMessage_SessionProposal(t *testing.T) {
 func TestClient_HandleRelayMessage_SessionRequest(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	receivedTopic := ""
 	receivedRequest := ""
@@ -237,7 +276,7 @@ func TestClient_HandleRelayMessage_SessionRequest(t *testing.T) {
 		},
 	}
 	requestJSON, _ := json.Marshal(request)
-	encryptedRequest, _ := EncryptType0Envelope(symKey, requestJSON)
+	encryptedRequest, _ := EncryptType0Envelope(testSymKey, requestJSON)
 
 	client.handleRelayMessage("topic", encryptedRequest, tagSessionRequest)
 
@@ -323,43 +362,57 @@ func TestClient_RegisterPending_ResolvePending(t *testing.T) {
 	require.False(t, ok)
 }
 
-func TestClient_HandleRelayMessage_JSONRPCResponse_ResolvesPending(t *testing.T) {
-	client, _ := NewClient("test")
+func TestClient_HandleRelayMessage_JSONRPCResponse(t *testing.T) {
+	t.Run("ResolvesPending", func(t *testing.T) {
+		client, _ := NewClient("test")
+		addActiveSession(client, "topic", testSymKey)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+		ch := client.registerPending(999)
+		resp := map[string]any{"jsonrpc": "2.0", "id": 999, "result": true}
+		respJSON, _ := json.Marshal(resp)
+		encrypted, _ := EncryptType0Envelope(testSymKey, respJSON)
 
-	ch := client.registerPending(999)
+		client.handleRelayMessage("topic", encrypted, tagSessionSettleResponse)
 
-	resp := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      999,
-		"result":  true,
-	}
-	respJSON, _ := json.Marshal(resp)
-	encrypted, _ := EncryptType0Envelope(symKey, respJSON)
+		select {
+		case r := <-ch:
+			require.NotNil(t, r)
+			require.Equal(t, true, r.Result)
+			require.Nil(t, r.Error)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("expected response to be delivered to pending channel")
+		}
+	})
 
-	client.handleRelayMessage("topic", encrypted, tagSessionSettleResponse)
+	t.Run("WithError", func(t *testing.T) {
+		client, _ := NewClient("test")
+		addActiveSession(client, "topic", testSymKey)
 
-	select {
-	case r := <-ch:
-		require.NotNil(t, r)
-		require.Equal(t, true, r.Result)
-		require.Nil(t, r.Error)
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("expected response to be delivered to pending channel")
-	}
+		ch := client.registerPending(777)
+		resp := map[string]any{
+			"jsonrpc": "2.0",
+			"id":      int64(777),
+			"error":   map[string]any{"code": 5000, "message": "rejected"},
+		}
+		respJSON, _ := json.Marshal(resp)
+		encrypted, _ := EncryptType0Envelope(testSymKey, respJSON)
+
+		client.handleRelayMessage("topic", encrypted, tagSessionSettleResponse)
+
+		select {
+		case r := <-ch:
+			require.NotNil(t, r.Error)
+			require.Equal(t, "rejected", r.Error.Message)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("expected error response")
+		}
+	})
 }
 
 func TestClient_HandleRelayMessage_SessionPing(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	// Use a mock relay to capture the publish call
 	// For now we just verify it doesn't panic - full test would need relay mock
@@ -369,7 +422,7 @@ func TestClient_HandleRelayMessage_SessionPing(t *testing.T) {
 		"params": map[string]any{},
 	}
 	pingJSON, _ := json.Marshal(ping)
-	encrypted, _ := EncryptType0Envelope(symKey, pingJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, pingJSON)
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, tagSessionPing)
@@ -379,10 +432,7 @@ func TestClient_HandleRelayMessage_SessionPing(t *testing.T) {
 func TestClient_HandleRelayMessage_SessionUpdate(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	called := false
 	client.SetSessionUpdateHandler(func(topic, namespacesJSON string) {
@@ -406,7 +456,7 @@ func TestClient_HandleRelayMessage_SessionUpdate(t *testing.T) {
 		},
 	}
 	updateJSON, _ := json.Marshal(update)
-	encrypted, _ := EncryptType0Envelope(symKey, updateJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, updateJSON)
 
 	client.handleRelayMessage("topic", encrypted, tagSessionUpdate)
 
@@ -414,37 +464,10 @@ func TestClient_HandleRelayMessage_SessionUpdate(t *testing.T) {
 	require.True(t, called)
 }
 
-func TestClient_HandleRelayMessage_SessionDelete_RemovesFromActiveSessions(t *testing.T) {
+func TestClient_HandleRelayMessage_SessionDelete(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
-
-	deleteReq := map[string]any{
-		"id":     int64(3),
-		"method": "wc_sessionDelete",
-		"params": map[string]any{"code": int64(1000), "message": "disconnect"},
-	}
-	deleteJSON, _ := json.Marshal(deleteReq)
-	encrypted, _ := EncryptType0Envelope(symKey, deleteJSON)
-
-	client.handleRelayMessage("topic", encrypted, tagSessionDelete)
-
-	client.mu.Lock()
-	_, exists := client.activeSessions["topic"]
-	client.mu.Unlock()
-	require.False(t, exists, "session should be removed from activeSessions on wc_sessionDelete")
-}
-
-func TestClient_HandleRelayMessage_SessionDelete_CallsHandler(t *testing.T) {
-	client, _ := NewClient("test")
-
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	called := false
 	var receivedTopic string
@@ -454,36 +477,21 @@ func TestClient_HandleRelayMessage_SessionDelete_CallsHandler(t *testing.T) {
 	})
 
 	deleteReq := map[string]any{
-		"id":     int64(4),
+		"id":     int64(3),
 		"method": "wc_sessionDelete",
 		"params": map[string]any{"code": int64(1000), "message": "disconnect"},
 	}
 	deleteJSON, _ := json.Marshal(deleteReq)
-	encrypted, _ := EncryptType0Envelope(symKey, deleteJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, deleteJSON)
 
 	client.handleRelayMessage("topic", encrypted, tagSessionDelete)
 
 	require.True(t, called)
 	require.Equal(t, "topic", receivedTopic)
-}
-
-func TestClient_SetSessionDeleteHandler(t *testing.T) {
-	client, _ := NewClient("test")
-
-	called := false
-	handler := func(topic string) {
-		called = true
-	}
-
-	client.SetSessionDeleteHandler(handler)
-
 	client.mu.Lock()
-	h := client.handlers.onSessionDelete
+	_, exists := client.activeSessions["topic"]
 	client.mu.Unlock()
-
-	require.NotNil(t, h)
-	h("topic")
-	require.True(t, called)
+	require.False(t, exists, "session should be removed from activeSessions on wc_sessionDelete")
 }
 
 func TestClient_Close(t *testing.T) {
@@ -499,24 +507,6 @@ func TestClient_SendSessionEvent_NoSession(t *testing.T) {
 	err := client.SendSessionEvent("unknown-topic", SessionEvent{Name: "accountsChanged", Data: []string{"0x123"}}, "eip155:1")
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrSessionNotFound)
-}
-
-func TestClient_SetSessionUpdateHandler(t *testing.T) {
-	client, _ := NewClient("test")
-
-	called := false
-	handler := func(topic, namespacesJSON string) {
-		called = true
-	}
-
-	client.SetSessionUpdateHandler(handler)
-
-	client.mu.Lock()
-	h := client.handlers.onSessionUpdate
-	client.mu.Unlock()
-
-	h("topic", `{"namespaces":{}}`)
-	require.True(t, called)
 }
 
 func TestClient_RestoreSessions(t *testing.T) {
@@ -552,9 +542,7 @@ func validWCURI(topic, symKey string) string {
 }
 
 func TestClient_Pair_InvalidURI(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, _, client := newMockClient(t)
 
 	err := client.Pair(context.Background(), "not-a-valid-wc-uri")
 	require.Error(t, err)
@@ -562,9 +550,7 @@ func TestClient_Pair_InvalidURI(t *testing.T) {
 }
 
 func TestClient_Pair_ConnectError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	relay.EXPECT().SetMessageHandler(gomock.Any())
 	relay.EXPECT().Connect().Return(fmt.Errorf("dial failed"))
@@ -575,9 +561,7 @@ func TestClient_Pair_ConnectError(t *testing.T) {
 }
 
 func TestClient_Pair_SubscribeError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	relay.EXPECT().SetMessageHandler(gomock.Any())
 	relay.EXPECT().Connect().Return(nil)
@@ -589,9 +573,7 @@ func TestClient_Pair_SubscribeError(t *testing.T) {
 }
 
 func TestClient_Pair_Success_NoMessages(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	relay.EXPECT().SetMessageHandler(gomock.Any())
 	relay.EXPECT().Connect().Return(nil)
@@ -603,9 +585,7 @@ func TestClient_Pair_Success_NoMessages(t *testing.T) {
 }
 
 func TestClient_Pair_WithFetchedMessages(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	payload := map[string]any{
 		"id":     int64(1),
@@ -628,13 +608,9 @@ func TestClient_Pair_WithFetchedMessages(t *testing.T) {
 }
 
 func TestClient_ConnectAndResubscribe_ConnectError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	client.mu.Lock()
-	client.activeSessions["topic1"] = "key1"
-	client.mu.Unlock()
+	addActiveSession(client, "topic1", "key1")
 
 	relay.EXPECT().SetMessageHandler(gomock.Any())
 	relay.EXPECT().Connect().Return(fmt.Errorf("connect failed"))
@@ -645,14 +621,10 @@ func TestClient_ConnectAndResubscribe_ConnectError(t *testing.T) {
 }
 
 func TestClient_ConnectAndResubscribe_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	client.mu.Lock()
-	client.activeSessions["topic1"] = "key1"
-	client.activeSessions["topic2"] = "key2"
-	client.mu.Unlock()
+	addActiveSession(client, "topic1", "key1")
+	addActiveSession(client, "topic2", "key2")
 
 	relay.EXPECT().SetMessageHandler(gomock.Any())
 	relay.EXPECT().Connect().Return(nil)
@@ -663,14 +635,10 @@ func TestClient_ConnectAndResubscribe_Success(t *testing.T) {
 }
 
 func TestClient_onReconnected_ResubscribesAll(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	client.mu.Lock()
-	client.activeSessions["session-topic"] = "skey"
-	client.pairingTopics["pairing-topic"] = "pkey"
-	client.mu.Unlock()
+	addActiveSession(client, "session-topic", "skey")
+	addPairingTopic(client, "pairing-topic", "pkey")
 
 	relay.EXPECT().Subscribe(gomock.Any()).Return("sub-id", nil).Times(2)
 
@@ -678,9 +646,7 @@ func TestClient_onReconnected_ResubscribesAll(t *testing.T) {
 }
 
 func TestClient_resubscribeTopics_SubscribeError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	relay.EXPECT().Subscribe(gomock.Any()).Return("", fmt.Errorf("subscribe failed")).Times(2)
 
@@ -690,15 +656,12 @@ func TestClient_resubscribeTopics_SubscribeError(t *testing.T) {
 }
 
 func TestClient_RejectSession_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	client.mu.Lock()
 	client.pendingProposals["proposal1"] = &pairingContext{
 		PairingTopic:  "pairing-topic",
-		PairingSymKey: symKey,
+		PairingSymKey: testSymKey,
 		JsonRpcID:     42,
 	}
 	client.mu.Unlock()
@@ -715,15 +678,12 @@ func TestClient_RejectSession_Success(t *testing.T) {
 }
 
 func TestClient_RejectSession_PublishError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	client.mu.Lock()
 	client.pendingProposals["proposal1"] = &pairingContext{
 		PairingTopic:  "pairing-topic",
-		PairingSymKey: symKey,
+		PairingSymKey: testSymKey,
 		JsonRpcID:     42,
 	}
 	client.mu.Unlock()
@@ -736,30 +696,28 @@ func TestClient_RejectSession_PublishError(t *testing.T) {
 }
 
 func TestClient_RespondToWCSessionRequest_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	addActiveSession(client, "topic", testSymKey)
 	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
+	client.pendingSessionRequests[999] = "topic"
 	client.mu.Unlock()
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionRequestResponse).Return(nil)
 
 	err := client.RespondToWCSessionRequest("topic", 999, "0xsignature")
 	require.NoError(t, err)
+
+	client.mu.Lock()
+	_, still := client.pendingSessionRequests[999]
+	client.mu.Unlock()
+	require.False(t, still, "pendingSessionRequests entry must be removed after respond")
 }
 
 func TestClient_RespondToWCSessionRequest_PublishError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionRequestResponse).Return(fmt.Errorf("publish failed"))
 
@@ -768,25 +726,26 @@ func TestClient_RespondToWCSessionRequest_PublishError(t *testing.T) {
 }
 
 func TestClient_RejectWCSessionRequest_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	addActiveSession(client, "topic", testSymKey)
 	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
+	client.pendingSessionRequests[999] = "topic"
 	client.mu.Unlock()
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionRequestResponse).Return(nil)
 
 	err := client.RejectWCSessionRequest("topic", 999, 4001, "User rejected")
 	require.NoError(t, err)
+
+	client.mu.Lock()
+	_, still := client.pendingSessionRequests[999]
+	client.mu.Unlock()
+	require.False(t, still, "pendingSessionRequests entry must be removed after reject")
 }
 
 func TestClient_RejectWCSessionRequest_NoSession(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, _, client := newMockClient(t)
 
 	err := client.RejectWCSessionRequest("nonexistent-topic", 999, 4001, "rejected")
 	require.Error(t, err)
@@ -794,14 +753,9 @@ func TestClient_RejectWCSessionRequest_NoSession(t *testing.T) {
 }
 
 func TestClient_RejectWCSessionRequest_PublishError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionRequestResponse).Return(fmt.Errorf("publish failed"))
 
@@ -810,9 +764,7 @@ func TestClient_RejectWCSessionRequest_PublishError(t *testing.T) {
 }
 
 func TestClient_SendSessionDelete_SessionNotFound(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, _, client := newMockClient(t)
 
 	// No Publish expected — session not in activeSessions
 	err := client.SendSessionDelete(context.Background(), "nonexistent-topic")
@@ -820,14 +772,9 @@ func TestClient_SendSessionDelete_SessionNotFound(t *testing.T) {
 }
 
 func TestClient_SendSessionDelete_PublishError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionDelete).Return(fmt.Errorf("publish failed"))
 
@@ -839,14 +786,9 @@ func TestClient_SendSessionDelete_PublishError(t *testing.T) {
 }
 
 func TestClient_SendSessionDelete_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionDelete).
 		DoAndReturn(func(topic, msg string, tag int) error {
@@ -862,9 +804,7 @@ func TestClient_SendSessionDelete_Success(t *testing.T) {
 }
 
 func TestClient_SendSessionUpdate_NoSession(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, _, client := newMockClient(t)
 
 	err := client.SendSessionUpdate("nonexistent-topic", map[string]Namespace{})
 	require.Error(t, err)
@@ -872,14 +812,9 @@ func TestClient_SendSessionUpdate_NoSession(t *testing.T) {
 }
 
 func TestClient_SendSessionUpdate_PublishError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionUpdate).Return(fmt.Errorf("publish failed"))
 
@@ -888,14 +823,9 @@ func TestClient_SendSessionUpdate_PublishError(t *testing.T) {
 }
 
 func TestClient_SendSessionUpdate_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionUpdate).
 		DoAndReturn(func(topic, msg string, tag int) error {
@@ -911,14 +841,9 @@ func TestClient_SendSessionUpdate_Success(t *testing.T) {
 }
 
 func TestClient_SendSessionEvent_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionEvent).
 		DoAndReturn(func(topic, msg string, tag int) error {
@@ -931,14 +856,9 @@ func TestClient_SendSessionEvent_Success(t *testing.T) {
 }
 
 func TestClient_SendSessionEvent_PublishError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionEvent).Return(fmt.Errorf("publish failed"))
 
@@ -947,9 +867,7 @@ func TestClient_SendSessionEvent_PublishError(t *testing.T) {
 }
 
 func TestClient_ApproveSession_InvalidProposalParams(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, _, client := newMockClient(t)
 
 	client.mu.Lock()
 	client.pendingProposals["proposal1"] = &pairingContext{
@@ -966,9 +884,7 @@ func TestClient_ApproveSession_InvalidProposalParams(t *testing.T) {
 }
 
 func TestClient_ApproveSession_InvalidProposerKey(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, _, client := newMockClient(t)
 
 	client.mu.Lock()
 	client.pendingProposals["proposal1"] = &pairingContext{
@@ -985,18 +901,15 @@ func TestClient_ApproveSession_InvalidProposerKey(t *testing.T) {
 }
 
 func TestClient_ApproveSession_ProposalResponsePublishError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	_, proposerPub, err := GenerateX25519KeyPair()
 	require.NoError(t, err)
 
-	pairingSymKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	client.mu.Lock()
 	client.pendingProposals["proposal1"] = &pairingContext{
 		PairingTopic:   "pairing-topic",
-		PairingSymKey:  pairingSymKey,
+		PairingSymKey:  testSymKey,
 		ProposerPubKey: hex.EncodeToString(proposerPub),
 		JsonRpcID:      1,
 		ProposalParams: json.RawMessage(`{}`),
@@ -1011,18 +924,15 @@ func TestClient_ApproveSession_ProposalResponsePublishError(t *testing.T) {
 }
 
 func TestClient_ApproveSession_SubscribeError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	_, proposerPub, err := GenerateX25519KeyPair()
 	require.NoError(t, err)
 
-	pairingSymKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	client.mu.Lock()
 	client.pendingProposals["proposal1"] = &pairingContext{
 		PairingTopic:   "pairing-topic",
-		PairingSymKey:  pairingSymKey,
+		PairingSymKey:  testSymKey,
 		ProposerPubKey: hex.EncodeToString(proposerPub),
 		JsonRpcID:      1,
 		ProposalParams: json.RawMessage(`{}`),
@@ -1039,18 +949,15 @@ func TestClient_ApproveSession_SubscribeError(t *testing.T) {
 }
 
 func TestClient_ApproveSession_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	_, proposerPub, err := GenerateX25519KeyPair()
 	require.NoError(t, err)
 
-	pairingSymKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	client.mu.Lock()
 	client.pendingProposals["proposal1"] = &pairingContext{
 		PairingTopic:   "pairing-topic",
-		PairingSymKey:  pairingSymKey,
+		PairingSymKey:  testSymKey,
 		ProposerPubKey: hex.EncodeToString(proposerPub),
 		JsonRpcID:      1,
 		ProposalParams: json.RawMessage(`{
@@ -1091,24 +998,18 @@ func TestClient_ApproveSession_Success(t *testing.T) {
 }
 
 func TestClient_sendAckResponse_PublishesSuccessfully(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionPingResponse).Return(nil)
 
-	err := client.sendAckResponse("topic", symKey, 1, tagSessionPingResponse)
+	err := client.sendAckResponse("topic", testSymKey, 1, tagSessionPingResponse)
 	require.NoError(t, err)
 }
 
 func TestClient_HandleRelayMessage_InvalidID(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	payload := map[string]any{
 		"id":     []string{"not", "an", "id"},
@@ -1116,7 +1017,7 @@ func TestClient_HandleRelayMessage_InvalidID(t *testing.T) {
 		"params": map[string]any{},
 	}
 	payloadJSON, _ := json.Marshal(payload)
-	encrypted, _ := EncryptType0Envelope(symKey, payloadJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, payloadJSON)
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, tagSessionPing)
@@ -1126,10 +1027,7 @@ func TestClient_HandleRelayMessage_InvalidID(t *testing.T) {
 func TestClient_HandleRelayMessage_SessionProposal_MissingPublicKey(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.pairingTopics["topic"] = symKey
-	client.mu.Unlock()
+	addPairingTopic(client, "topic", testSymKey)
 
 	proposal := map[string]any{
 		"id":     int64(1),
@@ -1137,7 +1035,7 @@ func TestClient_HandleRelayMessage_SessionProposal_MissingPublicKey(t *testing.T
 		"params": map[string]any{"proposer": map[string]any{"publicKey": ""}},
 	}
 	payloadJSON, _ := json.Marshal(proposal)
-	encrypted, _ := EncryptType0Envelope(symKey, payloadJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, payloadJSON)
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, tagSessionPropose)
@@ -1147,10 +1045,7 @@ func TestClient_HandleRelayMessage_SessionProposal_MissingPublicKey(t *testing.T
 func TestClient_HandleRelayMessage_SessionProposal_NoHandler_UsesSignal(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.pairingTopics["topic"] = symKey
-	client.mu.Unlock()
+	addPairingTopic(client, "topic", testSymKey)
 
 	proposal := map[string]any{
 		"id":     int64(42),
@@ -1158,7 +1053,7 @@ func TestClient_HandleRelayMessage_SessionProposal_NoHandler_UsesSignal(t *testi
 		"params": map[string]any{"proposer": map[string]any{"publicKey": "abcd1234"}},
 	}
 	payloadJSON, _ := json.Marshal(proposal)
-	encrypted, _ := EncryptType0Envelope(symKey, payloadJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, payloadJSON)
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, tagSessionPropose)
@@ -1175,56 +1070,21 @@ func TestClient_HandleRelayMessage_SessionProposal_NoHandler_UsesSignal(t *testi
 func TestClient_HandleRelayMessage_JSONRPCResponse_UnknownID(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	resp := map[string]any{"jsonrpc": "2.0", "id": int64(9999), "result": true}
 	respJSON, _ := json.Marshal(resp)
-	encrypted, _ := EncryptType0Envelope(symKey, respJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, respJSON)
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, tagSessionSettleResponse)
 	})
 }
 
-func TestClient_HandleRelayMessage_JSONRPCResponse_WithError(t *testing.T) {
-	client, _ := NewClient("test")
-
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
-
-	ch := client.registerPending(777)
-
-	resp := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      int64(777),
-		"error":   map[string]any{"code": 5000, "message": "rejected"},
-	}
-	respJSON, _ := json.Marshal(resp)
-	encrypted, _ := EncryptType0Envelope(symKey, respJSON)
-
-	client.handleRelayMessage("topic", encrypted, tagSessionSettleResponse)
-
-	select {
-	case r := <-ch:
-		require.NotNil(t, r.Error)
-		require.Equal(t, "rejected", r.Error.Message)
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("expected error response")
-	}
-}
-
 func TestClient_HandleRelayMessage_SessionRequest_NoHandler_UsesSignal(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	req := map[string]any{
 		"id":     int64(1),
@@ -1232,7 +1092,7 @@ func TestClient_HandleRelayMessage_SessionRequest_NoHandler_UsesSignal(t *testin
 		"params": map[string]any{"request": map[string]any{"method": "personal_sign"}},
 	}
 	reqJSON, _ := json.Marshal(req)
-	encrypted, _ := EncryptType0Envelope(symKey, reqJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, reqJSON)
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, tagSessionRequest)
@@ -1242,10 +1102,7 @@ func TestClient_HandleRelayMessage_SessionRequest_NoHandler_UsesSignal(t *testin
 func TestClient_HandleRelayMessage_UnknownMethod(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
 	msg := map[string]any{
 		"id":     int64(1),
@@ -1253,7 +1110,7 @@ func TestClient_HandleRelayMessage_UnknownMethod(t *testing.T) {
 		"params": map[string]any{},
 	}
 	msgJSON, _ := json.Marshal(msg)
-	encrypted, _ := EncryptType0Envelope(symKey, msgJSON)
+	encrypted, _ := EncryptType0Envelope(testSymKey, msgJSON)
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, 9999)
@@ -1263,12 +1120,9 @@ func TestClient_HandleRelayMessage_UnknownMethod(t *testing.T) {
 func TestClient_HandleRelayMessage_InvalidJSON(t *testing.T) {
 	client, _ := NewClient("test")
 
-	symKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	client.mu.Lock()
-	client.activeSessions["topic"] = symKey
-	client.mu.Unlock()
+	addActiveSession(client, "topic", testSymKey)
 
-	encrypted, _ := EncryptType0Envelope(symKey, []byte("not-json"))
+	encrypted, _ := EncryptType0Envelope(testSymKey, []byte("not-json"))
 
 	require.NotPanics(t, func() {
 		client.handleRelayMessage("topic", encrypted, tagSessionRequest)
@@ -1276,12 +1130,124 @@ func TestClient_HandleRelayMessage_InvalidJSON(t *testing.T) {
 }
 
 func TestClient_Publish(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	relay := NewMockRelay(ctrl)
-	client := newTestClient(relay)
+	_, relay, client := newMockClient(t)
 
 	relay.EXPECT().Publish("topic", "message", tagSessionEvent).Return(nil)
 
 	err := client.Publish("topic", "message", tagSessionEvent)
 	require.NoError(t, err)
+}
+
+// encryptMsg is a test helper that builds and encrypts a JSON-RPC message.
+func encryptMsg(t *testing.T, symKey string, method string, id int64, params any) string {
+	t.Helper()
+	msg := map[string]any{"id": id, "method": method, "params": params}
+	raw, err := json.Marshal(msg)
+	require.NoError(t, err)
+	enc, err := EncryptType0Envelope(symKey, raw)
+	require.NoError(t, err)
+	return enc
+}
+
+// --- wc_sessionPropose deduplication ---
+
+func TestClient_HandleRelayMessage_SessionProposal_Deduplicate(t *testing.T) {
+	client, _ := NewClient("test")
+
+	addPairingTopic(client, "topic", testSymKey)
+
+	callCount := 0
+	client.SetSessionProposalHandler(func(_ string) { callCount++ })
+
+	encrypted := encryptMsg(t, testSymKey, "wc_sessionPropose", 100, map[string]any{
+		"proposer": map[string]any{"publicKey": "abcd1234"},
+	})
+
+	// First delivery — should be processed.
+	client.handleRelayMessage("topic", encrypted, tagSessionPropose)
+	// Second delivery (same msgID) — must be ignored.
+	client.handleRelayMessage("topic", encrypted, tagSessionPropose)
+
+	require.Equal(t, 1, callCount, "handler must be called exactly once for duplicate wc_sessionPropose")
+
+	client.mu.Lock()
+	_, exists := client.pendingProposals["100"]
+	client.mu.Unlock()
+	require.True(t, exists)
+}
+
+// --- wc_sessionRequest deduplication ---
+
+func TestClient_HandleRelayMessage_SessionRequest_Deduplication(t *testing.T) {
+	t.Run("DuplicateIDIgnored", func(t *testing.T) {
+		client, _ := NewClient("test")
+		addActiveSession(client, "topic", testSymKey)
+
+		callCount := 0
+		client.SetSessionRequestHandler(func(_, _ string) { callCount++ })
+
+		encrypted := encryptMsg(t, testSymKey, "wc_sessionRequest", 456, map[string]any{
+			"request": map[string]any{"method": "personal_sign"},
+		})
+
+		// First delivery — should be processed.
+		client.handleRelayMessage("topic", encrypted, tagSessionRequest)
+		// Second delivery (same msgID) — must be ignored.
+		client.handleRelayMessage("topic", encrypted, tagSessionRequest)
+
+		require.Equal(t, 1, callCount, "handler must be called exactly once for duplicate wc_sessionRequest")
+
+		client.mu.Lock()
+		tracked := client.pendingSessionRequests[456]
+		client.mu.Unlock()
+		require.NotEmpty(t, tracked)
+	})
+
+	t.Run("DifferentIDsBothDelivered", func(t *testing.T) {
+		client, _ := NewClient("test")
+		addActiveSession(client, "topic", testSymKey)
+
+		callCount := 0
+		client.SetSessionRequestHandler(func(_, _ string) { callCount++ })
+
+		enc1 := encryptMsg(t, testSymKey, "wc_sessionRequest", 1, map[string]any{"request": map[string]any{"method": "eth_sign"}})
+		enc2 := encryptMsg(t, testSymKey, "wc_sessionRequest", 2, map[string]any{"request": map[string]any{"method": "personal_sign"}})
+
+		client.handleRelayMessage("topic", enc1, tagSessionRequest)
+		client.handleRelayMessage("topic", enc2, tagSessionRequest)
+
+		require.Equal(t, 2, callCount, "distinct request IDs must each trigger the handler")
+	})
+}
+
+// --- wc_sessionDelete deduplication ---
+
+func TestClient_HandleRelayMessage_SessionDelete_Deduplicate(t *testing.T) {
+	client, _ := NewClient("test")
+
+	// Register the key in both maps: pairingTopics keeps the symKey available for
+	// decryption even after activeSessions is cleared, so we can verify that the
+	// deduplication guard inside the wc_sessionDelete case fires on the second call.
+	addPairingTopic(client, "topic", testSymKey)
+	addActiveSession(client, "topic", testSymKey)
+
+	callCount := 0
+	client.SetSessionDeleteHandler(func(_ string) { callCount++ })
+
+	encrypted := encryptMsg(t, testSymKey, "wc_sessionDelete", 5, map[string]any{
+		"code": int64(1000), "message": "disconnect",
+	})
+
+	// First delivery — session present → processed; session removed from activeSessions.
+	client.handleRelayMessage("topic", encrypted, tagSessionDelete)
+	// Second delivery — session already gone → dedup guard fires and handler is skipped.
+	client.handleRelayMessage("topic", encrypted, tagSessionDelete)
+
+	require.Equal(t, 1, callCount, "delete handler must be called exactly once for duplicate wc_sessionDelete")
+}
+
+func TestClient_NewClient_InitializesPendingSessionRequests(t *testing.T) {
+	client, err := NewClient("test")
+	require.NoError(t, err)
+	require.NotNil(t, client.pendingSessionRequests)
 }
