@@ -55,14 +55,9 @@ jobs:
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
-        env:
-          CGO_ENABLED: '1'
-          CGO_CFLAGS: '-I${{ github.workspace }}/libs'
-          CGO_LDFLAGS: '-L${{ github.workspace }}/libs -lstorage -Wl,-rpath,${{ github.workspace }}/libs'
-          LD_LIBRARY_PATH: '${{ github.workspace }}/libs:${{ env.LD_LIBRARY_PATH }}'
         with:
           version: v2.3.1
-          args: --build-tags=gowaku_no_rln,lint
+          args: --build-tags=gowaku_no_rln,lint,use_torrent,use_logos_storage
 
       - name: lint-panics
         run: |
