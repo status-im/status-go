@@ -74,8 +74,12 @@ func (t Transfer) IsContractDeployment() bool {
 	return t.Category == TransferCategoryExternal && t.ToAddress == nil
 }
 
+func (t Transfer) IsOutgoing(accountAddress common.Address) bool {
+	return t.FromAddress == accountAddress
+}
+
 func (t Transfer) IsIncoming(accountAddress common.Address) bool {
-	return t.FromAddress != accountAddress
+	return t.ToAddress != nil && *t.ToAddress == accountAddress
 }
 
 func (t Transfer) IsValid() bool {

@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -117,6 +118,7 @@ func createTransactionData(fromAddr eth.Address, toAddr eth.Address, value *big.
 // createRouterPath creates a router path for testing
 func createRouterPath(fromToken, toToken *tokentypes.Token, value *big.Int) *routes.Path {
 	return &routes.Path{
+		ProcessorName: pathProcessorCommon.ProcessorTransferName,
 		FromChain: &params.Network{
 			ChainID: fromToken.ChainID,
 		},
@@ -840,6 +842,123 @@ func TestGetTransactionsOrder_SameHashDifferentChains(t *testing.T) {
 
 	require.True(t, foundEthereumTx, "Should find Ethereum transaction")
 	require.True(t, foundPolygonTx, "Should find Polygon transaction")
+}
+
+func newTestFilterDeps(db *sql.DB) FilterDependencies {
+	return FilterDependencies{
+		db:               db,
+		tokenSymbol:      func(_ ac.Token) string { return "" },
+		currentTimestamp: func() int64 { return time.Now().Unix() },
+	}
+}
+
+func countEntriesByType(entries []Entry, t ac.Type) int {
+	n := 0
+	for _, e := range entries {
+		if e.activityType == t {
+			n++
+		}
+	}
+	return n
+}
+
+// TestGetActivityEntries_SelfSend_SuccessProducesTwoEntries verifies that a successful
+// self-send transaction (sender == recipient) produces both a SendAT and a ReceiveAT entry.
+//
+// When a wallet sends ETH to itself (same address on the same chain), the activity list
+// should show the transaction twice — once as a send and once as a receive.
+// This only applies to confirmed (Success) transactions; pending ones only show SendAT.
+func TestGetActivityEntries_SelfSend_SuccessProducesTwoEntries(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	selfAddr := TestSenderAddr
+	timestamp := int64(1757333323)
+	weiValue := new(big.Int).Mul(big.NewInt(1), big.NewInt(gethParams.Ether/1000)) // 0.001 ETH
+
+	txHash := createEthereumTransaction(selfAddr, weiValue).Hash()
+
+	// Sent transaction (success) where from == to
+	insertTestSavedTransaction(t, db, txHash, selfAddr, selfAddr, weiValue, TestEthereumChainToken, TestEthereumChainToken, timestamp, "self-send-success-uuid")
+	// Corresponding Alchemy transfer (single row for address == selfAddr)
+	insertTestAlchemyTransfer(t, db, selfAddr, txHash, timestamp, 0.001, TestEthereumChainToken, selfAddr, selfAddr)
+
+	addresses := []eth.Address{selfAddr}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
+
+	txIDs, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	require.NoError(t, err)
+	require.Len(t, txIDs, 1, "Self-send should yield 1 ordered transaction ID")
+	require.Equal(t, SentTransaction, txIDs[0].Source, "Sent tx should take priority over fetched")
+
+	entries, err := getEntriesByTransactionIDs(context.Background(), newTestFilterDeps(db), txIDs)
+	require.NoError(t, err)
+	require.Len(t, entries, 2, "Successful self-send must produce 2 entries (send + receive)")
+	require.Equal(t, 1, countEntriesByType(entries, ac.SendAT), "Should have exactly 1 SendAT entry")
+	require.Equal(t, 1, countEntriesByType(entries, ac.ReceiveAT), "Should have exactly 1 ReceiveAT entry")
+}
+
+// TestGetActivityEntries_SelfSend_PendingProducesOneEntry verifies that a pending
+// self-send only produces a single SendAT entry.
+//
+// Until a transaction is confirmed, the wallet cannot guarantee the funds were received,
+// so only the outgoing side is shown.
+func TestGetActivityEntries_SelfSend_PendingProducesOneEntry(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	selfAddr := TestSenderAddr
+	timestamp := int64(1757333323)
+	weiValue := new(big.Int).Mul(big.NewInt(1), big.NewInt(gethParams.Ether/1000))
+
+	txHash := createEthereumTransaction(selfAddr, weiValue).Hash()
+
+	// Pending transaction where from == to (not yet confirmed)
+	insertTestPendingTransaction(t, db, TestEthereumChainToken.ChainID, txHash, selfAddr, selfAddr, weiValue, TestEthereumChainToken, TestEthereumChainToken, timestamp, "self-send-pending-uuid")
+
+	addresses := []eth.Address{selfAddr}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
+
+	txIDs, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	require.NoError(t, err)
+	require.Len(t, txIDs, 1)
+
+	entries, err := getEntriesByTransactionIDs(context.Background(), newTestFilterDeps(db), txIDs)
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "Pending self-send must produce only 1 entry (no receive until confirmed)")
+	require.Equal(t, ac.SendAT, entries[0].activityType, "The single entry must be SendAT")
+}
+
+// TestGetActivityEntries_SelfSend_FetchedOnlyProducesTwoEntries verifies that a self-send
+// fetched from Alchemy (with no corresponding sent_transaction row) also produces two entries.
+//
+// This covers the case where the transaction was sent from outside the app (e.g. another
+// wallet) to the same address. The single Alchemy row for the account produces both a
+// SendAT and a ReceiveAT.
+func TestGetActivityEntries_SelfSend_FetchedOnlyProducesTwoEntries(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	selfAddr := TestSenderAddr
+	txHash := eth.HexToHash("0x5678567856785678567856785678567856785678567856785678567856785678")
+	timestamp := int64(1757333323)
+
+	// Only an Alchemy transfer — no sent_transaction row
+	insertTestAlchemyTransfer(t, db, selfAddr, txHash, timestamp, 0.001, TestEthereumChainToken, selfAddr, selfAddr)
+
+	addresses := []eth.Address{selfAddr}
+	chainIDs := []walletCommon.ChainID{walletCommon.ChainID(TestEthereumChainToken.ChainID)}
+
+	txIDs, err := getTransactionsOrder(context.Background(), db, addresses, chainIDs, Filter{}, DefaultOffset, DefaultLimit)
+	require.NoError(t, err)
+	require.Len(t, txIDs, 1, "Should have 1 ordered transaction ID")
+	require.Equal(t, FetchedTransaction, txIDs[0].Source, "Should be fetched transaction")
+
+	entries, err := getEntriesByTransactionIDs(context.Background(), newTestFilterDeps(db), txIDs)
+	require.NoError(t, err)
+	require.Len(t, entries, 2, "Fetched self-send must produce 2 entries (send + receive)")
+	require.Equal(t, 1, countEntriesByType(entries, ac.SendAT), "Should have exactly 1 SendAT entry")
+	require.Equal(t, 1, countEntriesByType(entries, ac.ReceiveAT), "Should have exactly 1 ReceiveAT entry")
 }
 
 // TestGetTransactionsOrder_EmptyChainList tests validation when no chain IDs are provided.

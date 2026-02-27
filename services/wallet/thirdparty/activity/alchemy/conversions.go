@@ -62,17 +62,42 @@ type TransferAnalytics struct {
 	inboundNonZeroTransfers  []Transfer
 }
 
+func (a TransferAnalytics) identifyTransfer(outgoing bool) *Transfer {
+	if len(a.externalTransfers) < 1 {
+		return nil
+	}
+
+	sender := a.externalTransfers[0].FromAddress
+
+	if outgoing {
+		for _, t := range a.outboundNonZeroTransfers {
+			if t.IsOutgoing(sender) {
+				return &t
+			}
+		}
+	} else {
+		for _, t := range a.inboundNonZeroTransfers {
+			if t.IsIncoming(sender) {
+				return &t
+			}
+		}
+	}
+
+	return nil
+}
+
 func (a TransferAnalytics) isContractDeployment() bool {
 	return len(a.externalTransfers) == 1 && a.externalTransfers[0].IsContractDeployment()
 }
 
 func (a TransferAnalytics) isSwapTransfer() bool {
+	outgoingTransfer := a.identifyTransfer(true)
+	inboundTransfer := a.identifyTransfer(false)
 
-	if len(a.externalTransfers) == 1 {
-		to := a.externalTransfers[0].ToAddress.Hex()
-		_, known := dexRouters[strings.ToLower(to)]
-		return known
+	if outgoingTransfer != nil && inboundTransfer != nil {
+		return outgoingTransfer.Asset != "" && inboundTransfer.Asset != "" && outgoingTransfer.Asset != inboundTransfer.Asset
 	}
+
 	return false
 }
 
@@ -86,7 +111,7 @@ func (a TransferAnalytics) isBridgeTransfer() bool {
 }
 
 func (a TransferAnalytics) isErc20Transfer() bool {
-	if len(a.externalTransfers) == 1 && len(a.tokenTransfers) == 1 {
+	if len(a.externalTransfers) == 1 && len(a.tokenTransfers) > 0 {
 		et := a.externalTransfers[0]
 		tt := a.tokenTransfers[0]
 
@@ -110,7 +135,8 @@ func analyzeTransfers(txTransfers []Transfer, chainID uint64, accountAddress com
 		if transfer.Value > 0 {
 			if transfer.IsIncoming(accountAddress) {
 				analytics.inboundNonZeroTransfers = append(analytics.inboundNonZeroTransfers, transfer)
-			} else {
+			}
+			if transfer.IsOutgoing(accountAddress) {
 				analytics.outboundNonZeroTransfers = append(analytics.outboundNonZeroTransfers, transfer)
 			}
 		}
@@ -128,8 +154,10 @@ func sameHashTransfersToThirdpartyActivityEntries(txTransfers []Transfer, chainI
 	if analytics.isContractDeployment() {
 		entries = transferToThirdpartyActivityEntries(analytics.externalTransfers[0], chainID, accountAddress)
 	} else if analytics.isSwapTransfer() {
-		if len(analytics.inboundNonZeroTransfers) == 1 && len(analytics.outboundNonZeroTransfers) == 1 {
-			entries = append(entries, makeSwapThirdpartyActivityEntry(analytics.outboundNonZeroTransfers[0], analytics.inboundNonZeroTransfers[0], chainID))
+		outgoingTransfer := analytics.identifyTransfer(true)
+		inboundTransfer := analytics.identifyTransfer(false)
+		if outgoingTransfer != nil && inboundTransfer != nil {
+			entries = append(entries, makeSwapThirdpartyActivityEntry(*outgoingTransfer, *inboundTransfer, chainID))
 		}
 	} else if analytics.isBridgeTransfer() {
 		if len(analytics.inboundNonZeroTransfers) == 0 && len(analytics.outboundNonZeroTransfers) == 1 {
@@ -218,20 +246,24 @@ func transferToThirdpartyActivityEntries(t Transfer, chainID uint64, accountAddr
 
 	entries := make([]thirdparty.ActivityEntry, 0, len(transfersTokenAndValue))
 	for _, td := range transfersTokenAndValue {
-		entry := baseEntry
 
 		if t.IsIncoming(accountAddress) {
+			entry := baseEntry
 			entry.ActivityType = ac.ReceiveAT
 			entry.ChainIDIn = &chainID
 			entry.TokenIn = &td.Token
 			entry.AmountIn = td.Value
-		} else {
+			entries = append(entries, entry)
+		}
+
+		if t.IsOutgoing(accountAddress) {
+			entry := baseEntry
 			entry.ActivityType = ac.SendAT
 			entry.ChainIDOut = &chainID
 			entry.TokenOut = &td.Token
 			entry.AmountOut = td.Value
+			entries = append(entries, entry)
 		}
-		entries = append(entries, entry)
 	}
 	return entries
 }
