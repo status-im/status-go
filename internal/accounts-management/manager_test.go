@@ -113,17 +113,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 		require.NoError(t, err)
 
 		if testCase.importToLocation {
-			// Copy file instead of hard link to support cross-filesystem operations
-			src, err := os.Open(filename)
-			require.NoError(t, err)
-			defer src.Close()
-
-			dstPath := filepath.Join(keystore.KeystorePath(), filepath.Base(filename))
-			dst, err := os.Create(dstPath)
-			require.NoError(t, err)
-			defer dst.Close()
-
-			_, err = io.Copy(dst, src)
+			err = os.Link(filename, filepath.Join(keystore.KeystorePath(), filepath.Base(filename)))
 			require.NoError(t, err)
 
 			// now we need to re-create the keystore in order to make the get-keystore aware of the copied account1
