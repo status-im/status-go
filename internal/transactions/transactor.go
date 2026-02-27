@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -175,7 +176,7 @@ func createPendingTransaction(txArgs *wallettypes.SendTxArgs, txWithSignature *g
 		From:       common.Address(txArgs.From),
 		To:         toAddress,
 		Nonce:      txWithSignature.Nonce(),
-		Data:       string(txWithSignature.Data()),
+		Data:       hexutil.Encode(txWithSignature.Data()),
 		Type:       pendingtxtracker.WalletTransfer,
 		ChainID:    wallet_common.ChainID(txWithSignature.ChainId().Uint64()),
 		Symbol:     tokenKey,

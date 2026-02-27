@@ -45,14 +45,15 @@ type pairingContext struct {
 
 // Client handles WalletConnect protocol operations via the relay.
 type Client struct {
-	relay            Relay
-	logger           *zap.Logger
-	mu               sync.Mutex
-	handlers         *clientHandlers
-	pendingProposals map[string]*pairingContext // key = fmt.Sprintf("%d", jsonRpcId)
-	pendingRequests  map[int64]chan *JSONRPCResponse
-	pairingTopics    map[string]string // topic -> pairing symKey (hex), set on Pair()
-	activeSessions   map[string]string // topic -> session symKey (hex), set on ApproveSession
+	relay                  Relay
+	logger                 *zap.Logger
+	mu                     sync.Mutex
+	handlers               *clientHandlers
+	pendingProposals       map[string]*pairingContext // key = fmt.Sprintf("%d", jsonRpcId)
+	pendingRequests        map[int64]chan *JSONRPCResponse
+	pendingSessionRequests map[int64]string  // requestID -> topic; tracks in-flight wc_sessionRequests for deduplication
+	pairingTopics          map[string]string // topic -> pairing symKey (hex), set on Pair()
+	activeSessions         map[string]string // topic -> session symKey (hex), set on ApproveSession
 }
 
 type clientHandlers struct {
@@ -70,13 +71,14 @@ func NewClient(projectID string) (*Client, error) {
 	}
 
 	c := &Client{
-		relay:            relay,
-		logger:           logutils.ZapLogger(),
-		handlers:         &clientHandlers{},
-		pendingProposals: make(map[string]*pairingContext),
-		pendingRequests:  make(map[int64]chan *JSONRPCResponse),
-		pairingTopics:    make(map[string]string),
-		activeSessions:   make(map[string]string),
+		relay:                  relay,
+		logger:                 logutils.ZapLogger(),
+		handlers:               &clientHandlers{},
+		pendingProposals:       make(map[string]*pairingContext),
+		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
+		pendingSessionRequests: make(map[int64]string),
+		pairingTopics:          make(map[string]string),
+		activeSessions:         make(map[string]string),
 	}
 
 	// Set reconnection handler to re-subscribe to all active sessions
@@ -178,6 +180,16 @@ func (c *Client) cancelPending(id int64) {
 	c.mu.Lock()
 	delete(c.pendingRequests, id)
 	c.mu.Unlock()
+}
+
+// clearSessionRequests removes all in-flight wc_sessionRequest entries for the
+// given topic. Must be called with c.mu held.
+func (c *Client) clearSessionRequestsLocked(topic string) {
+	for id, t := range c.pendingSessionRequests {
+		if t == topic {
+			delete(c.pendingSessionRequests, id)
+		}
+	}
 }
 
 // sendAckResponse sends a JSON-RPC success response with result: true.
@@ -293,9 +305,17 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 			ProposalParams: payload.Params,
 		}
 		c.mu.Lock()
-		c.pendingProposals[requestID] = ctx
+		_, alreadyPending := c.pendingProposals[requestID]
+		if !alreadyPending {
+			c.pendingProposals[requestID] = ctx
+		}
 		handler := c.handlers.onSessionProposal
 		c.mu.Unlock()
+
+		if alreadyPending {
+			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID))
+			return
+		}
 
 		if handler != nil {
 			handler(paramsStr)
@@ -304,8 +324,20 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		}
 	case "wc_sessionRequest":
 		c.mu.Lock()
+		_, alreadyPendingReq := c.pendingSessionRequests[msgID]
+		if !alreadyPendingReq {
+			c.pendingSessionRequests[msgID] = topic
+		}
 		handler := c.handlers.onSessionRequest
 		c.mu.Unlock()
+
+		// Deduplicate: relay may deliver the same request both via FetchMessages
+		// and via an irn_subscription push
+		if alreadyPendingReq {
+			c.logger.Info("wc_sessionRequest duplicate ignored", zap.String("topic", topic), zap.Int64("msgID", msgID))
+			return
+		}
+
 		if handler != nil {
 			handler(topic, string(payload.Params))
 		} else {
@@ -326,16 +358,24 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 			updateHandler(topic, string(payload.Params))
 		}
 	case "wc_sessionDelete":
-		// Remove session immediately then attempt to ack
+		// Remove session atomically; if it was already gone this is a duplicate delivery.
 		c.mu.Lock()
+		_, sessionExisted := c.activeSessions[topic]
 		delete(c.activeSessions, topic)
+		c.clearSessionRequestsLocked(topic)
 		deleteHandler := c.handlers.onSessionDelete
 		c.mu.Unlock()
-		if deleteHandler != nil {
-			deleteHandler(topic)
-		}
+
 		if err := c.sendAckResponse(topic, symKey, msgID, tagSessionDeleteResponse); err != nil {
 			c.logger.Debug("failed to send session delete ack", zap.Error(err))
+		}
+
+		if !sessionExisted {
+			c.logger.Info("wc_sessionDelete duplicate ignored", zap.String("topic", topic))
+			return
+		}
+		if deleteHandler != nil {
+			deleteHandler(topic)
 		}
 	default:
 	}
@@ -470,6 +510,7 @@ func (c *Client) RemoveSession(topic string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.activeSessions, topic)
+	c.clearSessionRequestsLocked(topic)
 }
 
 // SendSessionDelete sends a wc_sessionDelete request to the dApp and removes the session from activeSessions
@@ -553,7 +594,14 @@ func (c *Client) RespondToWCSessionRequest(topic string, requestID int64, result
 	if err != nil {
 		return fmt.Errorf("encrypt response: %w", err)
 	}
-	return c.relay.Publish(topic, encrypted, tagSessionRequestResponse)
+
+	if err := c.relay.Publish(topic, encrypted, tagSessionRequestResponse); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	delete(c.pendingSessionRequests, requestID)
+	c.mu.Unlock()
+	return nil
 }
 
 // RejectWCSessionRequest sends a JSON-RPC error response for a wc_sessionRequest.
@@ -583,7 +631,14 @@ func (c *Client) RejectWCSessionRequest(topic string, requestID int64, code int,
 	if err != nil {
 		return fmt.Errorf("encrypt error response: %w", err)
 	}
-	return c.relay.Publish(topic, encrypted, tagSessionRequestResponse)
+
+	if err := c.relay.Publish(topic, encrypted, tagSessionRequestResponse); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	delete(c.pendingSessionRequests, requestID)
+	c.mu.Unlock()
+	return nil
 }
 
 // RejectSession sends a JSON-RPC error response to the relay when the user rejects a session proposal.
