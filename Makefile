@@ -648,15 +648,15 @@ benchmark:
 	@./scripts/run_benchmark.sh
 
 lint-panics: generate
-	GOFLAGS=-tags='$(BUILD_TAGS),lint' \
+	GOFLAGS=-tags='$(BUILD_TAGS),lint,use_logos_storage,use_torrent' \
 	go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/common.LogOnPanic ./...
 
 lint: generate lint-panics
 lint:
-	$(CGO_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
+	$(CGO_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint use_logos_storage use_torrent' run ./...
 
 lint-fix: generate
-	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
+	golangci-lint --build-tags '$(BUILD_TAGS) lint use_logos_storage use_torrent' run --fix ./...
 
 clean: clean-storage ##@other Cleanup
 	rm -fr build/bin/*
