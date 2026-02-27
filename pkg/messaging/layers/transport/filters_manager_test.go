@@ -117,6 +117,36 @@ func (s *FiltersManagerSuite) TestPartitionedTopicWithDiscoveryDisabled() {
 	s.assertRequiredFilters()
 }
 
+func (s *FiltersManagerSuite) TestInitKeepsDistinctCommunityPubsubFilters() {
+	communityChatID := "community-chat-id"
+	controlTopic := "topic/community-control"
+	contentTopic := "topic/community-content"
+
+	_, err := s.chats.Init([]FiltersToInitialize{
+		{
+			ChatID:           communityChatID,
+			PubsubTopic:      controlTopic,
+			DistinctByPubsub: true,
+		},
+		{
+			ChatID:           communityChatID,
+			PubsubTopic:      contentTopic,
+			DistinctByPubsub: true,
+		},
+	}, nil)
+	s.Require().NoError(err)
+
+	controlFilter := s.chats.filters[concatFilterKey(communityChatID, controlTopic)]
+	s.Require().NotNil(controlFilter, "It keeps control topic filter")
+	s.Require().Equal(controlTopic, controlFilter.PubsubTopic)
+
+	contentFilter := s.chats.filters[concatFilterKey(communityChatID, contentTopic)]
+	s.Require().NotNil(contentFilter, "It keeps content topic filter")
+	s.Require().Equal(contentTopic, contentFilter.PubsubTopic)
+
+	s.Require().NotEqual(controlFilter.FilterID, contentFilter.FilterID, "It creates distinct subscriptions per pubsub topic")
+}
+
 func (s *FiltersManagerSuite) assertRequiredFilters() {
 	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.manager[0].partitionedTopic)
 	personalDiscoveryTopic := fmt.Sprintf("contact-discovery-%s", s.manager[0].publicKeyString())

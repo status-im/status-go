@@ -97,7 +97,7 @@ func (f *FiltersManager) Init(
 
 	// Add public, one-to-one and negotiated filters.
 	for _, fi := range filtersToInit {
-		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic, false)
+		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic, fi.DistinctByPubsub)
 		if err != nil {
 			return nil, err
 		}

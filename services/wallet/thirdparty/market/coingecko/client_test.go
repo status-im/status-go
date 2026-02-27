@@ -179,6 +179,118 @@ func TestFetchPrices(t *testing.T) {
 	require.Equal(t, prices[tokens[2].Key()], map[string]float64{"USD": 0})
 }
 
+func TestAggregatePrices(t *testing.T) {
+	prices := []thirdparty.HistoricalPrice{
+		{Timestamp: 100, Value: 10.0},
+		{Timestamp: 200, Value: 20.0},
+		{Timestamp: 300, Value: 30.0},
+		{Timestamp: 400, Value: 40.0},
+		{Timestamp: 500, Value: 50.0},
+		{Timestamp: 600, Value: 60.0},
+	}
+
+	t.Run("aggregate=1 is a no-op", func(t *testing.T) {
+		result := aggregatePrices(prices, 1)
+		require.Equal(t, prices, result)
+	})
+
+	t.Run("empty slice returns empty slice", func(t *testing.T) {
+		result := aggregatePrices([]thirdparty.HistoricalPrice{}, 3)
+		require.Empty(t, result)
+	})
+
+	t.Run("aggregate=2 groups pairs and averages values", func(t *testing.T) {
+		result := aggregatePrices(prices, 2)
+		require.Len(t, result, 3)
+		// group [0,1]: avg=(10+20)/2=15, timestamp=200
+		require.Equal(t, int64(200), result[0].Timestamp)
+		require.InDelta(t, 15.0, result[0].Value, 1e-10)
+		// group [2,3]: avg=(30+40)/2=35, timestamp=400
+		require.Equal(t, int64(400), result[1].Timestamp)
+		require.InDelta(t, 35.0, result[1].Value, 1e-10)
+		// group [4,5]: avg=(50+60)/2=55, timestamp=600
+		require.Equal(t, int64(600), result[2].Timestamp)
+		require.InDelta(t, 55.0, result[2].Value, 1e-10)
+	})
+
+	t.Run("aggregate=4 with remainder group", func(t *testing.T) {
+		result := aggregatePrices(prices, 4)
+		require.Len(t, result, 2)
+		// group [0..3]: avg=(10+20+30+40)/4=25, timestamp=400
+		require.Equal(t, int64(400), result[0].Timestamp)
+		require.InDelta(t, 25.0, result[0].Value, 1e-10)
+		// remainder [4,5]: avg=(50+60)/2=55, timestamp=600
+		require.Equal(t, int64(600), result[1].Timestamp)
+		require.InDelta(t, 55.0, result[1].Value, 1e-10)
+	})
+
+	t.Run("aggregate >= len returns single group", func(t *testing.T) {
+		result := aggregatePrices(prices, 10)
+		require.Len(t, result, 1)
+		require.Equal(t, int64(600), result[0].Timestamp)
+		require.InDelta(t, (10.0+20+30+40+50+60)/6, result[0].Value, 1e-10)
+	})
+}
+
+func newSNTServer(t *testing.T, pricesJSON string) (*httptest.Server, *tokentypes.Token) {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/coins/list", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[{"id":"status","symbol":"snt","name":"Status","platforms":{"ethereum":"0x744d70fdbe2ba4cf95131626614a1763df805b9e"}}]`))
+	})
+	mux.HandleFunc("/coins/status/market_chart", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"prices":` + pricesJSON + `}`))
+	})
+	token := &tokentypes.Token{Token: &types.Token{
+		Name:    "Status",
+		Symbol:  "SNT",
+		ChainID: common.EthereumMainnet,
+		Address: gethcommon.HexToAddress("0x744d70fdbe2ba4cf95131626614a1763df805b9e"),
+	}}
+	return httptest.NewServer(mux), token
+}
+
+func TestFetchHistoricalDailyPrices(t *testing.T) {
+	tests := []struct {
+		name      string
+		prices    string
+		aggregate int
+		want      []thirdparty.HistoricalPrice
+	}{
+		{
+			name:      "timestamps converted from ms to seconds",
+			prices:    `[[1737889461000,1.0],[1737893061000,2.0],[1737896661000,3.0]]`,
+			aggregate: 1,
+			want: []thirdparty.HistoricalPrice{
+				{Timestamp: 1737889461, Value: 1.0},
+				{Timestamp: 1737893061, Value: 2.0},
+				{Timestamp: 1737896661, Value: 3.0},
+			},
+		},
+		{
+			name:      "aggregate=3 averages groups",
+			prices:    `[[1000,10.0],[2000,20.0],[3000,30.0],[4000,40.0],[5000,50.0],[6000,60.0]]`,
+			aggregate: 3,
+			want: []thirdparty.HistoricalPrice{
+				{Timestamp: 3, Value: 20.0},
+				{Timestamp: 6, Value: 50.0},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, token := newSNTServer(t, tc.prices)
+			defer srv.Close()
+			client := &Client{httpClient: thirdparty.NewHTTPClient(), baseURL: srv.URL}
+			result, err := client.FetchHistoricalDailyPrices(token, "usd", len(tc.want)*tc.aggregate, false, tc.aggregate)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, result)
+		})
+	}
+}
+
 func TestFetchMarketValues(t *testing.T) {
 	mux := http.NewServeMux()
 
