@@ -2,8 +2,8 @@
 .PHONY: statusgo-ios-library statusgo-android-library
 .PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 .PHONY: build-libsds clean-libsds rebuild-libsds
-.PHONY: fetch-libstorage clean-libstorage test-logosstorage test-logos-storage test-libstorage test-torrent
-.PHONY: logos-storage-help history-archive-help
+.PHONY: build-storage fetch-storage clean-storage test-storage test-torrent
+.PHONY: storage-help
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -188,7 +188,9 @@ ifeq ($(USE_LOGOS_STORAGE),true)
 	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
 endif
 
-fetch-libstorage: ##@build Fetch libstorage for native non-Nix workflows
+build-storage: fetch-storage
+
+fetch-storage: ##@build Fetch libstorage for native non-Nix workflows
 ifdef LIBSTORAGE_PATH
 	@echo "Using libstorage from Nix shell: $(LIBSTORAGE_PATH)"
 else
@@ -203,11 +205,11 @@ else
 	fi
 endif
 
-clean-libstorage: ##@other Remove downloaded native libstorage artifacts
+clean-storage: ##@other Remove downloaded native libstorage artifacts
 	@echo "Removing local libstorage artifacts from $(LIBS_DIR)"
 	@rm -f "$(LIBS_DIR)"/libstorage.so "$(LIBS_DIR)"/libstorage.dylib "$(LIBS_DIR)"/libstorage.dll "$(LIBS_DIR)"/libstorage.h
 
-test-logosstorage: fetch-libstorage $(LIBSDS) ##@tests Run logosstorage-related package tests via gotestsum
+test-storage: fetch-storage $(LIBSDS) ##@tests Run logosstorage-related package tests via gotestsum
 	go generate -tags "$(BUILD_TAGS) use_logos_storage" ./services/logosstorage
 	LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
 	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
@@ -223,10 +225,6 @@ test-logosstorage: fetch-libstorage $(LIBSDS) ##@tests Run logosstorage-related 
 	gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_logos_storage gowaku_skip_migrations" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
 
-test-logos-storage: test-logosstorage ##@tests Alias for test-logosstorage
-
-test-libstorage: test-logosstorage ##@tests Alias for test-logosstorage
-
 test-torrent: $(LIBSDS) ##@tests Run torrent archive package tests via gotestsum
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations"
@@ -234,11 +232,13 @@ test-torrent: $(LIBSDS) ##@tests Run torrent archive package tests via gotestsum
 	gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
 
-history-archive-help: ##@build Show history archive build/test toggles and env vars
+storage-help: ##@build Show history archive build/test toggles and env vars
 	@echo "History archive build toggles:"
 	@echo "  USE_TORRENT=true enables build tag: use_torrent"
-	@echo "  USE_LOGOS_STORAGE=true enables build tag: use_logos_storage"
+	@echo "  USE_LOGOS_STORAGE=true enables for builds: use_logos_storage"
 	@echo "  USE_LOGOS_STORAGE=true also wires libstorage include/lib/runtime paths"
+	@echo ""
+	@echo "test-storage always runs with logos-storage support enabled."
 	@echo ""
 	@echo "Variables:"
 	@echo "  USE_LOGOS_STORAGE          (default: false)"
@@ -252,12 +252,11 @@ history-archive-help: ##@build Show history archive build/test toggles and env v
 	@echo "  make test-unit USE_LOGOS_STORAGE=true"
 	@echo "  make test-unit USE_TORRENT=true"
 	@echo "  make test-unit USE_LOGOS_STORAGE=true USE_TORRENT=true"
-	@echo "  make fetch-libstorage"
+	@echo "  make fetch-storage"
+	@echo "  make build-storage"
 	@echo "  make test-torrent"
-	@echo "  make test-logosstorage"
+	@echo "  make test-storage"
 	@echo "  FUNCTIONAL_TESTS_USE_LOGOS_STORAGE=true ./scripts/run_functional_tests.sh"
-
-logos-storage-help: history-archive-help ##@build Alias for history-archive-help
 
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
@@ -344,7 +343,7 @@ CGO_ENV += LD_LIBRARY_PATH=$(LIBS_DIR):$(NIM_SDS_LIB_DIR):$$LD_LIBRARY_PATH
 endif
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate fetch-libstorage $(LIBWAKU) $(LIBSDS)
+$(GO_CMD_BUILDS): generate fetch-storage $(LIBWAKU) $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	$(CGO_ENV) go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
@@ -574,7 +573,7 @@ generate: GO_GENERATE_CMD ?= go tool go-generate-fast
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 ifeq ($(NO_NETWORK),)
-generate: fetch-libstorage
+generate: fetch-storage
 endif
 generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
@@ -605,7 +604,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit-prep: fetch-libstorage $(LIBSDS)
+test-unit-prep: fetch-storage $(LIBSDS)
 test-unit-prep: generate
 test-unit-prep: export BUILD_TAGS ?=
 test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
@@ -659,7 +658,7 @@ lint:
 lint-fix: generate
 	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
 
-clean: clean-libstorage ##@other Cleanup
+clean: clean-storage ##@other Cleanup
 	rm -fr build/bin/*
 
 git-clean:

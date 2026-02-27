@@ -184,7 +184,7 @@ pipeline {
                 variable: 'CODECOV_TOKEN'
               ),
             ]) {
-              nix.develop('USE_NWAKU=${USE_NWAKU} make test-libstorage V=1', pure: false)
+              nix.develop('USE_NWAKU=${USE_NWAKU} make test-storage V=1', pure: false)
               nix.develop('USE_NWAKU=${USE_NWAKU} make test-torrent V=1', pure: false)
               nix.develop('USE_NWAKU=${USE_NWAKU} make test-unit V=1', pure: false)
             }
