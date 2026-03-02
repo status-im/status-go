@@ -230,7 +230,16 @@ func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *Re
 	if showPushNotification {
 		// chat is highlighted for new group invites or group re-invites
 		chat.Highlight = true
-		messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility))
+		// Respect Contact Requests notification setting for local notification
+		if allow, _ := m.settings.GetAllowNotifications(); allow {
+			if contactReqs, _ := m.settings.GetContactRequests(); contactReqs != "TurnOff" {
+				messagePreview := messagePreviewNameAndMessage
+				if v, err := m.settings.GetMessagePreview(); err == nil {
+					messagePreview = v
+				}
+				messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility, messagePreview))
+			}
+		}
 	}
 
 	systemMessages := buildSystemMessages(message.Events, translations)
@@ -1456,7 +1465,17 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 
 		state.Response.AddRequestToJoinCommunity(requestToJoin)
 
-		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
+		// Respect Contact Requests notification setting for local notification
+		if allow, _ := m.settings.GetAllowNotifications(); allow {
+			if contactReqs, _ := m.settings.GetContactRequests(); contactReqs != "TurnOff" {
+				messagePreview := messagePreviewNameAndMessage
+				if v, err := m.settings.GetMessagePreview(); err == nil {
+					messagePreview = v
+				}
+				profilePicturesVisibility, _ := m.settings.GetProfilePicturesVisibility()
+				state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact, profilePicturesVisibility, messagePreview))
+			}
+		}
 
 		// Activity Center notification, new for pending state
 		notification := &ActivityCenterNotification{

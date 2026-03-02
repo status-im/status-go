@@ -3,6 +3,7 @@ package localnotifications
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -26,6 +27,10 @@ type Notification struct {
 	BodyType            NotificationType
 	Title               string
 	Message             string
+	// DisplayTitle and DisplayMessage are privacy-filtered for lock screen/OS display.
+	// When set, clients should use these for OS notifications; Title/Message remain full for in-app.
+	DisplayTitle   string
+	DisplayMessage string
 	Category            PushCategory
 	Deeplink            string
 	Image               string
@@ -36,6 +41,10 @@ type Notification struct {
 	ConversationID      string
 	Timestamp           uint64
 	Author              NotificationAuthor
+	// CommunityIcon is the community avatar (data URI) for community chat/request notifications.
+	CommunityIcon string
+	// ChatIcon is the chat/group avatar (data URI) for group chat notifications.
+	ChatIcon string
 	Deleted             bool
 }
 
@@ -47,23 +56,27 @@ type NotificationAuthor struct {
 
 // notificationAlias is an interim struct used for json un/marshalling
 type notificationAlias struct {
-	ID                  common.Hash        `json:"id"`
-	Platform            float32            `json:"platform,omitempty"`
-	Body                json.RawMessage    `json:"body"`
-	BodyType            NotificationType   `json:"bodyType"`
-	Title               string             `json:"title,omitempty"`
-	Message             string             `json:"message,omitempty"`
-	Category            PushCategory       `json:"category,omitempty"`
-	Deeplink            string             `json:"deepLink,omitempty"`
-	Image               string             `json:"imageUrl,omitempty"`
-	IsScheduled         bool               `json:"isScheduled,omitempty"`
-	ScheduledTime       string             `json:"scheduleTime,omitempty"`
-	IsConversation      bool               `json:"isConversation,omitempty"`
-	IsGroupConversation bool               `json:"isGroupConversation,omitempty"`
-	ConversationID      string             `json:"conversationId,omitempty"`
-	Timestamp           uint64             `json:"timestamp,omitempty"`
-	Author              NotificationAuthor `json:"notificationAuthor,omitempty"`
-	Deleted             bool               `json:"deleted,omitempty"`
+	ID             common.Hash         `json:"id"`
+	Platform       float32             `json:"platform,omitempty"`
+	Body           json.RawMessage     `json:"body"`
+	BodyType       NotificationType    `json:"bodyType"`
+	Title          string              `json:"title,omitempty"`
+	Message        string              `json:"message,omitempty"`
+	DisplayTitle   string              `json:"displayTitle,omitempty"`
+	DisplayMessage string              `json:"displayMessage,omitempty"`
+	Category       PushCategory        `json:"category,omitempty"`
+	Deeplink       string              `json:"deepLink,omitempty"`
+	Image          string              `json:"imageUrl,omitempty"`
+	IsScheduled   bool                 `json:"isScheduled,omitempty"`
+	ScheduledTime  string              `json:"scheduleTime,omitempty"`
+	IsConversation      bool           `json:"isConversation,omitempty"`
+	IsGroupConversation bool           `json:"isGroupConversation,omitempty"`
+	ConversationID string              `json:"conversationId,omitempty"`
+	Timestamp      uint64              `json:"timestamp,omitempty"`
+	Author         NotificationAuthor  `json:"notificationAuthor,omitempty"`
+	CommunityIcon  string              `json:"communityIcon,omitempty"`
+	ChatIcon       string              `json:"chatIcon,omitempty"`
+	Deleted        bool                `json:"deleted,omitempty"`
 }
 
 // MessageEvent - structure used to pass messages from chat to bus
@@ -105,6 +118,8 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		Category:            n.Category,
 		Title:               n.Title,
 		Message:             n.Message,
+		DisplayTitle:        n.DisplayTitle,
+		DisplayMessage:      n.DisplayMessage,
 		Deeplink:            n.Deeplink,
 		Image:               n.Image,
 		IsScheduled:         n.IsScheduled,
@@ -114,6 +129,8 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		ConversationID:      n.ConversationID,
 		Timestamp:           n.Timestamp,
 		Author:              n.Author,
+		CommunityIcon:       n.CommunityIcon,
+		ChatIcon:            n.ChatIcon,
 		Deleted:             n.Deleted,
 	}
 
@@ -127,6 +144,7 @@ func PushMessages(ns []*Notification) {
 }
 
 func pushMessage(notification *Notification) {
+	fmt.Printf("[local-notifications] pushMessage: title=%q convId=%s deleted=%v\n", notification.Title, notification.ConversationID, notification.Deleted)
 	logutils.ZapLogger().Debug("Pushing a new push notification")
 	signal.SendLocalNotifications(notification)
 }

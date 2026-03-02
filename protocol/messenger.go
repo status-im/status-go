@@ -2706,6 +2706,7 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	}
 
 	notifications := response.Notifications()
+	fmt.Printf("[messenger] PublishMessengerResponse: %d notifications to push\n", len(notifications))
 	// Clear notifications as not used for now
 	response.ClearNotifications()
 	signal.SendNewMessages(response)
@@ -2755,6 +2756,8 @@ type ReceivedMessageState struct {
 	// Response to the client
 	Response           *MessengerResponse
 	ResolvePrimaryName func(string) (string, error)
+	// CommunityLookup fetches community by ID for notification icons (nil safe)
+	CommunityLookup func(communityID string) *communities.Community
 	// Timesource is a time source for clock values/timestamps.
 	Timesource              common.TimeSource
 	AllBookmarks            map[string]*browsers.Bookmark
@@ -2764,20 +2767,21 @@ type ReceivedMessageState struct {
 
 // addNewMessageNotification takes a common.Message and generates a new NotificationBody and appends it to the
 // []Response.Notifications if the message is m.New
-func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicKey, m *common.Message, responseTo *common.Message, profilePicturesVisibility int) error {
-	if !m.New {
+func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, settings NotificationSettingsProvider, publicKey ecdsa.PublicKey, msg *common.Message, responseTo *common.Message, profilePicturesVisibility int) error {
+	if !msg.New {
 		return nil
 	}
+	fmt.Printf("[messenger] addNewMessageNotification: considering msgId=%s chatId=%s (m.New=true)\n", msg.ID, msg.LocalChatID)
 
-	pubKey, err := m.GetSenderPubKey()
+	pubKey, err := msg.GetSenderPubKey()
 	if err != nil {
 		return err
 	}
 	contactID := contacts.ContactIDFromPublicKey(pubKey)
 
-	chat, ok := r.AllChats.Load(m.LocalChatID)
+	chat, ok := r.AllChats.Load(msg.LocalChatID)
 	if !ok {
-		return fmt.Errorf("chat ID '%s' not present", gocommon.TruncateWithDot(m.LocalChatID))
+		return fmt.Errorf("chat ID '%s' not present", gocommon.TruncateWithDot(msg.LocalChatID))
 	}
 
 	contact, ok := r.AllContacts.Load(contactID)
@@ -2785,14 +2789,37 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 		return fmt.Errorf("contact ID '%s' not present", gocommon.TruncateWithDot(contactID))
 	}
 
-	if !chat.Muted {
-		if showMessageNotification(publicKey, m, chat, responseTo) {
-			notification, err := NewMessageNotification(m.ID, m, chat, contact, r.ResolvePrimaryName, profilePicturesVisibility)
+	// Use contact from persistence when available so we get Images with Payload (needed for notification icon
+	// data URIs). In-memory contacts may have had Payload cleared by updateContactImagesURL for memory.
+	if messenger != nil && messenger.persistence != nil {
+		if dbContact, err := messenger.persistence.ContactByID(contactID); err == nil && dbContact != nil && len(dbContact.Images) > 0 {
+			contact = dbContact
+		}
+	}
+
+		if !chat.Muted {
+		if showMessageNotification(settings, publicKey, msg, chat, responseTo) {
+			messagePreview := messagePreviewNameAndMessage
+			if settings != nil {
+				if v, err := settings.GetMessagePreview(); err == nil {
+					messagePreview = v
+				}
+			}
+			var community *communities.Community
+			if chat.CommunityChat() && r.CommunityLookup != nil {
+				community = r.CommunityLookup(chat.CommunityID)
+			}
+			notification, err := NewMessageNotification(msg.ID, msg, chat, contact, community, r.ResolvePrimaryName, profilePicturesVisibility, messagePreview)
 			if err != nil {
 				return err
 			}
+			fmt.Printf("[messenger] addNewMessageNotification: ADDING notification msgId=%s chatId=%s\n", msg.ID, msg.LocalChatID)
 			r.Response.AddNotification(notification)
+		} else {
+			fmt.Printf("[messenger] addNewMessageNotification: SKIP showMessageNotification=false msgId=%s chatId=%s\n", msg.ID, msg.LocalChatID)
 		}
+	} else {
+		fmt.Printf("[messenger] addNewMessageNotification: SKIP chat muted msgId=%s chatId=%s\n", msg.ID, msg.LocalChatID)
 	}
 
 	return nil
@@ -2924,6 +2951,10 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
 		ResolvePrimaryName:    m.ResolvePrimaryName,
+		CommunityLookup: func(communityID string) *communities.Community {
+			c, _ := m.communitiesManager.GetByIDString(communityID)
+			return c
+		},
 		AllBookmarks:          make(map[string]*browsers.Bookmark),
 		AllTrustStatus:        make(map[string]verification.TrustStatus),
 	}
@@ -3479,7 +3510,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 	}
 	messageState.Response.SetMessages(messagesWithResponses)
 
-	notificationsEnabled, err := m.settings.GetNotificationsEnabled()
+	notificationsEnabled, err := m.settings.GetAllowNotifications()
 	if err != nil {
 		return nil, err
 	}
@@ -3500,7 +3531,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 
 			if notificationsEnabled {
 				// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
-				if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo], profilePicturesVisibility); err != nil {
+				if err = messageState.addNewMessageNotification(m, m.settings, m.identity.PublicKey, message, messagesByID[message.ResponseTo], profilePicturesVisibility); err != nil {
 					return nil, err
 				}
 			}
