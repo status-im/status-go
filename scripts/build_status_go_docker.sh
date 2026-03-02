@@ -25,9 +25,14 @@ if [[ "${FUNCTIONAL_TESTS_USE_LOGOS_STORAGE}" == "true" ]]; then
     mkdir -p "${GIT_ROOT}/libs"
     if [[ -f "${LIBSTORAGE_PATH}/lib/libstorage.so" ]]; then
       cp "${LIBSTORAGE_PATH}/lib/libstorage.so" "${GIT_ROOT}/libs/libstorage.so"
-      echo -e "${GRN}Prepared ./libs/libstorage.so from \$LIBSTORAGE_PATH${RST}"
+      if [[ -f "${LIBSTORAGE_PATH}/include/libstorage.h" ]]; then
+        cp "${LIBSTORAGE_PATH}/include/libstorage.h" "${GIT_ROOT}/libs/libstorage.h"
+        echo -e "${GRN}Prepared ./libs/libstorage.so and ./libs/libstorage.h from \$LIBSTORAGE_PATH${RST}"
+      else
+        echo -e "${YEL}No libstorage.h at ${LIBSTORAGE_PATH}/include; Docker build may need make fetch-storage to download headers.${RST}"
+      fi
     else
-      echo -e "${YEL}No libstorage.so at ${LIBSTORAGE_PATH}/lib; Docker build will rely on make fetch-libstorage.${RST}"
+      echo -e "${YEL}No libstorage.so at ${LIBSTORAGE_PATH}/lib; Docker build will rely on make fetch-storage.${RST}"
     fi
   fi
 fi

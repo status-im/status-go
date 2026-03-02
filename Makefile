@@ -146,8 +146,8 @@ else
 endif
 
 LIBSDS := $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR) -I$(LIBS_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -L$(LIBS_DIR) -lstorage
+CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -194,10 +194,10 @@ fetch-storage: ##@build Fetch libstorage for native non-Nix workflows
 ifdef LIBSTORAGE_PATH
 	@echo "Using libstorage from Nix shell: $(LIBSTORAGE_PATH)"
 else
-	@if [ -f "$(LIBS_DIR)/libstorage.so" ] || [ -f "$(LIBS_DIR)/libstorage.dylib" ] || [ -f "$(LIBS_DIR)/libstorage.dll" ]; then \
-		echo "libstorage already present in $(LIBS_DIR); skipping download"; \
+	@if ([ -f "$(LIBS_DIR)/libstorage.so" ] || [ -f "$(LIBS_DIR)/libstorage.dylib" ] || [ -f "$(LIBS_DIR)/libstorage.dll" ]) && [ -f "$(LIBS_DIR)/libstorage.h" ]; then \
+		echo "libstorage and libstorage.h already present in $(LIBS_DIR); skipping download"; \
 	else \
-		echo "Fetching libstorage from: $(LOGOS_STORAGE_DOWNLOAD_URL)"; \
+		echo "Fetching libstorage artifacts from: $(LOGOS_STORAGE_DOWNLOAD_URL)"; \
 		mkdir -p "$(LIBS_DIR)"; \
 		curl -fSL --create-dirs -o "$(LIBS_DIR)/logos-storage-$(LOGOS_STORAGE_OS)-$(LOGOS_STORAGE_ARCH).zip" "$(LOGOS_STORAGE_DOWNLOAD_URL)"; \
 		unzip -o -qq "$(LIBS_DIR)/logos-storage-$(LOGOS_STORAGE_OS)-$(LOGOS_STORAGE_ARCH).zip" -d "$(LIBS_DIR)"; \
