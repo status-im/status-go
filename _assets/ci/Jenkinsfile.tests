@@ -186,7 +186,7 @@ pipeline {
             ]) {
               nix.develop('USE_NWAKU=${USE_NWAKU} make test-storage V=1', pure: false)
               nix.develop('USE_NWAKU=${USE_NWAKU} make test-torrent V=1', pure: false)
-              nix.develop('USE_NWAKU=${USE_NWAKU} make test-unit V=1', pure: false)
+              nix.develop('USE_NWAKU=${USE_NWAKU} USE_LOGOS_STORAGE=true USE_TORRENT=true make test-unit V=1', pure: false)
             }
             archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
           }

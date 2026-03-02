@@ -615,7 +615,7 @@ test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
 
 test-unit: test-unit-prep
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
-test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
+test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list -tags '$(BUILD_TAGS)' ./... | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
