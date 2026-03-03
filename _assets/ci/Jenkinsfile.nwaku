@@ -73,15 +73,7 @@ pipeline {
   }
 
   stages {
-    stage('Temporary Skip') {
-      when { expression { isTemporarilyDisabledNWakuPRCheck() } }
-      steps {
-        echo 'Temporarily skipping nwaku PR build due to libwaku/waku-go-bindings ABI incompatibility.'
-      }
-    }
-
     stage('Setup') {
-      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
         steps {
           script {
             if (!env.PLATFORM.startsWith('windows')) {
@@ -93,7 +85,6 @@ pipeline {
   }
 
     stage('Deps') {
-      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps { script {
         nix.develop('make status-go-deps', pure: false)
       }
@@ -101,7 +92,6 @@ pipeline {
   }
 
     stage('Generate') {
-      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps { script {
         nix.develop('make generate', pure: false)
       }
@@ -109,7 +99,6 @@ pipeline {
   }
 
     stage('Build Static Lib') {
-        when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
         steps {
             script {
                 nix.develop('make statusgo-library', pure: false)
@@ -118,7 +107,6 @@ pipeline {
         }
 
     stage('Build Shared Lib') {
-        when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
         steps {
             script {
                 nix.develop('make statusgo-shared-library', pure: false)
@@ -127,14 +115,12 @@ pipeline {
         }
 
     stage('Archive') {
-        when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
         steps {
           zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
             }
         }
 
     stage('Upload') {
-        when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
         steps {
             script {
                 env.PKG_URL = s5cmd.upload(ARTIFACT)
@@ -160,12 +146,4 @@ def getJobPathTokens() {
 
 def getNWakuMode() {
     return getJobPathTokens().contains('nwaku')
-}
-
-def isPRJob() {
-    return getJobPathTokens().contains('prs')
-}
-
-def isTemporarilyDisabledNWakuPRCheck() {
-    return isPRJob() && params.USE_NWAKU
 }
