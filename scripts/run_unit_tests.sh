@@ -141,10 +141,10 @@ else
   bg_pids+=("$!")
 
   # Spawn separate processes to run `protocol` package
-  # for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-  #   run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
-  #   bg_pids+=("$!")
-  # done
+  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+    run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+    bg_pids+=("$!")
+  done
 fi
 
 # Wait for jobs and handle failfast
