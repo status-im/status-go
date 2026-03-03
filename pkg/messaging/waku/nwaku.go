@@ -1033,16 +1033,23 @@ func (w *Waku) setupRelaySubscriptions() error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
-	w.cancel()
+	if w.cancel != nil {
+		w.cancel()
+	}
 
-	w.envelopeCache.Stop()
+	if w.envelopeCache != nil {
+		w.envelopeCache.Stop()
+	}
 
 	err := w.node.Stop()
 	if err != nil {
 		return err
 	}
 
-	close(w.goingOnline)
+	if w.goingOnline != nil {
+		close(w.goingOnline)
+		w.goingOnline = nil
+	}
 
 	w.wg.Wait()
 
