@@ -27,6 +27,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
@@ -145,6 +146,7 @@ type Messenger struct {
 		once sync.Once
 	}
 
+	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
 	savedAddressesManager *wallet.SavedAddressesManager

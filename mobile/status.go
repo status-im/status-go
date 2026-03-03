@@ -1894,3 +1894,17 @@ func LoadLocalBackup(requestJSON string) string {
 	err = statusBackend.StatusNode().LoadLocalBackup(request.FilePath)
 	return makeJSONResponse(err)
 }
+
+func ConnectionChange(requestJSON string) string {
+	return callWithResponse(connectionChange, requestJSON)
+}
+
+func connectionChange(requestJSON string) string {
+	var request requests.ConnectionChange
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	statusBackend.ConnectionChange(request.Type, request.Expensive)
+	return makeJSONResponse(nil)
+}
