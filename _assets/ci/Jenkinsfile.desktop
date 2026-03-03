@@ -71,8 +71,20 @@ pipeline {
   }
 
   stages {
+    stage('Temporary Skip') {
+      when { expression { isTemporarilyDisabledNWakuPRCheck() } }
+      steps {
+        echo 'Temporarily skipping nwaku PR desktop build due to libwaku/waku-go-bindings ABI incompatibility.'
+      }
+    }
+
     stage('Setup') {
-      when { expression { !env.PLATFORM.startsWith('windows') } }
+      when {
+        allOf {
+          expression { !isTemporarilyDisabledNWakuPRCheck() }
+          expression { !env.PLATFORM.startsWith('windows') }
+        }
+      }
       steps { script {
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
@@ -80,36 +92,42 @@ pipeline {
     }
 
     stage('Deps') {
+      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps { script {
         make('status-go-deps V=2')
       } }
     }
 
     stage('Generate') {
+      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps { script {
         make('generate V=2')
       } }
     }
 
     stage('Build Static Lib') {
+      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps { script {
         make('statusgo-library V=2')
       } }
     }
 
     stage('Build Shared Lib') {
+      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps { script {
         make('statusgo-shared-library V=2')
       } }
     }
 
     stage('Archive') {
+      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps {
         zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
       }
     }
 
     stage('Upload') {
+      when { expression { !isTemporarilyDisabledNWakuPRCheck() } }
       steps { script {
         env.PKG_URL = s5cmd.upload(ARTIFACT)
       } }
@@ -196,4 +214,12 @@ def getJobPathTokens() {
 
 def getNWakuMode() {
   return getJobPathTokens().any { it.contains('nwaku') }
+}
+
+def isPRJob() {
+  return getJobPathTokens().contains('prs')
+}
+
+def isTemporarilyDisabledNWakuPRCheck() {
+  return isPRJob() && params.USE_NWAKU
 }
