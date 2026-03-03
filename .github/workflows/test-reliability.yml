@@ -2,6 +2,20 @@ name: Test Reliability
 
 on:
   workflow_dispatch:
+    inputs:
+      test_marker:
+        description: "Pytest marker to run"
+        type: choice
+        required: false
+        default: reliability
+        options:
+          - reliability
+          - rpc
+      waku_fleet:
+        description: "Waku fleet value for --waku-fleet"
+        type: string
+        required: false
+        default: status.staging
   schedule:
     - cron:  '0 2 * * *'
 
@@ -12,6 +26,9 @@ jobs:
   test-reliability:
     timeout-minutes: 90
     runs-on: ubuntu-latest
+    env:
+      TEST_MARKER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_marker || 'reliability' }}
+      WAKU_FLEET: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.waku_fleet || 'status.staging' }}
     permissions:
       contents: read
       actions: read
@@ -57,12 +74,12 @@ jobs:
       run: |
         pytest --reruns 2 \
           -n auto \
-          -m "reliability" \
+          -m "${TEST_MARKER}" \
           -c tests-functional/pytest.ini \
           --junit-xml=pytest_results.xml \
           --tb=short \
           --docker-image="statusgo-local" \
-          --waku-fleet=status.staging \
+          --waku-fleet="${WAKU_FLEET}" \
           --waku-fleets-config="" \
           --logs-dir=tests-functional/log
 
