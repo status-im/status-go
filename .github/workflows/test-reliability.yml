@@ -36,13 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        config:
-          - name: ipv4
-            docker_compose_file: tests-functional/docker-compose.test.reliability.ipv4.yml
-            use_ipv6: "No"
-          - name: ipv6
-            docker_compose_file: tests-functional/docker-compose.test.reliability.ipv6.yml
-            use_ipv6: "Yes"
+        config: ${{ fromJSON((github.event_name == 'workflow_dispatch' && github.event.inputs.test_marker == 'rpc') && '[{"name":"ipv4","docker_compose_file":"tests-functional/docker-compose.test.reliability.ipv4.yml","use_ipv6":"No"}]' || '[{"name":"ipv4","docker_compose_file":"tests-functional/docker-compose.test.reliability.ipv4.yml","use_ipv6":"No"},{"name":"ipv6","docker_compose_file":"tests-functional/docker-compose.test.reliability.ipv6.yml","use_ipv6":"Yes"}]') }}
     steps:
 
     - uses: actions/checkout@v4
