@@ -640,6 +640,7 @@ test-unit-race: test-unit ##@tests Run unit and integration tests with -race fla
 test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
+test-functional: export FUNCTIONAL_TESTS_USE_LOGOS_STORAGE ?= true
 test-functional:
 	@./scripts/run_functional_tests.sh
 
