@@ -33,8 +33,8 @@ func TestNewConfigFromJSON(t *testing.T) {
 		"LogosStorageConfig": {
 			"Enabled": false,
 			"NodeConfig": {
-				"data-dir": "` + tmpDir + `/logos-storage/data",
-				"block-retries": 5
+				"DataDir": "` + tmpDir + `/logos-storage/data",
+				"BlockRetries": 5
 			}
 		},
 		"RuntimeLogLevel": "DEBUG"
