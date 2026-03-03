@@ -1,5 +1,5 @@
-//go:build use_nwaku
-// +build use_nwaku
+//go:build use_nwaku && integration
+// +build use_nwaku,integration
 
 package wakuv2
 
