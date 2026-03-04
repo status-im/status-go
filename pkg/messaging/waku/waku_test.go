@@ -38,6 +38,13 @@ import (
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
 var testBootENRBootstrap = "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.staging.status.nodes.status.im"
 
+func requireDiscoveryV5Integration(t *testing.T) {
+	t.Helper()
+	if os.Getenv("WAKU_DISCOVERY_V5_INTEGRATION") != "1" {
+		t.Skip("requires reachable staging discovery/store nodes; set WAKU_DISCOVERY_V5_INTEGRATION=1 to run")
+	}
+}
+
 func setDefaultConfig(config *Config, lightMode bool) {
 	config.ClusterID = 16
 
@@ -54,6 +61,8 @@ func setDefaultConfig(config *Config, lightMode bool) {
 }
 
 func TestDiscoveryV5(t *testing.T) {
+	requireDiscoveryV5Integration(t)
+
 	config := &Config{}
 	setDefaultConfig(config, false)
 	config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
@@ -77,6 +86,8 @@ func TestDiscoveryV5(t *testing.T) {
 }
 
 func TestRestartDiscoveryV5(t *testing.T) {
+	requireDiscoveryV5Integration(t)
+
 	config := &Config{}
 	setDefaultConfig(config, false)
 	// Use wrong discv5 bootstrap address, to simulate being offline
