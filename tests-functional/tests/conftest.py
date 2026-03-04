@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from requests import ReadTimeout
+from web3 import Web3
 
 from clients.anvil import Anvil
 from clients.async_status_backend import AsyncStatusBackend
@@ -169,7 +170,7 @@ def funded_new_profile(backend_new_profile, anvil_client):
 
         accounts = backend.accounts_service.get_accounts()
         wallet_account = next(a for a in accounts if not a.get("chat"))
-        wallet_address = wallet_account["address"]
+        wallet_address = Web3.to_checksum_address(wallet_account["address"])
 
         anvil_client.set_balance(wallet_address, balance)
 
