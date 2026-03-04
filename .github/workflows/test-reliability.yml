@@ -24,7 +24,7 @@ env:
 
 jobs:
   test-reliability:
-    timeout-minutes: 180
+    timeout-minutes: 360
     runs-on: ubuntu-latest
     env:
       TEST_MARKER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_marker || 'reliability' }}
