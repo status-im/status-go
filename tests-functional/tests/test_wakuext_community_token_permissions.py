@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+import json
 from typing import Optional, List
 
 
@@ -13,7 +14,6 @@ from clients.status_backend import StatusBackend
 from resources.constants import user_1
 from steps.messenger import MessengerSteps
 from utils import fake
-from utils.retry_utils import retry_call
 from utils.keys import change_community_key_compression
 
 logger = logging.getLogger(__name__)
@@ -429,7 +429,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
 
     def test_owner_edits_visible_before_and_after_minting_owner_token(self, owner_backend, member_backend, foundry_client, anvil_client):
-        """Test that owner edits are visible before and after minting the owner token on Anvil"""
+        """Test that owner edits are visible before and after minting the owner token"""
 
         # Owner creates a token-gated community
         community_id = self.create_token_gated_community(
@@ -447,7 +447,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
         member_address = self.fund_backend_account_with_tokens(member_backend, foundry_client)
         self.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
 
-        # Balance and permission checks are async/cached, force refresh and retry
+        # Balance and permission checks are async/cached, force refresh and retry.
+        # `community.memberReevaluationStatus` is not reliably emitted in this path.
         member_backend.wallet_service.fetch_or_get_cached_wallet_balances([member_address], True)
         permissions_resp = None
         for _ in range(10):
@@ -478,7 +479,6 @@ class TestCommunityTokenPermissions(MessengerSteps):
             assert len(requests) == 1, "Unexpected multiple requests to join community"
 
             req_id = requests[0].get("id")
-            logger.info(f"Sent request to join community {community_id} with id {req_id}")
 
         time.sleep(2)
 
@@ -492,11 +492,15 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert member_backend.public_key in owner_community.get("members", {})
 
         # When the Owner edits the community
-        new_name, new_description = self.edit_community(owner_backend, community_id)
-        logger.info(f"New name: {new_name}, new description2: {new_description}")
+        with member_backend.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda signal: community_id in json.dumps(signal),
+            timeout=60,
+        ):
+            new_name, new_description = self.edit_community(owner_backend, community_id)
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, member_backend, community_id, new_name, new_description)
+        assert self.check_member_community_updated(member_backend, community_id, new_name, new_description)
 
         # Fund owner wallet with native token on Anvil to cover gas for owner-token deployment
         owner_accounts = owner_backend.accounts_service.get_accounts()
@@ -518,11 +522,15 @@ class TestCommunityTokenPermissions(MessengerSteps):
         self.deploy_owner_token(owner_backend, community_id)
 
         # And the Owner edits the community again
-        new_name2, new_description2 = self.edit_community(owner_backend, community_id)
-        logger.info(f"New name2: {new_name2}, new description2: {new_description2}")
+        with member_backend.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda signal: community_id in json.dumps(signal),
+            timeout=60,
+        ):
+            new_name2, new_description2 = self.edit_community(owner_backend, community_id)
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, member_backend, community_id, new_name2, new_description2)
+        assert self.check_member_community_updated(member_backend, community_id, new_name2, new_description2)
 
         # When the Owner logouts and logs back in
         owner_backend.logout()
@@ -531,7 +539,12 @@ class TestCommunityTokenPermissions(MessengerSteps):
         owner_backend.wait_for_wakuext_ready(timeout=60, start_messenger=True)
 
         # And the Owner edits the community again
-        new_name3, new_description3 = self.edit_community(owner_backend, community_id)
+        with member_backend.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda signal: community_id in json.dumps(signal),
+            timeout=60,
+        ):
+            new_name3, new_description3 = self.edit_community(owner_backend, community_id)
 
         # Then the Member sees the updated community
-        retry_call(self.check_member_community_updated, member_backend, community_id, new_name3, new_description3)
+        assert self.check_member_community_updated(member_backend, community_id, new_name3, new_description3)
