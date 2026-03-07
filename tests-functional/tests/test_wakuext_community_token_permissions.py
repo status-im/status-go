@@ -9,7 +9,7 @@ from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenP
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
-from steps.messenger import MessengerSteps
+from steps import messenger
 from utils import fake
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ def request_to_join_with_signatures(backend: StatusBackend, community_id: str, a
 
 
 @pytest.mark.rpc
-class TestCommunityTokenPermissions(MessengerSteps):
+class TestCommunityTokenPermissions:
     @pytest.fixture(autouse=True)
     def setup_snt(self, snt_addresses):
         self.snt_address = snt_addresses["snt"]
@@ -51,7 +51,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         community = None
         for attempt in range(attempts):
-            community = self.fetch_community(backend, community_id)
+            community = messenger.fetch_community(backend, community_id)
             if community:
                 break
             logging.info(f"Community {community_id} not found yet (attempt {attempt + 1}/{attempts})")
@@ -131,7 +131,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
 
         # Fetch community as member
-        self.fetch_community(member_backend, community_id)
+        messenger.fetch_community(member_backend, community_id)
 
         # Member tries to join without tokens and with fake address - should fail permission check
         fake_address = "0x" + "0" * 40

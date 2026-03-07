@@ -1,11 +1,11 @@
 from uuid import uuid4
 import pytest
-from steps.messenger import MessengerSteps
+from steps import messenger
 from resources.enums import MessageContentType
 
 
 @pytest.mark.rpc
-class TestCreatePrivateGroups(MessengerSteps):
+class TestCreatePrivateGroups:
 
     @pytest.fixture()
     def community_admin(self, backend_new_profile):
@@ -16,7 +16,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         return backend_new_profile("community_member")
 
     def test_create_group_chat_with_members(self, community_admin, community_member):
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         private_group_name = f"private_group_{uuid4()}"
         create_group_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
@@ -24,19 +24,19 @@ class TestCreatePrivateGroups(MessengerSteps):
         )
         # TODO: Add more assertions on response
 
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             create_group_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{community_admin.public_key} created the group {private_group_name}",
         )[0]
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             create_group_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{community_admin.public_key} has added @{community_member.public_key}",
         )[0]
 
     def test_leave_group_chat(self, community_admin, community_member):
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         create_group_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
             f"private_group_{uuid4()}",
@@ -50,7 +50,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         leave_group_response = community_admin.wakuext_service.leave_group_chat(group_id, True)
         # TODO: Add more assertions on response
 
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             leave_group_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{community_admin.public_key} left the group",
@@ -62,9 +62,9 @@ class TestCreatePrivateGroups(MessengerSteps):
 
     def test_send_group_chat_invitation_request(self, community_admin, community_member, backend_new_profile):
         third_node = backend_new_profile("third_node")
-        self.make_contacts(community_admin, third_node)
+        messenger.make_contacts(community_admin, third_node)
 
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
 
         create_group_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
@@ -105,9 +105,9 @@ class TestCreatePrivateGroups(MessengerSteps):
 
     def test_add_members_to_group_chat(self, community_admin, community_member, backend_new_profile):
         third_node = backend_new_profile("third_node")
-        self.make_contacts(community_admin, third_node)
+        messenger.make_contacts(community_admin, third_node)
 
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         create_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
             f"add_members_group_{uuid4()}",
@@ -120,14 +120,14 @@ class TestCreatePrivateGroups(MessengerSteps):
         )
         # TODO: Add more assertions on response
 
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             add_members_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{community_admin.public_key} has added @{third_node.public_key}",
         )[0]
 
     def test_remove_member_from_group_chat(self, community_admin, community_member):
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         create_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
             f"group_{uuid4()}",
@@ -140,7 +140,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         )
         # TODO: Add more assertions on response
 
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             remove_member_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{community_member.public_key} left the group",
@@ -148,9 +148,9 @@ class TestCreatePrivateGroups(MessengerSteps):
 
     def test_remove_members_from_group_chat(self, community_admin, community_member, backend_new_profile):
         third_node = backend_new_profile("third_node")
-        self.make_contacts(community_admin, third_node)
+        messenger.make_contacts(community_admin, third_node)
 
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         create_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key, third_node.public_key], f"add_members_group_{uuid4()}"
         )
@@ -162,19 +162,19 @@ class TestCreatePrivateGroups(MessengerSteps):
         )
         # TODO: Add more assertions on response
 
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             remove_members_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{community_member.public_key} left the group",
         )[0]
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             remove_members_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{third_node.public_key} left the group",
         )[0]
 
     def test_confirm_joining_group(self, community_admin, community_member):
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         create_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
             f"confirm_join_group_{uuid4()}",
@@ -189,7 +189,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         assert len(chats[0].get("members", [])) == 2
 
     def test_change_group_chat_name(self, community_admin, community_member):
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         initial_group_name = "initial_group_name"
         create_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
@@ -201,7 +201,7 @@ class TestCreatePrivateGroups(MessengerSteps):
         change_name_response = community_admin.wakuext_service.change_group_chat_name(group_id, new_group_name)
         # TODO: Add more assertions on response
 
-        _ = self.get_message_by_content_type(
+        _ = messenger.get_message_by_content_type(
             change_name_response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
             message_pattern=f"@{community_admin.public_key} changed the group's name to {new_group_name}",
@@ -213,9 +213,9 @@ class TestCreatePrivateGroups(MessengerSteps):
     @pytest.mark.skip(reason="waiting for https://github.com/status-im/status-go/issues/6752 resolution")
     def test_get_group_chat_invitations(self, community_admin, community_member, backend_new_profile):
         third_node = backend_new_profile("third_node")
-        self.make_contacts(community_admin, third_node)
+        messenger.make_contacts(community_admin, third_node)
 
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         create_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
             f"group_{uuid4()}",
@@ -232,9 +232,9 @@ class TestCreatePrivateGroups(MessengerSteps):
 
     def test_send_group_chat_invitation_rejection(self, community_admin, community_member, backend_new_profile):
         third_node = backend_new_profile("third_node")
-        self.make_contacts(community_admin, third_node)
+        messenger.make_contacts(community_admin, third_node)
 
-        self.make_contacts(community_admin, community_member)
+        messenger.make_contacts(community_admin, community_member)
         create_response = community_admin.wakuext_service.create_group_chat_with_members(
             [community_member.public_key],
             f"group_{uuid4()}",
