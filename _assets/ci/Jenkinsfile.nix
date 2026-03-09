@@ -3,7 +3,7 @@
 library 'status-jenkins-lib@v1.9.39'
 
 pipeline {
-  agent { label "${params.AGENT_LABEL} && nix-2.24" }
+  agent { label "${params.AGENT_LABEL} && nix-2.33" }
 
   parameters {
     string(

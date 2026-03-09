@@ -45,8 +45,8 @@ in pkgs.buildGoModule {
     export HOME=$TMPDIR
 
     make generate \
-        NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \
-        NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib" \
+        NIM_SDS_INC_DIR="${pkgs.libsds}/include" \
+        NIM_SDS_LIB_DIR="${pkgs.libsds}/lib" \
         GO_GENERATE_CMD='go generate'
   '';
 
@@ -61,8 +61,8 @@ in pkgs.buildGoModule {
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
     make statusgo-library \
-        NIM_SDS_INC_DIR="${pkgs.lib-sds-pkg}/include" \
-        NIM_SDS_LIB_DIR="${pkgs.lib-sds-pkg}/lib" \
+        NIM_SDS_INC_DIR="${pkgs.libsds}/include" \
+        NIM_SDS_LIB_DIR="${pkgs.libsds}/lib" \
         STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
         STATUS_GO_LIBRARY_OUT="$out" \
         CLEANUP_GENERATED_FILES=false \

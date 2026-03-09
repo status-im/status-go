@@ -43,8 +43,8 @@
         overlays = [
           pkgsOverlay
           (final: prev: {
-            libwaku        = lmn.packages.${system}.libwaku;
-            lib-sds-pkg  = nim-sds.packages.${system}.libsds;
+            libwaku = lmn.packages.${system}.libwaku;
+            libsds  = nim-sds.packages.${system}.libsds;
           })
         ];
       }
