@@ -35,6 +35,17 @@ func ContractAddress(chainID uint64) (common.Address, error) {
 	return addr, nil
 }
 
+func ContractAddressWithOverrides(chainID uint64, overrides map[uint64]common.Address) (common.Address, error) {
+	if overrides != nil {
+		overrideAddr, exists := overrides[chainID]
+		if exists {
+			return overrideAddr, nil
+		}
+	}
+
+	return ContractAddress(chainID)
+}
+
 func CommunitiesSupportedOnChain(chainID uint64) bool {
 	addr, err := ContractAddress(chainID)
 	if err != nil {
