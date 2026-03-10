@@ -203,6 +203,9 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if len(walletRequest.MulticallOverrides) > 0 {
 		walletConfig.MulticallOverrides = walletRequest.MulticallOverrides
 	}
+	if len(walletRequest.CommunityTokenDeployerOverrides) > 0 {
+		walletConfig.CommunityTokenDeployerOverrides = walletRequest.CommunityTokenDeployerOverrides
+	}
 	if len(walletRequest.CustomTokens) > 0 {
 		walletConfig.CustomTokens = walletRequest.CustomTokens
 	}
