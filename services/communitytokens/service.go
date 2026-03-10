@@ -59,7 +59,7 @@ func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsM
 	walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
 	logger := logutils.ZapLogger().Named("communitytokens")
 	return &Service{
-		manager:         NewManager(rpcClient),
+		manager:         NewManager(rpcClient, config.WalletConfig.CommunityTokenDeployerOverrides),
 		accountsManager: accountsManager,
 		config:          config,
 		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
