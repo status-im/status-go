@@ -24,16 +24,18 @@ import (
 )
 
 type CommunityDeployCollectiblesProcessor struct {
-	contractMaker   *communitytokens.CommunityTokensContractMaker
-	ethClientGetter rpc.EthClientGetter
-	transactor      transactions.TransactorIface
+	contractMaker     *communitytokens.CommunityTokensContractMaker
+	ethClientGetter   rpc.EthClientGetter
+	transactor        transactions.TransactorIface
+	deployerOverrides map[uint64]common.Address
 }
 
-func NewCommunityDeployCollectiblesProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CommunityDeployCollectiblesProcessor {
+func NewCommunityDeployCollectiblesProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, deployerOverrides map[uint64]common.Address) *CommunityDeployCollectiblesProcessor {
 	return &CommunityDeployCollectiblesProcessor{
-		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
-		ethClientGetter: ethClientGetter,
-		transactor:      transactor,
+		contractMaker:     communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter:   ethClientGetter,
+		transactor:        transactor,
+		deployerOverrides: deployerOverrides,
 	}
 }
 
@@ -108,5 +110,9 @@ func (s *CommunityDeployCollectiblesProcessor) CalculateAmountOut(params Process
 }
 
 func (s *CommunityDeployCollectiblesProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	return communitytokendeployer.ContractAddress(params.FromChain.ChainID)
+	if params.ToAddr != (common.Address{}) {
+		return params.ToAddr, nil
+	}
+
+	return communitytokendeployer.ContractAddressWithOverrides(params.FromChain.ChainID, s.deployerOverrides)
 }
