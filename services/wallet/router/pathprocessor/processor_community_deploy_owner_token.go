@@ -29,16 +29,18 @@ import (
 )
 
 type CommunityDeployOwnerTokenProcessor struct {
-	contractMaker   *communitytokens.CommunityTokensContractMaker
-	ethClientGetter rpc.EthClientGetter
-	transactor      transactions.TransactorIface
+	contractMaker     *communitytokens.CommunityTokensContractMaker
+	ethClientGetter   rpc.EthClientGetter
+	transactor        transactions.TransactorIface
+	deployerOverrides map[uint64]common.Address
 }
 
-func NewCommunityDeployOwnerTokenProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *CommunityDeployOwnerTokenProcessor {
+func NewCommunityDeployOwnerTokenProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, deployerOverrides map[uint64]common.Address) *CommunityDeployOwnerTokenProcessor {
 	return &CommunityDeployOwnerTokenProcessor{
-		contractMaker:   communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
-		ethClientGetter: ethClientGetter,
-		transactor:      transactor,
+		contractMaker:     communitytokens.NewCommunityTokensContractMakerMaker(ethClientGetter),
+		ethClientGetter:   ethClientGetter,
+		transactor:        transactor,
+		deployerOverrides: deployerOverrides,
 	}
 }
 
@@ -176,5 +178,9 @@ func (s *CommunityDeployOwnerTokenProcessor) CalculateAmountOut(params Processor
 }
 
 func (s *CommunityDeployOwnerTokenProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	return communitytokendeployer.ContractAddress(params.FromChain.ChainID)
+	if params.ToAddr != (common.Address{}) {
+		return params.ToAddr, nil
+	}
+
+	return communitytokendeployer.ContractAddressWithOverrides(params.FromChain.ChainID, s.deployerOverrides)
 }
