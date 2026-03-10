@@ -15,6 +15,7 @@ from resources.constants import (
     USE_IPV6,
     SNT_ADDRESSES_CONTAINER_PATH,
     COMMUNITIES_ADDRESSES_CONTAINER_PATH,
+    ENS_ADDRESSES_CONTAINER_PATH,
 )
 from utils import fake
 
@@ -195,6 +196,21 @@ def communities_addresses(foundry_client):
         logger.error("Communities contracts should be deployed as part of docker-compose startup")
         raise RuntimeError(
             "Communities contracts not found. Make sure the foundry container has deployed contracts during startup. "
+            "This should happen automatically in entrypoint.sh"
+        ) from e
+
+
+@pytest.fixture(scope="session")
+def ens_addresses(foundry_client):
+    try:
+        data = foundry_client.load_json(ENS_ADDRESSES_CONTAINER_PATH)
+        logger.info(f"Using pre-deployed ENS contracts: registry={data['registry']}, " f"registrar={data['registrar']}, token={data['token']}")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to load ENS addresses from container: {e}")
+        logger.error("ENS contracts should be deployed as part of docker-compose startup")
+        raise RuntimeError(
+            "ENS contracts not found. Make sure the foundry container has deployed contracts during startup. "
             "This should happen automatically in entrypoint.sh"
         ) from e
 

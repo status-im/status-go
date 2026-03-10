@@ -101,7 +101,8 @@ func (e *EnsResolver) OwnerOf(ctx context.Context, chainID uint64, username stri
 	// Get the NameWrapper contract address for the given chain ID
 	nameWrapperAddress, err := NameWrapperContractAddress(chainID)
 	if err != nil {
-		return nil, err
+		// No NameWrapper on this chain — name can't be wrapped, return registry owner
+		return &owner, nil
 	}
 
 	if owner != nameWrapperAddress {

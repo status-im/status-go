@@ -146,3 +146,4 @@ NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 # Container paths for pre-deployed contracts
 SNT_ADDRESSES_CONTAINER_PATH = "/app/contracts/snt_addresses.json"
 COMMUNITIES_ADDRESSES_CONTAINER_PATH = "/app/contracts/communities_addresses.json"
+ENS_ADDRESSES_CONTAINER_PATH = "/app/contracts/ens_addresses.json"
