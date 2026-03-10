@@ -2115,6 +2115,24 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
+	// Push outgoing message to local-notifications so clients (e.g. Android) receive it
+	// via the same signal path as incoming messages and can refresh the notification.
+	var community *communities.Community
+	if chat.CommunityChat() && chat.CommunityID != "" {
+		community, _ = m.communitiesManager.GetByIDString(chat.CommunityID)
+	}
+	authorID := crypto.PubkeyToHex(&m.identity.PublicKey)
+	authorName, _ := m.settings.DisplayName()
+	var authorIcon string
+	if img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName); err == nil && img != nil && len(img.Payload) > 0 {
+		authorIcon, _ = images.GetPayloadDataURI(img.Payload)
+	}
+	if authorIcon == "" {
+		authorIcon, _ = identicon.GenerateBase64(authorID)
+	}
+	outgoingNotif := NewOutgoingMessageNotification(message.ID, message, chat, community, authorName, authorIcon, authorID)
+	localnotifications.PushMessages([]*localnotifications.Notification{outgoingNotif})
+
 	return &response, m.saveChat(chat)
 }
 

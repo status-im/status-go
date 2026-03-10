@@ -21,16 +21,16 @@ type NotificationBody interface {
 }
 
 type Notification struct {
-	ID                  common.Hash
-	Platform            float32
-	Body                NotificationBody
-	BodyType            NotificationType
-	Title               string
-	Message             string
+	ID       common.Hash
+	Platform float32
+	Body     NotificationBody
+	BodyType NotificationType
+	Title    string
+	Message  string
 	// DisplayTitle and DisplayMessage are privacy-filtered for lock screen/OS display.
 	// When set, clients should use these for OS notifications; Title/Message remain full for in-app.
-	DisplayTitle   string
-	DisplayMessage string
+	DisplayTitle        string
+	DisplayMessage      string
 	Category            PushCategory
 	Deeplink            string
 	Image               string
@@ -45,7 +45,9 @@ type Notification struct {
 	CommunityIcon string
 	// ChatIcon is the chat/group avatar (data URI) for group chat notifications.
 	ChatIcon string
-	Deleted             bool
+	Deleted  bool
+	// IsFromMe indicates the message was sent by the current user (outgoing).
+	IsFromMe bool
 }
 
 type NotificationAuthor struct {
@@ -56,27 +58,28 @@ type NotificationAuthor struct {
 
 // notificationAlias is an interim struct used for json un/marshalling
 type notificationAlias struct {
-	ID             common.Hash         `json:"id"`
-	Platform       float32             `json:"platform,omitempty"`
-	Body           json.RawMessage     `json:"body"`
-	BodyType       NotificationType    `json:"bodyType"`
-	Title          string              `json:"title,omitempty"`
-	Message        string              `json:"message,omitempty"`
-	DisplayTitle   string              `json:"displayTitle,omitempty"`
-	DisplayMessage string              `json:"displayMessage,omitempty"`
-	Category       PushCategory        `json:"category,omitempty"`
-	Deeplink       string              `json:"deepLink,omitempty"`
-	Image          string              `json:"imageUrl,omitempty"`
-	IsScheduled   bool                 `json:"isScheduled,omitempty"`
-	ScheduledTime  string              `json:"scheduleTime,omitempty"`
-	IsConversation      bool           `json:"isConversation,omitempty"`
-	IsGroupConversation bool           `json:"isGroupConversation,omitempty"`
-	ConversationID string              `json:"conversationId,omitempty"`
-	Timestamp      uint64              `json:"timestamp,omitempty"`
-	Author         NotificationAuthor  `json:"notificationAuthor,omitempty"`
-	CommunityIcon  string              `json:"communityIcon,omitempty"`
-	ChatIcon       string              `json:"chatIcon,omitempty"`
-	Deleted        bool                `json:"deleted,omitempty"`
+	ID                  common.Hash        `json:"id"`
+	Platform            float32            `json:"platform,omitempty"`
+	Body                json.RawMessage    `json:"body"`
+	BodyType            NotificationType   `json:"bodyType"`
+	Title               string             `json:"title,omitempty"`
+	Message             string             `json:"message,omitempty"`
+	DisplayTitle        string             `json:"displayTitle,omitempty"`
+	DisplayMessage      string             `json:"displayMessage,omitempty"`
+	Category            PushCategory       `json:"category,omitempty"`
+	Deeplink            string             `json:"deepLink,omitempty"`
+	Image               string             `json:"imageUrl,omitempty"`
+	IsScheduled         bool               `json:"isScheduled,omitempty"`
+	ScheduledTime       string             `json:"scheduleTime,omitempty"`
+	IsConversation      bool               `json:"isConversation,omitempty"`
+	IsGroupConversation bool               `json:"isGroupConversation,omitempty"`
+	ConversationID      string             `json:"conversationId,omitempty"`
+	Timestamp           uint64             `json:"timestamp,omitempty"`
+	Author              NotificationAuthor `json:"notificationAuthor,omitempty"`
+	CommunityIcon       string             `json:"communityIcon,omitempty"`
+	ChatIcon            string             `json:"chatIcon,omitempty"`
+	Deleted             bool               `json:"deleted,omitempty"`
+	IsFromMe            bool               `json:"isFromMe,omitempty"`
 }
 
 // MessageEvent - structure used to pass messages from chat to bus
@@ -132,6 +135,7 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		CommunityIcon:       n.CommunityIcon,
 		ChatIcon:            n.ChatIcon,
 		Deleted:             n.Deleted,
+		IsFromMe:            n.IsFromMe,
 	}
 
 	return json.Marshal(alias)

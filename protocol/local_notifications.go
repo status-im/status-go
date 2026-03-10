@@ -26,8 +26,8 @@ const (
 
 // MessagePreview values (must match Constants.settingsSection.notificationsBubble)
 const (
-	messagePreviewAnonymous     = 0
-	messagePreviewNameOnly      = 1
+	messagePreviewAnonymous      = 0
+	messagePreviewNameOnly       = 1
 	messagePreviewNameAndMessage = 2
 )
 
@@ -281,6 +281,43 @@ func NewCommunityRequestToJoinNotification(id string, community *communities.Com
 	return body.toCommunityRequestToJoinNotification(id, profilePicturesVisibility, messagePreview)
 }
 
+// NewOutgoingMessageNotification creates a local notification for a message sent by the current user.
+func NewOutgoingMessageNotification(id string, message *common.Message, chat *Chat, community *communities.Community, authorName string, authorIcon string, authorID string) *localnotifications.Notification {
+	title := chat.Name
+	simplifiedText, err := message.GetSimplifiedText("", nil)
+	if err != nil {
+		simplifiedText = message.Text
+	}
+	notif := &localnotifications.Notification{
+		ID:                  gethcommon.HexToHash(id),
+		BodyType:            localnotifications.TypeMessage,
+		Category:            localnotifications.CategoryMessage,
+		Deeplink:            chat.DeepLink(),
+		Title:               title,
+		Message:             simplifiedText,
+		DisplayTitle:        title,
+		DisplayMessage:      simplifiedText,
+		IsConversation:      true,
+		IsGroupConversation: chat.PrivateGroupChat() || chat.Public() || chat.CommunityChat(),
+		Author: localnotifications.NotificationAuthor{
+			Name: authorName,
+			Icon: authorIcon,
+			ID:   authorID,
+		},
+		Timestamp:      message.WhisperTimestamp,
+		ConversationID: chat.ID,
+		Image:          "",
+		IsFromMe:       true,
+	}
+	if chat.CommunityChat() && community != nil {
+		notif.CommunityIcon = communityIconDataURI(community)
+	}
+	if chat.PrivateGroupChat() {
+		notif.ChatIcon = chatIconDataURI(chat)
+	}
+	return notif
+}
+
 func NewPrivateGroupInviteNotification(id string, chat *Chat, contact *contacts.Contact, profilePicturesVisibility int, messagePreview int) *localnotifications.Notification {
 	body := &NotificationBody{
 		Chat:    chat,
@@ -326,8 +363,8 @@ func (n NotificationBody) toMessageNotification(id string, resolvePrimaryName fu
 		Title:               title,
 		Message:             simplifiedText,
 		DisplayTitle:        displayTitle,
-		DisplayMessage:     displayMessage,
-		IsConversation:     true,
+		DisplayMessage:      displayMessage,
+		IsConversation:      true,
 		IsGroupConversation: true,
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.PrimaryName(),
