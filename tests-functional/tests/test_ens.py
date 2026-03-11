@@ -58,6 +58,16 @@ def extract_pubkey_coordinates(public_key):
     return x, y
 
 
+def sync_registry_to_well_known(foundry, registry_addr, username):
+    """Sync deployed registry storage to well-known address so Go code can read it."""
+    well_known = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
+    user_namehash = f"$(cast namehash '{username}.stateofus.eth')"
+    cmd = f"/app/sync_registry.sh {registry_addr} {well_known} {ANVIL_RPC_URL} {user_namehash}"
+    result = foundry.container.exec_run(["sh", "-c", cmd])
+    if result.exit_code != 0:
+        raise RuntimeError(f"sync_registry failed: {result.output.decode().strip()}")
+
+
 def register_ens_name(foundry, ens_addresses, username, account_address, public_key):
     token = ens_addresses["token"]
     registrar = ens_addresses["registrar"]
@@ -71,8 +81,8 @@ def register_ens_name(foundry, ens_addresses, username, account_address, public_
         [label, account_address, x, y],
     )
 
-    price_hex = cast_call(foundry, registrar, "getPrice()(uint256)")
-    price = price_hex.strip()
+    price_raw = cast_call(foundry, registrar, "getPrice()(uint256)")
+    price = price_raw.strip().split()[0]
 
     cast_send(
         foundry,
@@ -124,6 +134,9 @@ class TestEnsRegistration:
             public_key,
         )
         logger.info(f"Registered {ENS_FULL_NAME} on-chain")
+
+        # Sync registered name from deployed registry to well-known address for Go
+        sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], ENS_USERNAME)
 
         resolved_pubkey = self.rpc_client.ens_service.public_key_of(CHAIN_ID, ENS_FULL_NAME)
         assert resolved_pubkey, "ens_publicKeyOf returned empty"

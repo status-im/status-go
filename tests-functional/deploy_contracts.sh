@@ -52,70 +52,41 @@ echo "Deploying ENS contracts..."
 
 ENS_BROADCAST_FILE="/app/ens-usernames/broadcast/Deploy.s.sol/31337/run-latest.json"
 if [ -f "$ENS_BROADCAST_FILE" ]; then
-    REGISTRY_ADDR=$(grep -B5 '"contractName": "ENSRegistry"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
-    RESOLVER_ADDR=$(grep -B5 '"contractName": "PublicResolver"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
-    TOKEN_ADDR=$(grep -B5 '"contractName": "MiniMeToken"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
-    REGISTRAR_ADDR=$(grep -B5 '"contractName": "UsernameRegistrar"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+    REGISTRY_ADDR=$(grep -A1 '"contractName": "ENSRegistry"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+    RESOLVER_ADDR=$(grep -A1 '"contractName": "PublicResolver"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+    TOKEN_ADDR=$(grep -A1 '"contractName": "MiniMeToken"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+    REGISTRAR_ADDR=$(grep -A1 '"contractName": "UsernameRegistrar"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
 
     echo "ENS Registry (deployed): $REGISTRY_ADDR"
     echo "ENS Resolver: $RESOLVER_ADDR"
     echo "ENS Token: $TOKEN_ADDR"
     echo "ENS Registrar: $REGISTRAR_ADDR"
 
-    # go-ens library and status-go resolver hardcode this address
-    WELL_KNOWN_REGISTRY="0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
-
-    # Copy registry bytecode to well-known address
-    echo "Copying ENS registry to well-known address..."
-    REGISTRY_CODE=$(cast code $REGISTRY_ADDR --rpc-url $ANVIL_URL)
-    cast rpc anvil_setCode $WELL_KNOWN_REGISTRY $REGISTRY_CODE --rpc-url $ANVIL_URL
-
-    # Copy storage for root, eth, stateofus.eth nodes from deployed to well-known
+    # Domain setup on deployed registry — registrar and resolver reference it via immutables
+    echo "Setting up stateofus.eth domain..."
     ROOT_NODE="0x0000000000000000000000000000000000000000000000000000000000000000"
     ETH_NAMEHASH=$(cast namehash "eth")
-    STATEOFUS_NAMEHASH=$(cast namehash "stateofus.eth")
-
-    for NODE in $ROOT_NODE $ETH_NAMEHASH $STATEOFUS_NAMEHASH; do
-        BASE_SLOT=$(cast keccak $(cast abi-encode "f(bytes32,uint256)" $NODE 0))
-        for OFFSET in 0 1 2; do
-            SLOT=$(cast to-hex $(($(cast to-dec $BASE_SLOT) + $OFFSET)) 2>/dev/null || python3 -c "print(hex(int('$BASE_SLOT', 16) + $OFFSET))")
-            VALUE=$(cast storage $REGISTRY_ADDR $SLOT --rpc-url $ANVIL_URL)
-            cast rpc anvil_setStorageAt $WELL_KNOWN_REGISTRY $SLOT $VALUE --rpc-url $ANVIL_URL
-        done
-    done
-
-    # Set up stateofus.eth domain on well-known registry (not deployed),
-    # because Go resolves registrar via OwnerOf("stateofus.eth") on well-known
-    echo "Setting up stateofus.eth domain on well-known registry..."
     ETH_LABELHASH=$(cast keccak "eth")
     STATEOFUS_LABELHASH=$(cast keccak "stateofus")
 
-    cast send $WELL_KNOWN_REGISTRY "setSubnodeOwner(bytes32,bytes32,address)" \
+    cast send $REGISTRY_ADDR "setSubnodeOwner(bytes32,bytes32,address)" \
         $ROOT_NODE $ETH_LABELHASH $DEPLOYER_ADDRESS \
         --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY
 
-    cast send $WELL_KNOWN_REGISTRY "setSubnodeOwner(bytes32,bytes32,address)" \
+    cast send $REGISTRY_ADDR "setSubnodeOwner(bytes32,bytes32,address)" \
         $ETH_NAMEHASH $STATEOFUS_LABELHASH $REGISTRAR_ADDR \
         --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY
-
-    # Patch registrar (slot 1) and resolver (slot 0) to use well-known registry,
-    # so register() updates the registry that Go actually queries
-    echo "Patching registrar and resolver to use well-known registry..."
-    WELL_KNOWN_PADDED=$(echo $WELL_KNOWN_REGISTRY | sed 's/0x//' | tr '[:upper:]' '[:lower:]')
-    WELL_KNOWN_SLOT_VALUE="0x000000000000000000000000${WELL_KNOWN_PADDED}"
-
-    cast rpc anvil_setStorageAt $REGISTRAR_ADDR \
-        "0x0000000000000000000000000000000000000000000000000000000000000001" \
-        $WELL_KNOWN_SLOT_VALUE --rpc-url $ANVIL_URL
-
-    cast rpc anvil_setStorageAt $RESOLVER_ADDR \
-        "0x0000000000000000000000000000000000000000000000000000000000000000" \
-        $WELL_KNOWN_SLOT_VALUE --rpc-url $ANVIL_URL
 
     # Activate registrar (required before it accepts registrations)
     echo "Activating registrar..."
     cast send $REGISTRAR_ADDR "activate(uint256)" 1000000000000000000 \
         --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY
+
+    # Go code (go-ens, resolver/address.go) queries the well-known ENS registry.
+    # Copy deployed registry code + storage to well-known address so Go can read it.
+    WELL_KNOWN_REGISTRY="0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
+    echo "Syncing deployed registry to well-known address..."
+    /app/sync_registry.sh $REGISTRY_ADDR $WELL_KNOWN_REGISTRY $ANVIL_URL
 
     cat > $CONTRACTS_PATH/ens_addresses.json << EOF
 {
