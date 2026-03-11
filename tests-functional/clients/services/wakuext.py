@@ -934,3 +934,8 @@ class WakuextService(Service):
         params = [sign_params]
         response = self.rpc_request("signData", params)
         return response
+
+    def send_contact_updates(self, ens_name: str, profile_image: str = "", customization_color: str = "blue"):
+        params = [ens_name, profile_image, customization_color]
+        response = self.rpc_request("sendContactUpdates", params)
+        return response

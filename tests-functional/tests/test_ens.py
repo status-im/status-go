@@ -2,6 +2,7 @@ import logging
 
 import pytest
 
+from clients.api import ApiResponseError
 import resources.constants as constants
 
 logger = logging.getLogger(__name__)
@@ -58,8 +59,24 @@ def extract_pubkey_coordinates(public_key):
     return x, y
 
 
+def cast_rpc(foundry, method, params=None):
+    params_str = " ".join(str(p) for p in params) if params else ""
+    cmd = f"cast rpc {method} {params_str} --rpc-url {ANVIL_RPC_URL}"
+    result = foundry.container.exec_run(cmd)
+    if result.exit_code != 0:
+        raise RuntimeError(f"cast rpc {method} failed: {result.output.decode().strip()}")
+    return result.output.decode().strip()
+
+
+def get_block_timestamp(foundry):
+    cmd = f"cast block latest --field timestamp --rpc-url {ANVIL_RPC_URL}"
+    result = foundry.container.exec_run(cmd)
+    if result.exit_code != 0:
+        raise RuntimeError(f"get_block_timestamp failed: {result.output.decode().strip()}")
+    return int(result.output.decode().strip())
+
+
 def sync_registry_to_well_known(foundry, registry_addr, username):
-    """Sync deployed registry storage to well-known address so Go code can read it."""
     well_known = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
     user_namehash = f"$(cast namehash '{username}.stateofus.eth')"
     cmd = f"/app/sync_registry.sh {registry_addr} {well_known} {ANVIL_RPC_URL} {user_namehash}"
@@ -135,7 +152,6 @@ class TestEnsRegistration:
         )
         logger.info(f"Registered {ENS_FULL_NAME} on-chain")
 
-        # Sync registered name from deployed registry to well-known address for Go
         sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], ENS_USERNAME)
 
         resolved_pubkey = self.rpc_client.ens_service.public_key_of(CHAIN_ID, ENS_FULL_NAME)
@@ -147,3 +163,94 @@ class TestEnsRegistration:
         assert usernames, "ens_getEnsUsernames returned empty"
         found = any(u.get("username") == ENS_FULL_NAME for u in usernames)
         assert found, f"{ENS_FULL_NAME} not found in {usernames}"
+
+    def test_ens_link_and_manage_names(self):
+        public_key = self.rpc_client.public_key
+        user1 = "linkuser1"
+        user1_full = f"{user1}.stateofus.eth"
+        user2 = "linkuser2"
+        user2_full = f"{user2}.stateofus.eth"
+
+        register_ens_name(
+            self.foundry,
+            self.ens_addresses,
+            user1,
+            constants.DEPLOYER_ACCOUNT.address,
+            public_key,
+        )
+        sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], user1)
+        self.rpc_client.ens_service.add(CHAIN_ID, user1_full)
+        logger.info(f"Linked {user1_full}")
+
+        usernames = self.rpc_client.ens_service.get_ens_usernames()
+        assert any(u.get("username") == user1_full for u in usernames), f"{user1_full} not found in {usernames}"
+
+        resolver_addr = self.rpc_client.ens_service.resolver(CHAIN_ID, user1_full)
+        assert resolver_addr, "ens_resolver returned empty"
+        logger.info(f"Resolver for {user1_full}: {resolver_addr}")
+
+        register_ens_name(
+            self.foundry,
+            self.ens_addresses,
+            user2,
+            constants.DEPLOYER_ACCOUNT.address,
+            public_key,
+        )
+        sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], user2)
+        self.rpc_client.ens_service.add(CHAIN_ID, user2_full)
+        logger.info(f"Linked {user2_full}")
+
+        usernames = self.rpc_client.ens_service.get_ens_usernames()
+        names = [u.get("username") for u in usernames]
+        assert user1_full in names, f"{user1_full} not found in {names}"
+        assert user2_full in names, f"{user2_full} not found in {names}"
+
+        self.rpc_client.ens_service.remove(CHAIN_ID, user1_full)
+        logger.info(f"Removed {user1_full}")
+
+        usernames = self.rpc_client.ens_service.get_ens_usernames()
+        names = [u.get("username") for u in usernames if not u.get("removed")]
+        assert user1_full not in names, f"{user1_full} should have been removed"
+        assert user2_full in names, f"{user2_full} not found after removal of first"
+
+        with pytest.raises(ApiResponseError):
+            self.rpc_client.ens_service.add(CHAIN_ID, "INVALID")
+
+        with pytest.raises(ApiResponseError):
+            self.rpc_client.ens_service.add(CHAIN_ID, "test.stateofus.eth.stateofus.eth")
+
+    def test_ens_validity_time(self):
+        public_key = self.rpc_client.public_key
+        username = "timeuser"
+        full_name = f"{username}.stateofus.eth"
+        one_year_seconds = 365 * 24 * 60 * 60
+
+        register_ens_name(
+            self.foundry,
+            self.ens_addresses,
+            username,
+            constants.DEPLOYER_ACCOUNT.address,
+            public_key,
+        )
+        sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
+        logger.info(f"Registered {full_name}")
+
+        # expire_at expects plain username, not full ENS name
+        expire_hex = self.rpc_client.ens_service.expire_at(CHAIN_ID, username)
+        assert expire_hex, "ens_expireAt returned empty"
+        expire_time = int(expire_hex, 16)
+        logger.info(f"Expiration timestamp: {expire_time}")
+
+        current_time = get_block_timestamp(self.foundry)
+        expected_expire = current_time + one_year_seconds
+        delta = abs(expire_time - expected_expire)
+        assert delta < 60, f"Expiration {expire_time} too far from expected {expected_expire} (delta={delta}s)"
+
+        half_year_seconds = 180 * 24 * 60 * 60
+        cast_rpc(self.foundry, "evm_increaseTime", [half_year_seconds])
+        cast_rpc(self.foundry, "evm_mine")
+        logger.info("Advanced time by 180 days")
+
+        expire_hex_after = self.rpc_client.ens_service.expire_at(CHAIN_ID, username)
+        expire_time_after = int(expire_hex_after, 16)
+        assert expire_time_after == expire_time, f"Expiration changed after time advance: was {expire_time}, now {expire_time_after}"
