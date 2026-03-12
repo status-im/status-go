@@ -2814,7 +2814,7 @@ func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, s
 		}
 	}
 
-		if !chat.Muted {
+	if !chat.Muted {
 		if showMessageNotification(settings, publicKey, msg, chat, responseTo) {
 			messagePreview := messagePreviewNameAndMessage
 			if settings != nil {
@@ -2967,8 +2967,8 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 			c, _ := m.communitiesManager.GetByIDString(communityID)
 			return c
 		},
-		AllBookmarks:          make(map[string]*browsers.Bookmark),
-		AllTrustStatus:        make(map[string]verification.TrustStatus),
+		AllBookmarks:   make(map[string]*browsers.Bookmark),
+		AllTrustStatus: make(map[string]verification.TrustStatus),
 	}
 }
 

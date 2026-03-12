@@ -20,27 +20,37 @@ type mockNotificationSettings struct {
 	oneToOneChats      string
 	groupChats         string
 	personalMentions   string
-	globalMentions    string
-	allMessages       string
-	messagePreview    int
-	hasExemption      bool
-	exMuteAllMessages bool
+	globalMentions     string
+	allMessages        string
+	messagePreview     int
+	hasExemption       bool
+	exMuteAllMessages  bool
 	exPersonalMentions string
-	exGlobalMentions  string
-	exOtherMessages   string
+	exGlobalMentions   string
+	exOtherMessages    string
 }
 
-func (m *mockNotificationSettings) GetOneToOneChats() (string, error)                { return m.oneToOneChats, nil }
-func (m *mockNotificationSettings) GetGroupChats() (string, error)                   { return m.groupChats, nil }
-func (m *mockNotificationSettings) GetPersonalMentions() (string, error)             { return m.personalMentions, nil }
-func (m *mockNotificationSettings) GetGlobalMentions() (string, error)               { return m.globalMentions, nil }
-func (m *mockNotificationSettings) GetAllMessages() (string, error)                 { return m.allMessages, nil }
-func (m *mockNotificationSettings) GetMessagePreview() (int, error)                   { return m.messagePreview, nil }
-func (m *mockNotificationSettings) HasExemption(id string) (bool, error)             { return m.hasExemption, nil }
-func (m *mockNotificationSettings) GetExMuteAllMessages(id string) (bool, error)     { return m.exMuteAllMessages, nil }
-func (m *mockNotificationSettings) GetExPersonalMentions(id string) (string, error) { return m.exPersonalMentions, nil }
-func (m *mockNotificationSettings) GetExGlobalMentions(id string) (string, error)    { return m.exGlobalMentions, nil }
-func (m *mockNotificationSettings) GetExOtherMessages(id string) (string, error)     { return m.exOtherMessages, nil }
+func (m *mockNotificationSettings) GetOneToOneChats() (string, error) { return m.oneToOneChats, nil }
+func (m *mockNotificationSettings) GetGroupChats() (string, error)    { return m.groupChats, nil }
+func (m *mockNotificationSettings) GetPersonalMentions() (string, error) {
+	return m.personalMentions, nil
+}
+func (m *mockNotificationSettings) GetGlobalMentions() (string, error)   { return m.globalMentions, nil }
+func (m *mockNotificationSettings) GetAllMessages() (string, error)      { return m.allMessages, nil }
+func (m *mockNotificationSettings) GetMessagePreview() (int, error)      { return m.messagePreview, nil }
+func (m *mockNotificationSettings) HasExemption(id string) (bool, error) { return m.hasExemption, nil }
+func (m *mockNotificationSettings) GetExMuteAllMessages(id string) (bool, error) {
+	return m.exMuteAllMessages, nil
+}
+func (m *mockNotificationSettings) GetExPersonalMentions(id string) (string, error) {
+	return m.exPersonalMentions, nil
+}
+func (m *mockNotificationSettings) GetExGlobalMentions(id string) (string, error) {
+	return m.exGlobalMentions, nil
+}
+func (m *mockNotificationSettings) GetExOtherMessages(id string) (string, error) {
+	return m.exOtherMessages, nil
+}
 
 func TestApplyMessagePreview(t *testing.T) {
 	title, message := "Alice", "Hello there"
@@ -179,9 +189,9 @@ func TestShowMessageNotification_Exemptions(t *testing.T) {
 		msg.ID, msg.ChatId, msg.Text, msg.From, msg.Mentioned = "m1", chat.ID, "hi", "0xabc", true
 		msg.MessageType = protobuf.MessageType_COMMUNITY_CHAT
 		settings := &mockNotificationSettings{
-			personalMentions: notifValueSendAlerts,
-			globalMentions:   notifValueSendAlerts,
-			hasExemption:     true,
+			personalMentions:  notifValueSendAlerts,
+			globalMentions:    notifValueSendAlerts,
+			hasExemption:      true,
 			exMuteAllMessages: true,
 		}
 		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
@@ -193,9 +203,9 @@ func TestShowMessageNotification_Exemptions(t *testing.T) {
 		msg.ID, msg.ChatId, msg.Text, msg.From = "m1", chat.ID, "hi", "0xabc"
 		msg.MessageType = protobuf.MessageType_COMMUNITY_CHAT
 		settings := &mockNotificationSettings{
-			allMessages:      notifValueSendAlerts,
-			hasExemption:     true,
-			exOtherMessages:  notifValueTurnOff,
+			allMessages:     notifValueSendAlerts,
+			hasExemption:    true,
+			exOtherMessages: notifValueTurnOff,
 		}
 		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
 		require.False(t, got)
@@ -219,11 +229,11 @@ func TestShowMessageNotification_Exemptions(t *testing.T) {
 		msg.ID, msg.ChatId, msg.Text, msg.From, msg.Mentioned = "m1", chat.ID, "hi", "0xabc", true
 		msg.MessageType = protobuf.MessageType_COMMUNITY_CHAT
 		settings := &mockNotificationSettings{
-			personalMentions:    notifValueSendAlerts,
-			globalMentions:      notifValueSendAlerts,
-			hasExemption:        true,
-			exPersonalMentions:  notifValueTurnOff,
-			exGlobalMentions:    notifValueTurnOff,
+			personalMentions:   notifValueSendAlerts,
+			globalMentions:     notifValueSendAlerts,
+			hasExemption:       true,
+			exPersonalMentions: notifValueTurnOff,
+			exGlobalMentions:   notifValueTurnOff,
 		}
 		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
 		require.False(t, got)
@@ -235,8 +245,8 @@ func TestShowMessageNotification_Exemptions(t *testing.T) {
 		msg.MessageType = protobuf.MessageType_COMMUNITY_CHAT
 		settings := &mockNotificationSettings{
 			personalMentions:   notifValueTurnOff,
-			globalMentions:    notifValueTurnOff,
-			hasExemption:      true,
+			globalMentions:     notifValueTurnOff,
+			hasExemption:       true,
 			exPersonalMentions: notifValueSendAlerts,
 		}
 		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
@@ -248,9 +258,9 @@ func TestShowMessageNotification_Exemptions(t *testing.T) {
 		msg.ID, msg.ChatId, msg.Text, msg.From, msg.Mentioned = "m1", chat.ID, "hi", "0xabc", true
 		msg.MessageType = protobuf.MessageType_COMMUNITY_CHAT
 		settings := &mockNotificationSettings{
-			personalMentions:  notifValueTurnOff,
+			personalMentions: notifValueTurnOff,
 			globalMentions:   notifValueTurnOff,
-			hasExemption:    true,
+			hasExemption:     true,
 			exGlobalMentions: notifValueSendAlerts,
 		}
 		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
