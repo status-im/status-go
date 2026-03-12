@@ -3,8 +3,9 @@ import time
 import docker
 
 from utils.config import Config
-from tenacity import retry, wait_fixed, stop_after_attempt
+from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
 from web3 import Web3
+from web3.exceptions import TransactionNotFound
 from web3.types import (
     TxData,
     TxReceipt,
@@ -67,6 +68,15 @@ class Anvil(Web3):
         return self.eth.get_transaction(HexStr(tx_hash))
 
     def transaction_receipt(self, tx_hash: str) -> TxReceipt:
+        return self.eth.get_transaction_receipt(HexStr(tx_hash))
+
+    @retry(
+        stop=stop_after_attempt(50),
+        wait=wait_fixed(0.2),
+        retry=retry_if_exception_type(TransactionNotFound),
+        reraise=True,
+    )
+    def wait_for_transaction_receipt(self, tx_hash: str) -> TxReceipt:
         return self.eth.get_transaction_receipt(HexStr(tx_hash))
 
     def send_raw_transaction(self, transaction: Union[HexStr, bytes]) -> HexBytes:
