@@ -155,8 +155,6 @@ type Settings struct {
 	MutualContactEnabled bool             `json:"mutual-contact-enabled?"`
 	Name                 string           `json:"name,omitempty"`
 	Networks             *json.RawMessage `json:"networks/networks"`
-	// NotificationsEnabled indicates whether local notifications should be enabled (android only)
-	NotificationsEnabled bool             `json:"notifications-enabled?,omitempty"`
 	PhotoPath            string           `json:"photo-path"`
 	PinnedMailserver     *json.RawMessage `json:"pinned-mailservers,omitempty"`
 	// PreferredName represents the user's preferred Ethereum Name Service (ENS) name.

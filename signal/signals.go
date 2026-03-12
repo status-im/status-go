@@ -10,7 +10,6 @@ extern void SetEventCallback(void *cb);
 import "C"
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 	"unsafe"
@@ -59,13 +58,9 @@ func send(typ string, event interface{}) {
 
 	// If a Go implementation of signal handler is set, let's use it.
 	if mobileSignalHandler != nil {
-		fmt.Printf("[signal] send(%q): using mobileSignalHandler\n", typ)
-		logger.Debug("signal.send using mobileSignalHandler", zap.String("type", typ))
 		mobileSignalHandler(data)
 	} else {
 		// ...and fallback to C implementation otherwise.
-		fmt.Printf("[signal] send(%q): using C StatusServiceSignalEvent, len=%d\n", typ, len(data))
-		logger.Debug("signal.send using C StatusServiceSignalEvent", zap.String("type", typ))
 		str := C.CString(string(data))
 		C.StatusServiceSignalEvent(str)
 		C.free(unsafe.Pointer(str))

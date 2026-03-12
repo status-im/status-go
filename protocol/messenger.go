@@ -2789,7 +2789,6 @@ func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, s
 	if !msg.New {
 		return nil
 	}
-	fmt.Printf("[messenger] addNewMessageNotification: considering msgId=%s chatId=%s (m.New=true)\n", msg.ID, msg.LocalChatID)
 
 	pubKey, err := msg.GetSenderPubKey()
 	if err != nil {
@@ -2831,13 +2830,8 @@ func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, s
 			if err != nil {
 				return err
 			}
-			fmt.Printf("[messenger] addNewMessageNotification: ADDING notification msgId=%s chatId=%s\n", msg.ID, msg.LocalChatID)
 			r.Response.AddNotification(notification)
-		} else {
-			fmt.Printf("[messenger] addNewMessageNotification: SKIP showMessageNotification=false msgId=%s chatId=%s\n", msg.ID, msg.LocalChatID)
 		}
-	} else {
-		fmt.Printf("[messenger] addNewMessageNotification: SKIP chat muted msgId=%s chatId=%s\n", msg.ID, msg.LocalChatID)
 	}
 
 	return nil

@@ -3,7 +3,6 @@ package localnotifications
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -148,7 +147,6 @@ func PushMessages(ns []*Notification) {
 }
 
 func pushMessage(notification *Notification) {
-	fmt.Printf("[local-notifications] pushMessage: title=%q convId=%s deleted=%v\n", notification.Title, notification.ConversationID, notification.Deleted)
 	logutils.ZapLogger().Debug("Pushing a new push notification")
 	signal.SendLocalNotifications(notification)
 }

@@ -3,7 +3,6 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -111,6 +110,17 @@ func applyMessagePreview(title, message string, messagePreview int) (displayTitl
 	}
 }
 
+// applyAuthorPrivacy clears identity-revealing fields from a notification when the privacy
+// level is anonymous. In anonymous mode the OS notification must not expose who sent
+// the message: no sender name, no sender/community/chat icon.
+func applyAuthorPrivacy(notif *localnotifications.Notification, messagePreview int) {
+	if messagePreview == messagePreviewAnonymous {
+		notif.Author = localnotifications.NotificationAuthor{}
+		notif.CommunityIcon = ""
+		notif.ChatIcon = ""
+	}
+}
+
 // NotificationSettingsProvider allows querying notification preferences for local notifications.
 // Implemented by *accounts.Database which embeds *NotificationsSettings.
 type NotificationSettingsProvider interface {
@@ -142,7 +152,6 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 	// For public/community chats, skip inactive (soft-deleted). For 1:1 and group,
 	// still notify — e.g. contact requests or new messages can arrive when Active=false.
 	if chat != nil && !chat.Active && !chat.OneToOne() && !chat.PrivateGroupChat() {
-		fmt.Printf("[local_notifications] showMessageNotification: false (chat !Active, not 1:1/group) msgId=%s\n", message.ID)
 		return false
 	}
 
@@ -168,7 +177,6 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 	// 1. Check per-chat/community exemptions first
 	exMuteAll, err := settings.GetExMuteAllMessages(chatID)
 	if err == nil && exMuteAll {
-		fmt.Printf("[local_notifications] showMessageNotification: false (exemption muteAll) msgId=%s\n", message.ID)
 		return false
 	}
 
@@ -179,10 +187,8 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 	if chat.OneToOne() {
 		val, err := settings.GetOneToOneChats()
 		if err == nil && !isNotificationAllowed(val) {
-			fmt.Printf("[local_notifications] showMessageNotification: false (1:1 TurnOff) msgId=%s\n", message.ID)
 			return false
 		}
-		fmt.Printf("[local_notifications] showMessageNotification: true (1:1) msgId=%s\n", message.ID)
 		return true
 	}
 
@@ -190,10 +196,8 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 	if chat.PrivateGroupChat() {
 		val, err := settings.GetGroupChats()
 		if err == nil && !isNotificationAllowed(val) {
-			fmt.Printf("[local_notifications] showMessageNotification: false (group TurnOff) msgId=%s\n", message.ID)
 			return false
 		}
-		fmt.Printf("[local_notifications] showMessageNotification: true (private group) msgId=%s\n", message.ID)
 		return true
 	}
 
@@ -210,9 +214,7 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 			exG, _ := settings.GetExGlobalMentions(chatID)
 			effPersonal, effGlobal = exP, exG
 		}
-		allowed := isNotificationAllowed(effPersonal) || isNotificationAllowed(effGlobal)
-		fmt.Printf("[local_notifications] showMessageNotification: %v (mention) msgId=%s\n", allowed, message.ID)
-		return allowed
+		return isNotificationAllowed(effPersonal) || isNotificationAllowed(effGlobal)
 	}
 
 	if isReplyToOwn {
@@ -222,9 +224,7 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 			exOther, _ := settings.GetExOtherMessages(chatID)
 			eff = exOther
 		}
-		allowed := isNotificationAllowed(eff)
-		fmt.Printf("[local_notifications] showMessageNotification: %v (reply to own) msgId=%s\n", allowed, message.ID)
-		return allowed
+		return isNotificationAllowed(eff)
 	}
 
 	// 5. Other messages in public/community chats
@@ -234,9 +234,7 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 		exOther, _ := settings.GetExOtherMessages(chatID)
 		eff = exOther
 	}
-	allowed := isNotificationAllowed(eff)
-	fmt.Printf("[local_notifications] showMessageNotification: %v (other) msgId=%s\n", allowed, message.ID)
-	return allowed
+	return isNotificationAllowed(eff)
 }
 
 func (n NotificationBody) MarshalJSON() ([]byte, error) {
@@ -385,6 +383,7 @@ func (n NotificationBody) toMessageNotification(id string, resolvePrimaryName fu
 		notif.ChatIcon = chatIconDataURI(n.Chat)
 	}
 
+	applyAuthorPrivacy(notif, messagePreview)
 	return notif, nil
 }
 
@@ -392,7 +391,7 @@ func (n NotificationBody) toContactRequestNotification(id string, profilePicture
 	title := n.Contact.PrimaryName() + " wants to connect"
 	message := n.Contact.PrimaryName() + " sent you a contact request"
 	displayTitle, displayMessage := applyMessagePreview(title, message, messagePreview)
-	return &localnotifications.Notification{
+	notif := &localnotifications.Notification{
 		ID:             gethcommon.HexToHash(id),
 		Body:           n,
 		Title:          title,
@@ -411,14 +410,16 @@ func (n NotificationBody) toContactRequestNotification(id string, profilePicture
 		Timestamp:      n.Message.WhisperTimestamp,
 		IsConversation: true,
 		Image:          "",
-	}, nil
+	}
+	applyAuthorPrivacy(notif, messagePreview)
+	return notif, nil
 }
 
 func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePicturesVisibility int, messagePreview int) *localnotifications.Notification {
 	title := n.Contact.PrimaryName() + " invited you to " + n.Chat.Name
 	message := n.Contact.PrimaryName() + " wants you to join group " + n.Chat.Name
 	displayTitle, displayMessage := applyMessagePreview(title, message, messagePreview)
-	return &localnotifications.Notification{
+	notif := &localnotifications.Notification{
 		ID:             gethcommon.HexToHash(id),
 		Body:           n,
 		Title:          title,
@@ -436,13 +437,15 @@ func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePic
 		ChatIcon: chatIconDataURI(n.Chat),
 		Image:    "",
 	}
+	applyAuthorPrivacy(notif, messagePreview)
+	return notif
 }
 
 func (n NotificationBody) toCommunityRequestToJoinNotification(id string, profilePicturesVisibility int, messagePreview int) *localnotifications.Notification {
 	title := n.Contact.PrimaryName() + " wants to join " + n.Community.Name()
-	message := n.Contact.PrimaryName() + " wants to join  message " + n.Community.Name()
+	message := n.Contact.PrimaryName() + " wants to join " + n.Community.Name()
 	displayTitle, displayMessage := applyMessagePreview(title, message, messagePreview)
-	return &localnotifications.Notification{
+	notif := &localnotifications.Notification{
 		ID:             gethcommon.HexToHash(id),
 		Body:           n,
 		Title:          title,
@@ -460,4 +463,6 @@ func (n NotificationBody) toCommunityRequestToJoinNotification(id string, profil
 		CommunityIcon: communityIconDataURI(n.Community),
 		Image:         "",
 	}
+	applyAuthorPrivacy(notif, messagePreview)
+	return notif
 }
