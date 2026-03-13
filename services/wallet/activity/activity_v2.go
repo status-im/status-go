@@ -237,20 +237,20 @@ func getEntriesByTransactionIDs(ctx context.Context, deps FilterDependencies, tx
 }
 
 // mergeAndOrderEntries combines entries from sent and fetched sources
-func mergeAndOrderEntries(sentEntries, fetchedEntries map[string]Entry, orderedIDs []OrderedTransactionID) []Entry {
-	entries := make([]Entry, 0, len(orderedIDs))
+func mergeAndOrderEntries(sentEntries, fetchedEntries map[string][]Entry, orderedIDs []OrderedTransactionID) []Entry {
+	allEntries := make([]Entry, 0)
 
 	for _, txID := range orderedIDs {
 		key := txID.Key()
 
-		if entry, exists := sentEntries[key]; exists {
-			entries = append(entries, entry)
-		} else if entry, exists := fetchedEntries[key]; exists {
-			entries = append(entries, entry)
+		if entries, exists := sentEntries[key]; exists {
+			allEntries = append(allEntries, entries...)
+		} else if entries, exists := fetchedEntries[key]; exists {
+			allEntries = append(allEntries, entries...)
 		}
 	}
 
-	return entries
+	return allEntries
 }
 
 func getFinalizationPeriod(chainID wCommon.ChainID) int64 {

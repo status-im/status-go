@@ -2,13 +2,18 @@ package alchemy_test
 
 import (
 	"encoding/json"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/stretchr/testify/require"
+
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 func TestGetAssetTransfers(t *testing.T) {
@@ -35,7 +40,7 @@ func TestTransferToCommon(t *testing.T) {
 	}
 	result := []int{
 		1000,
-		48,
+		50,
 	}
 	addresses := []common.Address{
 		common.HexToAddress("0xd8da6bf26964af9d7eed9e03e53415d37aa96045"),
@@ -48,6 +53,49 @@ func TestTransferToCommon(t *testing.T) {
 		commonResponse := alchemy.TransfersToThirdpartyActivityEntries(response.Transfers, 1, addresses[i])
 		require.Equal(t, result[i], len(commonResponse))
 	}
+}
+
+func TestTransfersToThirdpartyActivityEntries_SelfSend(t *testing.T) {
+	selfAddr := common.HexToAddress("0xabcdef1234567890abcdef1234567890abcdef12")
+	txHash := common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+
+	toAddr := selfAddr
+	transfer := alchemy.Transfer{
+		Category:    alchemy.TransferCategoryExternal,
+		BlockNum:    &bigint.VarHexBigInt{Int: big.NewInt(1000)},
+		FromAddress: selfAddr,
+		ToAddress:   &toAddr,
+		Value:       1.0,
+		Asset:       "ETH",
+		UniqueID:    "self-send-unit-test",
+		Hash:        txHash,
+		RawContract: alchemy.RawContract{
+			Value: &bigint.VarHexBigInt{Int: new(big.Int).Mul(big.NewInt(1e15), big.NewInt(1))},
+		},
+		Metadata: alchemy.Metadata{
+			BlockTimestamp: time.Unix(1757333323, 0),
+		},
+	}
+
+	entries := alchemy.TransfersToThirdpartyActivityEntries([]alchemy.Transfer{transfer}, 1, selfAddr)
+
+	require.Len(t, entries, 2, "Self-send should produce 2 activity entries (send + receive)")
+
+	var sendCount, receiveCount int
+	for _, e := range entries {
+		switch e.ActivityType {
+		case ac.SendAT:
+			sendCount++
+			require.Equal(t, selfAddr, e.Sender, "SendAT sender must be selfAddr")
+			require.Equal(t, &selfAddr, e.Recipient, "SendAT recipient must be selfAddr")
+		case ac.ReceiveAT:
+			receiveCount++
+			require.Equal(t, selfAddr, e.Sender, "ReceiveAT sender must be selfAddr")
+			require.Equal(t, &selfAddr, e.Recipient, "ReceiveAT recipient must be selfAddr")
+		}
+	}
+	require.Equal(t, 1, sendCount, "Should have exactly 1 SendAT entry")
+	require.Equal(t, 1, receiveCount, "Should have exactly 1 ReceiveAT entry")
 }
 
 var malformedErc721Response = `{

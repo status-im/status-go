@@ -43,10 +43,10 @@ func newSentEntryDataV2() *sentEntryDataV2 {
 
 // getSentEntriesByIDs fetches sent transaction details by IDs
 // Returns a map keyed by "chainID-hash-address" string
-func getSentEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []OrderedTransactionID) (map[string]Entry, error) {
+func getSentEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []OrderedTransactionID) (map[string][]Entry, error) {
 
 	if len(txIDs) == 0 {
-		return make(map[string]Entry), nil
+		return make(map[string][]Entry), nil
 	}
 
 	var chainIDs []wCommon.ChainID
@@ -62,7 +62,7 @@ func getSentEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []O
 	}
 
 	if len(hashes) == 0 {
-		return make(map[string]Entry), nil
+		return make(map[string][]Entry), nil
 	}
 
 	for chainID := range chainIDSet {
@@ -127,11 +127,11 @@ func getSentEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []O
 	}
 
 	// Build the result map using ChainID-Hash-Address key format
-	result := make(map[string]Entry)
+	result := make(map[string][]Entry)
 	for _, entry := range entries {
 		if entry.transaction != nil {
 			key := entry.transaction.Key()
-			result[key] = entry
+			result[key] = append(result[key], entry) // multiple entries can have the same key if they are self-sends
 		}
 	}
 
@@ -236,6 +236,13 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 
 		if entry.activityType == ac.ApproveAT {
 			entry.approvalSpender = d.Path.ApprovalContractAddress
+		}
+
+		// For self-send (sender == recipient) that succeeded, also generate a ReceiveAT entry
+		if entry.activityType == ac.SendAT && d.Status == ac.Success && d.RouteInputParams.AddrFrom == d.RouteInputParams.AddrTo {
+			receiveEntry := entry
+			receiveEntry.activityType = ac.ReceiveAT
+			ret = append(ret, receiveEntry)
 		}
 
 		ret = append(ret, entry)

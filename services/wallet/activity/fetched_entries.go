@@ -21,10 +21,10 @@ import (
 
 // getFetchedEntriesByIDs fetches Alchemy transaction details by IDs
 // Returns a map keyed by "chainID-hash-address" string
-func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []OrderedTransactionID) (map[string]Entry, error) {
+func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs []OrderedTransactionID) (map[string][]Entry, error) {
 
 	if len(txIDs) == 0 {
-		return make(map[string]Entry), nil
+		return make(map[string][]Entry), nil
 	}
 
 	var chainIDs []wCommon.ChainID
@@ -40,7 +40,7 @@ func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs 
 	}
 
 	if len(hashStrings) == 0 {
-		return make(map[string]Entry), nil
+		return make(map[string][]Entry), nil
 	}
 
 	for chainID := range chainIDSet {
@@ -75,7 +75,7 @@ func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs 
 		return nil, fmt.Errorf("failed to convert rows to transfers: %w", err)
 	}
 
-	result := make(map[string]Entry)
+	result := make(map[string][]Entry)
 	for chainID, addressMap := range transfersMap {
 		for address, transfers := range addressMap {
 			var activityEntries []thirdparty.ActivityEntry = alchemy.TransfersToThirdpartyActivityEntries(transfers, uint64(chainID), address)
@@ -87,7 +87,7 @@ func getFetchedEntriesByIDs(ctx context.Context, deps FilterDependencies, txIDs 
 						entry.transaction.ChainID,
 						entry.transaction.Hash.Hex(),
 						address.Hex())
-					result[key] = entry
+					result[key] = append(result[key], entry)
 				}
 			}
 		}
