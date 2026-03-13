@@ -74,7 +74,6 @@ var sensitiveMethod = map[string]bool{
 	"wakuext_getCommunityPublicKeyFromPrivateKey":        true,
 	"personal_sign":                                      true,
 	"wallet_signTypedDataV4":                             true,
-	"wallet_safeSignTypedDataForDApps":                   true,
 	"wallet_getDerivedAddresses":                         true,
 	"wallet_signMessage":                                 true,
 	"wallet_getVerifiedWalletAccount":                    true,
