@@ -238,6 +238,81 @@ func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
 	s.Require().Equal(expected, actualInstallations)
 }
 
+func (s *SQLLitePersistenceTestSuite) TestDeleteInstallation() {
+	identity := []byte("alice")
+
+	installations := []*Installation{
+		{ID: "alice-1", Version: 1},
+		{ID: "alice-2", Version: 2},
+	}
+
+	_, err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DeleteInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	actualActiveInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+	expectedActive := []*Installation{{ID: "alice-2", Version: 2, Enabled: true}}
+	s.Require().Equal(expectedActive, actualActiveInstallations)
+
+	actualInstallations, err := s.service.GetInstallations(identity)
+	s.Require().NoError(err)
+	expectedInstallations := []*Installation{{
+		ID:                   "alice-2",
+		Version:              2,
+		Timestamp:            1,
+		Enabled:              true,
+		InstallationMetadata: &InstallationMetadata{},
+	}}
+	s.Require().ElementsMatch(expectedInstallations, actualInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestAddInstallationsDoesNotRestoreDeletedInstallation() {
+	identity := []byte("alice")
+
+	installations := []*Installation{
+		{ID: "alice-1", Version: 1},
+		{ID: "alice-2", Version: 2},
+	}
+
+	_, err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DeleteInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	_, err = s.service.AddInstallations(
+		identity,
+		2,
+		[]*Installation{{ID: "alice-1", Version: 10}},
+		true,
+	)
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetInstallations(identity)
+	s.Require().NoError(err)
+	expectedInstallations := []*Installation{{
+		ID:                   "alice-2",
+		Version:              2,
+		Timestamp:            1,
+		Enabled:              true,
+		InstallationMetadata: &InstallationMetadata{},
+	}}
+	s.Require().ElementsMatch(expectedInstallations, actualInstallations)
+}
+
 func (s *SQLLitePersistenceTestSuite) TestGetInstallations() {
 	identity := []byte("alice")
 

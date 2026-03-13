@@ -191,6 +191,7 @@ func (b *StatusNode) connectorService() *connector.Service {
 			fees.NewFeeManager(b.rpcClient, logger.Named("feeManager")),
 			b.rpcClient.GetNetworkManager(),
 			&connector.Config{
+				WSEnabled: b.config.WSEnabled,
 				WSHost:    b.config.WSHost,
 				WSPort:    b.config.WSPort,
 				ProjectID: b.config.WalletConnectProjectID,

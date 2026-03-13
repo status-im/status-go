@@ -14,7 +14,7 @@ func NewSQLitePersistence(db *sql.DB) *SQLitePersistence {
 func (s *SQLitePersistence) GetActiveInstallations(maxInstallations int, identity []byte) ([]*Installation, error) {
 	stmt, err := s.db.Prepare(`SELECT installation_id, version
 				   FROM installations
-				   WHERE enabled = 1 AND identity = ?
+				   WHERE enabled = 1 AND deleted = 0 AND identity = ?
 				   ORDER BY timestamp DESC
 				   LIMIT ?`)
 	if err != nil {
@@ -62,7 +62,7 @@ func (s *SQLitePersistence) GetInstallations(identity []byte) ([]*Installation, 
 	var installations []*Installation
 
 	// We query both tables as sqlite does not support full outer joins
-	installationsStmt, err := s.db.Prepare(`SELECT installation_id, version, enabled, timestamp FROM installations WHERE identity = ?`)
+	installationsStmt, err := s.db.Prepare(`SELECT installation_id, version, enabled, timestamp FROM installations WHERE identity = ? AND deleted = 0`)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,16 @@ func (s *SQLitePersistence) GetInstallations(identity []byte) ([]*Installation, 
 		installationMap[installation.ID] = &installation
 	}
 
-	metadataStmt, err := s.db.Prepare(`SELECT installation_id, name, device_type, fcm_token FROM installation_metadata WHERE identity = ?`)
+	metadataStmt, err := s.db.Prepare(`SELECT m.installation_id, m.name, m.device_type, m.fcm_token
+				FROM installation_metadata m
+				WHERE m.identity = ?
+				AND NOT EXISTS (
+					SELECT 1
+					FROM installations i
+					WHERE i.identity = m.identity
+					AND i.installation_id = m.installation_id
+					AND i.deleted = 1
+				)`)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +157,7 @@ func (s *SQLitePersistence) AddInstallations(identity []byte, timestamp int64, i
 	var insertedInstallations []*Installation
 
 	for _, installation := range installations {
-		stmt, err := tx.Prepare(`SELECT enabled, version
+		stmt, err := tx.Prepare(`SELECT enabled, version, deleted
 					 FROM installations
 					 WHERE identity = ? AND installation_id = ?
 					 LIMIT 1`)
@@ -160,9 +169,10 @@ func (s *SQLitePersistence) AddInstallations(identity []byte, timestamp int64, i
 		var oldEnabled bool
 		// We don't override version once we saw one
 		var oldVersion uint32
+		var deleted bool
 		latestVersion := installation.Version
 
-		err = stmt.QueryRow(identity, installation.ID).Scan(&oldEnabled, &oldVersion)
+		err = stmt.QueryRow(identity, installation.ID).Scan(&oldEnabled, &oldVersion, &deleted)
 		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}
@@ -187,6 +197,10 @@ func (s *SQLitePersistence) AddInstallations(identity []byte, timestamp int64, i
 			}
 			insertedInstallations = append(insertedInstallations, installation)
 		} else {
+			if deleted {
+				continue
+			}
+
 			// We update timestamp if present without changing enabled, only if this is a new bundle
 			// and we set the version to the latest we ever saw
 			if oldVersion > installation.Version {
@@ -194,7 +208,7 @@ func (s *SQLitePersistence) AddInstallations(identity []byte, timestamp int64, i
 			}
 
 			stmt, err = tx.Prepare(`UPDATE installations
-					        SET timestamp = ?,  enabled = ?, version = ?
+					        SET timestamp = ?, enabled = ?, version = ?
 						WHERE identity = ?
 						AND installation_id = ?
 						AND timestamp < ?`)
@@ -256,7 +270,8 @@ func (s *SQLitePersistence) DisableInstallation(identity []byte, installationID 
 }
 
 func (s *SQLitePersistence) DeleteInstallation(identity []byte, installationID string) error {
-	stmt, err := s.db.Prepare(`DELETE FROM installations
+	stmt, err := s.db.Prepare(`UPDATE installations
+				   SET deleted = 1
 				   WHERE identity = ? AND installation_id = ?`)
 	if err != nil {
 		return err
