@@ -1,6 +1,6 @@
 #!/bin/sh
 # Sync ENS registry storage from source to destination address.
-# Usage: sync_registry.sh <source_addr> <dest_addr> <rpc_url> [node1 node2 ...]
+# Usage: sync_ens_registry.sh <source_addr> <dest_addr> <rpc_url> [node1 node2 ...]
 # If no nodes specified, syncs root, eth, and stateofus.eth nodes.
 
 set -e

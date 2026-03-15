@@ -86,7 +86,7 @@ if [ -f "$ENS_BROADCAST_FILE" ]; then
     # Copy deployed registry code + storage to well-known address so Go can read it.
     WELL_KNOWN_REGISTRY="0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
     echo "Syncing deployed registry to well-known address..."
-    /app/sync_registry.sh $REGISTRY_ADDR $WELL_KNOWN_REGISTRY $ANVIL_URL
+    /app/sync_ens_registry.sh $REGISTRY_ADDR $WELL_KNOWN_REGISTRY $ANVIL_URL
 
     cat > $CONTRACTS_PATH/ens_addresses.json << EOF
 {
