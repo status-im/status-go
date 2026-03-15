@@ -20,6 +20,7 @@ import (
 const serviceName = "connector"
 
 type Config struct {
+	WSEnabled bool
 	WSHost    string
 	WSPort    int
 	ProjectID string
@@ -70,6 +71,10 @@ func (s *Service) Start() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if !s.config.WSEnabled {
+		return nil
 	}
 
 	// Expose the RPC server over websocket
