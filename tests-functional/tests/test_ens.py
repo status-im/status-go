@@ -107,28 +107,28 @@ def register_ens_name(foundry, ens_addresses, username, account_address, public_
 @pytest.mark.ens
 class TestEnsRegistration:
 
-    @pytest.fixture(autouse=True)
-    def setup(self, backend_new_profile, foundry_client, ens_addresses, multicall3_deployer):
+    @pytest.fixture()
+    def backend(self, backend_new_profile, foundry_client, ens_addresses, multicall3_deployer):
         self.foundry = foundry_client
         self.ens_addresses = ens_addresses
-        self.rpc_client = backend_new_profile(
+        return backend_new_profile(
             name="ens_user",
             multicall_contract_address=multicall3_deployer.contract_address,
         )
 
-    def test_ens_add_external_registration(self):
+    def test_ens_add_external_registration(self, backend):
         """Register ENS name externally (via cast), then link it to Status profile via ens_service.add."""
         username = random_ens_username()
         full_name = f"{username}.stateofus.eth"
 
-        public_key = self.rpc_client.public_key
+        public_key = backend.public_key
         assert public_key, "Backend public key not available"
 
-        price = self.rpc_client.ens_service.price(CHAIN_ID)
+        price = backend.ens_service.price(CHAIN_ID)
         assert price, "ens_price returned empty"
         logger.info(f"ENS registration price: {price}")
 
-        registrar_addr = self.rpc_client.ens_service.get_registrar_address(CHAIN_ID)
+        registrar_addr = backend.ens_service.get_registrar_address(CHAIN_ID)
         assert registrar_addr, "ens_getRegistrarAddress returned empty"
         assert (
             registrar_addr == self.ens_addresses["registrar"]
@@ -145,60 +145,50 @@ class TestEnsRegistration:
 
         sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
 
-        resolved_pubkey = self.rpc_client.ens_service.public_key_of(CHAIN_ID, full_name)
+        resolved_pubkey = backend.ens_service.public_key_of(CHAIN_ID, full_name)
         assert resolved_pubkey, "ens_publicKeyOf returned empty"
 
-        self.rpc_client.ens_service.add(CHAIN_ID, full_name)
+        backend.ens_service.add(CHAIN_ID, full_name)
 
-        usernames = self.rpc_client.ens_service.get_ens_usernames()
+        usernames = backend.ens_service.get_ens_usernames()
         assert usernames, "ens_getEnsUsernames returned empty"
         found = any(u.get("username") == full_name for u in usernames)
         assert found, f"{full_name} not found in {usernames}"
-
-
-def mint_ens_tokens(foundry, token_address, recipient, amount):
-    """Mint ENS MiniMeToken to recipient via generateTokens."""
-    cast_send(
-        foundry,
-        token_address,
-        "generateTokens(address,uint256)",
-        [recipient, amount],
-    )
 
 
 @pytest.mark.rpc
 @pytest.mark.ens
 class TestEnsRouterRegistration:
 
-    @pytest.fixture(autouse=True)
-    def setup(self, backend_recovered_profile, foundry_client, ens_addresses, multicall3_deployer):
+    @pytest.fixture()
+    def backend(self, backend_recovered_profile, foundry_client, ens_addresses, multicall3_deployer):
         self.foundry = foundry_client
         self.ens_addresses = ens_addresses
-        self.rpc_client = backend_recovered_profile(
+        return backend_recovered_profile(
             name="ens_router_user",
             user=constants.user_1,
             multicall_contract_address=multicall3_deployer.contract_address,
         )
 
-    def test_ens_register_via_router(self):
+    def test_ens_register_via_router(self, backend):
         """Register ENS name via wallet router (production flow used by status-app)."""
         username = random_ens_username()
         full_name = f"{username}.stateofus.eth"
 
-        public_key = self.rpc_client.public_key
+        public_key = backend.public_key
         assert public_key, "Backend public key not available"
 
-        price_hex = self.rpc_client.ens_service.price(CHAIN_ID)
+        price_hex = backend.ens_service.price(CHAIN_ID)
         assert price_hex, "ens_price returned empty"
         amount_in = f"0x{price_hex}"
         logger.info(f"ENS registration price: {amount_in}")
 
         token_address = self.ens_addresses["token"]
-        mint_ens_tokens(self.foundry, token_address, constants.user_1.address, int(price_hex, 16))
+        cast_send(self.foundry, token_address, "generateTokens(address,uint256)", [constants.user_1.address, int(price_hex, 16)])
 
         token_key = wallet_utils.get_token_key(CHAIN_ID, token_address)
         tx_result = wallet_utils.send_router_transaction(
-            self.rpc_client,
+            backend,
             uuid=str(uuid.uuid4()),
             sendType=1,  # ENSRegister
             addrFrom=constants.user_1.address,
@@ -218,12 +208,12 @@ class TestEnsRouterRegistration:
 
         sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
 
-        resolved_pubkey = self.rpc_client.ens_service.public_key_of(CHAIN_ID, full_name)
+        resolved_pubkey = backend.ens_service.public_key_of(CHAIN_ID, full_name)
         assert resolved_pubkey, "ens_publicKeyOf returned empty after router registration"
 
-        self.rpc_client.ens_service.add(CHAIN_ID, full_name)
+        backend.ens_service.add(CHAIN_ID, full_name)
 
-        usernames = self.rpc_client.ens_service.get_ens_usernames()
+        usernames = backend.ens_service.get_ens_usernames()
         assert usernames, "ens_getEnsUsernames returned empty"
         found = any(u.get("username") == full_name for u in usernames)
         assert found, f"{full_name} not found in {usernames}"
