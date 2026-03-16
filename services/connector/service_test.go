@@ -14,9 +14,25 @@ func TestNewService(t *testing.T) {
 
 func TestService_Start(t *testing.T) {
 	state := setupTests(t)
+	state.service.config.WSEnabled = true
+	state.service.config.WSHost = "127.0.0.1"
+	state.service.config.WSPort = 0
 
 	err := state.service.Start()
 	assert.NoError(t, err)
+	assert.NotNil(t, state.service.wsServer)
+	t.Cleanup(func() {
+		assert.NoError(t, state.service.Stop())
+	})
+}
+
+func TestService_Start_WSDisabled_DoesNotCreateWSServer(t *testing.T) {
+	state := setupTests(t)
+	state.service.config.WSEnabled = false
+
+	err := state.service.Start()
+	assert.NoError(t, err)
+	assert.Nil(t, state.service.wsServer)
 }
 
 func TestService_Stop(t *testing.T) {

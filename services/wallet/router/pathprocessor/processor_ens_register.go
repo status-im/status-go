@@ -61,7 +61,9 @@ func (s *ENSRegisterProcessor) GetPriceForRegisteringEnsName(chainID uint64) (*b
 }
 
 func (s *ENSRegisterProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
-	return params.FromChain.ChainID == walletCommon.EthereumMainnet || params.FromChain.ChainID == walletCommon.EthereumSepolia, nil
+	return params.FromChain.ChainID == walletCommon.EthereumMainnet ||
+		params.FromChain.ChainID == walletCommon.EthereumSepolia ||
+		params.FromChain.ChainID == walletCommon.AnvilMainnet, nil
 }
 
 func (s *ENSRegisterProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
@@ -144,5 +146,19 @@ func (s *ENSRegisterProcessor) CalculateAmountOut(params ProcessorInputParams) (
 }
 
 func (s *ENSRegisterProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	return snt.ContractAddress(params.FromChain.ChainID)
+	addr, err := snt.ContractAddress(params.FromChain.ChainID)
+	if err == nil {
+		return addr, nil
+	}
+
+	// Fallback: resolve token address dynamically from the registrar contract
+	registrarAddr, err := s.ensResolver.GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
+	if err != nil {
+		return common.Address{}, createENSRegisterProcessorErrorResponse(err)
+	}
+	reg, err := s.contractMaker.NewUsernameRegistrar(params.FromChain.ChainID, registrarAddr)
+	if err != nil {
+		return common.Address{}, createENSRegisterProcessorErrorResponse(err)
+	}
+	return reg.Token(&bind.CallOpts{Context: context.Background(), Pending: false})
 }

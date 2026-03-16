@@ -41,7 +41,6 @@ import (
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 
 	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
@@ -789,28 +788,6 @@ func (api *API) SignTypedDataV4(typedJson string, address string, password strin
 		return types2.HexBytes{}, err
 	}
 	return types2.HexBytes(sig), err
-}
-
-// SafeSignTypedDataForDApps is used to execute requests for "eth_signTypedData"
-// if legacy is true else "eth_signTypedData_v4"
-// the formatted typed data won't be prefixed in case of legacy calls, as the
-// old dApps implementation expects
-// the chain is validate for both cases
-func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, password string, chainID uint64, legacy bool) (types2.HexBytes, error) {
-	logutils.ZapLogger().Debug("wallet.api.SafeSignTypedDataForDApps",
-		zap.Int("len(typedJson)", len(typedJson)),
-		zap.String("address", address),
-		zap.Int("len(password)", len(password)),
-		zap.Uint64("chainID", chainID),
-		zap.Bool("legacy", legacy),
-	)
-
-	account, err := api.s.gethManager.GetVerifiedWalletAccount(types2.HexToAddress(address), password)
-	if err != nil {
-		return types2.HexBytes{}, err
-	}
-
-	return walletconnect.SafeSignTypedDataForDApps(typedJson, account.PrivateKey(), chainID, legacy)
 }
 
 func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
