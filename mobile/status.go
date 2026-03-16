@@ -23,8 +23,6 @@ import (
 	abi_spec "github.com/status-im/status-go/internal/abi-spec"
 	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
-	"github.com/status-im/status-go/internal/centralizedmetrics"
-	"github.com/status-im/status-go/internal/centralizedmetrics/providers"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
@@ -60,8 +58,7 @@ func callWithResponse(fn any, params ...any) string {
 }
 
 type InitializeApplicationResponse struct {
-	Accounts               []multiaccounts.Account         `json:"accounts"`
-	CentralizedMetricsInfo *centralizedmetrics.MetricsInfo `json:"centralizedMetricsInfo"`
+	Accounts []multiaccounts.Account `json:"accounts"`
 }
 
 func InitializeApplication(requestJSON string) string {
@@ -98,9 +95,6 @@ func initializeApplication(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	providers.MixpanelAppID = request.MixpanelAppID
-	providers.MixpanelToken = request.MixpanelToken
-
 	err = os.MkdirAll(request.DataDir, 0700)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -114,7 +108,7 @@ func initializeApplication(requestJSON string) string {
 	)
 	statusBackend.UpdateRootDataDir(request.DataDir)
 
-	err = statusBackend.OpenAccounts(true)
+	err = statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -123,18 +117,7 @@ func initializeApplication(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	metricsInfo, err := statusBackend.CentralizedMetricsInfo()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
 	statusBackend.SetSentryDSN(request.SentryDSN)
-	if metricsInfo.Enabled {
-		err = statusBackend.EnablePanicReporting()
-		if err != nil {
-			return makeJSONResponse(err)
-		}
-	}
 
 	if request.WakuFleetsConfigFilePath != "" {
 		err = params.LoadWakuFleetsFromFile(request.WakuFleetsConfigFilePath)
@@ -157,8 +140,7 @@ func initializeApplication(requestJSON string) string {
 	}
 
 	response := &InitializeApplicationResponse{
-		Accounts:               accs,
-		CentralizedMetricsInfo: metricsInfo,
+		Accounts: accs,
 	}
 	data, err := json.Marshal(response)
 	if err != nil {
@@ -226,7 +208,7 @@ func OpenAccounts(datadir string) string {
 // openAccounts opens database and returns accounts list.
 func openAccounts(datadir string) string {
 	statusBackend.UpdateRootDataDir(datadir)
-	err := statusBackend.OpenAccounts(true)
+	err := statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -301,6 +283,37 @@ func getNodeConfig() string {
 	}
 
 	respJSON, err := json.Marshal(conf)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
+func GetActiveAccount() string {
+	return callWithResponse(getActiveAccount)
+}
+
+func getActiveAccount() string {
+	acc, err := statusBackend.GetActiveAccount()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(acc)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
+func KeyUID() string {
+	return callWithResponse(keyUID)
+}
+
+func keyUID() string {
+	respJSON, err := json.Marshal(&APIKeyUIDResponse{KeyUID: statusBackend.KeyUID()})
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -1743,77 +1756,6 @@ func GetRandomMnemonic() string {
 		return makeJSONResponse(err)
 	}
 	return mnemonic
-}
-
-func ToggleCentralizedMetrics(requestJSON string) string {
-	return callWithResponse(toggleCentralizedMetrics, requestJSON)
-}
-
-func toggleCentralizedMetrics(requestJSON string) string {
-	var request requests.ToggleCentralizedMetrics
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.ToggleCentralizedMetrics(request.Enabled)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = statusBackend.TogglePanicReporting(request.Enabled)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return makeJSONResponse(nil)
-}
-
-func CentralizedMetricsInfo() string {
-	return callWithResponse(centralizedMetricsInfo)
-}
-
-func centralizedMetricsInfo() string {
-	metricsInfo, err := statusBackend.CentralizedMetricsInfo()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	data, err := json.Marshal(metricsInfo)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return string(data)
-}
-
-func AddCentralizedMetric(requestJSON string) string {
-	return callWithResponse(addCentralizedMetric, requestJSON)
-}
-
-func addCentralizedMetric(requestJSON string) string {
-	var request requests.AddCentralizedMetric
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	metric := request.Metric
-
-	metric.EnsureID()
-	err = statusBackend.AddCentralizedMetric(*metric)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return metric.ID
 }
 
 // Deprecated: Use SetProfileLogLevel instead.
