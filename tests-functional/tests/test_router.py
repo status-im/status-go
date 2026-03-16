@@ -6,6 +6,7 @@ from web3.types import Wei  # type: ignore
 
 import resources.constants as constants
 from clients.api import ApiResponseError
+from resources.constants import BURN_ADDRESS
 from utils import wallet_utils
 
 
@@ -15,11 +16,9 @@ from utils import wallet_utils
 class TestRouter:
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile, anvil_client, multicall3_deployer):
+    def setup_backend(self, funded_new_profile, anvil_client, multicall3_deployer):
         self.anvil_client = anvil_client
-        self.rpc_client = backend_recovered_profile(
-            name="main_user", user=constants.user_1, multicall_contract_address=multicall3_deployer.contract_address
-        )
+        self.rpc_client, self.wallet_address = funded_new_profile(name="main_user", multicall_contract_address=multicall3_deployer.contract_address)
 
     def test_tx_from_route(self):
         uuid = str(uuid_lib.uuid4())
@@ -31,8 +30,8 @@ class TestRouter:
         params = {
             "uuid": uuid,
             "sendType": 0,
-            "addrFrom": constants.user_1.address,
-            "addrTo": constants.user_2.address,
+            "addrFrom": self.wallet_address,
+            "addrTo": BURN_ADDRESS,
             "amountIn": amount_in,
             "amountOut": "0x0",
             "tokenKey": native_token_key,
@@ -53,7 +52,7 @@ class TestRouter:
             raise ValueError("signingDetails not found in wallet_router_sign_transactions")
 
         transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
-        tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, constants.user_1.address)
+        tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, self.wallet_address)
         tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
 
         # Check tx details
@@ -61,7 +60,7 @@ class TestRouter:
 
         assert tx_data.get("value", 0) == int(amount_in, 16)
         assert tx_data.get("value", 0) == amount_in_wei
-        assert tx_data.get("to", "").upper() == constants.user_2.address.upper()
+        assert tx_data.get("to", "").upper() == BURN_ADDRESS.upper()
 
     def test_setting_different_fee_modes(self):
         uuid = str(uuid_lib.uuid4())
@@ -72,8 +71,8 @@ class TestRouter:
         router_input_params = {
             "uuid": uuid,
             "sendType": 0,
-            "addrFrom": constants.user_1.address,
-            "addrTo": constants.user_2.address,
+            "addrFrom": self.wallet_address,
+            "addrTo": BURN_ADDRESS,
             "amountIn": amount_in,
             "amountOut": "0x0",
             "tokenKey": native_token_key,
@@ -138,8 +137,8 @@ class TestRouter:
         router_input_params = {
             "uuid": uuid,
             "sendType": 0,
-            "addrFrom": constants.user_1.address,
-            "addrTo": constants.user_2.address,
+            "addrFrom": self.wallet_address,
+            "addrTo": BURN_ADDRESS,
             "amountIn": amount_in,
             "amountOut": "0x0",
             "tokenKey": native_token_key,

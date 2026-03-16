@@ -143,6 +143,9 @@ STATUS_MEDIA_SERVER_PORT = 8587
 
 NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 
+# Well-known burn address, used as a generic recipient in tests
+BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD"
+
 # Container paths for pre-deployed contracts
 SNT_ADDRESSES_CONTAINER_PATH = "/app/contracts/snt_addresses.json"
 COMMUNITIES_ADDRESSES_CONTAINER_PATH = "/app/contracts/communities_addresses.json"
