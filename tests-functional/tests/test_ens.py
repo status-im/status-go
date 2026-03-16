@@ -164,9 +164,18 @@ class TestEnsRouterRegistration:
     def backend(self, backend_recovered_profile, foundry_client, ens_addresses, multicall3_deployer):
         self.foundry = foundry_client
         self.ens_addresses = ens_addresses
+        token_overrides = [
+            {
+                "symbol": "SNT",
+                "name": "Status Network Token",
+                "address": ens_addresses["token"],
+                "decimals": 18,
+            }
+        ]
         return backend_recovered_profile(
             name="ens_router_user",
             user=constants.user_1,
+            token_overrides=token_overrides,
             multicall_contract_address=multicall3_deployer.contract_address,
         )
 
