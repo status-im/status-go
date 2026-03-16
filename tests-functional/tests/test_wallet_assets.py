@@ -1,6 +1,7 @@
 import uuid as uuid_lib
 import json
 import pytest
+from resources.constants import BURN_ADDRESS
 import resources.constants as constants
 
 from clients.signals import SignalType, WalletEventType
@@ -14,24 +15,20 @@ from clients.services.wallet import WalletService
 class TestWalletAssets:
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile, multicall3_deployer):
-        self.rpc_client = backend_recovered_profile(
-            name="rpc_client", user=constants.user_1, multicall_contract_address=multicall3_deployer.contract_address
-        )
+    def setup_backend(self, funded_new_profile, multicall3_deployer):
+        self.rpc_client, self.wallet_address = funded_new_profile(name="rpc_client", multicall_contract_address=multicall3_deployer.contract_address)
         self.wallet_service = WalletService(self.rpc_client)
-        self.wallet_service.start_wallet()
 
     def test_balance_refresh_ticker_after_sending_transaction(self):
         uuid = str(uuid_lib.uuid4())
         gas_fee_mode = constants.gas_fee_mode_medium
         amount_in = "0xde0b6b3a7640000"
-
         native_token_key = wallet_utils.get_token_key(constants.ANVIL_NETWORK_ID, constants.NATIVE_TOKEN_ADDRESS)
         input_params = {
             "uuid": uuid,
             "sendType": 0,
-            "addrFrom": constants.user_1.address,
-            "addrTo": constants.user_2.address,
+            "addrFrom": self.wallet_address,
+            "addrTo": BURN_ADDRESS,
             "amountIn": amount_in,
             "amountOut": "0x0",
             "tokenKey": native_token_key,

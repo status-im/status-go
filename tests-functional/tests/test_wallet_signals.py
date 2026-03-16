@@ -3,7 +3,6 @@ import json
 import pytest
 
 from clients.signals import SignalType
-from resources.constants import user_1
 
 
 @pytest.mark.wallet
@@ -11,8 +10,8 @@ from resources.constants import user_1
 class TestWalletSignals:
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile):
-        self.rpc_client = backend_recovered_profile(name="rpc_client", user=user_1)
+    def setup_backend(self, funded_new_profile):
+        self.rpc_client, self.wallet_address = funded_new_profile(name="rpc_client")
 
     @pytest.mark.skip  # TODO: returns empty response in most of the cases, so needs to be fixed with attention of required signals in signal_response
     def test_wallet_get_owned_collectibles_async(self):
@@ -21,7 +20,7 @@ class TestWalletSignals:
             [
                 self.rpc_client.network_id,  # type: ignore
             ],
-            [user_1.address],
+            [self.wallet_address],
             None,
             0,
             25,
@@ -34,4 +33,4 @@ class TestWalletSignals:
         # TODO: Add more assertions on response
         assert signal_response["event"]["type"] == "wallet-owned-collectibles-filtering-done"
         message = json.loads(signal_response["event"]["message"].replace("'", '"'))
-        assert user_1.address in message["ownershipStatus"].keys()
+        assert self.wallet_address in message["ownershipStatus"].keys()
