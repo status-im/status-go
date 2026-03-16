@@ -19,6 +19,7 @@ from utils.keys import change_community_key_compression
 logger = logging.getLogger(__name__)
 
 COMMUNITY_DEPLOY_OWNER_TOKEN = 12
+NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
@@ -211,7 +212,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         transaction_uuid = str(uuid.uuid4())
 
         # Fetch balances
-        owner_backend.wallet_service.get_balances_at_by_chain([chain_id], [address_from], [])
+        owner_backend.wallet_service.get_balances_at_by_chain([address_from], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
 
         # Get suggested routes for deploying tokens
         signer_pub_key = owner_backend.public_key
@@ -514,7 +515,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Refresh wallet balances cache after forcing Anvil balance
         owner_backend.wallet_service.fetch_or_get_cached_wallet_balances([owner_address], True)
-        owner_backend.wallet_service.get_balances_at_by_chain([owner_backend.network_id], [owner_address], [])
+        owner_backend.wallet_service.get_balances_at_by_chain([owner_address], [f"{owner_backend.network_id}-{NATIVE_TOKEN_ADDRESS}"])
 
         # When the Owner mints the owner token
         owner_backend.wallet_service.restart_wallet_reload_timer()
