@@ -120,3 +120,17 @@ func (s *MessengerNewsFeedSuite) TestToggleSettings() {
 	s.service.newsFeedManager.StopPolling()
 	s.Require().False(s.service.newsFeedManager.IsPolling())
 }
+
+func (s *MessengerNewsFeedSuite) TestPauseResumeBackground() {
+	err := s.service.Start()
+	s.Require().NoError(err)
+	s.Require().True(s.service.started)
+
+	err = s.service.PauseBackground()
+	s.Require().NoError(err)
+	s.Require().False(s.service.started)
+
+	err = s.service.ResumeForeground()
+	s.Require().NoError(err)
+	s.Require().True(s.service.started)
+}

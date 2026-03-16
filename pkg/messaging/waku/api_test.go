@@ -63,6 +63,54 @@ func TestRunPausedPollingLoopSkipsWhenPausedAndResumes(t *testing.T) {
 		case tickerCh <- time.Now():
 		default:
 		}
+		return ticks.Load() >= 1
+	}, time.Second, 20*time.Millisecond)
+
+	stopCh <- nil
+	require.Eventually(t, func() bool {
+		return len(stopped) == 1
+	}, time.Second, 20*time.Millisecond)
+}
+
+func TestRunPausedPollingLoopStopsWhenLifecycleChannelCloses(t *testing.T) {
+	lifecycleCh := make(chan bool)
+	tickerCh := make(chan time.Time, 1)
+	stopCh := make(chan error, 1)
+
+	stopped := make(chan struct{}, 1)
+	go runPausedPollingLoop(
+		false,
+		lifecycleCh,
+		tickerCh,
+		stopCh,
+		func() {},
+		func() { stopped <- struct{}{} },
+	)
+
+	close(lifecycleCh)
+	require.Eventually(t, func() bool {
+		return len(stopped) == 1
+	}, time.Second, 20*time.Millisecond)
+}
+
+func TestRunPausedPollingLoopStopsOnStopSignal(t *testing.T) {
+	lifecycleCh := make(chan bool, 1)
+	tickerCh := make(chan time.Time, 1)
+	stopCh := make(chan error, 1)
+
+	var ticks atomic.Int32
+	stopped := make(chan struct{}, 1)
+	go runPausedPollingLoop(
+		false,
+		lifecycleCh,
+		tickerCh,
+		stopCh,
+		func() { ticks.Add(1) },
+		func() { stopped <- struct{}{} },
+	)
+
+	tickerCh <- time.Now()
+	require.Eventually(t, func() bool {
 		return ticks.Load() == 1
 	}, time.Second, 20*time.Millisecond)
 

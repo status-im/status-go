@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"syscall"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -153,15 +155,22 @@ func (s *Server) listen() error {
 	return nil
 }
 
-func (s *Server) serve() {
+func (s *Server) serve(currentServer *http.Server, currentListener net.Listener) {
 	defer common.LogOnPanic()
 
 	defer func() {
-		s.isRunning = false
-		s.address = nil
+		s.lifecycleMu.Lock()
+		defer s.lifecycleMu.Unlock()
+
+		// If a newer Start() already replaced server/listener, do not clobber
+		// the latest running instance state.
+		if s.server == currentServer && s.listener == currentListener {
+			s.isRunning = false
+			s.address = nil
+		}
 	}()
 
-	err := s.server.Serve(s.listener)
+	err := currentServer.Serve(currentListener)
 	if errors.Is(err, http.ErrServerClosed) {
 		return
 	}
@@ -209,23 +218,26 @@ func (s *Server) Start() error {
 	// Mark running synchronously to avoid pause/play races where ToBackground
 	// can run before serve() goroutine has a chance to set the state.
 	s.isRunning = true
-	go s.serve()
+	go s.serve(s.server, s.listener)
 	return nil
 }
 
 func (s *Server) Stop() error {
 	s.lifecycleMu.Lock()
-	defer s.lifecycleMu.Unlock()
-
 	s.StopTimeout()
 	if !s.isRunning || s.server == nil {
+		s.lifecycleMu.Unlock()
 		return nil
 	}
 
-	// Flip state before shutdown so rapid foreground/background transitions
-	// don't attempt a concurrent second bind to a cached port.
+	// Capture the current instance and release the lock before Shutdown.
+	// Shutdown waits for Serve() to return, and Serve() may update state in
+	// its defer path under the same mutex.
+	currentServer := s.server
 	s.isRunning = false
-	return s.server.Shutdown(context.Background())
+	s.lifecycleMu.Unlock()
+
+	return currentServer.Shutdown(context.Background())
 }
 
 func (s *Server) IsRunning() bool {
@@ -234,9 +246,26 @@ func (s *Server) IsRunning() bool {
 
 func (s *Server) ToForeground() {
 	err := s.Start()
-	if err != nil {
-		s.logger.Error("server start failed during foreground transition", zap.Error(err))
+	if err == nil {
+		return
 	}
+
+	// On rapid pause/resume cycles with ephemeral ports, the previous listener
+	// close can lag briefly and return EADDRINUSE for the cached port.
+	// Retry a few times to preserve stable URL reuse semantics.
+	if s.config != nil && s.config.AddrPort.Port() == 0 && s.cachedPort != 0 && errors.Is(err, syscall.EADDRINUSE) {
+		for i := 0; i < 10; i++ {
+			time.Sleep(20 * time.Millisecond)
+			err = s.Start()
+			if err == nil {
+				return
+			}
+			if !errors.Is(err, syscall.EADDRINUSE) {
+				break
+			}
+		}
+	}
+	s.logger.Error("server start failed during foreground transition", zap.Error(err))
 }
 
 func (s *Server) ToBackground() {

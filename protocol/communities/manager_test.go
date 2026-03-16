@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -517,6 +518,33 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 	s.archiveManager.historyArchiveTasksWaitGroup.Wait()
 	count = s.getHistoryTasksCount()
 	s.Require().Equal(count, 0)
+}
+
+func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval_RespectsPausedLifecycle() {
+	err := s.archiveManager.StartTorrentClient()
+	s.Require().NoError(err)
+	defer s.archiveManager.Stop() //nolint: errcheck
+
+	messaginglifecycle.SetPausedBackground(true)
+	defer messaginglifecycle.SetPausedBackground(false)
+
+	community, _, err := s.buildCommunityWithChat()
+	s.Require().NoError(err)
+
+	interval := 300 * time.Millisecond
+	go s.archiveManager.StartHistoryArchiveTasksInterval(community, interval)
+
+	time.Sleep(200 * time.Millisecond)
+	s.Require().Equal(1, s.getHistoryTasksCount())
+
+	// Unpause to exercise lifecycle transition handling in the running loop.
+	messaginglifecycle.SetPausedBackground(false)
+	time.Sleep(200 * time.Millisecond)
+	s.Require().Equal(1, s.getHistoryTasksCount())
+
+	s.archiveManager.StopHistoryArchiveTasksInterval(community.ID())
+	s.archiveManager.historyArchiveTasksWaitGroup.Wait()
+	s.Require().Equal(0, s.getHistoryTasksCount())
 }
 
 func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
