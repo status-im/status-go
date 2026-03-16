@@ -96,6 +96,7 @@ type StatusBackend struct {
 	connectionState          connection.State
 	transactor               *transactions.Transactor
 	appState                 AppState
+	lifecycleState           AppLifecycleState
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	prometheusMetrics        *metrics.Server
 	sentryDSN                string
@@ -113,6 +114,7 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 		logger:            logger,
 		preLoginLogConfig: logutils2.NewPreLoginLogConfig(),
 		shutdownTasks:     []func() error{},
+		lifecycleState:    AppLifecycleStopped,
 	}
 	if err := backend.initialize(); err != nil {
 		logger.Error("failed to initialize backend", zap.Error(err))
@@ -1934,6 +1936,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 
 	signal.SendNodeReady()
+	b.lifecycleState = AppLifecycleRunning
 	return nil
 }
 
@@ -1946,6 +1949,7 @@ func (b *StatusBackend) StopNode() error {
 
 func (b *StatusBackend) stopNode() error {
 	if b.statusNode == nil || !b.IsNodeRunning() {
+		b.lifecycleState = AppLifecycleStopped
 		return nil
 	}
 	if !b.LocalPairingStateManager.IsPairing() {
@@ -1959,7 +1963,11 @@ func (b *StatusBackend) stopNode() error {
 	}
 	b.shutdownTasks = []func() error{}
 
-	return b.statusNode.Stop()
+	err := b.statusNode.Stop()
+	if err == nil {
+		b.lifecycleState = AppLifecycleStopped
+	}
+	return err
 }
 
 // RestartNode restart running Status node, fails if node is not running
@@ -2081,37 +2089,29 @@ func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*gen
 // AppStateChange handles app state changes (background/foreground).
 // state values: see https://facebook.github.io/react-native/docs/appstate.html
 func (b *StatusBackend) AppStateChange(state AppState) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if !state.IsValid() {
 		b.logger.Warn("invalid app state, not reporting app state change", zap.Any("state", state))
 		return
 	}
 
-	var messenger *protocol.Messenger
-
 	b.appState = state
 
 	if b.statusNode == nil {
-		b.logger.Warn("statusNode nil, not reporting app state change")
-		return
-	}
-
-	if b.statusNode.WakuV2ExtService() != nil {
-		messenger = b.statusNode.WakuV2ExtService().Messenger()
-	}
-
-	if messenger == nil {
-		b.logger.Warn("messenger nil, not reporting app state change")
-		return
+		b.logger.Warn("statusNode nil, applying app state change without running node")
 	}
 
 	if state == AppStateForeground {
-		messenger.ToForeground()
+		if err := b.resumeLocked(); err != nil {
+			b.logger.Warn("failed to resume backend on app foreground", zap.Error(err))
+		}
 	} else {
-		messenger.ToBackground()
+		if err := b.pauseLocked(); err != nil {
+			b.logger.Warn("failed to pause backend on app background", zap.Error(err))
+		}
 	}
-
-	// TODO: put node in low-power mode if the app is in background (or inactive)
-	// and normal mode if the app is in foreground.
 }
 
 func (b *StatusBackend) StopLocalNotifications() error {
@@ -2144,6 +2144,7 @@ func (b *StatusBackend) Logout() error {
 			return err
 		}
 		b.statusNode = nil
+		b.lifecycleState = AppLifecycleStopped
 	}
 
 	err := b.closeDBs()

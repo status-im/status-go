@@ -27,6 +27,9 @@ func (m *Messenger) watchExpiredMessages() {
 		for {
 			select {
 			case <-time.After(time.Second):
+				if m.isPausedBackground() {
+					continue
+				}
 				if m.Online() {
 					err := m.resendExpiredMessages()
 					if err != nil {

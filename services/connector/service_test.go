@@ -2,6 +2,7 @@ package connector
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -51,4 +52,25 @@ func TestService_APIs(t *testing.T) {
 	assert.Equal(t, "connector", apis[0].Namespace)
 	assert.Equal(t, "0.1.0", apis[0].Version)
 	assert.NotNil(t, apis[0].Service)
+}
+
+func TestService_PauseResumeBackground(t *testing.T) {
+	state := setupTests(t)
+
+	err := state.service.Start()
+	assert.NoError(t, err)
+
+	err = state.service.PauseBackground()
+	assert.NoError(t, err)
+	assert.True(t, state.service.paused)
+
+	err = state.service.ResumeForeground()
+	assert.NoError(t, err)
+	assert.False(t, state.service.paused)
+
+	// Give the listener goroutine a small window to bind.
+	time.Sleep(50 * time.Millisecond)
+
+	err = state.service.Stop()
+	assert.NoError(t, err)
 }

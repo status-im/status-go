@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -79,8 +80,11 @@ type Transport struct {
 	cache       ProcessedMessageIDsCachePersistence
 
 	envelopesMonitor *EnvelopesMonitor
+	cleanFiltersFn   func() error
 	quit             chan struct{}
 }
+
+var cleanFiltersLoopInterval = 5 * time.Minute
 
 // NewTransport returns a new Transport.
 // TODO: leaving a chat should verify that for a given public key
@@ -362,6 +366,9 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 }
 
 func (t *Transport) cleanFilters() error {
+	if t.cleanFiltersFn != nil {
+		return t.cleanFiltersFn()
+	}
 	return t.filters.RemoveNoListenFilters()
 }
 
@@ -429,15 +436,34 @@ func (t *Transport) Stop() error {
 
 func (t *Transport) cleanFiltersLoop() {
 
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(cleanFiltersLoopInterval)
 	go func() {
 		defer gocommon.LogOnPanic()
+		sub := messaginglifecycle.SubscribePausedBackground()
+		defer sub.Unsubscribe()
+		paused := <-sub.C()
+		var tickerC <-chan time.Time
+		if !paused {
+			tickerC = ticker.C
+		}
+
 		for {
 			select {
 			case <-t.quit:
 				ticker.Stop()
 				return
-			case <-ticker.C:
+			case pausedState, ok := <-sub.C():
+				if !ok {
+					ticker.Stop()
+					return
+				}
+				paused = pausedState
+				if paused {
+					tickerC = nil
+				} else {
+					tickerC = ticker.C
+				}
+			case <-tickerC:
 				err := t.cleanFilters()
 				if err != nil {
 					t.logger.Error("failed to clean up topics", zap.Error(err))

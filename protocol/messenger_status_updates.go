@@ -211,6 +211,9 @@ func (m *Messenger) broadcastLatestUserStatus() {
 		select {
 		// Ensure that we are connected before sending a message
 		case <-time.After(5 * time.Second):
+			if m.isPausedBackground() {
+				return
+			}
 			m.sendCurrentUserStatus(ctx)
 		case <-m.quit:
 			return
@@ -219,6 +222,9 @@ func (m *Messenger) broadcastLatestUserStatus() {
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
+				if m.isPausedBackground() {
+					continue
+				}
 				m.sendCurrentUserStatus(ctx)
 			case <-m.quit:
 				return
@@ -329,6 +335,10 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 		for {
 			select {
 			case <-time.After(time.Duration(waitDuration) * time.Second):
+				if m.isPausedBackground() {
+					waitDuration = fiveMinutes
+					continue
+				}
 				tempNextClock, err := m.persistence.NextHigherClockValueOfAutomaticStatusUpdates(referenceClock)
 
 				if err == nil {

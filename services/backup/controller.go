@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -88,10 +89,29 @@ func (c *Controller) Start() {
 		defer common.LogOnPanic()
 		ticker := time.NewTicker(c.config.Interval)
 		defer ticker.Stop()
+		sub := messaginglifecycle.SubscribePausedBackground()
+		defer sub.Unsubscribe()
 		defer c.wg.Done()
+
+		paused := <-sub.C()
+		var tickerC <-chan time.Time
+		if !paused {
+			tickerC = ticker.C
+		}
+
 		for {
 			select {
-			case <-ticker.C:
+			case pausedState, ok := <-sub.C():
+				if !ok {
+					return
+				}
+				paused = pausedState
+				if paused {
+					tickerC = nil
+				} else {
+					tickerC = ticker.C
+				}
+			case <-tickerC:
 				_, err := c.PerformBackup()
 				if err != nil {
 					c.logger.Error("Error performing backup: %v\n", zap.Error(err))

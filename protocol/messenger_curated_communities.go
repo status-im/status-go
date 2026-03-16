@@ -44,6 +44,10 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 		for {
 			select {
 			case <-time.After(interval):
+				if m.isPausedBackground() {
+					interval = curatedCommunitiesUpdateInterval
+					continue
+				}
 				// Immediate execution on first run, then set to regular interval
 				interval = curatedCommunitiesUpdateInterval
 

@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/signal"
 
@@ -331,11 +332,31 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	sub := messaginglifecycle.SubscribePausedBackground()
+	defer sub.Unsubscribe()
+	paused := <-sub.C()
+	var tickerC <-chan time.Time
+	if !paused {
+		tickerC = ticker.C
+	}
 
 	m.logger.Debug("starting history archive tasks interval", zap.String("id", id))
 	for {
 		select {
-		case <-ticker.C:
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				m.UnseedHistoryArchiveTorrent(community.ID())
+				m.historyArchiveTasks.Delete(id)
+				m.historyArchiveTasksWaitGroup.Done()
+				return
+			}
+			paused = pausedState
+			if paused {
+				tickerC = nil
+			} else {
+				tickerC = ticker.C
+			}
+		case <-tickerC:
 			m.logger.Debug("starting archive task...", zap.String("id", id))
 			lastArchiveEndDateTimestamp, err := m.GetHistoryArchivePartitionStartTimestamp(community.ID())
 			if err != nil {
@@ -528,14 +549,31 @@ func (m *ArchiveManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 		m.logger.Debug("downloading history archive index")
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
+		sub := messaginglifecycle.SubscribePausedBackground()
+		defer sub.Unsubscribe()
+		paused := <-sub.C()
+		var tickerC <-chan time.Time
+		if !paused {
+			tickerC = ticker.C
+		}
 
 		for {
 			select {
+			case pausedState, ok := <-sub.C():
+				if !ok {
+					return nil, errors.New("lifecycle subscription closed")
+				}
+				paused = pausedState
+				if paused {
+					tickerC = nil
+				} else {
+					tickerC = ticker.C
+				}
 			case <-cancelTask:
 				m.logger.Debug("cancelled downloading archive index")
 				downloadTaskInfo.Cancelled = true
 				return downloadTaskInfo, nil
-			case <-ticker.C:
+			case <-tickerC:
 				if indexFile.BytesCompleted() == indexFile.Length() {
 
 					index, err := m.ArchiveFileManager.LoadHistoryArchiveIndexFromFile(m.identity, communityID)
@@ -602,11 +640,25 @@ func (m *ArchiveManager) DownloadHistoryArchivesByMagnetlink(communityID types.H
 						psc := torrent.SubscribePieceStateChanges()
 						downloadTicker := time.NewTicker(1 * time.Second)
 						defer downloadTicker.Stop()
+						var downloadTickerC <-chan time.Time
+						if !paused {
+							downloadTickerC = downloadTicker.C
+						}
 
 					downloadLoop:
 						for {
 							select {
-							case <-downloadTicker.C:
+							case pausedState, ok := <-sub.C():
+								if !ok {
+									return nil, errors.New("lifecycle subscription closed")
+								}
+								paused = pausedState
+								if paused {
+									downloadTickerC = nil
+								} else {
+									downloadTickerC = downloadTicker.C
+								}
+							case <-downloadTickerC:
 								done := true
 								for i = startIndex; i < endIndex; i++ {
 									piecesCompleted[i] = torrent.PieceState(i).Complete

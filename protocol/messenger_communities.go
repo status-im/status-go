@@ -467,6 +467,9 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				}
 
 			case <-ticker.C:
+				if m.isPausedBackground() {
+					continue
+				}
 				// If we are not online, we don't even try
 				if !m.Online() {
 					continue
@@ -514,6 +517,9 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 		for {
 			select {
 			case <-ticker.C:
+				if m.isPausedBackground() {
+					continue
+				}
 				controlledCommunities, err := m.communitiesManager.Controlled()
 				if err != nil {
 					m.logger.Error("failed to update community active members count", zap.Error(err))
@@ -4330,6 +4336,9 @@ func (m *Messenger) startCommunityRekeyLoop() {
 		for {
 			select {
 			case <-ticker.C:
+				if m.isPausedBackground() {
+					continue
+				}
 				m.rekeyCommunities(logger)
 			case <-m.quit:
 				ticker.Stop()
@@ -4783,6 +4792,9 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
+				if m.isPausedBackground() {
+					continue
+				}
 				communitiesChannels, err := m.communitiesManager.DetermineChannelsForHRKeysRequest()
 				if err != nil {
 					logger.Error("failed to determine channels for encryption keys request", zap.Error(err))

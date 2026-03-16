@@ -77,6 +77,7 @@ func (s *Service) Start() error {
 	if newsFeedEnabled {
 		s.newsFeedManager.StartPolling(context.Background())
 	}
+	s.started = true
 
 	return nil
 }
@@ -85,7 +86,16 @@ func (s *Service) Stop() error {
 	if s.newsFeedManager != nil {
 		s.newsFeedManager.StopPolling()
 	}
+	s.started = false
 	return nil
+}
+
+func (s *Service) PauseBackground() error {
+	return s.Stop()
+}
+
+func (s *Service) ResumeForeground() error {
+	return s.Start()
 }
 
 func (s *Service) APIs() []rpc.API {

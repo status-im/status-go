@@ -847,36 +847,17 @@ func makeJSONResponse(err error) string {
 	return string(outBytes)
 }
 
-// Deprecated: Use AppStateChangeV2 instead.
-func AppStateChange(state string) {
-	call(appStateChange, state)
+func AppStateChange(state string) string {
+	return callWithResponse(appStateChange, state)
 }
 
 // appStateChange handles app state changes (background/foreground).
-func appStateChange(state string) {
+func appStateChange(state string) string {
 	s, err := backend.ParseAppState(state)
 	if err != nil {
-		logutils2.ZapLogger().Error("parse app state failed, ignoring", zap.Error(err))
-		return
+		return makeJSONResponse(err)
 	}
 	statusBackend.AppStateChange(s)
-}
-
-func AppStateChangeV2(requestJSON string) string {
-	return callWithResponse(appStateChangeV2, requestJSON)
-}
-
-func appStateChangeV2(requestJSON string) string {
-	var request m_requests.AppStateChange
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	err = request.Validate()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	statusBackend.AppStateChange(request.State)
 	return makeJSONResponse(nil)
 }
 

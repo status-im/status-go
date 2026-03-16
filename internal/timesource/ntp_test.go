@@ -10,6 +10,8 @@ import (
 	"github.com/beevik/ntp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 )
 
 const (
@@ -285,6 +287,39 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	n = ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	ts.Stop()
+}
+
+func TestRunPeriodicallyPausesAndResumesByLifecycle(t *testing.T) {
+	messaginglifecycle.SetPausedBackground(true)
+	defer messaginglifecycle.SetPausedBackground(false)
+
+	source := &ntpTimeSource{
+		fastNTPSyncPeriod: 20 * time.Millisecond,
+		slowNTPSyncPeriod: 120 * time.Millisecond,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	hitsCh := make(chan struct{}, 4)
+	source.runPeriodically(ctx, func() error {
+		hitsCh <- struct{}{}
+		return nil
+	}, false)
+
+	select {
+	case <-hitsCh:
+		t.Fatal("periodic function ran while paused")
+	case <-time.After(90 * time.Millisecond):
+	}
+
+	messaginglifecycle.SetPausedBackground(false)
+
+	select {
+	case <-hitsCh:
+	case <-time.After(600 * time.Millisecond):
+		t.Fatal("periodic function did not run after resume")
+	}
 }
 
 func TestGetCurrentTimeOffline(t *testing.T) {

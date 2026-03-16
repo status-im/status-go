@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/status-im/mvds/protobuf"
@@ -17,10 +18,23 @@ const backoffInterval = 60
 
 var errNotInitialized = errors.New("datasync transport not initialized")
 var DatasyncTicker = 300 * time.Millisecond
+var datasyncTickerMutex sync.RWMutex
 
-// It's easier to calculate nextEpoch if we consider seconds as a unit rather than
-// 300 ms, so we multiply the result by the ratio
-var offsetToSecond = uint64(time.Second / DatasyncTicker)
+func SetPausedBackground(paused bool) {
+	datasyncTickerMutex.Lock()
+	defer datasyncTickerMutex.Unlock()
+	if paused {
+		DatasyncTicker = 2 * time.Second
+	} else {
+		DatasyncTicker = 300 * time.Millisecond
+	}
+}
+
+func currentOffsetToSecond() uint64 {
+	datasyncTickerMutex.RLock()
+	defer datasyncTickerMutex.RUnlock()
+	return uint64(time.Second / DatasyncTicker)
+}
 
 type NodeTransport struct {
 	packets  chan transport.Packet
@@ -74,5 +88,5 @@ func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload *protobu
 // at which a message should be sent.
 // We randomize it a bit so that not all messages are sent on the same epoch
 func CalculateSendTime(count uint64, time int64) int64 {
-	return time + int64(uint64(math.Exp2(float64(count-1)))*backoffInterval*offsetToSecond) + int64(rand.Intn(30)) // nolint: gosec
+	return time + int64(uint64(math.Exp2(float64(count-1)))*backoffInterval*currentOffsetToSecond()) + int64(rand.Intn(30)) // nolint: gosec
 }

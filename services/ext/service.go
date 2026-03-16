@@ -317,6 +317,22 @@ func (s *Service) Stop() error {
 	return nil
 }
 
+func (s *Service) PauseBackground() error {
+	if s.messenger == nil {
+		return nil
+	}
+	s.messenger.SetPausedBackground(true)
+	return nil
+}
+
+func (s *Service) ResumeForeground() error {
+	if s.messenger == nil {
+		return nil
+	}
+	s.messenger.SetPausedBackground(false)
+	return nil
+}
+
 func buildMessengerOptions(
 	config params.NodeConfig,
 	identity *ecdsa.PrivateKey,

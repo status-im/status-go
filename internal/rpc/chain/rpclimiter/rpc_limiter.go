@@ -12,6 +12,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 )
 
 const (
@@ -260,9 +261,29 @@ func (rl *RPCRpsLimiter) start() {
 	ticker := time.NewTicker(tickerInterval)
 	go func() {
 		defer gocommon.LogOnPanic()
+		sub := messaginglifecycle.SubscribePausedBackground()
+		defer sub.Unsubscribe()
+
+		paused := <-sub.C()
+		var tickerC <-chan time.Time
+		if !paused {
+			tickerC = ticker.C
+		}
+
 		for {
 			select {
-			case <-ticker.C:
+			case pausedState, ok := <-sub.C():
+				if !ok {
+					ticker.Stop()
+					return
+				}
+				paused = pausedState
+				if paused {
+					tickerC = nil
+				} else {
+					tickerC = ticker.C
+				}
+			case <-tickerC:
 				{
 					rl.requestsMadeWithinSecondMutex.Lock()
 					oldrequestsMadeWithinSecond := rl.requestsMadeWithinSecond

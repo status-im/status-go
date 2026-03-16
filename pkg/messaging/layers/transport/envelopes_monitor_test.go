@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	types3 "github.com/status-im/status-go/internal/crypto/types"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -242,9 +243,34 @@ func (s *EnvelopesMonitorSuite) TestRetryOnce() {
 	s.Require().Equal(envelope.envelopeHashID, s.monitor.envelopes[envelope.envelopeHashID].envelopeHashID)
 }
 
-type mockWakuAPI struct{}
+func (s *EnvelopesMonitorSuite) TestRetryLoopSkipsWhenPausedBackground() {
+	messaginglifecycle.SetPausedBackground(true)
+	defer messaginglifecycle.SetPausedBackground(false)
+
+	mockAPI := &mockWakuAPI{}
+	s.monitor.api = mockAPI
+	err := s.monitor.Add(testIDs, testHashes, []*types2.NewMessage{{}})
+	s.Require().NoError(err)
+	envelope := s.monitor.envelopes[testHash]
+	envelope.attempts = 2
+	envelope.lastAttemptTime = time.Now().Add(-20 * time.Second)
+	s.monitor.retryQueue = append(s.monitor.retryQueue, envelope)
+
+	s.monitor.quit = make(chan struct{})
+	go s.monitor.retryLoop()
+	time.Sleep(1100 * time.Millisecond)
+	close(s.monitor.quit)
+	time.Sleep(50 * time.Millisecond)
+
+	s.Require().Equal(0, mockAPI.postCalls)
+}
+
+type mockWakuAPI struct {
+	postCalls int
+}
 
 func (m *mockWakuAPI) Post(ctx context.Context, msg types2.NewMessage) ([]byte, error) {
+	m.postCalls++
 	return []byte{0x01}, nil
 }
 

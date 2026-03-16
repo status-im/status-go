@@ -4,7 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 )
 
 func setupTest() (*InMemRequestsMapStorage, RequestLimiter) {
@@ -192,4 +195,37 @@ func TestAllowWhenLimitNotReachedForInfinitePeriod(t *testing.T) {
 
 	// Verify the result
 	require.True(t, allow)
+}
+
+func TestRPCRpsLimiterStartPausesAndResumesReleases(t *testing.T) {
+	messaginglifecycle.SetPausedBackground(true)
+	defer messaginglifecycle.SetPausedBackground(false)
+
+	waitCh := make(chan bool, 1)
+	rl := &RPCRpsLimiter{
+		uuid:                     uuid.New(),
+		maxRequestsPerSecond:     1,
+		requestsMadeWithinSecond: 1,
+		callersOnWaitForRequests: []callerOnWait{
+			{requests: 1, ch: waitCh},
+		},
+		quit: make(chan bool),
+	}
+
+	rl.start()
+	defer rl.Stop()
+
+	select {
+	case <-waitCh:
+		t.Fatal("limiter released callers while paused")
+	case <-time.After(tickerInterval + 200*time.Millisecond):
+	}
+
+	messaginglifecycle.SetPausedBackground(false)
+
+	select {
+	case <-waitCh:
+	case <-time.After(2 * tickerInterval):
+		t.Fatal("limiter did not release callers after resume")
+	}
 }

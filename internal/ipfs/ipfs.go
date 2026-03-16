@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/params"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 )
 
 const maxRequestsPerSecond = 3
@@ -100,15 +101,39 @@ func (d *Downloader) taskDispatcher() {
 	defer common.LogOnPanic()
 	ticker := time.NewTicker(time.Second / maxRequestsPerSecond)
 	defer ticker.Stop()
+	sub := messaginglifecycle.SubscribePausedBackground()
+	defer sub.Unsubscribe()
+
+	paused := <-sub.C()
+	var tickerC <-chan time.Time
+	if !paused {
+		tickerC = ticker.C
+	}
 
 	for {
-		<-ticker.C
-		request, ok := <-d.inputTaskChan
-		if !ok {
+		select {
+		case <-d.quit:
 			return
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			paused = pausedState
+			if paused {
+				tickerC = nil
+			} else {
+				tickerC = ticker.C
+			}
+		case <-tickerC:
+			select {
+			case request, ok := <-d.inputTaskChan:
+				if !ok {
+					return
+				}
+				d.rateLimiterChan <- request
+			default:
+			}
 		}
-		d.rateLimiterChan <- request
-
 	}
 }
 

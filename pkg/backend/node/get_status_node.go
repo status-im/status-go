@@ -131,6 +131,11 @@ type StatusNode struct {
 	localBackup *backup.Controller
 }
 
+type backgroundLifecycle interface {
+	PauseBackground() error
+	ResumeForeground() error
+}
+
 // New makes new instance of StatusNode.
 func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")
@@ -488,6 +493,44 @@ func (n *StatusNode) Stop() error {
 // IsRunning confirm that node is running.
 func (n *StatusNode) IsRunning() bool {
 	return n.running.Load()
+}
+
+// PauseBackground reduces non-essential background work while preserving core messaging/Waku runtime.
+func (n *StatusNode) PauseBackground() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	var errs []error
+	if n.mediaServer != nil {
+		n.mediaServer.ToBackground()
+	}
+	for _, service := range n.services {
+		if lifecycle, ok := service.(backgroundLifecycle); ok {
+			if err := lifecycle.PauseBackground(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// ResumeForeground restores regular service work after paused background mode.
+func (n *StatusNode) ResumeForeground() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	var errs []error
+	if n.mediaServer != nil {
+		n.mediaServer.ToForeground()
+	}
+	for _, service := range n.services {
+		if lifecycle, ok := service.(backgroundLifecycle); ok {
+			if err := lifecycle.ResumeForeground(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (n *StatusNode) CallInProcessRPC(inputJSON string) string {

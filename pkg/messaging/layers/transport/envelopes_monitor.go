@@ -11,6 +11,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -330,12 +331,29 @@ func backoffDuration(attempts int) time.Duration {
 func (m *EnvelopesMonitor) retryLoop() {
 	ticker := time.NewTicker(500 * time.Millisecond) // Timer, triggers every 500 milliseconds
 	defer ticker.Stop()
+	sub := messaginglifecycle.SubscribePausedBackground()
+	defer sub.Unsubscribe()
+	paused := <-sub.C()
+	var tickerC <-chan time.Time
+	if !paused {
+		tickerC = ticker.C
+	}
 
 	for {
 		select {
 		case <-m.quit:
 			return
-		case <-ticker.C:
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			paused = pausedState
+			if paused {
+				tickerC = nil
+			} else {
+				tickerC = ticker.C
+			}
+		case <-tickerC:
 			m.retryOnce()
 		}
 	}

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"reflect"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"go.uber.org/mock/gomock"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	messaginglifecycle "github.com/status-im/status-go/pkg/messaging/lifecycle"
 	mock_backup_controller "github.com/status-im/status-go/services/backup/mock"
 )
 
@@ -99,4 +102,50 @@ func TestController(t *testing.T) {
 
 	require.True(t, reflect.DeepEqual(barProvider.bar, barFromBackup))
 	require.True(t, reflect.DeepEqual(fooProvider.foo, fooFromBackup))
+}
+
+type countingProvider struct {
+	hits *atomic.Int32
+}
+
+func (p countingProvider) ExportBackup() ([]byte, error) {
+	p.hits.Add(1)
+	return []byte(`{"ok":true}`), nil
+}
+
+func (p countingProvider) ImportBackup([]byte) error {
+	return nil
+}
+
+func TestControllerStartPausesAndResumesByLifecycle(t *testing.T) {
+	messaginglifecycle.SetPausedBackground(true)
+	defer messaginglifecycle.SetPausedBackground(false)
+
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	filenameProvider := mock_backup_controller.NewMockFilenameProvider(ctrl)
+	filenameProvider.EXPECT().GetBackupFilename().Return(t.TempDir()+"/pause_resume_backup.bak", nil).AnyTimes()
+
+	controller, err := NewController(Config{
+		FileNameProvider: filenameProvider,
+		PrivateKey:       []byte("0123456789abcdef0123456789abcdef"),
+		BackupEnabled:    true,
+		Interval:         40 * time.Millisecond,
+	}, logger)
+	require.NoError(t, err)
+
+	var hits atomic.Int32
+	controller.Register("counting", countingProvider{hits: &hits})
+	controller.Start()
+	defer controller.Stop()
+
+	time.Sleep(150 * time.Millisecond)
+	require.Equal(t, int32(0), hits.Load())
+
+	messaginglifecycle.SetPausedBackground(false)
+	require.Eventually(t, func() bool {
+		return hits.Load() > 0
+	}, time.Second, 20*time.Millisecond)
 }
