@@ -11,9 +11,7 @@ var (
 )
 
 type InitializeApplication struct {
-	DataDir       string `json:"dataDir"`
-	MixpanelAppID string `json:"mixpanelAppId"`
-	MixpanelToken string `json:"mixpanelToken"`
+	DataDir string `json:"dataDir"`
 
 	// MediaServerAddress specifies the URL of the media server used for file storage and retrieval.
 	// The address should be in the format "hostname:port" or a complete URL. If not provided, defaults to "localhost:0".

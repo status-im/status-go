@@ -29,8 +29,6 @@ import (
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
-	"github.com/status-im/status-go/internal/centralizedmetrics"
-	centralizedmetricscommon "github.com/status-im/status-go/internal/centralizedmetrics/common"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
@@ -96,7 +94,6 @@ type StatusBackend struct {
 	transactor               *transactions.Transactor
 	appState                 AppState
 	LocalPairingStateManager *statecontrol.ProcessStateManager
-	centralizedMetrics       *centralizedmetrics.MetricService
 	prometheusMetrics        *metrics.Server
 	sentryDSN                string
 
@@ -205,7 +202,7 @@ func (b *StatusBackend) GetMultiaccountDB() *multiaccounts.Database {
 	return b.multiaccountsDB
 }
 
-func (b *StatusBackend) OpenAccounts(thirdpartyServicesEnabled bool) error {
+func (b *StatusBackend) OpenAccounts() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB != nil {
@@ -218,14 +215,6 @@ func (b *StatusBackend) OpenAccounts(thirdpartyServicesEnabled bool) error {
 	}
 	b.multiaccountsDB = db
 
-	if thirdpartyServicesEnabled {
-		b.centralizedMetrics = centralizedmetrics.NewDefaultMetricService(b.multiaccountsDB.DB(), b.logger)
-		err = b.centralizedMetrics.EnsureStarted()
-		if err != nil {
-			return err
-		}
-	}
-
 	// Probably we should iron out a bit better how to create/dispose of the status-service
 	b.statusNode.SetMultiaccountsDB(db)
 
@@ -236,30 +225,6 @@ func (b *StatusBackend) OpenAccounts(thirdpartyServicesEnabled bool) error {
 	}
 
 	return nil
-}
-
-func (b *StatusBackend) CentralizedMetricsInfo() (*centralizedmetrics.MetricsInfo, error) {
-	if b.centralizedMetrics == nil {
-		return nil, errors.New("centralized metrics not initialized")
-	}
-
-	return b.centralizedMetrics.Info()
-}
-
-func (b *StatusBackend) ToggleCentralizedMetrics(isEnabled bool) error {
-	if b.centralizedMetrics == nil {
-		return errors.New("centralized metrics nil")
-	}
-
-	return b.centralizedMetrics.ToggleEnabled(isEnabled)
-}
-
-func (b *StatusBackend) AddCentralizedMetric(metric centralizedmetricscommon.Metric) error {
-	if b.centralizedMetrics == nil {
-		return errors.New("centralized metrics nil")
-	}
-	return b.centralizedMetrics.AddMetric(metric)
-
 }
 
 func (b *StatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
@@ -1327,7 +1292,7 @@ func (b *StatusBackend) generateDerivedAddresses(genAcc *generator2.Account, pat
 }
 
 func (b *StatusBackend) buildAccount(request *requests.CreateAccount, keyUID string, customizationColorClock uint64) (*multiaccounts.Account, error) {
-	err := b.OpenAccounts(request.ThirdpartyServicesEnabled)
+	err := b.OpenAccounts()
 	if err != nil {
 		return nil, err
 	}
