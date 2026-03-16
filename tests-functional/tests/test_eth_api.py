@@ -1,14 +1,13 @@
 import pytest
 
-from resources.constants import user_1, user_2
+from resources.constants import BURN_ADDRESS
 
 
 @pytest.mark.rpc
 @pytest.mark.ethclient
-@pytest.mark.xdist_group(name="Eth")
 class TestEth:
 
-    def test_estimate_gas(self, backend_recovered_profile):
-        backend = backend_recovered_profile("sender", user=user_1)
-        result = backend.eth_service.estimate_gas(31337, user_2.address, 100)
+    def test_estimate_gas(self, funded_new_profile):
+        backend, wallet_address = funded_new_profile("sender")
+        result = backend.eth_service.estimate_gas(31337, BURN_ADDRESS, 100)
         assert int(result, 16) > 0
