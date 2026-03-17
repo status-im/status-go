@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from requests import ReadTimeout
+from tenacity import retry, stop_after_attempt, wait_fixed
 from web3 import Web3
 
 from clients.anvil import Anvil
@@ -16,11 +17,17 @@ from resources.constants import (
     USE_IPV6,
     SNT_ADDRESSES_CONTAINER_PATH,
     COMMUNITIES_ADDRESSES_CONTAINER_PATH,
+    ENS_ADDRESSES_CONTAINER_PATH,
 )
 from utils import fake
 from utils.config import Config
 
 logger = logging.getLogger(__name__)
+
+
+@retry(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True)
+def _load_contract_json(foundry_client, path):
+    return foundry_client.load_json(path)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -197,7 +204,7 @@ def multicall3_deployer(foundry_client):
 @pytest.fixture(scope="session")
 def snt_addresses(foundry_client):
     try:
-        data = foundry_client.load_json(SNT_ADDRESSES_CONTAINER_PATH)
+        data = _load_contract_json(foundry_client, SNT_ADDRESSES_CONTAINER_PATH)
         logger.info(f"Using pre-deployed SNT contracts: token={data['snt']}, controller={data['controller']}")
         return data
     except Exception as e:
@@ -212,7 +219,7 @@ def snt_addresses(foundry_client):
 @pytest.fixture(scope="session")
 def communities_addresses(foundry_client):
     try:
-        data = foundry_client.load_json(COMMUNITIES_ADDRESSES_CONTAINER_PATH)
+        data = _load_contract_json(foundry_client, COMMUNITIES_ADDRESSES_CONTAINER_PATH)
         logger.info("Using pre-deployed Communities contracts")
         return data
     except Exception as e:
@@ -220,6 +227,21 @@ def communities_addresses(foundry_client):
         logger.error("Communities contracts should be deployed as part of docker-compose startup")
         raise RuntimeError(
             "Communities contracts not found. Make sure the foundry container has deployed contracts during startup. "
+            "This should happen automatically in entrypoint.sh"
+        ) from e
+
+
+@pytest.fixture(scope="session")
+def ens_addresses(foundry_client):
+    try:
+        data = _load_contract_json(foundry_client, ENS_ADDRESSES_CONTAINER_PATH)
+        logger.info(f"Using pre-deployed ENS contracts: registry={data['registry']}, " f"registrar={data['registrar']}, token={data['token']}")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to load ENS addresses from container: {e}")
+        logger.error("ENS contracts should be deployed as part of docker-compose startup")
+        raise RuntimeError(
+            "ENS contracts not found. Make sure the foundry container has deployed contracts during startup. "
             "This should happen automatically in entrypoint.sh"
         ) from e
 

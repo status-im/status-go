@@ -144,7 +144,7 @@ func (s SendType) IsAvailableFor(chainID uint64) bool {
 	}
 
 	if s.IsEnsTransfer() || s.IsStickersTransfer() {
-		return chainID == walletCommon.EthereumMainnet || chainID == walletCommon.EthereumSepolia
+		return chainID == walletCommon.EthereumMainnet || chainID == walletCommon.EthereumSepolia || chainID == walletCommon.AnvilMainnet
 	}
 
 	return true
