@@ -25,7 +25,7 @@ from utils.keys import change_community_key_compression
 logger = logging.getLogger(__name__)
 
 COMMUNITY_DEPLOY_OWNER_TOKEN = 12
-COMMUNITY_MINT_TOKENS = 13
+NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
@@ -218,7 +218,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         transaction_uuid = str(uuid.uuid4())
 
         # Fetch balances
-        owner_backend.wallet_service.get_balances_at_by_chain([chain_id], [address_from], [])
+        owner_backend.wallet_service.get_balances_at_by_chain([address_from], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
 
         # Get suggested routes for deploying tokens
         signer_pub_key = owner_backend.public_key
@@ -266,250 +266,13 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # Send the signed transactions
         with owner_backend.expect_signal(
             SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
-            predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
-            timeout=120,
+            timeout=60,
         ) as sent_exp:
-            send_result = owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+            owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
 
         sent_signal = sent_exp.result
 
         logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
-
-        if not anvil_client:
-            return {"owner_token_contract": None, "master_token_contract": None}
-
-        def _extract_contract_from_log(receipt, event_name: str) -> Optional[str]:
-            signature_hash = anvil_client.keccak(text=event_name).hex()
-            signature_hash_normalized = str(signature_hash).lower().replace("0x", "")
-            for log in receipt.get("logs", []):
-                topics = log.get("topics", [])
-                if not topics:
-                    continue
-                topic0 = topics[0].hex() if hasattr(topics[0], "hex") else str(topics[0])
-                topic0_normalized = str(topic0).lower().replace("0x", "")
-                if topic0_normalized != signature_hash_normalized:
-                    continue
-
-                # Try indexed address first: topic[1]
-                if len(topics) > 1:
-                    topic1_hex = topics[1].hex() if hasattr(topics[1], "hex") else str(topics[1])
-                    if isinstance(topic1_hex, str):
-                        topic1_normalized = topic1_hex.lower().replace("0x", "")
-                        if len(topic1_normalized) >= 40:
-                            return anvil_client.to_checksum_address("0x" + topic1_normalized[-40:])
-
-                # Fallback to non-indexed address in data
-                data_hex = log.get("data")
-                if hasattr(data_hex, "hex"):
-                    data_hex = data_hex.hex()
-                if isinstance(data_hex, str) and data_hex.startswith("0x") and len(data_hex) >= 66:
-                    return anvil_client.to_checksum_address("0x" + data_hex[-40:])
-
-            return None
-
-        tx_hashes = []
-
-        def _add_tx_hash(candidate):
-            if candidate and candidate not in tx_hashes:
-                tx_hashes.append(candidate)
-
-        if isinstance(send_result, dict):
-            _add_tx_hash(send_result.get("txHash"))
-            _add_tx_hash(send_result.get("hash"))
-            for tx in send_result.get("sentTransactions") or []:
-                if isinstance(tx, dict):
-                    _add_tx_hash(tx.get("hash"))
-
-        event_payload = sent_signal.get("event", {}) if isinstance(sent_signal, dict) else {}
-        if isinstance(event_payload, dict):
-            _add_tx_hash(event_payload.get("txHash"))
-            _add_tx_hash(event_payload.get("hash"))
-            for tx in event_payload.get("sentTransactions") or []:
-                if isinstance(tx, dict):
-                    _add_tx_hash(tx.get("hash"))
-
-        owner_token_contract = None
-        master_token_contract = None
-        for tx_hash in tx_hashes:
-            receipt = anvil_client.wait_for_transaction_receipt(tx_hash)
-            owner_token_contract = owner_token_contract or _extract_contract_from_log(receipt, "DeployOwnerToken(address)")
-            master_token_contract = master_token_contract or _extract_contract_from_log(receipt, "DeployMasterToken(address)")
-            if owner_token_contract and master_token_contract:
-                break
-
-        return {
-            "owner_token_contract": owner_token_contract,
-            "master_token_contract": master_token_contract,
-        }
-
-    def _wallet_address(self, backend: StatusBackend) -> str:
-        accounts = backend.accounts_service.get_accounts()
-        assert accounts, "No accounts found"
-        wallet_account = next(a for a in accounts if not a.get("chat"))
-        assert wallet_account, "No wallet account found"
-        return wallet_account["address"]
-
-    def _set_native_balance_and_refresh(self, backend: StatusBackend, anvil_client, amount_wei: int = 10 * 10**18):
-        wallet_address = self._wallet_address(backend)
-        anvil_client.set_balance(wallet_address, amount_wei)
-        backend.wallet_service.fetch_or_get_cached_wallet_balances([wallet_address], True)
-        backend.wallet_service.get_balances_at_by_chain([backend.network_id], [wallet_address], [])
-        return wallet_address
-
-    def _find_community_token_contract(self, backend: StatusBackend, community_id: str, symbol: str, attempts: int = 15, delay: int = 2) -> str:
-        for _ in range(attempts):
-            community = self.fetch_community(backend, community_id)
-            if isinstance(community, dict):
-                token_collections = [
-                    community.get("communityTokensMetadata"),
-                    community.get("communityTokens"),
-                    community.get("tokensMetadata"),
-                    community.get("tokens"),
-                ]
-
-                for collection in token_collections:
-                    if not collection:
-                        continue
-
-                    iterable = collection.values() if isinstance(collection, dict) else collection
-                    for token in iterable:
-                        if not isinstance(token, dict):
-                            continue
-                        if token.get("symbol") != symbol:
-                            continue
-
-                        direct_contract = token.get("contractAddress") or token.get("address")
-                        if isinstance(direct_contract, str) and direct_contract:
-                            return direct_contract
-
-                        contract_addresses = token.get("contractAddresses") or token.get("contract_addresses")
-                        if isinstance(contract_addresses, dict):
-                            contract = contract_addresses.get(backend.network_id) or contract_addresses.get(str(backend.network_id))
-                            if contract:
-                                return contract
-
-            time.sleep(delay)
-
-        raise AssertionError(f"Failed to find contract for token {symbol} in community {community_id}")
-
-    def _find_permission_token_contract(
-        self,
-        backend: StatusBackend,
-        community_id: str,
-        permission_type: CommunityTokenPermissionType,
-        attempts: int = 30,
-        delay: int = 2,
-    ) -> str:
-        for _ in range(attempts):
-            community = self.fetch_community(backend, community_id)
-            if isinstance(community, dict):
-                token_permissions = community.get("tokenPermissions") or {}
-                iterable = token_permissions.values() if isinstance(token_permissions, dict) else token_permissions
-                for permission in iterable:
-                    if not isinstance(permission, dict):
-                        continue
-                    if permission.get("type") != permission_type.value:
-                        continue
-
-                    criteria = permission.get("token_criteria") or permission.get("tokenCriteria") or []
-                    for criterion in criteria:
-                        if not isinstance(criterion, dict):
-                            continue
-                        contract_addresses = criterion.get("contract_addresses") or criterion.get("contractAddresses")
-                        if isinstance(contract_addresses, dict):
-                            contract = contract_addresses.get(backend.network_id) or contract_addresses.get(str(backend.network_id))
-                            if contract:
-                                return contract
-
-            time.sleep(delay)
-
-        raise AssertionError(f"Failed to find contract for permission type {permission_type.name} in community {community_id}")
-
-    def mint_community_token(
-        self, actor_backend: StatusBackend, community_id: str, token_contract: str, recipient_address: str, amount_hex: str = "0x1"
-    ):
-        address_from = self._wallet_address(actor_backend)
-        chain_id = actor_backend.network_id
-        transaction_uuid = str(uuid.uuid4())
-        normalized_token_contract = token_contract.lower()
-
-        actor_backend.wallet_service.get_balances_at_by_chain([chain_id], [address_from], [])
-
-        transfer_details = [
-            {
-                "tokenType": CommunityTokenType.ERC20.value,
-                "privilegeLevel": CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
-                "tokenContractAddress": normalized_token_contract,
-                "amount": amount_hex,
-            }
-        ]
-
-        routes_result = None
-        for attempt in range(20):
-            try:
-                routes_result = actor_backend.wallet_service.suggested_community_routes(
-                    uuid=transaction_uuid,
-                    send_type=COMMUNITY_MINT_TOKENS,
-                    chain_id=chain_id,
-                    address_from=address_from,
-                    addr_to=normalized_token_contract,
-                    community_id=community_id,
-                    signer_pub_key=actor_backend.public_key,
-                    token_ids=[],
-                    wallet_addresses=[recipient_address],
-                    transfer_details=transfer_details,
-                    signature="",
-                )
-                break
-            except ApiResponseError as exc:
-                if "can't find token" not in str(exc) or attempt == 19:
-                    raise
-                # Soft wallet refresh + token refresh before retrying route calculation.
-                actor_backend.wallet_service.restart_wallet_reload_timer()
-                actor_backend.wallet_service.fetch_or_get_cached_wallet_balances([address_from], True)
-                actor_backend.wallet_service.get_balances_at_by_chain([chain_id], [address_from], [])
-
-                # Community/token refresh on wakuext side.
-                actor_backend.wakuext_service.spectate_community(community_id)
-                self.fetch_community(actor_backend, community_id)
-
-                # Token deployment indexing can lag behind tx inclusion; register/refresh and retry.
-                actor_backend.wakuext_service.add_community_token(community_id, chain_id, normalized_token_contract)
-                self.fetch_community(actor_backend, community_id)
-                time.sleep(2)
-
-        assert routes_result is not None, "Failed to build routes for minting community token"
-
-        assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
-
-        with actor_backend.expect_signal(
-            SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
-            predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
-            timeout=60,
-        ) as sign_exp:
-            actor_backend.wallet_service.build_transactions_from_route(transaction_uuid)
-
-        sign_signal = sign_exp.result
-        assert isinstance(sign_signal, dict), f"Unexpected sign signal payload: {sign_signal}"
-        signing_details = sign_signal.get("event", {}).get("signingDetails")
-        assert signing_details is not None, f"Missing signing details in signal: {sign_signal}"
-        signatures = {}
-        for tx_hash in signing_details["hashes"]:
-            sig_hex = actor_backend.wallet_service.sign_message(tx_hash, address_from, actor_backend.password)
-            assert sig_hex and sig_hex.startswith("0x"), f"Invalid transaction signature for hash {tx_hash}: {sig_hex}"
-            tx_signature = sig_hex[2:]
-            signatures[tx_hash] = {
-                "r": tx_signature[:64],
-                "s": tx_signature[64:128],
-                "v": tx_signature[128:],
-            }
-
-        with actor_backend.expect_signal(
-            SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
-            predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
-            timeout=120,
-        ):
-            actor_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
@@ -758,7 +521,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Refresh wallet balances cache after forcing Anvil balance
         owner_backend.wallet_service.fetch_or_get_cached_wallet_balances([owner_address], True)
-        owner_backend.wallet_service.get_balances_at_by_chain([owner_backend.network_id], [owner_address], [])
+        owner_backend.wallet_service.get_balances_at_by_chain([owner_address], [f"{owner_backend.network_id}-{NATIVE_TOKEN_ADDRESS}"])
 
         # When the Owner mints the owner token
         owner_backend.wallet_service.restart_wallet_reload_timer()
