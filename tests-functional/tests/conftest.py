@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from requests import ReadTimeout
+from web3 import Web3
 
 from clients.anvil import Anvil
 from clients.async_status_backend import AsyncStatusBackend
@@ -18,6 +19,7 @@ from resources.constants import (
     ENS_ADDRESSES_CONTAINER_PATH,
 )
 from utils import fake
+from utils.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +157,29 @@ def backend_recovered_profile(request, backend_factory):
         backend.logout()
 
 
+@pytest.fixture(scope="function", autouse=False)
+def funded_new_profile(backend_new_profile, anvil_client):
+    """
+    Creates a fresh profile with a funded wallet address.
+
+    Returns a factory that produces (backend, wallet_address) tuples.
+    """
+
+    def factory(name: str = "", balance: int = 10_000 * 10**18, **kwargs):
+        kwargs.setdefault("password", Config.password)
+        backend = backend_new_profile(name, **kwargs)
+
+        accounts = backend.accounts_service.get_accounts()
+        wallet_account = next(a for a in accounts if not a.get("chat"))
+        wallet_address = Web3.to_checksum_address(wallet_account["address"])
+
+        anvil_client.set_balance(wallet_address, balance)
+
+        return backend, wallet_address
+
+    yield factory
+
+
 @pytest.fixture(scope="session")
 def anvil_client():
     return Anvil()
@@ -227,22 +252,38 @@ def snt_token_overrides(snt_addresses):
     ]
 
 
-@pytest.fixture(scope="function", autouse=False)
-def owner_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
-    return backend_new_profile(name="owner", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
+@pytest.fixture(scope="session")
+def community_token_deployer_contract_address(communities_addresses):
+    return next(info["value"] for info in communities_addresses.values() if info.get("internal_type") == "contract CommunityTokenDeployer")
 
 
 @pytest.fixture(scope="function", autouse=False)
-def member_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
-    return backend_new_profile(name="member", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
+def owner_backend(backend_new_profile, snt_token_overrides, multicall3_deployer, community_token_deployer_contract_address):
+    return backend_new_profile(
+        name="owner",
+        token_overrides=snt_token_overrides,
+        multicall_contract_address=multicall3_deployer.contract_address,
+        community_token_deployer_contract_address=community_token_deployer_contract_address,
+    )
 
 
 @pytest.fixture(scope="function", autouse=False)
-def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+def member_backend(backend_new_profile, snt_token_overrides, multicall3_deployer, community_token_deployer_contract_address):
+    return backend_new_profile(
+        name="member",
+        token_overrides=snt_token_overrides,
+        multicall_contract_address=multicall3_deployer.contract_address,
+        community_token_deployer_contract_address=community_token_deployer_contract_address,
+    )
+
+
+@pytest.fixture(scope="function", autouse=False)
+def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3_deployer, community_token_deployer_contract_address):
     return backend_new_profile(
         name="member_with_snt",
         token_overrides=snt_token_overrides,
         multicall_contract_address=multicall3_deployer.contract_address,
+        community_token_deployer_contract_address=community_token_deployer_contract_address,
     )
 
 

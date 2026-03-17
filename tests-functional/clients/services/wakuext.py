@@ -306,9 +306,9 @@ class WakuextService(Service):
         response = self.rpc_request("editCommunity", [params])
         return response
 
-    def fetch_community(self, community_key):
-        params = [{"communityKey": community_key, "waitForResponse": True, "tryDatabase": True}]
-        response = self.rpc_request("fetchCommunity", params)
+    def fetch_community(self, community_key, wait_for_response: bool = True, try_database: bool = True, **kwargs):
+        params = [{"communityKey": community_key, "waitForResponse": wait_for_response, "tryDatabase": try_database}]
+        response = self.rpc_request("fetchCommunity", params, **kwargs)
         return response
 
     def spectate_community(self, community_id: str):
@@ -933,4 +933,9 @@ class WakuextService(Service):
     def sign_data(self, sign_params: list[dict]):
         params = [sign_params]
         response = self.rpc_request("signData", params)
+        return response
+
+    def create_community_token_deployment_signature(self, chain_id: int, address_from: str, community_id: str):
+        params = [chain_id, address_from, community_id]
+        response = self.rpc_request("createCommunityTokenDeploymentSignature", params)
         return response

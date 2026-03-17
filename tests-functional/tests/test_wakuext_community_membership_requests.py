@@ -1,11 +1,10 @@
-from uuid import uuid4
-
 import pytest
 
 from clients.signals import SignalType
 from resources.enums import RequestToJoinState
 from steps.messenger import MessengerSteps
 from utils.retry_utils import retry_call
+from utils import fake
 
 
 @pytest.mark.rpc
@@ -21,12 +20,8 @@ class TestCommunityMembershipRequests(MessengerSteps):
         self.fetch_community(req)
         return req
 
-    @pytest.fixture()
-    def fake_address(self):
-        return "0x" + str(uuid4())[:8]
-
-    def test_pending_request_to_join_community_and_cancel(self, creator, requester, fake_address):
-        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake_address])
+    def test_pending_request_to_join_community_and_cancel(self, creator, requester):
+        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake.address()])
         assert len(req_resp.get("requestsToJoinCommunity")) == 1
         assert req_resp.get("requestsToJoinCommunity")[0].get("state") == RequestToJoinState.RequestToJoinStatePending.value
         req_id = req_resp.get("requestsToJoinCommunity")[0].get("id")
@@ -75,8 +70,8 @@ class TestCommunityMembershipRequests(MessengerSteps):
         pending = creator.wakuext_service.pending_requests_to_join_for_community(self.community_id)
         assert pending is None
 
-    def test_pending_request_to_join_community_and_accept(self, creator, requester, fake_address):
-        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake_address])
+    def test_pending_request_to_join_community_and_accept(self, creator, requester):
+        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake.address()])
         assert len(req_resp.get("requestsToJoinCommunity")) == 1
         assert req_resp.get("requestsToJoinCommunity")[0].get("state") == RequestToJoinState.RequestToJoinStatePending.value
         req_id = req_resp.get("requestsToJoinCommunity")[0].get("id")
@@ -129,8 +124,8 @@ class TestCommunityMembershipRequests(MessengerSteps):
         all_non_approved = creator.wakuext_service.all_non_approved_communities_requests_to_join()
         assert all_non_approved == []
 
-    def test_pending_request_to_join_community_and_decline(self, creator, requester, fake_address):
-        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake_address])
+    def test_pending_request_to_join_community_and_decline(self, creator, requester):
+        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake.address()])
         assert len(req_resp.get("requestsToJoinCommunity")) == 1
         assert req_resp.get("requestsToJoinCommunity")[0].get("state") == RequestToJoinState.RequestToJoinStatePending.value
         req_id = req_resp.get("requestsToJoinCommunity")[0].get("id")
@@ -172,8 +167,8 @@ class TestCommunityMembershipRequests(MessengerSteps):
         pending = creator.wakuext_service.pending_requests_to_join_for_community(self.community_id)
         assert pending is None
 
-    def test_check_and_delete_pending_request_to_join_community(self, creator, requester, fake_address):
-        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake_address])
+    def test_check_and_delete_pending_request_to_join_community(self, creator, requester):
+        req_resp = requester.wakuext_service.request_to_join_community(self.community_id, [fake.address()])
         assert len(req_resp.get("requestsToJoinCommunity")) == 1
         req_id = req_resp.get("requestsToJoinCommunity")[0].get("id")
 

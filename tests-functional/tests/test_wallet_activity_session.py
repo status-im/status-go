@@ -13,7 +13,7 @@ from resources.constants import (
     ANVIL_NETWORK_ID,
     NATIVE_TOKEN_ADDRESS,
 )
-from resources.constants import user_1, user_2
+from resources.constants import BURN_ADDRESS
 from utils import wallet_utils
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
@@ -29,7 +29,6 @@ def validate_entry(entry, tx_data):
 @pytest.mark.wallet
 @pytest.mark.rpc
 @pytest.mark.activity
-@pytest.mark.xdist_group(name="WalletSteps")
 class TestWalletActivitySession:
 
     @staticmethod
@@ -56,7 +55,7 @@ class TestWalletActivitySession:
         self.anvil_client.eth.wait_for_transaction_receipt(tx_hash)
 
     @pytest.fixture(autouse=True)
-    def setup_backend(self, backend_recovered_profile, anvil_client, multicall3_deployer, snt_addresses):
+    def setup_backend(self, funded_new_profile, anvil_client, multicall3_deployer, snt_addresses):
         # Setup contracts and deployers
         self.anvil_client = anvil_client
         self.anvil_client.eth.default_account = Web3.to_checksum_address(DEPLOYER_ACCOUNT.address)
@@ -65,12 +64,12 @@ class TestWalletActivitySession:
         self.erc20_token_list = {ANVIL_NETWORK_ID: self.snt_address}
         token_overrides = self._token_list_to_token_overrides(self.erc20_token_list)
 
-        # Create backend
-        self.rpc_client = backend_recovered_profile(
-            name="rpc_client", user=user_1, token_overrides=token_overrides, multicall_contract_address=multicall3_deployer.contract_address
+        # Create backend with fresh funded profile
+        self.rpc_client, self.wallet_address = funded_new_profile(
+            name="rpc_client", token_overrides=token_overrides, multicall_contract_address=multicall3_deployer.contract_address
         )
 
-        self.mint_snt(user_1.address, 1000000000000000000000000)
+        self.mint_snt(self.wallet_address, 1000000000000000000000000)
 
     def test_wallet_start_activity_filter_session(self):
         uuid = str(uuid_lib.uuid4())
@@ -80,8 +79,8 @@ class TestWalletActivitySession:
         input_params = {
             "uuid": uuid,
             "sendType": 0,
-            "addrFrom": user_1.address,
-            "addrTo": user_2.address,
+            "addrFrom": self.wallet_address,
+            "addrTo": BURN_ADDRESS,
             "amountIn": amount_in,
             "amountOut": "0x0",
             "tokenKey": native_token_key,
@@ -100,7 +99,7 @@ class TestWalletActivitySession:
 
         # Start activity session
         params = [
-            [user_1.address],
+            [self.wallet_address],
             [self.rpc_client.network_id],  # type: ignore
             {
                 "period": {"startTimestamp": 0, "endTimestamp": 0},

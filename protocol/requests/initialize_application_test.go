@@ -86,8 +86,6 @@ func TestInitializeApplication_Validate(t *testing.T) {
 			name: "Full configuration with valid values",
 			app: InitializeApplication{
 				DataDir:              "/valid/path",
-				MixpanelAppID:        "app-id",
-				MixpanelToken:        "token",
 				MediaServerEnableTLS: common.Ptr(true),
 				SentryDSN:            "sentry-dsn",
 				LogDir:               "/logs/path",

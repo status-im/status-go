@@ -21,10 +21,8 @@ def get_suggested_routes(rpc_client, **kwargs):
         if key not in input_params:
             logging.info(f"Warning: The key '{key}' does not exist in the input_params parameters and will be ignored.")
 
-    params = [input_params]
-
     with rpc_client.expect_signal("wallet.suggested.routes") as exp:
-        _ = rpc_client.wallet_service.get_suggested_routes_async(params)
+        _ = rpc_client.wallet_service.get_suggested_routes_async(input_params)
     routes_signal = exp.result
     routes = routes_signal["event"]
 
