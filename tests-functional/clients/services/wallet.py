@@ -1,13 +1,18 @@
+import logging
+from typing import Optional
+
 from clients.rpc import RpcClient
 from clients.services.service import Service
+
+logger = logging.getLogger(__name__)
 
 
 class WalletService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "wallet")
 
-    def get_balances_at_by_chain(self, chains: list, addresses: list, tokens: list):
-        params = [chains, addresses, tokens]
+    def get_balances_at_by_chain(self, addresses: list, tokens: list):
+        params = [addresses, tokens]
         return self.rpc_request("getBalancesByChain", params)
 
     def start_wallet(self):
@@ -40,14 +45,14 @@ class WalletService(Service):
         return self.rpc_request("setCustomTxDetails", params)
 
     def get_suggested_routes_async(self, params: dict):
-        return self.rpc_request("getSuggestedRoutesAsync", params)
+        return self.rpc_request("getSuggestedRoutesAsync", [params])
 
     def build_transactions_from_route(self, uuid: str):
         params = [uuid]
         return self.rpc_request("buildTransactionsFromRoute", params)
 
-    def sign_message(self, hash: str, address: str, password: str):
-        params = [hash, address, password]
+    def sign_message(self, message: str, address: str, password: str):
+        params = [message, address, password]
         return self.rpc_request("signMessage", params)
 
     def get_ethereum_chain(
@@ -91,3 +96,60 @@ class WalletService(Service):
 
     def restart_wallet_reload_timer(self):
         return self.rpc_request("restartWalletReloadTimer")
+
+    def build_transaction(self, chain_id: int, send_tx_args_json: str):
+        params = [chain_id, send_tx_args_json]
+        return self.rpc_request("buildTransaction", params)
+
+    def send_transaction_with_signature(self, chain_id: int, tx_type: int, send_tx_args_json: str, signature: str):
+        params = [chain_id, tx_type, send_tx_args_json, signature]
+        return self.rpc_request("sendTransactionWithSignature", params)
+
+    def suggested_community_routes(
+        self,
+        uuid: str,
+        send_type: int,
+        chain_id: int,
+        address_from: str,
+        community_id: str,
+        signer_pub_key: str,
+        token_ids: list,
+        wallet_addresses: list,
+        transfer_details: list,
+        addr_to: Optional[str] = None,
+        signature: str = "",
+        owner_token_parameters: Optional[dict] = None,
+        master_token_parameters: Optional[dict] = None,
+    ):
+        community_params = {
+            "communityID": community_id,
+            "signerPubKey": signer_pub_key,
+            "tokenIds": token_ids,
+            "walletAddresses": wallet_addresses,
+            "transferDetails": transfer_details,
+            "tokenDeploymentSignature": signature,
+        }
+        if owner_token_parameters:
+            community_params["ownerTokenParameters"] = owner_token_parameters
+        if master_token_parameters:
+            community_params["masterTokenParameters"] = master_token_parameters
+
+        native_address = "0x0000000000000000000000000000000000000000"
+        addr_to = addr_to if addr_to else native_address
+        params = {
+            "uuid": uuid,
+            "sendType": send_type,
+            "addrFrom": address_from,
+            "addrTo": addr_to,
+            "amountIn": "0x0",
+            "tokenKey": f"{chain_id}-{native_address}",
+            "toTokenKey": f"{chain_id}-{native_address}",
+            "fromChainID": chain_id,
+            "toChainID": chain_id,
+            "gasFeeMode": 0,
+            "communityRouteInputParams": community_params,
+        }
+
+        logger.info(f"Params to suggested_community_routes {params}")
+
+        return self.rpc_request("getSuggestedRoutes", [params])

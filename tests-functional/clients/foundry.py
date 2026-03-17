@@ -119,7 +119,8 @@ class Foundry:
             --broadcast"""
         constructor_args = kwargs.get("constructor_args")
         if constructor_args:
-            cmd += f" --constructor-args {constructor_args}"
+            args_str = " ".join(map(str, constructor_args))
+            cmd += f" --constructor-args {args_str}"
 
         logging.info(f"Running command: {cmd}")
         exec_result = self.container.exec_run(
@@ -208,6 +209,17 @@ class Foundry:
 
         balance_cmd = f"cast call {token_address} 'balanceOf(address)' {owner_address} --rpc-url http://anvil:8545"
         result = self.container.exec_run(balance_cmd)
+        if result.exit_code != 0:
+            raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
+        return result
+
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    def get_erc721_owner(self, token_address, token_id):
+        if not self.container:
+            raise Exception("Container not found")
+
+        owner_cmd = f"cast call {token_address} 'ownerOf(uint256)' {token_id} --rpc-url http://anvil:8545"
+        result = self.container.exec_run(owner_cmd)
         if result.exit_code != 0:
             raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
         return result

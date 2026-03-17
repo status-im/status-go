@@ -236,22 +236,38 @@ def snt_token_overrides(snt_addresses):
     ]
 
 
-@pytest.fixture(scope="function", autouse=False)
-def owner_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
-    return backend_new_profile(name="owner", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
+@pytest.fixture(scope="session")
+def community_token_deployer_contract_address(communities_addresses):
+    return next(info["value"] for info in communities_addresses.values() if info.get("internal_type") == "contract CommunityTokenDeployer")
 
 
 @pytest.fixture(scope="function", autouse=False)
-def member_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
-    return backend_new_profile(name="member", token_overrides=snt_token_overrides, multicall_contract_address=multicall3_deployer.contract_address)
+def owner_backend(backend_new_profile, snt_token_overrides, multicall3_deployer, community_token_deployer_contract_address):
+    return backend_new_profile(
+        name="owner",
+        token_overrides=snt_token_overrides,
+        multicall_contract_address=multicall3_deployer.contract_address,
+        community_token_deployer_contract_address=community_token_deployer_contract_address,
+    )
 
 
 @pytest.fixture(scope="function", autouse=False)
-def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3_deployer):
+def member_backend(backend_new_profile, snt_token_overrides, multicall3_deployer, community_token_deployer_contract_address):
+    return backend_new_profile(
+        name="member",
+        token_overrides=snt_token_overrides,
+        multicall_contract_address=multicall3_deployer.contract_address,
+        community_token_deployer_contract_address=community_token_deployer_contract_address,
+    )
+
+
+@pytest.fixture(scope="function", autouse=False)
+def member_with_snt_backend(backend_new_profile, snt_token_overrides, multicall3_deployer, community_token_deployer_contract_address):
     return backend_new_profile(
         name="member_with_snt",
         token_overrides=snt_token_overrides,
         multicall_contract_address=multicall3_deployer.contract_address,
+        community_token_deployer_contract_address=community_token_deployer_contract_address,
     )
 
 
