@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from uuid import uuid4
 
 from clients.signals import SignalType
@@ -54,12 +55,31 @@ class AsyncMessengerSteps:
         return message_id
 
     async def accept_contact_request_and_wait(self, message_id: str, sender, receiver) -> None:
-        """Accept contact request and wait for sender to get the acceptance signal."""
+        """Accept contact request and wait for sender to confirm acceptance.
+
+        Uses signal-based confirmation first (fast path), then falls back to
+        RPC polling if the WebSocket signal is lost (e.g., broken pipe).
+        """
         accepted_signal = f"@{receiver.public_key} accepted your contact request"
         # Sync RPC call
         receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
-        # Async signal waiting
-        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=accepted_signal, timeout=60, check_buffer=True)
+
+        # Fast path: wait for WebSocket signal
+        try:
+            await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=accepted_signal, timeout=30, check_buffer=True)
+            return
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            logging.warning("Signal for contact acceptance not received, falling back to RPC polling")
+
+        # Fallback: poll sender's contacts via RPC
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            contact = sender.wakuext_service.get_contact_by_id(receiver.public_key)
+            if contact and contact.get("mutual") is True:
+                return
+            await asyncio.sleep(2)
+
+        raise TimeoutError(f"Contact {receiver.public_key} did not become mutual on sender within timeout")
 
     async def make_contacts(self, sender, receiver) -> str:
         """Create a mutual contact between sender and receiver.
