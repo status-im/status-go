@@ -212,7 +212,7 @@ class StatusGoContainer:
             self.stop_performance_monitoring()  # Stop performance monitoring if running
         if self.container:
             logging.debug(f"Stopping container {self.container.name}...")
-            self.container.stop(timeout=10)
+            self.container.stop(timeout=5)
             logging.debug(f"Container {self.container.name} stopped.")
 
     def remove(self):
