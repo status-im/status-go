@@ -22,15 +22,19 @@ const (
 	ErrCodeInvalidDerivationIndex
 	ErrCodeUnexpectedToken
 	ErrCodeUnexpectedEOF
+	ErrCodeExtendedKeyParsingFailed
+	ErrCodeExtendedPrivateKeyNotAllowed
+	ErrCodePublicKeyDerivationFailed
 )
 
 var (
-	ErrInvalidKeystoreExtendedKey = errors.NewError(ErrCodeInvalidKeystoreExtendedKey, "PrivateKey and ExtendedKey are different", getErrorCategory)
-	ErrZeroedExtendedKey          = errors.NewError(ErrCodeZeroedExtendedKey, "can not derive child account from zeroed extended key", getErrorCategory)
-	ErrPathParsingFailed          = errors.NewError(ErrCodePathParsingFailed, "error parsing derivation path", getErrorCategory)
-	ErrInvalidDerivationIndex     = errors.NewError(ErrCodeInvalidDerivationIndex, "index must be lower than 2^31", getErrorCategory)
-	ErrUnexpectedToken            = errors.NewError(ErrCodeUnexpectedToken, "unexpected token in derivation path", getErrorCategory)
-	ErrUnexpectedEOF              = errors.NewError(ErrCodeUnexpectedEOF, "unexpected end of derivation path", getErrorCategory)
+	ErrInvalidKeystoreExtendedKey   = errors.NewError(ErrCodeInvalidKeystoreExtendedKey, "PrivateKey and ExtendedKey are different", getErrorCategory)
+	ErrZeroedExtendedKey            = errors.NewError(ErrCodeZeroedExtendedKey, "can not derive child account from zeroed extended key", getErrorCategory)
+	ErrPathParsingFailed            = errors.NewError(ErrCodePathParsingFailed, "error parsing derivation path", getErrorCategory)
+	ErrInvalidDerivationIndex       = errors.NewError(ErrCodeInvalidDerivationIndex, "index must be lower than 2^31", getErrorCategory)
+	ErrUnexpectedToken              = errors.NewError(ErrCodeUnexpectedToken, "unexpected token in derivation path", getErrorCategory)
+	ErrUnexpectedEOF                = errors.NewError(ErrCodeUnexpectedEOF, "unexpected end of derivation path", getErrorCategory)
+	ErrExtendedPrivateKeyNotAllowed = errors.NewError(ErrCodeExtendedPrivateKeyNotAllowed, "extended private key (xprv) not allowed; use an extended public key (xpub)", getErrorCategory)
 )
 
 func ErrMnemonicCreationFailed(err error) *errors.AccountsError {
@@ -61,6 +65,14 @@ func ErrChildAccountDerivationFailed(err error) *errors.AccountsError {
 	return errors.WrapError(ErrCodeChildAccountDerivationFailed, "can not derive child account from path", err, getErrorCategory)
 }
 
+func ErrExtendedKeyParsingFailed(err error) *errors.AccountsError {
+	return errors.WrapError(ErrCodeExtendedKeyParsingFailed, "can not parse extended key string", err, getErrorCategory)
+}
+
+func ErrPublicKeyDerivationFailed(err error) *errors.AccountsError {
+	return errors.WrapError(ErrCodePublicKeyDerivationFailed, "can not derive public key from extended key", err, getErrorCategory)
+}
+
 func getErrorCategory(code errors.ErrorCode) errors.ErrorCategory {
 	switch code {
 	case ErrCodeInvalidKeystoreExtendedKey,
@@ -75,7 +87,10 @@ func getErrorCategory(code errors.ErrorCode) errors.ErrorCategory {
 		ErrCodePathParsingFailed,
 		ErrCodeInvalidDerivationIndex,
 		ErrCodeUnexpectedToken,
-		ErrCodeUnexpectedEOF:
+		ErrCodeUnexpectedEOF,
+		ErrCodeExtendedKeyParsingFailed,
+		ErrCodeExtendedPrivateKeyNotAllowed,
+		ErrCodePublicKeyDerivationFailed:
 		return ErrorCategoryGenerator
 	default:
 		return errors.ErrorCategoryUnknown

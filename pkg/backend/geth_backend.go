@@ -1619,22 +1619,32 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		masterAddress = keycardData.Address
 
 		derivedAddresses[common.PathWalletRoot] = generator2.AccountInfo{
-			Address: keycardData.WalletRootAddress,
+			AccountPublicInfo: generator2.AccountPublicInfo{
+				Address: keycardData.WalletRootAddress,
+			},
 		}
 		derivedAddresses[common.PathEIP1581Root] = generator2.AccountInfo{
-			Address: keycardData.Eip1581Address,
+			AccountPublicInfo: generator2.AccountPublicInfo{
+				Address: keycardData.Eip1581Address,
+			},
 		}
 		derivedAddresses[common.PathEIP1581Chat] = generator2.AccountInfo{
-			Address:    keycardData.WhisperAddress,
-			PublicKey:  keycardData.WhisperPublicKey,
+			AccountPublicInfo: generator2.AccountPublicInfo{
+				Address:   keycardData.WhisperAddress,
+				PublicKey: keycardData.WhisperPublicKey,
+			},
 			PrivateKey: keycardData.WhisperPrivateKey,
 		}
 		derivedAddresses[common.PathDefaultWalletAccount] = generator2.AccountInfo{
-			Address:   keycardData.WalletAddress,
-			PublicKey: keycardData.WalletPublicKey,
+			AccountPublicInfo: generator2.AccountPublicInfo{
+				Address:   keycardData.WalletAddress,
+				PublicKey: keycardData.WalletPublicKey,
+			},
 		}
 		derivedAddresses[common.PathEIP1581Encryption] = generator2.AccountInfo{
-			PublicKey: keycardData.EncryptionPublicKey,
+			AccountPublicInfo: generator2.AccountPublicInfo{
+				PublicKey: keycardData.EncryptionPublicKey,
+			},
 		}
 	} else {
 		genMasterAcc, err := generator2.CreateAccountFromMnemonic(mnemonic, "")
