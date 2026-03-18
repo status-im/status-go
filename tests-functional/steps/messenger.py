@@ -729,6 +729,17 @@ def add_packet_loss(node, packet_loss=2):
 
 
 @contextmanager
+def node_pause(node):
+    logging.info("Entering context manager: node_pause")
+    node.container_pause()
+    try:
+        yield
+    finally:
+        logging.info("Exiting context manager: node_pause")
+        node.container_unpause()
+
+
+@contextmanager
 def add_low_bandwith(node, rate="1mbit", burst="32kbit", limit="12500"):
     logging.info("Entering context manager: add_low_bandwith")
     node.container_exec(f"apt-get update && apt-get install -y iproute2 && tc qdisc add dev eth0 root tbf rate {rate} burst {burst} limit {limit}")
