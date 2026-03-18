@@ -155,13 +155,14 @@ def backend_new_profile(request, backend_factory):
 
     yield factory
 
-    if not Config.status_backend_urls:
-        return
-    for backend in backends:
+    def _logout(b):
         try:
-            backend.logout(timeout=10)
+            b.logout(timeout=10)
         except ReadTimeout as e:
             logging.warning(f"Failed to logout during shutdown: {e}")
+
+    tasks = [(f"logout-{i}", lambda b=backend: _logout(b)) for i, backend in enumerate(backends)]
+    _parallel_teardown(tasks)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -182,13 +183,14 @@ def backend_recovered_profile(request, backend_factory):
 
     yield _backend_recovered_profile
 
-    if not Config.status_backend_urls:
-        return
-    for backend in backends:
+    def _logout(b):
         try:
-            backend.logout(timeout=10)
+            b.logout(timeout=10)
         except ReadTimeout as e:
             logging.warning(f"Failed to logout during shutdown: {e}")
+
+    tasks = [(f"logout-{i}", lambda b=backend: _logout(b)) for i, backend in enumerate(backends)]
+    _parallel_teardown(tasks)
 
 
 @pytest.fixture(scope="function", autouse=False)
