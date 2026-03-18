@@ -3,7 +3,9 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -36,8 +38,10 @@ type Core struct {
 
 	publisher *pubsub.Publisher
 
-	wg   sync.WaitGroup
-	quit chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	quit   chan struct{}
 
 	connectionState connection.State
 
@@ -126,7 +130,9 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		timeSource = timesource.DefaultService()
 	}
 
-	return &Core{
+	ctx, cancel := context.WithCancel(context.Background())
+
+	core := &Core{
 		config:     *config,
 		identity:   params.Identity,
 		waku:       waku,
@@ -134,8 +140,43 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		stack:      stack,
 		controller: controller,
 		publisher:  publisher,
+		ctx:        ctx,
+		cancel:     cancel,
 		quit:       make(chan struct{}),
-	}, nil
+	}
+
+	if config.missingDepsObserver != nil {
+		stack.Reliability.SetMissingDependenciesHandler(func(messageID string, missingDeps []string, channelID string) error {
+			config.missingDepsObserver(messageID, missingDeps, channelID)
+			return core.fetchMissingDependenciesAsync(messageID, missingDeps, channelID)
+		})
+	} else {
+		stack.Reliability.SetMissingDependenciesHandler(core.fetchMissingDependenciesAsync)
+	}
+	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
+
+	return core, nil
+}
+
+func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
+	decodedMessageID, err := cryptotypes.DecodeHex(messageID)
+	if err != nil {
+		c.logger.Debug("failed to decode SDS message ID for retrieval hint",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	hash, ok := c.stack.Transport.FirstTrackedEnvelopeHash(decodedMessageID)
+	if !ok {
+		c.logger.Debug("no tracked envelope hash for SDS message ID",
+			zap.String("messageID", messageID),
+		)
+		return nil
+	}
+
+	return []byte(hash)
 }
 
 func NewCore(params CoreParams, options ...Options) (*Core, error) {
@@ -190,6 +231,7 @@ func (c *Core) start() error {
 
 func (c *Core) stop() error {
 	close(c.quit)
+	c.cancel()
 
 	err := c.controller.Stop()
 	if err != nil {
@@ -209,6 +251,41 @@ func (c *Core) stop() error {
 	}
 
 	c.wg.Wait()
+
+	return nil
+}
+
+func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []string, channelID string) error {
+	if len(missingDeps) == 0 {
+		return nil
+	}
+
+	select {
+	case <-c.ctx.Done():
+		return nil
+	default:
+	}
+
+	fmt.Println("Scheduling missing dependency fetch for message", messageID, "with deps", missingDeps)
+
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+
+		fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
+		defer cancel()
+
+		err := c.stack.Transport.FetchMessagesByHashes(fetchCtx, missingDeps)
+		if err != nil {
+			fmt.Println("failed to fetch missing dependencies from storenode", "messageID", messageID, "channelID", channelID, "missingDeps", missingDeps, "error", err)
+			c.logger.Debug("failed to fetch missing dependencies from storenode",
+				zap.String("messageID", messageID),
+				zap.String("channelID", channelID),
+				zap.Strings("missingDeps", missingDeps),
+				zap.Error(err),
+			)
+		}
+	}()
 
 	return nil
 }
