@@ -45,7 +45,9 @@ func (s *ENSReleaseProcessor) Name() string {
 }
 
 func (s *ENSReleaseProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
-	return params.FromChain.ChainID == walletCommon.EthereumMainnet || params.FromChain.ChainID == walletCommon.EthereumSepolia, nil
+	return params.FromChain.ChainID == walletCommon.EthereumMainnet ||
+		params.FromChain.ChainID == walletCommon.EthereumSepolia ||
+		params.FromChain.ChainID == walletCommon.AnvilMainnet, nil
 }
 
 func (s *ENSReleaseProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {

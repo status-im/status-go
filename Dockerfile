@@ -6,24 +6,33 @@ ENV CC=clang
 ENV CXX=clang++
 
 RUN apt-get update \
-    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config curl xz-utils \
+    && apt-get install -y git bash make llvm clang protobuf-compiler build-essential pkg-config curl xz-utils jq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Nim using choosenim
+# Install Nim from pre-built binaries
 ARG NIM_VERSION=2.2.4
-ENV CHOOSENIM_NO_ANALYTICS=1
-RUN curl https://nim-lang.org/choosenim/init.sh -sSf | sh -s -- -y \
-    && /root/.nimble/bin/choosenim ${NIM_VERSION}
+RUN set -eu && \
+    DPKG_ARCH="$(dpkg --print-architecture)" && \
+    case "$DPKG_ARCH" in \
+        amd64) NIM_ARCH="x64" ;; \
+        arm64) NIM_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture: $DPKG_ARCH" >&2; exit 1 ;; \
+    esac && \
+    NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
+        | jq -r --arg ver "$NIM_VERSION" --arg arch "$NIM_ARCH" \
+            '.[$ver]["linux_" + $arch].github_url // empty') && \
+    if [ -z "$NIM_URL" ]; then \
+        echo "ERROR: No download URL found for Nim $NIM_VERSION linux_$NIM_ARCH" >&2; \
+        exit 1; \
+    fi && \
+    curl -sSfL "$NIM_URL" -o /tmp/nim.tar.xz && \
+    mkdir -p /opt/nim && \
+    tar -xJf /tmp/nim.tar.xz -C /opt/nim --strip-components=1 && \
+    rm /tmp/nim.tar.xz && \
+    /opt/nim/bin/nim --version
 
-ENV PATH="/root/.nimble/bin:${PATH}"
-
-# Create system-wide symlinks for Nim binaries
-RUN ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nim /usr/local/bin/nim \
-    && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/nimble /usr/local/bin/nimble \
-    && ln -sf /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/choosenim /usr/local/bin/choosenim \
-    && chmod 755 /root/.choosenim/toolchains/nim-${NIM_VERSION}/bin/* \
-    && nim --version
+ENV PATH="/opt/nim/bin:${PATH}"
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''

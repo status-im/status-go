@@ -46,4 +46,61 @@ else
     exit 1
 fi
 
+# Deploy ENS contracts
+echo "Deploying ENS contracts..."
+/app/clone_and_run.sh status-im ens-usernames script Deploy.s.sol $DEPLOYER_PRIVATE_KEY $DEPLOYER_ADDRESS
+
+ENS_BROADCAST_FILE="/app/ens-usernames/broadcast/Deploy.s.sol/31337/run-latest.json"
+if [ -f "$ENS_BROADCAST_FILE" ]; then
+    REGISTRY_ADDR=$(grep -A1 '"contractName": "ENSRegistry"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+    RESOLVER_ADDR=$(grep -A1 '"contractName": "PublicResolver"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+    TOKEN_ADDR=$(grep -A1 '"contractName": "MiniMeToken"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+    REGISTRAR_ADDR=$(grep -A1 '"contractName": "UsernameRegistrar"' "$ENS_BROADCAST_FILE" | grep '"contractAddress"' | head -1 | sed 's/.*"contractAddress": "\([^"]*\)".*/\1/')
+
+    echo "ENS Registry (deployed): $REGISTRY_ADDR"
+    echo "ENS Resolver: $RESOLVER_ADDR"
+    echo "ENS Token: $TOKEN_ADDR"
+    echo "ENS Registrar: $REGISTRAR_ADDR"
+
+    # Domain setup on deployed registry — registrar and resolver reference it via immutables
+    echo "Setting up stateofus.eth domain..."
+    ROOT_NODE="0x0000000000000000000000000000000000000000000000000000000000000000"
+    ETH_NAMEHASH=$(cast namehash "eth")
+    ETH_LABELHASH=$(cast keccak "eth")
+    STATEOFUS_LABELHASH=$(cast keccak "stateofus")
+
+    cast send $REGISTRY_ADDR "setSubnodeOwner(bytes32,bytes32,address)" \
+        $ROOT_NODE $ETH_LABELHASH $DEPLOYER_ADDRESS \
+        --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY
+
+    cast send $REGISTRY_ADDR "setSubnodeOwner(bytes32,bytes32,address)" \
+        $ETH_NAMEHASH $STATEOFUS_LABELHASH $REGISTRAR_ADDR \
+        --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY
+
+    # Activate registrar (required before it accepts registrations)
+    echo "Activating registrar..."
+    cast send $REGISTRAR_ADDR "activate(uint256)" 1000000000000000000 \
+        --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY
+
+    # Go code (go-ens, resolver/address.go) queries the well-known ENS registry.
+    # Copy deployed registry code + storage to well-known address so Go can read it.
+    WELL_KNOWN_REGISTRY="0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
+    echo "Syncing deployed registry to well-known address..."
+    /app/sync_ens_registry.sh $REGISTRY_ADDR $WELL_KNOWN_REGISTRY $ANVIL_URL
+
+    cat > $CONTRACTS_PATH/ens_addresses.json << EOF
+{
+  "registry": "$REGISTRY_ADDR",
+  "resolver": "$RESOLVER_ADDR",
+  "token": "$TOKEN_ADDR",
+  "registrar": "$REGISTRAR_ADDR"
+}
+EOF
+
+    echo "ENS contracts deployed and configured successfully"
+else
+    echo "Error: ENS broadcast file not found!"
+    exit 1
+fi
+
 echo "All contracts deployed successfully!"
