@@ -46,6 +46,7 @@ type testMessengerConfig struct {
 	appSettings  *settings2.Settings
 	nodeConfig   *params.NodeConfig
 	extraOptions []Option
+	messagingOptions []messaging2.Options
 }
 
 func (tmc *testMessengerConfig) complete(t *testing.T) error {
@@ -145,15 +146,20 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 
 	installationID := uuid.New().String()
 
+	messagingCoreOptions := []messaging2.Options{
+		messaging2.WithLogger(config.logger.Named("messaging")),
+		messaging2.WithTracer(trace.NewTracer(otel.Tracer("messaging_" + config.name))),
+		messaging2.WithSQLitePersistence(appDb),
+	}
+	messagingCoreOptions = append(messagingCoreOptions, config.messagingOptions...)
+
 	messaging, err := messagingEnv.NewTestCore(
 		messaging2.CoreParams{
 			Identity:       config.privateKey,
 			InstallationID: installationID,
 			TimeSource:     &testTimeSource{},
 		},
-		messaging2.WithLogger(config.logger.Named("messaging")),
-		messaging2.WithTracer(trace.NewTracer(otel.Tracer("messaging_"+config.name))),
-		messaging2.WithSQLitePersistence(appDb),
+		messagingCoreOptions...,
 	)
 	if err != nil {
 		return nil, err

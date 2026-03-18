@@ -3,6 +3,7 @@ package sender
 import (
 	"context"
 	"crypto/ecdsa"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -12,15 +13,17 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-const sdsForCommunitiesEnabled = false
+const sdsForCommunitiesEnabled = true
 
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
 	messageID := messagingtypes.MessageID(params.Sender, params.Payload)
+	var sdsMessageIDBytes []byte
 
 	logger := s.logger.Named("sendPublic").With(
 		zap.Stringer("messageID", messageID),
@@ -40,12 +43,29 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 	)
 
 	if sdsForCommunitiesEnabled && len(params.CommunityID) > 0 {
-		logger.Debug("send public message with SDS", zap.String("communityID", cryptotypes.EncodeHex(params.CommunityID)))
-		sdsWrappedPayload, err := s.stack.Reliability.WrapPayloadForSDS(params.Payload, params.CommunityID)
+		sdsChannelID := reliability.BuildChannelID(params.CommunityID, params.ContentTopic)
+		sdsMessageIDBytes = crypto.Keccak256(params.Payload)
+		sdsMessageIDHex := cryptotypes.EncodeHex(sdsMessageIDBytes)
+		logger.Debug("send public message with SDS",
+			zap.String("communityID", cryptotypes.EncodeHex(params.CommunityID)),
+			zap.String("sdsChannelID", sdsChannelID),
+			zap.String("sdsMessageID", sdsMessageIDHex),
+		)
+
+		sdsWrappedPayload, err := s.stack.Reliability.WrapPayloadForSDS(params.Payload, sdsChannelID)
 		if err != nil {
-			return errors.Wrap(err, "failed to wrap payload for SDS")
+			if strings.Contains(err.Error(), "reMessageTooLarge") {
+				logger.Warn("SDS wrap skipped for oversized public community payload",
+					zap.Int("payloadLength", len(params.Payload)),
+					zap.Error(err),
+				)
+				sdsMessageIDBytes = nil
+			} else {
+				return errors.Wrap(err, "failed to wrap payload for SDS")
+			}
+		} else {
+			params.Payload = sdsWrappedPayload
 		}
-		params.Payload = sdsWrappedPayload
 	}
 
 	var err error
@@ -116,7 +136,11 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
 	)
 
-	s.stack.Transport.Track(messageID, hashes, wakuMessages)
+	if len(sdsMessageIDBytes) > 0 {
+		s.stack.Transport.TrackMany([][]byte{[]byte(messageID), sdsMessageIDBytes}, hashes, wakuMessages)
+	} else {
+		s.stack.Transport.Track(messageID, hashes, wakuMessages)
+	}
 
 	if spec != nil {
 		pubsub.Publish(s.publisher, SentMessage{

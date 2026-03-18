@@ -48,6 +48,7 @@ import (
 	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -57,6 +58,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
+	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
+	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -1680,6 +1683,94 @@ func (w *Waku) StoreQuery(
 	processEnvelopes bool,
 ) error {
 	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	if w.storeClient == nil {
+		return peer.AddrInfo{}
+	}
+
+	return w.storeClient.nextStorenode()
+}
+
+func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error {
+	if len(messageHashes) == 0 {
+		return nil
+	}
+	fmt.Println("Fetching messages by hash from storenode:", storenode.ID, "hashes:", messageHashes)
+
+	parsedHashes := make([]pb.MessageHash, 0, len(messageHashes))
+	for _, messageHash := range messageHashes {
+		decodedHash, err := hexutil.Decode(messageHash)
+		if err != nil {
+			w.logger.Debug("invalid message hash for storenode fetch", zap.String("messageHash", messageHash), zap.Error(err))
+			continue
+		}
+		parsedHashes = append(parsedHashes, pb.ToMessageHash(decodedHash))
+	}
+	fmt.Println("Parsed message hashes for storenode fetch:", parsedHashes)
+
+	if len(parsedHashes) == 0 {
+		return nil
+	}
+
+	// Enrich the storenode AddrInfo with addresses from the peerstore
+	storenodeInfo := w.node.Host().Peerstore().PeerInfo(storenode.ID)
+	// Encapsulate the peer ID into the multiaddresses as expected by the missing API
+	encapsulatedAddrs := utils.EncapsulatePeerID(storenodeInfo.ID, storenodeInfo.Addrs...)
+	storenodeInfo.Addrs = encapsulatedAddrs
+	fmt.Println("Enriched storenode with encapsulated addresses:", storenodeInfo.Addrs)
+
+	type hashRequestor interface {
+		GetMessagesByHash(ctx context.Context, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error)
+	}
+
+	requestor, ok := missing.NewDefaultStorenodeRequestor(w.node.Store()).(hashRequestor)
+	if !ok {
+		return errors.New("storenode requestor does not support fetching by hash")
+	}
+
+	result, err := requestor.GetMessagesByHash(ctx, storenodeInfo, uint64(len(parsedHashes)), parsedHashes)
+	if err != nil {
+		fmt.Println("Error fetching messages by hash from storenode:", storenodeInfo.ID, "error:", err)
+		return err
+	}
+
+	if result == nil {
+		fmt.Println("No messages found for the requested hashes from storenode:", storenodeInfo.ID)
+		return nil
+	}
+
+	for {
+		messages := result.Messages()
+		fmt.Println("Processing batch of messages from storenode fetch by hash, batch size:", len(messages))
+
+		for _, mkv := range messages {
+			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
+			fmt.Println("Received message from storenode fetch by hash:", envelope.Hash().String())
+			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, true); err != nil {
+				fmt.Println("Error processing messages from storenode fetch by hash:", err)
+				return err
+			}
+		}
+
+		if result.IsComplete() {
+			break
+		}
+
+		if err := result.Next(ctx); err != nil {
+			fmt.Println("Error fetching next batch of messages from storenode:", err)
+			return err
+		}
+	}
+
+	if processedCount == 0 {
+		fmt.Println("Storenode fetch by hash completed without returning any messages for the requested hashes")
+	} else {
+		fmt.Println("Storenode fetch by hash completed, processed messages:", processedCount)
+	}
+
+	return nil
 }
 
 func (w *Waku) Metrics() string {

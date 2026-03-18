@@ -1,9 +1,12 @@
 package processor
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
@@ -16,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/testutils"
 	common "github.com/status-im/status-go/pkg/messaging/common"
@@ -41,6 +45,31 @@ type ProcessorSuite struct {
 	processor   *Processor
 	testPayload []byte
 	logger      *zap.Logger
+}
+
+func (s *ProcessorSuite) newStandaloneReliability() *reliability.Reliability {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer(nil))
+	s.Require().NoError(err)
+
+	s.T().Cleanup(func() {
+		s.Require().NoError(db.Close())
+	})
+
+	err = mvdsmigrations.Migrate(db)
+	s.Require().NoError(err)
+
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	r := reliability.NewReliability(
+		mvdsnode.NewSQLitePersistence(db),
+		identity,
+		s.logger,
+	)
+
+	s.T().Cleanup(r.Stop)
+
+	return r
 }
 
 func (s *ProcessorSuite) SetupTest() {
@@ -331,9 +360,10 @@ func (s *ProcessorSuite) TestHandleSegmentMessages() {
 	s.Require().Equal(&senderKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(s.testPayload, decodedMessages[0].EncryptionLayer.Payload)
 
-	// Receiving another segment after the message has been reassembled is considered an error
-	_, err = s.processor.ProcessMessage(message)
-	s.Require().ErrorIs(err, segmentation.ErrAlreadyCompleted)
+	// Receiving another segment after reassembly should be ignored as a duplicate.
+	response, err = s.processor.ProcessMessage(message)
+	s.Require().NoError(err)
+	s.Require().Nil(response)
 }
 
 func (s *ProcessorSuite) TestGetEphemeralKey() {
@@ -355,9 +385,9 @@ func (s *ProcessorSuite) TestGetEphemeralKey() {
 
 func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	payload := []byte("hello")
-	communityID := []byte("community123")
+	sdsChannelID := "community123|channel-1"
 
-	wrappedPayload, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, communityID)
+	wrappedPayload, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, sdsChannelID)
 	s.Require().NoError(err)
 	s.Require().True(len(wrappedPayload) > 0)
 
@@ -380,4 +410,106 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	err = s.processor.processSDSLayer(&receivedMsg2)
 	s.Require().NoError(err)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
+}
+
+func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPayloads() {
+	senderReliability := s.newStandaloneReliability()
+	receiverReliability := s.newStandaloneReliability()
+
+	channelID := "community123|general"
+	oldPayload := []byte("old-community-message")
+	newPayload := []byte("new-community-message")
+
+	expectedOldMessageID := cryptotypes.EncodeHex(crypto.Keccak256(oldPayload))
+	expectedNewMessageID := cryptotypes.EncodeHex(crypto.Keccak256(newPayload))
+	expectedOldHint := "store-hash-" + expectedOldMessageID
+
+	senderReliability.SetRetrievalHintProvider(func(messageID string) []byte {
+		return []byte("store-hash-" + messageID)
+	})
+
+	type missingDepsCall struct {
+		messageID string
+		deps      []string
+		channelID string
+	}
+
+	var (
+		callsMu sync.Mutex
+		calls   []missingDepsCall
+	)
+
+	receiverReliability.SetMissingDependenciesHandler(func(messageID string, missingDeps []string, missingDepsChannelID string) error {
+		callsMu.Lock()
+		calls = append(calls, missingDepsCall{
+			messageID: messageID,
+			deps:      append([]string(nil), missingDeps...),
+			channelID: missingDepsChannelID,
+		})
+		callsMu.Unlock()
+		return nil
+	})
+
+	wrappedOldPayload, err := senderReliability.WrapPayloadForSDS(oldPayload, channelID)
+	s.Require().NoError(err)
+	wrappedNewPayload, err := senderReliability.WrapPayloadForSDS(newPayload, channelID)
+	s.Require().NoError(err)
+
+	originalReliability := s.processor.stack.Reliability
+	s.processor.stack.Reliability = receiverReliability
+	defer func() {
+		s.processor.stack.Reliability = originalReliability
+	}()
+
+	newMessageFirst := types.Message{
+		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+	}
+	err = s.processor.processSDSLayer(&newMessageFirst)
+	s.Require().NoError(err)
+
+	err = testutils.RetryWithBackOff(func() error {
+		callsMu.Lock()
+		defer callsMu.Unlock()
+
+		if len(calls) == 0 {
+			return errors.New("missing dependencies callback not triggered")
+		}
+
+		return nil
+	})
+	s.Require().NoError(err)
+
+	callsMu.Lock()
+	firstCall := calls[0]
+	callsMu.Unlock()
+
+	s.Require().Equal(expectedNewMessageID, firstCall.messageID)
+	s.Require().Equal(channelID, firstCall.channelID)
+	s.Require().Contains(firstCall.deps, expectedOldHint)
+
+	recovered := map[string]bool{}
+	if bytes.Equal(newMessageFirst.EncryptionLayer.Payload, newPayload) {
+		recovered["new"] = true
+	}
+
+	oldMessage := types.Message{
+		EncryptionLayer: types.EncryptionLayer{Payload: wrappedOldPayload},
+	}
+	err = s.processor.processSDSLayer(&oldMessage)
+	s.Require().NoError(err)
+	if bytes.Equal(oldMessage.EncryptionLayer.Payload, oldPayload) {
+		recovered["old"] = true
+	}
+
+	newMessageReplay := types.Message{
+		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+	}
+	err = s.processor.processSDSLayer(&newMessageReplay)
+	s.Require().NoError(err)
+	if bytes.Equal(newMessageReplay.EncryptionLayer.Payload, newPayload) {
+		recovered["new"] = true
+	}
+
+	s.Require().True(recovered["old"], "old payload should be recoverable after dependency handling")
+	s.Require().True(recovered["new"], "new payload should be recoverable after dependency handling")
 }

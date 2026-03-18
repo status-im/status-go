@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -672,6 +674,26 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 	}
 }
 
+// FirstTrackedEnvelopeHash returns the first tracked envelope hash for a given
+// message identifier. The returned hash is hex-encoded (0x-prefixed).
+func (t *Transport) FirstTrackedEnvelopeHash(identifier []byte) (string, bool) {
+	if t.envelopesMonitor == nil {
+		return "", false
+	}
+
+	key := types2.HexBytes(identifier).String()
+
+	t.envelopesMonitor.mu.Lock()
+	defer t.envelopesMonitor.mu.Unlock()
+
+	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[key]
+	if !ok || len(hashes) == 0 {
+		return "", false
+	}
+
+	return hashes[0].String(), true
+}
+
 func (t *Transport) MaxMessageSize() uint32 {
 	return t.waku.MaxMessageSize()
 }
@@ -814,4 +836,45 @@ func (t *Transport) Query(
 	processEnvelopes bool,
 ) error {
 	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (t *Transport) FetchMessagesByHashes(ctx context.Context, messageHashes []string) error {
+	if len(messageHashes) == 0 {
+		return nil
+	}
+
+	type activeStorenodeProvider interface {
+		GetActiveStorenode() peer.AddrInfo
+	}
+
+	provider, ok := t.waku.(activeStorenodeProvider)
+	if !ok {
+		return errors.New("waku backend does not expose an active storenode")
+	}
+
+	storenode := provider.GetActiveStorenode()
+	if storenode.ID == "" {
+		return errors.New("no active storenode")
+	}
+
+	type hashFetcher interface {
+		FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error
+	}
+
+	fetcher, ok := t.waku.(hashFetcher)
+	if !ok {
+		return errors.New("waku backend does not support hash-based message fetch")
+	}
+
+	return fetcher.FetchMessagesByHashes(ctx, storenode, messageHashes)
+}
+
+func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
+	type storenodeConfigProviderSetter interface {
+		SetStorenodeConfigProvider(history.StorenodeConfigProvider)
+	}
+
+	if setter, ok := t.waku.(storenodeConfigProviderSetter); ok {
+		setter.SetStorenodeConfigProvider(c)
+	}
 }

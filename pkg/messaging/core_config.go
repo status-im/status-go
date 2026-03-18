@@ -17,6 +17,7 @@ type config struct {
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 	metricsEnabled         bool
 	persistence            Persistence
+	missingDepsObserver    MissingDependenciesObserver
 }
 
 func newConfig(options ...Options) *config {
@@ -39,6 +40,10 @@ func newConfig(options ...Options) *config {
 }
 
 type Options func(*config)
+
+// MissingDependenciesObserver allows tests to observe SDS missing dependency
+// events before the core triggers background fetching.
+type MissingDependenciesObserver func(messageID string, missingDeps []string, channelID string)
 
 func WithLogger(logger *zap.Logger) Options {
 	return func(c *config) {
@@ -80,5 +85,11 @@ func WithSQLitePersistence(db *sql.DB) Options {
 func WithPersistence(persistence Persistence) Options {
 	return func(c *config) {
 		c.persistence = persistence
+	}
+}
+
+func WithMissingDependenciesObserver(observer MissingDependenciesObserver) Options {
+	return func(c *config) {
+		c.missingDepsObserver = observer
 	}
 }
