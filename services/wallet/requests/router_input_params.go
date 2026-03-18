@@ -113,6 +113,10 @@ func (i *RouteInputParams) Validate() error {
 		if i.Username == "" || i.PublicKey == "" {
 			return ErrENSRegisterRequiresUsernameAndPubKey
 		}
+		if i.FromChainID == walletCommon.AnvilMainnet {
+			// On Anvil, the token address is determined dynamically from the registrar contract
+			return nil
+		}
 		if i.TestnetMode {
 			// available only on sepolia testnet
 			sntToken := tokentypes.Token{

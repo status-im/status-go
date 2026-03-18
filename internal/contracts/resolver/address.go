@@ -11,6 +11,7 @@ var errorNotAvailableOnChainID = errors.New("not available for chainID")
 var contractAddressByChainID = map[uint64]common.Address{
 	1:        common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"), // mainnet
 	11155111: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"), // sepolia testnet
+	31337:    common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"), // anvil (copied from ens-usernames deploy)
 }
 
 func ContractAddress(chainID uint64) (common.Address, error) {

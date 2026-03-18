@@ -19,6 +19,7 @@ from clients.rpc import RpcClient
 from clients.services.accounts import AccountService
 from clients.services.appgeneral import AppgeneralService
 from clients.services.connector import ConnectorService
+from clients.services.ens import EnsService
 from clients.services.eth import EthService
 from clients.services.linkpreview import LinkPreviewService
 from clients.services.multiaccounts import MultiAccountsService
@@ -106,6 +107,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.sharedurls_service = SharedURLsService(self)
         self.connector_service = ConnectorService(self)
         self.appgeneral_service = AppgeneralService(self)
+        self.ens_service = EnsService(self)
         self.eth_service = EthService(self)
         self.linkpreview_service = LinkPreviewService(self)
         self.expvar_client = ExpvarClient(self.base_url)
@@ -275,6 +277,14 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data["multicallOverrides"] = {self.network_id: multicall_contract_address}
         return data
 
+    def _set_community_token_deployer_overrides(self, data, kwargs):
+        deployer_address = kwargs.get("community_token_deployer_contract_address", None)
+        if not deployer_address:
+            return data
+
+        data["communityTokenDeployerOverrides"] = {self.network_id: deployer_address}
+        return data
+
     def _set_custom_tokens(self, data, kwargs):
         token_overrides = kwargs.get("token_overrides", [])
         if not token_overrides:
@@ -360,6 +370,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
         data = self._set_multicall_overrides(data, kwargs)
+        data = self._set_community_token_deployer_overrides(data, kwargs)
         data = self._set_custom_tokens(data, kwargs)
         return data
 
@@ -380,6 +391,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def login(self, key_uid, password: str, kdf_iterations=256000):
         self.password = password
+        # Reconnect to signals before login to avoid missing node.login after logout.
+        SignalClient.disconnect(self)
+        SignalClient.connect(self)
         method = "LoginAccount"
         data = {
             "password": self.password,

@@ -8,9 +8,12 @@ from uuid import uuid4
 import pytest
 from tenacity import retry, stop_after_delay, wait_fixed
 
+from clients.api import ApiResponseError
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 from utils import fake
+
+logger = logging.getLogger(__name__)
 
 
 # --- Message parsing utilities ---
@@ -163,6 +166,7 @@ def join_private_group(admin=None, member=None) -> str:
 
 
 def create_private_group(private_groups_count, admin, member):
+    start_index = len(member.received_signals[SignalType.MESSAGES_NEW])
     private_groups = []
     for i in range(private_groups_count):
         private_group_name = f"private_group_{i+1}_{uuid4()}"
@@ -179,7 +183,7 @@ def create_private_group(private_groups_count, admin, member):
         time.sleep(0.01)
 
     for i, expected_message in enumerate(private_groups):
-        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+        with member.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start_index) as exp:
             pass
         messages_new_event = exp.result
         validate_signal_event_against_response(
@@ -190,6 +194,7 @@ def create_private_group(private_groups_count, admin, member):
 
 
 def private_group_message(message_count, private_group_id, sender=None, receiver=None):
+    start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     sent_messages = []
     for i in range(message_count):
         message_text = f"test_message_{i+1}_{uuid4()}"
@@ -199,7 +204,7 @@ def private_group_message(message_count, private_group_id, sender=None, receiver
         time.sleep(0.01)
 
     for _, expected_message in enumerate(sent_messages):
-        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start_index) as exp:
             pass
         messages_new_event = exp.result
         validate_signal_event_against_response(
@@ -218,186 +223,413 @@ def create_community(node) -> str:
     return community_id
 
 
-def fetch_community(node, community_id):
-    return node.wakuext_service.fetch_community(community_id)
+def fetch_community(node, community_id, wait_for_response=True, try_database=True, **kwargs):
+    return node.wakuext_service.fetch_community(
+        community_id,
+        wait_for_response=wait_for_response,
+        try_database=try_database,
+        **kwargs,
+    )
+
+
+def _pick_chat_id(chats: dict) -> str | None:
+    if not chats:
+        return None
+    try:
+        items = list(chats.items())
+        items.sort(key=lambda kv: (kv[1] or {}).get("position", 1_000_000))
+        for key, value in items:
+            if isinstance(value, dict):
+                chat_id = value.get("id") or key
+            else:
+                chat_id = key
+            if chat_id:
+                return chat_id
+        return items[0][0] if items else None
+    except Exception:
+        return next(iter(chats.keys()), None)
 
 
 def join_community(member, admin, community_id):
-    # Ensure both nodes are aware of the community before we proceed.
-    # (Some RPCs depend on local DB state and can lag if the community wasn't fetched yet.)
-    fetch_community(member, community_id)
-    fetch_community(admin, community_id)
-
-    # Capture start index to make any post-hoc signal waits race-safe.
-    member_messages_start = len(member.received_signals[SignalType.MESSAGES_NEW])
-
-    response_to_join = member.wakuext_service.request_to_join_community(community_id)
-    join_req = (response_to_join.get("requestsToJoinCommunity") or [{}])[0]
-    join_id = join_req.get("id")
-    join_state = join_req.get("state")
-    assert join_id, f"Failed to request to join community: {response_to_join}"
-
-    def _pick_chat_id(chats: dict) -> str | None:
-        if not chats:
-            return None
-        try:
-            # Prefer the default/general chat (lowest position).
-            # Different RPCs return `chats` in slightly different shapes:
-            # - {chatId: {...}} (where value may or may not include "id")
-            # - {chatId: {"id": chatId, ...}}
-            items = list(chats.items())
-            items.sort(key=lambda kv: (kv[1] or {}).get("position", 1_000_000))
-            for key, value in items:
-                if isinstance(value, dict):
-                    chat_id = value.get("id") or key
-                else:
-                    chat_id = key
-                if chat_id:
-                    return chat_id
-            return items[0][0] if items else None
-        except Exception:
-            # Fallback: take any key.
-            return next(iter(chats.keys()), None)
-
-    # Communities can be created with different membership rules.
-    # We decide the flow by the request state returned from `request_to_join_community`:
-    # - Accepted => auto-accept flow (no admin action required)
-    # - Pending  => manual-accept flow (admin must accept)
-    deadline = time.monotonic() + 240
-
-    last_pending = None
-    last_latest_admin = None
-    last_member_comm = None
-    last_member_latest = None
-    last_accept_error = None
-    last_chat_messages_error = None
-    last_accept_attempt_at = 0.0
-    accepted_seen = False
-    accepted_via = None
-
     def _is_accepted(state) -> bool:
         return state == 3 or str(state) == "3"
 
-    while time.monotonic() < deadline:
-        # 1) Observe request state on the member side (it can transition from Pending -> Accepted).
-        # This is the most reliable driver for the join flow.
-        if not accepted_seen:
-            if join_state is not None:
-                # `join_state` comes from the immediate RPC response.
-                # We consider it authoritative, but still allow later confirmation.
-                if _is_accepted(join_state):
-                    accepted_seen = True
-                    accepted_via = "rpc_response"
+    def _is_community_not_found(error: ApiResponseError) -> bool:
+        return "community not found" in str(error).lower()
+
+    def _is_already_joined(error: ApiResponseError) -> bool:
+        msg = str(error).lower()
+        return "already joined" in msg or "already a member" in msg
+
+    deadline = time.monotonic() + 120
+    logger.info("join_community: starting for community_id=%s", community_id)
+    member_messages_start = len(member.received_signals[SignalType.MESSAGES_NEW])
+
+    member_warmup_attempts = 0
+    member_fast_fetch_attempts = 0
+    member_blocking_fetch_attempts = 0
+    member_last_fetch = None
+    member_last_fetch_error = None
+    member_last_spectate_error = None
+
+    request_attempts = 0
+    request_resend_attempts = 0
+    last_request_error = None
+
+    join_id = None
+    join_state = None
+    response_to_join = None
+
+    last_pending = None
+    last_latest_admin = None
+    last_member_latest = None
+    last_member_comm = None
+    last_accept_error = None
+    last_chat_messages_error = None
+    last_poll_error = None
+    last_accept_attempt_at = 0.0
+    last_resend_at = 0.0
+    accepted_seen = False
+    accepted_via = None
+
+    logger.info("join_community: Phase A — member visibility warm-up")
+    phase_a_deadline = min(deadline, time.monotonic() + 50.0)
+    warmup_timed_out = False
+    while time.monotonic() < phase_a_deadline:
+        member_warmup_attempts += 1
+        member_fast_fetch_attempts += 1
+        try:
+            member_last_fetch = fetch_community(member, community_id, wait_for_response=False, try_database=False)
+        except ApiResponseError as e:
+            if not _is_community_not_found(e):
+                raise
+            member_last_fetch_error = str(e)
+            member_last_fetch = None
+
+        if member_last_fetch:
+            logger.info("join_community: Phase A — community visible after %d fast-fetch attempts", member_warmup_attempts)
+            break
+
+        remaining_phase_a = phase_a_deadline - time.monotonic()
+        if member_warmup_attempts % 10 == 0 and remaining_phase_a > 20:
+            member_blocking_fetch_attempts += 1
             try:
-                last_member_latest = member.wakuext_service.latest_request_to_join_for_community(community_id)
-                if last_member_latest and last_member_latest.get("id") == join_id:
-                    if _is_accepted(last_member_latest.get("state")):
+                member_last_fetch = fetch_community(
+                    member,
+                    community_id,
+                    wait_for_response=True,
+                    try_database=False,
+                    timeout=10,
+                )
+            except ApiResponseError as e:
+                if not _is_community_not_found(e):
+                    raise
+                member_last_fetch_error = str(e)
+                member_last_fetch = None
+            except Exception as e:
+                member_last_fetch_error = str(e)
+                member_last_fetch = None
+
+            if member_last_fetch:
+                logger.info("join_community: Phase A — community visible after blocking fetch (attempt %d)", member_blocking_fetch_attempts)
+                break
+
+        try:
+            member.wakuext_service.spectate_community(community_id)
+        except ApiResponseError as e:
+            if not _is_community_not_found(e):
+                raise
+            member_last_spectate_error = str(e)
+
+        time.sleep(1)
+
+    if not member_last_fetch:
+        warmup_timed_out = True
+        logger.warning(
+            "join_community: Phase A — warm-up timed out after %d attempts (last_error=%s)", member_warmup_attempts, member_last_fetch_error
+        )
+
+    fetch_community(admin, community_id)
+
+    logger.info("join_community: Phase B — requesting to join")
+    request_retry_interval = 25.0
+    next_request_at = time.monotonic()
+    while time.monotonic() < deadline and not join_id:
+        now = time.monotonic()
+        if now >= next_request_at:
+            request_attempts += 1
+            try:
+                response_to_join = member.wakuext_service.request_to_join_community(community_id)
+                join_req = (response_to_join.get("requestsToJoinCommunity") or [{}])[0]
+                join_id = join_req.get("id")
+                join_state = join_req.get("state")
+                if join_id:
+                    logger.info("join_community: Phase B — got join_id=%s, state=%s (attempt %d)", join_id, join_state, request_attempts)
+                    if _is_accepted(join_state):
                         accepted_seen = True
-                        accepted_via = "member_latest"
-            except Exception:
-                pass
+                        accepted_via = "rpc_response"
+                    break
+                last_request_error = f"Missing join id in response: {response_to_join}"
+                logger.debug("join_community: Phase B — no join_id in response (attempt %d)", request_attempts)
+            except ApiResponseError as e:
+                if _is_already_joined(e):
+                    accepted_seen = True
+                    accepted_via = "request_already_joined"
+                    logger.info("join_community: Phase B — already joined")
+                    break
+                elif _is_community_not_found(e):
+                    last_request_error = str(e)
+                    logger.debug("join_community: Phase B — community not found (attempt %d): %s", request_attempts, e)
+                else:
+                    raise
+            finally:
+                next_request_at = now + request_retry_interval
 
-        if not accepted_seen and not _is_accepted(join_state):
-            try:
-                last_pending = admin.wakuext_service.pending_requests_to_join_for_community(community_id) or []
-            except Exception:
-                pass
+        try:
+            member.wakuext_service.spectate_community(community_id)
+        except ApiResponseError as spectate_error:
+            if not _is_community_not_found(spectate_error):
+                raise
+            member_last_spectate_error = str(spectate_error)
 
-            try:
-                last_latest_admin = admin.wakuext_service.latest_request_to_join_for_community(community_id)
-            except Exception:
-                pass
+        member_fast_fetch_attempts += 1
+        try:
+            member_last_fetch = fetch_community(member, community_id, wait_for_response=False, try_database=False)
+            if member_last_fetch:
+                warmup_timed_out = False
+        except ApiResponseError as e:
+            if not _is_community_not_found(e):
+                raise
+            member_last_fetch_error = str(e)
+            member_last_fetch = None
+        time.sleep(1)
 
-            admin_observed_ids: set[str] = set()
-            if last_pending:
-                admin_observed_ids.update([r.get("id") for r in last_pending if r.get("id")])
+    if not join_id and not accepted_seen:
+        raise Exception(
+            "Failed to request join for community within timeout. "
+            f"community_id={community_id}, request_attempts={request_attempts}, "
+            f"last_request_error={last_request_error}, response_to_join={response_to_join}, "
+            f"warmup_timed_out={warmup_timed_out}, warmup_attempts={member_warmup_attempts}, "
+            f"fast_fetch_attempts={member_fast_fetch_attempts}, blocking_fetch_attempts={member_blocking_fetch_attempts}, "
+            f"member_last_fetch_error={member_last_fetch_error}, member_last_spectate_error={member_last_spectate_error}"
+        )
+
+    last_resend_at = time.monotonic()
+
+    logger.info("join_community: Phase C — waiting for admin to accept join request (join_id=%s)", join_id)
+    while time.monotonic() < deadline and not accepted_seen:
+        try:
+            last_member_latest = member.wakuext_service.latest_request_to_join_for_community(community_id)
+            if last_member_latest and last_member_latest.get("id") == join_id and _is_accepted(last_member_latest.get("state")):
+                accepted_seen = True
+                accepted_via = "member_latest"
+                join_state = last_member_latest.get("state")
+                logger.info("join_community: Phase C — member sees accepted state via latest_request")
+                break
+        except Exception as e:
+            last_poll_error = f"member_latest: {e}"
+
+        admin_observed_ids: set[str] = set()
+        try:
+            last_pending = admin.wakuext_service.pending_requests_to_join_for_community(community_id) or []
+            admin_observed_ids.update([r.get("id") for r in last_pending if r.get("id")])
+        except Exception as e:
+            last_poll_error = f"pending_requests: {e}"
+
+        try:
+            last_latest_admin = admin.wakuext_service.latest_request_to_join_for_community(community_id)
             if last_latest_admin and last_latest_admin.get("id"):
                 admin_observed_ids.add(last_latest_admin.get("id"))
+        except Exception as e:
+            last_poll_error = f"latest_request: {e}"
 
-            try:
-                all_non_approved = admin.wakuext_service.all_non_approved_communities_requests_to_join() or []
-                for r in all_non_approved:
-                    if r.get("communityId") == community_id and r.get("id"):
-                        admin_observed_ids.add(r.get("id"))
-            except Exception:
-                pass
-
-            # If admin sees our join_id, we can accept it.
-            # If join_id is not visible but admin sees exactly one request for this community,
-            # accept that one (best-effort for eventual-consistency glitches).
-            accept_id: str | None = None
-            if join_id and join_id in admin_observed_ids:
-                accept_id = join_id
-            elif len(admin_observed_ids) == 1:
-                accept_id = next(iter(admin_observed_ids))
-
-            if accept_id and (time.monotonic() - last_accept_attempt_at) >= 2.0:
-                try:
-                    accept_resp = admin.wakuext_service.accept_request_to_join_community(accept_id)
-                    if accept_resp and _is_accepted((accept_resp.get("requestsToJoinCommunity") or [{}])[0].get("state")):
-                        accepted_seen = True
-                        accepted_via = "admin_accept"
-                        join_state = 3
-                        if accept_id != join_id:
-                            join_id = accept_id
-                except Exception as e:
-                    last_accept_error = str(e)
-                finally:
-                    last_accept_attempt_at = time.monotonic()
-
-        # 3) Once accepted, wait for member to observe acceptance via signal (helps with propagation).
-        if accepted_seen and accepted_via != "member_signal":
-            try:
-                with member.expect_signal(
-                    SignalType.MESSAGES_NEW,
-                    accept_fn=lambda s: any(
-                        r.get("id") == join_id and r.get("state") == 3 for r in (s.get("event", {}).get("requestsToJoinCommunity") or [])
-                    ),
-                    start=member_messages_start,
-                    timeout=5,
-                ):
-                    pass
-                accepted_via = "member_signal"
-            except Exception:
-                # Not all setups emit the signal immediately; don't fail here.
-                pass
-
-        # 4) Completion: member reports joined/isMember OR chat becomes accessible.
         try:
-            last_member_comm = member.wakuext_service.fetch_community(community_id)
-            is_joined = last_member_comm and (last_member_comm.get("joined") is True or last_member_comm.get("isMember") is True)
+            all_non_approved = admin.wakuext_service.all_non_approved_communities_requests_to_join() or []
+            for request in all_non_approved:
+                if request.get("communityId") == community_id and request.get("id"):
+                    admin_observed_ids.add(request.get("id"))
+        except Exception as e:
+            last_poll_error = f"all_non_approved: {e}"
 
-            chats = (last_member_comm.get("chats") or {}) if last_member_comm else {}
-            chat_id = _pick_chat_id(chats)
-            if chat_id:
-                if is_joined:
-                    return community_id + chat_id
+        accept_id: str | None = None
+        if join_id and join_id in admin_observed_ids:
+            accept_id = join_id
+        elif len(admin_observed_ids) == 1:
+            accept_id = next(iter(admin_observed_ids))
 
-                # Only use chat access as a proof AFTER we've seen the request accepted.
-                if accepted_seen:
-                    try:
-                        resp = member.wakuext_service.chat_messages(community_id + chat_id, limit=1)
-                        if resp is not None and "messages" in resp:
-                            return community_id + chat_id
-                    except Exception as e:
-                        last_chat_messages_error = str(e)
+        logger.debug("join_community: Phase C — admin observed request ids: %s, will accept: %s", admin_observed_ids, accept_id)
+
+        if accept_id and (time.monotonic() - last_accept_attempt_at) >= 2.0:
+            try:
+                accept_resp = admin.wakuext_service.accept_request_to_join_community(accept_id)
+                accept_state = (accept_resp.get("requestsToJoinCommunity") or [{}])[0].get("state")
+                if _is_accepted(accept_state):
+                    accepted_seen = True
+                    accepted_via = "admin_accept"
+                    join_state = accept_state
+                    logger.info("join_community: Phase C — admin accepted request %s", accept_id)
+                    if accept_id != join_id:
+                        join_id = accept_id
+            except Exception as e:
+                last_accept_error = str(e)
+                logger.debug("join_community: Phase C — accept failed for %s: %s", accept_id, e)
+            finally:
+                last_accept_attempt_at = time.monotonic()
+
+        if not accepted_seen and (time.monotonic() - last_resend_at) >= 25.0:
+            logger.debug("join_community: Phase C — re-sending join request (resend attempt %d)", request_resend_attempts + 1)
+            request_resend_attempts += 1
+            try:
+                retry_resp = member.wakuext_service.request_to_join_community(community_id)
+                retry_req = (retry_resp.get("requestsToJoinCommunity") or [{}])[0]
+                if retry_req.get("id"):
+                    join_id = retry_req.get("id")
+                    join_state = retry_req.get("state")
+                    if _is_accepted(join_state):
+                        accepted_seen = True
+                        accepted_via = "resend_rpc_response"
+            except ApiResponseError as e:
+                if _is_already_joined(e):
+                    accepted_seen = True
+                    accepted_via = "resend_already_joined"
+                elif _is_community_not_found(e):
+                    last_request_error = str(e)
+                else:
+                    raise
+            finally:
+                last_resend_at = time.monotonic()
+
+        if not accepted_seen:
+            time.sleep(1)
+
+    logger.info("join_community: accepted_seen=%s, accepted_via=%s", accepted_seen, accepted_via)
+    if accepted_seen:
+        try:
+            with member.expect_signal(
+                SignalType.MESSAGES_NEW,
+                accept_fn=lambda signal: any(
+                    request.get("id") == join_id and request.get("state") == 3
+                    for request in (signal.get("event", {}).get("requestsToJoinCommunity") or [])
+                ),
+                start=member_messages_start,
+                timeout=5,
+            ):
+                pass
+            accepted_via = "member_signal"
         except Exception:
             pass
 
-        time.sleep(0.5)
+    logger.info("join_community: Phase D — waiting for member to see community as joined")
+    completion_attempt = 0
+    while time.monotonic() < deadline:
+        completion_attempt += 1
+        try:
+            last_member_comm = fetch_community(member, community_id, wait_for_response=False)
+        except ApiResponseError as e:
+            if not _is_community_not_found(e):
+                raise
+            member_last_fetch_error = str(e)
+            last_member_comm = None
+
+        if not last_member_comm and completion_attempt % 10 == 0:
+            try:
+                last_member_comm = fetch_community(member, community_id)
+            except ApiResponseError as e:
+                if not _is_community_not_found(e):
+                    raise
+                member_last_fetch_error = str(e)
+                last_member_comm = None
+
+        is_joined = last_member_comm and (last_member_comm.get("joined") is True or last_member_comm.get("isMember") is True)
+        chats = (last_member_comm.get("chats") or {}) if last_member_comm else {}
+        chat_id = _pick_chat_id(chats)
+
+        if completion_attempt % 5 == 0:
+            logger.debug(
+                "join_community: Phase D — attempt %d, community_found=%s, is_joined=%s, chats=%d, chat_id=%s",
+                completion_attempt,
+                last_member_comm is not None,
+                is_joined,
+                len(chats),
+                chat_id,
+            )
+
+        if chat_id:
+            full_chat_id = community_id + chat_id
+            if is_joined:
+                logger.info("join_community: Phase D — member joined, chat_id=%s (attempt %d)", full_chat_id, completion_attempt)
+                return full_chat_id
+            if accepted_seen:
+                try:
+                    response = member.wakuext_service.chat_messages(full_chat_id, limit=1)
+                    if response is not None and "messages" in response:
+                        logger.info(
+                            "join_community: Phase D — member can access chat messages, chat_id=%s (attempt %d)", full_chat_id, completion_attempt
+                        )
+                        return full_chat_id
+                except Exception as e:
+                    last_chat_messages_error = str(e)
+
+        time.sleep(1)
 
     raise Exception(
-        "Failed to join community within timeout. "
+        "Failed to complete community join within timeout. "
         f"community_id={community_id}, join_id={join_id}, join_state={join_state}, "
         f"accepted_seen={accepted_seen}, accepted_via={accepted_via}, "
-        f"last_pending={last_pending}, "
-        f"last_latest_admin={last_latest_admin}, "
+        f"request_attempts={request_attempts}, resend_attempts={request_resend_attempts}, "
+        f"member_warmup_attempts={member_warmup_attempts}, "
+        f"member_fast_fetch_attempts={member_fast_fetch_attempts}, "
+        f"member_blocking_fetch_attempts={member_blocking_fetch_attempts}, "
+        f"member_last_fetch_error={member_last_fetch_error}, member_last_spectate_error={member_last_spectate_error}, "
+        f"last_pending={last_pending}, last_latest_admin={last_latest_admin}, last_member_latest={last_member_latest}, "
         f"last_member_joined={getattr(last_member_comm, 'get', lambda *_: None)('joined') if last_member_comm else None}, "
         f"last_member_is_member={getattr(last_member_comm, 'get', lambda *_: None)('isMember') if last_member_comm else None}, "
         f"last_member_chats_keys={list((last_member_comm or {}).get('chats', {}).keys()) if last_member_comm else None}, "
-        f"last_member_latest={last_member_latest}, "
-        f"last_accept_error={last_accept_error}, "
-        f"last_chat_messages_error={last_chat_messages_error}"
+        f"last_request_error={last_request_error}, last_accept_error={last_accept_error}, "
+        f"last_chat_messages_error={last_chat_messages_error}, last_poll_error={last_poll_error}"
+    )
+
+
+def wait_for_community_chat_visible(member, community_id, chat_id, timeout=60):
+    """Force member to sync community from store node until the new chat appears.
+
+    After join_community, Waku relay subscriptions may be in a transitional
+    state and the member can miss community description updates published via
+    relay.  This method bypasses relay by polling the store node directly
+    (tryDatabase=False forces a network fetch through the store protocol).
+    """
+    short_chat_id = chat_id[len(community_id) :] if chat_id.startswith(community_id) else chat_id
+    deadline = time.time() + timeout
+    last_error = None
+    last_chats_keys = None
+    last_joined = None
+    last_is_member = None
+    while time.time() < deadline:
+        try:
+            comm = fetch_community(
+                member,
+                community_id,
+                wait_for_response=True,
+                try_database=False,
+                timeout=10,
+            )
+        except ApiResponseError as e:
+            last_error = e
+            time.sleep(2)
+            continue
+        if comm:
+            chats = comm.get("chats") or {}
+            last_chats_keys = list(chats.keys())
+            last_joined = comm.get("joined")
+            last_is_member = comm.get("isMember")
+            if short_chat_id in chats or any(v.get("id") == chat_id for v in chats.values() if isinstance(v, dict)):
+                return
+        time.sleep(2)
+    raise TimeoutError(
+        f"Member did not see chat {chat_id} in community {community_id} "
+        f"within {timeout}s. last_error={last_error}, "
+        f"last_chats_keys={last_chats_keys}, "
+        f"last_joined={last_joined}, last_is_member={last_is_member}"
     )
 
 
@@ -431,11 +663,12 @@ def send_multiple_one_to_one_messages(message_count=1, sender=None, receiver=Non
 
 
 def one_to_one_message(message_count, sender=None, receiver=None):
+    start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     _, responses = send_multiple_one_to_one_messages(message_count, sender=sender, receiver=receiver)
     messages = list(map(lambda r: r.get("messages", [])[0], responses))
 
     for expected_message in messages:
-        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start_index) as exp:
             pass
         messages_new_event = exp.result
         validate_signal_event_against_response(
@@ -448,6 +681,7 @@ def one_to_one_message(message_count, sender=None, receiver=None):
 
 
 def community_messages(message_chat_id, message_count, sender=None, receiver=None):
+    start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     sent_messages = []
     for i in range(message_count):
         message_text = f"test_message_{i+1}_{uuid4()}"
@@ -457,7 +691,7 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
         time.sleep(0.01)
 
     for i, expected_message in enumerate(sent_messages):
-        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60) as exp:
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start_index) as exp:
             pass
         messages_new_event = exp.result
         validate_signal_event_against_response(
@@ -503,14 +737,3 @@ def add_low_bandwith(node, rate="1mbit", burst="32kbit", limit="12500"):
     finally:
         logging.info("Exiting context manager: add_low_bandwith")
         node.container_exec("tc qdisc del dev eth0 root")
-
-
-@contextmanager
-def node_pause(node):
-    logging.info("Entering context manager: node_pause")
-    node.container_pause()
-    try:
-        yield
-    finally:
-        logging.info("Exiting context manager: node_pause")
-        node.container_unpause()
