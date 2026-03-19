@@ -13,22 +13,6 @@ type DescriptionEncryptor interface {
 	decryptCommunityDescription(keyIDSeqNo string, d []byte) (*DecryptCommunityResponse, error)
 }
 
-// NoopDescriptionEncryptor implements DescriptionEncryptor with no-op behavior.
-// For use in tests when encryption is not needed (e.g. unencrypted communities).
-type NoopDescriptionEncryptor struct{}
-
-func (*NoopDescriptionEncryptor) encryptCommunityDescription(*Community, *protobuf.CommunityDescription) (string, []byte, error) {
-	return "", nil, nil
-}
-
-func (*NoopDescriptionEncryptor) encryptCommunityDescriptionChannel(*Community, string, *protobuf.CommunityDescription) (string, []byte, error) {
-	return "", nil, nil
-}
-
-func (*NoopDescriptionEncryptor) decryptCommunityDescription(string, []byte) (*DecryptCommunityResponse, error) {
-	return &DecryptCommunityResponse{}, nil
-}
-
 // Encrypts members and chats
 func encryptDescription(encryptor DescriptionEncryptor, community *Community, description *protobuf.CommunityDescription) error {
 	description.PrivateData = make(map[string][]byte)

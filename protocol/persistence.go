@@ -882,6 +882,10 @@ func (db sqlitePersistence) ContactByID(contactID string) (*contacts.Contact, er
 		}
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return result, nil
 }
 

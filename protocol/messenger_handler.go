@@ -231,14 +231,8 @@ func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *Re
 		// chat is highlighted for new group invites or group re-invites
 		chat.Highlight = true
 		// Respect Contact Requests notification setting for local notification
-		if allow, _ := m.settings.GetAllowNotifications(); allow {
-			if contactReqs, _ := m.settings.GetContactRequests(); contactReqs != "TurnOff" {
-				messagePreview := messagePreviewNameAndMessage
-				if v, err := m.settings.GetMessagePreview(); err == nil {
-					messagePreview = v
-				}
-				messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility, messagePreview))
-			}
+		if show, preview := m.contactRequestNotificationPreview(); show {
+			messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility, preview))
 		}
 	}
 
@@ -1466,15 +1460,9 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 		state.Response.AddRequestToJoinCommunity(requestToJoin)
 
 		// Respect Contact Requests notification setting for local notification
-		if allow, _ := m.settings.GetAllowNotifications(); allow {
-			if contactReqs, _ := m.settings.GetContactRequests(); contactReqs != "TurnOff" {
-				messagePreview := messagePreviewNameAndMessage
-				if v, err := m.settings.GetMessagePreview(); err == nil {
-					messagePreview = v
-				}
-				profilePicturesVisibility, _ := m.settings.GetProfilePicturesVisibility()
-				state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact, profilePicturesVisibility, messagePreview))
-			}
+		if show, preview := m.contactRequestNotificationPreview(); show {
+			profilePicturesVisibility, _ := m.settings.GetProfilePicturesVisibility()
+			state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact, profilePicturesVisibility, preview))
 		}
 
 		// Activity Center notification, new for pending state

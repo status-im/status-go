@@ -56,9 +56,9 @@ func communityIconDataURI(c *communities.Community) string {
 
 // authorIconDataURI returns a data URI for the notification author (sender) avatar.
 // Uses contact's profile image or identicon fallback so notifications always have an icon.
-// For local notifications we use ProfilePicturesVisibilityEveryone so the sender's custom
-// profile image is shown when available—the notification is private to the recipient.
-func authorIconDataURI(contact *contacts.Contact, _ settings.ProfilePicturesVisibilityType) string {
+// Profile picture visibility is always treated as Everyone for local notifications—the
+// notification is private to the recipient who has already opted into receiving it.
+func authorIconDataURI(contact *contacts.Contact) string {
 	if contact == nil {
 		return ""
 	}
@@ -363,10 +363,10 @@ func (n NotificationBody) toMessageNotification(id string, resolvePrimaryName fu
 		DisplayTitle:        displayTitle,
 		DisplayMessage:      displayMessage,
 		IsConversation:      true,
-		IsGroupConversation: true,
+		IsGroupConversation: n.Chat.PrivateGroupChat() || n.Chat.Public() || n.Chat.CommunityChat(),
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.PrimaryName(),
-			Icon: authorIconDataURI(n.Contact, settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
+			Icon: authorIconDataURI(n.Contact),
 			ID:   n.Contact.ID,
 		},
 		Timestamp:      n.Message.WhisperTimestamp,
@@ -403,7 +403,7 @@ func (n NotificationBody) toContactRequestNotification(id string, profilePicture
 		Deeplink:       n.Chat.DeepLink(),
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.PrimaryName(),
-			Icon: authorIconDataURI(n.Contact, settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
+			Icon: authorIconDataURI(n.Contact),
 			ID:   n.Contact.ID,
 		},
 		ConversationID: n.Chat.ID,
@@ -431,7 +431,7 @@ func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePic
 		Deeplink:       n.Chat.DeepLink(),
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.PrimaryName(),
-			Icon: authorIconDataURI(n.Contact, settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
+			Icon: authorIconDataURI(n.Contact),
 			ID:   n.Contact.ID,
 		},
 		ChatIcon: chatIconDataURI(n.Chat),
@@ -457,7 +457,7 @@ func (n NotificationBody) toCommunityRequestToJoinNotification(id string, profil
 		Deeplink:       "status-app://cr/" + n.Community.IDString(),
 		Author: localnotifications.NotificationAuthor{
 			Name: n.Contact.PrimaryName(),
-			Icon: authorIconDataURI(n.Contact, settings.ProfilePicturesVisibilityType(profilePicturesVisibility)),
+			Icon: authorIconDataURI(n.Contact),
 			ID:   n.Contact.ID,
 		},
 		CommunityIcon: communityIconDataURI(n.Community),

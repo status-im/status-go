@@ -2117,21 +2117,23 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 	// Push outgoing message to local-notifications so clients (e.g. Android) receive it
 	// via the same signal path as incoming messages and can refresh the notification.
-	var community *communities.Community
-	if chat.CommunityChat() && chat.CommunityID != "" {
-		community, _ = m.communitiesManager.GetByIDString(chat.CommunityID)
+	if allowed, _ := m.settings.GetAllowNotifications(); allowed {
+		var community *communities.Community
+		if chat.CommunityChat() && chat.CommunityID != "" {
+			community, _ = m.communitiesManager.GetByIDString(chat.CommunityID)
+		}
+		authorID := crypto.PubkeyToHex(&m.identity.PublicKey)
+		authorName, _ := m.settings.DisplayName()
+		var authorIcon string
+		if img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName); err == nil && img != nil && len(img.Payload) > 0 {
+			authorIcon, _ = images.GetPayloadDataURI(img.Payload)
+		}
+		if authorIcon == "" {
+			authorIcon, _ = identicon.GenerateBase64(authorID)
+		}
+		outgoingNotif := NewOutgoingMessageNotification(message.ID, message, chat, community, authorName, authorIcon, authorID)
+		localnotifications.PushMessages([]*localnotifications.Notification{outgoingNotif})
 	}
-	authorID := crypto.PubkeyToHex(&m.identity.PublicKey)
-	authorName, _ := m.settings.DisplayName()
-	var authorIcon string
-	if img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, images.SmallDimName); err == nil && img != nil && len(img.Payload) > 0 {
-		authorIcon, _ = images.GetPayloadDataURI(img.Payload)
-	}
-	if authorIcon == "" {
-		authorIcon, _ = identicon.GenerateBase64(authorID)
-	}
-	outgoingNotif := NewOutgoingMessageNotification(message.ID, message, chat, community, authorName, authorIcon, authorID)
-	localnotifications.PushMessages([]*localnotifications.Notification{outgoingNotif})
 
 	return &response, m.saveChat(chat)
 }
@@ -2724,11 +2726,27 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	}
 
 	notifications := response.Notifications()
-	fmt.Printf("[messenger] PublishMessengerResponse: %d notifications to push\n", len(notifications))
 	// Clear notifications as not used for now
 	response.ClearNotifications()
 	signal.SendNewMessages(response)
 	localnotifications.PushMessages(notifications)
+}
+
+// contactRequestNotificationPreview returns whether a contact-request-type local
+// notification should be shown (based on AllowNotifications and ContactRequests settings)
+// and the applicable message preview mode. Used for group invites and community join requests.
+func (m *Messenger) contactRequestNotificationPreview() (show bool, preview int) {
+	if allow, _ := m.settings.GetAllowNotifications(); !allow {
+		return false, 0
+	}
+	if v, _ := m.settings.GetContactRequests(); v == notifValueTurnOff {
+		return false, 0
+	}
+	preview = messagePreviewNameAndMessage
+	if v, err := m.settings.GetMessagePreview(); err == nil {
+		preview = v
+	}
+	return true, preview
 }
 
 func (m *Messenger) GetStats() types2.TransportStats {
