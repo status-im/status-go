@@ -2431,7 +2431,22 @@ func IntendedPanic(message string) string {
 }
 
 func performLocalBackup() string {
-	filePath, err := statusBackend.StatusNode().PerformLocalBackup()
+	node := statusBackend.StatusNode()
+	if node == nil {
+		return makeJSONResponse(errors.New("node not running"))
+	}
+
+	filePath, err := node.PerformLocalBackup()
+	if err != nil && err.Error() == "local backup not initialized" {
+		chatAccount, accErr := statusBackend.AccountManager().SelectedChatAccount()
+		if accErr != nil {
+			return makeJSONResponse(accErr)
+		}
+		if startErr := node.StartLocalBackup(chatAccount.AccountKey.PrivateKey); startErr != nil {
+			return makeJSONResponse(startErr)
+		}
+		filePath, err = node.PerformLocalBackup()
+	}
 	if err != nil {
 		return makeJSONResponse(err)
 	}

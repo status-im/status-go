@@ -306,10 +306,16 @@ func (n *StatusNode) StartLocalBackup(privateKey *ecdsa.PrivateKey) error {
 }
 
 func (n *StatusNode) PerformLocalBackup() (string, error) {
+	if n.localBackup == nil {
+		return "", errors.New("local backup not initialized")
+	}
 	return n.localBackup.PerformBackup()
 }
 
 func (n *StatusNode) LoadLocalBackup(filePath string) error {
+	if n.localBackup == nil {
+		return errors.New("local backup not initialized")
+	}
 	return n.localBackup.LoadBackup(filePath)
 }
 

@@ -837,6 +837,14 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to inject accounts into services")
 		}
+
+		chatAccount, err := b.accountManager.SelectedChatAccount()
+		if err != nil {
+			return errors.Wrap(err, "failed to get selected chat account for backup")
+		}
+		if err = b.statusNode.StartLocalBackup(chatAccount.AccountKey.PrivateKey); err != nil {
+			b.logger.Error("failed to start local backup", zap.Error(err))
+		}
 	}
 
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
