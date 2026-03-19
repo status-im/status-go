@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -29,7 +30,7 @@ type Config struct {
 }
 
 type Server struct {
-	lifecycleMu sync.Mutex
+	mu sync.Mutex
 
 	listener net.Listener
 	server   *http.Server
@@ -41,8 +42,8 @@ type Server struct {
 	// address is the host and port the server is listening on
 	address *net.TCPAddr
 
-	// isRunning is true if the server was started and is running
-	isRunning bool
+	// running is true if the server was started and Serve is active; read via IsRunning().
+	running atomic.Bool
 
 	// cachedPort stores the port from the first successful bind when AddrPort used port 0 (ephemeral).
 	// Reused on pause/resume so URLs remain valid across ToBackground/ToForeground cycles.
@@ -159,13 +160,13 @@ func (s *Server) serve(currentServer *http.Server, currentListener net.Listener)
 	defer common.LogOnPanic()
 
 	defer func() {
-		s.lifecycleMu.Lock()
-		defer s.lifecycleMu.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 
 		// If a newer Start() already replaced server/listener, do not clobber
 		// the latest running instance state.
 		if s.server == currentServer && s.listener == currentListener {
-			s.isRunning = false
+			s.running.Store(false)
 			s.address = nil
 		}
 	}()
@@ -199,10 +200,10 @@ func (s *Server) applyHandlers() {
 }
 
 func (s *Server) Start() error {
-	s.lifecycleMu.Lock()
-	defer s.lifecycleMu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if s.isRunning {
+	if s.running.Load() {
 		return nil
 	}
 
@@ -217,16 +218,16 @@ func (s *Server) Start() error {
 
 	// Mark running synchronously to avoid pause/play races where ToBackground
 	// can run before serve() goroutine has a chance to set the state.
-	s.isRunning = true
+	s.running.Store(true)
 	go s.serve(s.server, s.listener)
 	return nil
 }
 
 func (s *Server) Stop() error {
-	s.lifecycleMu.Lock()
+	s.mu.Lock()
 	s.StopTimeout()
-	if !s.isRunning || s.server == nil {
-		s.lifecycleMu.Unlock()
+	if !s.running.Load() || s.server == nil {
+		s.mu.Unlock()
 		return nil
 	}
 
@@ -234,14 +235,14 @@ func (s *Server) Stop() error {
 	// Shutdown waits for Serve() to return, and Serve() may update state in
 	// its defer path under the same mutex.
 	currentServer := s.server
-	s.isRunning = false
-	s.lifecycleMu.Unlock()
+	s.running.Store(false)
+	s.mu.Unlock()
 
 	return currentServer.Shutdown(context.Background())
 }
 
 func (s *Server) IsRunning() bool {
-	return s.isRunning
+	return s.running.Load()
 }
 
 func (s *Server) ToForeground() {

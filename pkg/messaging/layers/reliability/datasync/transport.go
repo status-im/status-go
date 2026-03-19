@@ -33,7 +33,7 @@ func SetPausedBackground(paused bool) {
 func currentOffsetToSecond() uint64 {
 	datasyncTickerMutex.RLock()
 	defer datasyncTickerMutex.RUnlock()
-	return uint64(time.Second / DatasyncTicker)
+	return uint64(math.Ceil(float64(time.Second) / float64(DatasyncTicker)))
 }
 
 type NodeTransport struct {

@@ -2089,18 +2089,24 @@ func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*gen
 // AppStateChange handles app state changes (background/foreground).
 // state values: see https://facebook.github.io/react-native/docs/appstate.html
 func (b *StatusBackend) AppStateChange(state AppState) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if !state.IsValid() {
 		b.logger.Warn("invalid app state, not reporting app state change", zap.Any("state", state))
 		return
 	}
 
-	b.appState = state
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
+	b.appState = state
 	if b.statusNode == nil {
 		b.logger.Warn("statusNode nil, applying app state change without running node")
+	}
+
+	if state == AppStateForeground && b.lifecycleState == AppLifecycleRunning {
+		return
+	}
+	if state != AppStateForeground && b.lifecycleState == AppLifecyclePausedBackground {
+		return
 	}
 
 	if state == AppStateForeground {
