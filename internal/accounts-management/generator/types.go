@@ -80,9 +80,11 @@ func (a *Account) ToAccountInfo() AccountInfo {
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
 	return AccountInfo{
+		AccountPublicInfo: AccountPublicInfo{
+			PublicKey: publicKeyHex,
+			Address:   addressHex,
+		},
 		PrivateKey: privateKeyHex,
-		PublicKey:  publicKeyHex,
-		Address:    addressHex,
 	}
 }
 
@@ -122,19 +124,39 @@ func (a *Account) ValidateExtendedKey() error {
 	return nil
 }
 
-type AccountInfo struct {
-	PrivateKey string `json:"privateKey"`
-	PublicKey  string `json:"publicKey"`
-	Address    string `json:"address"`
+type AccountPublicInfo struct {
+	PublicKey string `json:"publicKey"`
+	Address   string `json:"address"`
 }
 
-func (a AccountInfo) MarshalJSON() ([]byte, error) {
-	type Alias AccountInfo
-	ext, err := common.ExtendStructWithPubKeyData(a.PublicKey, Alias(a))
+func (p AccountPublicInfo) MarshalJSON() ([]byte, error) {
+	type Alias AccountPublicInfo
+	ext, err := common.ExtendStructWithPubKeyData(p.PublicKey, Alias(p))
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(ext)
+}
+
+type AccountInfo struct {
+	AccountPublicInfo
+	PrivateKey string `json:"privateKey"`
+}
+
+func (a AccountInfo) MarshalJSON() ([]byte, error) {
+	pubJSON, err := a.AccountPublicInfo.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	type priv struct {
+		PrivateKey string `json:"privateKey"`
+	}
+	privJSON, err := json.Marshal(priv{PrivateKey: a.PrivateKey})
+	if err != nil {
+		return nil, err
+	}
+	privJSON[0] = ','
+	return append(pubJSON[:len(pubJSON)-1], privJSON...), nil
 }
 
 type IdentifiedAccountInfo struct {
