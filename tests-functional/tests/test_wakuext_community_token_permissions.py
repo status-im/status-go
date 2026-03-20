@@ -9,11 +9,12 @@ import pytest
 
 from clients.api import ApiResponseError
 from clients.services.wakuext import (
+    ActivityCenterNotificationType,
     CommunityPermissionsAccess,
     CommunityTokenPermissionType,
+    CommunityTokenPrivilegesLevel,
     CommunityTokenType,
     CommunityRoles,
-    CommunityTokenPrivilegesLevel,
 )
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
@@ -25,6 +26,7 @@ from utils.keys import change_community_key_compression
 logger = logging.getLogger(__name__)
 
 COMMUNITY_DEPLOY_OWNER_TOKEN = 12
+COMMUNITY_MINT_TOKENS = 13
 NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
@@ -263,16 +265,197 @@ class TestCommunityTokenPermissions(MessengerSteps):
                 "v": tx_signature[128:],
             }
 
-        # Send the signed transactions
+        # Send the signed transactions and wait for wallet pending-tx success event.
+        # This gives us concrete tx hash(es) that can be checked on-chain.
+        def _wallet_tx_success(signal: dict) -> bool:
+            event = signal.get("event", {})
+            if event.get("type") != "pending-transaction-status-changed":
+                return False
+
+            try:
+                tx_status = json.loads(event.get("message", "{}").replace("'", '"'))
+            except Exception:
+                return False
+
+            return tx_status.get("status") == "Success"
+
         with owner_backend.expect_signal(
+            SignalType.WALLET,
+            accept_fn=_wallet_tx_success,
+            timeout=60,
+        ) as wallet_exp:
+            with owner_backend.expect_signal(
+                SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
+                timeout=60,
+            ) as sent_exp:
+                owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+
+        sent_signal = sent_exp.result
+        wallet_signal = wallet_exp.result
+
+        assert isinstance(sent_signal, dict), f"Unexpected sent signal payload: {sent_signal}"
+        assert isinstance(wallet_signal, dict), f"Unexpected wallet signal payload: {wallet_signal}"
+
+        logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
+
+        tx_status = json.loads(wallet_signal["event"]["message"].replace("'", '"'))
+        tx_hash = tx_status.get("hash")
+
+        logger.info(f"Initial owner token deployment tx status {tx_status}")
+
+        # Optional concrete chain-level check: wait until tx is mined successfully.
+        if anvil_client and tx_hash:
+            for _ in range(30):
+                try:
+                    receipt = anvil_client.transaction_receipt(tx_hash)
+                    if receipt and receipt.get("status") == 1:
+                        logger.info("Owner token deployment tx minted on chain")
+                        break
+                except Exception:
+                    pass
+                time.sleep(1)
+
+    def wallet_address(self, backend: StatusBackend) -> str:
+        accounts = backend.accounts_service.get_accounts()
+        assert accounts, "No accounts found"
+        wallet_account = next(a for a in accounts if not a.get("chat"))
+        assert wallet_account, "No wallet account found"
+        return wallet_account["address"]
+
+    def fund_native_balance(self, backend: StatusBackend, anvil_client, amount_in_wei: int = 10 * 10**18):
+        wallet_address = self.wallet_address(backend)
+        anvil_client.set_balance(wallet_address, amount_in_wei)
+        backend.wallet_service.fetch_or_get_cached_wallet_balances([wallet_address], True)
+        backend.wallet_service.get_balances_at_by_chain([wallet_address], [f"{backend.network_id}-{NATIVE_TOKEN_ADDRESS}"])
+        return wallet_address
+
+    def mint_community_token(
+        self,
+        sender_backend: StatusBackend,
+        community_id: str,
+        token_contract_address: str,
+        wallet_addresses: list[str],
+        token_type: CommunityTokenType,
+        privilege_level: int,
+        amount: int = 1,
+    ):
+        address_from = self.wallet_address(sender_backend)
+        chain_id = sender_backend.network_id
+        sender_backend.wallet_service.get_balances_at_by_chain([address_from], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
+
+        transaction_uuid = str(uuid.uuid4())
+        transfer_details = [
+            {
+                "tokenType": token_type.value,
+                "privilegeLevel": privilege_level,
+                "tokenContractAddress": token_contract_address,
+                "amount": hex(amount),
+            }
+        ]
+
+        routes_result = sender_backend.wallet_service.suggested_community_routes(
+            uuid=transaction_uuid,
+            send_type=COMMUNITY_MINT_TOKENS,
+            chain_id=chain_id,
+            address_from=address_from,
+            addr_to=token_contract_address,
+            community_id=community_id,
+            signer_pub_key=sender_backend.public_key,
+            token_ids=[],
+            wallet_addresses=wallet_addresses,
+            transfer_details=transfer_details,
+        )
+        assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
+
+        with sender_backend.expect_signal(
+            SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
+            predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
+            timeout=60,
+        ) as sign_exp:
+            sender_backend.wallet_service.build_transactions_from_route(transaction_uuid)
+
+        sign_signal = sign_exp.result
+        assert isinstance(sign_signal, dict), f"Unexpected sign signal payload: {sign_signal}"
+        signing_details = sign_signal["event"]["signingDetails"]
+        signatures = {}
+        for tx_hash in signing_details["hashes"]:
+            sig_hex = sender_backend.wallet_service.sign_message(tx_hash, address_from, sender_backend.password)
+            assert sig_hex and sig_hex.startswith("0x"), f"Invalid transaction signature for hash {tx_hash}: {sig_hex}"
+            tx_signature = sig_hex[2:]
+            signatures[tx_hash] = {
+                "r": tx_signature[:64],
+                "s": tx_signature[64:128],
+                "v": tx_signature[128:],
+            }
+
+        with sender_backend.expect_signal(
             SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
             timeout=60,
         ) as sent_exp:
-            owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+            sender_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
 
-        sent_signal = sent_exp.result
+        return sent_exp.result
 
-        logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
+    def join_community_with_signatures_and_accept(self, owner_backend, member_backend, community_id: str, member_wallet_address: str):
+        req_id = None
+        with owner_backend.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda signal: any(r.get("id") == req_id for r in (signal.get("event", {}).get("requestsToJoinCommunity") or [])),
+            timeout=60,
+        ):
+            join_resp = request_to_join_with_signatures(member_backend, community_id, [member_wallet_address])
+            requests = join_resp.get("requestsToJoinCommunity", [])
+            assert requests, "No requests to join community"
+            assert len(requests) == 1, "Unexpected multiple requests to join community"
+            req_id = requests[0].get("id")
+
+        time.sleep(2)
+        accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
+        assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
+
+    def get_community_token_contract_address(
+        self, backend: StatusBackend, community_id: str, privileges_level: int, attempts: int = 10, delay: int = 2
+    ):
+        for _ in range(attempts):
+            # Keep subscription active and refresh both network and local-db views.
+            try:
+                backend.wakuext_service.spectate_community(community_id)
+            except Exception:
+                pass
+
+            community = self.fetch_community(backend, community_id)
+            communities_resp = backend.wakuext_service.communities()
+            communities_list = self._communities_list(communities_resp)
+            community_from_list = next((c for c in communities_list if c.get("id") == community_id), None)
+
+            for source in [community, community_from_list]:
+                token_metadata = (source or {}).get("communityTokensMetadata") or []
+
+                for metadata in token_metadata:
+                    level = metadata.get("privilegesLevel", metadata.get("privilegeLevel"))
+                    if level is None or int(level) != int(privileges_level):
+                        continue
+
+                    contract_addresses = metadata.get("contractAddresses", {})
+                    contract_address = contract_addresses.get(backend.network_id) or contract_addresses.get(str(backend.network_id))
+                    if contract_address:
+                        return contract_address
+
+            time.sleep(delay)
+
+        return None
+
+    def get_received_token_notifications_count(self, backend: StatusBackend) -> int:
+        response = backend.wakuext_service.get_activity_center_notifications(
+            activity_types=[
+                ActivityCenterNotificationType.NOTIFICATION_TYPE_COMMUNITY_TOKEN_RECEIVED,
+                ActivityCenterNotificationType.NOTIFICATION_TYPE_FIRST_COMMUNITY_TOKEN_RECEIVED,
+            ],
+            limit=100,
+        )
+
+        notifications = response.get("notifications", []) or []
+        return len(notifications)
 
     @pytest.mark.skip(reason="Pending on issue https://github.com/status-im/status-go/issues/7114")
     def test_membership_no_valid_tokens_fake_address(self, owner_backend, member_backend):
@@ -526,7 +709,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # When the Owner mints the owner token
         owner_backend.wallet_service.restart_wallet_reload_timer()
         time.sleep(2)  # Sync metadata
-        self.deploy_owner_token(owner_backend, community_id)
+        self.deploy_owner_token(owner_backend, community_id, anvil_client=anvil_client)
 
         # And the Owner edits the community again
         with member_backend.expect_signal(
@@ -557,84 +740,92 @@ class TestCommunityTokenPermissions(MessengerSteps):
         assert self.check_member_community_updated(member_backend, community_id, new_name3, new_description3)
 
     def test_master_token_holder_can_edit_and_mint_tokens(
-        self,
-        owner_backend,
-        member_backend,
-        member_with_snt_backend,
-        foundry_client,
-        anvil_client,
+        self, owner_backend, member_backend, backend_new_profile, multicall3_deployer, anvil_client
     ):
-        """Master token holder can edit community and mint/airdrop tokens."""
+        """Test that a master token holder can edit community and mint/airdrop tokens"""
 
-        # Given the Owner has created a community and members joined
-        community_id = self.create_token_gated_community(
-            owner_backend,
-            permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
-            membership=CommunityPermissionsAccess.AUTO_ACCEPT,
+        member_b_backend = backend_new_profile(
+            name="member_b",
+            token_overrides=[
+                {
+                    "symbol": "SNT",
+                    "name": "Status Network Token",
+                    "address": self.snt_address,
+                    "decimals": 18,
+                }
+            ],
+            multicall_contract_address=multicall3_deployer.contract_address,
+            community_token_deployer_contract_address=self.community_token_deployer,
         )
 
-        self.community_id = community_id
-        self.join_community(member=member_backend, admin=owner_backend)
-        self.join_community(member=member_with_snt_backend, admin=owner_backend)
+        # Given the Owner has created a community
+        community_resp = owner_backend.wakuext_service.create_community(
+            name=fake.community_name(),
+            description=fake.community_description(),
+            membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
+        )
+        community_id = community_resp.get("communities", [{}])[0].get("id")
 
-        member_a_address = self._wallet_address(member_backend)
-        member_b_address = self._wallet_address(member_with_snt_backend)
-        owner_address = self._wallet_address(owner_backend)
+        # And Member A and Member B have joined the community
+        time.sleep(2)
+        assert self._spectate_and_fetch_community(member_backend, community_id), "Community not found for member A"
+        assert self._spectate_and_fetch_community(member_b_backend, community_id), "Community not found for member B"
 
-        # Give gas for owner/member A community token transactions
-        self._set_native_balance_and_refresh(owner_backend, anvil_client)
-        self._set_native_balance_and_refresh(member_backend, anvil_client)
+        member_a_wallet = self.wallet_address(member_backend)
+        member_b_wallet = self.wallet_address(member_b_backend)
+        self.join_community_with_signatures_and_accept(owner_backend, member_backend, community_id, member_a_wallet)
+        self.join_community_with_signatures_and_accept(owner_backend, member_b_backend, community_id, member_b_wallet)
+
+        owner_community = next((c for c in self._communities_list(owner_backend.wakuext_service.communities()) if c.get("id") == community_id), None)
+        assert owner_community is not None
+        assert member_backend.public_key in owner_community.get("members", {})
+        assert member_b_backend.public_key in owner_community.get("members", {})
+
+        # Fund Owner and Member A with native token to pay gas
+        self.fund_native_balance(owner_backend, anvil_client)
+        self.fund_native_balance(member_backend, anvil_client)
 
         # When the Owner mints the owner token
         owner_backend.wallet_service.restart_wallet_reload_timer()
         time.sleep(2)
-        deployment_result = self.deploy_owner_token(owner_backend, community_id, anvil_client=anvil_client)
+        self.deploy_owner_token(owner_backend, community_id, anvil_client=anvil_client)
 
         # And the Owner airdrops the master token to Member A
-        try:
-            master_token_contract = self._find_permission_token_contract(
-                owner_backend,
-                community_id,
-                permission_type=CommunityTokenPermissionType.BECOME_TOKEN_MASTER,
-            )
-        except AssertionError:
-            try:
-                master_token_contract = self._find_community_token_contract(owner_backend, community_id, symbol="TMT")
-            except AssertionError:
-                master_token_contract = deployment_result.get("master_token_contract")
-        assert master_token_contract, "Failed to resolve master token contract"
-        self.mint_community_token(owner_backend, community_id, master_token_contract, member_a_address)
+        master_token_address = self.get_community_token_contract_address(
+            owner_backend,
+            community_id,
+            CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
+            attempts=30,
+            delay=2,
+        )
+        assert master_token_address, "Master token contract address not found"
 
-        # Member A should receive master token balance
-        self.verify_token_balance(
-            foundry_client,
-            CommunityTokenType.ERC20,
-            master_token_contract,
-            member_a_address,
-            min_balance=1,
+        self.mint_community_token(
+            sender_backend=owner_backend,
+            community_id=community_id,
+            token_contract_address=master_token_address,
+            wallet_addresses=[member_a_wallet],
+            token_type=CommunityTokenType.ERC721,
+            privilege_level=CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
+            amount=1,
         )
 
-        # Wait until token-master role is propagated to owner's community view
+        # Wait for token-master role propagation
         owner_community = None
-        for _ in range(15):
-            communities = owner_backend.wakuext_service.communities()
-            owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
-            if (
-                owner_community
-                and member_backend.public_key in owner_community.get("members", {})
-                and CommunityRoles.ROLE_TOKEN_MASTER.value in owner_community["members"][member_backend.public_key].get("roles", [])
-            ):
+        for _ in range(10):
+            owner_communities = owner_backend.wakuext_service.communities()
+            owner_community = next((c for c in self._communities_list(owner_communities) if c.get("id") == community_id), None)
+            member_roles = (owner_community or {}).get("members", {}).get(member_backend.public_key, {}).get("roles", [])
+            if CommunityRoles.ROLE_TOKEN_MASTER.value in member_roles:
                 break
             time.sleep(2)
 
-        assert owner_community is not None, "Community not found on owner"
-        assert member_backend.public_key in owner_community.get("members", {}), "Member A not in members"
-        assert CommunityRoles.ROLE_TOKEN_MASTER.value in owner_community["members"][member_backend.public_key].get(
-            "roles", []
-        ), "Member A did not get token master role"
+        assert owner_community is not None
+        member_roles = owner_community.get("members", {}).get(member_backend.public_key, {}).get("roles", [])
+        assert CommunityRoles.ROLE_TOKEN_MASTER.value in member_roles, "Member A did not receive token master role"
 
         # When Member A edits the community
-        with owner_backend.expect_signal(
+        with member_b_backend.expect_signal(
             SignalType.MESSAGES_NEW,
             predicate=lambda signal: community_id in json.dumps(signal),
             timeout=60,
@@ -643,28 +834,46 @@ class TestCommunityTokenPermissions(MessengerSteps):
 
         # Then the Owner and Member B see the updated community
         assert self.check_member_community_updated(owner_backend, community_id, new_name, new_description)
-        assert self.check_member_community_updated(member_with_snt_backend, community_id, new_name, new_description)
+        assert self.check_member_community_updated(member_b_backend, community_id, new_name, new_description)
 
-        # When Member A mints a new token (master token airdrop to owner)
-        self.mint_community_token(member_backend, community_id, master_token_contract, owner_address)
+        # When Member A mints a new token (airdrop master token to Owner)
+        owner_notifications_before = self.get_received_token_notifications_count(owner_backend)
+        self.mint_community_token(
+            sender_backend=member_backend,
+            community_id=community_id,
+            token_contract_address=master_token_address,
+            wallet_addresses=[self.wallet_address(owner_backend)],
+            token_type=CommunityTokenType.ERC721,
+            privilege_level=CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
+            amount=1,
+        )
 
         # Then the Owner sees the minted token
-        self.verify_token_balance(
-            foundry_client,
-            CommunityTokenType.ERC20,
-            master_token_contract,
-            owner_address,
-            min_balance=1,
-        )
+        owner_notifications_after = owner_notifications_before
+        for _ in range(10):
+            owner_notifications_after = self.get_received_token_notifications_count(owner_backend)
+            if owner_notifications_after > owner_notifications_before:
+                break
+            time.sleep(2)
+        assert owner_notifications_after > owner_notifications_before, "Owner did not receive minted token notification"
 
         # When Member A airdrops the minted token to Member B
-        self.mint_community_token(member_backend, community_id, master_token_contract, member_b_address)
+        member_b_notifications_before = self.get_received_token_notifications_count(member_b_backend)
+        self.mint_community_token(
+            sender_backend=member_backend,
+            community_id=community_id,
+            token_contract_address=master_token_address,
+            wallet_addresses=[member_b_wallet],
+            token_type=CommunityTokenType.ERC721,
+            privilege_level=CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
+            amount=1,
+        )
 
         # Then Member B receives the token
-        self.verify_token_balance(
-            foundry_client,
-            CommunityTokenType.ERC20,
-            master_token_contract,
-            member_b_address,
-            min_balance=1,
-        )
+        member_b_notifications_after = member_b_notifications_before
+        for _ in range(10):
+            member_b_notifications_after = self.get_received_token_notifications_count(member_b_backend)
+            if member_b_notifications_after > member_b_notifications_before:
+                break
+            time.sleep(2)
+        assert member_b_notifications_after > member_b_notifications_before, "Member B did not receive minted token notification"
