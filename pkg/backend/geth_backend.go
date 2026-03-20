@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/afex/hystrix-go/hystrix"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -29,6 +30,7 @@ import (
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
@@ -91,6 +93,7 @@ type StatusBackend struct {
 	multiaccountsDB          *multiaccounts.Database
 	account                  *multiaccounts.Account
 	accountsManager          *accsmanagement.AccountsManager
+	connectionState          connection.State
 	transactor               *transactions.Transactor
 	appState                 AppState
 	LocalPairingStateManager *statecontrol.ProcessStateManager
@@ -188,7 +191,35 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 		return err
 	}
 
+	// Set initial connection state
+	b.statusNode.ConnectionChanged(b.connectionState)
+
 	return nil
+}
+
+// ConnectionChange handles network state changes logic.
+func (b *StatusBackend) ConnectionChange(typ string, expensive bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	state := connection.State{
+		Type:      connection.NewType(typ),
+		Expensive: expensive,
+	}
+	if typ == connection.None {
+		state.Offline = true
+	}
+
+	b.logger.Info("Network state change", zap.Stringer("old", b.connectionState), zap.Stringer("new", state))
+
+	if b.connectionState.Offline && !state.Offline {
+		//  flush hystrix if we are going again online, since it doesn't behave
+		// well when offline
+		hystrix.Flush()
+	}
+
+	b.connectionState = state
+	b.statusNode.ConnectionChanged(state)
 }
 
 func (b *StatusBackend) UpdateRootDataDir(datadir string) {

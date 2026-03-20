@@ -5,6 +5,7 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/internal/connection"
 	adapters2 "github.com/status-im/status-go/pkg/messaging/adapters"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 )
@@ -51,4 +52,8 @@ func (a *API) ReportUserOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
 
 func (a *API) EncryptionSubscriptions() *types2.EncryptionSubscriptions {
 	return adapters2.FromEncryptionSubscriptions(a.core.stack.Encryption.Subscriptions())
+}
+
+func (a *API) ConnectionChanged(state connection.State) {
+	a.core.connectionChanged(state)
 }
