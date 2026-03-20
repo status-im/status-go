@@ -386,9 +386,9 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.Communities()[0].Categories(), 1)
 	s.Require().Len(response.notifications, 1)
 	for _, notification := range response.notifications {
-		s.Require().Equal(notification.Title, community.Name())
-		s.Require().EqualValues(notification.BodyType, localnotifications.CategoryCommunityJoined)
-		s.Require().EqualValues(notification.Category, localnotifications.CategoryCommunityJoined)
+		s.Require().Equal(community.Name(), notification.Title)
+		s.Require().EqualValues(localnotifications.TypeMessage, notification.BodyType)
+		s.Require().EqualValues(localnotifications.CategoryCommunityJoined, notification.Category)
 	}
 
 	var categoryID string
