@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 import json
+import re
 from typing import Optional, List
 
 
@@ -198,21 +199,32 @@ class TestCommunityTokenPermissions(MessengerSteps):
             "name": "TestOwnerToken",
             "symbol": "TOT",
             "tokenUri": token_uri,
-            "supply": 1,
+            "ownerTokenAddress": NATIVE_TOKEN_ADDRESS,
+            "masterTokenAddress": NATIVE_TOKEN_ADDRESS,
+            "description": "",
+            "communityId": community_id,
+            "supply": "1",
             "infiniteSupply": False,
             "decimals": 0,
             "transferable": True,
             "remoteSelfDestruct": False,
+            "tokenType": CommunityTokenType.ERC721.value,
             "base64image": "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=",
         }
         master_token_parameters = {
             "name": "TestMasterToken",
             "symbol": "TMT",
             "tokenUri": token_uri,
+            "ownerTokenAddress": NATIVE_TOKEN_ADDRESS,
+            "masterTokenAddress": NATIVE_TOKEN_ADDRESS,
+            "description": "",
+            "communityId": community_id,
+            "supply": "0",
             "infiniteSupply": True,
             "decimals": 0,
             "transferable": True,
             "remoteSelfDestruct": True,
+            "tokenType": CommunityTokenType.ERC721.value,
             "base64image": "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=",
         }
 
@@ -299,9 +311,64 @@ class TestCommunityTokenPermissions(MessengerSteps):
         logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
 
         tx_status = json.loads(wallet_signal["event"]["message"].replace("'", '"'))
-        tx_hash = tx_status.get("hash")
+
+        tx_hash = tx_status.get("hash") or tx_status.get("Hash") or tx_status.get("txHash") or tx_status.get("TxHash")
+
+        if not tx_hash:
+            for sent_tx in tx_status.get("sentTransactions", []) or []:
+                tx_hash = sent_tx.get("hash") or sent_tx.get("Hash")
+                if tx_hash:
+                    break
+
+        if not tx_hash and isinstance(sent_signal, dict):
+            sent_event = sent_signal.get("event", {})
+            tx_hash = sent_event.get("hash") or sent_event.get("Hash") or sent_event.get("txHash") or sent_event.get("TxHash")
+            if not tx_hash:
+                for sent_tx in sent_event.get("sentTransactions", []) or []:
+                    tx_hash = sent_tx.get("hash") or sent_tx.get("Hash")
+                    if tx_hash:
+                        break
+
+        if isinstance(tx_hash, str) and tx_hash and not tx_hash.startswith("0x"):
+            tx_hash = f"0x{tx_hash}"
+
+        is_valid_tx_hash = isinstance(tx_hash, str) and re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash) is not None
 
         logger.info(f"Initial owner token deployment tx status {tx_status}")
+        logger.info(f"Resolved owner token deployment tx hash {tx_hash}")
+
+        # Mirror desktop flow: explicitly register owner/master deployment intent in backend
+        # using tx hash + deployment params, then wait for backend deploy-status signal.
+        if is_valid_tx_hash:
+            try:
+                owner_backend.rpc_valid_request(
+                    "communitytokens_storeDeployedOwnerToken",
+                    [
+                        address_from,
+                        chain_id,
+                        tx_hash,
+                        owner_token_parameters,
+                        master_token_parameters,
+                    ],
+                )
+            except Exception as exc:
+                logger.warning(f"communitytokens_storeDeployedOwnerToken failed for tx {tx_hash}: {exc}")
+            else:
+                with owner_backend.expect_signal(
+                    SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
+                    predicate=lambda s: s.get("event", {}).get("sendType") == COMMUNITY_DEPLOY_OWNER_TOKEN
+                    and s.get("event", {}).get("success") is True
+                    and str(s.get("event", {}).get("hash", "")).lower() == str(tx_hash).lower(),
+                    timeout=60,
+                    start="beginning",
+                ) as community_token_exp:
+                    pass
+
+                community_token_signal = community_token_exp.result
+                assert isinstance(community_token_signal, dict), f"Unexpected community token signal payload: {community_token_signal}"
+                logger.debug(f"Community token transaction status signal: {community_token_signal}")
+        else:
+            logger.warning(f"Skipping communitytokens_storeDeployedOwnerToken due to invalid tx hash: {tx_hash}")
 
         # Optional concrete chain-level check: wait until tx is mined successfully.
         if anvil_client and tx_hash:
@@ -790,6 +857,18 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
         self.deploy_owner_token(owner_backend, community_id, anvil_client=anvil_client)
 
+        # Capture deploy-status signal (if present) as fallback source for master token address.
+        deployment_signals = owner_backend.received_signals.get(SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED, []) or []
+        latest_owner_deploy_signal = next(
+            (
+                s
+                for s in reversed(deployment_signals)
+                if s.get("event", {}).get("sendType") == COMMUNITY_DEPLOY_OWNER_TOKEN and s.get("event", {}).get("success") is True
+            ),
+            None,
+        )
+        master_token_address_from_signal = ((latest_owner_deploy_signal or {}).get("event", {}).get("masterToken") or {}).get("address")
+
         # And the Owner airdrops the master token to Member A
         master_token_address = self.get_community_token_contract_address(
             owner_backend,
@@ -798,6 +877,8 @@ class TestCommunityTokenPermissions(MessengerSteps):
             attempts=30,
             delay=2,
         )
+        if not master_token_address:
+            master_token_address = master_token_address_from_signal
         assert master_token_address, "Master token contract address not found"
 
         self.mint_community_token(
