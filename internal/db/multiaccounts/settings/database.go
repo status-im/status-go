@@ -394,7 +394,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		custom_bootnodes, custom_bootnodes_enabled, dapps_address, display_name, bio, eip1581_address, fleet,
 		hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing,
 		last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level,
-		mnemonic, mnemonic_removed, name, networks, notifications_enabled,
+		mnemonic, mnemonic_removed, name, networks,
 		push_notifications_from_contacts_only, remote_push_notifications_enabled, messenger_notifications_enabled,
 		send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key,
 		remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers,
@@ -437,7 +437,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.MnemonicRemoved,
 		&s.Name,
 		&s.Networks,
-		&s.NotificationsEnabled,
 		&s.PushNotificationsFromContactsOnly,
 		&s.RemotePushNotificationsEnabled,
 		&s.MessengerNotificationsEnabled,
@@ -499,15 +498,6 @@ func (db *Database) GetSettings() (Settings, error) {
 	}
 
 	return s, err
-}
-
-// We should remove this and realated things once mobile team starts usign `settings_notifications` package
-func (db *Database) GetNotificationsEnabled() (result bool, err error) {
-	err = db.makeSelectRow(NotificationsEnabled).Scan(&result)
-	if err == sql.ErrNoRows {
-		return result, nil
-	}
-	return result, err
 }
 
 func (db *Database) GetProfilePicturesVisibility() (result int, err error) {

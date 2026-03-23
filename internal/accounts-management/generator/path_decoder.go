@@ -172,6 +172,12 @@ func (d *pathDecoder) saveSegment() error {
 func (d *pathDecoder) parseSeparator() error {
 	b, err := d.readByte()
 	if err != nil {
+		if err == io.EOF {
+			if saveErr := d.saveSegment(); saveErr != nil {
+				return saveErr
+			}
+			return io.EOF
+		}
 		return err
 	}
 

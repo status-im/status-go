@@ -18,7 +18,6 @@ type DatabaseSettingsManager interface {
 	GetNotifier() Notifier
 	GetSettingLastSynced(setting SettingField) (result uint64, err error)
 	GetSettings() (Settings, error)
-	GetNotificationsEnabled() (result bool, err error)
 	GetProfilePicturesVisibility() (result int, err error)
 	GetPublicKey() (string, error)
 	GetFleet() (string, error)
