@@ -104,7 +104,6 @@ require (
 	github.com/status-im/go-wallet-sdk v0.0.0-20260126140800-7bb3ccf032ab
 	github.com/waku-org/go-waku v0.10.1
 	github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904
-	github.com/waku-org/waku-go-bindings v0.0.0-20251202095947-63b01b7d0ca9
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.uber.org/atomic v1.11.0
 	go.uber.org/mock v0.6.0

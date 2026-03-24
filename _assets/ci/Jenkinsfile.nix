@@ -11,11 +11,6 @@ pipeline {
       description: 'Label for targetted CI slave host.',
       defaultValue: params.AGENT_LABEL ?: jenkins.getAgentLabelFromJob(),
     )
-    booleanParam(
-      name: 'USE_NWAKU',
-      description: 'Whether to build with nwaku or not',
-      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
-    )
   }
 
   options {
@@ -31,9 +26,8 @@ pipeline {
   }
 
   environment {
-    USE_NWAKU = "${params.USE_NWAKU}"
-    /* nwaku source directory */
-    NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
+    /* fixes nim cache collision */
+    XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
   }
 
   stages {
@@ -54,12 +48,3 @@ pipeline {
   }
 }
 
-/* We extract the name of the job from currentThread because
- * before an agent is picked env is not available. */
-def getJobPathTokens() {
-  return Thread.currentThread().getName().split('/')
-}
-
-def getNWakuMode() {
-  return getJobPathTokens().any { it.contains('nwaku') }
-}
