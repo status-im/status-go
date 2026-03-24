@@ -34,13 +34,15 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return err
 	}
 
-	isDupe, err := m.IsDisplayNameDupeOfCommunityMember(displayName)
-	if err != nil {
-		return err
-	}
+	if displayName != "" {
+		isDupe, err := m.IsDisplayNameDupeOfCommunityMember(displayName)
+		if err != nil {
+			return err
+		}
 
-	if isDupe {
-		return ErrDisplayNameDupeOfCommunityMember
+		if isDupe {
+			return ErrDisplayNameDupeOfCommunityMember
+		}
 	}
 
 	m.account.Name = displayName

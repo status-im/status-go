@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/status-im/status-go/internal/accounts-management/common"
 	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
 )
 
@@ -77,6 +78,46 @@ func CreateAccountFromMnemonicAndDeriveAccountsForPaths(paramsJSON string) strin
 	}
 
 	out, err := json.Marshal(generatedAndDerivedAccountsInfo)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(out)
+}
+
+// ConvertURCryptoHDKeyToXPub converts a UR:CRYPTO-HDKEY encoded string to a standard BIP32 xpub string.
+// The resulting xpub can be passed to DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths.
+func ConvertURCryptoHDKeyToXPub(ur string) string {
+	xpub, err := common.URCryptoHDKeyToXPub(ur)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	out, err := json.Marshal(xpub)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return string(out)
+}
+
+// DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths derives accounts public info from an extended public key (xpub)
+// for the given derivation paths.Paths are relative to the provided xpub.
+func DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(paramsJSON string) string {
+	type Params struct {
+		ExtendedPublicKey string   `json:"extendedPublicKey"`
+		Paths             []string `json:"paths"`
+	}
+
+	var p Params
+	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	result, err := generator2.DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(p.ExtendedPublicKey, p.Paths)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(result)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

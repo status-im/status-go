@@ -1774,7 +1774,7 @@ func (s *MessengerSuite) TestSendMessageMention() {
 	// Set display names for Bob and Alice
 	s.Require().NoError(bob.settings.SaveSettingField(settings.DisplayName, "bobby"))
 	s.Require().NoError(alice.settings.SaveSettingField(settings.DisplayName, "Alice"))
-	s.Require().NoError(alice.settings.SaveSettingField(settings.NotificationsEnabled, true))
+	s.Require().NoError(alice.settings.SetAllowNotifications(true))
 
 	// Create one-to-one chats
 	chat, chat2 := CreateOneToOneChat(crypto.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.getTimesource()),

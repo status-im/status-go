@@ -30,7 +30,7 @@ profile_data = {
     "currency": "usd",
     "networks/current-network": "",
     "dapps-address": "0xc43f4ab94ec965a3ee9815c5df07383057d261a8",
-    "eip1581-address": "0x803102f704324d4a4f2ddb1c47f6ab31339d0f70",
+    "eip1581-address": "0xc8bb785b71e826d6889e009a992f5ddb4a2d414e",
     "key-uid": "0x3231d92c94548d14f097173765a50bebe28fbad8f2267c9e08cc4433a6f219a4",
     "latest-derived-path": 0,
     "link-preview-request-enabled": True,

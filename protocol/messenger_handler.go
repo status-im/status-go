@@ -230,7 +230,10 @@ func (m *Messenger) HandleMembershipUpdate(ctx context.Context, messageState *Re
 	if showPushNotification {
 		// chat is highlighted for new group invites or group re-invites
 		chat.Highlight = true
-		messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility))
+		// Respect Contact Requests notification setting for local notification
+		if show, preview := m.contactRequestNotificationPreview(); show {
+			messageState.Response.AddNotification(NewPrivateGroupInviteNotification(chat.ID, chat, messageState.CurrentMessageState.Contact, profilePicturesVisibility, preview))
+		}
 	}
 
 	systemMessages := buildSystemMessages(message.Events, translations)
@@ -1456,7 +1459,11 @@ func (m *Messenger) HandleCommunityRequestToJoin(ctx context.Context, state *Rec
 
 		state.Response.AddRequestToJoinCommunity(requestToJoin)
 
-		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
+		// Respect Contact Requests notification setting for local notification
+		if show, preview := m.contactRequestNotificationPreview(); show {
+			profilePicturesVisibility, _ := m.settings.GetProfilePicturesVisibility()
+			state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact, profilePicturesVisibility, preview))
+		}
 
 		// Activity Center notification, new for pending state
 		notification := &ActivityCenterNotification{

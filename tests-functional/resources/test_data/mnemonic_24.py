@@ -28,7 +28,7 @@ accounts = [
 profile_data = {
     "address": "0xb47386b0074a9ddfd979540f134915d1df8dc3d0",
     "dapps-address": "0xf2d58ae5aa880f7c3f65d769296b1061c61e0955",
-    "eip1581-address": "0xf203f9c33afd10e2d3888289ad2cad81c4b017c4",
+    "eip1581-address": "0x0f25a48c91a45d9ead4e89ceee185cb52d451df2",
     "key-uid": "0xcf119f28496e4123dd6d5a4936c5f595ee1a873b11ead5f275098456eb8777c4",
     "name": "Selfassured Pesky Mayfly",
     "public-key": (
