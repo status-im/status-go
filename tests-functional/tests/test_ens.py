@@ -1,4 +1,6 @@
+import json
 import logging
+from contextlib import contextmanager
 import uuid
 
 import pytest
@@ -90,6 +92,18 @@ def sync_registry_to_well_known(foundry, registry_addr, username):
         raise RuntimeError(f"sync_registry failed: {result.output.decode().strip()}")
 
 
+@contextmanager
+def anvil_snapshot(foundry):
+    """Snapshot Anvil state and revert on exit. Use around evm_increaseTime
+    to prevent permanent timestamp drift from affecting other tests."""
+    raw = cast_rpc(foundry, "evm_snapshot")
+    snapshot_id = json.loads(raw)
+    try:
+        yield snapshot_id
+    finally:
+        cast_rpc(foundry, "evm_revert", [snapshot_id])
+
+
 def register_ens_name(foundry, ens_addresses, username, account_address, public_key):
     token = ens_addresses["token"]
     registrar = ens_addresses["registrar"]
@@ -119,6 +133,11 @@ def register_ens_name(foundry, ens_addresses, username, account_address, public_
         "approveAndCall(address,uint256,bytes)",
         [registrar, price, extra_data],
     )
+
+
+def register_and_sync_ens_name(foundry, ens_addresses, username, account_address, public_key):
+    register_ens_name(foundry, ens_addresses, username, account_address, public_key)
+    sync_registry_to_well_known(foundry, ens_addresses["registry"], username)
 
 
 @pytest.mark.rpc
@@ -152,7 +171,7 @@ class TestEnsRegistration:
             registrar_addr == self.ens_addresses["registrar"]
         ), f"Registrar mismatch: RPC={registrar_addr}, deployed={self.ens_addresses['registrar']}"
 
-        register_ens_name(
+        register_and_sync_ens_name(
             self.foundry,
             self.ens_addresses,
             username,
@@ -161,10 +180,22 @@ class TestEnsRegistration:
         )
         logger.info(f"Registered {full_name} on-chain")
 
-        sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
+        owner = backend.ens_service.owner_of(CHAIN_ID, full_name)
+        assert (
+            owner.lower() == constants.DEPLOYER_ACCOUNT.address.lower()
+        ), f"Owner mismatch: expected={constants.DEPLOYER_ACCOUNT.address}, got={owner}"
 
         resolved_pubkey = backend.ens_service.public_key_of(CHAIN_ID, full_name)
         assert resolved_pubkey, "ens_publicKeyOf returned empty"
+        assert resolved_pubkey.startswith("0x04"), f"Unexpected pubkey format: {resolved_pubkey}"
+
+        resolver_addr = backend.ens_service.resolver(CHAIN_ID, full_name)
+        assert (
+            resolver_addr.lower() == self.ens_addresses["resolver"].lower()
+        ), f"Resolver mismatch: expected={self.ens_addresses['resolver']}, got={resolver_addr}"
+
+        resolved_addr = backend.ens_service.address_of(CHAIN_ID, full_name)
+        assert resolved_addr, "ens_addressOf returned empty"
 
         backend.ens_service.add(CHAIN_ID, full_name)
 
@@ -173,13 +204,152 @@ class TestEnsRegistration:
         found = any(u.get("username") == full_name for u in usernames)
         assert found, f"{full_name} not found in {usernames}"
 
+    def test_ens_link_and_manage_names(self, backend):
+        public_key = backend.public_key
+        user1 = random_ens_username()
+        user1_full = f"{user1}.stateofus.eth"
+        user2 = random_ens_username()
+        user2_full = f"{user2}.stateofus.eth"
+
+        register_and_sync_ens_name(
+            self.foundry,
+            self.ens_addresses,
+            user1,
+            constants.DEPLOYER_ACCOUNT.address,
+            public_key,
+        )
+        backend.ens_service.add(CHAIN_ID, user1_full)
+        logger.info(f"Linked {user1_full}")
+
+        usernames = backend.ens_service.get_ens_usernames()
+        assert any(u.get("username") == user1_full for u in usernames), f"{user1_full} not found in {usernames}"
+
+        resolver_addr = backend.ens_service.resolver(CHAIN_ID, user1_full)
+        assert resolver_addr, "ens_resolver returned empty"
+        logger.info(f"Resolver for {user1_full}: {resolver_addr}")
+
+        register_and_sync_ens_name(
+            self.foundry,
+            self.ens_addresses,
+            user2,
+            constants.DEPLOYER_ACCOUNT.address,
+            public_key,
+        )
+        backend.ens_service.add(CHAIN_ID, user2_full)
+        logger.info(f"Linked {user2_full}")
+
+        usernames = backend.ens_service.get_ens_usernames()
+        names = [u.get("username") for u in usernames]
+        assert user1_full in names, f"{user1_full} not found in {names}"
+        assert user2_full in names, f"{user2_full} not found in {names}"
+
+        backend.ens_service.remove(CHAIN_ID, user1_full)
+        logger.info(f"Removed {user1_full}")
+
+        usernames = backend.ens_service.get_ens_usernames()
+        names = [u.get("username") for u in usernames if not u.get("removed")]
+        assert user1_full not in names, f"{user1_full} should have been removed"
+        assert user2_full in names, f"{user2_full} not found after removal of first"
+
+        with pytest.raises(ApiResponseError):
+            backend.ens_service.add(CHAIN_ID, "INVALID")
+
+        with pytest.raises(ApiResponseError):
+            backend.ens_service.add(CHAIN_ID, "test.stateofus.eth.stateofus.eth")
+
+    def test_ens_validity_time(self, backend):
+        public_key = backend.public_key
+        username = random_ens_username()
+        full_name = f"{username}.stateofus.eth"
+        one_year_seconds = 365 * 24 * 60 * 60
+
+        register_and_sync_ens_name(
+            self.foundry,
+            self.ens_addresses,
+            username,
+            constants.DEPLOYER_ACCOUNT.address,
+            public_key,
+        )
+        logger.info(f"Registered {full_name}")
+
+        # expire_at expects plain username, not full ENS name
+        expire_hex = backend.ens_service.expire_at(CHAIN_ID, username)
+        assert expire_hex, "ens_expireAt returned empty"
+        expire_time = int(expire_hex, 16)
+        logger.info(f"Expiration timestamp: {expire_time}")
+
+        current_time = get_block_timestamp(self.foundry)
+        expected_expire = current_time + one_year_seconds
+        delta = abs(expire_time - expected_expire)
+        assert delta < 60, f"Expiration {expire_time} too far from expected {expected_expire} (delta={delta}s)"
+
+        with anvil_snapshot(self.foundry):
+            half_year_seconds = 180 * 24 * 60 * 60
+            cast_rpc(self.foundry, "evm_increaseTime", [half_year_seconds])
+            cast_rpc(self.foundry, "evm_mine")
+            logger.info("Advanced time by 180 days")
+
+            expire_hex_after = backend.ens_service.expire_at(CHAIN_ID, username)
+            expire_time_after = int(expire_hex_after, 16)
+            assert expire_time_after == expire_time, f"Expiration changed after time advance: was {expire_time}, now {expire_time_after}"
+
+    def test_ens_release(self, backend):
+        public_key = backend.public_key
+        username = random_ens_username()
+        full_name = f"{username}.stateofus.eth"
+        registrar = self.ens_addresses["registrar"]
+        one_year_seconds = 365 * 24 * 60 * 60
+
+        register_and_sync_ens_name(
+            self.foundry,
+            self.ens_addresses,
+            username,
+            constants.DEPLOYER_ACCOUNT.address,
+            public_key,
+        )
+        logger.info(f"Registered {full_name}")
+
+        backend.ens_service.add(CHAIN_ID, full_name)
+        usernames = backend.ens_service.get_ens_usernames()
+        assert any(u.get("username") == full_name for u in usernames), f"{full_name} not found in {usernames}"
+
+        label = cast_keccak(self.foundry, username)
+        with pytest.raises(RuntimeError):
+            cast_send(self.foundry, registrar, "release(bytes32)", [label])
+        logger.info("Early release correctly reverted")
+
+        with anvil_snapshot(self.foundry):
+            cast_rpc(self.foundry, "evm_increaseTime", [one_year_seconds + 1])
+            cast_rpc(self.foundry, "evm_mine")
+            logger.info("Advanced time past 365 days")
+
+            cast_send(self.foundry, registrar, "release(bytes32)", [label])
+            logger.info(f"Released {full_name}")
+
+            sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
+
+            owner = backend.ens_service.owner_of(CHAIN_ID, full_name)
+            assert owner == "0x0000000000000000000000000000000000000000", f"Owner should be zero after release: {owner}"
+
+        backend.ens_service.remove(CHAIN_ID, full_name)
+
+        usernames = backend.ens_service.get_ens_usernames() or []
+        active = [u.get("username") for u in usernames if not u.get("removed")]
+        assert full_name not in active, f"{full_name} should have been removed"
+
 
 @pytest.mark.rpc
 @pytest.mark.ens
 class TestEnsRouterRegistration:
 
     @pytest.fixture()
-    def backend(self, backend_recovered_profile, foundry_client, ens_addresses, multicall3_deployer):
+    def backend(
+        self,
+        backend_recovered_profile,
+        foundry_client,
+        ens_addresses,
+        multicall3_deployer,
+    ):
         self.foundry = foundry_client
         self.ens_addresses = ens_addresses
         token_overrides = [
@@ -211,7 +381,12 @@ class TestEnsRouterRegistration:
         logger.info(f"ENS registration price: {amount_in}")
 
         token_address = self.ens_addresses["token"]
-        cast_send(self.foundry, token_address, "generateTokens(address,uint256)", [constants.user_1.address, int(price_hex, 16)])
+        cast_send(
+            self.foundry,
+            token_address,
+            "generateTokens(address,uint256)",
+            [constants.user_1.address, int(price_hex, 16)],
+        )
 
         token_key = wallet_utils.get_token_key(CHAIN_ID, token_address)
         tx_result = wallet_utils.send_router_transaction(
@@ -245,93 +420,74 @@ class TestEnsRouterRegistration:
         found = any(u.get("username") == full_name for u in usernames)
         assert found, f"{full_name} not found in {usernames}"
 
-    def test_ens_link_and_manage_names(self, backend):
-        public_key = backend.public_key
-        user1 = "linkuser1"
-        user1_full = f"{user1}.stateofus.eth"
-        user2 = "linkuser2"
-        user2_full = f"{user2}.stateofus.eth"
-
-        register_ens_name(
-            self.foundry,
-            self.ens_addresses,
-            user1,
-            constants.DEPLOYER_ACCOUNT.address,
-            public_key,
-        )
-        sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], user1)
-        backend.ens_service.add(CHAIN_ID, user1_full)
-        logger.info(f"Linked {user1_full}")
-
-        usernames = backend.ens_service.get_ens_usernames()
-        assert any(u.get("username") == user1_full for u in usernames), f"{user1_full} not found in {usernames}"
-
-        resolver_addr = backend.ens_service.resolver(CHAIN_ID, user1_full)
-        assert resolver_addr, "ens_resolver returned empty"
-        logger.info(f"Resolver for {user1_full}: {resolver_addr}")
-
-        register_ens_name(
-            self.foundry,
-            self.ens_addresses,
-            user2,
-            constants.DEPLOYER_ACCOUNT.address,
-            public_key,
-        )
-        sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], user2)
-        backend.ens_service.add(CHAIN_ID, user2_full)
-        logger.info(f"Linked {user2_full}")
-
-        usernames = backend.ens_service.get_ens_usernames()
-        names = [u.get("username") for u in usernames]
-        assert user1_full in names, f"{user1_full} not found in {names}"
-        assert user2_full in names, f"{user2_full} not found in {names}"
-
-        backend.ens_service.remove(CHAIN_ID, user1_full)
-        logger.info(f"Removed {user1_full}")
-
-        usernames = backend.ens_service.get_ens_usernames()
-        names = [u.get("username") for u in usernames if not u.get("removed")]
-        assert user1_full not in names, f"{user1_full} should have been removed"
-        assert user2_full in names, f"{user2_full} not found after removal of first"
-
-        with pytest.raises(ApiResponseError):
-            backend.ens_service.add(CHAIN_ID, "INVALID")
-
-        with pytest.raises(ApiResponseError):
-            backend.ens_service.add(CHAIN_ID, "test.stateofus.eth.stateofus.eth")
-
-    def test_ens_validity_time(self, backend):
-        public_key = backend.public_key
-        username = "timeuser"
+    def test_ens_release_after_router_registration(self, backend):
+        """Register ENS name via router, then release it on-chain after expiry."""
+        username = random_ens_username()
         full_name = f"{username}.stateofus.eth"
         one_year_seconds = 365 * 24 * 60 * 60
 
-        register_ens_name(
+        public_key = backend.public_key
+        assert public_key, "Backend public key not available"
+
+        price_hex = backend.ens_service.price(CHAIN_ID)
+        assert price_hex, "ens_price returned empty"
+        amount_in = f"0x{price_hex}"
+
+        token_address = self.ens_addresses["token"]
+        cast_send(
             self.foundry,
-            self.ens_addresses,
-            username,
-            constants.DEPLOYER_ACCOUNT.address,
-            public_key,
+            token_address,
+            "generateTokens(address,uint256)",
+            [constants.user_1.address, int(price_hex, 16)],
         )
+
+        token_key = wallet_utils.get_token_key(CHAIN_ID, token_address)
+        wallet_utils.send_router_transaction(
+            backend,
+            uuid=str(uuid.uuid4()),
+            sendType=1,  # ENSRegister
+            addrFrom=constants.user_1.address,
+            addrTo=constants.user_1.address,
+            amountIn=amount_in,
+            amountOut="0x0",
+            tokenKey=token_key,
+            tokenIDIsOwnerToken=False,
+            toTokenKey=token_key,
+            fromChainID=CHAIN_ID,
+            toChainID=CHAIN_ID,
+            gasFeeMode=1,
+            username=username,
+            publicKey=public_key,
+        )
+        logger.info(f"Registered {full_name} via router")
+
         sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
-        logger.info(f"Registered {full_name}")
 
-        # expire_at expects plain username, not full ENS name
-        expire_hex = backend.ens_service.expire_at(CHAIN_ID, username)
-        assert expire_hex, "ens_expireAt returned empty"
-        expire_time = int(expire_hex, 16)
-        logger.info(f"Expiration timestamp: {expire_time}")
+        backend.ens_service.add(CHAIN_ID, full_name)
 
-        current_time = get_block_timestamp(self.foundry)
-        expected_expire = current_time + one_year_seconds
-        delta = abs(expire_time - expected_expire)
-        assert delta < 60, f"Expiration {expire_time} too far from expected {expected_expire} (delta={delta}s)"
+        with anvil_snapshot(self.foundry):
+            cast_rpc(self.foundry, "evm_increaseTime", [one_year_seconds + 1])
+            cast_rpc(self.foundry, "evm_mine")
+            logger.info("Advanced time past 365 days")
 
-        half_year_seconds = 180 * 24 * 60 * 60
-        cast_rpc(self.foundry, "evm_increaseTime", [half_year_seconds])
-        cast_rpc(self.foundry, "evm_mine")
-        logger.info("Advanced time by 180 days")
+            label = cast_keccak(self.foundry, username)
+            registrar = self.ens_addresses["registrar"]
+            cast_send(
+                self.foundry,
+                registrar,
+                "release(bytes32)",
+                [label],
+                private_key=constants.user_1.private_key,
+            )
+            logger.info(f"Released {full_name}")
 
-        expire_hex_after = backend.ens_service.expire_at(CHAIN_ID, username)
-        expire_time_after = int(expire_hex_after, 16)
-        assert expire_time_after == expire_time, f"Expiration changed after time advance: was {expire_time}, now {expire_time_after}"
+            sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
+
+            owner = backend.ens_service.owner_of(CHAIN_ID, full_name)
+            assert owner == "0x0000000000000000000000000000000000000000", f"Owner should be zero after release: {owner}"
+
+        backend.ens_service.remove(CHAIN_ID, full_name)
+
+        usernames = backend.ens_service.get_ens_usernames() or []
+        active = [u.get("username") for u in usernames if not u.get("removed")]
+        assert full_name not in active, f"{full_name} should have been removed"

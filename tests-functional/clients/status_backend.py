@@ -364,6 +364,11 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             },
             "thirdpartyServicesEnabled": True,
         }
+
+        verify_ens = kwargs.get("verify_ens_contract_address")
+        if verify_ens is not None:
+            data["verifyENSContractAddress"] = verify_ens
+
         if not Config.disable_override_networks:
             self._set_networks(data, **kwargs)
 

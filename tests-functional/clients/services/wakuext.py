@@ -190,7 +190,14 @@ class WakuextService(Service):
         return response
 
     def add_contact(self, contact_id: str, displayName: str):
-        params = [{"id": contact_id, "nickname": "fake_nickname", "displayName": displayName, "ensName": ""}]
+        params = [
+            {
+                "id": contact_id,
+                "nickname": "fake_nickname",
+                "displayName": displayName,
+                "ensName": "",
+            }
+        ]
         response = self.rpc_request("addContact", params)
         return response
 
@@ -307,7 +314,13 @@ class WakuextService(Service):
         return response
 
     def fetch_community(self, community_key, wait_for_response: bool = True, try_database: bool = True, **kwargs):
-        params = [{"communityKey": community_key, "waitForResponse": wait_for_response, "tryDatabase": try_database}]
+        params = [
+            {
+                "communityKey": community_key,
+                "waitForResponse": wait_for_response,
+                "tryDatabase": try_database,
+            }
+        ]
         response = self.rpc_request("fetchCommunity", params, **kwargs)
         return response
 
@@ -410,7 +423,13 @@ class WakuextService(Service):
         response = self.rpc_request("generateEditCommunityRequestsForSigning", params)
         return response
 
-    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value, responseTo: str = ""):
+    def send_chat_message(
+        self,
+        chat_id,
+        message,
+        content_type=MessageContentType.TEXT_PLAIN.value,
+        responseTo: str = "",
+    ):
         params = [
             {
                 "chatId": chat_id,
@@ -423,7 +442,16 @@ class WakuextService(Service):
         return response
 
     def send_chat_messages(self, messages: list[SendChatMessagePayload]):
-        params = [[{"chatId": m["chat_id"], "text": m["text"], "contentType": m["content_type"]} for m in messages]]
+        params = [
+            [
+                {
+                    "chatId": m["chat_id"],
+                    "text": m["text"],
+                    "contentType": m["content_type"],
+                }
+                for m in messages
+            ]
+        ]
         response = self.rpc_request("sendChatMessages", params)
         return response
 
@@ -463,7 +491,11 @@ class WakuextService(Service):
         return response
 
     def all_messages_from_chats_and_communities_which_match_term(
-        self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
+        self,
+        community_ids: list[str],
+        chat_ids: list[str],
+        searchTerm: str,
+        caseSensitive: bool,
     ):
         params = [community_ids, chat_ids, searchTerm, caseSensitive]
         response = self.rpc_request("allMessagesFromChatsAndCommunitiesWhichMatchTerm", params)
@@ -599,7 +631,12 @@ class WakuextService(Service):
         response = self.rpc_request("createOneToOneChat", params)
         return response
 
-    def register_for_push_notifications(self, device_token: str, apnTopic: str, tokenType: PushNotificationRegistrationTokenType):
+    def register_for_push_notifications(
+        self,
+        device_token: str,
+        apnTopic: str,
+        tokenType: PushNotificationRegistrationTokenType,
+    ):
         params = [device_token, apnTopic, tokenType.value]
         response = self.rpc_request("registerForPushNotifications", params)
         return response
@@ -623,7 +660,9 @@ class WakuextService(Service):
         return response
 
     def activity_center_notifications_count(
-        self, activity_types: list = list(ActivityCenterNotificationType), read_type: Union[ActivityCenterQueryParamsRead, None] = None
+        self,
+        activity_types: list = list(ActivityCenterNotificationType),
+        read_type: Union[ActivityCenterQueryParamsRead, None] = None,
     ):
         params = [{"activityTypes": activity_types, "readType": read_type}]
         response = self.rpc_request("activityCenterNotificationsCount", params)
@@ -708,7 +747,15 @@ class WakuextService(Service):
         response = self.rpc_request("getSavedAddressesPerMode", params)
         return response
 
-    def upsert_saved_address(self, address: str, name: str, color_id: str = "", ens: str = "", chain_short_names: str = "", is_test: bool = False):
+    def upsert_saved_address(
+        self,
+        address: str,
+        name: str,
+        color_id: str = "",
+        ens: str = "",
+        chain_short_names: str = "",
+        is_test: bool = False,
+    ):
         params = [
             {
                 "address": address,
@@ -840,11 +887,19 @@ class WakuextService(Service):
         response = self.rpc_request("addCommunityToken", params)
         return response
 
-    def create_history_archive_torrent_from_db(self, community_id: str, topics: list, start_date, end_date, partition_duration, encrypted: bool):
+    def create_history_archive_torrent_from_db(
+        self,
+        community_id: str,
+        topics: list,
+        start_date,
+        end_date,
+        partition_duration,
+        encrypted: bool,
+    ):
         params = [
             community_id,
             topics,
-            start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),
+            (start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date)),
             end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),
             partition_duration,
             encrypted,
@@ -883,7 +938,11 @@ class WakuextService(Service):
         return response
 
     def create_community_token_permission(
-        self, community_id: str, permission_type: CommunityTokenPermissionType, token_criteria: list, chat_ids: Optional[list] = None
+        self,
+        community_id: str,
+        permission_type: CommunityTokenPermissionType,
+        token_criteria: list,
+        chat_ids: Optional[list] = None,
     ):
         params = [
             {
@@ -938,6 +997,11 @@ class WakuextService(Service):
     def send_contact_updates(self, ens_name: str, profile_image: str = "", customization_color: str = "blue"):
         params = [ens_name, profile_image, customization_color]
         response = self.rpc_request("sendContactUpdates", params)
+        return response
+
+    def ens_verified(self, public_key: str, ens_name: str):
+        params = [public_key, ens_name]
+        response = self.rpc_request("ensVerified", params)
         return response
 
     def create_community_token_deployment_signature(self, chain_id: int, address_from: str, community_id: str):
