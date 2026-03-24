@@ -3,15 +3,17 @@
 Welcome to `status-backend`. This is a tool for debugging and testing `status-go`.
 In contrast to existing `statusd`, the `status-backend` exposes full status-go API through HTTP.
 
-This allows to communicate with status-go through HTTP the same way as `status-desktop` and `status-mobile` do, including: 
+This allows to communicate with status-go through HTTP the same way as `status-desktop` and `status-mobile` do, including:
 - create account
 - restore account
 - login
 - logout
 - start messenger
-- start wallet 
+- start wallet
 - subscribe to status-go signals
 - etc.
+
+> **📚 Building a bot?** See [API_REFERENCE.md](./API_REFERENCE.md) for a practical API reference with request/response examples, community join sequences, error codes, and common gotchas.
 
 # 📍status-go API
 
