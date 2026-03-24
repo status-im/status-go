@@ -57,7 +57,7 @@ pipeline {
     )
     /* prevent sharing cache dir across different jobs */
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
-    /* fixes nim cache collision */
+    /* fixes nim cache collision*/
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
   }
 
