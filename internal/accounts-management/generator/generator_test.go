@@ -7,6 +7,7 @@ import (
 	"github.com/status-im/extkeys"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/accounts-management/types"
 )
@@ -156,4 +157,54 @@ func TestGenerator_DeriveChildrenFromAccount(t *testing.T) {
 	assert.Equal(t, testData.childAccount1.address, children[testData.childAccount1.path].ToIdentifiedAccountInfo().Address)
 	assert.Equal(t, testData.childAccount1.publicKey, children[testData.childAccount1.path].ToIdentifiedAccountInfo().PublicKey)
 	assert.Equal(t, testData.childAccount1.privateKey, children[testData.childAccount1.path].ToIdentifiedAccountInfo().PrivateKey)
+}
+
+func xpubAtPath(t *testing.T, mnemonic, passphrase, path string) string {
+	t.Helper()
+	acc, err := CreateAccountFromMnemonic(mnemonic, passphrase)
+	require.NoError(t, err)
+	derived, err := DeriveChildFromAccount(acc, path)
+	require.NoError(t, err)
+	xpub, err := derived.ExtendedKey().Neuter()
+	require.NoError(t, err)
+	return xpub.String()
+}
+
+func TestDerivePublicKeyInfoFromExtendedPublicKey(t *testing.T) {
+	const hardenedPath = "m/44'/60'/0'" // hardened derivation path for the wallet
+	xpub := xpubAtPath(t, testData.mnemonic, testData.bip39Passphrase, hardenedPath)
+
+	t.Run("derives correct public key and address for single path", func(t *testing.T) {
+		result, err := DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(xpub, []string{"0/0"})
+		assert.NoError(t, err)
+		assert.Equal(t, testData.childAccount0.publicKey, result["0/0"].PublicKey)
+		assert.Equal(t, testData.childAccount0.address, result["0/0"].Address)
+	})
+
+	t.Run("derives correct public key and address for multiple paths", func(t *testing.T) {
+		result, err := DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(xpub, []string{"0/0", "0/1"})
+		assert.NoError(t, err)
+		assert.Equal(t, testData.childAccount0.publicKey, result["0/0"].PublicKey)
+		assert.Equal(t, testData.childAccount0.address, result["0/0"].Address)
+		assert.Equal(t, testData.childAccount1.publicKey, result["0/1"].PublicKey)
+		assert.Equal(t, testData.childAccount1.address, result["0/1"].Address)
+	})
+
+	t.Run("rejects extended private key", func(t *testing.T) {
+		acc, err := CreateAccountFromMnemonic(testData.mnemonic, testData.bip39Passphrase)
+		require.NoError(t, err)
+		xprv := acc.ExtendedKey().String()
+		_, err = DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(xprv, []string{"0/0"})
+		assert.ErrorIs(t, err, ErrExtendedPrivateKeyNotAllowed)
+	})
+
+	t.Run("returns error for hardened child path", func(t *testing.T) {
+		_, err := DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(xpub, []string{"0'"})
+		assert.Error(t, err)
+	})
+
+	t.Run("returns error for invalid xpub string", func(t *testing.T) {
+		_, err := DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths("not-a-valid-xpub", []string{"0/0"})
+		assert.Error(t, err)
+	})
 }

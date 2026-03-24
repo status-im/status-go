@@ -53,6 +53,26 @@ func TestDecodePath(t *testing.T) {
 			expectedStartingPoint: startingPointMaster,
 		},
 		{
+			path:                  "m/44'/60'/0'/0/0",
+			expectedPath:          []uint32{2147483692, 2147483708, 2147483648, 0, 0},
+			expectedStartingPoint: startingPointMaster,
+		},
+		{
+			path:                  "m/43'/60'/1581'",
+			expectedPath:          []uint32{2147483691, 2147483708, 2147485229},
+			expectedStartingPoint: startingPointMaster,
+		},
+		{
+			path:                  "m/43'/60'/1581'/0'",
+			expectedPath:          []uint32{2147483691, 2147483708, 2147485229, 2147483648},
+			expectedStartingPoint: startingPointMaster,
+		},
+		{
+			path:                  "m/43'/60'/1581'/0'/0",
+			expectedPath:          []uint32{2147483691, 2147483708, 2147485229, 2147483648, 0},
+			expectedStartingPoint: startingPointMaster,
+		},
+		{
 			path: "m/",
 			err:  fmt.Errorf("error parsing derivation path m/; at position 2, expected number, got EOF"),
 		},

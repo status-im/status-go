@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
@@ -1523,4 +1525,37 @@ func TestDeleteMultiaccount(t *testing.T) {
 	files, err = os.ReadDir(rootDataDir)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(files))
+}
+
+func TestBackendConnectionChangesConcurrently(t *testing.T) {
+	connections := [...]string{connection.Wifi, connection.Cellular, connection.Unknown}
+	testContext := setupTestContext(t, testPassword, true, true, true)
+
+	count := 3
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			connIdx := rand.Intn(len(connections)) // nolint: gosec
+			testContext.backend.ConnectionChange(connections[connIdx], false)
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestBackendConnectionChangesToOffline(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, true)
+
+	testContext.backend.ConnectionChange(connection.None, false)
+	assert.True(t, testContext.backend.connectionState.Offline)
+
+	testContext.backend.ConnectionChange(connection.Wifi, false)
+	assert.False(t, testContext.backend.connectionState.Offline)
+
+	testContext.backend.ConnectionChange("unknown-state", false)
+	assert.False(t, testContext.backend.connectionState.Offline)
 }

@@ -28,7 +28,7 @@ accounts = [
 profile_data = {
     "address": "0x3644a8cc3860606fdee3b95c8825e17933a91647",
     "dapps-address": "0x685d7ec8e08769ca7020a6b65709887e38e68e6d",
-    "eip1581-address": "0xe98734898ff58ac33a1a9c28f732696ec3e6b580",
+    "eip1581-address": "0x8069b3f375504491addb13940b079611015b8e0c",
     "key-uid": "0x944c1ce03f83dd1750acee591745d6ef14da90723af86f97b2df7d7282e8dd97",
     "name": "Overcooked Lost Grayreefshark",
     "public-key": (

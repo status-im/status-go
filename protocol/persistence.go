@@ -720,6 +720,175 @@ func (db sqlitePersistence) Contacts() ([]*contacts.Contact, error) {
 	return response, nil
 }
 
+// ContactByID loads a single contact by ID from the database with full Images (including Payload).
+// Used when building notifications so the contact has image data for data URIs; the in-memory
+// contact may have had Payload cleared by updateContactImagesURL for memory efficiency.
+func (db sqlitePersistence) ContactByID(contactID string) (*contacts.Contact, error) {
+	rows, err := db.db.Query(`
+		SELECT
+			c.id,
+			c.address,
+			v.name,
+			v.verified,
+			c.alias,
+			c.display_name,
+			c.customization_color,
+			c.identicon,
+			c.last_updated,
+			c.last_updated_locally,
+			c.blocked,
+			c.removed,
+			c.bio,
+			c.local_nickname,
+			c.contact_request_state,
+			c.contact_request_local_clock,
+			c.contact_request_remote_state,
+			c.contact_request_remote_clock,
+			i.image_type,
+			i.payload,
+			i.clock_value,
+			COALESCE(c.verification_status, 0) as verification_status,
+			COALESCE(t.trust_status, 0) as trust_status
+		FROM contacts c
+		LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id
+		LEFT JOIN ens_verification_records v ON c.id = v.public_key
+		LEFT JOIN trusted_users t ON c.id = t.id
+		WHERE c.id = ?;
+	`, contactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result *contacts.Contact
+	for rows.Next() {
+		var (
+			contact                   contacts.Contact
+			nickname                  sql.NullString
+			contactRequestLocalState  sql.NullInt64
+			contactRequestLocalClock  sql.NullInt64
+			contactRequestRemoteState sql.NullInt64
+			contactRequestRemoteClock sql.NullInt64
+			displayName               sql.NullString
+			customizationColor        sql.NullString
+			imageType                 sql.NullString
+			ensName                   sql.NullString
+			ensVerified               sql.NullBool
+			blocked                   sql.NullBool
+			removed                   sql.NullBool
+			bio                       sql.NullString
+			lastUpdatedLocally        sql.NullInt64
+			identityImageClock        sql.NullInt64
+			imagePayload              []byte
+		)
+
+		contact.Images = make(map[string]images.IdentityImage)
+
+		err := rows.Scan(
+			&contact.ID,
+			&contact.Address,
+			&ensName,
+			&ensVerified,
+			&contact.Alias,
+			&displayName,
+			&customizationColor,
+			&contact.Identicon,
+			&contact.LastUpdated,
+			&lastUpdatedLocally,
+			&blocked,
+			&removed,
+			&bio,
+			&nickname,
+			&contactRequestLocalState,
+			&contactRequestLocalClock,
+			&contactRequestRemoteState,
+			&contactRequestRemoteClock,
+			&imageType,
+			&imagePayload,
+			&identityImageClock,
+			&contact.VerificationStatus,
+			&contact.TrustStatus,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if nickname.Valid {
+			contact.LocalNickname = nickname.String
+		}
+
+		if bio.Valid {
+			contact.Bio = bio.String
+		}
+
+		if contactRequestLocalState.Valid {
+			contact.ContactRequestLocalState = contacts.ContactRequestState(contactRequestLocalState.Int64)
+		}
+
+		if contactRequestLocalClock.Valid {
+			contact.ContactRequestLocalClock = uint64(contactRequestLocalClock.Int64)
+		}
+
+		if contactRequestRemoteState.Valid {
+			contact.ContactRequestRemoteState = contacts.ContactRequestState(contactRequestRemoteState.Int64)
+		}
+
+		if contactRequestRemoteClock.Valid {
+			contact.ContactRequestRemoteClock = uint64(contactRequestRemoteClock.Int64)
+		}
+
+		if displayName.Valid {
+			contact.DisplayName = displayName.String
+		}
+
+		if customizationColor.Valid {
+			contact.CustomizationColor = multiaccountscommon.CustomizationColor(customizationColor.String)
+		}
+
+		if ensName.Valid {
+			contact.EnsName = ensName.String
+		}
+
+		if ensVerified.Valid {
+			contact.ENSVerified = ensVerified.Bool
+		}
+
+		if blocked.Valid {
+			contact.Blocked = blocked.Bool
+		}
+
+		if removed.Valid {
+			contact.Removed = removed.Bool
+		}
+
+		if lastUpdatedLocally.Valid {
+			contact.LastUpdatedLocally = uint64(lastUpdatedLocally.Int64)
+		}
+
+		if result == nil {
+			c := contact
+			result = &c
+		}
+
+		if imageType.Valid && len(imagePayload) > 0 {
+			if result.Images == nil {
+				result.Images = make(map[string]images.IdentityImage)
+			}
+			result.Images[imageType.String] = images.IdentityImage{
+				Name:    imageType.String,
+				Payload: imagePayload,
+				Clock:   uint64(identityImageClock.Int64),
+			}
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func extractImageTypes(images map[string]*protobuf.IdentityImage) []string {
 	uniqueImageTypesMap := make(map[string]struct{})
 	for key := range images {

@@ -225,6 +225,31 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	s.Require().Equal("name with space", displayName)
 }
 
+func (s *MessengerProfileDisplayNameHandlerSuite) TestSetEmptyDisplayNameSkipsDupeCheck() {
+	// add profile keypair
+	profileKp, _, _, err := accounts.GetProfileKeypairForTest(true, false, false)
+	s.Require().NoError(err)
+	profileKp.KeyUID = s.m.account.KeyUID
+	profileKp.Name = DefaultProfileDisplayName
+	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
+
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	// save account will create the account
+	err = s.m.multiAccounts.SaveAccount(*s.m.account)
+	s.Require().NoError(err)
+
+	// Setting an empty display name should succeed without triggering
+	// the community member dupe check (ErrDisplayNameDupeOfCommunityMember).
+	err = s.m.SetDisplayName("")
+	s.Require().NoError(err)
+
+	displayName, err := s.m.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal("", displayName)
+}
+
 func (s *MessengerProfileDisplayNameHandlerSuite) TestSaveAccountWhenEnsNameIsSet() {
 	// try to manually set display name to ens name (will fail)
 	err := s.m.SetDisplayName("godfrain.stateofus.eth")

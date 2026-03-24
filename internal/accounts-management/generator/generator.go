@@ -1,11 +1,19 @@
 package generator
 
 import (
+	"crypto/ecdsa"
+	"crypto/hmac"
+	"crypto/sha512"
+	"encoding/binary"
+	"errors"
 	"strings"
+
+	"github.com/status-im/extkeys"
 
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 // CreateAccountFromMnemonic creates an account from a mnemonic phrase.
@@ -99,6 +107,76 @@ func DeriveChildrenFromAccount(acc *Account, pathStrings []string) (map[string]*
 	}
 
 	return pathAccounts, nil
+}
+
+// derivePublicChildKey performs BIP32 non-hardened public child key derivation using go-ethereum's secp256k1 primitives
+func derivePublicChildKey(parentPubKeyBytes, chainCode []byte, index uint32) (childPubKeyBytes, childChainCode []byte, err error) {
+	if index >= 0x80000000 {
+		return nil, nil, errors.New("hardened child derivation not supported from public key")
+	}
+	data := make([]byte, 37)
+	copy(data[:33], parentPubKeyBytes)
+	binary.BigEndian.PutUint32(data[33:], index)
+
+	mac := hmac.New(sha512.New, chainCode)
+	_, _ = mac.Write(data)
+	I := mac.Sum(nil)
+	IL, IR := I[:32], I[32:]
+
+	curve := crypto.S256()
+	x1, y1 := curve.ScalarBaseMult(IL)
+	parentKey, err := crypto.DecompressPubkey(parentPubKeyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	x, y := curve.Add(x1, y1, parentKey.X, parentKey.Y)
+	if x.Sign() == 0 && y.Sign() == 0 {
+		return nil, nil, errors.New("derived key is point at infinity")
+	}
+	childPubKey := &ecdsa.PublicKey{Curve: curve, X: x, Y: y}
+	return crypto.CompressPubkey(childPubKey), IR, nil
+}
+
+// DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths derives public accounts from an extended public key (xpub) for the given paths.
+// Paths are relative to the provided xpub.
+func DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(xpubString string, paths []string) (map[string]AccountPublicInfo, error) {
+	extKey, err := extkeys.NewKeyFromString(xpubString)
+	if err != nil {
+		return nil, ErrExtendedKeyParsingFailed(err)
+	}
+
+	if extKey.IsPrivate {
+		return nil, ErrExtendedPrivateKeyNotAllowed
+	}
+
+	result := make(map[string]AccountPublicInfo)
+	for _, pathString := range paths {
+		_, path, err := decodePath(pathString)
+		if err != nil {
+			return nil, ErrPathDecodingFailed(err)
+		}
+
+		pubKeyBytes := extKey.KeyData
+		chainCode := extKey.ChainCode
+		for _, index := range path {
+			pubKeyBytes, chainCode, err = derivePublicChildKey(pubKeyBytes, chainCode, index)
+			if err != nil {
+				return nil, ErrExtendedKeyDerivationFailed(err)
+			}
+		}
+
+		pubKey, err := crypto.DecompressPubkey(pubKeyBytes)
+		if err != nil {
+			return nil, ErrPublicKeyDerivationFailed(err)
+		}
+
+		result[pathString] = AccountPublicInfo{
+			PublicKey: cryptotypes.EncodeHex(crypto.FromECDSAPub(pubKey)),
+			Address:   crypto.PubkeyToAddress(*pubKey).Hex(),
+		}
+	}
+
+	return result, nil
 }
 
 func CreateAndDeriveAccountsFromMnemonic(mnemonic string, paths []string, bip39Passphrase string) (*Account, map[string]*Account, error) {

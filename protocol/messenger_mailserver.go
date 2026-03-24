@@ -13,6 +13,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
@@ -588,7 +589,15 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 }
 
 func (m *Messenger) canSyncWithStoreNodes() (bool, error) {
+	if m.connectionState.IsExpensive() {
+		return m.settings.CanSyncOnMobileNetwork()
+	}
 	return true, nil
+}
+
+func (m *Messenger) ConnectionChanged(state connection.State) {
+	m.messaging.ConnectionChanged(state)
+	m.connectionState = state
 }
 
 func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch) error {

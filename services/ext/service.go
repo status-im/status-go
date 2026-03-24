@@ -20,6 +20,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
@@ -778,4 +779,10 @@ func obtainNodeKey(nodeConfig *params.NodeConfig) (*ecdsa.PrivateKey, error) {
 	}
 
 	return nil, nil
+}
+
+func (s *Service) ConnectionChanged(state connection.State) {
+	if s.messenger != nil {
+		s.messenger.ConnectionChanged(state)
+	}
 }
