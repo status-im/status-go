@@ -1,2 +1,0 @@
-2026-03-13T13:15:11.985Z	ERROR	TransferDetectorController	transferdetector/controller.go:242	failed to get all accounts	{"error": "sql: database is closed"}
-2026-03-13T13:15:14.404Z	ERROR	TransferDetectorController	transferdetector/controller.go:242	failed to get all accounts	{"error": "sql: database is closed"}

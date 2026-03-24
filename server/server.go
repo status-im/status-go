@@ -12,12 +12,25 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
-	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
 )
+
+// tcpListenConfig sets SO_REUSEADDR so rapid Stop/Start can rebind the same
+// cached ephemeral port without waiting for the kernel to release it.
+var tcpListenConfig = net.ListenConfig{
+	Control: func(network, address string, c syscall.RawConn) error {
+		var optErr error
+		if err := c.Control(func(fd uintptr) {
+			optErr = setReuseAddr(fd)
+		}); err != nil {
+			return err
+		}
+		return optErr
+	},
+}
 
 type Config struct {
 	Cert     *tls.Certificate
@@ -112,12 +125,17 @@ func (s *Server) getBindAddrPort() netip.AddrPort {
 
 func (s *Server) createListener() (net.Listener, error) {
 	addr := s.getBindAddrPort()
-	if s.config.Cert == nil {
-		// HTTP mode
-		return net.Listen("tcp", addr.String())
+	addrStr := addr.String()
+
+	ln, err := tcpListenConfig.Listen(context.Background(), "tcp", addrStr)
+	if err != nil {
+		return nil, err
 	}
 
-	// HTTPS mode
+	if s.config.Cert == nil {
+		return ln, nil
+	}
+
 	serverName := addr.Addr().String()
 	if len(s.config.Cert.Leaf.DNSNames) > 0 {
 		serverName = s.config.Cert.Leaf.DNSNames[0]
@@ -128,7 +146,7 @@ func (s *Server) createListener() (net.Listener, error) {
 		ServerName:   serverName,
 		MinVersion:   tls.VersionTLS12,
 	}
-	return tls.Listen("tcp", addr.String(), cfg)
+	return tls.NewListener(ln, cfg), nil
 }
 
 func (s *Server) listen() error {
@@ -246,27 +264,9 @@ func (s *Server) IsRunning() bool {
 }
 
 func (s *Server) ToForeground() {
-	err := s.Start()
-	if err == nil {
-		return
+	if err := s.Start(); err != nil {
+		s.logger.Error("server start failed during foreground transition", zap.Error(err))
 	}
-
-	// On rapid pause/resume cycles with ephemeral ports, the previous listener
-	// close can lag briefly and return EADDRINUSE for the cached port.
-	// Retry a few times to preserve stable URL reuse semantics.
-	if s.config != nil && s.config.AddrPort.Port() == 0 && s.cachedPort != 0 && errors.Is(err, syscall.EADDRINUSE) {
-		for i := 0; i < 10; i++ {
-			time.Sleep(20 * time.Millisecond)
-			err = s.Start()
-			if err == nil {
-				return
-			}
-			if !errors.Is(err, syscall.EADDRINUSE) {
-				break
-			}
-		}
-	}
-	s.logger.Error("server start failed during foreground transition", zap.Error(err))
 }
 
 func (s *Server) ToBackground() {
