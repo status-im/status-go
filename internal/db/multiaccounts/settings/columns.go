@@ -217,12 +217,6 @@ var (
 		dBColumnName:   "node_config",
 		valueHandler:   NodeConfigHandler,
 	}
-	// NotificationsEnabled - we should remove this and realated things once mobile team starts usign `settings_notifications` package
-	NotificationsEnabled = SettingField{
-		reactFieldName: "notifications-enabled?",
-		dBColumnName:   "notifications_enabled",
-		valueHandler:   BoolHandler,
-	}
 	OpenseaEnabled = SettingField{
 		reactFieldName: "opensea-enabled?",
 		dBColumnName:   "opensea_enabled",
@@ -544,7 +538,6 @@ var (
 		NetworksNetworks,
 		MessengerNotificationsEnabled,
 		NodeConfig,
-		NotificationsEnabled,
 		OpenseaEnabled,
 		PhotoPath,
 		PinnedMailservers,

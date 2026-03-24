@@ -3,13 +3,13 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from resources.enums import ChatType, ChatPreviewFilterType, MuteType
-from steps.messenger import MessengerSteps
+from steps import messenger
 
 
 @pytest.mark.rpc
 @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["waku_light_client_False", "waku_light_client_True"])
 @pytest.mark.parametrize("backend_factory", [{"privileged": False}], indirect=True, ids=["privileged_False"])
-class TestChatActions(MessengerSteps):
+class TestChatActions:
 
     @pytest.fixture()
     def sender(self, backend_new_profile, waku_light_client):
@@ -20,10 +20,10 @@ class TestChatActions(MessengerSteps):
         return backend_new_profile("receiver", waku_light_client)
 
     def test_all_chats(self, sender, receiver):
-        self.make_contacts(sender, receiver)
-        private_group_id = self.join_private_group(admin=sender, member=receiver)
+        messenger.make_contacts(sender, receiver)
+        private_group_id = messenger.join_private_group(admin=sender, member=receiver)
         sender.wakuext_service.send_chat_message(private_group_id, "test_message")
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
 
         chats = sender.wakuext_service.chats()
         assert len(chats) == 2
@@ -37,7 +37,7 @@ class TestChatActions(MessengerSteps):
         assert one_to_one_chat.get("chatType", "") == ChatType.ONE_TO_ONE.value
 
     def test_chat_by_chat_id(self, sender, receiver):
-        sent_texts, _ = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        sent_texts, _ = messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         chat_id = receiver.public_key
 
         chat = sender.wakuext_service.chat(chat_id)
@@ -46,17 +46,17 @@ class TestChatActions(MessengerSteps):
 
     def test_chats_preview(self, sender, receiver):
         # One to one
-        self.make_contacts(sender, receiver)
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.make_contacts(sender, receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         one_to_one_chat_id = receiver.public_key
 
         # Group
-        private_group_chat_id = self.join_private_group(admin=sender, member=receiver)
+        private_group_chat_id = messenger.join_private_group(admin=sender, member=receiver)
         sender.wakuext_service.send_group_chat_message(private_group_chat_id, "test_message_group")
 
         # Community
-        self.create_community(sender)
-        community_chat_id = self.join_community(member=receiver, admin=sender)
+        community_id = messenger.create_community(sender)
+        community_chat_id = messenger.join_community(member=receiver, admin=sender, community_id=community_id)
         sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
 
         chats_previews = sender.wakuext_service.chats_preview(ChatPreviewFilterType.Community.value)
@@ -68,10 +68,10 @@ class TestChatActions(MessengerSteps):
         assert {chat.get("id", "") for chat in chats_previews} == {one_to_one_chat_id, private_group_chat_id}
 
     def test_active_chats(self, sender, receiver):
-        self.make_contacts(sender, receiver)
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.make_contacts(sender, receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         one_to_one_chat_id = receiver.public_key
-        private_group_chat_id = self.join_private_group(admin=sender, member=receiver)
+        private_group_chat_id = messenger.join_private_group(admin=sender, member=receiver)
 
         chats = sender.wakuext_service.active_chats()
         # TODO: Add more assertions on response
@@ -84,7 +84,7 @@ class TestChatActions(MessengerSteps):
         assert chats[0].get("id", 0) == one_to_one_chat_id
 
     def test_mute_chat(self, sender, receiver):
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         chat_id = receiver.public_key
 
         result = sender.wakuext_service.mute_chat(chat_id)
@@ -109,7 +109,7 @@ class TestChatActions(MessengerSteps):
         ],
     )
     def test_mute_chat_v2(self, sender, receiver, mute_type, time_delta):
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         chat_id = receiver.public_key
 
         result = sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
@@ -132,7 +132,7 @@ class TestChatActions(MessengerSteps):
         ],
     )
     def test_unmute_mute_chat_v2_till_unmuted(self, sender, receiver, mute_type):
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         chat_id = receiver.public_key
 
         result = sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
@@ -145,7 +145,7 @@ class TestChatActions(MessengerSteps):
         assert chat.get("muted", True) is False
 
     def test_clear_history(self, sender, receiver):
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         chat_id = receiver.public_key
 
         response = sender.wakuext_service.chat(chat_id)
@@ -165,7 +165,7 @@ class TestChatActions(MessengerSteps):
         ],
     )
     def test_deactivate_chat(self, sender, receiver, preserve_history, expected):
-        self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         chat_id = receiver.public_key
 
         response = sender.wakuext_service.deactivate_chat(chat_id, preserve_history)

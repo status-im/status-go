@@ -1,13 +1,9 @@
-//go:build !use_nwaku
-// +build !use_nwaku
-
 package wakuv2
 
 import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"math/big"
 	"os"
 	"sync"
 	"testing"
@@ -24,11 +20,9 @@ import (
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/internal/connection"
 	testutils2 "github.com/status-im/status-go/internal/testutils"
@@ -155,144 +149,6 @@ func parseNodes(rec []string) []*enode.Node {
 		ns = append(ns, &n)
 	}
 	return ns
-}
-
-// In order to run these tests, you must run an nwaku node
-//
-// Using Docker:
-//
-//	IP_ADDRESS=$(hostname -I | awk '{print $1}');
-//	docker run \
-//	 -p 60000:60000/tcp -p 9000:9000/udp -p 8645:8645/tcp harbor.status.im/wakuorg/nwaku:v0.36.0 \
-//	 --tcp-port=60000 --discv5-discovery=true --cluster-id=16 --pubsub-topic=/waku/2/rs/16/32 --pubsub-topic=/waku/2/rs/16/64 \
-//	 --nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=9000 --rest-address=0.0.0.0 --store
-
-func TestBasicWakuV2(t *testing.T) {
-	nwakuInfo, err := GetNwakuInfo(nil, nil)
-	require.NoError(t, err)
-
-	// Creating a fake DNS Discovery ENRTree
-	tree, url := makeTestTree("n", parseNodes([]string{nwakuInfo.EnrUri}), nil)
-	enrTreeAddress := url
-	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
-	if envEnrTreeAddress != "" {
-		enrTreeAddress = envEnrTreeAddress
-	}
-
-	config := &Config{}
-	setDefaultConfig(config, false)
-	config.Port = 0
-	config.Resolver = mapResolver(tree.ToTXT("n"))
-	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
-	config.DiscoveryLimit = 20
-	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New(nil, config, nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, w.Start())
-
-	enr, err := w.ENR()
-	require.NoError(t, err)
-	require.NotNil(t, enr)
-
-	// DNSDiscovery
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress, dnsdisc.WithResolver(config.Resolver))
-	require.NoError(t, err)
-
-	// Peer used for retrieving history
-	r, err := rand.Int(rand.Reader, big.NewInt(int64(len(discoveredNodes))))
-	require.NoError(t, err)
-
-	storeNode := discoveredNodes[int(r.Int64())]
-
-	options := func(b *backoff.ExponentialBackOff) {
-		b.MaxElapsedTime = 30 * time.Second
-	}
-
-	// Sanity check, not great, but it's probably helpful
-	err = testutils2.RetryWithBackOff(func() error {
-		if len(w.Peers()) < 1 {
-			return errors.New("no peers discovered")
-		}
-		return nil
-	}, options)
-	require.NoError(t, err)
-
-	// Dropping Peer
-	err = w.DropPeer(storeNode.PeerID)
-	require.NoError(t, err)
-
-	// Dialing with peerID
-	err = w.DialPeerByID(storeNode.PeerID)
-	require.NoError(t, err)
-
-	err = testutils2.RetryWithBackOff(func() error {
-		if len(w.Peers()) < 1 {
-			return errors.New("no peers discovered")
-		}
-		return nil
-	}, options)
-	require.NoError(t, err)
-
-	filter := &common2.Filter{
-		PubsubTopic:   config.DefaultShardPubsubTopic,
-		Messages:      common2.NewMemoryMessageStore(),
-		ContentTopics: common2.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
-	}
-
-	_, err = w.subscribe(filter)
-	require.NoError(t, err)
-
-	msgTimestamp := w.timestamp()
-	contentTopic := maps.Keys(filter.ContentTopics)[0]
-
-	time.Sleep(2 * time.Second)
-
-	_, err = w.Send(config.DefaultShardPubsubTopic, &pb.WakuMessage{
-		Payload:      []byte{1, 2, 3, 4, 5},
-		ContentTopic: contentTopic.ContentTopic(),
-		Version:      proto.Uint32(0),
-		Timestamp:    &msgTimestamp,
-	}, nil)
-
-	require.NoError(t, err)
-
-	time.Sleep(1 * time.Second)
-
-	messages := filter.Retrieve()
-	require.Len(t, messages, 1)
-
-	timestampInSeconds := msgTimestamp / int64(time.Second)
-	marginInSeconds := 20
-
-	options = func(b *backoff.ExponentialBackOff) {
-		b.MaxElapsedTime = 60 * time.Second
-		b.InitialInterval = 500 * time.Millisecond
-	}
-	err = testutils2.RetryWithBackOff(func() error {
-		result, err := w.node.Store().Query(
-			context.Background(),
-			store.FilterCriteria{
-				ContentFilter: protocol.NewContentFilter(config.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
-				TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
-				TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
-			},
-			store.WithPeer(storeNode.PeerID),
-		)
-		if err != nil || len(result.Messages()) == 0 {
-			// in case of failure extend timestamp margin up to 40secs
-			if marginInSeconds < 40 {
-				marginInSeconds += 5
-			}
-			return errors.New("no messages received from store node")
-		}
-		return nil
-	}, options)
-	require.NoError(t, err)
-
-	require.NoError(t, w.Stop())
 }
 
 type mapResolver map[string]string

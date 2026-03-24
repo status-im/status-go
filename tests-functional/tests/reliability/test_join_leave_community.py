@@ -1,10 +1,10 @@
 from time import sleep
 import pytest
-from steps.messenger import MessengerSteps
+from steps import messenger
 
 
 @pytest.mark.reliability
-class TestJoinLeaveCommunities(MessengerSteps):
+class TestJoinLeaveCommunities:
 
     @pytest.fixture()
     def community_admin(self, backend_new_profile):
@@ -16,18 +16,18 @@ class TestJoinLeaveCommunities(MessengerSteps):
 
     def _run_join_leave_community_baseline(self, community_admin, community_member, num_joins=1, network_condition=None):
         nodes_list = [community_admin, community_member]
-        self.create_community(community_admin)
-        self.leave_the_community(community_admin)
+        community_id = messenger.create_community(community_admin)
+        messenger.leave_the_community(community_admin, community_id)
 
         if network_condition:
             for node in nodes_list:
                 network_condition(node)
 
         for _ in range(num_joins):
-            self.join_community(member=community_member, admin=community_admin)
-            self.check_node_joined_community(community_member, joined=True)
-            self.leave_the_community(community_member)
-            self.check_node_joined_community(community_member, joined=False)
+            messenger.join_community(member=community_member, admin=community_admin, community_id=community_id)
+            messenger.check_node_joined_community(community_member, joined=True, community_id=community_id)
+            messenger.leave_the_community(community_member, community_id)
+            messenger.check_node_joined_community(community_member, joined=False, community_id=community_id)
 
     @pytest.mark.skip(reason="Skipping due to failing on local build")
     # TODO: check in nightly build locally and recheck test logic
@@ -36,31 +36,31 @@ class TestJoinLeaveCommunities(MessengerSteps):
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_join_leave_community_with_latency(self, community_admin, community_member):
-        self._run_join_leave_community_baseline(community_admin, community_member, network_condition=self.add_latency)
+        self._run_join_leave_community_baseline(community_admin, community_member, network_condition=messenger.add_latency)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_join_leave_community_with_packet_loss(self, community_admin, community_member):
-        self._run_join_leave_community_baseline(community_admin, community_member, network_condition=self.add_packet_loss)
+        self._run_join_leave_community_baseline(community_admin, community_member, network_condition=messenger.add_packet_loss)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_join_leave_community_with_low_bandwidth(self, community_admin, community_member):
-        self._run_join_leave_community_baseline(community_admin, community_member, network_condition=self.add_low_bandwith)
+        self._run_join_leave_community_baseline(community_admin, community_member, network_condition=messenger.add_low_bandwith)
 
     def test_join_leave_community_with_node_pause(self, community_admin, community_member):
-        self.create_community(community_admin)
-        self.join_community(member=community_member, admin=community_admin)
-        self.check_node_joined_community(community_member, joined=True)
+        community_id = messenger.create_community(community_admin)
+        messenger.join_community(member=community_member, admin=community_admin, community_id=community_id)
+        messenger.check_node_joined_community(community_member, joined=True, community_id=community_id)
 
-        with self.node_pause(community_member):
+        with messenger.node_pause(community_member):
             sleep(2)
-        self.leave_the_community(community_member)
-        self.check_node_joined_community(community_member, joined=False)
+        messenger.leave_the_community(community_member, community_id)
+        messenger.check_node_joined_community(community_member, joined=False, community_id=community_id)
 
     def test_join_leave_community_with_ip_change(self, community_admin, community_member):
-        self.create_community(community_admin)
-        self.join_community(member=community_member, admin=community_admin)
-        self.check_node_joined_community(community_member, joined=True)
+        community_id = messenger.create_community(community_admin)
+        messenger.join_community(member=community_member, admin=community_admin, community_id=community_id)
+        messenger.check_node_joined_community(community_member, joined=True, community_id=community_id)
 
         community_member.change_container_ip()
-        self.leave_the_community(community_member)
-        self.check_node_joined_community(community_member, joined=False)
+        messenger.leave_the_community(community_member, community_id)
+        messenger.check_node_joined_community(community_member, joined=False, community_id=community_id)

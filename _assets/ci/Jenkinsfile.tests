@@ -50,11 +50,6 @@ pipeline {
       defaultValue: false,
       description: 'Should the job report ignore the actual test run and just print the test plan?'
     )
-    booleanParam(
-      name: 'USE_NWAKU',
-      description: 'Whether to build with nwaku or not',
-      defaultValue: params.USE_NWAKU ?: getNWakuMode(),
-    )
   }
 
   options {
@@ -84,11 +79,6 @@ pipeline {
     REPO_SRC    = "${GOPATH}/src/github.com/status-im/status-go"
     BASE_BRANCH = "${env.CHANGE_TARGET}"
 
-    NWAKU_CONT  = "status-go-test-nwaku-${env.EXECUTOR_NUMBER.toInteger() + 1}"
-    NWAKU_TCP_PORT  = "${60000 + env.EXECUTOR_NUMBER.toInteger()}"
-    NWAKU_UDP_PORT  = "${9000 + env.EXECUTOR_NUMBER.toInteger()}"
-    NWAKU_REST_PORT = "${9645 + env.EXECUTOR_NUMBER.toInteger()}"
-
     /* Hack-fix for params not being set in env on first job run. */
     UNIT_TEST_FAILFAST =               "${params.UNIT_TEST_FAILFAST}"
     UNIT_TEST_RERUN_FAILS =            "${params.UNIT_TEST_RERUN_FAILS}"
@@ -98,26 +88,13 @@ pipeline {
 
     /* prevent sharing cache dir across different jobs */
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
-
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
-    USE_NWAKU = "${params.USE_NWAKU}"
-    /* nwaku source directory */
-    NWAKU_SOURCE_DIR = "${WORKSPACE_TMP}/nwaku"
   }
 
   stages {
     stage('Prep') {
       steps {
-        /* Check NWAKU ports before starting containers */
-        sh '''
-          for port in ${NWAKU_REST_PORT} ${NWAKU_TCP_PORT} ${NWAKU_UDP_PORT}; do
-            if lsof -i :$port; then
-              echo "Port $port is already in use! Failing early."
-              exit 1
-            fi
-          done
-        '''
         /* Go needs to find status-go in GOPATH. */
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
@@ -133,50 +110,26 @@ pipeline {
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
-        NWAKU_REST_PORT = "${env.NWAKU_REST_PORT}"
       }
       steps { script {
-        def ipAddress = sh(script: "hostname -I | awk '{print \$1}'", returnStdout: true).trim()
         db = docker.image('postgres:9.6-alpine').withRun([
           "--name=${DB_CONT}",
           "--env=POSTGRES_HOST_AUTH_METHOD=trust",
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
-          nwaku = docker.image('wakuorg/nwaku:v0.36.0').withRun([
-            "--name=${NWAKU_CONT}",
-            "--publish=${NWAKU_TCP_PORT}:${NWAKU_TCP_PORT}/tcp",
-            "--publish=${NWAKU_UDP_PORT}:${NWAKU_UDP_PORT}/udp",
-            "--publish=${NWAKU_REST_PORT}:8645/tcp"
-          ].join(' '), [
-            "--tcp-port=${NWAKU_TCP_PORT}",
-            "--discv5-discovery=true",
-            "--cluster-id=16",
-         // "--num-shards-in-network=0", // uncomment when switching to nwaku:v0.37.0
-            "--shard=32",
-            "--shard=64",
-            "--nat=extip:${ipAddress}",
-            "--discv5-discovery",
-            "--discv5-udp-port=${NWAKU_UDP_PORT}",
-            "--rest-address=0.0.0.0",
-            "--store",
-            "--filter",
-            "--lightpush"
-          ].join(' ')) { c2 ->
-            withCredentials([
-              string(
-                credentialsId: 'codecov-repository-upload-token',
-                variable: 'CODECOV_TOKEN'
-              ),
-            ]) {
-              nix.develop('USE_NWAKU=${USE_NWAKU} make test-unit V=1', pure: false)
-            }
-            archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
+          withCredentials([
+            string(
+              credentialsId: 'codecov-repository-upload-token',
+              variable: 'CODECOV_TOKEN'
+            ),
+          ]) {
+            nix.develop('make test-unit V=1', pure: false)
           }
+          archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
         }
       } }
       post { cleanup { /* Leftover DB containers. */
         sh "docker rm -f ${DB_CONT} || true"
-        sh "docker rm -f ${NWAKU_CONT} || true"
       } }
     }
   } // stages
@@ -238,12 +191,3 @@ def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
 
 def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '30' : '5' }
 
-/* We extract the name of the job from currentThread because
- * before an agent is picked env is not available. */
-def getJobPathTokens() {
-  return Thread.currentThread().getName().split('/')
-}
-
-def getNWakuMode() {
-  return getJobPathTokens().any { it.contains('nwaku') }
-}

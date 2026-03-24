@@ -5,12 +5,12 @@ import pytest
 from clients.api import ApiResponseError
 from clients.signals import SignalType
 from resources.enums import MessageContentType
-from steps.async_messenger import AsyncMessengerSteps
+from steps import async_messenger
 
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
-class TestMessageReactions(AsyncMessengerSteps):
+class TestMessageReactions:
 
     @pytest.fixture
     async def sender(self, async_backend_new_profile, waku_light_client):
@@ -23,9 +23,9 @@ class TestMessageReactions(AsyncMessengerSteps):
     @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
     async def test_one_to_one_message_reactions(self, sender, receiver, waku_light_client):
         """Test message reactions with different wakuV2LightClient configurations"""
-        await self.make_contacts(sender, receiver)
+        await async_messenger.make_contacts(sender, receiver)
         response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, "test_message")
-        message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = receiver.wakuext_service.chats()[0]["id"]
 
@@ -57,7 +57,7 @@ class TestMessageReactions(AsyncMessengerSteps):
         assert not response
 
         response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, "test_message 1")
-        message_1 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message_1 = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
 
         # Send emoji reaction
         response = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_1["id"], "1f642")
@@ -65,7 +65,7 @@ class TestMessageReactions(AsyncMessengerSteps):
         await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=emoji_1_id, timeout=60, check_buffer=True)
 
         response = receiver.wakuext_service.send_one_to_one_message(sender.public_key, "test_message 2")
-        message_2 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message_2 = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         response = sender.wakuext_service.send_emoji_reaction(sender_chat_id, message_2["id"], "1f641")
         emoji_2_id = response["emojiReactions"][0]["id"]
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=emoji_2_id, timeout=60, check_buffer=True)
@@ -92,9 +92,9 @@ class TestMessageReactions(AsyncMessengerSteps):
     @pytest.mark.parametrize("waku_light_client", [False], indirect=True, ids=["wakuV2LightClient_False"])
     async def test_limit_of_20_reactions(self, sender, receiver, waku_light_client):
         """Test that you cannot send more than 20 message reactions on a single message"""
-        await self.make_contacts(sender, receiver)
+        await async_messenger.make_contacts(sender, receiver)
         response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, "test_message")
-        message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = receiver.wakuext_service.chats()[0]["id"]
 

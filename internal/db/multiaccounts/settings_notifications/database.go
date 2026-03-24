@@ -253,6 +253,16 @@ func (ns *NotificationsSettings) SetMessagePreview(value int) error {
 	return err
 }
 
+// HasExemption returns true if an exemption row exists for the given chat/community id.
+func (ns *NotificationsSettings) HasExemption(id string) (bool, error) {
+	var dummy int
+	err := ns.db.QueryRow("SELECT 1 FROM notifications_settings WHERE id = ? AND exemption = 1 LIMIT 1", id).Scan(&dummy)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // Exemption settings
 func (ns *NotificationsSettings) GetExMuteAllMessages(id string) (result bool, err error) {
 	err = ns.db.QueryRow(ns.buildSelectQuery(columnExMuteAllMessages), id).Scan(&result)

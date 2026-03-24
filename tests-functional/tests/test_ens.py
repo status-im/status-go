@@ -81,6 +81,7 @@ def get_block_timestamp(foundry):
 
 
 def sync_registry_to_well_known(foundry, registry_addr, username):
+    """Sync deployed registry storage to well-known address so Go code can read it."""
     well_known = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
     user_namehash = f"$(cast namehash '{username}.stateofus.eth')"
     cmd = f"/app/sync_ens_registry.sh {registry_addr} {well_known} {ANVIL_RPC_URL} {user_namehash}"

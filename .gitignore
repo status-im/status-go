@@ -117,3 +117,7 @@ pkg/sentry/SENTRY_PRODUCTION
 
 go.work
 go.work.sum
+
+# Token deployment cache files
+tests-functional/snt_addresses.json*
+

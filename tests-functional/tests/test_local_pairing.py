@@ -8,7 +8,7 @@ from clients.async_status_backend import AsyncStatusBackend
 from clients.services.wakuext import ActivityCenterNotificationType, ContactRequestState
 from clients.signals import LocalPairingEventAction, LocalPairingEventType, SignalType
 from resources.enums import MessageContentType
-from steps.async_messenger import AsyncMessengerSteps
+from steps import async_messenger
 
 
 def check_server_sender_events(events):
@@ -184,7 +184,7 @@ async def login_paired_device(backend: AsyncStatusBackend, key_uid, password):
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
-class TestLocalPairing(AsyncMessengerSteps):
+class TestLocalPairing:
 
     async def test_pairing_server_as_sender(self, async_backend_new_profile, async_backend_factory):
         alice, bob, bob_second_device = await asyncio.gather(
@@ -195,19 +195,19 @@ class TestLocalPairing(AsyncMessengerSteps):
         bob_second_device.backend.init_status_backend()
 
         # Make contacts before local pairing
-        await self.make_contacts(alice, bob)
+        await async_messenger.make_contacts(alice, bob)
 
         # Create community before local pairing
-        self.create_community(bob)
+        async_messenger.create_community(bob)
 
         # Send a message to Alice before local pairing
         response = bob.wakuext_service.send_one_to_one_message(alice.public_key, "hello alice")
-        message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id1, sender_chat_id, clock_1 = message["id"], message["chatId"], message["clock"]
 
         # Send a message to Bob before local pairing
         response = alice.wakuext_service.send_one_to_one_message(bob.public_key, "hello bob")
-        message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id2, clock_2 = message["id"], message["clock"]
 
         response = bob.wakuext_service.send_emoji_reaction(alice.public_key, message_id2, "1f642")  # 🙂
@@ -279,14 +279,14 @@ class TestLocalPairing(AsyncMessengerSteps):
         bob_second_device.backend.init_status_backend()
 
         # Make contacts before local pairing
-        await self.make_contacts(alice, bob)
+        await async_messenger.make_contacts(alice, bob)
 
         # Create community before local pairing
-        self.create_community(bob)
+        async_messenger.create_community(bob)
 
         # Send a message to Alice before local pairing
         response = bob.wakuext_service.send_one_to_one_message(alice.public_key, "test_message")
-        message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         _, sender_chat_id = message["id"], message["chatId"]
 
         # Local pairing WITHOUT message syncing
@@ -328,9 +328,9 @@ class TestLocalPairing(AsyncMessengerSteps):
         bob3.backend.init_status_backend()
 
         # Setup contacts before local pairing
-        await self.make_contacts(user_accepted, bob1)
-        await self.send_contact_request_and_wait(user_pending, bob1)
-        message_id_declined = await self.send_contact_request_and_wait(user_declined, bob1)
+        await async_messenger.make_contacts(user_accepted, bob1)
+        await async_messenger.send_contact_request_and_wait(user_pending, bob1)
+        message_id_declined = await async_messenger.send_contact_request_and_wait(user_declined, bob1)
         bob1.wakuext_service.decline_contact_request(message_id_declined, user_declined.public_key)
 
         # Pair second device

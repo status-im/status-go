@@ -4,12 +4,12 @@ import pytest
 
 from clients.signals import SignalType
 from resources.enums import ContactVerificationState, MessageContentType
-from steps.async_messenger import AsyncMessengerSteps
+from steps import async_messenger
 
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
-class TestContactVerification(AsyncMessengerSteps):
+class TestContactVerification:
 
     @pytest.fixture
     async def creator(self, async_backend_new_profile):
@@ -18,7 +18,7 @@ class TestContactVerification(AsyncMessengerSteps):
     @pytest.fixture
     async def member(self, async_backend_new_profile, creator):
         m = await async_backend_new_profile("member")
-        await self.make_contacts(sender=creator, receiver=m)
+        await async_messenger.make_contacts(sender=creator, receiver=m)
         return m
 
     @pytest.fixture

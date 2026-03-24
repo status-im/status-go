@@ -90,8 +90,10 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		derivedAddresses := make(map[string]generator2.AccountInfo)
 		for path, acc := range derivedAccs {
 			derivedAddresses[path] = generator2.AccountInfo{
-				Address:   acc.Address().Hex(),
-				PublicKey: acc.PublicKeyHex(),
+				AccountPublicInfo: generator2.AccountPublicInfo{
+					Address:   acc.Address().Hex(),
+					PublicKey: acc.PublicKeyHex(),
+				},
 			}
 		}
 
@@ -152,7 +154,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	data.backend = NewStatusBackend(testutils.MustCreateTestLogger())
 	data.backend.UpdateRootDataDir(tmpdir)
 
-	err = data.backend.OpenAccounts(true)
+	err = data.backend.OpenAccounts()
 	require.NoError(t, err)
 
 	if storeMultiAcc {

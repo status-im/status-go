@@ -97,7 +97,7 @@ pip install -r "${root_path}/requirements.txt"
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
 pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" -n 12 \
-  --dist loadgroup\
+  --dist load\
   --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
   --docker_project_name="${project_name}" \
   --docker-image=${image_name} \
