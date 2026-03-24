@@ -6,11 +6,11 @@ import pytest
 from clients.services.wakuext import ActivityCenterNotificationType
 from clients.signals import SignalType
 from resources.enums import MuteType
-from steps.messenger import MessengerSteps
+from steps import messenger
 
 
 @pytest.mark.rpc
-class TestCommunityChats(MessengerSteps):
+class TestCommunityChats:
     @pytest.fixture()
     def creator(self, backend_new_profile):
         return backend_new_profile("creator")
@@ -21,8 +21,8 @@ class TestCommunityChats(MessengerSteps):
 
     @pytest.fixture()
     def community_id(self, creator, member):
-        cid = self.create_community(creator)
-        self.join_community(member=member, admin=creator)
+        cid = messenger.create_community(creator)
+        messenger.join_community(member=member, admin=creator, community_id=cid)
         return cid
 
     @pytest.fixture()
@@ -63,7 +63,7 @@ class TestCommunityChats(MessengerSteps):
         assert chats_by_position[1].get("permissions") == chat_payload["permissions"]
         added_chat_id = chats_by_position[1].get("id")
 
-        comm_before_delete = self.fetch_community(creator, community_id)
+        comm_before_delete = messenger.fetch_community(creator, community_id)
         assert added_chat_id in comm_before_delete.get("chats")
 
         edit_payload = {
@@ -83,7 +83,7 @@ class TestCommunityChats(MessengerSteps):
         assert del_resp.get("removedChats")[0] == added_chat_id
         assert added_chat_id not in del_resp.get("communities")[0].get("chats")
 
-        comm_after_delete = self.fetch_community(creator, community_id)
+        comm_after_delete = messenger.fetch_community(creator, community_id)
         assert added_chat_id not in comm_after_delete.get("chats")
 
     def test_reorder_community_chat(self, creator, community_id, chat_payload):
@@ -173,7 +173,7 @@ class TestCommunityChats(MessengerSteps):
     def test_send_community_chat_message_with_mention(self, creator, member, community_id, chat_payload):
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        self.wait_for_community_chat_visible(member, community_id, chat_id)
+        messenger.wait_for_community_chat_visible(member, community_id, chat_id)
 
         text = f"Hi @{member.public_key}"
         # creator sends a chat message with a mention to trigger a notification
@@ -200,7 +200,7 @@ class TestCommunityChats(MessengerSteps):
     def test_send_community_chat_message_while_chat_is_muted_and_then_unmuted(self, creator, member, community_id, chat_payload):
         create_resp = creator.wakuext_service.create_community_chat(community_id, chat_payload)
         chat_id = create_resp.get("chats")[0].get("id")
-        self.wait_for_community_chat_visible(member, community_id, chat_id)
+        messenger.wait_for_community_chat_visible(member, community_id, chat_id)
 
         # muting the community chats
         member.wakuext_service.mute_community_chats(community_id, MuteType.MUTE_FOR15_MIN.value)

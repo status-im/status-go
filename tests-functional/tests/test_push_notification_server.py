@@ -6,7 +6,7 @@ import pytest
 from clients.gorush_stub import GorushStub
 from clients.push_notification_server import PushNotificationServer
 from clients.services.wakuext import PushNotificationRegistrationTokenType
-from steps.messenger import MessengerSteps
+from steps import messenger
 from utils import keys
 
 APN_TOPIC = "im.status.ethereum"
@@ -50,7 +50,7 @@ def expect_push_notification(gorush, sender, receiver):
 
 
 @pytest.mark.rpc
-class TestPushNotificationServer(MessengerSteps):
+class TestPushNotificationServer:
 
     @pytest.fixture()
     def sender(self, backend_new_profile):
@@ -76,7 +76,7 @@ class TestPushNotificationServer(MessengerSteps):
         time.sleep(10)
 
         # Make contacts, this should force delivery of a push notification
-        self.make_contacts(sender, receiver)
+        messenger.make_contacts(sender, receiver)
         expect_push_notification(gorush, sender, receiver)
 
         # Send a message from Alice to Bob

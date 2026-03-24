@@ -12,7 +12,7 @@ from clients.services.wakuext import CommunityPermissionsAccess, CommunityTokenP
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
-from steps.messenger import MessengerSteps
+from steps import messenger
 from utils import fake
 from utils.keys import change_community_key_compression
 
@@ -39,7 +39,7 @@ def request_to_join_with_signatures(backend: StatusBackend, community_id: str, a
 
 
 @pytest.mark.rpc
-class TestCommunityTokenPermissions(MessengerSteps):
+class TestCommunityTokenPermissions:
     @pytest.fixture(autouse=True)
     def setup_tokens(self, snt_addresses):
         self.snt_address = snt_addresses["snt"]
@@ -61,7 +61,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         # `wakuext_spectateCommunity` returns "community not found" when called before fetch/sync.
         community = None
         for attempt in range(attempts):
-            community = self.fetch_community(backend, community_id)
+            community = messenger.fetch_community(backend, community_id)
             if community:
                 break
             logging.info(f"Community {community_id} not found yet (attempt {attempt + 1}/{attempts})")
@@ -278,7 +278,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         time.sleep(2)
 
         # Fetch community as member
-        self.fetch_community(member_backend, community_id)
+        messenger.fetch_community(member_backend, community_id)
 
         # Member tries to join without tokens and with fake address - should fail permission check
         fake_address = "0x" + "0" * 40
@@ -455,7 +455,7 @@ class TestCommunityTokenPermissions(MessengerSteps):
         for _ in range(10):
             time.sleep(2)
             # Refresh community view too, token-permission propagation can lag behind fetchCommunity
-            self.fetch_community(member_backend, community_id)
+            messenger.fetch_community(member_backend, community_id)
             permissions_resp = member_backend.wakuext_service.check_permissions_to_join_community(community_id)
             if permissions_resp and permissions_resp.get("satisfied"):
                 break

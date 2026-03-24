@@ -5,13 +5,13 @@ import pytest
 from clients.services.wakuext import SendChatMessagePayload
 from clients.signals import SignalType
 from resources.enums import MessageContentType
-from steps.async_messenger import AsyncMessengerSteps
+from steps import async_messenger
 
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
 @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
-class TestSendingChatMessages(AsyncMessengerSteps):
+class TestSendingChatMessages:
 
     @pytest.fixture
     async def sender(self, async_backend_new_profile, waku_light_client):
@@ -52,8 +52,8 @@ class TestSendingChatMessages(AsyncMessengerSteps):
         assert actual_text == message_text
 
     async def test_send_chat_message_community(self, sender, receiver):
-        self.create_community(sender)
-        community_chat_id = await self.join_community(member=receiver, admin=sender)
+        community_id = async_messenger.create_community(sender)
+        community_chat_id = await async_messenger.join_community(member=receiver, admin=sender, community_id=community_id)
 
         text = "test_message"
         response = sender.wakuext_service.send_chat_message(community_chat_id, text)
@@ -66,20 +66,20 @@ class TestSendingChatMessages(AsyncMessengerSteps):
         assert actual_text == text
 
     async def test_send_chat_message_private_group(self, sender, receiver):
-        await self.make_contacts(sender, receiver)
-        private_group_id = await self.join_private_group(admin=sender, member=receiver)
+        await async_messenger.make_contacts(sender, receiver)
+        private_group_id = await async_messenger.join_private_group(admin=sender, member=receiver)
 
         text = "test_message"
         response = sender.wakuext_service.send_chat_message(private_group_id, text)
 
         response = sender.wakuext_service.chat_messages(private_group_id)
-        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        expected_message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         actual_text = expected_message.get("text", "")
         assert actual_text == text
 
     async def test_send_chat_messages_same_chat(self, sender, receiver):
-        self.create_community(sender)
-        community_chat_id = await self.join_community(member=receiver, admin=sender)
+        community_id = async_messenger.create_community(sender)
+        community_chat_id = await async_messenger.join_community(member=receiver, admin=sender, community_id=community_id)
 
         payload = [
             SendChatMessagePayload(chat_id=community_chat_id, text=f"test_message_{i}", content_type=MessageContentType.TEXT_PLAIN.value)
@@ -99,12 +99,12 @@ class TestSendingChatMessages(AsyncMessengerSteps):
 
     async def test_send_chat_messages_different_chats(self, sender, receiver):
         # Group
-        await self.make_contacts(sender, receiver)
-        private_group_chat_id = await self.join_private_group(admin=sender, member=receiver)
+        await async_messenger.make_contacts(sender, receiver)
+        private_group_chat_id = await async_messenger.join_private_group(admin=sender, member=receiver)
 
         # Community
-        self.create_community(sender)
-        community_chat_id = await self.join_community(member=receiver, admin=sender)
+        community_id = async_messenger.create_community(sender)
+        community_chat_id = await async_messenger.join_community(member=receiver, admin=sender, community_id=community_id)
 
         payload = [
             SendChatMessagePayload(chat_id=private_group_chat_id, text="test_message_group", content_type=MessageContentType.TEXT_PLAIN.value),
@@ -118,15 +118,15 @@ class TestSendingChatMessages(AsyncMessengerSteps):
         assert len(messages) == 2
 
     async def test_send_group_message(self, sender, receiver):
-        await self.make_contacts(sender, receiver)
-        private_group_id = await self.join_private_group(admin=sender, member=receiver)
+        await async_messenger.make_contacts(sender, receiver)
+        private_group_id = await async_messenger.join_private_group(admin=sender, member=receiver)
 
         text = "test_message_group"
         response = sender.wakuext_service.send_group_chat_message(private_group_id, text)
         # TODO: Add more assertions on response
 
         response = sender.wakuext_service.chat_messages(private_group_id)
-        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        expected_message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         actual_text = expected_message.get("text", "")
         assert actual_text == text
 
@@ -134,9 +134,9 @@ class TestSendingChatMessages(AsyncMessengerSteps):
     # TODO: create more realistic scenario where the message is intercepted in the network and not delivered,
     # use community messages to avoid 1-1 and group chats reliability mechanisms on protocol level
     async def test_resend_one_to_one_message(self, sender, receiver):
-        await self.make_contacts(sender, receiver)
+        await async_messenger.make_contacts(sender, receiver)
 
-        _, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        _, responses = async_messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         message_id = responses[0].get("messages", [])[0].get("id", "")
         receiver_chat_id = sender.public_key
 

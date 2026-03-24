@@ -1,16 +1,16 @@
 import pytest
 
 from clients.services.linkpreview import URLUnfurlPermission
-from steps.messenger import MessengerSteps
+from steps import messenger
 
 
 @pytest.mark.rpc
-class TestLinkPreview(MessengerSteps):
+class TestLinkPreview:
 
     def test_contact_link_preview(self, backend_new_profile):
         user_1 = backend_new_profile("user_1")
         user_2 = backend_new_profile("user_2")
-        self.make_contacts(user_1, user_2)
+        messenger.make_contacts(user_1, user_2)
 
         user_1_url = user_1.sharedurls_service.share_user_url_with_data(user_1.public_key)
         text = f"Here's my shared URL: {user_1_url}"
