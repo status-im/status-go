@@ -1,13 +1,13 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from steps.messenger import MessengerSteps
+from steps import messenger
 from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
 @pytest.mark.reliability
-class TestOneToOneMessages(MessengerSteps):
+class TestOneToOneMessages:
 
     @pytest.fixture()
     def sender(self, backend_new_profile):
@@ -18,7 +18,7 @@ class TestOneToOneMessages(MessengerSteps):
         return backend_new_profile("receiver", bridge_network=True)
 
     def _run_one_to_one_message_baseline(self, sender, receiver, message_count=1):
-        self.one_to_one_message(message_count, sender=sender, receiver=receiver)
+        messenger.one_to_one_message(message_count, sender=sender, receiver=receiver)
 
     def test_one_to_one_message_baseline(self, sender, receiver, message_count=1):
         self._run_one_to_one_message_baseline(sender, receiver, message_count)
@@ -28,21 +28,21 @@ class TestOneToOneMessages(MessengerSteps):
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_latency(self, sender, receiver):
-        with self.add_latency(receiver):
+        with messenger.add_latency(receiver):
             self._run_one_to_one_message_baseline(sender, receiver, message_count=50)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_packet_loss(self, sender, receiver):
-        with self.add_packet_loss(receiver):
+        with messenger.add_packet_loss(receiver):
             self._run_one_to_one_message_baseline(sender, receiver, message_count=50)
 
     @pytest.mark.parametrize("backend_factory", [{"privileged": True}], indirect=True)
     def test_one_to_one_message_with_low_bandwidth(self, sender, receiver):
-        with self.add_low_bandwith(receiver):
+        with messenger.add_low_bandwith(receiver):
             self._run_one_to_one_message_baseline(sender, receiver, message_count=50)
 
     def test_one_to_one_message_with_node_pause_30_seconds(self, sender, receiver):
-        with self.node_pause(receiver):
+        with messenger.node_pause(receiver):
             message_text = f"test_message_{uuid4()}"
             sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
             sleep(30)

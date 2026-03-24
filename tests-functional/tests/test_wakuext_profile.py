@@ -1,7 +1,7 @@
 import logging
 import pytest
 from clients.signals import SignalType
-from steps.async_messenger import AsyncMessengerSteps
+from steps import async_messenger
 
 
 @pytest.mark.asyncio
@@ -127,7 +127,7 @@ class TestProfile:
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
-class TestUserStatus(AsyncMessengerSteps):
+class TestUserStatus:
 
     @pytest.fixture
     async def sender(self, async_backend_new_profile):
@@ -138,7 +138,7 @@ class TestUserStatus(AsyncMessengerSteps):
         return await async_backend_new_profile("receiver")
 
     async def test_status_updates(self, sender, receiver):
-        await self.make_contacts(sender=sender, receiver=receiver)
+        await async_messenger.make_contacts(sender=sender, receiver=receiver)
 
         statuses = [[1, "text_1"], [2, "text_2"], [3, "text_3"], [4, "text_4"]]
 

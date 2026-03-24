@@ -1,13 +1,13 @@
 import re
 import pytest
-from steps.messenger import MessengerSteps
+from steps import messenger
 from clients.services.wakuext import SendPinMessagePayload
 from clients.api import ApiResponseError
 
 
 @pytest.mark.rpc
 @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
-class TestInteractingWithChatMessages(MessengerSteps):
+class TestInteractingWithChatMessages:
 
     @pytest.fixture()
     def sender(self, backend_new_profile, waku_light_client):
@@ -18,7 +18,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         return backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     def test_pinned_messages(self, sender, receiver):
-        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        sent_texts, responses = messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
 
         # pin
         message = responses[0].get("messages", [])[0]
@@ -49,7 +49,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert pinned_messages is None
 
     def test_pinned_messages_with_pagination(self, sender, receiver):
-        sent_texts, responses = self.send_multiple_one_to_one_messages(5, sender=sender, receiver=receiver)
+        sent_texts, responses = messenger.send_multiple_one_to_one_messages(5, sender=sender, receiver=receiver)
         sender_chat_id = receiver.public_key
 
         for response in responses:
@@ -83,7 +83,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert cursor2 == ""
 
     def test_edit_message(self, sender, receiver):
-        sent_texts, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        sent_texts, responses = messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         message_id = responses[0].get("messages", [])[0].get("id", "")
 
         response = sender.wakuext_service.message_by_message_id(message_id)
@@ -99,7 +99,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert actual_text == new_text
 
     def test_delete_message(self, sender, receiver):
-        _, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        _, responses = messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
 
         message_id = responses[0].get("messages", [])[0].get("id", "")
         response = sender.wakuext_service.message_by_message_id(message_id)
@@ -112,7 +112,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
             sender.wakuext_service.message_by_message_id(message_id)
 
     def test_delete_message_and_send(self, sender, receiver):
-        _, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        _, responses = messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
 
         message_id = responses[0].get("messages", [])[0].get("id", "")
         response = sender.wakuext_service.message_by_message_id(message_id)
@@ -129,7 +129,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert message.get("deleted", None) is True
 
     def test_delete_messages_by_chat_id(self, sender, receiver):
-        _, _ = self.send_multiple_one_to_one_messages(3, sender=sender, receiver=receiver)
+        _, _ = messenger.send_multiple_one_to_one_messages(3, sender=sender, receiver=receiver)
         sender_chat_id = receiver.public_key
 
         response = sender.wakuext_service.chat_messages(sender_chat_id)
@@ -144,7 +144,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert messages is None
 
     def test_delete_message_for_me_and_sync(self, sender, receiver):
-        _, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        _, responses = messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
 
         message_id = responses[0].get("messages", [])[0].get("id", "")
         local_chat_id = responses[0].get("messages", [])[0].get("localChatId", "")
@@ -161,7 +161,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         # TODO: assert sync action
 
     def test_update_message_outgoing_status(self, sender, receiver):
-        _, responses = self.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
+        _, responses = messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
         message_id = responses[0].get("messages", [])[0].get("id", "")
         new_status = "delivered"
 
