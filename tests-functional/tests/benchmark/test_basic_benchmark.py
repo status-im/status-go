@@ -3,14 +3,14 @@ import time
 import pytest
 
 from clients.status_backend import StatusBackend
-from steps.messenger import MessengerSteps
+from steps import messenger
 from utils import fake
 from utils.config import Config
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["waku_light_client_False", "waku_light_client_True"])
-class TestBasicBenchmark(MessengerSteps):
+class TestBasicBenchmark:
     """Test StatusBackend performance.
 
     This test suite contains a few test cases that track CPU, RAM and network usage via Docker API.
@@ -59,7 +59,7 @@ class TestBasicBenchmark(MessengerSteps):
 
         # Create a message sender
         sender = backend_new_profile("sender")
-        self.make_contacts(sender, aut)
+        messenger.make_contacts(sender, aut)
 
         messages_count = 200
         post_sleep_duration = 30
@@ -67,12 +67,12 @@ class TestBasicBenchmark(MessengerSteps):
         # Benchmark receiving many messages.
         # Don't verify reception, because it might be 1-2 messages flaky at the moment.
         aut.events.append(f"Send {messages_count} messages to AUT")
-        self.send_multiple_one_to_one_messages(messages_count, sender=sender, receiver=aut)
+        messenger.send_multiple_one_to_one_messages(messages_count, sender=sender, receiver=aut)
         self.sleep(aut, post_sleep_duration)
 
         # Benchmark sending many messages
         aut.events.append(f"Send {messages_count} messages from AUT")
-        self.send_multiple_one_to_one_messages(messages_count, sender=aut, receiver=sender)
+        messenger.send_multiple_one_to_one_messages(messages_count, sender=aut, receiver=sender)
         self.sleep(aut, post_sleep_duration)
 
         # Extra sleep after the test

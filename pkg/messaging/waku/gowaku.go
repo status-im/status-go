@@ -1,6 +1,3 @@
-//go:build !use_nwaku
-// +build !use_nwaku
-
 // Copyright 2019 The Waku Library Authors.
 //
 // The Waku library is free software: you can redistribute it and/or modify
@@ -2035,8 +2032,6 @@ func (w *Waku) Version() uint {
 	return 2
 }
 
-// This function is needed for nwaku, adding here for compatibility
 func (w *Waku) Metrics() string {
-
 	return ""
 }

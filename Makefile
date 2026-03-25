@@ -1,6 +1,5 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-ios-library statusgo-android-library
-.PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 .PHONY: build-libsds clean-libsds rebuild-libsds
 
 # Clear any GOROOT set outside of the Nix shell
@@ -100,17 +99,6 @@ GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
-
-# `nwaku` variables
-
-ifeq ($(USE_NWAKU), true)
-    BUILD_TAGS += use_nwaku
-    NWAKU_VERSION ?= v0.37.0-rc.3
-    NWAKU_SOURCE_DIR ?= $(GIT_ROOT)/../nwaku
-    LIBWAKU ?= $(NWAKU_SOURCE_DIR)/build/libwaku.$(LIB_EXT)
-    CGO_CFLAGS+=-I$(NWAKU_SOURCE_DIR)/library
-	CGO_LDFLAGS+=-L$(NWAKU_SOURCE_DIR)/build -lwaku -Wl,-rpath,$(NWAKU_SOURCE_DIR)/build
-endif
 
 # `nim-sds` variables
 
@@ -223,7 +211,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate $(LIBWAKU) $(LIBSDS)
+$(GO_CMD_BUILDS): generate $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -v \
@@ -232,37 +220,10 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-# Flag needed by nim-based dependencies (e.g., nwaku and nim-sds) that also use nimbus-build-system.
+# Flag needed by nim-based dependencies (e.g., nim-sds) that also use nimbus-build-system.
 # When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
 # enforces to use system-installed Nim.
 USE_SYSTEM_NIM ?= 1
-
-# Libwaku targets
-
-$(NWAKU_SOURCE_DIR): ##@build Clone nwaku
-ifeq ($(USE_NWAKU),true)
-	@echo "Cloning nwaku $(NWAKU_VERSION)..."
-	git clone --branch $(NWAKU_VERSION) https://github.com/waku-org/nwaku.git $(NWAKU_SOURCE_DIR)
-endif
-
-clone-nwaku: $(NWAKU_SOURCE_DIR)
-
-$(LIBWAKU): clone-nwaku
-ifeq ($(USE_NWAKU),true)
-	@echo "Building libwaku" $(LIBWAKU)
-	$(MAKE) -C $(NWAKU_SOURCE_DIR) libwaku USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
-endif
-
-build-libwaku: $(LIBWAKU)
-
-test-libwaku: | $(LIBWAKU)
-	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestDial ./wakuv2/... -count 1 -v -json | jq -r '.Output'
-
-clean-libwaku:
-	@echo "Removing libwaku"
-	rm $(LIBWAKU)
-
-rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 # libsds targets
 
@@ -355,7 +316,7 @@ statusgo-stub-bindings:
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
-statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
+statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
@@ -367,7 +328,7 @@ statusgo-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS)  ##@cross-compile Bui
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
 statusgo-shared-library: generate
-statusgo-shared-library: statusgo-c-bindings $(LIBWAKU) $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -386,7 +347,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
@@ -395,7 +356,7 @@ statusgo-android-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-a
 	@echo "Android library built"
 	@file build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings $(LIBWAKU) build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
