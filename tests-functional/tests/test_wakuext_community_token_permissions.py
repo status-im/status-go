@@ -490,7 +490,7 @@ class TestCommunityTokenPermissions:
             except Exception:
                 pass
 
-            community = self.fetch_community(backend, community_id)
+            community = messenger.fetch_community(backend, community_id)
             communities_resp = backend.wakuext_service.communities()
             communities_list = self._communities_list(communities_resp)
             community_from_list = next((c for c in communities_list if c.get("id") == community_id), None)
