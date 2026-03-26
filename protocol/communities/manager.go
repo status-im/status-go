@@ -196,6 +196,7 @@ type ArchiveFileService interface {
 type ArchiveService interface {
 	ArchiveFileService
 
+	SetPaused(paused bool)
 	SetOnline(bool)
 	SetTorrentConfig(*params.TorrentConfig)
 	StartTorrentClient() error

@@ -86,6 +86,8 @@ type monitoredEnvelope struct {
 
 // EnvelopesMonitor is responsible for monitoring waku envelopes state.
 type EnvelopesMonitor struct {
+	gocommon.PauseBroadcaster
+
 	w           types.Waku
 	api         types.PublicWakuAPI
 	handler     EnvelopeEventsHandler
@@ -328,17 +330,13 @@ func backoffDuration(attempts int) time.Duration {
 
 // retryLoop handles the retry logic to send envelope in a loop
 func (m *EnvelopesMonitor) retryLoop() {
-	ticker := time.NewTicker(500 * time.Millisecond) // Timer, triggers every 500 milliseconds
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-m.quit:
-			return
-		case <-ticker.C:
-			m.retryOnce()
-		}
-	}
+	sub := m.Subscribe()
+	defer sub.Unsubscribe()
+	pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+		Interval: 500 * time.Millisecond,
+		OnTick:   m.retryOnce,
+	}, sub.C())
+	pt.Run(m.quit)
 }
 
 // retryOnce retries once
