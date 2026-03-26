@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"reflect"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"go.uber.org/mock/gomock"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/common"
 	mock_backup_controller "github.com/status-im/status-go/services/backup/mock"
 )
 
@@ -99,4 +102,77 @@ func TestController(t *testing.T) {
 
 	require.True(t, reflect.DeepEqual(barProvider.bar, barFromBackup))
 	require.True(t, reflect.DeepEqual(fooProvider.foo, fooFromBackup))
+}
+
+type countingProvider struct {
+	hits *atomic.Int32
+}
+
+func (p countingProvider) ExportBackup() ([]byte, error) {
+	p.hits.Add(1)
+	return []byte(`{"ok":true}`), nil
+}
+
+func (p countingProvider) ImportBackup([]byte) error {
+	return nil
+}
+
+func TestControllerLifecycleState(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	filenameProvider := mock_backup_controller.NewMockFilenameProvider(ctrl)
+	filenameProvider.EXPECT().GetBackupFilename().Return(t.TempDir()+"/lifecycle_backup.bak", nil).AnyTimes()
+
+	controller, err := NewController(Config{
+		FileNameProvider: filenameProvider,
+		PrivateKey:       []byte("0123456789abcdef0123456789abcdef"),
+		BackupEnabled:    true,
+		Interval:         time.Hour, // long interval so backup doesn't fire during test
+	}, logger)
+	require.NoError(t, err)
+
+	require.Equal(t, common.ServiceStateStopped, controller.PausableState())
+
+	controller.Start()
+	require.Equal(t, common.ServiceStateRunning, controller.PausableState())
+
+	controller.Stop()
+	require.Equal(t, common.ServiceStateStopped, controller.PausableState())
+}
+
+func TestControllerStartPausesAndResumesByLifecycle(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	filenameProvider := mock_backup_controller.NewMockFilenameProvider(ctrl)
+	filenameProvider.EXPECT().GetBackupFilename().Return(t.TempDir()+"/pause_resume_backup.bak", nil).AnyTimes()
+
+	controller, err := NewController(Config{
+		FileNameProvider: filenameProvider,
+		PrivateKey:       []byte("0123456789abcdef0123456789abcdef"),
+		BackupEnabled:    true,
+		// Long enough that the first tick cannot fire before MarkPaused propagates.
+		Interval: time.Second,
+	}, logger)
+	require.NoError(t, err)
+
+	var hits atomic.Int32
+	controller.Register("counting", countingProvider{hits: &hits})
+	controller.Start()
+	// Pause immediately after Start. Subscribe() delivers the current pause
+	// state as a snapshot, so the PausableTicker goroutine will see "paused"
+	// regardless of whether it subscribes before or after this call.
+	controller.MarkPaused()
+	defer controller.Stop()
+
+	time.Sleep(150 * time.Millisecond)
+	require.Equal(t, int32(0), hits.Load())
+
+	controller.MarkResumed()
+	require.Eventually(t, func() bool {
+		return hits.Load() > 0
+	}, 3*time.Second, 20*time.Millisecond)
 }

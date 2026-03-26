@@ -25,6 +25,8 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManagerNop {
 	}
 }
 
+func (tmm *ArchiveManagerNop) SetPaused(paused bool) {}
+
 func (tmm *ArchiveManagerNop) SetOnline(online bool) {}
 
 func (tmm *ArchiveManagerNop) SetTorrentConfig(*params.TorrentConfig) {}

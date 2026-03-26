@@ -98,6 +98,7 @@ const cacheTTL = 20 * time.Minute
 const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
+const pausedModePeerExchangeMinPeers = 3
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -128,6 +129,8 @@ type IMetricsHandler interface {
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
+	gocommon.PauseBroadcaster
+
 	node *node.WakuNode // reference to a libp2p waku node
 
 	dnsAddressCache             map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
@@ -590,13 +593,29 @@ func (w *Waku) runPeerExchangeLoop() {
 
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
+	sub := w.PauseBroadcaster.Subscribe()
+	defer sub.Unsubscribe()
+	paused := <-sub.C()
 
 	for {
 		select {
 		case <-w.ctx.Done():
 			w.logger.Debug("Peer exchange loop stopped")
 			return
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			paused = pausedState
 		case <-ticker.C:
+			if paused {
+				peerCount := len(w.node.Host().Network().Peers())
+				if peerCount >= pausedModePeerExchangeMinPeers {
+					// In paused mode, avoid proactive peer exchange unless peer count
+					// drops below a minimal threshold needed to keep connectivity healthy.
+					continue
+				}
+			}
 			w.logger.Debug("Running peer exchange loop")
 			err := w.node.PeerExchange().Request(
 				w.ctx,
@@ -1054,11 +1073,28 @@ func (w *Waku) Start() error {
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
+		sub := w.PauseBroadcaster.Subscribe()
+		defer sub.Unsubscribe()
+		paused := <-sub.C()
+		var tickerC <-chan time.Time
+		if !paused {
+			tickerC = ticker.C
+		}
 		for {
 			select {
 			case <-w.ctx.Done():
 				return
-			case <-ticker.C:
+			case pausedState, ok := <-sub.C():
+				if !ok {
+					return
+				}
+				paused = pausedState
+				if paused {
+					tickerC = nil
+				} else {
+					tickerC = ticker.C
+				}
+			case <-tickerC:
 				w.checkForConnectionChanges()
 			case <-w.topicHealthStatusChan:
 				// TODO: https://github.com/status-im/status-go/issues/4628
@@ -1076,6 +1112,13 @@ func (w *Waku) Start() error {
 			peerTelemetryTickerInterval := 10 * time.Second
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
 			defer peerTelemetryTicker.Stop()
+			sub := w.PauseBroadcaster.Subscribe()
+			defer sub.Unsubscribe()
+			paused := <-sub.C()
+			var telemetryTickerC <-chan time.Time
+			if !paused {
+				telemetryTickerC = peerTelemetryTicker.C
+			}
 
 			dialErrSub, err := w.node.Host().EventBus().Subscribe(new(utils.DialError))
 			if err != nil {
@@ -1099,7 +1142,17 @@ func (w *Waku) Start() error {
 				select {
 				case <-w.ctx.Done():
 					return
-				case <-peerTelemetryTicker.C:
+				case pausedState, ok := <-sub.C():
+					if !ok {
+						return
+					}
+					paused = pausedState
+					if paused {
+						telemetryTickerC = nil
+					} else {
+						telemetryTickerC = peerTelemetryTicker.C
+					}
+				case <-telemetryTickerC:
 					w.reportPeerMetrics()
 				case dialErr := <-dialErrSub.Out():
 					errors := common2.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
@@ -1184,6 +1237,7 @@ func (w *Waku) Start() error {
 	w.wg.Add(1)
 	go w.seedBootnodesForDiscV5()
 
+	w.MarkStarted()
 	return nil
 }
 
@@ -1368,6 +1422,8 @@ func (w *Waku) Stop() error {
 
 	close(w.goingOnline)
 	w.wg.Wait()
+
+	w.MarkStopped()
 
 	_ = w.logger.Sync()
 
@@ -1686,6 +1742,13 @@ func (w *Waku) seedBootnodesForDiscV5() {
 
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
+	sub := w.PauseBroadcaster.Subscribe()
+	defer sub.Unsubscribe()
+	paused := <-sub.C()
+	var tickerC <-chan time.Time
+	if !paused {
+		tickerC = ticker.C
+	}
 	var retries = 0
 
 	now := func() int64 {
@@ -1703,6 +1766,16 @@ func (w *Waku) seedBootnodesForDiscV5() {
 
 	for {
 		select {
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			paused = pausedState
+			if paused {
+				tickerC = nil
+			} else {
+				tickerC = ticker.C
+			}
 		case <-w.dnsDiscAsyncRetrievedSignal:
 			if !canQuery() {
 				continue
@@ -1714,7 +1787,7 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			}
 			retries = 0
 			lastTry = now()
-		case <-ticker.C:
+		case <-tickerC:
 			if w.seededBootnodesForDiscV5 && len(w.node.Host().Network().Peers()) > 3 {
 				w.logger.Debug("not querying bootnodes", zap.Bool("seeded", w.seededBootnodesForDiscV5), zap.Int("peer-count", len(w.node.Host().Network().Peers())))
 				continue

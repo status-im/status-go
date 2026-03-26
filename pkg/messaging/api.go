@@ -30,3 +30,17 @@ func (a *API) Publisher() *pubsub.Publisher {
 func (a *API) GetCurrentTime() uint64 {
 	return a.core.stack.Transport.GetCurrentTime()
 }
+
+// PauseTransport signals the transport and its sub-components to idle their goroutines.
+func (a *API) PauseTransport() {
+	if a.core.stack.Transport != nil {
+		a.core.stack.Transport.Pause()
+	}
+}
+
+// ResumeTransport signals the transport and its sub-components to resume their goroutines.
+func (a *API) ResumeTransport() {
+	if a.core.stack.Transport != nil {
+		a.core.stack.Transport.Resume()
+	}
+}
