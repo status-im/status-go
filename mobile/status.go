@@ -854,37 +854,62 @@ func makeJSONResponse(err error) string {
 	return string(outBytes)
 }
 
-// Deprecated: Use AppStateChangeV2 instead.
-func AppStateChange(state string) {
-	call(appStateChange, state)
+// PausableServices returns a JSON array of {name, state} for all pausable services.
+func PausableServices() string {
+	return callWithResponse(pausableServices)
 }
 
-// appStateChange handles app state changes (background/foreground).
-func appStateChange(state string) {
-	s, err := backend.ParseAppState(state)
-	if err != nil {
-		logutils2.ZapLogger().Error("parse app state failed, ignoring", zap.Error(err))
-		return
-	}
-	statusBackend.AppStateChange(s)
-}
-
-func AppStateChangeV2(requestJSON string) string {
-	return callWithResponse(appStateChangeV2, requestJSON)
-}
-
-func appStateChangeV2(requestJSON string) string {
-	var request m_requests.AppStateChange
-	err := json.Unmarshal([]byte(requestJSON), &request)
+func pausableServices() string {
+	list := statusBackend.PausableServices()
+	data, err := json.Marshal(list)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	err = request.Validate()
-	if err != nil {
+	return string(data)
+}
+
+// PauseService pauses a single named service.
+func PauseService(name string) string {
+	return callWithResponse(pauseService, name)
+}
+
+func pauseService(name string) string {
+	return makeJSONResponse(statusBackend.PauseService(name))
+}
+
+// ResumeService resumes a single named service.
+func ResumeService(name string) string {
+	return callWithResponse(resumeService, name)
+}
+
+func resumeService(name string) string {
+	return makeJSONResponse(statusBackend.ResumeService(name))
+}
+
+// PauseServices pauses a JSON-encoded list of service names.
+func PauseServices(namesJSON string) string {
+	return callWithResponse(pauseServices, namesJSON)
+}
+
+func pauseServices(namesJSON string) string {
+	var names []string
+	if err := json.Unmarshal([]byte(namesJSON), &names); err != nil {
 		return makeJSONResponse(err)
 	}
-	statusBackend.AppStateChange(request.State)
-	return makeJSONResponse(nil)
+	return makeJSONResponse(statusBackend.PauseServices(names))
+}
+
+// ResumeServices resumes a JSON-encoded list of service names.
+func ResumeServices(namesJSON string) string {
+	return callWithResponse(resumeServices, namesJSON)
+}
+
+func resumeServices(namesJSON string) string {
+	var names []string
+	if err := json.Unmarshal([]byte(namesJSON), &names); err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(statusBackend.ResumeServices(names))
 }
 
 func StartLocalNotifications() string {
