@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
 )
 
 func setupTest() (*InMemRequestsMapStorage, RequestLimiter) {
@@ -192,4 +194,26 @@ func TestAllowWhenLimitNotReachedForInfinitePeriod(t *testing.T) {
 
 	// Verify the result
 	require.True(t, allow)
+}
+
+func TestRPCRpsLimiterStartReleasesWaitingCallersOnTick(t *testing.T) {
+	waitCh := make(chan bool, 1)
+	rl := &RPCRpsLimiter{
+		uuid:                     uuid.New(),
+		maxRequestsPerSecond:     1,
+		requestsMadeWithinSecond: 1,
+		callersOnWaitForRequests: []callerOnWait{
+			{requests: 1, ch: waitCh},
+		},
+		quit: make(chan struct{}),
+	}
+
+	rl.start()
+	defer rl.Stop()
+
+	select {
+	case <-waitCh:
+	case <-time.After(2 * tickerInterval):
+		t.Fatal("limiter did not release callers after tick")
+	}
 }

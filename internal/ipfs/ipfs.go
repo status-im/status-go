@@ -35,6 +35,8 @@ type taskRequest struct {
 }
 
 type Downloader struct {
+	common.PauseBroadcaster
+
 	ctx             context.Context
 	cancel          func()
 	ipfsDir         string
@@ -98,18 +100,22 @@ func (d *Downloader) worker() {
 
 func (d *Downloader) taskDispatcher() {
 	defer common.LogOnPanic()
-	ticker := time.NewTicker(time.Second / maxRequestsPerSecond)
-	defer ticker.Stop()
-
-	for {
-		<-ticker.C
-		request, ok := <-d.inputTaskChan
-		if !ok {
-			return
-		}
-		d.rateLimiterChan <- request
-
-	}
+	sub := d.Subscribe()
+	defer sub.Unsubscribe()
+	pt := common.NewPausableTicker(common.PausableTickerConfig{
+		Interval: time.Second / maxRequestsPerSecond,
+		OnTick: func() {
+			select {
+			case request, ok := <-d.inputTaskChan:
+				if !ok {
+					return
+				}
+				d.rateLimiterChan <- request
+			default:
+			}
+		},
+	}, sub.C())
+	pt.Run(d.quit)
 }
 
 func hashToCid(hash []byte) (string, error) {
