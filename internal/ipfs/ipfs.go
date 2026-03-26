@@ -18,7 +18,6 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/params"
 )
 
 const maxRequestsPerSecond = 3
@@ -202,7 +201,7 @@ func (d *Downloader) exists(cid string) (bool, []byte, error) {
 func (d *Downloader) download(cid string, download bool) ([]byte, error) {
 	path := filepath.Join(d.ipfsDir, cid)
 
-	req, err := http.NewRequest(http.MethodGet, params.IpfsGatewayURL+cid, nil)
+	req, err := http.NewRequest(http.MethodGet, common.IpfsGatewayURL+cid, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -12,10 +12,11 @@ import (
 	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 func TestStatusNodeStart(t *testing.T) {
-	config, err := params.NewNodeConfig("", params.StatusChainNetworkID)
+	config, err := params.NewNodeConfig("", walletcommon.StatusNetworkSepolia)
 	require.NoError(t, err)
 
 	// StatusNode startup always creates & starts TokenManager, which requires at least one active network.

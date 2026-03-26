@@ -48,6 +48,7 @@ import (
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/backend/node"
 	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
 	"github.com/status-im/status-go/pkg/sentry"
@@ -122,7 +123,7 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 	logger.Info("Status backend initialized",
 		zap.String("backend geth version", version.Version()),
 		zap.String("commit", version.GitCommit()),
-		zap.String("IpfsGatewayURL", params.IpfsGatewayURL))
+		zap.String("IpfsGatewayURL", gocommon.IpfsGatewayURL))
 
 	if gocommon.IsMobilePlatform() {
 		debug.SetMemoryLimit(1024 * 1024 * 150) // 150MB
@@ -580,7 +581,7 @@ func (b *StatusBackend) updateAccountColorHashAndColorID(keyUID string, accounts
 }
 
 func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login, thirdpartyServicesEnabled bool) {
-	conf.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig, thirdpartyServicesEnabled)
+	conf.Networks = networkdefaults.BuildDefaultNetworks(&request.WalletSecretsConfig, thirdpartyServicesEnabled)
 }
 
 func (b *StatusBackend) LoginAccount(request *requests.Login) error {

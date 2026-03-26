@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/common"
 	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/params"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 // makeTestNodeConfig defines a function to return a params.NodeConfig
@@ -16,7 +17,7 @@ import (
 func makeTestNodeConfig(t *testing.T) (*params.NodeConfig, error) {
 	rootDataDir := t.TempDir()
 
-	networkID := params.StatusChainNetworkID
+	networkID := walletcommon.StatusNetworkSepolia
 	testDir := filepath.Join(rootDataDir, "StatusChain")
 
 	if common.OperatingSystemIs(common.WindowsPlatform) {
@@ -32,7 +33,7 @@ func makeTestNodeConfig(t *testing.T) (*params.NodeConfig, error) {
 
 	configJSON := `{
 		"Name": "test",
-		"NetworkId": ` + strconv.Itoa(networkID) + `,
+		"NetworkId": ` + strconv.FormatUint(networkID, 10) + `,
 		"RootDataDir": "` + testDir + `",
 		"KeycardPairingDataFile": "` + path.Join(testDir, "keycard/pairings.json") + `",
 		"HTTPPort": 8645,

@@ -20,6 +20,15 @@ var (
 	newBlockCheckIntervalArbitrum      = 200 * time.Millisecond
 	newBlockCheckIntervalBase          = 1 * time.Second
 	newBlockCheckIntervalLinea         = 1 * time.Second
+	newBlockCheckIntervalPolygonZkEVM  = 2 * time.Second
+	newBlockCheckIntervalUnichain      = 1 * time.Second
+	newBlockCheckIntervalKatana        = 1 * time.Second
+	newBlockCheckIntervalInk           = 1 * time.Second
+	newBlockCheckIntervalAbstract      = 200 * time.Millisecond
+	newBlockCheckIntervalZkSync        = 1 * time.Second
+	newBlockCheckIntervalSoneium       = 2 * time.Second
+	newBlockCheckIntervalScroll        = 1 * time.Second
+	newBlockCheckIntervalBlast         = 2 * time.Second
 	newBlockCheckIntervalBSC           = 3 * time.Second
 	newBlockCheckIntervalStatusNetwork = 1 * time.Second
 	newBlockCheckIntervalAnvilMainnet  = 2 * time.Second
@@ -75,6 +84,33 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 	case walletCommon.LineaMainnet,
 		walletCommon.LineaSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalLinea)
+	case walletCommon.PolygonZkEVMMainnet,
+		walletCommon.PolygonZkEVMCardona:
+		ticker = time.NewTicker(newBlockCheckIntervalPolygonZkEVM)
+	case walletCommon.UnichainMainnet,
+		walletCommon.UnichainSepolia:
+		ticker = time.NewTicker(newBlockCheckIntervalUnichain)
+	case walletCommon.KatanaMainnet,
+		walletCommon.KatanaBokuto:
+		ticker = time.NewTicker(newBlockCheckIntervalKatana)
+	case walletCommon.InkMainnet,
+		walletCommon.InkSepolia:
+		ticker = time.NewTicker(newBlockCheckIntervalInk)
+	case walletCommon.AbstractMainnet,
+		walletCommon.AbstractTestnet:
+		ticker = time.NewTicker(newBlockCheckIntervalAbstract)
+	case walletCommon.ZkSyncMainnet,
+		walletCommon.ZkSyncSepolia:
+		ticker = time.NewTicker(newBlockCheckIntervalZkSync)
+	case walletCommon.SoneiumMainnet,
+		walletCommon.SoneiumMinato:
+		ticker = time.NewTicker(newBlockCheckIntervalSoneium)
+	case walletCommon.ScrollMainnet,
+		walletCommon.ScrollSepolia:
+		ticker = time.NewTicker(newBlockCheckIntervalScroll)
+	case walletCommon.BlastMainnet,
+		walletCommon.BlastSepolia:
+		ticker = time.NewTicker(newBlockCheckIntervalBlast)
 	case walletCommon.StatusNetworkSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalStatusNetwork)
 	case walletCommon.BSCMainnet,

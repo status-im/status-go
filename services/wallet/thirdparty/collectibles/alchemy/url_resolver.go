@@ -71,6 +71,38 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 		return "https://linea-mainnet.g.alchemy.com", nil
 	case walletCommon.LineaSepolia:
 		return "https://linea-sepolia.g.alchemy.com", nil
+	case walletCommon.PolygonZkEVMMainnet:
+		return "https://polygonzkevm-mainnet.g.alchemy.com", nil
+	case walletCommon.PolygonZkEVMCardona:
+		return "https://polygonzkevm-cardona.g.alchemy.com", nil
+	case walletCommon.UnichainMainnet:
+		return "https://unichain-mainnet.g.alchemy.com", nil
+	case walletCommon.UnichainSepolia:
+		return "https://unichain-sepolia.g.alchemy.com", nil
+	case walletCommon.InkMainnet:
+		return "https://ink-mainnet.g.alchemy.com", nil
+	case walletCommon.InkSepolia:
+		return "https://ink-sepolia.g.alchemy.com", nil
+	case walletCommon.AbstractMainnet:
+		return "https://abstract-mainnet.g.alchemy.com", nil
+	case walletCommon.AbstractTestnet:
+		return "https://abstract-sepolia.g.alchemy.com", nil
+	case walletCommon.ZkSyncMainnet:
+		return "https://zksync-mainnet.g.alchemy.com", nil
+	case walletCommon.ZkSyncSepolia:
+		return "https://zksync-sepolia.g.alchemy.com", nil
+	case walletCommon.SoneiumMainnet:
+		return "https://soneium-mainnet.g.alchemy.com", nil
+	case walletCommon.SoneiumMinato:
+		return "https://soneium-minato.g.alchemy.com", nil
+	case walletCommon.ScrollMainnet:
+		return "https://scroll-mainnet.g.alchemy.com", nil
+	case walletCommon.ScrollSepolia:
+		return "https://scroll-sepolia.g.alchemy.com", nil
+	case walletCommon.BlastMainnet:
+		return "https://blast-mainnet.g.alchemy.com", nil
+	case walletCommon.BlastSepolia:
+		return "https://blast-sepolia.g.alchemy.com", nil
 	}
 
 	return "", thirdparty.ErrChainIDNotSupported
