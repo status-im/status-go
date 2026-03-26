@@ -29,7 +29,7 @@ import (
 */
 
 type BaseServer struct {
-	server.Server
+	*server.Server
 	challengeGiver *ChallengeGiver
 
 	config ServerConfig
