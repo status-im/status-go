@@ -73,7 +73,7 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	s.server = &BaseServer{
-		Server: bs,
+		Server: &bs,
 		config: sc,
 	}
 }

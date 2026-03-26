@@ -29,7 +29,7 @@ import (
 */
 
 type BaseServer struct {
-	server.Server
+	*server.Server
 	challengeGiver *ChallengeGiver
 
 	config ServerConfig
@@ -47,14 +47,15 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 		return nil, errorspkg.New("invalid listen IP")
 	}
 
+	srv := server.NewServer(
+		logger,
+		&server.Config{
+			Cert:     config.Cert,
+			AddrPort: netip.AddrPortFrom(addr, 0),
+		},
+	)
 	bs := &BaseServer{
-		Server: server.NewServer(
-			logger,
-			&server.Config{
-				Cert:     config.Cert,
-				AddrPort: netip.AddrPortFrom(addr, 0),
-			},
-		),
+		Server:         &srv,
 		challengeGiver: cg,
 		config:         *config,
 	}

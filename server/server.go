@@ -9,11 +9,28 @@ import (
 	"net/netip"
 	"net/url"
 	"strconv"
+	"sync"
+	"sync/atomic"
+	"syscall"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
 )
+
+// tcpListenConfig sets SO_REUSEADDR so rapid Stop/Start can rebind the same
+// cached ephemeral port without waiting for the kernel to release it.
+var tcpListenConfig = net.ListenConfig{
+	Control: func(network, address string, c syscall.RawConn) error {
+		var optErr error
+		if err := c.Control(func(fd uintptr) {
+			optErr = setReuseAddr(fd)
+		}); err != nil {
+			return err
+		}
+		return optErr
+	},
+}
 
 type Config struct {
 	Cert     *tls.Certificate
@@ -26,6 +43,8 @@ type Config struct {
 }
 
 type Server struct {
+	mu sync.Mutex
+
 	listener net.Listener
 	server   *http.Server
 	logger   *zap.Logger
@@ -36,8 +55,12 @@ type Server struct {
 	// address is the host and port the server is listening on
 	address *net.TCPAddr
 
-	// isRunning is true if the server was started and is running
-	isRunning bool
+	// running is true if the server was started and Serve is active; read via IsRunning().
+	running atomic.Bool
+
+	// cachedPort stores the port from the first successful bind when AddrPort used port 0 (ephemeral).
+	// Reused on pause/resume so URLs remain valid across ToBackground/ToForeground cycles.
+	cachedPort int
 
 	*timeoutManager
 }
@@ -91,14 +114,29 @@ func (s *Server) GetLogger() *zap.Logger {
 	return s.logger
 }
 
+// getBindAddrPort returns the address to bind to. When config used port 0 (ephemeral)
+// and we have a cached port from a previous run, reuse it so URLs stay stable across pause/resume.
+func (s *Server) getBindAddrPort() netip.AddrPort {
+	if s.cachedPort != 0 && s.config.AddrPort.Port() == 0 {
+		return netip.AddrPortFrom(s.config.AddrPort.Addr(), uint16(s.cachedPort))
+	}
+	return s.config.AddrPort
+}
+
 func (s *Server) createListener() (net.Listener, error) {
-	if s.config.Cert == nil {
-		// HTTP mode
-		return net.Listen("tcp", s.config.AddrPort.String())
+	addr := s.getBindAddrPort()
+	addrStr := addr.String()
+
+	ln, err := tcpListenConfig.Listen(context.Background(), "tcp", addrStr)
+	if err != nil {
+		return nil, err
 	}
 
-	// HTTPS mode
-	serverName := s.config.AddrPort.Addr().String()
+	if s.config.Cert == nil {
+		return ln, nil
+	}
+
+	serverName := addr.Addr().String()
 	if len(s.config.Cert.Leaf.DNSNames) > 0 {
 		serverName = s.config.Cert.Leaf.DNSNames[0]
 	}
@@ -108,7 +146,7 @@ func (s *Server) createListener() (net.Listener, error) {
 		ServerName:   serverName,
 		MinVersion:   tls.VersionTLS12,
 	}
-	return tls.Listen("tcp", s.config.AddrPort.String(), cfg)
+	return tls.NewListener(ln, cfg), nil
 }
 
 func (s *Server) listen() error {
@@ -122,6 +160,9 @@ func (s *Server) listen() error {
 	}
 
 	s.address = s.listener.Addr().(*net.TCPAddr)
+	if s.config.AddrPort.Port() == 0 {
+		s.cachedPort = s.address.Port
+	}
 
 	s.StartTimeout(func() {
 		err := s.Stop()
@@ -133,16 +174,22 @@ func (s *Server) listen() error {
 	return nil
 }
 
-func (s *Server) serve() {
+func (s *Server) serve(currentServer *http.Server, currentListener net.Listener) {
 	defer common.LogOnPanic()
 
-	s.isRunning = true
 	defer func() {
-		s.isRunning = false
-		s.address = nil
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		// If a newer Start() already replaced server/listener, do not clobber
+		// the latest running instance state.
+		if s.server == currentServer && s.listener == currentListener {
+			s.running.Store(false)
+			s.address = nil
+		}
 	}()
 
-	err := s.server.Serve(s.listener)
+	err := currentServer.Serve(currentListener)
 	if errors.Is(err, http.ErrServerClosed) {
 		return
 	}
@@ -171,7 +218,10 @@ func (s *Server) applyHandlers() {
 }
 
 func (s *Server) Start() error {
-	if s.isRunning {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.running.Load() {
 		return nil
 	}
 
@@ -184,38 +234,45 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	go s.serve()
+	// Mark running synchronously to avoid pause/play races where ToBackground
+	// can run before serve() goroutine has a chance to set the state.
+	s.running.Store(true)
+	go s.serve(s.server, s.listener)
 	return nil
 }
 
 func (s *Server) Stop() error {
+	s.mu.Lock()
 	s.StopTimeout()
-	if s.server != nil {
-		return s.server.Shutdown(context.Background())
+	if !s.running.Load() || s.server == nil {
+		s.mu.Unlock()
+		return nil
 	}
 
-	return nil
+	// Capture the current instance and release the lock before Shutdown.
+	// Shutdown waits for Serve() to return, and Serve() may update state in
+	// its defer path under the same mutex.
+	currentServer := s.server
+	s.running.Store(false)
+	s.mu.Unlock()
+
+	return currentServer.Shutdown(context.Background())
 }
 
 func (s *Server) IsRunning() bool {
-	return s.isRunning
+	return s.running.Load()
 }
 
 func (s *Server) ToForeground() {
-	if !s.isRunning && (s.server != nil) {
-		err := s.Start()
-		if err != nil {
-			s.logger.Error("server start failed during foreground transition", zap.Error(err))
-		}
+	if err := s.Start(); err != nil {
+		s.logger.Error("server start failed during foreground transition", zap.Error(err))
 	}
 }
 
 func (s *Server) ToBackground() {
-	if s.isRunning {
-		err := s.Stop()
-		if err != nil {
-			s.logger.Error("server stop failed during background transition", zap.Error(err))
-		}
+	err := s.Stop()
+	if err != nil {
+		s.logger.Error("server stop failed during background transition", zap.Error(err))
 	}
 }
 
