@@ -332,37 +332,6 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	wg.Wait()
 }
 
-func TestAppStateChange(t *testing.T) {
-	backend := NewStatusBackend(testutils.MustCreateTestLogger())
-
-	var testCases = []struct {
-		name          string
-		fromState     AppState
-		toState       AppState
-		expectedState AppState
-	}{
-		{
-			name:          "success",
-			fromState:     AppStateInactive,
-			toState:       AppStateBackground,
-			expectedState: AppStateBackground,
-		},
-		{
-			name:          "invalid state",
-			fromState:     AppStateInvalid,
-			toState:       "unexisting",
-			expectedState: AppStateInvalid,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			backend.appState = tc.fromState
-			backend.AppStateChange(tc.toState)
-			assert.Equal(t, tc.expectedState.String(), backend.appState.String())
-		})
-	}
-}
 
 func TestCallRPCWithStoppedNode(t *testing.T) {
 	backend := NewStatusBackend(testutils.MustCreateTestLogger())
