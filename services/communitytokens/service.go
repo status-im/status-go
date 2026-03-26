@@ -204,6 +204,17 @@ func (s *Service) handleBurnCommunityToken(status string, toAddress common.Addre
 }
 
 func (s *Service) handleDeployOwnerToken(status string, chainID walletCommon.ChainID, txHash common.Hash) (*token.CommunityToken, *token.CommunityToken, error) {
+	tempOwnerAddress := s.TemporaryOwnerContractAddress(txHash.Hex())
+	tempMasterAddress := s.TemporaryMasterContractAddress(txHash.Hex())
+
+	s.logger.Debug("handling owner/master token deployment status",
+		zap.String("status", status),
+		zap.Uint64("chainID", uint64(chainID)),
+		zap.String("txHash", txHash.Hex()),
+		zap.String("temporaryOwnerAddress", tempOwnerAddress),
+		zap.String("temporaryMasterAddress", tempMasterAddress),
+	)
+
 	newMasterAddress, err := s.GetMasterTokenContractAddressFromHash(context.Background(), uint64(chainID), txHash.Hex())
 	if err != nil {
 		s.logger.Error("failed to resolve master token contract address from transaction hash",
@@ -223,24 +234,75 @@ func (s *Service) handleDeployOwnerToken(status string, chainID walletCommon.Cha
 		return nil, nil, err
 	}
 
-	err = s.Messenger.UpdateCommunityTokenAddress(int(chainID), s.TemporaryOwnerContractAddress(txHash.Hex()), newOwnerAddress)
+	s.logger.Debug("resolved owner/master addresses from receipt",
+		zap.Uint64("chainID", uint64(chainID)),
+		zap.String("txHash", txHash.Hex()),
+		zap.String("newOwnerAddress", newOwnerAddress),
+		zap.String("newMasterAddress", newMasterAddress),
+		zap.String("temporaryOwnerAddress", tempOwnerAddress),
+		zap.String("temporaryMasterAddress", tempMasterAddress),
+	)
+
+	err = s.Messenger.UpdateCommunityTokenAddress(int(chainID), tempOwnerAddress, newOwnerAddress)
 	if err != nil {
+		s.logger.Error("failed to update owner token temporary address to deployed address",
+			zap.Uint64("chainID", uint64(chainID)),
+			zap.String("txHash", txHash.Hex()),
+			zap.String("temporaryOwnerAddress", tempOwnerAddress),
+			zap.String("newOwnerAddress", newOwnerAddress),
+			zap.Error(err),
+		)
 		return nil, nil, err
 	}
-	err = s.Messenger.UpdateCommunityTokenAddress(int(chainID), s.TemporaryMasterContractAddress(txHash.Hex()), newMasterAddress)
+	err = s.Messenger.UpdateCommunityTokenAddress(int(chainID), tempMasterAddress, newMasterAddress)
 	if err != nil {
+		s.logger.Error("failed to update master token temporary address to deployed address",
+			zap.Uint64("chainID", uint64(chainID)),
+			zap.String("txHash", txHash.Hex()),
+			zap.String("temporaryMasterAddress", tempMasterAddress),
+			zap.String("newMasterAddress", newMasterAddress),
+			zap.Error(err),
+		)
 		return nil, nil, err
 	}
 
+	s.logger.Debug("updated temporary token addresses to deployed addresses",
+		zap.Uint64("chainID", uint64(chainID)),
+		zap.String("txHash", txHash.Hex()),
+		zap.String("temporaryOwnerAddress", tempOwnerAddress),
+		zap.String("temporaryMasterAddress", tempMasterAddress),
+		zap.String("newOwnerAddress", newOwnerAddress),
+		zap.String("newMasterAddress", newMasterAddress),
+	)
+
 	ownerToken, err := s.updateStateAndAddTokenToCommunityDescription(status, int(chainID), newOwnerAddress)
 	if err != nil {
+		s.logger.Error("failed to update owner token state after deployment",
+			zap.Uint64("chainID", uint64(chainID)),
+			zap.String("txHash", txHash.Hex()),
+			zap.String("ownerAddress", newOwnerAddress),
+			zap.Error(err),
+		)
 		return nil, nil, err
 	}
 
 	masterToken, err := s.updateStateAndAddTokenToCommunityDescription(status, int(chainID), newMasterAddress)
 	if err != nil {
+		s.logger.Error("failed to update master token state after deployment",
+			zap.Uint64("chainID", uint64(chainID)),
+			zap.String("txHash", txHash.Hex()),
+			zap.String("masterAddress", newMasterAddress),
+			zap.Error(err),
+		)
 		return nil, nil, err
 	}
+
+	s.logger.Debug("owner/master token deployment status handled successfully",
+		zap.Uint64("chainID", uint64(chainID)),
+		zap.String("txHash", txHash.Hex()),
+		zap.String("ownerAddress", newOwnerAddress),
+		zap.String("masterAddress", newMasterAddress),
+	)
 
 	return ownerToken, masterToken, nil
 }

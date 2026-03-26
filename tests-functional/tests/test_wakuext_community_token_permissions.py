@@ -3,10 +3,11 @@ import time
 import uuid
 import json
 import re
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 
 import pytest
+from web3 import Web3
 
 from clients.api import ApiResponseError
 from clients.services.wakuext import (
@@ -175,6 +176,97 @@ class TestCommunityTokenPermissions:
             member_community and member_community.get("name") == expected_name and member_community.get("description") == expected_description
         )
 
+    def temporary_master_contract_address(self, tx_hash: str) -> str:
+        return f"{tx_hash}-master"
+
+    def temporary_owner_contract_address(self, tx_hash: str) -> str:
+        return f"{tx_hash}-owner"
+
+    def _extract_master_token_address_from_event(self, event: dict) -> Optional[str]:
+        candidates = [
+            (event.get("masterToken") or {}).get("address"),
+            event.get("masterTokenAddress"),
+            event.get("masterTokenContractAddress"),
+            ((event.get("tokenData") or {}).get("masterToken") or {}).get("address"),
+            (event.get("tokenData") or {}).get("masterTokenAddress"),
+            ((event.get("token") or {}).get("masterToken") or {}).get("address"),
+            (event.get("token") or {}).get("masterTokenAddress"),
+        ]
+        for address in candidates:
+            if isinstance(address, str) and re.fullmatch(r"0x[a-fA-F0-9]{40}", address):
+                return address
+        return None
+
+    def resolve_master_token_address_from_receipt(self, anvil_client, tx_hash: Optional[str]) -> Optional[str]:
+        """Resolve deployed master token address directly from deploy tx receipt logs."""
+        _, master_token_address = self.resolve_owner_and_master_token_addresses_from_receipt(anvil_client, tx_hash)
+        return master_token_address
+
+    def resolve_owner_and_master_token_addresses_from_receipt(self, anvil_client, tx_hash: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve deployed owner/master token addresses directly from deploy tx receipt logs."""
+        if not anvil_client:
+            return None, None
+        if not isinstance(tx_hash, str) or re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash) is None:
+            return None, None
+
+        try:
+            receipt = anvil_client.transaction_receipt(tx_hash)
+        except Exception as exc:
+            logger.warning(f"Failed to fetch tx receipt for {tx_hash}: {exc}")
+            return None, None
+
+        if not receipt:
+            return None, None
+
+        status = receipt.get("status")
+        if status not in (1, "0x1", True):
+            logger.warning(f"Receipt for tx {tx_hash} is not successful yet (status={status})")
+            return None, None
+
+        expected_owner_topic0 = Web3.keccak(text="DeployOwnerToken(address)").hex().lower()
+        expected_master_topic0 = Web3.keccak(text="DeployMasterToken(address)").hex().lower()
+        expected_emitter = str(self.community_token_deployer).lower()
+
+        owner_token_address = None
+        master_token_address = None
+
+        for v_log in receipt.get("logs", []) or []:
+            topics = v_log.get("topics", []) or []
+            if not topics:
+                continue
+
+            topic0 = topics[0].hex() if hasattr(topics[0], "hex") else str(topics[0])
+            topic0_lower = str(topic0).lower()
+            if topic0_lower not in (expected_owner_topic0, expected_master_topic0):
+                continue
+
+            emitter = str(v_log.get("address", "")).lower()
+            if expected_emitter and emitter and emitter != expected_emitter:
+                continue
+
+            if len(topics) < 2:
+                continue
+
+            topic1 = topics[1].hex() if hasattr(topics[1], "hex") else str(topics[1])
+            topic1_no_prefix = topic1[2:] if topic1.startswith("0x") else topic1
+            if not re.fullmatch(r"[a-fA-F0-9]{64}", topic1_no_prefix):
+                continue
+
+            resolved_address = f"0x{topic1_no_prefix[-40:]}"
+            if re.fullmatch(r"0x[a-fA-F0-9]{40}", resolved_address):
+                checksum_address = Web3.to_checksum_address(resolved_address)
+                if topic0_lower == expected_owner_topic0:
+                    owner_token_address = checksum_address
+                elif topic0_lower == expected_master_topic0:
+                    master_token_address = checksum_address
+
+        if owner_token_address is None:
+            logger.warning(f"DeployOwnerToken event not found in receipt logs for tx {tx_hash}")
+        if master_token_address is None:
+            logger.warning(f"DeployMasterToken event not found in receipt logs for tx {tx_hash}")
+
+        return owner_token_address, master_token_address
+
     def deploy_owner_token(self, owner_backend, community_id, anvil_client=None):
         """Deploy and mint owner token for the community"""
 
@@ -277,8 +369,61 @@ class TestCommunityTokenPermissions:
                 "v": tx_signature[128:],
             }
 
-        # Send the signed transactions and wait for wallet pending-tx success event.
-        # This gives us concrete tx hash(es) that can be checked on-chain.
+        # Send the signed transactions and collect tx hashes from route-sent signal first.
+        # WALLET pending-tx status can include unrelated successes if not correlated strictly.
+        with owner_backend.expect_signal(
+            SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
+            predicate=lambda s: s.get("event", {}).get("uuid") == transaction_uuid
+            or s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
+            timeout=60,
+        ) as sent_exp:
+            owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+
+        sent_signal = sent_exp.result
+        assert isinstance(sent_signal, dict), f"Unexpected sent signal payload: {sent_signal}"
+        logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
+
+        def _normalize_tx_hash(value: Optional[str]) -> Optional[str]:
+            if not isinstance(value, str) or not value:
+                return None
+            normalized = value if value.startswith("0x") else f"0x{value}"
+            return normalized if re.fullmatch(r"0x[a-fA-F0-9]{64}", normalized) else None
+
+        def _extract_tx_hashes(payload: dict) -> list[str]:
+            hashes: list[str] = []
+
+            def _push(candidate: Optional[str]):
+                normalized = _normalize_tx_hash(candidate)
+                if normalized and normalized not in hashes:
+                    hashes.append(normalized)
+
+            event = payload.get("event", {}) if isinstance(payload, dict) else {}
+            root = payload if isinstance(payload, dict) else {}
+
+            for container in (event, root):
+                _push(container.get("hash"))
+                _push(container.get("Hash"))
+                _push(container.get("txHash"))
+                _push(container.get("TxHash"))
+                _push(container.get("transactionHash"))
+
+                for h in container.get("hashes", []) or []:
+                    _push(h)
+
+                for key in ("sentTransactions", "transactions", "txs", "items"):
+                    for item in container.get(key, []) or []:
+                        if not isinstance(item, dict):
+                            continue
+                        _push(item.get("hash"))
+                        _push(item.get("Hash"))
+                        _push(item.get("txHash"))
+                        _push(item.get("TxHash"))
+                        _push(item.get("transactionHash"))
+
+            return hashes
+
+        sent_hashes = _extract_tx_hashes(sent_signal)
+
         def _wallet_tx_success(signal: dict) -> bool:
             event = signal.get("event", {})
             if event.get("type") != "pending-transaction-status-changed":
@@ -289,57 +434,49 @@ class TestCommunityTokenPermissions:
             except Exception:
                 return False
 
-            return tx_status.get("status") == "Success"
+            if tx_status.get("status") != "Success":
+                return False
 
-        with owner_backend.expect_signal(
-            SignalType.WALLET,
-            accept_fn=_wallet_tx_success,
-            timeout=60,
-        ) as wallet_exp:
+            # If we already know route-sent hashes, only accept matching wallet updates.
+            if sent_hashes:
+                candidate_hashes = _extract_tx_hashes({"event": tx_status})
+                return any(h in sent_hashes for h in candidate_hashes)
+
+            return True
+
+        tx_status = {}
+        wallet_signal = None
+        try:
             with owner_backend.expect_signal(
-                SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
+                SignalType.WALLET,
+                accept_fn=_wallet_tx_success,
                 timeout=60,
-            ) as sent_exp:
-                owner_backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+            ) as wallet_exp:
+                pass
+            wallet_signal = wallet_exp.result
+            assert isinstance(wallet_signal, dict), f"Unexpected wallet signal payload: {wallet_signal}"
+            tx_status = json.loads(wallet_signal["event"]["message"].replace("'", '"'))
+        except Exception as exc:
+            logger.warning(f"Did not capture correlated wallet pending-tx success signal for deploy UUID {transaction_uuid}: {exc}")
 
-        sent_signal = sent_exp.result
-        wallet_signal = wallet_exp.result
-
-        assert isinstance(sent_signal, dict), f"Unexpected sent signal payload: {sent_signal}"
-        assert isinstance(wallet_signal, dict), f"Unexpected wallet signal payload: {wallet_signal}"
-
-        logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
-
-        tx_status = json.loads(wallet_signal["event"]["message"].replace("'", '"'))
-
-        tx_hash = tx_status.get("hash") or tx_status.get("Hash") or tx_status.get("txHash") or tx_status.get("TxHash")
-
+        # Prefer route-sent hash first, then wallet status fallback.
+        tx_hash = sent_hashes[0] if sent_hashes else None
         if not tx_hash:
-            for sent_tx in tx_status.get("sentTransactions", []) or []:
-                tx_hash = sent_tx.get("hash") or sent_tx.get("Hash")
-                if tx_hash:
-                    break
-
-        if not tx_hash and isinstance(sent_signal, dict):
-            sent_event = sent_signal.get("event", {})
-            tx_hash = sent_event.get("hash") or sent_event.get("Hash") or sent_event.get("txHash") or sent_event.get("TxHash")
-            if not tx_hash:
-                for sent_tx in sent_event.get("sentTransactions", []) or []:
-                    tx_hash = sent_tx.get("hash") or sent_tx.get("Hash")
-                    if tx_hash:
-                        break
-
-        if isinstance(tx_hash, str) and tx_hash and not tx_hash.startswith("0x"):
-            tx_hash = f"0x{tx_hash}"
+            wallet_hashes = _extract_tx_hashes({"event": tx_status})
+            tx_hash = wallet_hashes[0] if wallet_hashes else None
 
         is_valid_tx_hash = isinstance(tx_hash, str) and re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash) is not None
 
-        logger.info(f"Initial owner token deployment tx status {tx_status}")
+        if tx_status:
+            logger.info(f"Initial owner token deployment tx status {tx_status}")
         logger.info(f"Resolved owner token deployment tx hash {tx_hash}")
 
         # Mirror desktop flow: explicitly register owner/master deployment intent in backend
         # using tx hash + deployment params, then wait for backend deploy-status signal.
-        if is_valid_tx_hash:
+        if is_valid_tx_hash and isinstance(tx_hash, str):
+            self._last_deployed_master_token_placeholder = self.temporary_master_contract_address(tx_hash)
+            self._last_deployed_owner_token_placeholder = self.temporary_owner_contract_address(tx_hash)
+
             try:
                 owner_backend.rpc_valid_request(
                     "communitytokens_storeDeployedOwnerToken",
@@ -354,19 +491,57 @@ class TestCommunityTokenPermissions:
             except Exception as exc:
                 logger.warning(f"communitytokens_storeDeployedOwnerToken failed for tx {tx_hash}: {exc}")
             else:
-                with owner_backend.expect_signal(
-                    SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
-                    predicate=lambda s: s.get("event", {}).get("sendType") == COMMUNITY_DEPLOY_OWNER_TOKEN
-                    and s.get("event", {}).get("success") is True
-                    and str(s.get("event", {}).get("hash", "")).lower() == str(tx_hash).lower(),
-                    timeout=60,
-                    start="beginning",
-                ) as community_token_exp:
-                    pass
+                try:
+                    with owner_backend.expect_signal(
+                        SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
+                        predicate=lambda s: s.get("event", {}).get("sendType") == COMMUNITY_DEPLOY_OWNER_TOKEN
+                        and s.get("event", {}).get("success") is True
+                        and str(s.get("event", {}).get("hash", "")).lower() == str(tx_hash).lower(),
+                        timeout=60,
+                        start="beginning",
+                    ) as community_token_exp:
+                        pass
 
-                community_token_signal = community_token_exp.result
-                assert isinstance(community_token_signal, dict), f"Unexpected community token signal payload: {community_token_signal}"
-                logger.debug(f"Community token transaction status signal: {community_token_signal}")
+                    community_token_signal = community_token_exp.result
+                    assert isinstance(community_token_signal, dict), f"Unexpected community token signal payload: {community_token_signal}"
+                    logger.debug(f"Community token transaction status signal: {community_token_signal}")
+
+                    master_token_address = self._extract_master_token_address_from_event(community_token_signal.get("event", {}))
+                    if master_token_address:
+                        self._last_deployed_master_token_address = master_token_address
+                    else:
+                        logger.info(
+                            f"Deploy status signal for tx {tx_hash} did not include master token address; " "continuing with later reconciliation"
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        f"Did not capture deploy status signal for tx {tx_hash}; " f"will reconcile later via signals/receipt/metadata: {exc}"
+                    )
+
+                # Keep fallback path, but prefer authoritative deploy-status signal with address first.
+                if not isinstance(getattr(self, "_last_deployed_master_token_address", None), str):
+                    for _ in range(10):
+                        deployment_signals = owner_backend.received_signals.get(SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED, []) or []
+                        for signal in reversed(deployment_signals):
+                            event = signal.get("event", {})
+                            signal_hash = (
+                                str(event.get("hash") or event.get("txHash") or event.get("transactionHash") or event.get("Hash") or "")
+                                .strip()
+                                .lower()
+                            )
+                            if signal_hash != str(tx_hash).lower():
+                                continue
+                            if event.get("sendType") != COMMUNITY_DEPLOY_OWNER_TOKEN or event.get("success") is not True:
+                                continue
+
+                            master_token_address = self._extract_master_token_address_from_event(event)
+                            if master_token_address:
+                                self._last_deployed_master_token_address = master_token_address
+                                break
+
+                        if isinstance(getattr(self, "_last_deployed_master_token_address", None), str):
+                            break
+                        time.sleep(1)
         else:
             logger.warning(f"Skipping communitytokens_storeDeployedOwnerToken due to invalid tx hash: {tx_hash}")
 
@@ -381,6 +556,8 @@ class TestCommunityTokenPermissions:
                 except Exception:
                     pass
                 time.sleep(1)
+
+        return tx_hash if is_valid_tx_hash else None
 
     def wallet_address(self, backend: StatusBackend) -> str:
         accounts = backend.accounts_service.get_accounts()
@@ -511,6 +688,242 @@ class TestCommunityTokenPermissions:
             time.sleep(delay)
 
         return None
+
+    def wait_for_master_token_address_after_deploy(
+        self,
+        backend: StatusBackend,
+        community_id: str,
+        deploy_tx_hash: Optional[str],
+        anvil_client=None,
+        attempts: int = 30,
+        delay: int = 2,
+    ) -> Optional[str]:
+        """Resolve real master token address after deploy (signal first, receipt fallback, metadata last)."""
+        expected_hash = (deploy_tx_hash or "").lower()
+
+        # A) Fast path: address already cached in this test process.
+        cached_address = getattr(self, "_last_deployed_master_token_address", None)
+        if isinstance(cached_address, str) and re.fullmatch(r"0x[a-fA-F0-9]{40}", cached_address):
+            return cached_address
+
+        def _find_master_from_received_signals() -> Optional[str]:
+            deployment_signals = backend.received_signals.get(SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED, []) or []
+            for signal in reversed(deployment_signals):
+                event = signal.get("event", {})
+                if event.get("sendType") != COMMUNITY_DEPLOY_OWNER_TOKEN or event.get("success") is not True:
+                    continue
+
+                signal_hash = str(event.get("hash") or event.get("txHash") or event.get("transactionHash") or event.get("Hash") or "").strip().lower()
+                # Keep tx-hash correlation when present, but don't reject events that omit hash fields.
+                if expected_hash and signal_hash and signal_hash != expected_hash:
+                    continue
+
+                master_token_from_signal = self._extract_master_token_address_from_event(event)
+                if master_token_from_signal:
+                    return master_token_from_signal
+
+            return None
+
+        # B) Use already-received deployment status signals.
+        master_token_from_signal = _find_master_from_received_signals()
+        if master_token_from_signal:
+            self._last_deployed_master_token_address = master_token_from_signal
+            return master_token_from_signal
+
+        # C) Wait briefly for additional deployment status signals.
+        for _ in range(attempts):
+            master_token_from_signal = _find_master_from_received_signals()
+            if master_token_from_signal:
+                self._last_deployed_master_token_address = master_token_from_signal
+                return master_token_from_signal
+
+            time.sleep(delay)
+
+        # D) Parse deployment tx receipt directly from chain when signal reconciliation is missing.
+        owner_token_from_receipt, master_token_from_receipt = self.resolve_owner_and_master_token_addresses_from_receipt(anvil_client, deploy_tx_hash)
+        if owner_token_from_receipt:
+            self._last_deployed_owner_token_address = owner_token_from_receipt
+        if master_token_from_receipt:
+            self._last_deployed_master_token_address = master_token_from_receipt
+            return master_token_from_receipt
+
+        # E) Last resort: metadata polling (persistence-dependent).
+        for _ in range(attempts):
+            master_token_address = self.get_community_token_contract_address(
+                backend,
+                community_id,
+                CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
+                attempts=1,
+                delay=0,
+            )
+            if isinstance(master_token_address, str) and re.fullmatch(r"0x[a-fA-F0-9]{40}", master_token_address):
+                self._last_deployed_master_token_address = master_token_address
+                return master_token_address
+            time.sleep(delay)
+
+        return None
+
+    def _log_master_token_router_diagnostics(
+        self,
+        backend: StatusBackend,
+        community_id: str,
+        chain_id: int,
+        master_token_address: str,
+        owner_token_address: Optional[str],
+        deploy_tx_hash: Optional[str],
+    ):
+        logger.info(
+            "[DIAGNOSTICS] master token router usability snapshot | "
+            f"community_id={community_id} chain_id={chain_id} master_token={master_token_address} "
+            f"owner_token={owner_token_address} deploy_tx_hash={deploy_tx_hash}"
+        )
+
+        try:
+            communities_resp = backend.wakuext_service.communities()
+            community = next((c for c in self._communities_list(communities_resp) if c.get("id") == community_id), None)
+            logger.info(
+                "[DIAGNOSTICS] owner community snapshot | "
+                f"community_found={community is not None} "
+                f"community_tokens_metadata={json.dumps((community or {}).get('communityTokensMetadata', []), default=str)}"
+            )
+        except Exception as exc:
+            logger.warning(f"[DIAGNOSTICS] failed to get owner community snapshot: {exc}")
+
+        try:
+            deployment_signals = backend.received_signals.get(SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED, []) or []
+            deploy_signals = [
+                s
+                for s in deployment_signals
+                if (s.get("event", {}).get("sendType") == COMMUNITY_DEPLOY_OWNER_TOKEN)
+                and ((not deploy_tx_hash) or str(s.get("event", {}).get("hash", "")).lower() == str(deploy_tx_hash).lower())
+            ]
+            logger.info(
+                "[DIAGNOSTICS] deploy status signals snapshot | "
+                f"total_signals={len(deployment_signals)} matching_deploy_signals={len(deploy_signals)}"
+            )
+            if deploy_signals:
+                logger.info(
+                    "[DIAGNOSTICS] latest deploy status signal | " f"event={json.dumps((deploy_signals[-1] or {}).get('event', {}), default=str)}"
+                )
+        except Exception as exc:
+            logger.warning(f"[DIAGNOSTICS] failed to inspect deploy status signals: {exc}")
+
+        rpc_calls = [
+            (
+                "communitytokens_safeGetOwnerTokenAddress",
+                [chain_id, community_id],
+            ),
+            (
+                "communitytokens_safeGetSignerPubKey",
+                [chain_id, community_id],
+            ),
+        ]
+
+        for method, params in rpc_calls:
+            try:
+                rpc_result = backend.rpc_valid_request(method, params)
+                logger.info(f"[DIAGNOSTICS] {method}({params}) => {rpc_result}")
+            except Exception as exc:
+                logger.warning(f"[DIAGNOSTICS] {method}({params}) failed: {exc}")
+
+        token_addresses_to_probe = [master_token_address]
+        if owner_token_address:
+            token_addresses_to_probe.append(owner_token_address)
+
+        for address in token_addresses_to_probe:
+            try:
+                remaining_supply = backend.rpc_valid_request("communitytokens_remainingSupply", [chain_id, address])
+                logger.info("[DIAGNOSTICS] communitytokens_remainingSupply " f"chain_id={chain_id} address={address} => {remaining_supply}")
+            except Exception as exc:
+                logger.warning("[DIAGNOSTICS] communitytokens_remainingSupply failed " f"chain_id={chain_id} address={address}: {exc}")
+
+    def wait_until_master_token_is_router_usable(
+        self,
+        backend: StatusBackend,
+        community_id: str,
+        master_token_address: str,
+        sender_wallet_address: str,
+        owner_token_address: Optional[str] = None,
+        recipient_wallet_addresses: Optional[list[str]] = None,
+        attempts: int = 30,
+        delay: int = 2,
+    ):
+        """Wait until router accepts the real master token in mint route suggestion."""
+        assert re.fullmatch(r"0x[a-fA-F0-9]{40}", master_token_address), f"Invalid master token address: {master_token_address}"
+        assert re.fullmatch(r"0x[a-fA-F0-9]{40}", sender_wallet_address), f"Invalid sender wallet address: {sender_wallet_address}"
+
+        chain_id = backend.network_id
+        recipient_wallet_addresses = recipient_wallet_addresses or [sender_wallet_address]
+        backend.wallet_service.get_balances_at_by_chain([sender_wallet_address], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
+
+        last_backend_error = None
+        retrack_method = "communitytokens_reTrackOwnerTokenDeploymentTransaction"
+        owner_token_is_valid = isinstance(owner_token_address, str) and re.fullmatch(r"0x[a-fA-F0-9]{40}", owner_token_address) is not None
+        deploy_tx_hash = getattr(self, "_last_deployed_tx_hash", None)
+
+        for attempt in range(1, attempts + 1):
+            transaction_uuid = str(uuid.uuid4())
+            transfer_details = [
+                {
+                    "tokenType": CommunityTokenType.ERC721.value,
+                    "privilegeLevel": CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
+                    "tokenContractAddress": master_token_address,
+                    "amount": hex(1),
+                }
+            ]
+
+            try:
+                routes_result = backend.wallet_service.suggested_community_routes(
+                    uuid=transaction_uuid,
+                    send_type=COMMUNITY_MINT_TOKENS,
+                    chain_id=chain_id,
+                    address_from=sender_wallet_address,
+                    addr_to=master_token_address,
+                    community_id=community_id,
+                    signer_pub_key=backend.public_key,
+                    token_ids=[],
+                    wallet_addresses=recipient_wallet_addresses,
+                    transfer_details=transfer_details,
+                )
+                assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
+                return routes_result
+            except ApiResponseError as exc:
+                error_text = str(exc)
+                error_text_lower = error_text.lower()
+                token_not_ready = "can't find token" in error_text_lower or "token does not exist in database" in error_text_lower
+
+                if not token_not_ready:
+                    raise
+
+                last_backend_error = error_text
+
+                if owner_token_is_valid:
+                    try:
+                        backend.rpc_valid_request(retrack_method, [chain_id, owner_token_address])
+                    except Exception as retrack_exc:
+                        logger.warning(f"{retrack_method} failed for owner token {owner_token_address} on chain {chain_id}: {retrack_exc}")
+
+                if attempt == 1 or attempt == attempts or attempt % 5 == 0:
+                    self._log_master_token_router_diagnostics(
+                        backend=backend,
+                        community_id=community_id,
+                        chain_id=chain_id,
+                        master_token_address=master_token_address,
+                        owner_token_address=owner_token_address,
+                        deploy_tx_hash=deploy_tx_hash,
+                    )
+
+                if attempt < attempts:
+                    logger.info(f"Master token {master_token_address} not router-usable yet (attempt {attempt}/{attempts}); retrying")
+                    time.sleep(delay)
+            except Exception:
+                raise
+
+        raise AssertionError(
+            "Master token was resolved but never became router-usable for mint routing. "
+            f"community_id={community_id}, master_token_address={master_token_address}, "
+            f"last_backend_error={last_backend_error}"
+        )
 
     def get_received_token_notifications_count(self, backend: StatusBackend) -> int:
         response = backend.wakuext_service.get_activity_center_notifications(
@@ -855,31 +1268,39 @@ class TestCommunityTokenPermissions:
         # When the Owner mints the owner token
         owner_backend.wallet_service.restart_wallet_reload_timer()
         time.sleep(2)
-        self.deploy_owner_token(owner_backend, community_id, anvil_client=anvil_client)
-
-        # Capture deploy-status signal (if present) as fallback source for master token address.
-        deployment_signals = owner_backend.received_signals.get(SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED, []) or []
-        latest_owner_deploy_signal = next(
-            (
-                s
-                for s in reversed(deployment_signals)
-                if s.get("event", {}).get("sendType") == COMMUNITY_DEPLOY_OWNER_TOKEN and s.get("event", {}).get("success") is True
-            ),
-            None,
-        )
-        master_token_address_from_signal = ((latest_owner_deploy_signal or {}).get("event", {}).get("masterToken") or {}).get("address")
+        deploy_tx_hash = self.deploy_owner_token(owner_backend, community_id, anvil_client=anvil_client)
+        self._last_deployed_tx_hash = deploy_tx_hash
 
         # And the Owner airdrops the master token to Member A
-        master_token_address = self.get_community_token_contract_address(
-            owner_backend,
-            community_id,
-            CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
+        owner_wallet = self.wallet_address(owner_backend)
+        owner_token_address, master_token_address = self.resolve_owner_and_master_token_addresses_from_receipt(
+            anvil_client=anvil_client,
+            tx_hash=deploy_tx_hash,
+        )
+
+        if not master_token_address:
+            master_token_address = self.wait_for_master_token_address_after_deploy(
+                backend=owner_backend,
+                community_id=community_id,
+                deploy_tx_hash=deploy_tx_hash,
+                anvil_client=anvil_client,
+                attempts=30,
+                delay=2,
+            )
+
+        assert owner_token_address, f"Owner token contract address not found for deploy tx {deploy_tx_hash}"
+        assert master_token_address, f"Master token contract address not found for deploy tx {deploy_tx_hash}"
+
+        self.wait_until_master_token_is_router_usable(
+            backend=owner_backend,
+            community_id=community_id,
+            master_token_address=master_token_address,
+            sender_wallet_address=owner_wallet,
+            owner_token_address=owner_token_address,
+            recipient_wallet_addresses=[member_a_wallet],
             attempts=30,
             delay=2,
         )
-        if not master_token_address:
-            master_token_address = master_token_address_from_signal
-        assert master_token_address, "Master token contract address not found"
 
         self.mint_community_token(
             sender_backend=owner_backend,

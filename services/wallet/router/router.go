@@ -602,15 +602,53 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 
 		if input.CommunityRouteInputParams.UseTransferDetails() {
 			tokenContractAddress := input.CommunityRouteInputParams.TransferDetails[useCommunityTokenTransferDetailsAtIndex].TokenContractAddress
+			r.logger.Debug("resolving community token metadata for route transfer detail",
+				zap.String("uuid", input.Uuid),
+				zap.Int("sendType", int(input.SendType)),
+				zap.Int("transferDetailsIndex", useCommunityTokenTransferDetailsAtIndex),
+				zap.Uint64("chainID", fromChain.ChainID),
+				zap.String("communityID", input.CommunityRouteInputParams.CommunityID),
+				zap.String("tokenContractAddress", tokenContractAddress.String()),
+			)
 			tokenType, err := r.tokenManager.GetCommunityTokenType(fromChain.ChainID, tokenContractAddress.String())
 			if err != nil {
+				r.logger.Error("failed to resolve community token type for route transfer detail",
+					zap.String("uuid", input.Uuid),
+					zap.Int("sendType", int(input.SendType)),
+					zap.Int("transferDetailsIndex", useCommunityTokenTransferDetailsAtIndex),
+					zap.Uint64("chainID", fromChain.ChainID),
+					zap.String("communityID", input.CommunityRouteInputParams.CommunityID),
+					zap.String("tokenContractAddress", tokenContractAddress.String()),
+					zap.Error(err),
+				)
 				return processorInputParams, err
 			}
 
 			privilegeLevel, err := r.tokenManager.GetCommunityTokenPrivilegesLevel(fromChain.ChainID, tokenContractAddress.String())
 			if err != nil {
+				r.logger.Error("failed to resolve community token privilege level for route transfer detail",
+					zap.String("uuid", input.Uuid),
+					zap.Int("sendType", int(input.SendType)),
+					zap.Int("transferDetailsIndex", useCommunityTokenTransferDetailsAtIndex),
+					zap.Uint64("chainID", fromChain.ChainID),
+					zap.String("communityID", input.CommunityRouteInputParams.CommunityID),
+					zap.String("tokenContractAddress", tokenContractAddress.String()),
+					zap.String("resolvedTokenType", tokenType.String()),
+					zap.Error(err),
+				)
 				return processorInputParams, err
 			}
+
+			r.logger.Debug("resolved community token metadata for route transfer detail",
+				zap.String("uuid", input.Uuid),
+				zap.Int("sendType", int(input.SendType)),
+				zap.Int("transferDetailsIndex", useCommunityTokenTransferDetailsAtIndex),
+				zap.Uint64("chainID", fromChain.ChainID),
+				zap.String("communityID", input.CommunityRouteInputParams.CommunityID),
+				zap.String("tokenContractAddress", tokenContractAddress.String()),
+				zap.String("tokenType", tokenType.String()),
+				zap.Int("privilegeLevel", int(privilegeLevel)),
+			)
 
 			input.CommunityRouteInputParams.TransferDetails[useCommunityTokenTransferDetailsAtIndex].TokenType = tokenType
 			input.CommunityRouteInputParams.TransferDetails[useCommunityTokenTransferDetailsAtIndex].PrivilegeLevel = privilegeLevel
