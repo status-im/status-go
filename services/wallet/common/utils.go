@@ -10,8 +10,6 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethParams "github.com/ethereum/go-ethereum/params"
-
-	"github.com/status-im/status-go/params"
 )
 
 // ShouldCancel returns true if the context has been cancelled and task should be aborted
@@ -22,15 +20,6 @@ func ShouldCancel(ctx context.Context) bool {
 	default:
 	}
 	return false
-}
-
-func NetworksToChainIDs(networks []*params.Network) []uint64 {
-	chainIDs := make([]uint64, 0)
-	for _, network := range networks {
-		chainIDs = append(chainIDs, network.ChainID)
-	}
-
-	return chainIDs
 }
 
 func ArrayContainsElement[T comparable](el T, arr []T) bool {

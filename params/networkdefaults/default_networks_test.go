@@ -1,4 +1,4 @@
-package backend
+package networkdefaults
 
 import (
 	"strings"
@@ -27,7 +27,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig, true)
 
-	require.Len(t, actualNetworks, 13)
+	require.Len(t, actualNetworks, 31)
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
@@ -41,6 +41,24 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		case common.BaseSepolia:
 		case common.LineaMainnet:
 		case common.LineaSepolia:
+		case common.PolygonZkEVMMainnet:
+		case common.PolygonZkEVMCardona:
+		case common.UnichainMainnet:
+		case common.UnichainSepolia:
+		case common.KatanaMainnet:
+		case common.KatanaBokuto:
+		case common.InkMainnet:
+		case common.InkSepolia:
+		case common.AbstractMainnet:
+		case common.AbstractTestnet:
+		case common.ZkSyncMainnet:
+		case common.ZkSyncSepolia:
+		case common.SoneiumMainnet:
+		case common.SoneiumMinato:
+		case common.ScrollMainnet:
+		case common.ScrollSepolia:
+		case common.BlastMainnet:
+		case common.BlastSepolia:
 		case common.StatusNetworkSepolia:
 		case common.BSCMainnet:
 		case common.BSCTestnet:

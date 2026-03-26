@@ -124,15 +124,23 @@ func (s SendType) IsAvailableBetween(fromChainID, toChainID uint64) bool {
 }
 
 func (s SendType) IsAvailableFor(chainID uint64) bool {
-	// Check for Swap specific networks
+	// Check if the swap is supported via paraswap is done on the client side via `IsChainSupportedForSwapViaParaswap` endpoint.
+	// Basically if this request https://api.paraswap.io/tokens/CHAIN-ID returns the list (no error), means the chain is supported.
+	// For now these are supported chains via paraswap:
+	// 1, 10, 56, 100, 130, 137, 146, 8453, 42161, 43114
+	// even not needed to check here, because of the client side check, we still keep it here for reference when adding new swap providers.
 	if s == Swap {
 		swapAllowedNetworks := map[uint64]bool{
-			walletCommon.EthereumMainnet: true,
-			walletCommon.OptimismMainnet: true,
-			walletCommon.ArbitrumMainnet: true,
-			walletCommon.BaseMainnet:     true,
-			walletCommon.BSCMainnet:      true,
-			walletCommon.LineaMainnet:    true,
+			walletCommon.EthereumMainnet: true, // 1
+			walletCommon.OptimismMainnet: true, // 10
+			walletCommon.BSCMainnet:      true, // 56
+			100:                          true, // 100 - Gnosis
+			walletCommon.UnichainMainnet: true, // 130
+			137:                          true, // 137 - Polygon PoS
+			146:                          true, // 146 - Sonic
+			walletCommon.BaseMainnet:     true, // 8453
+			walletCommon.ArbitrumMainnet: true, // 42161
+			43114:                        true, // 43114 - Avalanche C-Chain
 		}
 		_, ok := swapAllowedNetworks[chainID]
 		return ok
