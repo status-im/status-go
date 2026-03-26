@@ -79,4 +79,5 @@ ENV LD_LIBRARY_PATH=/usr/local/lib/
 
 EXPOSE 8080 8545 30303 30303/udp 30304/udp
 
-CMD ["status-backend", "--help"]
+ENTRYPOINT ["status-backend"]
+CMD ["--help"]
