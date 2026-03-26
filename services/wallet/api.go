@@ -122,7 +122,7 @@ func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []
 		return nil, err
 	}
 
-	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
+	chainIDs := params.NetworksToChainIDs(activeNetworks)
 
 	return api.reader.GetCachedBalances(chainIDs, addresses)
 }
@@ -397,7 +397,7 @@ func gweiToWei(val *big.Float) *big.Int {
 
 func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, gasPrice *hexutil.Big, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
 	logutils.ZapLogger().Debug("call to getTransactionEstimatedTimeV2")
-	return api.s.router.GetFeesManager().EstimatedTime(ctx, chainID, maxFeePerGas.ToInt(), maxPriorityFeePerGas.ToInt())
+	return api.s.router.GetFeesManager().EstimatedTime(ctx, chainID, gasPrice.ToInt(), maxFeePerGas.ToInt(), maxPriorityFeePerGas.ToInt())
 }
 
 func (api *API) GetSuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (*router.SuggestedRoutes, error) {
@@ -514,13 +514,13 @@ func (api *API) AddressExists(ctx context.Context, address types2.Address) (bool
 // if chainIDs is empty, it will use all active chains
 // if timeout is zero, it will wait until the call completes
 // response doesn't include derivation path
-func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDetails) (*DerivedAddress, error) {
-	if err := params.Validate(); err != nil {
+func (api *API) AddressDetails(ctx context.Context, addrDetails *requests.AddressDetails) (*DerivedAddress, error) {
+	if err := addrDetails.Validate(); err != nil {
 		return nil, err
 	}
 
 	result := &DerivedAddress{
-		Address: types2.HexToAddress(params.Address),
+		Address: types2.HexToAddress(addrDetails.Address),
 	}
 	addressExists, err := api.s.accountsDB.AddressExists(result.Address)
 	if err != nil {
@@ -529,19 +529,19 @@ func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDeta
 
 	result.AlreadyCreated = addressExists
 
-	chainIDs := params.ChainIDs
+	chainIDs := addrDetails.ChainIDs
 	if len(chainIDs) == 0 {
 		activeNetworks, err := api.s.rpcClient.GetNetworkManager().GetActiveNetworks()
 		if err != nil {
 			return nil, err
 		}
 
-		chainIDs = wcommon.NetworksToChainIDs(activeNetworks)
+		chainIDs = params.NetworksToChainIDs(activeNetworks)
 	}
 
-	if params.TimeoutInMilliseconds > 0 {
+	if addrDetails.TimeoutInMilliseconds > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(params.TimeoutInMilliseconds)*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(addrDetails.TimeoutInMilliseconds)*time.Millisecond)
 		defer cancel()
 	}
 

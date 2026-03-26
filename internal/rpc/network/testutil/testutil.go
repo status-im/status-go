@@ -30,7 +30,7 @@ func CreateNetwork(chainID uint64, chainName string, providers []params.RpcProvi
 		ChainID:                chainID,
 		ChainName:              chainName,
 		BlockExplorerURL:       "https://explorer.example.com",
-		IconURL:                "network/Network=" + chainName,
+		IconURL:                "network/" + chainName,
 		NativeCurrencyName:     "Ether",
 		NativeCurrencySymbol:   "ETH",
 		NativeCurrencyDecimals: 18,

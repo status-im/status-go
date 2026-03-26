@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/params/networkdefaults"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
@@ -28,10 +28,10 @@ func GetNftProxyHost(customURL, stageName string) string {
 func GetNftProxyBaseURL(customURL, stageName string, chainID walletCommon.ChainID) (string, error) {
 	host := GetNftProxyHost(customURL, stageName)
 
-	chainPath, networkPath, err := networkhelper.ChainIDToChainAndNetwork(uint64(chainID))
-	if err != nil {
+	chainName, networkName := networkdefaults.GetProxyChainAndNetworkName(uint64(chainID))
+	if networkName == "" || chainName == "" {
 		return "", thirdparty.ErrChainIDNotSupported
 	}
 
-	return fmt.Sprintf("%s/%s/%s/nft/v3", host, chainPath, networkPath), nil
+	return fmt.Sprintf("%s/%s/%s/nft/v3", host, chainName, networkName), nil
 }

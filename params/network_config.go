@@ -132,3 +132,12 @@ func NewEthRpcProxyProvider(chainID uint64, name string, url security.SensitiveS
 func NewDirectProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedDirectProviderType)
 }
+
+func NetworksToChainIDs(networks []*Network) []uint64 {
+	chainIDs := make([]uint64, 0)
+	for _, network := range networks {
+		chainIDs = append(chainIDs, network.ChainID)
+	}
+
+	return chainIDs
+}

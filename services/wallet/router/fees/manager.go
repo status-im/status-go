@@ -37,7 +37,6 @@ const (
 
 var (
 	ErrCustomFeeModeNotAvailableInSuggestedFees = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-001"), Details: "custom fee mode is not available in suggested fees"}
-	ErrEIP1559IncompaibleChain                  = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-002"), Details: "EIP-1559 is not supported on this chain"}
 	ErrInvalidRewardData                        = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-003"), Details: "invalid reward data"}
 )
 
@@ -133,7 +132,11 @@ func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
 		return gas.ChainClassL1, nil
 	case common.ArbitrumMainnet, common.ArbitrumSepolia:
 		return gas.ChainClassArbStack, nil
-	case common.OptimismMainnet, common.OptimismSepolia, common.BaseMainnet, common.BaseSepolia:
+	case common.OptimismMainnet, common.OptimismSepolia, common.BaseMainnet, common.BaseSepolia, common.UnichainMainnet,
+		common.UnichainSepolia, common.InkMainnet, common.InkSepolia, common.AbstractMainnet, common.AbstractTestnet,
+		common.SoneiumMainnet, common.SoneiumMinato, common.BlastMainnet, common.BlastSepolia, common.PolygonZkEVMMainnet,
+		common.PolygonZkEVMCardona, common.KatanaMainnet, common.KatanaBokuto, common.ZkSyncMainnet, common.ZkSyncSepolia,
+		common.ScrollMainnet, common.ScrollSepolia:
 		return gas.ChainClassOPStack, nil
 	case common.StatusNetworkSepolia, common.LineaMainnet, common.LineaSepolia:
 		return gas.ChainClassLineaStack, nil
@@ -141,7 +144,7 @@ func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
 	return "", fmt.Errorf("chainID class identification not handled for chainID: %d", chainID)
 }
 
-func buildConfig(chainID uint64) (gas.ChainParameters, gas.SuggestionsConfig, error) {
+func buildConfig(chainID uint64, feeModel gas.FeeModel) (gas.ChainParameters, gas.SuggestionsConfig, error) {
 	class, err := chainIDToClass(chainID)
 	if err != nil {
 		return gas.ChainParameters{}, gas.SuggestionsConfig{}, err
@@ -151,13 +154,29 @@ func buildConfig(chainID uint64) (gas.ChainParameters, gas.SuggestionsConfig, er
 	params := gas.ChainParameters{
 		ChainClass:       class,
 		NetworkBlockTime: common.GetBlockCreationTimeForChain(chainID).Seconds(),
+		FeeModel:         feeModel,
+	}
+
+	// in case of legacy fee model, we need want gas price to be evaluated using the gasPrice call, not based on the Transactions GasPrice sampling
+	if feeModel == gas.FeeModelLegacy {
+		config.GasPriceEstimationBlocks = 0
 	}
 
 	return params, config, nil
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address ethCommon.Address) (suggestedFees *SuggestedFees, noBaseFee bool, noPriorityFee bool, err error) {
-	params, config, err := buildConfig(chainID)
+	ethClient, err := f.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return nil, false, false, err
+	}
+
+	feeModel, err := gas.ResolveFeeModel(ctx, ethClient)
+	if err != nil {
+		return nil, false, false, err
+	}
+
+	params, config, err := buildConfig(chainID, feeModel)
 	if err != nil {
 		return nil, false, false, err
 	}
@@ -167,11 +186,6 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 		zap.Any("params", params),
 		zap.Any("config", config),
 	)
-
-	ethClient, err := f.ethClientGetter.EthClient(chainID)
-	if err != nil {
-		return nil, false, false, err
-	}
 
 	feeSuggestions, err := gas.GetChainSuggestions(ctx, ethClient, params, config, address)
 	if err != nil {
@@ -183,14 +197,26 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 		zap.String("chainID", fmt.Sprintf("%d", chainID)),
 		zap.Any("feeSuggestions", feeSuggestions),
 	)
+	if feeModel == gas.FeeModelLegacy {
+		suggestedFees = &SuggestedFees{
+			GasPrice:       feeSuggestions.GasPrice,
+			L1GasFee:       big.NewFloat(0),
+			EIP1559Enabled: false,
+
+			NonEIP1559Fees: &NonEIP1559Fees{
+				GasPrice:      (*hexutil.Big)(feeSuggestions.GasPrice),
+				EstimatedTime: uint(feeSuggestions.LowInclusion.MinTimeUntilInclusion),
+			},
+		}
+
+		return suggestedFees, false, false, nil
+	}
 
 	suggestedFees = &SuggestedFees{
-		GasPrice:             big.NewInt(0),
 		BaseFee:              feeSuggestions.EstimatedBaseFee,
 		MaxPriorityFeePerGas: feeSuggestions.Medium.MaxPriorityFeePerGas,
 		L1GasFee:             big.NewFloat(0),
 
-		NonEIP1559Fees: nil,
 		MaxFeesLevels: &MaxFeesLevels{
 			Low:                 (*hexutil.Big)(feeSuggestions.Low.MaxFeePerGas),
 			LowPriority:         (*hexutil.Big)(feeSuggestions.Low.MaxPriorityFeePerGas),
@@ -213,13 +239,17 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 	noBaseFee = false
 	estimatedBaseFee := feeSuggestions.EstimatedBaseFee
 	if estimatedBaseFee != nil && estimatedBaseFee.Sign() == 0 {
-		noBaseFee = true
+		if chainID == common.StatusNetworkSepolia {
+			noBaseFee = true
+		}
 	}
 
 	noPriorityFee = false
 	estimatedPriorityFeeLowerBound := feeSuggestions.PriorityFeeLowerBound
 	if estimatedPriorityFeeLowerBound != nil && estimatedPriorityFeeLowerBound.Sign() == 0 {
-		noPriorityFee = true
+		if chainID == common.StatusNetworkSepolia {
+			noPriorityFee = true
+		}
 	}
 
 	f.logger.Debug("Suggested fees",
@@ -232,8 +262,13 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 	return
 }
 
-func (f *FeeManager) EstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Int, priorityFee *big.Int) (uint, error) {
-	params, config, err := buildConfig(chainID)
+func (f *FeeManager) EstimatedTime(ctx context.Context, chainID uint64, gasPrice *big.Int, maxFeePerGas *big.Int, priorityFee *big.Int) (uint, error) {
+	feeModel := gas.FeeModelEIP1559
+	if gasPrice != nil && gasPrice.Sign() > 0 {
+		feeModel = gas.FeeModelLegacy
+	}
+
+	params, config, err := buildConfig(chainID, feeModel)
 	if err != nil {
 		return 0, err
 	}
@@ -244,6 +279,7 @@ func (f *FeeManager) EstimatedTime(ctx context.Context, chainID uint64, maxFeePe
 	}
 
 	estimatedTime, err := gas.EstimateInclusion(ctx, ethClient, params, config, gas.Fee{
+		GasPrice:             gasPrice,
 		MaxFeePerGas:         maxFeePerGas,
 		MaxPriorityFeePerGas: priorityFee,
 	})
@@ -277,19 +313,20 @@ func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*Su
 		return nil, err
 	}
 
-	if !fees.EIP1559Enabled {
-		return nil, ErrEIP1559IncompaibleChain
-	}
-
 	feesGwei := &SuggestedFeesGwei{
 		EIP1559Enabled: fees.EIP1559Enabled,
 	}
-	feesGwei.GasPrice = common.WeiToGwei(fees.GasPrice)
-	feesGwei.BaseFee = common.WeiToGwei(fees.BaseFee)
-	feesGwei.MaxPriorityFeePerGas = common.WeiToGwei(fees.MaxPriorityFeePerGas)
-	feesGwei.MaxFeePerGasLow = common.WeiToGwei(fees.MaxFeesLevels.Low.ToInt())
-	feesGwei.MaxFeePerGasMedium = common.WeiToGwei(fees.MaxFeesLevels.Medium.ToInt())
-	feesGwei.MaxFeePerGasHigh = common.WeiToGwei(fees.MaxFeesLevels.High.ToInt())
+
+	if feesGwei.EIP1559Enabled {
+		feesGwei.GasPrice = common.WeiToGwei(fees.GasPrice)
+		feesGwei.BaseFee = common.WeiToGwei(fees.BaseFee)
+		feesGwei.MaxPriorityFeePerGas = common.WeiToGwei(fees.MaxPriorityFeePerGas)
+		feesGwei.MaxFeePerGasLow = common.WeiToGwei(fees.MaxFeesLevels.Low.ToInt())
+		feesGwei.MaxFeePerGasMedium = common.WeiToGwei(fees.MaxFeesLevels.Medium.ToInt())
+		feesGwei.MaxFeePerGasHigh = common.WeiToGwei(fees.MaxFeesLevels.High.ToInt())
+	} else {
+		feesGwei.GasPrice = common.WeiToGwei(fees.NonEIP1559Fees.GasPrice.ToInt())
+	}
 
 	return feesGwei, nil
 }

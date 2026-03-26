@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/status-im/status-go/services/wallet/common"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 )
@@ -154,20 +155,21 @@ func TestSendType_IsAvailableBetween(t *testing.T) {
 }
 
 func TestSendType_IsAvailableFor(t *testing.T) {
-	chainIDs := []uint64{
-		walletCommon.EthereumMainnet,
-		walletCommon.EthereumSepolia,
-		walletCommon.OptimismMainnet,
-		walletCommon.ArbitrumMainnet,
-		walletCommon.BaseMainnet,
-		walletCommon.BSCMainnet,
-		walletCommon.LineaMainnet,
-		walletCommon.LineaSepolia,
-		999999, // unknown
-	}
+	chainIDs := common.AllChainIDsAsUint64()
 
-	swapNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet, walletCommon.LineaMainnet}
-	ensNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.EthereumSepolia}
+	swapNetworks := []uint64{
+		walletCommon.EthereumMainnet, // 1
+		walletCommon.OptimismMainnet, // 10
+		walletCommon.BSCMainnet,      // 56
+		100,                          // 100 - Gnosis
+		walletCommon.UnichainMainnet, // 130
+		137,                          // 137 - Polygon PoS
+		146,                          // 146 - Sonic
+		walletCommon.BaseMainnet,     // 8453
+		walletCommon.ArbitrumMainnet, // 42161
+		43114,                        // 43114 - Avalanche C-Chain
+	}
+	ensNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.EthereumSepolia, walletCommon.AnvilMainnet}
 
 	// Test Swap
 	for _, chainID := range chainIDs {
