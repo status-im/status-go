@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -60,9 +61,17 @@ type Service struct {
 
 	rpcServer *gethrpc.Server
 	wsServer  *http.Server
+	mu        sync.Mutex
+	paused    bool
+	started   bool
 }
 
 func (s *Service) Start() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.started {
+		return nil
+	}
 	// Create an RPC server
 	s.rpcServer = gethrpc.NewServer()
 
@@ -98,19 +107,27 @@ func (s *Service) Start() error {
 		Handler:           handler,
 		ReadHeaderTimeout: time.Second * 10,
 	}
+	wsServer := s.wsServer
 
 	go func() {
 		defer common.LogOnPanic()
-		err := s.wsServer.ListenAndServe()
+		err := wsServer.ListenAndServe()
 		if !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("connector server closed with error", zap.Error(err))
 		}
 	}()
-
+	s.started = true
+	s.paused = false
 	return nil
 }
 
 func (s *Service) Stop() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stopLocked()
+}
+
+func (s *Service) stopLocked() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
@@ -121,16 +138,22 @@ func (s *Service) Stop() error {
 	}
 
 	if s.wsServer == nil {
+		s.started = false
 		return nil
 	}
 
 	err := s.wsServer.Shutdown(ctx)
 	if err == nil {
+		s.wsServer = nil
+		s.started = false
 		return nil
 	}
 
 	s.logger.Error("failed to stop status connector server", zap.Error(err))
-	return s.wsServer.Close()
+	wsServer := s.wsServer
+	s.wsServer = nil
+	s.started = false
+	return wsServer.Close()
 }
 
 func (s *Service) APIs() []gethrpc.API {

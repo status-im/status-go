@@ -137,6 +137,8 @@ var defaultNTPTimeSource = &ntpTimeSource{
 // ntpTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
 type ntpTimeSource struct {
+	common.PauseBroadcaster
+
 	servers           []string
 	allowedFailures   int
 	fastNTPSyncPeriod time.Duration
@@ -221,14 +223,52 @@ func (s *ntpTimeSource) runPeriodically(ctx context.Context, fn func() error, st
 	}
 	go func() {
 		defer common.LogOnPanic()
+		sub := s.Subscribe()
+		defer sub.Unsubscribe()
+
+		paused := <-sub.C()
+		if paused && period != s.slowNTPSyncPeriod {
+			period = s.slowNTPSyncPeriod
+		}
+
+		timer := time.NewTimer(period)
+		defer timer.Stop()
+
+		resetTimer := func(d time.Duration) {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(d)
+		}
+
 		for {
 			select {
-			case <-time.After(period):
+			case pausedState, ok := <-sub.C():
+				if !ok {
+					return
+				}
+				paused = pausedState
+				if paused && period != s.slowNTPSyncPeriod {
+					period = s.slowNTPSyncPeriod
+				}
+				resetTimer(period)
+			case <-timer.C:
+				if paused {
+					resetTimer(period)
+					continue
+				}
 				if err := fn(); err == nil {
 					period = s.slowNTPSyncPeriod
 				} else if period != s.slowNTPSyncPeriod {
 					period = s.fastNTPSyncPeriod
 				}
+				if paused && period != s.slowNTPSyncPeriod {
+					period = s.slowNTPSyncPeriod
+				}
+				resetTimer(period)
 
 			case <-ctx.Done():
 				return
