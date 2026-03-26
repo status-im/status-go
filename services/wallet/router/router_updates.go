@@ -70,6 +70,7 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 	var ticker *time.Ticker
 	switch chainID {
 	case walletCommon.EthereumMainnet,
+		walletCommon.EthereumHoodi,
 		walletCommon.EthereumSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalMainnet)
 	case walletCommon.OptimismMainnet,
