@@ -8,14 +8,22 @@ import (
 
 type ConnectionStatusSubscription struct {
 	S *wakutypes.ConnStatusSubscription
+	c <-chan types.ConnectionStatus
+}
+
+func NewConnectionStatusSubscription(s *wakutypes.ConnStatusSubscription) *ConnectionStatusSubscription {
+	return &ConnectionStatusSubscription{
+		S: s,
+		c: utils.BridgeChannels(s.C, func(status wakutypes.ConnStatus) types.ConnectionStatus {
+			return types.ConnectionStatus{
+				IsOnline: status.IsOnline,
+			}
+		}),
+	}
 }
 
 func (c *ConnectionStatusSubscription) C() <-chan types.ConnectionStatus {
-	return utils.BridgeChannels(c.S.C, func(status wakutypes.ConnStatus) types.ConnectionStatus {
-		return types.ConnectionStatus{
-			IsOnline: status.IsOnline,
-		}
-	})
+	return c.c
 }
 
 func (c *ConnectionStatusSubscription) Unsubscribe() {
