@@ -724,6 +724,14 @@ func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types2.EnvelopeEvent) 
 	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
 }
 
+func (w *Waku) SubscribeFilterMatched() chan struct{} {
+	return w.filters.SubscribeFilterMatched()
+}
+
+func (w *Waku) UnsubscribeFilterMatched(ch chan struct{}) {
+	w.filters.UnsubscribeFilterMatched(ch)
+}
+
 // NewKeyPair generates a new cryptographic identity for the client, and injects
 // it into the known identities for message decryption. Returns ID of the new key pair.
 func (w *Waku) NewKeyPair() (string, error) {
