@@ -65,7 +65,15 @@ func TestServiceRegistry_PauseUnknownReturnsError(t *testing.T) {
 	r := newServiceRegistry()
 	err := r.Pause("nonexistent")
 	require.Error(t, err)
-	require.True(t, errors.Is(err, err)) // just check it's non-nil with proper message
+	require.ErrorIs(t, err, ErrServiceNotFound)
+	require.Contains(t, err.Error(), "nonexistent")
+}
+
+func TestServiceRegistry_ResumeUnknownReturnsError(t *testing.T) {
+	r := newServiceRegistry()
+	err := r.Resume("nonexistent")
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrServiceNotFound)
 	require.Contains(t, err.Error(), "nonexistent")
 }
 
@@ -108,6 +116,7 @@ func TestServiceRegistry_PauseMultiple_PartialError(t *testing.T) {
 
 	err := r.PauseMultiple([]string{"wallet", "connector"})
 	require.Error(t, err)
+	require.ErrorIs(t, err, ErrServiceNotFound)
 	require.Contains(t, err.Error(), "connector")
 }
 

@@ -201,7 +201,7 @@ func TestPausableTicker_OnPauseChanged(t *testing.T) {
 
 	send(false) // initial: running
 	time.Sleep(20 * time.Millisecond)
-	send(true)  // pause
+	send(true) // pause
 	time.Sleep(20 * time.Millisecond)
 	send(false) // resume
 	time.Sleep(20 * time.Millisecond)
@@ -210,4 +210,159 @@ func TestPausableTicker_OnPauseChanged(t *testing.T) {
 	<-done
 
 	require.Equal(t, []bool{false, true, false}, states)
+}
+
+func TestPausableTicker_NoTickerArmedWhenInitialStatePaused(t *testing.T) {
+	pauseCh, send := makePauseCh()
+
+	var armed atomic.Bool
+	pt := NewPausableTicker(PausableTickerConfig{
+		Interval: 10 * time.Millisecond,
+		OnTick:   func() {},
+		TickerArmed: func(on bool) {
+			armed.Store(on)
+		},
+	}, pauseCh)
+
+	quit := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pt.Run(quit)
+	}()
+
+	send(true)
+	time.Sleep(50 * time.Millisecond)
+	require.False(t, armed.Load(), "no time.Ticker should be created while paused from the start")
+
+	close(quit)
+	<-done
+	require.False(t, armed.Load())
+}
+
+func TestPausableTicker_TickerDisarmedWhilePausedRearmedOnResume(t *testing.T) {
+	pauseCh, send := makePauseCh()
+
+	var armed atomic.Bool
+	pt := NewPausableTicker(PausableTickerConfig{
+		Interval: 10 * time.Millisecond,
+		OnTick:   func() {},
+		TickerArmed: func(on bool) {
+			armed.Store(on)
+		},
+	}, pauseCh)
+
+	quit := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pt.Run(quit)
+	}()
+
+	send(false)
+	require.Eventually(t, func() bool { return armed.Load() }, 200*time.Millisecond, 5*time.Millisecond,
+		"time.Ticker should be armed while running")
+
+	send(true)
+	require.Eventually(t, func() bool { return !armed.Load() }, 200*time.Millisecond, 5*time.Millisecond,
+		"time.Ticker should be stopped while paused (not only ignored in select)")
+
+	send(false)
+	require.Eventually(t, func() bool { return armed.Load() }, 200*time.Millisecond, 5*time.Millisecond,
+		"time.Ticker should be armed again after resume")
+
+	close(quit)
+	<-done
+	require.False(t, armed.Load(), "ticker stopped when Run exits")
+}
+
+func TestPausableTicker_Run_invalidConfigReturnsWithoutPanic(t *testing.T) {
+	t.Run("zero interval", func(t *testing.T) {
+		pauseCh, send := makePauseCh()
+		var ticked atomic.Bool
+		pt := NewPausableTicker(PausableTickerConfig{
+			Interval: 0,
+			OnTick:   func() { ticked.Store(true) },
+		}, pauseCh)
+
+		quit := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			require.NotPanics(t, func() { pt.Run(quit) })
+		}()
+
+		send(false)
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("Run should return without waiting on pause channel when Interval is invalid")
+		}
+		require.False(t, ticked.Load(), "OnTick must not run with invalid Interval")
+	})
+
+	t.Run("negative interval", func(t *testing.T) {
+		pauseCh, send := makePauseCh()
+		pt := NewPausableTicker(PausableTickerConfig{
+			Interval: -time.Second,
+			OnTick:   func() { t.Fatal("OnTick called") },
+		}, pauseCh)
+
+		quit := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			require.NotPanics(t, func() { pt.Run(quit) })
+		}()
+
+		send(false)
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("Run should return for negative Interval")
+		}
+	})
+
+	t.Run("nil OnTick", func(t *testing.T) {
+		pauseCh, send := makePauseCh()
+		pt := NewPausableTicker(PausableTickerConfig{
+			Interval: time.Millisecond,
+			OnTick:   nil,
+		}, pauseCh)
+
+		quit := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			require.NotPanics(t, func() { pt.Run(quit) })
+		}()
+
+		send(false)
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("Run should return when OnTick is nil")
+		}
+	})
+}
+
+func TestPausableTicker_Run_invalidConfig_skipsOnPauseChanged(t *testing.T) {
+	pauseCh, send := makePauseCh()
+	var calls atomic.Int32
+	pt := NewPausableTicker(PausableTickerConfig{
+		Interval:       0,
+		OnTick:         func() {},
+		OnPauseChanged: func(bool) { calls.Add(1) },
+	}, pauseCh)
+
+	quit := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pt.Run(quit)
+	}()
+
+	send(false)
+	<-done
+	require.Equal(t, int32(0), calls.Load(), "invalid config: Run exits before reading pauseCh; OnPauseChanged must not run")
 }

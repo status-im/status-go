@@ -12,6 +12,11 @@ type PausableTickerConfig struct {
 	// including once with the initial state before the first tick. Useful for
 	// consumers that need to change their own interval or behaviour (e.g. NTP).
 	OnPauseChanged func(paused bool)
+	// TickerArmed is optional. When set, called with true after a time.Ticker is
+	// created for the running state, and false after it is stopped (pause,
+	// replacement, or Run exit). Production code can leave this nil; tests use it
+	// to assert no underlying ticker is armed while paused.
+	TickerArmed func(armed bool)
 }
 
 // PausableTicker runs a periodic tick that is suppressed while paused.
@@ -42,9 +47,40 @@ func NewPausableTicker(cfg PausableTickerConfig, pauseCh <-chan bool) *PausableT
 
 // Run blocks, firing cfg.OnTick at cfg.Interval while not paused.
 // It returns when quit is closed or pauseCh is closed.
+// While paused, no time.Ticker is active (see cfg.TickerArmed for tests).
 func (pt *PausableTicker) Run(quit <-chan struct{}) {
-	ticker := time.NewTicker(pt.cfg.Interval)
-	defer ticker.Stop()
+	if pt.cfg.Interval <= 0 || pt.cfg.OnTick == nil {
+		return
+	}
+
+	var ticker *time.Ticker
+	notifyArmed := func(armed bool) {
+		if pt.cfg.TickerArmed != nil {
+			pt.cfg.TickerArmed(armed)
+		}
+	}
+	defer func() {
+		if ticker != nil {
+			ticker.Stop()
+			notifyArmed(false)
+		}
+	}()
+
+	startTicker := func() {
+		if ticker != nil {
+			ticker.Stop()
+			notifyArmed(false)
+		}
+		ticker = time.NewTicker(pt.cfg.Interval)
+		notifyArmed(true)
+	}
+	stopTicker := func() {
+		if ticker != nil {
+			ticker.Stop()
+			notifyArmed(false)
+			ticker = nil
+		}
+	}
 
 	// Read initial pause state; this unblocks once the lifecycle sends it.
 	var paused bool
@@ -64,6 +100,7 @@ func (pt *PausableTicker) Run(quit <-chan struct{}) {
 
 	var tickerC <-chan time.Time
 	if !paused {
+		startTicker()
 		tickerC = ticker.C
 	}
 
@@ -73,10 +110,13 @@ func (pt *PausableTicker) Run(quit <-chan struct{}) {
 			if !ok {
 				return
 			}
+			prev := paused
 			paused = pausedState
-			if paused {
+			if paused && !prev {
+				stopTicker()
 				tickerC = nil
-			} else {
+			} else if !paused && prev {
+				startTicker()
 				tickerC = ticker.C
 			}
 			if pt.cfg.OnPauseChanged != nil {

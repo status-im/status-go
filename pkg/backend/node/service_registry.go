@@ -9,6 +9,9 @@ import (
 	"github.com/status-im/status-go/server"
 )
 
+// ErrServiceNotFound is returned by Pause and Resume when the name is not registered.
+var ErrServiceNotFound = errors.New("service not found in registry")
+
 // PausableMediaServer wraps a server.MediaServer to implement common.Pausable.
 type PausableMediaServer struct {
 	common.PauseBroadcaster
@@ -77,7 +80,7 @@ func (r *ServiceRegistry) Pause(name string) error {
 	p, ok := r.pausables[name]
 	r.mu.RUnlock()
 	if !ok {
-		return fmt.Errorf("service %q not found in registry", name)
+		return fmt.Errorf("%w: %q", ErrServiceNotFound, name)
 	}
 	return p.Pause()
 }
@@ -88,7 +91,7 @@ func (r *ServiceRegistry) Resume(name string) error {
 	p, ok := r.pausables[name]
 	r.mu.RUnlock()
 	if !ok {
-		return fmt.Errorf("service %q not found in registry", name)
+		return fmt.Errorf("%w: %q", ErrServiceNotFound, name)
 	}
 	return p.Resume()
 }

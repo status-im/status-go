@@ -105,7 +105,9 @@ func (m *PauseBroadcaster) IsPaused() bool {
 // separate IsPaused() check before entering the select loop.
 func (m *PauseBroadcaster) Subscribe() Subscription {
 	m.initPub()
-	ch := m.pub.Subscribe(1)
+	// Buffer must fit initial snapshot plus one transition before the consumer reads; see
+	// common.TestPauseBroadcaster_Subscribe_* and pkg/pubsub.TestTypePublisher_publishDroppedWhenPerSubscriberBufferFull.
+	ch := m.pub.Subscribe(2)
 	// Deliver the current state immediately.
 	select {
 	case ch <- m.IsPaused():
