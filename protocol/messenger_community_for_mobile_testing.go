@@ -2,9 +2,9 @@ package protocol
 
 import (
 	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 func (m *Messenger) createCommunityChat(communityID types.HexBytes, name string) (*MessengerResponse, error) {
@@ -122,7 +122,7 @@ func (m *Messenger) CreateTokenGatedCommunity() (*MessengerResponse, error) {
 		CommunityID: cid,
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{{
-			ContractAddresses: map[uint64]string{params.SepoliaNetworkID: "0x3D6AFAA395C31FCd391fE3D562E75fe9E8ec7E6a"},
+			ContractAddresses: map[uint64]string{walletcommon.EthereumSepolia: "0x3D6AFAA395C31FCd391fE3D562E75fe9E8ec7E6a"},
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Symbol:            "STT",
 			Name:              "Status Test Token",

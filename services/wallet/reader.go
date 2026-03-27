@@ -362,7 +362,21 @@ func (r *Reader) GetCachedBalances(chainIDs []uint64, addresses []common.Address
 	tokensOfInterest := make(map[string]struct{}, 0)
 	for _, cachedToken := range cachedTokens {
 		for _, token := range cachedToken {
+			if !slices.Contains(chainIDs, token.TokenChainID) {
+				continue
+			}
 			tokensOfInterest[types.TokenKey(token.TokenChainID, token.TokenAddress)] = struct{}{}
+		}
+	}
+
+	// add mandatory tokens for chainIDs to tokensOfInterest if not already present
+	for _, chainID := range chainIDs {
+		mandatoryTokens := walletcommon.MandatoryTokensByChainID(chainID)
+		for _, tokenKey := range mandatoryTokens {
+			if _, ok := tokensOfInterest[tokenKey]; ok {
+				continue
+			}
+			tokensOfInterest[tokenKey] = struct{}{}
 		}
 	}
 

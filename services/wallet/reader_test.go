@@ -16,6 +16,8 @@ import (
 
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/wallet"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/testutils"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock/storage"
@@ -124,8 +126,12 @@ func TestGetCachedBalances(t *testing.T) {
 		types.TokenKey(cachedTokens[addresses[1]][0].TokenChainID, cachedTokens[addresses[1]][0].TokenAddress),
 	}
 
+	for _, chainID := range chainIDs {
+		tokensOfInterest = append(tokensOfInterest, walletcommon.MandatoryTokensByChainID(chainID)...)
+	}
+
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
-	tokenManager.EXPECT().GetTokensByKeys(tokensOfInterest).Return(allTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
 
@@ -198,9 +204,13 @@ func TestFetchBalances(t *testing.T) {
 		types.TokenKey(cachedTokens[addresses[1]][0].TokenChainID, cachedTokens[addresses[1]][0].TokenAddress),
 	}
 
+	for _, chainID := range chainIDs {
+		tokensOfInterest = append(tokensOfInterest, walletcommon.MandatoryTokensByChainID(chainID)...)
+	}
+
 	// Test GetCachedBalances with cached data
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
-	tokenManager.EXPECT().GetTokensByKeys(tokensOfInterest).Return(allTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
 
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)

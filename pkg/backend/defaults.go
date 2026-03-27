@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -299,7 +300,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
-		nodeConfig.Networks = BuildDefaultNetworks(&request.WalletSecretsConfig, request.ThirdpartyServicesEnabled)
+		nodeConfig.Networks = networkdefaults.BuildDefaultNetworks(&request.WalletSecretsConfig, request.ThirdpartyServicesEnabled)
 	}
 
 	if request.NetworkID != nil {
@@ -360,8 +361,8 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	nodeConfig.TorrentConfig = params.TorrentConfig{
 		Enabled:    false,
 		Port:       0,
-		DataDir:    filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
-		TorrentDir: filepath.Join(nodeConfig.RootDataDir, params.TorrentTorrentsRelativePath),
+		DataDir:    filepath.Join(nodeConfig.RootDataDir, gocommon.ArchivesRelativePath),
+		TorrentDir: filepath.Join(nodeConfig.RootDataDir, gocommon.TorrentTorrentsRelativePath),
 	}
 
 	if request.TorrentConfigEnabled != nil {
