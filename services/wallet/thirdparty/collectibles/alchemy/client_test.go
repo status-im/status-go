@@ -1,17 +1,24 @@
 package alchemy
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnmarshallCollection(t *testing.T) {
@@ -164,4 +171,188 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 	collectiblesData := alchemyToCollectiblesData(w_common.ChainID(w_common.EthereumMainnet), container.OwnedNFTs, &owner)
 
 	assert.Equal(t, expectedCollectiblesData, collectiblesData)
+}
+
+type testURLResolver struct {
+	baseURL string
+}
+
+func (r testURLResolver) GetNFTBaseURL(chainID w_common.ChainID) (string, error) {
+	return r.baseURL, nil
+}
+
+func (r testURLResolver) IsChainSupported(chainID w_common.ChainID) bool {
+	return true
+}
+
+func makeNFTResponse(t *testing.T, w http.ResponseWriter, nftCount int, nextPageKey string) {
+	t.Helper()
+
+	nfts := make([]map[string]any, 0, nftCount)
+	for i := range nftCount {
+		nfts = append(nfts, map[string]any{
+			"contract": map[string]any{
+				"address":   "0x0000000000000000000000000000000000000001",
+				"tokenType": "ERC721",
+			},
+			"tokenId": fmt.Sprintf("%d", i+1),
+			"name":    fmt.Sprintf("NFT #%d", i+1),
+			"raw": map[string]any{
+				"tokenUri":    "",
+				"metadata":    map[string]any{},
+				"error":       nil,
+				"rawMetadata": map[string]any{"attributes": []any{}},
+			},
+			"image": map[string]any{},
+		})
+	}
+
+	resp := map[string]any{
+		"ownedNfts": nfts,
+	}
+	if nextPageKey != "" {
+		resp["pageKey"] = nextPageKey
+	}
+
+	require.NoError(t, json.NewEncoder(w).Encode(resp))
+}
+
+func newTestClient(baseURL string) *Client {
+	client := NewClient(security.NewSensitiveString(""))
+	client.urlResolver = testURLResolver{baseURL: baseURL}
+	return client
+}
+
+var testOwner = common.HexToAddress("0x1234567890123456789012345678901234567890")
+
+func TestFetchOwnedAssetsSendsPageSizeAndExcludeFilters(t *testing.T) {
+	var called atomic.Bool
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called.Store(true)
+		assert.Equal(t, "/getNFTsForOwner", r.URL.Path)
+		assert.Equal(t, "500", r.URL.Query().Get("pageSize"))
+		assert.Equal(t, "SPAM", r.URL.Query().Get("excludeFilters"))
+		makeNFTResponse(t, w, 1, "")
+	}))
+	defer server.Close()
+
+	assets, err := newTestClient(server.URL).FetchAllAssetsByOwner(
+		context.Background(), w_common.ChainID(w_common.EthereumMainnet), testOwner, "", thirdparty.FetchNoLimit,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, assets)
+	assert.True(t, called.Load())
+	assert.Len(t, assets.Items, 1)
+	assert.Empty(t, assets.NextCursor)
+}
+
+func TestFetchOwnedAssetsPagination(t *testing.T) {
+	tests := []struct {
+		name            string
+		limit           int
+		handler         func(t *testing.T, page int32, w http.ResponseWriter, r *http.Request)
+		expectedPages   int32
+		expectedItems   int
+		expectCursorSet bool
+	}{
+		{
+			name:  "stops on empty page key",
+			limit: thirdparty.FetchNoLimit,
+			handler: func(t *testing.T, page int32, w http.ResponseWriter, r *http.Request) {
+				if page < 3 {
+					makeNFTResponse(t, w, 2, fmt.Sprintf("page-%d", page))
+				} else {
+					makeNFTResponse(t, w, 1, "")
+				}
+			},
+			expectedPages:   3,
+			expectedItems:   5,
+			expectCursorSet: false,
+		},
+		{
+			name:  "stops at page cap for unbounded fetch",
+			limit: thirdparty.FetchNoLimit,
+			handler: func(t *testing.T, page int32, w http.ResponseWriter, r *http.Request) {
+				makeNFTResponse(t, w, 1, fmt.Sprintf("page-%d", page))
+			},
+			expectedPages:   int32(fetchNoLimitMaxPages),
+			expectedItems:   fetchNoLimitMaxPages,
+			expectCursorSet: true,
+		},
+		{
+			name:  "honors limit before page cap",
+			limit: 3,
+			handler: func(t *testing.T, page int32, w http.ResponseWriter, r *http.Request) {
+				makeNFTResponse(t, w, 1, fmt.Sprintf("page-%d", page))
+			},
+			expectedPages:   3,
+			expectedItems:   3,
+			expectCursorSet: true,
+		},
+		{
+			name:  "trims items to limit",
+			limit: 3,
+			handler: func(t *testing.T, _ int32, w http.ResponseWriter, r *http.Request) {
+				makeNFTResponse(t, w, 5, "next-page")
+			},
+			expectedPages:   1,
+			expectedItems:   3,
+			expectCursorSet: true,
+		},
+		{
+			name:  "single page no next cursor",
+			limit: thirdparty.FetchNoLimit,
+			handler: func(t *testing.T, _ int32, w http.ResponseWriter, r *http.Request) {
+				makeNFTResponse(t, w, 2, "")
+			},
+			expectedPages:   1,
+			expectedItems:   2,
+			expectCursorSet: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var requestCount atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				page := requestCount.Add(1)
+				if page == 1 {
+					assert.Empty(t, r.URL.Query().Get("pageKey"))
+				} else {
+					assert.NotEmpty(t, r.URL.Query().Get("pageKey"))
+				}
+				tt.handler(t, page, w, r)
+			}))
+			defer server.Close()
+
+			assets, err := newTestClient(server.URL).FetchAllAssetsByOwner(
+				context.Background(), w_common.ChainID(w_common.EthereumMainnet), testOwner, "", tt.limit,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, assets)
+			assert.Equal(t, tt.expectedPages, requestCount.Load())
+			assert.Len(t, assets.Items, tt.expectedItems)
+			if tt.expectCursorSet {
+				assert.NotEmpty(t, assets.NextCursor)
+			} else {
+				assert.Empty(t, assets.NextCursor)
+			}
+		})
+	}
+}
+
+func TestFetchOwnedAssetsRespectsContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		makeNFTResponse(t, w, 1, "next")
+	}))
+	defer server.Close()
+
+	_, err := newTestClient(server.URL).FetchAllAssetsByOwner(
+		ctx, w_common.ChainID(w_common.EthereumMainnet), testOwner, "", thirdparty.FetchNoLimit,
+	)
+	require.Error(t, err)
 }
