@@ -31,6 +31,7 @@ import (
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -420,6 +421,51 @@ func (s *Service) GetAssetContractData(chainID uint64, contractAddress string) (
 
 func (s *Service) DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error) {
 	return s.manager.DeploymentSignatureDigest(chainID, addressFrom, communityID)
+}
+
+// FetchCollectibleOwnersByContractAddressDirectly queries ERC721 contract ownership
+// directly via RPC, bypassing third-party collectibles providers. This is used as a
+// fallback for chains not supported by those providers (e.g. local Anvil chain 31337).
+func (s *Service) FetchCollectibleOwnersByContractAddressDirectly(ctx context.Context, chainID uint64, contractAddress string) (*thirdparty.CollectibleContractOwnership, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+
+	contractInst, err := s.manager.NewCollectiblesInstance(chainID, common.HexToAddress(contractAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	mintedCount, err := contractInst.MintedCount(callOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	ownersMap := make(map[common.Address][]thirdparty.TokenBalance)
+	for i := int64(0); i < mintedCount.Int64(); i++ {
+		tokenID, err := contractInst.TokenByIndex(callOpts, big.NewInt(i))
+		if err != nil {
+			continue
+		}
+		owner, err := contractInst.OwnerOf(callOpts, tokenID)
+		if err != nil {
+			continue
+		}
+		ownersMap[owner] = append(ownersMap[owner], thirdparty.TokenBalance{
+			TokenID: &bigint.BigInt{Int: new(big.Int).Set(tokenID)},
+			Balance: &bigint.BigInt{Int: big.NewInt(1)},
+		})
+	}
+
+	ownership := &thirdparty.CollectibleContractOwnership{
+		ContractAddress: common.HexToAddress(contractAddress),
+	}
+	for ownerAddr, balances := range ownersMap {
+		ownership.Owners = append(ownership.Owners, thirdparty.CollectibleOwner{
+			OwnerAddress:  ownerAddr,
+			TokenBalances: balances,
+		})
+	}
+
+	return ownership, nil
 }
 
 func (s *Service) ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error {

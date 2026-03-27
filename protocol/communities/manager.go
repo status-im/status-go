@@ -290,6 +290,10 @@ type CommunityTokensServiceInterface interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
 	ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error
+	// FetchCollectibleOwnersByContractAddressDirectly uses direct blockchain RPC calls
+	// to enumerate ERC721 token owners. Used as a fallback when third-party collectibles
+	// providers (Alchemy/Rarible) do not support the chain (e.g. local chain 31337).
+	FetchCollectibleOwnersByContractAddressDirectly(ctx context.Context, chainID uint64, contractAddress string) (*thirdparty.CollectibleContractOwnership, error)
 }
 
 type BalancesByChain = map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
@@ -1045,7 +1049,16 @@ func (m *Manager) fetchCollectiblesOwners(collectibles map[walletcommon.ChainID]
 		for contractAddress := range contractAddresses {
 			ownership, err := m.collectiblesManager.FetchCollectibleOwnersByContractAddress(context.Background(), chainID, contractAddress)
 			if err != nil {
-				return nil, err
+				if m.communityTokensService == nil {
+					return nil, err
+				}
+				// Fall back to direct RPC contract queries for chains where
+				// third-party providers are not available (e.g. local chain 31337).
+				directOwnership, directErr := m.communityTokensService.FetchCollectibleOwnersByContractAddressDirectly(context.Background(), uint64(chainID), contractAddress.Hex())
+				if directErr != nil {
+					return nil, err
+				}
+				ownership = directOwnership
 			}
 			collectiblesOwners[chainID][contractAddress] = ownership
 		}
