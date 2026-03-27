@@ -77,32 +77,14 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokentyp
 
 func (tm *Manager) GetCommunityTokenType(chainID uint64, tokenContractAddress string) (protobuf.CommunityTokenType, error) {
 	if tm.communityTokensDB != nil {
-		tokenType, err := tm.communityTokensDB.GetTokenType(chainID, tokenContractAddress)
-		if err != nil {
-			logutils.ZapLogger().Warn("failed to resolve community token type",
-				zap.Uint64("chainID", chainID),
-				zap.String("tokenContractAddress", tokenContractAddress),
-				zap.String("tokenContractAddressLower", strings.ToLower(tokenContractAddress)),
-				zap.Error(err),
-			)
-		}
-		return tokenType, err
+		return tm.communityTokensDB.GetTokenType(chainID, tokenContractAddress)
 	}
 	return protobuf.CommunityTokenType_UNKNOWN_TOKEN_TYPE, nil
 }
 
 func (tm *Manager) GetCommunityTokenPrivilegesLevel(chainID uint64, tokenContractAddress string) (token.PrivilegesLevel, error) {
 	if tm.communityTokensDB != nil {
-		privilegesLevel, err := tm.communityTokensDB.GetTokenPrivilegesLevel(chainID, tokenContractAddress)
-		if err != nil {
-			logutils.ZapLogger().Warn("failed to resolve community token privilege level",
-				zap.Uint64("chainID", chainID),
-				zap.String("tokenContractAddress", tokenContractAddress),
-				zap.String("tokenContractAddressLower", strings.ToLower(tokenContractAddress)),
-				zap.Error(err),
-			)
-		}
-		return privilegesLevel, err
+		return tm.communityTokensDB.GetTokenPrivilegesLevel(chainID, tokenContractAddress)
 	}
 	return token.CommunityLevel, nil
 }

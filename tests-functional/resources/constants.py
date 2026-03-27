@@ -126,7 +126,7 @@ TESTS_DIR = os.path.join(PROJECT_ROOT, "tests-functional")
 SIGNALS_DIR = os.path.join(TESTS_DIR, "signals")
 FORGE_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "forge_output")
 DEPLOYER_ACCOUNT = user_1
-LOG_SIGNALS_TO_FILE = True  # used for debugging purposes
+LOG_SIGNALS_TO_FILE = False  # used for debugging purposes
 USE_IPV6 = os.getenv("USE_IPV6", "No")
 
 gas_fee_mode_low = 0
