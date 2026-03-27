@@ -152,6 +152,12 @@ type Waku interface {
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
+	// SubscribeFilterMatched returns a channel that is notified (non-blocking, coalescing)
+	// whenever an incoming envelope matches at least one installed filter.
+	// Callers must call UnsubscribeFilterMatched when done to avoid a channel leak.
+	SubscribeFilterMatched() chan struct{}
+	UnsubscribeFilterMatched(ch chan struct{})
+
 	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 	// DeleteKeyPair deletes the key with the specified ID if it exists.
