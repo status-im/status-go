@@ -3,7 +3,7 @@ import time
 import uuid
 import json
 import re
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 
 
 import pytest
@@ -506,6 +506,14 @@ class TestCommunityTokenPermissions:
                     assert isinstance(community_token_signal, dict), f"Unexpected community token signal payload: {community_token_signal}"
                     logger.debug(f"Community token transaction status signal: {community_token_signal}")
 
+                    deploy_event = community_token_signal.get("event", {})
+                    logger.info(
+                        "[DIAGNOSTICS] deploy status event | "
+                        f"tx_hash={tx_hash} success={deploy_event.get('success')} "
+                        f"error_string={deploy_event.get('errorString')} "
+                        f"event={json.dumps(deploy_event, default=str)}"
+                    )
+
                     master_token_address = self._extract_master_token_address_from_event(community_token_signal.get("event", {}))
                     if master_token_address:
                         self._last_deployed_master_token_address = master_token_address
@@ -771,12 +779,21 @@ class TestCommunityTokenPermissions:
         master_token_address: str,
         owner_token_address: Optional[str],
         deploy_tx_hash: Optional[str],
+        temp_master_token_address: Optional[str] = None,
+        temp_owner_token_address: Optional[str] = None,
+        route_debug_context: Optional[dict[str, Any]] = None,
+        last_router_error: Optional[str] = None,
     ):
         logger.info(
             "[DIAGNOSTICS] master token router usability snapshot | "
             f"community_id={community_id} chain_id={chain_id} master_token={master_token_address} "
-            f"owner_token={owner_token_address} deploy_tx_hash={deploy_tx_hash}"
+            f"owner_token={owner_token_address} deploy_tx_hash={deploy_tx_hash} "
+            f"temp_master_token={temp_master_token_address} temp_owner_token={temp_owner_token_address}"
         )
+        if route_debug_context:
+            logger.info(f"[DIAGNOSTICS] route debug context | {json.dumps(route_debug_context, default=str)}")
+        if last_router_error:
+            logger.info(f"[DIAGNOSTICS] last router error | {last_router_error}")
 
         try:
             communities_resp = backend.wakuext_service.communities()
@@ -826,16 +843,88 @@ class TestCommunityTokenPermissions:
             except Exception as exc:
                 logger.warning(f"[DIAGNOSTICS] {method}({params}) failed: {exc}")
 
-        token_addresses_to_probe = [master_token_address]
+        token_addresses_to_probe: list[tuple[str, str]] = [("final_master", master_token_address)]
         if owner_token_address:
-            token_addresses_to_probe.append(owner_token_address)
+            token_addresses_to_probe.append(("final_owner", owner_token_address))
+        if temp_master_token_address:
+            token_addresses_to_probe.append(("temp_master", temp_master_token_address))
+        if temp_owner_token_address:
+            token_addresses_to_probe.append(("temp_owner", temp_owner_token_address))
 
-        for address in token_addresses_to_probe:
+        for label, address in token_addresses_to_probe:
             try:
                 remaining_supply = backend.rpc_valid_request("communitytokens_remainingSupply", [chain_id, address])
-                logger.info("[DIAGNOSTICS] communitytokens_remainingSupply " f"chain_id={chain_id} address={address} => {remaining_supply}")
+                logger.info(
+                    "[DIAGNOSTICS] communitytokens_remainingSupply " f"label={label} chain_id={chain_id} address={address} => {remaining_supply}"
+                )
             except Exception as exc:
-                logger.warning("[DIAGNOSTICS] communitytokens_remainingSupply failed " f"chain_id={chain_id} address={address}: {exc}")
+                logger.warning("[DIAGNOSTICS] communitytokens_remainingSupply failed " f"label={label} chain_id={chain_id} address={address}: {exc}")
+
+    def _extract_router_error_details(self, error_text: str) -> dict[str, Any]:
+        details: dict[str, Any] = {"raw": error_text}
+
+        json_candidate: Optional[str] = None
+        marker = "response:"
+        marker_idx = error_text.find(marker)
+        if marker_idx >= 0:
+            json_candidate = error_text[marker_idx + len(marker) :].strip()
+        else:
+            first_brace = error_text.find("{")
+            if first_brace >= 0:
+                json_candidate = error_text[first_brace:].strip()
+
+        if json_candidate:
+            try:
+                parsed = json.loads(json_candidate)
+                details["parsed"] = parsed
+                if isinstance(parsed, dict):
+                    if "error" in parsed:
+                        details["error"] = parsed.get("error")
+                    if "message" in parsed:
+                        details["message"] = parsed.get("message")
+
+                    nested_message = parsed.get("message")
+                    if isinstance(nested_message, str):
+                        nested_first_brace = nested_message.find("{")
+                        if nested_first_brace >= 0:
+                            try:
+                                details["nested_message_parsed"] = json.loads(nested_message[nested_first_brace:])
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+        return details
+
+    def derive_frontend_known_owner_and_master_token_addresses(
+        self,
+        deploy_tx_hash: str,
+        receipt_owner_token_address: str,
+        receipt_master_token_address: str,
+    ) -> Tuple[str, str, str, str]:
+        """
+        Simulate status-app cache-backed transition for owner/master tokens:
+        temp tx-hash addresses -> final receipt-derived deployed addresses.
+        """
+        assert isinstance(deploy_tx_hash, str) and deploy_tx_hash, f"Invalid deploy tx hash: {deploy_tx_hash}"
+        assert re.fullmatch(r"0x[a-fA-F0-9]{40}", receipt_owner_token_address), f"Invalid receipt owner token address: {receipt_owner_token_address}"
+        assert re.fullmatch(
+            r"0x[a-fA-F0-9]{40}", receipt_master_token_address
+        ), f"Invalid receipt master token address: {receipt_master_token_address}"
+
+        temp_owner_token_address = self.temporary_owner_contract_address(deploy_tx_hash)
+        temp_master_token_address = self.temporary_master_contract_address(deploy_tx_hash)
+
+        final_owner_token_address = Web3.to_checksum_address(receipt_owner_token_address)
+        final_master_token_address = Web3.to_checksum_address(receipt_master_token_address)
+
+        logger.info(
+            "Simulating status-app processDeployOwnerToken() cache-backed transition "
+            f"temp_owner={temp_owner_token_address} -> owner={final_owner_token_address}, "
+            f"temp_master={temp_master_token_address} -> master={final_master_token_address}"
+        )
+
+        return temp_owner_token_address, temp_master_token_address, final_owner_token_address, final_master_token_address
 
     def wait_until_master_token_is_router_usable(
         self,
@@ -848,7 +937,7 @@ class TestCommunityTokenPermissions:
         attempts: int = 30,
         delay: int = 2,
     ):
-        """Wait until router accepts the real master token in mint route suggestion."""
+        """Wait until router accepts master token for mint route suggestion."""
         assert re.fullmatch(r"0x[a-fA-F0-9]{40}", master_token_address), f"Invalid master token address: {master_token_address}"
         assert re.fullmatch(r"0x[a-fA-F0-9]{40}", sender_wallet_address), f"Invalid sender wallet address: {sender_wallet_address}"
 
@@ -856,21 +945,47 @@ class TestCommunityTokenPermissions:
         recipient_wallet_addresses = recipient_wallet_addresses or [sender_wallet_address]
         backend.wallet_service.get_balances_at_by_chain([sender_wallet_address], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
 
+        owner_token_is_valid = isinstance(owner_token_address, str) and re.fullmatch(r"0x[a-fA-F0-9]{40}", owner_token_address) is not None
+        router_master_token_address = master_token_address
+        router_owner_token_address = owner_token_address
+
         last_backend_error = None
         retrack_method = "communitytokens_reTrackOwnerTokenDeploymentTransaction"
-        owner_token_is_valid = isinstance(owner_token_address, str) and re.fullmatch(r"0x[a-fA-F0-9]{40}", owner_token_address) is not None
         deploy_tx_hash = getattr(self, "_last_deployed_tx_hash", None)
+        temp_master_token_address = (
+            self.temporary_master_contract_address(deploy_tx_hash) if isinstance(deploy_tx_hash, str) and deploy_tx_hash else None
+        )
+        temp_owner_token_address = (
+            self.temporary_owner_contract_address(deploy_tx_hash) if isinstance(deploy_tx_hash, str) and deploy_tx_hash else None
+        )
 
+        # Single readiness gate: router usability for the final (cache-transitioned) master token address.
         for attempt in range(1, attempts + 1):
             transaction_uuid = str(uuid.uuid4())
             transfer_details = [
                 {
                     "tokenType": CommunityTokenType.ERC721.value,
                     "privilegeLevel": CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
-                    "tokenContractAddress": master_token_address,
+                    "tokenContractAddress": router_master_token_address,
                     "amount": hex(1),
                 }
             ]
+            route_debug_context = {
+                "attempt": attempt,
+                "attempts": attempts,
+                "uuid": transaction_uuid,
+                "community_id": community_id,
+                "chain_id": chain_id,
+                "sender_wallet_address": sender_wallet_address,
+                "recipient_wallet_addresses": recipient_wallet_addresses,
+                "deploy_tx_hash": deploy_tx_hash,
+                "temp_owner_token_address": temp_owner_token_address,
+                "temp_master_token_address": temp_master_token_address,
+                "final_owner_token_address": router_owner_token_address,
+                "final_master_token_address": router_master_token_address,
+                "transfer_details": transfer_details,
+            }
+            logger.info(f"[DIAGNOSTICS] mint route suggestion payload | {json.dumps(route_debug_context, default=str)}")
 
             try:
                 routes_result = backend.wallet_service.suggested_community_routes(
@@ -878,7 +993,7 @@ class TestCommunityTokenPermissions:
                     send_type=COMMUNITY_MINT_TOKENS,
                     chain_id=chain_id,
                     address_from=sender_wallet_address,
-                    addr_to=master_token_address,
+                    addr_to=router_master_token_address,
                     community_id=community_id,
                     signer_pub_key=backend.public_key,
                     token_ids=[],
@@ -896,6 +1011,8 @@ class TestCommunityTokenPermissions:
                     raise
 
                 last_backend_error = error_text
+                parsed_error = self._extract_router_error_details(error_text)
+                logger.info(f"[DIAGNOSTICS] parsed router error | {json.dumps(parsed_error, default=str)}")
 
                 if owner_token_is_valid:
                     try:
@@ -908,20 +1025,24 @@ class TestCommunityTokenPermissions:
                         backend=backend,
                         community_id=community_id,
                         chain_id=chain_id,
-                        master_token_address=master_token_address,
-                        owner_token_address=owner_token_address,
+                        master_token_address=router_master_token_address,
+                        owner_token_address=router_owner_token_address,
                         deploy_tx_hash=deploy_tx_hash,
+                        temp_master_token_address=temp_master_token_address,
+                        temp_owner_token_address=temp_owner_token_address,
+                        route_debug_context=route_debug_context,
+                        last_router_error=error_text,
                     )
 
                 if attempt < attempts:
-                    logger.info(f"Master token {master_token_address} not router-usable yet (attempt {attempt}/{attempts}); retrying")
+                    logger.info(f"Master token {router_master_token_address} not router-usable yet " f"(attempt {attempt}/{attempts}); retrying")
                     time.sleep(delay)
             except Exception:
                 raise
 
         raise AssertionError(
             "Master token was resolved but never became router-usable for mint routing. "
-            f"community_id={community_id}, master_token_address={master_token_address}, "
+            f"community_id={community_id}, master_token_address={router_master_token_address}, "
             f"last_backend_error={last_backend_error}"
         )
 
@@ -1290,6 +1411,22 @@ class TestCommunityTokenPermissions:
 
         assert owner_token_address, f"Owner token contract address not found for deploy tx {deploy_tx_hash}"
         assert master_token_address, f"Master token contract address not found for deploy tx {deploy_tx_hash}"
+
+        (
+            temp_owner_token_address,
+            temp_master_token_address,
+            owner_token_address,
+            master_token_address,
+        ) = self.derive_frontend_known_owner_and_master_token_addresses(
+            deploy_tx_hash=deploy_tx_hash,
+            receipt_owner_token_address=owner_token_address,
+            receipt_master_token_address=master_token_address,
+        )
+        logger.info(
+            "Using post-transition real token addresses for mint routing "
+            f"(frontend cache model): temp_owner={temp_owner_token_address}, temp_master={temp_master_token_address}, "
+            f"owner={owner_token_address}, master={master_token_address}"
+        )
 
         self.wait_until_master_token_is_router_usable(
             backend=owner_backend,
