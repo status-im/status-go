@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import uuid4
 
 import pytest
@@ -23,6 +25,23 @@ from utils import fake
 from utils.config import Config
 
 logger = logging.getLogger(__name__)
+
+
+def _parallel_teardown(tasks: list[tuple[str, Callable]]):
+    if not tasks:
+        return
+    errors: list[Exception] = []
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        futures = {executor.submit(fn): label for label, fn in tasks}
+        for future in as_completed(futures):
+            label = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                logging.warning(f"[TEARDOWN] {label} failed: {e}")
+                errors.append(e)
+    if errors:
+        raise ExceptionGroup("teardown failures", errors)
 
 
 @retry(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True)
@@ -101,12 +120,14 @@ def backend_factory(request):
 
     yield factory
 
-    # Cleanup all created backends
+    # Cleanup all created backends concurrently
     logging.debug(f"🧹 [TEARDOWN] Cleaning up {len(created_backends)} backends for {cls_name or 'test'}")
 
-    for i, backend in enumerate(reversed(created_backends)):
-        logging.debug(f"🧹 [TEARDOWN] Cleaning up backend {len(created_backends) - i}...")
-        backend.shutdown(log_sufix=test_name)
+    tasks = [
+        (f"backend-{len(created_backends) - i}", lambda b=backend: b.shutdown(log_sufix=test_name))
+        for i, backend in enumerate(reversed(created_backends))
+    ]
+    _parallel_teardown(tasks)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -134,11 +155,14 @@ def backend_new_profile(request, backend_factory):
 
     yield factory
 
-    for backend in backends:
+    def _logout(b):
         try:
-            backend.logout(timeout=10)
+            b.logout(timeout=10)
         except ReadTimeout as e:
             logging.warning(f"Failed to logout during shutdown: {e}")
+
+    tasks = [(f"logout-{i}", lambda b=backend: _logout(b)) for i, backend in enumerate(backends)]
+    _parallel_teardown(tasks)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -159,8 +183,14 @@ def backend_recovered_profile(request, backend_factory):
 
     yield _backend_recovered_profile
 
-    for backend in backends:
-        backend.logout()
+    def _logout(b):
+        try:
+            b.logout(timeout=10)
+        except ReadTimeout as e:
+            logging.warning(f"Failed to logout during shutdown: {e}")
+
+    tasks = [(f"logout-{i}", lambda b=backend: _logout(b)) for i, backend in enumerate(backends)]
+    _parallel_teardown(tasks)
 
 
 @pytest.fixture(scope="function", autouse=False)
