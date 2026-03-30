@@ -169,6 +169,56 @@ class TestCommunityTokenPermissions:
         assert edit_resp is not None
         return new_name, new_description
 
+    def wait_for_member_role(
+        self,
+        backend,
+        community_id: str,
+        member_key: str,
+        role: int,
+        attempts: int = 10,
+        delay: int = 2,
+        fetch_from_store: bool = False,
+        required: bool = True,
+    ):
+        """Poll until *backend* sees *role* on the member identified by *member_key*.
+
+        When *fetch_from_store* is True, a live store-node fetch is forced on
+        each iteration so the backend's local state is updated with the latest
+        community description.
+
+        Returns the community dict when the role is found, or the last observed
+        community dict when *required* is False and the role was not seen.
+        Raises AssertionError when *required* is True and the role is missing
+        after all attempts.
+        """
+        community = None
+        for _ in range(attempts):
+            if fetch_from_store:
+                messenger.fetch_community(backend, community_id, try_database=False)
+            communities = backend.wakuext_service.communities()
+            community = next(
+                (c for c in self._communities_list(communities) if c.get("id") == community_id),
+                None,
+            )
+            roles = (community or {}).get("members", {}).get(member_key, {}).get("roles", [])
+            if role in roles:
+                return community
+            time.sleep(delay)
+
+        if required:
+            assert community is not None, "Community not found"
+            roles = community.get("members", {}).get(member_key, {}).get("roles", [])
+            assert role in roles, f"Member {member_key} did not receive role {role} after {attempts} attempts"
+        else:
+            logger.warning(f"Backend local state may not yet reflect role {role} for {member_key}; proceeding")
+        return community
+
+    @staticmethod
+    def _mint_tx_confirmed_predicate(signal):
+        """Predicate for expect_signal: matches a successful community mint transaction."""
+        event = signal.get("event", {})
+        return event.get("sendType") == COMMUNITY_MINT_TOKENS and event.get("success") is True
+
     def check_member_community_updated(self, member_backend, community_id: str, expected_name: str, expected_description: str) -> bool:
         member_communities = member_backend.wakuext_service.communities()
         member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
@@ -1705,7 +1755,7 @@ class TestCommunityTokenPermissions:
         # tx is confirmed — otherwise the 5-minute cooldown would block an earlier loop run.
         with owner_backend.expect_signal(
             SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
-            predicate=lambda s: s.get("event", {}).get("sendType") == COMMUNITY_MINT_TOKENS and s.get("event", {}).get("success") is True,
+            predicate=self._mint_tx_confirmed_predicate,
             timeout=60,
         ):
             self.mint_community_token(
@@ -1723,38 +1773,28 @@ class TestCommunityTokenPermissions:
         owner_backend.wakuext_service.reevaluate_community_members_permissions(community_id)
 
         # Poll the owner backend until it sees Member A's ROLE_TOKEN_MASTER.
-        owner_community = None
-        for _ in range(10):
-            owner_communities = owner_backend.wakuext_service.communities()
-            owner_community = next((c for c in self._communities_list(owner_communities) if c.get("id") == community_id), None)
-            member_roles = (owner_community or {}).get("members", {}).get(member_backend.public_key, {}).get("roles", [])
-            if CommunityRoles.ROLE_TOKEN_MASTER.value in member_roles:
-                break
-            time.sleep(2)
+        self.wait_for_member_role(
+            owner_backend,
+            community_id,
+            member_backend.public_key,
+            CommunityRoles.ROLE_TOKEN_MASTER.value,
+            attempts=10,
+            delay=2,
+        )
 
-        assert owner_community is not None
-        member_roles = owner_community.get("members", {}).get(member_backend.public_key, {}).get("roles", [])
-        assert CommunityRoles.ROLE_TOKEN_MASTER.value in member_roles, "Member A did not receive token master role"
-
-        # After the owner sees the role, wait for member_backend's own local state to reflect
-        # it. The community description update (with token permissions and member roles) is
-        # delivered over Waku. For token-ownership communities the processing is queued for
-        # async owner-token verification on the receiving side. Force a fetch on each poll
-        # iteration so member_backend pulls the latest description from the store node —
-        # this is the canonical way to sync a member's local state with the network.
-        for _ in range(30):
-            # try_database=False forces a live store-node fetch so member_backend's local
-            # state is updated with the latest community description (token permissions +
-            # member roles) instead of returning the stale local DB entry.
-            messenger.fetch_community(member_backend, community_id, try_database=False)
-            member_communities = member_backend.wakuext_service.communities()
-            member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
-            own_roles = (member_community or {}).get("members", {}).get(member_backend.public_key, {}).get("roles", [])
-            if CommunityRoles.ROLE_TOKEN_MASTER.value in own_roles:
-                break
-            time.sleep(2)
-        else:
-            logger.warning("member_backend local state may not yet reflect ROLE_TOKEN_MASTER; proceeding")
+        # After the owner sees the role, wait for member_backend's own local state to
+        # reflect it. Force a store-node fetch on each iteration so the member pulls the
+        # latest community description (token permissions + member roles).
+        self.wait_for_member_role(
+            member_backend,
+            community_id,
+            member_backend.public_key,
+            CommunityRoles.ROLE_TOKEN_MASTER.value,
+            attempts=30,
+            delay=2,
+            fetch_from_store=True,
+            required=False,
+        )
 
         # When Member A edits the community
         new_name, new_description = self.edit_community(member_backend, community_id)
@@ -1796,7 +1836,7 @@ class TestCommunityTokenPermissions:
         # message directly. Verify the mint tx was confirmed on-chain via the sender signal.
         with member_backend.expect_signal(
             SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
-            predicate=lambda s: s.get("event", {}).get("sendType") == COMMUNITY_MINT_TOKENS and s.get("event", {}).get("success") is True,
+            predicate=self._mint_tx_confirmed_predicate,
             timeout=60,
         ):
             self.mint_community_token(
