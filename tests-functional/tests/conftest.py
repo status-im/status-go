@@ -21,6 +21,7 @@ from resources.constants import (
     COMMUNITIES_ADDRESSES_CONTAINER_PATH,
     ENS_ADDRESSES_CONTAINER_PATH,
 )
+from steps import messenger
 from utils import fake
 from utils.config import Config
 
@@ -205,9 +206,7 @@ def funded_new_profile(backend_new_profile, anvil_client):
         kwargs.setdefault("password", Config.password)
         backend = backend_new_profile(name, **kwargs)
 
-        accounts = backend.accounts_service.get_accounts()
-        wallet_account = next(a for a in accounts if not a.get("chat"))
-        wallet_address = Web3.to_checksum_address(wallet_account["address"])
+        wallet_address = Web3.to_checksum_address(messenger.wallet_address(backend))
 
         anvil_client.set_balance(wallet_address, balance)
 

@@ -3,7 +3,7 @@ import time
 import uuid
 import json
 import re
-from typing import Optional, List, Tuple, Any
+from typing import Optional, Tuple, Any
 
 
 import pytest
@@ -20,8 +20,7 @@ from clients.services.wakuext import (
 )
 from clients.signals import SignalType
 from clients.status_backend import StatusBackend
-from resources.constants import user_1
-from steps import messenger
+from steps import community_tokens, messenger
 from utils import fake
 from utils.keys import change_community_key_compression
 
@@ -30,22 +29,6 @@ logger = logging.getLogger(__name__)
 COMMUNITY_DEPLOY_OWNER_TOKEN = 12
 COMMUNITY_MINT_TOKENS = 13
 NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
-
-
-def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
-    # Generate signatures for joining community with selected addresses to reveal
-    # Address must correspond to a non-chat and non-watch account
-    sign_params = backend.wakuext_service.generate_joining_community_requests_for_signing(backend.public_key, community_id, addresses)
-
-    # Set password for each sign parameter
-    for i in range(len(sign_params)):
-        sign_params[i]["password"] = backend.password
-
-    # Sign addresses to reveal
-    signatures = backend.wakuext_service.sign_data(sign_params)
-
-    # Send request to join with addresses to reveal and signatures
-    return backend.wakuext_service.request_to_join_community(community_id, addresses, signatures)
 
 
 @pytest.mark.rpc
@@ -61,158 +44,6 @@ class TestCommunityTokenPermissions:
             info["value"] for info in communities_addresses.values() if info["internal_type"] == "contract CommunityTokenDeployer"
         )
 
-    def _communities_list(self, communities_response):
-        if isinstance(communities_response, dict):
-            return communities_response.get("communities", []) or []
-        return communities_response or []
-
-    def _spectate_and_fetch_community(self, backend, community_id, attempts=10, delay=5):
-        # Fetch first so community exists in local DB before spectating.
-        # `wakuext_spectateCommunity` returns "community not found" when called before fetch/sync.
-        community = None
-        for attempt in range(attempts):
-            community = messenger.fetch_community(backend, community_id)
-            if community:
-                break
-            logging.info(f"Community {community_id} not found yet (attempt {attempt + 1}/{attempts})")
-            time.sleep(delay)
-
-        if not community:
-            return None
-
-        try:
-            backend.wakuext_service.spectate_community(community_id)
-        except ApiResponseError as exc:
-            logging.warning(f"Spectate community failed for {community_id}: {exc}")
-
-        return community
-
-    def create_token_gated_community(
-        self,
-        owner_backend,
-        permission_types: Optional[List[CommunityTokenPermissionType]] = None,
-        token_criteria: Optional[List[dict]] = None,
-        membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
-    ):
-        """Helper to create a community and add token permissions"""
-        if permission_types is None:
-            permission_types = [CommunityTokenPermissionType.BECOME_MEMBER]
-        if token_criteria is None:
-            token_criteria = [
-                {
-                    "type": CommunityTokenType.ERC20.value,
-                    "contract_addresses": {31337: self.snt_address},
-                    "symbol": "SNT",
-                    "amountInWei": "1",  # 1 wei required
-                    "decimals": 18,
-                }
-            ]
-
-        # Create basic community
-        community_resp = owner_backend.wakuext_service.create_community(
-            name=fake.community_name(),
-            description=fake.community_description(),
-            membership=membership,
-        )
-        community_id = community_resp.get("communities", [{}])[0].get("id")
-
-        # Add token permissions
-        for permission_type in permission_types:
-            owner_backend.wakuext_service.create_community_token_permission(
-                community_id=community_id, permission_type=permission_type, token_criteria=token_criteria
-            )
-
-        return community_id
-
-    def fund_backend_account_with_tokens(self, backend, foundry_client, amount=10, token_type=CommunityTokenType.ERC20, token_id=0):
-        """Fund the given backend's first account with the specified amount of SNT tokens or mint an ERC721 token."""
-        accounts = backend.accounts_service.get_accounts()
-        assert accounts, "No accounts found"
-        assert len(accounts) == 2  # Chat and Wallet accounts
-
-        # Select non-chat account
-        wallet_account = next(a for a in accounts if not a.get("chat"))
-        assert wallet_account, "No wallet account found"
-
-        member_address = wallet_account["address"]
-
-        if token_type == CommunityTokenType.ERC20:
-            token_amount = str(amount * 10**18)  # amount tokens with 18 decimals
-            gen_tokens_result = foundry_client.generate_tokens(self.snt_controller_address, member_address, token_amount, user_1.private_key)
-            logging.debug(f"Generate tokens result: exit_code={gen_tokens_result.exit_code}, output={gen_tokens_result.output.decode()}")
-            logger.debug(f"Funded {member_address} with {amount} SNT tokens at contract {self.snt_address}")
-
-        else:
-            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20")
-
-        return member_address
-
-    def verify_token_balance(self, foundry_client, token_type: CommunityTokenType, contract_address, owner_address, min_balance=1, token_id=0):
-        """Verify token balance using foundry client. Supports ERC20 and ERC721."""
-        if token_type == CommunityTokenType.ERC20:
-            balance_result = foundry_client.get_erc20_balance(contract_address, owner_address)
-            assert balance_result.exit_code == 0, "Balance check command failed"
-            balance = int(balance_result.output.decode().strip(), 16)
-            assert balance >= min_balance, f"Insufficient {token_type.name} balance: {balance}, expected at least {min_balance}"
-
-        else:
-            raise ValueError(f"Unsupported token_type: {token_type}. Supported types: ERC20")
-
-    def edit_community(self, owner_backend, community_id):
-        new_name = fake.community_name()
-        new_description = fake.community_description()
-        edit_resp = owner_backend.wakuext_service.edit_community(
-            community_id=community_id,
-            name=new_name,
-            description=new_description,
-        )
-        assert edit_resp is not None
-        return new_name, new_description
-
-    def wait_for_member_role(
-        self,
-        backend,
-        community_id: str,
-        member_key: str,
-        role: int,
-        attempts: int = 10,
-        delay: int = 2,
-        fetch_from_store: bool = False,
-        required: bool = True,
-    ):
-        """Poll until *backend* sees *role* on the member identified by *member_key*.
-
-        When *fetch_from_store* is True, a live store-node fetch is forced on
-        each iteration so the backend's local state is updated with the latest
-        community description.
-
-        Returns the community dict when the role is found, or the last observed
-        community dict when *required* is False and the role was not seen.
-        Raises AssertionError when *required* is True and the role is missing
-        after all attempts.
-        """
-        community = None
-        for _ in range(attempts):
-            if fetch_from_store:
-                messenger.fetch_community(backend, community_id, try_database=False)
-            communities = backend.wakuext_service.communities()
-            community = next(
-                (c for c in self._communities_list(communities) if c.get("id") == community_id),
-                None,
-            )
-            roles = (community or {}).get("members", {}).get(member_key, {}).get("roles", [])
-            if role in roles:
-                return community
-            time.sleep(delay)
-
-        if required:
-            assert community is not None, "Community not found"
-            roles = community.get("members", {}).get(member_key, {}).get("roles", [])
-            assert role in roles, f"Member {member_key} did not receive role {role} after {attempts} attempts"
-        else:
-            logger.warning(f"Backend local state may not yet reflect role {role} for {member_key}; proceeding")
-        return community
-
     @staticmethod
     def _mint_tx_confirmed_predicate(signal):
         """Predicate for expect_signal: matches a successful community mint transaction."""
@@ -221,7 +52,7 @@ class TestCommunityTokenPermissions:
 
     def check_member_community_updated(self, member_backend, community_id: str, expected_name: str, expected_description: str) -> bool:
         member_communities = member_backend.wakuext_service.communities()
-        member_community = next((c for c in self._communities_list(member_communities) if c.get("id") == community_id), None)
+        member_community = next((c for c in messenger.communities_list(member_communities) if c.get("id") == community_id), None)
         return bool(
             member_community and member_community.get("name") == expected_name and member_community.get("description") == expected_description
         )
@@ -647,20 +478,6 @@ class TestCommunityTokenPermissions:
 
         return tx_hash if is_valid_tx_hash else None
 
-    def wallet_address(self, backend: StatusBackend) -> str:
-        accounts = backend.accounts_service.get_accounts()
-        assert accounts, "No accounts found"
-        wallet_account = next(a for a in accounts if not a.get("chat"))
-        assert wallet_account, "No wallet account found"
-        return wallet_account["address"]
-
-    def fund_native_balance(self, backend: StatusBackend, anvil_client, amount_in_wei: int = 10 * 10**18):
-        wallet_address = self.wallet_address(backend)
-        anvil_client.set_balance(wallet_address, amount_in_wei)
-        backend.wallet_service.fetch_or_get_cached_wallet_balances([wallet_address], True)
-        backend.wallet_service.get_balances_at_by_chain([wallet_address], [f"{backend.network_id}-{NATIVE_TOKEN_ADDRESS}"])
-        return wallet_address
-
     def mint_community_token(
         self,
         sender_backend: StatusBackend,
@@ -671,7 +488,7 @@ class TestCommunityTokenPermissions:
         privilege_level: int,
         amount: int = 1,
     ):
-        address_from = self.wallet_address(sender_backend)
+        address_from = messenger.wallet_address(sender_backend)
         chain_id = sender_backend.network_id
         sender_backend.wallet_service.get_balances_at_by_chain([address_from], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
 
@@ -728,23 +545,6 @@ class TestCommunityTokenPermissions:
 
         return sent_exp.result
 
-    def join_community_with_signatures_and_accept(self, owner_backend, member_backend, community_id: str, member_wallet_address: str):
-        req_id = None
-        with owner_backend.expect_signal(
-            SignalType.MESSAGES_NEW,
-            predicate=lambda signal: any(r.get("id") == req_id for r in (signal.get("event", {}).get("requestsToJoinCommunity") or [])),
-            timeout=60,
-        ):
-            join_resp = request_to_join_with_signatures(member_backend, community_id, [member_wallet_address])
-            requests = join_resp.get("requestsToJoinCommunity", [])
-            assert requests, "No requests to join community"
-            assert len(requests) == 1, "Unexpected multiple requests to join community"
-            req_id = requests[0].get("id")
-
-        time.sleep(2)
-        accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
-        assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
-
     def get_community_token_contract_address(
         self, backend: StatusBackend, community_id: str, privileges_level: int, attempts: int = 10, delay: int = 2
     ):
@@ -757,7 +557,7 @@ class TestCommunityTokenPermissions:
 
             community = messenger.fetch_community(backend, community_id)
             communities_resp = backend.wakuext_service.communities()
-            communities_list = self._communities_list(communities_resp)
+            communities_list = messenger.communities_list(communities_resp)
             community_from_list = next((c for c in communities_list if c.get("id") == community_id), None)
 
             for source in [community, community_from_list]:
@@ -792,7 +592,7 @@ class TestCommunityTokenPermissions:
 
         community = messenger.fetch_community(backend, community_id)
         communities_resp = backend.wakuext_service.communities()
-        communities_list = self._communities_list(communities_resp)
+        communities_list = messenger.communities_list(communities_resp)
         community_from_list = next((c for c in communities_list if c.get("id") == community_id), None)
 
         def _add_address(contract_address: str, level: int) -> None:
@@ -1031,7 +831,7 @@ class TestCommunityTokenPermissions:
 
         try:
             communities_resp = backend.wakuext_service.communities()
-            community = next((c for c in self._communities_list(communities_resp) if c.get("id") == community_id), None)
+            community = next((c for c in messenger.communities_list(communities_resp) if c.get("id") == community_id), None)
             logger.info(
                 "[DIAGNOSTICS] owner community snapshot | "
                 f"community_found={community is not None} "
@@ -1324,7 +1124,9 @@ class TestCommunityTokenPermissions:
         """Test that join request with no tokens/fake address fails permission check (no request created)"""
 
         # Owner creates token-gated community
-        community_id = self.create_token_gated_community(owner_backend, membership=CommunityPermissionsAccess.MANUAL_ACCEPT)
+        community_id = community_tokens.create_token_gated_community(
+            owner_backend, self.snt_address, membership=CommunityPermissionsAccess.MANUAL_ACCEPT
+        )
 
         time.sleep(2)
 
@@ -1335,7 +1137,7 @@ class TestCommunityTokenPermissions:
         fake_address = "0x" + "0" * 40
 
         # Verify request got rejected right away - no request created
-        join_req = request_to_join_with_signatures(member_backend, community_id, [fake_address])
+        join_req = community_tokens.request_to_join_with_signatures(member_backend, community_id, [fake_address])
         requests = join_req.get("requestsToJoinCommunity", [])
         assert len(requests) == 0, "No request should get accepted"
 
@@ -1345,19 +1147,22 @@ class TestCommunityTokenPermissions:
 
         # Verify member is not in community
         communities = member_backend.wakuext_service.communities()
-        member_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
+        member_community = next((c for c in messenger.communities_list(communities) if c.get("id") == community_id), None)
         assert member_community is None or not member_community.get("joined", False)
 
     def test_membership_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
         """Test that users with required tokens can successfully join community as member"""
 
         # Fund the member_with_snt with 10 SNT tokens
-        member_address = self.fund_backend_account_with_tokens(member_with_snt_backend, foundry_client)
-        self.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
+        member_address = community_tokens.fund_backend_account_with_tokens(
+            member_with_snt_backend, foundry_client, self.snt_controller_address, self.snt_address
+        )
+        community_tokens.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
 
         # Owner creates token-gated community with the deployed token
-        community_id = self.create_token_gated_community(
+        community_id = community_tokens.create_token_gated_community(
             owner_backend,
+            self.snt_address,
             permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
@@ -1366,7 +1171,7 @@ class TestCommunityTokenPermissions:
         # TODO: Remove this sleep somehow
         time.sleep(2)
 
-        member_community = self._spectate_and_fetch_community(member_with_snt_backend, community_id)
+        member_community = messenger.spectate_and_fetch_community(member_with_snt_backend, community_id)
         assert member_community, "Community not found on member"
 
         req_id = None
@@ -1376,7 +1181,7 @@ class TestCommunityTokenPermissions:
             predicate=lambda s: ((s.get("event", {}).get("requestsToJoinCommunity") or [{}])[0].get("id") == req_id),
             timeout=60,
         ):
-            join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
+            join_req = community_tokens.request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
             requests = join_req.get("requestsToJoinCommunity", [])
             assert requests, "No requests to join community"
             assert len(requests) == 1, "Unexpected multiple requests to join community"
@@ -1389,7 +1194,7 @@ class TestCommunityTokenPermissions:
 
         # Verify member is now in community (check from owner's perspective since acceptance happened there)
         communities = owner_backend.wakuext_service.communities()
-        owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
+        owner_community = next((c for c in messenger.communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
 
         # Check that member is in the community members list
@@ -1400,12 +1205,15 @@ class TestCommunityTokenPermissions:
         """Test that users with required tokens get admin privileges"""
 
         # Fund the member_with_snt with 10 SNT tokens
-        member_address = self.fund_backend_account_with_tokens(member_with_snt_backend, foundry_client)
-        self.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
+        member_address = community_tokens.fund_backend_account_with_tokens(
+            member_with_snt_backend, foundry_client, self.snt_controller_address, self.snt_address
+        )
+        community_tokens.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
 
         # Owner creates token-gated community with member and admin permissions
-        community_id = self.create_token_gated_community(
+        community_id = community_tokens.create_token_gated_community(
             owner_backend,
+            self.snt_address,
             permission_types=[
                 CommunityTokenPermissionType.BECOME_MEMBER,
                 CommunityTokenPermissionType.BECOME_ADMIN,
@@ -1422,7 +1230,7 @@ class TestCommunityTokenPermissions:
         time.sleep(2)
 
         # Fetch community as member
-        response = self._spectate_and_fetch_community(member_with_snt_backend, community_id)
+        response = messenger.spectate_and_fetch_community(member_with_snt_backend, community_id)
         assert response, "Community not found"
         assert response["tokenPermissions"], "No token permissions found"
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
@@ -1450,7 +1258,7 @@ class TestCommunityTokenPermissions:
             predicate=lambda signal: any(r.get("id") == req_id for r in (signal.get("event", {}).get("requestsToJoinCommunity") or [])),
             timeout=60,
         ):
-            join_req = request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
+            join_req = community_tokens.request_to_join_with_signatures(member_with_snt_backend, community_id, [member_address])
             requests = join_req.get("requestsToJoinCommunity", [])
             assert requests, "No requests to join community"
             assert len(requests) == 1, "Unexpected multiple requests to join community"
@@ -1464,7 +1272,7 @@ class TestCommunityTokenPermissions:
         # Verify member is now in community and has admin role
         communities = owner_backend.wakuext_service.communities()
         owner_community = next(
-            (c for c in self._communities_list(communities) if c.get("id") == community_id),
+            (c for c in messenger.communities_list(communities) if c.get("id") == community_id),
             None,
         )
         assert owner_community is not None
@@ -1484,20 +1292,23 @@ class TestCommunityTokenPermissions:
         """Test that owner edits are visible before and after minting the owner token"""
 
         # Owner creates a token-gated community
-        community_id = self.create_token_gated_community(
+        community_id = community_tokens.create_token_gated_community(
             owner_backend,
+            self.snt_address,
             permission_types=[CommunityTokenPermissionType.BECOME_MEMBER],
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
         # Fetch/spectate community as member and wait until it is available with propagated metadata
         time.sleep(2)
-        response = self._spectate_and_fetch_community(member_backend, community_id)
+        response = messenger.spectate_and_fetch_community(member_backend, community_id)
         assert response, "Community not found"
 
         # Fund member and verify token balance so member satisfies token-gated permission
-        member_address = self.fund_backend_account_with_tokens(member_backend, foundry_client)
-        self.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
+        member_address = community_tokens.fund_backend_account_with_tokens(
+            member_backend, foundry_client, self.snt_controller_address, self.snt_address
+        )
+        community_tokens.verify_token_balance(foundry_client, CommunityTokenType.ERC20, self.snt_address, member_address)
 
         # Balance and permission checks are async/cached, force refresh and retry.
         # `community.memberReevaluationStatus` is not reliably emitted in this path.
@@ -1524,7 +1335,7 @@ class TestCommunityTokenPermissions:
             predicate=lambda signal: any(r.get("id") == req_id for r in (signal.get("event", {}).get("requestsToJoinCommunity") or [])),
             timeout=60,
         ):
-            join_resp = request_to_join_with_signatures(member_backend, community_id, [member_address])
+            join_resp = community_tokens.request_to_join_with_signatures(member_backend, community_id, [member_address])
             requests = join_resp.get("requestsToJoinCommunity", [])
 
             assert requests, "No requests to join community"
@@ -1539,7 +1350,7 @@ class TestCommunityTokenPermissions:
 
         # Verify member is in community
         communities = owner_backend.wakuext_service.communities()
-        owner_community = next((c for c in self._communities_list(communities) if c.get("id") == community_id), None)
+        owner_community = next((c for c in messenger.communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
         assert member_backend.public_key in owner_community.get("members", {})
 
@@ -1549,7 +1360,7 @@ class TestCommunityTokenPermissions:
             predicate=lambda signal: community_id in json.dumps(signal),
             timeout=60,
         ):
-            new_name, new_description = self.edit_community(owner_backend, community_id)
+            new_name, new_description = messenger.edit_community(owner_backend, community_id)
 
         # Then the Member sees the updated community
         assert self.check_member_community_updated(member_backend, community_id, new_name, new_description)
@@ -1576,7 +1387,7 @@ class TestCommunityTokenPermissions:
         # And the Owner edits the community again. After deploy_owner_token the community
         # has HasTokenOwnership=true, so MESSAGES_NEW is unreliable (messages may be queued
         # for async owner-token verification). Use store-node polling instead.
-        new_name2, new_description2 = self.edit_community(owner_backend, community_id)
+        new_name2, new_description2 = messenger.edit_community(owner_backend, community_id)
 
         # Then the Member sees the updated community
         for _ in range(30):
@@ -1593,7 +1404,7 @@ class TestCommunityTokenPermissions:
         owner_backend.wait_for_wakuext_ready(timeout=60, start_messenger=True)
 
         # And the Owner edits the community again
-        new_name3, new_description3 = self.edit_community(owner_backend, community_id)
+        new_name3, new_description3 = messenger.edit_community(owner_backend, community_id)
 
         # Then the Member sees the updated community
         for _ in range(30):
@@ -1632,22 +1443,24 @@ class TestCommunityTokenPermissions:
 
         # And Member A and Member B have joined the community
         time.sleep(2)
-        assert self._spectate_and_fetch_community(member_backend, community_id), "Community not found for member A"
-        assert self._spectate_and_fetch_community(member_b_backend, community_id), "Community not found for member B"
+        assert messenger.spectate_and_fetch_community(member_backend, community_id), "Community not found for member A"
+        assert messenger.spectate_and_fetch_community(member_b_backend, community_id), "Community not found for member B"
 
-        member_a_wallet = self.wallet_address(member_backend)
-        member_b_wallet = self.wallet_address(member_b_backend)
-        self.join_community_with_signatures_and_accept(owner_backend, member_backend, community_id, member_a_wallet)
-        self.join_community_with_signatures_and_accept(owner_backend, member_b_backend, community_id, member_b_wallet)
+        member_a_wallet = messenger.wallet_address(member_backend)
+        member_b_wallet = messenger.wallet_address(member_b_backend)
+        community_tokens.join_community_with_signatures_and_accept(owner_backend, member_backend, community_id, member_a_wallet)
+        community_tokens.join_community_with_signatures_and_accept(owner_backend, member_b_backend, community_id, member_b_wallet)
 
-        owner_community = next((c for c in self._communities_list(owner_backend.wakuext_service.communities()) if c.get("id") == community_id), None)
+        owner_community = next(
+            (c for c in messenger.communities_list(owner_backend.wakuext_service.communities()) if c.get("id") == community_id), None
+        )
         assert owner_community is not None
         assert member_backend.public_key in owner_community.get("members", {})
         assert member_b_backend.public_key in owner_community.get("members", {})
 
         # Fund Owner and Member A with native token to pay gas
-        self.fund_native_balance(owner_backend, anvil_client)
-        self.fund_native_balance(member_backend, anvil_client)
+        community_tokens.fund_native_balance(owner_backend, anvil_client)
+        community_tokens.fund_native_balance(member_backend, anvil_client)
 
         # When the Owner mints the owner token
         owner_backend.wallet_service.restart_wallet_reload_timer()
@@ -1730,7 +1543,7 @@ class TestCommunityTokenPermissions:
             assert Web3.to_checksum_address(receipt_master_token_address) == master_token_address
 
         # And the Owner airdrops the master token to Member A using refreshed backend state.
-        owner_wallet = self.wallet_address(owner_backend)
+        owner_wallet = messenger.wallet_address(owner_backend)
         minted_master_token_address = master_token_address
         logger.info(
             "Using refreshed backend state token addresses for mint routing "
@@ -1773,7 +1586,7 @@ class TestCommunityTokenPermissions:
         owner_backend.wakuext_service.reevaluate_community_members_permissions(community_id)
 
         # Poll the owner backend until it sees Member A's ROLE_TOKEN_MASTER.
-        self.wait_for_member_role(
+        community_tokens.wait_for_member_role(
             owner_backend,
             community_id,
             member_backend.public_key,
@@ -1785,7 +1598,7 @@ class TestCommunityTokenPermissions:
         # After the owner sees the role, wait for member_backend's own local state to
         # reflect it. Force a store-node fetch on each iteration so the member pulls the
         # latest community description (token permissions + member roles).
-        self.wait_for_member_role(
+        community_tokens.wait_for_member_role(
             member_backend,
             community_id,
             member_backend.public_key,
@@ -1797,7 +1610,7 @@ class TestCommunityTokenPermissions:
         )
 
         # When Member A edits the community
-        new_name, new_description = self.edit_community(member_backend, community_id)
+        new_name, new_description = messenger.edit_community(member_backend, community_id)
 
         # Then the Owner and Member B see the updated community. Poll with store-node
         # fetches (try_database=False) because community description updates for
@@ -1825,14 +1638,14 @@ class TestCommunityTokenPermissions:
                 sender_backend=member_backend,
                 community_id=community_id,
                 token_contract_address=minted_master_token_address,
-                wallet_addresses=[self.wallet_address(owner_backend)],
+                wallet_addresses=[messenger.wallet_address(owner_backend)],
                 token_type=CommunityTokenType.ERC721,
                 privilege_level=CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
                 amount=1,
             )
 
         # Then the Owner has the master token
-        owner_address = self.wallet_address(owner_backend)
+        owner_address = messenger.wallet_address(owner_backend)
         balance_of_abi = [
             {
                 "inputs": [{"name": "owner", "type": "address"}],
