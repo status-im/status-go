@@ -1831,6 +1831,21 @@ class TestCommunityTokenPermissions:
                 amount=1,
             )
 
+        # Then the Owner has the master token
+        owner_address = self.wallet_address(owner_backend)
+        balance_of_abi = [
+            {
+                "inputs": [{"name": "owner", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"name": "", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function",
+            }
+        ]
+        master_token_contract = anvil_client.eth.contract(address=Web3.to_checksum_address(minted_master_token_address), abi=balance_of_abi)
+        owner_master_balance = master_token_contract.functions.balanceOf(Web3.to_checksum_address(owner_address)).call()
+        assert owner_master_balance >= 1, f"Owner should hold at least 1 master token, got {owner_master_balance}"
+
         # When Member A airdrops the minted token to Member B.
         # Member B is not a privileged member so they don't receive a CommunityTokenAction
         # message directly. Verify the mint tx was confirmed on-chain via the sender signal.
@@ -1848,3 +1863,7 @@ class TestCommunityTokenPermissions:
                 privilege_level=CommunityTokenPrivilegesLevel.MASTER_LEVEL.value,
                 amount=1,
             )
+
+        # Then Member B has the master token
+        member_b_master_balance = master_token_contract.functions.balanceOf(Web3.to_checksum_address(member_b_wallet)).call()
+        assert member_b_master_balance >= 1, f"Member B should hold at least 1 master token, got {member_b_master_balance}"
