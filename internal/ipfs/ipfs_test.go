@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 )
 
 func TestTaskDispatcherPausesAndResumesByLifecycle(t *testing.T) {

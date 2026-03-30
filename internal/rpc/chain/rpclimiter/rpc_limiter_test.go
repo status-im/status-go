@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-
 )
 
 func setupTest() (*InMemRequestsMapStorage, RequestLimiter) {

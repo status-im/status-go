@@ -83,6 +83,7 @@ func (s *Service) Start() error {
 	}
 
 	if !s.config.WSEnabled {
+		s.started = true
 		return nil
 	}
 

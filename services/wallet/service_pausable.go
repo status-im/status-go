@@ -11,7 +11,7 @@ func (s *Service) Pause() error {
 	if !s.started || s.paused {
 		return nil
 	}
-	s.stopBackgroundWorkersLocked()
+	s.stopBackgroundWorkers()
 	s.paused = true
 	return nil
 }
@@ -23,7 +23,7 @@ func (s *Service) Resume() error {
 	if !s.started || !s.paused {
 		return nil
 	}
-	if err := s.startBackgroundWorkersLocked(); err != nil {
+	if err := s.startBackgroundWorkers(); err != nil {
 		return err
 	}
 	s.paused = false

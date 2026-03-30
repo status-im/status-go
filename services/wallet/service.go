@@ -462,10 +462,8 @@ type Service struct {
 	activityFetcherService         *activityfetcher.Service
 	started                        bool
 	paused                         bool
-	readerWasRunningBeforePause    bool
-
-	mu                     sync.Mutex
-	cancelWalletServiceCtx context.CancelFunc
+	mu                             sync.Mutex
+	cancelWalletServiceCtx         context.CancelFunc
 }
 
 // Start signals transmitter.
@@ -479,7 +477,7 @@ func (s *Service) Start() error {
 	if s.started && !s.paused {
 		return nil
 	}
-	err := s.startBackgroundWorkersLocked()
+	err := s.startBackgroundWorkers()
 	if err == nil {
 		s.started = true
 		s.paused = false
@@ -520,7 +518,7 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-func (s *Service) startBackgroundWorkersLocked() error {
+func (s *Service) startBackgroundWorkers() error {
 	if s.cancelWalletServiceCtx != nil {
 		return nil
 	}
@@ -534,16 +532,14 @@ func (s *Service) startBackgroundWorkersLocked() error {
 	s.collectibles.Start(ctx)
 	s.leaderboardService.Start(ctx)
 	s.activityFetcherService.Start(ctx)
-	if s.readerWasRunningBeforePause {
+	if s.reader != nil && !s.reader.IsRunning() {
 		_ = s.reader.Start()
-		s.readerWasRunningBeforePause = false
 	}
 	return err
 }
 
-func (s *Service) stopBackgroundWorkersLocked() {
-	s.readerWasRunningBeforePause = s.reader != nil && s.reader.IsRunning()
-	if s.readerWasRunningBeforePause {
+func (s *Service) stopBackgroundWorkers() {
+	if s.reader != nil && s.reader.IsRunning() {
 		s.reader.Stop()
 	}
 	s.signals.Stop()
