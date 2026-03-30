@@ -290,9 +290,6 @@ type CommunityTokensServiceInterface interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
 	ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error
-	// FetchCollectibleOwnersByContractAddressDirectly uses direct blockchain RPC calls
-	// to enumerate ERC721 token owners. Used as a fallback when third-party collectibles
-	// providers (Alchemy/Rarible) do not support the chain (e.g. local chain 31337).
 	FetchCollectibleOwnersByContractAddressDirectly(ctx context.Context, chainID uint64, contractAddress string) (*thirdparty.CollectibleContractOwnership, error)
 }
 
