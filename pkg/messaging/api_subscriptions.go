@@ -10,7 +10,5 @@ func (a *API) SubscribeToConnStatusChanges() (types.ConnectionStatusSubscription
 	if err != nil {
 		return nil, err
 	}
-	return &adapters.ConnectionStatusSubscription{
-		S: sub,
-	}, nil
+	return adapters.NewConnectionStatusSubscription(sub), nil
 }
