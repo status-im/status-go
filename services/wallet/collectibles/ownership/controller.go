@@ -466,28 +466,28 @@ func (c *Controller) loadWithPeriodicalLoaderIfFound(ctx context.Context, chainI
 		_ = loader.Load(ctx)
 	}()
 
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	case finishedEvent, ok := <-finishedCh:
-		if !ok {
+	for {
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
 			return
-		}
-		if finishedEvent.ChainID == chainID && finishedEvent.Account == account {
-			return
-		}
-	case errEvent, ok := <-errCh:
-		if !ok {
-			return
-		}
-		if errEvent.ChainID == chainID && errEvent.Account == account {
-			err = errEvent.Error
-			return
+		case finishedEvent, ok := <-finishedCh:
+			if !ok {
+				return
+			}
+			if finishedEvent.ChainID == chainID && finishedEvent.Account == account {
+				return
+			}
+		case errEvent, ok := <-errCh:
+			if !ok {
+				return
+			}
+			if errEvent.ChainID == chainID && errEvent.Account == account {
+				err = errEvent.Error
+				return
+			}
 		}
 	}
-
-	return
 }
 
 func (c *Controller) checkPeriodicalLoaders() {
