@@ -76,6 +76,66 @@ func TestApplyMessagePreview(t *testing.T) {
 	})
 }
 
+func TestGetMessagePreviewTextNilMessage(t *testing.T) {
+	require.Equal(t, "", getMessagePreviewText(nil, nil))
+}
+
+func TestGetMessagePreviewTextTrimsMessageText(t *testing.T) {
+	msg := &common.Message{
+		ChatMessage: &protobuf.ChatMessage{
+			Text: "  hello world  ",
+		},
+	}
+	require.Equal(t, "hello world", getMessagePreviewText(msg, nil))
+}
+
+func TestTimestampOrZero(t *testing.T) {
+	require.Equal(t, uint64(0), timestampOrZero(nil))
+
+	msg := &common.Message{WhisperTimestamp: 42}
+	require.Equal(t, uint64(42), timestampOrZero(msg))
+}
+
+func TestToContactRequestNotificationFallbackMessageAndZeroTimestamp(t *testing.T) {
+	body := NotificationBody{
+		Contact: &contacts.Contact{
+			ID:          "0xabc",
+			DisplayName: "Alice",
+		},
+		Chat: &Chat{
+			ID:       "chat-1",
+			ChatType: ChatTypeOneToOne,
+		},
+	}
+
+	notif, err := body.toContactRequestNotification("0x1", 0, messagePreviewNameAndMessage)
+	require.NoError(t, err)
+	require.Equal(t, "Alice sent you a contact request", notif.Message)
+	require.Equal(t, uint64(0), notif.Timestamp)
+}
+
+func TestToPrivateGroupInviteNotificationUsesMessagePreviewWhenPresent(t *testing.T) {
+	body := NotificationBody{
+		Contact: &contacts.Contact{
+			ID:          "0xabc",
+			DisplayName: "Alice",
+		},
+		Chat: &Chat{
+			ID:       "group-1",
+			Name:     "Secret Group",
+			ChatType: ChatTypePrivateGroupChat,
+		},
+		Message: &common.Message{
+			ChatMessage: &protobuf.ChatMessage{
+				Text: "  please join us  ",
+			},
+		},
+	}
+
+	notif := body.toPrivateGroupInviteNotification("0x2", 0, messagePreviewNameAndMessage)
+	require.Equal(t, "please join us", notif.Message)
+}
+
 func TestShowMessageNotification_OneToOneChats(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	pkHex := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
