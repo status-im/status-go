@@ -2,6 +2,15 @@ name: Test Reliability
 
 on:
   workflow_dispatch:
+    inputs:
+      test_filter:
+        description: 'pytest -k filter expression (leave empty for all reliability tests)'
+        required: false
+        default: ''
+      waku_fleet:
+        description: 'Waku fleet to use'
+        required: false
+        default: 'status.prod'
   schedule:
     - cron:  '0 2 * * *'
 
@@ -54,17 +63,29 @@ jobs:
     - name: Run tests
       env:
         USE_IPV6: ${{ matrix.config.use_ipv6 }}
+        TEST_FILTER: ${{ inputs.test_filter || '' }}
+        WAKU_FLEET: ${{ inputs.waku_fleet || 'status.prod' }}
       run: |
-        pytest --reruns 2 \
-          -n auto \
-          -m "reliability" \
-          -c tests-functional/pytest.ini \
-          --junit-xml=pytest_results.xml \
-          --tb=short \
-          --docker-image="statusgo-local" \
-          --waku-fleet=status.staging \
-          --waku-fleets-config="" \
+        PYTEST_ARGS=(
+          --reruns 2
+          -m "reliability"
+          -c tests-functional/pytest.ini
+          --junit-xml=pytest_results.xml
+          --tb=short
+          --docker-image="statusgo-local"
+          --waku-fleets-config=""
           --logs-dir=tests-functional/log
+        )
+
+        if [ -n "$TEST_FILTER" ]; then
+          PYTEST_ARGS+=(-k "$TEST_FILTER" --dist no --reruns 0 --tb=long)
+        else
+          PYTEST_ARGS+=(-n auto)
+        fi
+
+        PYTEST_ARGS+=(--waku-fleet="$WAKU_FLEET")
+
+        pytest "${PYTEST_ARGS[@]}"
 
     - name: Test Report
       if: always()
