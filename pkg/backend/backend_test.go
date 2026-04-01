@@ -1148,6 +1148,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	alchemyAPIKey := fakeToken()
 	raribleMainnetAPIKey := fakeToken()
 	raribleTestnetAPIKey := fakeToken()
+	coingeckoAPIKey := fakeToken()
+	coingeckoDemoAPIKey := fakeToken()
 
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
@@ -1180,6 +1182,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 			AlchemyAPIKey:        alchemyAPIKey,
 			RaribleMainnetAPIKey: raribleMainnetAPIKey,
 			RaribleTestnetAPIKey: raribleTestnetAPIKey,
+			CoingeckoAPIKey:      coingeckoAPIKey,
+			CoingeckoDemoAPIKey:  coingeckoDemoAPIKey,
 		},
 	}
 
@@ -1198,6 +1202,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	require.Equal(t, walletConfig.AlchemyAPIKey, alchemyAPIKey)
 	require.Equal(t, walletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, walletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
+	require.Equal(t, walletConfig.CoingeckoAPIKey, coingeckoAPIKey)
+	require.Equal(t, walletConfig.CoingeckoDemoAPIKey, coingeckoDemoAPIKey)
 
 	require.NoError(t, testContext.backend.Logout())
 }

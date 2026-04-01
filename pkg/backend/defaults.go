@@ -192,6 +192,12 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if !request.MarketDataProxyUrl.Empty() {
 		walletConfig.MarketDataProxyConfig.UrlOverride = request.MarketDataProxyUrl
 	}
+	if !request.CoingeckoAPIKey.Empty() {
+		walletConfig.CoingeckoAPIKey = request.CoingeckoAPIKey
+	}
+	if !request.CoingeckoDemoAPIKey.Empty() {
+		walletConfig.CoingeckoDemoAPIKey = request.CoingeckoDemoAPIKey
+	}
 	if request.StatusProxyStageName != "" {
 		walletConfig.MarketDataProxyConfig.StageName = request.StatusProxyStageName
 	}
