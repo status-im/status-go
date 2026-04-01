@@ -179,7 +179,12 @@ class SignalClient:
             Path(SIGNALS_DIR).mkdir(parents=True, exist_ok=True)
 
     def on_message(self, ws, signal):
-        signal_data = json.loads(signal)
+        try:
+            signal_data = json.loads(signal)
+        except Exception:
+            logging.exception(f"SignalClient [{self.url}]: failed to parse signal ({len(signal)} bytes)")
+            return
+
         if LOG_SIGNALS_TO_FILE:
             self.write_signal_to_file(signal_data)
 
@@ -219,7 +224,7 @@ class SignalClient:
         logging.error(f"SignalClient [{self.url}]: websocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logging.debug(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
+        logging.error(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
         logging.debug(f"SignalClient [{self.url}]: websocket connection opened")
@@ -232,7 +237,8 @@ class SignalClient:
             on_open=self._on_open,
             on_close=self._on_close,
         )
-        self.wsapp.run_forever()
+        self.wsapp.run_forever(ping_interval=30, ping_timeout=10)
+        logging.error(f"SignalClient [{self.url}]: run_forever() exited — websocket is dead")
 
     def connect(self):
         websocket_thread = threading.Thread(target=self._connect)

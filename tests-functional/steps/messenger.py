@@ -682,6 +682,14 @@ def one_to_one_message(message_count, sender=None, receiver=None):
 
 def community_messages(message_chat_id, message_count, sender=None, receiver=None):
     start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
+    total_signals_before = sum(len(v) for v in receiver.received_signals.values())
+    logging.info(
+        "community_messages: start_index=%d, total_signals_before=%d, ws_url=%s",
+        start_index,
+        total_signals_before,
+        getattr(receiver, "url", "unknown"),
+    )
+
     sent_messages = []
     for i in range(message_count):
         message_text = f"test_message_{i+1}_{uuid4()}"
@@ -689,6 +697,17 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
         expected_message = get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         sent_messages.append(expected_message)
         time.sleep(0.01)
+
+    messages_new_after_send = len(receiver.received_signals[SignalType.MESSAGES_NEW])
+    total_signals_after_send = sum(len(v) for v in receiver.received_signals.values())
+    logging.info(
+        "community_messages: all %d messages sent, MESSAGES_NEW count=%d (was %d), total_signals=%d (was %d)",
+        message_count,
+        messages_new_after_send,
+        start_index,
+        total_signals_after_send,
+        total_signals_before,
+    )
 
     for i, expected_message in enumerate(sent_messages):
         with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start_index) as exp:
