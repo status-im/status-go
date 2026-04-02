@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 
 	"github.com/status-im/status-go/internal/crypto/types"
@@ -57,7 +58,7 @@ func TestServiceShouldTriggerLoadFetchIfNotCachedSkipsWhenLoaderExists(t *testin
 		nil,
 		fetcher,
 		pubsub.NewPublisher(),
-		zaptest.NewLogger(t),
+		zap.NewNop(),
 	)
 	ownershipController.StartWithLoaderParams(ownership.PeriodicalLoaderParams{
 		StartDelay:   0,

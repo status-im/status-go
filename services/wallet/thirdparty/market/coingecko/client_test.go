@@ -1,6 +1,7 @@
 package coingecko
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,11 +14,50 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/builder"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestCoingeckoAPIKeyInQueryProOverDemo(t *testing.T) {
+	var sawQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	t.Cleanup(srv.Close)
+
+	client := NewClientWithParams(Params{
+		URL:                 srv.URL,
+		CoingeckoAPIKey:     security.NewSensitiveString("pro-secret"),
+		CoingeckoDemoAPIKey: security.NewSensitiveString("demo-secret"),
+	})
+	_, err := client.fetchTokens(context.Background())
+	require.NoError(t, err)
+	require.Contains(t, sawQuery, "x_cg_pro_api_key=pro-secret")
+	require.NotContains(t, sawQuery, "demo-secret")
+}
+
+func TestCoingeckoAPIKeyInQueryDemoWhenNoPro(t *testing.T) {
+	var sawQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	t.Cleanup(srv.Close)
+
+	client := NewClientWithParams(Params{
+		URL:                 srv.URL,
+		CoingeckoDemoAPIKey: security.NewSensitiveString("demo-only"),
+	})
+	_, err := client.fetchTokens(context.Background())
+	require.NoError(t, err)
+	require.Contains(t, sawQuery, "x_cg_demo_api_key=demo-only")
+}
 
 func setupTest(t *testing.T, response []byte) (*httptest.Server, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

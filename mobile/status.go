@@ -751,7 +751,7 @@ func sendTransactionV2(requestJSON string) string {
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
-	hash, err := statusBackend.SendTransaction(request.TxArgs, request.Password)
+	hash, err := statusBackend.SendTransactionWithChainID(request.TxArgs.FromChainID, request.TxArgs, request.Password)
 	code := codeUnknown
 	if c, ok := errToCodeMap[err]; ok {
 		code = c

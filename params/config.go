@@ -229,6 +229,8 @@ type WalletConfig struct {
 	InfuraAPIKeySecret        security.SensitiveString `json:"InfuraAPIKeySecret"`
 	StatusProxyMarketUser     security.SensitiveString `json:"StatusProxyMarketUser"`
 	StatusProxyMarketPassword security.SensitiveString `json:"StatusProxyMarketPassword"`
+	CoingeckoAPIKey           security.SensitiveString `json:"CoingeckoAPIKey"`
+	CoingeckoDemoAPIKey       security.SensitiveString `json:"CoingeckoDemoAPIKey"`
 	MarketDataProxyConfig     MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
 	NftProxyConfig            NftProxyConfig           `json:"NftProxyConfig"`
 
