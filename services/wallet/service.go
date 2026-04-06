@@ -158,7 +158,10 @@ func NewService(
 		}
 
 		cryptoCompare := cryptocompare.NewClient()
-		coingeckoClient := coingecko.NewClient()
+		coingeckoClient := coingecko.NewClientWithParams(coingecko.Params{
+			CoingeckoAPIKey:     config.WalletConfig.CoingeckoAPIKey,
+			CoingeckoDemoAPIKey: config.WalletConfig.CoingeckoDemoAPIKey,
+		})
 		coingeckoProxy := createCoingeckoProxyClient(config.WalletConfig.MarketDataProxyConfig)
 		cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
 			ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),

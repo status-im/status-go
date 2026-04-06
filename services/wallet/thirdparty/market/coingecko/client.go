@@ -28,15 +28,19 @@ const (
 )
 
 type Client struct {
-	httpClient *thirdparty.HTTPClient
-	baseURL    string
-	creds      *thirdparty.BasicCreds
+	httpClient       *thirdparty.HTTPClient
+	baseURL          string
+	creds            *thirdparty.BasicCreds
+	coingeckoProKey  security.SensitiveString
+	coingeckoDemoKey security.SensitiveString
 }
 
 type Params struct {
-	URL      string
-	User     security.SensitiveString
-	Password security.SensitiveString
+	URL                 string
+	User                security.SensitiveString
+	Password            security.SensitiveString
+	CoingeckoAPIKey     security.SensitiveString
+	CoingeckoDemoAPIKey security.SensitiveString
 }
 
 func NewClient() *Client {
@@ -73,9 +77,11 @@ func NewClientWithParams(params Params) *Client {
 	}
 
 	return &Client{
-		httpClient: httpClient,
-		baseURL:    clientBaseURL,
-		creds:      creds,
+		httpClient:       httpClient,
+		baseURL:          clientBaseURL,
+		creds:            creds,
+		coingeckoProKey:  params.CoingeckoAPIKey,
+		coingeckoDemoKey: params.CoingeckoDemoAPIKey,
 	}
 }
 
@@ -350,10 +356,24 @@ func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency st
 	return aggregatePrices(result, aggregate), nil
 }
 
+func (c *Client) mergeCoingeckoQueryKey(params url.Values) url.Values {
+	out := url.Values{}
+	for k, vs := range params {
+		out[k] = append([]string(nil), vs...)
+	}
+	if !c.coingeckoProKey.Empty() {
+		out.Set("x_cg_pro_api_key", c.coingeckoProKey.Reveal())
+	} else if !c.coingeckoDemoKey.Empty() {
+		out.Set("x_cg_demo_api_key", c.coingeckoDemoKey.Reveal())
+	}
+	return out
+}
+
 // doGetRequestWithOptionalAuth performs a GET request, using credentials if they are available
 func (c *Client) doGetRequestWithOptionalAuth(ctx context.Context, url string, params url.Values) ([]byte, error) {
+	q := c.mergeCoingeckoQueryKey(params)
 	if c.creds != nil {
-		return c.httpClient.DoGetRequestWithCredentials(ctx, url, params, c.creds)
+		return c.httpClient.DoGetRequestWithCredentials(ctx, url, q, c.creds)
 	}
-	return c.httpClient.DoGetRequest(ctx, url, params)
+	return c.httpClient.DoGetRequest(ctx, url, q)
 }
