@@ -86,13 +86,17 @@ func (pl *PeriodicalLoader) Start(withDelay bool, waitForInterval bool) {
 	pl.Stop()
 	pl.stopCh = make(chan struct{})
 
+	// Capture stopCh once so the goroutine always sees the closed channel
+	// even after Stop() sets pl.stopCh = nil.
+	stopCh := pl.stopCh
+
 	// Trigger
 	go func() {
 		defer gocommon.LogOnPanic()
 
 		if withDelay && pl.params.StartDelay.Seconds() > 0 {
 			pl.state.Store(LoaderStateDelayed)
-			if cancelled := pl.waitFor(pl.params.StartDelay); cancelled {
+			if cancelled := pl.waitFor(stopCh, pl.params.StartDelay); cancelled {
 				pl.state.Store(LoaderStateIdle)
 				return
 			}
@@ -104,7 +108,7 @@ func (pl *PeriodicalLoader) Start(withDelay bool, waitForInterval bool) {
 				zap.Uint64("chain", uint64(pl.chainID)),
 				zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
 			)
-			pl.triggerLoadAsync()
+			pl.triggerLoadAsync(stopCh)
 		}
 
 		ticker := time.NewTicker(pl.params.LoadInterval)
@@ -118,8 +122,8 @@ func (pl *PeriodicalLoader) Start(withDelay bool, waitForInterval bool) {
 					zap.Uint64("chain", uint64(pl.chainID)),
 					zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
 				)
-				pl.triggerLoadAsync()
-			case <-pl.stopCh:
+				pl.triggerLoadAsync(stopCh)
+			case <-stopCh:
 				return
 			}
 		}
@@ -137,14 +141,14 @@ func (pl *PeriodicalLoader) GetState() LoaderState {
 	return pl.state.Load().(LoaderState)
 }
 
-func (pl *PeriodicalLoader) triggerLoadAsync() {
+func (pl *PeriodicalLoader) triggerLoadAsync(stopCh <-chan struct{}) {
 	go func() {
 		defer gocommon.LogOnPanic()
-		pl.triggerLoad()
+		pl.triggerLoad(stopCh)
 	}()
 }
 
-func (pl *PeriodicalLoader) triggerLoad() {
+func (pl *PeriodicalLoader) triggerLoad(stopCh <-chan struct{}) {
 	if pl.GetState() == LoaderStateUpdating {
 		// Another load is in progress which should've finished or have been cancelled at this point
 		pl.logger.Error("skipping Load because it's already in progress",
@@ -171,13 +175,9 @@ func (pl *PeriodicalLoader) triggerLoad() {
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer cancelFn() // Cancel ctx if PeriodicalLoader is stopped
-		for {
-			select {
-			case <-pl.stopCh:
-				return
-			case <-ctx.Done():
-				return
-			}
+		select {
+		case <-stopCh:
+		case <-ctx.Done():
 		}
 	}()
 
@@ -189,13 +189,13 @@ func (pl *PeriodicalLoader) Load(ctx context.Context) (err error) {
 	return
 }
 
-func (pl *PeriodicalLoader) waitFor(delay time.Duration) (cancelled bool) {
+func (pl *PeriodicalLoader) waitFor(stopCh <-chan struct{}, delay time.Duration) (cancelled bool) {
 	delayTimer := time.NewTicker(delay)
 	defer delayTimer.Stop()
 	select {
 	case <-delayTimer.C:
 		break
-	case <-pl.stopCh:
+	case <-stopCh:
 		return true
 	}
 	return false
