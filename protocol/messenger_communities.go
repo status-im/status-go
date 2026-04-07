@@ -2465,11 +2465,6 @@ func (m *Messenger) DefaultFilters(o *communities.Community) types2.ChatsToIniti
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultNonProtectedPubsubTopic()},
 	}
-	if communityPubsubTopic == "" {
-		chats = append(chats, &types2.ChatToInitialize{ChatID: cID, PubsubTopic: types2.GlobalCommunityControlPubsubTopic(), IsCommunity: true})
-		chats = append(chats, &types2.ChatToInitialize{ChatID: memberUpdateChannelID, PubsubTopic: types2.GlobalCommunityContentPubsubTopic(), IsCommunity: true})
-	}
-	return chats
 }
 
 func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDefaultChannel bool) (*MessengerResponse, error) {

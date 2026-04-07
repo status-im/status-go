@@ -155,8 +155,6 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		topics := make([]string, 0)
 		topics = append(topics, wakuv2.DefaultShardPubsubTopic())
 		topics = append(topics, wakuv2.DefaultNonProtectedPubsubTopic())
-		topics = append(topics, wakuv2.GlobalCommunityControlPubsubTopic())
-		topics = append(topics, wakuv2.GlobalCommunityContentPubsubTopic())
 
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey
@@ -697,4 +695,3 @@ func (f *FiltersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 
 	return f.filters[NegotiatedTopic(identity)]
 }
-

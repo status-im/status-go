@@ -26,15 +26,6 @@ func (m *Messenger) InitFilters() error {
 	if err := m.messaging.SubscribeToPubsubTopic(types.DefaultNonProtectedPubsubTopic()); err != nil {
 		return err
 	}
-	// TODO only subscribe if interested in communities
-	if err := m.messaging.SubscribeToPubsubTopic(types.GlobalCommunityControlPubsubTopic()); err != nil {
-		return err
-	}
-	// TODO only subscribe if interested in communities
-	if err := m.messaging.SubscribeToPubsubTopic(types.GlobalCommunityContentPubsubTopic()); err != nil {
-		return err
-	}
-
 	filters, publicKeys, err := m.collectFiltersAndKeys()
 	if err != nil {
 		return err

@@ -81,12 +81,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 		zap.Any("config", cfg))
 
 	fetch := func() (*communities.Community, StoreNodeRequestStats, error) {
-		// Since now we could have this community description in shards 32 and 128 we are doing the following:
-		//  1. trying to fetch in shards 32 and 128
-		//  2. returning the first non-nil community result
-		//
-		// Eventually we should just go to shard 128, once full migration to Global Community Control and Content Topic is done.
-		return m.fetchCommunity(ctx, communityID, cfg, types2.DefaultShard(), types2.GlobalCommunityControlShard())
+		return m.fetchCommunity(ctx, communityID, cfg, types2.DefaultShard())
 	}
 
 	if !cfg.WaitForResponse {
