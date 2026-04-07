@@ -213,15 +213,7 @@ func (f *FiltersManager) Filter(chatID string) *Filter {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	// find the first filter that matches this chat ID
-	// TODO this is temporary so not changing the return type, otherwise we should return a slice
-	for key, filter := range f.filters {
-		if strings.HasPrefix(key, chatID) {
-			return filter
-		}
-	}
-
-	return nil
+	return f.filters[chatID]
 }
 
 // FilterByFilterID returns a Filter with a given Whisper filter ID.
