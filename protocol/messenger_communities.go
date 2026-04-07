@@ -2460,11 +2460,10 @@ func (m *Messenger) DefaultFilters(o *communities.Community) types2.ChatsToIniti
 
 	communityPubsubTopic := o.PubsubTopic()
 
-	chats := types2.ChatsToInitialize{
-		{ChatID: cID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
-		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic, IsCommunity: true},
-		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultNonProtectedPubsubTopic(), IsCommunity: true},
-		{ChatID: uncompressedPubKey, PubsubTopic: types2.GlobalCommunityContentPubsubTopic(), IsCommunity: true},
+	return types2.ChatsToInitialize{
+		{ChatID: cID, PubsubTopic: communityPubsubTopic},
+		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
+		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultNonProtectedPubsubTopic()},
 	}
 	if communityPubsubTopic == "" {
 		chats = append(chats, &types2.ChatToInitialize{ChatID: cID, PubsubTopic: types2.GlobalCommunityControlPubsubTopic(), IsCommunity: true})

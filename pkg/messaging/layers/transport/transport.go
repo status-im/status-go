@@ -207,7 +207,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret messagingtypes.NegotiatedSecr
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, "", false)
+	return t.filters.LoadPublic(chatID, "")
 }
 
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
@@ -289,7 +289,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic, false)
+	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +370,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	}
 
 	// We load the filter to make sure we can post on it
-	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic, true)
+	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}

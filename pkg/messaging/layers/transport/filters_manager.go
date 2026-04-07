@@ -5,8 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -97,7 +95,7 @@ func (f *FiltersManager) Init(
 
 	// Add public, one-to-one and negotiated filters.
 	for _, fi := range filtersToInit {
-		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic, fi.DistinctByPubsub)
+		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic)
 		if err != nil {
 			return nil, err
 		}
@@ -123,15 +121,13 @@ func (f *FiltersManager) Init(
 type FiltersToInitialize struct {
 	ChatID      string
 	PubsubTopic string
-	// TODO (#6384) temporary flag while migrating community shards
-	DistinctByPubsub bool
 }
 
 func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitialize) ([]*Filter, error) {
 	var filters []*Filter
 	// Add public, one-to-one and negotiated filters.
 	for _, pf := range publicFiltersToInit {
-		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic, pf.DistinctByPubsub)
+		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic)
 		if err != nil {
 			return nil, err
 		}
@@ -536,16 +532,11 @@ func (f *FiltersManager) PersonalTopicFilter() *Filter {
 }
 
 // LoadPublic adds a filter for a public chat with specific pubsubTopic
-func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, distinctByPubsub bool) (*Filter, error) {
+func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	filterKey := chatID
-	if distinctByPubsub {
-		filterKey = concatFilterKey(chatID, pubsubTopic)
-	}
-
-	if chat, ok := f.filters[filterKey]; ok {
+	if chat, ok := f.filters[chatID]; ok {
 		if chat.PubsubTopic != pubsubTopic {
 			f.logger.Debug("updating pubsub topic for filter",
 				zap.String("chatID", chatID),
@@ -554,7 +545,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, distinctB
 				zap.String("newTopic", pubsubTopic),
 			)
 			chat.PubsubTopic = pubsubTopic
-			f.filters[filterKey] = chat
+			f.filters[chatID] = chat
 		}
 		return chat, nil
 	}
@@ -575,12 +566,10 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, distinctB
 		OneToOne:     false,
 	}
 
-	f.filters[filterKey] = chat
+	f.filters[chatID] = chat
 
 	f.logger.Debug("registering filter for",
 		zap.String("chatID", chatID),
-		zap.String("filterKey", filterKey),
-		zap.Bool("distinctByPubsub", distinctByPubsub),
 		zap.String("type", "public"),
 		zap.String("ContentTopic", filterAndTopic.Topic.String()),
 		zap.String("PubsubTopic", pubsubTopic),
@@ -709,12 +698,3 @@ func (f *FiltersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 	return f.filters[NegotiatedTopic(identity)]
 }
 
-// toCommunityFilterKey creates a unique key for filters map using chatID and pubsubTopic
-//
-// to allow one chat to have multiple filters in different pubsubTopics so that we can migrate the communities to 128 and 256 shards
-func concatFilterKey(chatID string, pubsubTopic string) string {
-	if pubsubTopic == "" {
-		return chatID
-	}
-	return fmt.Sprintf("%s::%s", chatID, pubsubTopic)
-}
