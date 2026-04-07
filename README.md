@@ -2,7 +2,7 @@
 
 # status-go
 
-`status-go` is the backbone library of [Status App](github.com/status-im/status-desktop). It acts as a "backend" for both applications and implements most of the Status apps business logic. 
+`status-go` is the backbone library of [Status App](https://github.com/status-im/status-desktop). It acts as a "backend" for both applications and implements most of the Status apps business logic. 
 
 A comprehensive list of `status-go` functionality can be found in [Brief overview](https://www.notion.so/WIP-Brief-overview-1578f96fb65c8042a166ecd79a6b1cb6?pvs=4).
 
