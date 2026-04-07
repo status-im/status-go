@@ -443,11 +443,11 @@ func (s *Service) FetchCollectibleOwnersByContractAddressDirectly(ctx context.Co
 	for i := int64(0); i < mintedCount.Int64(); i++ {
 		tokenID, err := contractInst.TokenByIndex(callOpts, big.NewInt(i))
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("TokenByIndex(%d) failed: %w", i, err)
 		}
 		owner, err := contractInst.OwnerOf(callOpts, tokenID)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("OwnerOf(tokenID=%s) failed: %w", tokenID, err)
 		}
 		ownersMap[owner] = append(ownersMap[owner], thirdparty.TokenBalance{
 			TokenID: &bigint.BigInt{Int: new(big.Int).Set(tokenID)},
