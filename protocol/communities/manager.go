@@ -290,6 +290,7 @@ type CommunityTokensServiceInterface interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
 	ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error
+	FetchCollectibleOwnersByContractAddressDirectly(ctx context.Context, chainID uint64, contractAddress string) (*thirdparty.CollectibleContractOwnership, error)
 }
 
 type BalancesByChain = map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
@@ -1045,7 +1046,16 @@ func (m *Manager) fetchCollectiblesOwners(collectibles map[walletcommon.ChainID]
 		for contractAddress := range contractAddresses {
 			ownership, err := m.collectiblesManager.FetchCollectibleOwnersByContractAddress(context.Background(), chainID, contractAddress)
 			if err != nil {
-				return nil, err
+				if m.communityTokensService == nil || uint64(chainID) != walletcommon.AnvilMainnet {
+					return nil, err
+				}
+				// Fall back to direct RPC contract queries for local Anvil chain (31337)
+				// where third-party providers are not available.
+				directOwnership, directErr := m.communityTokensService.FetchCollectibleOwnersByContractAddressDirectly(context.Background(), uint64(chainID), contractAddress.Hex())
+				if directErr != nil {
+					return nil, err
+				}
+				ownership = directOwnership
 			}
 			collectiblesOwners[chainID][contractAddress] = ownership
 		}

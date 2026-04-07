@@ -227,6 +227,10 @@ func (s *CollectiblesServiceMock) ProcessCommunityTokenAction(message *protobuf.
 	return nil
 }
 
+func (s *CollectiblesServiceMock) FetchCollectibleOwnersByContractAddressDirectly(ctx context.Context, chainID uint64, contractAddress string) (*thirdparty.CollectibleContractOwnership, error) {
+	return nil, errors.New("not implemented in mock")
+}
+
 type testCommunitiesMessengerConfig struct {
 	testMessengerConfig
 
