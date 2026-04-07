@@ -82,6 +82,7 @@ const (
 	ScrollSepolia        uint64 = 534351
 	BlastMainnet         uint64 = 81457
 	BlastSepolia         uint64 = 168587773
+	EthereumHoodi        uint64 = 560048
 	StatusNetworkSepolia uint64 = 1660990954
 	TestnetChainID       uint64 = 777333
 )
@@ -106,6 +107,7 @@ var (
 	}
 
 	SupportedTestNetworks = map[uint64]bool{
+		EthereumHoodi:        true,
 		EthereumSepolia:      true,
 		OptimismSepolia:      true,
 		ArbitrumSepolia:      true,
@@ -161,7 +163,7 @@ func (c ChainID) IsMainnet() bool {
 		PolygonZkEVMMainnet, UnichainMainnet, KatanaMainnet, InkMainnet, AbstractMainnet, ZkSyncMainnet,
 		SoneiumMainnet, ScrollMainnet, BlastMainnet:
 		return true
-	case EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, LineaSepolia,
+	case EthereumHoodi, EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, LineaSepolia,
 		PolygonZkEVMCardona, UnichainSepolia, KatanaBokuto, InkSepolia, AbstractTestnet, ZkSyncSepolia,
 		SoneiumMinato, ScrollSepolia, BlastSepolia,
 		BSCTestnet, StatusNetworkSepolia:
@@ -175,6 +177,7 @@ func (c ChainID) IsMainnet() bool {
 func AllChainIDs() []ChainID {
 	return []ChainID{
 		ChainID(EthereumMainnet),
+		ChainID(EthereumHoodi),
 		ChainID(EthereumSepolia),
 		ChainID(OptimismMainnet),
 		ChainID(OptimismSepolia),
@@ -225,6 +228,7 @@ func IsSupportedChainID(chainID uint64) bool {
 var AverageBlockDurationForChain = map[ChainID]time.Duration{
 	ChainID(UnknownChainID):       time.Duration(12000) * time.Millisecond,
 	ChainID(EthereumMainnet):      time.Duration(12000) * time.Millisecond,
+	ChainID(EthereumHoodi):        time.Duration(12000) * time.Millisecond,
 	ChainID(EthereumSepolia):      time.Duration(12000) * time.Millisecond,
 	ChainID(OptimismMainnet):      time.Duration(2000) * time.Millisecond,
 	ChainID(OptimismSepolia):      time.Duration(2000) * time.Millisecond,
@@ -286,6 +290,7 @@ var ethAddressesByChainID = map[uint64]common.Address{
 	SoneiumMainnet:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	ScrollMainnet:        common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	BlastMainnet:         common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	EthereumHoodi:        common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	EthereumSepolia:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	OptimismSepolia:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	ArbitrumSepolia:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
@@ -316,6 +321,7 @@ var daiAddressesByChainID = map[uint64]common.Address{
 	BaseMainnet:     common.HexToAddress("0x50c5725949a6f0c72e6c4a641f24049a917db0cb"),
 	ArbitrumMainnet: common.HexToAddress("0xda10009cbd5d07dd0cecc66161fc93d7c9000da1"),
 	LineaMainnet:    common.HexToAddress("0x4af15ec2a0bd43db75dd04e62faa3b8ef36b00d5"),
+	EthereumHoodi:   common.HexToAddress("0xcafbbad55eb09efe7bec8408cff9932be7d9a7fa"),
 	EthereumSepolia: common.HexToAddress("0x3e622317f8c93f7328350cf0b56d9ed4c620c5d6"),
 	UnichainMainnet: common.HexToAddress("0x20cab320a855b39f724131c69424240519573f81"),
 	UnichainSepolia: common.HexToAddress("0x35f965903a85e7528437c3ce0b4bdfbc4e5fc27c"),
@@ -328,6 +334,7 @@ var usdcEVMAddressesByChainID = map[uint64]common.Address{
 	ArbitrumMainnet:      common.HexToAddress("0xaf88d065e77c8cc2239327c5edb3a432268e5831"),
 	BaseMainnet:          common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
 	LineaMainnet:         common.HexToAddress("0x176211869ca2b568f2a7d4ee941e073a821ee1ff"),
+	EthereumHoodi:        common.HexToAddress("0x8c5476bfd428dce0f9b2315afb63b3976c6a2b50"),
 	EthereumSepolia:      common.HexToAddress("0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"),
 	OptimismSepolia:      common.HexToAddress("0x5fd84259d66cd46123540766be93dfe6d43130d7"),
 	ArbitrumSepolia:      common.HexToAddress("0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d"),
@@ -359,6 +366,7 @@ var sntAddressesByChainID = map[uint64]common.Address{
 	ArbitrumMainnet:      common.HexToAddress("0x707f635951193ddafbb40971a0fcaab8a6415160"),
 	BaseMainnet:          common.HexToAddress("0x662015ec830df08c0fc45896fab726542e8ac09e"),
 	LineaMainnet:         common.HexToAddress("0xa3c26a308ac52520320ebcafdba0bb0aaa105ee8"),
+	EthereumHoodi:        common.HexToAddress("0x0B5DAd18B8791ddb24252B433ec4f21f9e6e5Ed0"), // hoodi
 	EthereumSepolia:      common.HexToAddress("0xE452027cdEF746c7Cd3DB31CB700428b16cD8E51"),
 	OptimismSepolia:      common.HexToAddress("0x0b5dad18b8791ddb24252b433ec4f21f9e6e5ed0"),
 	BaseSepolia:          common.HexToAddress("0xfdb3b57944943a7724fcc0520ee2b10659969a06"),
