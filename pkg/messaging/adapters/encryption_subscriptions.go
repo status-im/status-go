@@ -13,6 +13,5 @@ func FromEncryptionSubscriptions(s *encryption.Subscriptions) *types.EncryptionS
 	return &types.EncryptionSubscriptions{
 		SendContactCode:    s.SendContactCode,
 		NewHashRatchetKeys: utils.BridgeChannelsSlice(s.NewHashRatchetKeys, FromEncryptionHashRatchet),
-		Quit:               s.Quit,
 	}
 }

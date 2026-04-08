@@ -695,10 +695,25 @@ func (w *Waku) subscribeEnvelopeEvents(events chan<- common2.EnvelopeEvent) even
 
 func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types2.EnvelopeEvent) types2.Subscription {
 	events := make(chan common2.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	w.wg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
-		for e := range events {
-			eventsProxy <- *NewWakuV2EnvelopeEventWrapper(&e)
+		defer w.wg.Done()
+
+		select {
+		case <-w.ctx.Done():
+			close(eventsProxy)
+			return
+		case e, ok := <-events:
+			if !ok {
+				return
+			}
+			select {
+			case <-w.ctx.Done():
+				close(eventsProxy)
+				return
+			case eventsProxy <- *NewWakuV2EnvelopeEventWrapper(&e):
+			}
 		}
 	}()
 

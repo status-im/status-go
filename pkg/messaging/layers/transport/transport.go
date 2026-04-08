@@ -80,6 +80,7 @@ type Transport struct {
 
 	envelopesMonitor *EnvelopesMonitor
 	quit             chan struct{}
+	quitWg           sync.WaitGroup
 }
 
 // NewTransport returns a new Transport.
@@ -405,6 +406,7 @@ func (t *Transport) MaxMessageSize() uint32 {
 
 func (t *Transport) Stop() error {
 	close(t.quit)
+	t.quitWg.Wait()
 
 	if t.envelopesMonitor != nil {
 		t.envelopesMonitor.Stop()
@@ -430,8 +432,10 @@ func (t *Transport) Stop() error {
 func (t *Transport) cleanFiltersLoop() {
 
 	ticker := time.NewTicker(5 * time.Minute)
+	t.quitWg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
+		defer t.quitWg.Done()
 		for {
 			select {
 			case <-t.quit:
