@@ -21,7 +21,25 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/stretchr/testify/require"
+
+	gocommon "github.com/status-im/status-go/common"
 )
+
+func TestWakuLifecycleState(t *testing.T) {
+	// New() alone is safe to call with nil params; Start()/Stop() are not used
+	// here because they initialise the SDS library (requires a full node
+	// environment). The PauseBroadcaster state machine is validated directly.
+	w, err := New(nil, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	require.Equal(t, gocommon.ServiceStateStopped, w.PausableState())
+
+	w.MarkStarted()
+	require.Equal(t, gocommon.ServiceStateRunning, w.PausableState())
+
+	w.MarkStopped()
+	require.Equal(t, gocommon.ServiceStateStopped, w.PausableState())
+}
 
 func TestHandlePeerAddress(t *testing.T) {
 	ctrl := gomock.NewController(t)

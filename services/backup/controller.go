@@ -33,6 +33,8 @@ type Provider interface {
 }
 
 type Controller struct {
+	common.PauseBroadcaster
+
 	config Config
 	core   *core
 	logger *zap.Logger
@@ -82,30 +84,31 @@ func (c *Controller) Start() {
 	if !c.config.BackupEnabled {
 		return
 	}
+	c.MarkStarted()
 	c.wg.Add(1)
 
 	go func() {
 		defer common.LogOnPanic()
-		ticker := time.NewTicker(c.config.Interval)
-		defer ticker.Stop()
 		defer c.wg.Done()
-		for {
-			select {
-			case <-ticker.C:
+		sub := c.Subscribe()
+		defer sub.Unsubscribe()
+		pt := common.NewPausableTicker(common.PausableTickerConfig{
+			Interval: c.config.Interval,
+			OnTick: func() {
 				_, err := c.PerformBackup()
 				if err != nil {
-					c.logger.Error("Error performing backup: %v\n", zap.Error(err))
+					c.logger.Error("Error performing backup", zap.Error(err))
 				}
-			case <-c.quit:
-				return
-			}
-		}
+			},
+		}, sub.C())
+		pt.Run(c.quit)
 	}()
 }
 
 func (c *Controller) Stop() {
 	close(c.quit)
 	c.wg.Wait()
+	c.MarkStopped()
 }
 
 func (c *Controller) PerformBackup() (string, error) {
