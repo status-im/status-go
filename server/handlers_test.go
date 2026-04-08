@@ -53,7 +53,7 @@ func (s *HandlersSuite) SetupTest() {
 
 	s.server = &MediaServer{
 		db: s.db,
-		Server: Server{
+		Server: &Server{
 			logger: s.logger,
 		},
 	}

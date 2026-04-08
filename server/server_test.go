@@ -28,7 +28,7 @@ func (s *ServerURLSuite) SetupTest() {
 	s.baseURL = fmt.Sprintf("http://%s:%d", ip, port)
 
 	s.server = &MediaServer{
-		Server: Server{
+		Server: &Server{
 			address: &net.TCPAddr{
 				IP:   net.ParseIP(ip),
 				Port: port,
