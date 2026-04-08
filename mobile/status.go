@@ -126,6 +126,13 @@ func initializeApplication(requestJSON string) string {
 		}
 	}
 
+	if envFleetConfig := os.Getenv("STATUS_FLEET_CONFIG_FILE"); envFleetConfig != "" && request.WakuFleetsConfigFilePath == "" {
+		err = params.LoadWakuFleetsFromFile(envFleetConfig)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
 	if request.PushFleetsConfigFilePath != "" {
 		err = params.LoadPushFleetsFromFile(request.PushFleetsConfigFilePath)
 		if err != nil {
@@ -1343,7 +1350,7 @@ func convertFleets(fleetsMap params.FleetsMap) map[string]map[string][]string {
 
 func fleets() string {
 	fleets := FleetDescription{
-		DefaultFleet: backend.DefaultFleet,
+		DefaultFleet: backend.ResolveDefaultFleet(),
 		Fleets:       convertFleets(params.GetSupportedFleets()),
 	}
 

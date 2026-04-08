@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -39,6 +40,13 @@ var (
 
 	DefaultFleet = params.FleetStatusProd
 )
+
+func ResolveDefaultFleet() string {
+	if envFleet := os.Getenv("STATUS_FLEET"); envFleet != "" && params.IsFleetSupported(envFleet) {
+		return envFleet
+	}
+	return DefaultFleet
+}
 
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings2.Settings, error) {
 	chatKeyString := derivedAddresses[accscommon.PathEIP1581Chat].PublicKey
@@ -322,7 +330,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	fleet := request.WakuV2Fleet
 	if fleet == "" {
-		fleet = DefaultFleet
+		fleet = ResolveDefaultFleet()
 	}
 
 	err := SetFleet(fleet, nodeConfig)
