@@ -105,6 +105,8 @@ func (db *Database) processRows(rows *sql.Rows) ([]*accsmanagementtypes.Keypair,
 		kpSyncedFrom              sql.NullString
 		kpClock                   sql.NullInt64
 		kpRemoved                 sql.NullBool
+		kpXPub                    sql.NullString
+		kpColdWallet              sql.NullString
 	)
 
 	var (
@@ -133,6 +135,7 @@ func (db *Database) processRows(rows *sql.Rows) ([]*accsmanagementtypes.Keypair,
 		pubkey := []byte{}
 		err := rows.Scan(
 			&kpKeyUID, &kpName, &kpType, &kpDerivedFrom, &kpLastUsedDerivationIndex, &kpSyncedFrom, &kpClock, &kpRemoved,
+			&kpXPub, &kpColdWallet,
 			&accAddress, &accKeyUID, &pubkey, &accPath, &accName, &accColorID, &accEmoji,
 			&accWallet, &accChat, &accHidden, &accOperable, &accClock, &accCreatedAt, &accPosition, &accRemoved,
 			&accProdPreferredChainIDs, &accTestPreferredChainIDs, &accAddressWasNotShown)
@@ -164,6 +167,12 @@ func (db *Database) processRows(rows *sql.Rows) ([]*accsmanagementtypes.Keypair,
 		}
 		if kpRemoved.Valid {
 			kp.Removed = kpRemoved.Bool
+		}
+		if kpXPub.Valid {
+			kp.XPub = kpXPub.String
+		}
+		if kpColdWallet.Valid {
+			kp.ColdWallet = accsmanagementtypes.ColdWalletType(kpColdWallet.String)
 		}
 		// check keypair accounts fields
 		if accAddress.Valid {
@@ -924,11 +933,14 @@ func (db *Database) SaveOrUpdateKeypair(keypair *accsmanagementtypes.Keypair) er
 			last_used_derivation_index = ?,
 			synced_from = ?,
 			clock = ?,
-			removed = ?
+			removed = ?,
+			xpub = ?,
+			cold_wallet = ?
 		WHERE
 			key_uid = ?;
 	`, keypair.KeyUID, keypair.Type, keypair.DerivedFrom,
-		keypair.Name, keypair.LastUsedDerivationIndex, keypair.SyncedFrom, keypair.Clock, keypair.Removed, keypair.KeyUID)
+		keypair.Name, keypair.LastUsedDerivationIndex, keypair.SyncedFrom, keypair.Clock, keypair.Removed,
+		keypair.XPub, keypair.ColdWallet, keypair.KeyUID)
 	if err != nil {
 		return err
 	}
