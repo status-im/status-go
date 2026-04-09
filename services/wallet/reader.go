@@ -110,6 +110,10 @@ func (r *Reader) Stop() {
 	r.lastWalletTokenUpdateTimestamp = sync.Map{}
 }
 
+func (r *Reader) IsRunning() bool {
+	return r.stopCh != nil
+}
+
 func (r *Reader) triggerWalletReload() {
 	r.walletFeed.Send(walletevent.Event{
 		Type: EventWalletTickReload,

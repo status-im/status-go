@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -460,27 +461,28 @@ type Service struct {
 	leaderboardService             *leaderboard.MarketDataService
 	activityFetcherService         *activityfetcher.Service
 	started                        bool
-
-	cancelWalletServiceCtx context.CancelFunc
+	paused                         bool
+	mu                             sync.Mutex
+	cancelWalletServiceCtx         context.CancelFunc
 }
 
 // Start signals transmitter.
 func (s *Service) Start() error {
-	if ThirdpartyServicesEnabled(s.accountsDB) {
-		ctx, cancel := context.WithCancel(context.Background())
-		s.cancelWalletServiceCtx = cancel
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-		s.multistandardBalanceController.Start()
-		s.transferDetectorController.Start()
-		s.currency.Start(ctx)
-		err := s.signals.Start(ctx)
-		s.collectibles.Start(ctx)
-		s.leaderboardService.Start(ctx)
-		s.activityFetcherService.Start(ctx)
-		s.started = true
-		return err
+	if !ThirdpartyServicesEnabled(s.accountsDB) {
+		return nil
 	}
-	return nil
+	if s.started && !s.paused {
+		return nil
+	}
+	err := s.startBackgroundWorkers()
+	if err == nil {
+		s.started = true
+		s.paused = false
+	}
+	return err
 }
 
 // Set external Collectibles community info provider
@@ -490,6 +492,9 @@ func (s *Service) SetWalletCommunityInfoProvider(provider thirdparty.CommunityIn
 
 // Stop reactor and close db.
 func (s *Service) Stop() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	logutils.ZapLogger().Info("wallet will be stopped")
 	s.router.Stop()
 	s.signals.Stop()
@@ -501,6 +506,7 @@ func (s *Service) Stop() error {
 	s.tokenManager.Stop()
 	s.leaderboardService.Stop()
 	s.started = false
+	s.paused = false
 	logutils.ZapLogger().Info("wallet stopped")
 
 	// Cancel wallet service context
@@ -510,6 +516,41 @@ func (s *Service) Stop() error {
 	}
 
 	return nil
+}
+
+func (s *Service) startBackgroundWorkers() error {
+	if s.cancelWalletServiceCtx != nil {
+		return nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancelWalletServiceCtx = cancel
+
+	s.multistandardBalanceController.Start()
+	s.transferDetectorController.Start()
+	s.currency.Start(ctx)
+	err := s.signals.Start(ctx)
+	s.collectibles.Start(ctx)
+	s.leaderboardService.Start(ctx)
+	s.activityFetcherService.Start(ctx)
+	if s.reader != nil && !s.reader.IsRunning() {
+		_ = s.reader.Start()
+	}
+	return err
+}
+
+func (s *Service) stopBackgroundWorkers() {
+	if s.reader != nil && s.reader.IsRunning() {
+		s.reader.Stop()
+	}
+	s.signals.Stop()
+	s.multistandardBalanceController.Stop()
+	s.transferDetectorController.Stop()
+	s.collectibles.Stop()
+	s.leaderboardService.Stop()
+	if s.cancelWalletServiceCtx != nil {
+		s.cancelWalletServiceCtx()
+		s.cancelWalletServiceCtx = nil
+	}
 }
 
 // APIs returns list of available RPC APIs.

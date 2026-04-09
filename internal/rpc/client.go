@@ -145,6 +145,15 @@ func (c *Client) Stop() {
 	c.signalsTransmitter.Stop()
 	c.networkManager.Stop()
 
+	c.rpsLimiterMutex.Lock()
+	for key, limiter := range c.limiterPerProvider {
+		if limiter != nil {
+			limiter.Stop()
+		}
+		delete(c.limiterPerProvider, key)
+	}
+	c.rpsLimiterMutex.Unlock()
+
 	c.rpcClientsMutex.Lock()
 	for _, client := range c.rpcClients {
 		client.Close()
