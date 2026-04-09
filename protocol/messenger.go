@@ -581,9 +581,10 @@ func (m *Messenger) SetPaused(paused bool) {
 			m.messaging.ResumeTransport()
 		}
 	}
-	if m.archiveManager != nil {
-		m.archiveManager.SetPaused(paused)
-	}
+	// ToDo: the current ArchiveManager does not provide SetPaused method yet
+	// if m.archiveManager != nil {
+	// 	m.archiveManager.SetPaused(paused)
+	// }
 }
 
 func (m *Messenger) isPaused() bool {
