@@ -170,6 +170,10 @@ type NotificationBody struct {
 }
 
 func showMessageNotification(settings NotificationSettingsProvider, publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) bool {
+	if message != nil && message.From == crypto.PubkeyToHex(&publicKey) {
+		return false
+	}
+
 	// For public/community chats, skip inactive (soft-deleted). For 1:1 and group,
 	// still notify — e.g. contact requests or new messages can arrive when Active=false.
 	if chat != nil && !chat.Active && !chat.OneToOne() && !chat.PrivateGroupChat() {
