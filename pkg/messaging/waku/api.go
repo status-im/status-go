@@ -284,10 +284,16 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types2.Criteria) (*
 		// for now poll internally, refactor waku internal for channel support
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
+		sub := api.w.PauseBroadcaster.Subscribe()
+		defer sub.Unsubscribe()
+		paused := <-sub.C()
 
-		for {
-			select {
-			case <-ticker.C:
+		runPausedPollingLoop(
+			paused,
+			sub.C(),
+			ticker.C,
+			rpcSub.Err(),
+			func() {
 				if filter := api.w.getFilter(id); filter != nil {
 					for _, rpcMessage := range toMessage(filter.Retrieve()) {
 						if err := notifier.Notify(rpcSub.ID, rpcMessage); err != nil {
@@ -295,14 +301,43 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types2.Criteria) (*
 						}
 					}
 				}
-			case <-rpcSub.Err():
+			},
+			func() {
 				_ = api.w.Unsubscribe(context.Background(), id)
-				return
-			}
-		}
+			},
+		)
 	}()
 
 	return rpcSub, nil
+}
+
+func runPausedPollingLoop(initialPaused bool, lifecycleCh <-chan bool, tickerCh <-chan time.Time, stopCh <-chan error, onTick func(), onStop func()) {
+	paused := initialPaused
+	var activeTicker <-chan time.Time
+	if !paused {
+		activeTicker = tickerCh
+	}
+
+	for {
+		select {
+		case pausedState, ok := <-lifecycleCh:
+			if !ok {
+				onStop()
+				return
+			}
+			paused = pausedState
+			if paused {
+				activeTicker = nil
+			} else {
+				activeTicker = tickerCh
+			}
+		case <-activeTicker:
+			onTick()
+		case <-stopCh:
+			onStop()
+			return
+		}
+	}
 }
 
 // ToWakuMessage converts an internal message into an API version.

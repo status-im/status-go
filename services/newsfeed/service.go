@@ -29,6 +29,7 @@ func isNil(data interface{}) bool {
 }
 
 type Service struct {
+	gocommon.PauseBroadcaster
 	logger          *zap.Logger
 	storage         Persistence
 	ac              ActivityCenter
@@ -77,6 +78,8 @@ func (s *Service) Start() error {
 	if newsFeedEnabled {
 		s.newsFeedManager.StartPolling(context.Background())
 	}
+	s.started = true
+	s.MarkStarted()
 
 	return nil
 }
@@ -85,6 +88,8 @@ func (s *Service) Stop() error {
 	if s.newsFeedManager != nil {
 		s.newsFeedManager.StopPolling()
 	}
+	s.started = false
+	s.MarkStopped()
 	return nil
 }
 

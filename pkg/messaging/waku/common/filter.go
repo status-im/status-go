@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/pkg/pubsub"
 )
 
 // Filter represents a Waku message filter
@@ -63,6 +64,10 @@ type Filters struct {
 	// list all the filters that will be notified of a new message, no matter what its topic is
 	allTopicsMatcher map[*Filter]struct{}
 
+	// matchedPublisher notifies subscribers when at least one filter matched an incoming envelope.
+	// Uses non-blocking sends so processQueueLoop is never stalled.
+	matchedPublisher *pubsub.TypePublisher[struct{}]
+
 	logger *zap.Logger
 
 	sync.RWMutex
@@ -75,6 +80,7 @@ func NewFilters(defaultPubsubTopic string, logger *zap.Logger) *Filters {
 		topicMatcher:       make(PubsubTopicToContentTopic),
 		allTopicsMatcher:   make(map[*Filter]struct{}),
 		defaultPubsubTopic: defaultPubsubTopic,
+		matchedPublisher:   pubsub.NewTypePublisher[struct{}](),
 		logger:             logger,
 	}
 }
@@ -261,7 +267,24 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 		}
 	}
 
+	if matched {
+		fs.matchedPublisher.Publish(struct{}{})
+	}
+
 	return matched
+}
+
+// SubscribeFilterMatched returns a channel that receives a notification whenever
+// an incoming envelope matches at least one filter. The channel has a buffer of 1
+// so sends are non-blocking and bursts coalesce naturally.
+func (fs *Filters) SubscribeFilterMatched() chan struct{} {
+	return fs.matchedPublisher.Subscribe(1)
+}
+
+// UnsubscribeFilterMatched removes and closes the subscription channel returned
+// by SubscribeFilterMatched.
+func (fs *Filters) UnsubscribeFilterMatched(ch chan struct{}) {
+	fs.matchedPublisher.Unsubscribe(ch)
 }
 
 func (f *Filter) expectsAsymmetricEncryption() bool {

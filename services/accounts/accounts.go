@@ -73,7 +73,19 @@ func (api *API) AddKeypairViaSeedPhrase(ctx context.Context, mnemonic string, pa
 
 func (api *API) AddKeypairStoredToKeycard(ctx context.Context, keyUID string, masterAddress string, name string,
 	walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
-	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, walletAccounts)
+	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, "", "", walletAccounts)
+	if err != nil {
+		return nil, err
+	}
+
+	api.publishAccountsEvent(addedKeypair.Accounts, false)
+
+	return addedKeypair, nil
+}
+
+func (api *API) AddKeypairStoredToKeycardNew(ctx context.Context, keyUID string, masterAddress string, name string,
+	xpub string, coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
+	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, xpub, coldWallet, walletAccounts)
 	if err != nil {
 		return nil, err
 	}

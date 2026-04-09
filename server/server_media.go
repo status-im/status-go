@@ -60,7 +60,7 @@ type MediaServerConfig struct {
 }
 
 type MediaServer struct {
-	Server
+	*Server
 
 	db                          *sql.DB
 	downloader                  *ipfs.Downloader

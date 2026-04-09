@@ -96,7 +96,6 @@ type StatusBackend struct {
 	accountsManager          *accsmanagement.AccountsManager
 	connectionState          connection.State
 	transactor               *transactions.Transactor
-	appState                 AppState
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	prometheusMetrics        *metrics.Server
 	sentryDSN                string
@@ -751,10 +750,11 @@ func (b *StatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, passwor
 	fleet := accountSettings.GetFleet()
 
 	if !params.IsFleetSupported(fleet) {
+		effectiveDefault := ResolveDefaultFleet()
 		b.logger.Warn("fleet is not supported, overriding with default value",
 			zap.String("fleet", fleet),
-			zap.String("defaultFleet", DefaultFleet))
-		fleet = DefaultFleet
+			zap.String("defaultFleet", effectiveDefault))
+		fleet = effectiveDefault
 	}
 
 	err = SetFleet(fleet, config)
@@ -2079,40 +2079,44 @@ func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*gen
 	return b.accountsManager.GetVerifiedWalletAccount(types2.HexToAddress(address), password)
 }
 
-// AppStateChange handles app state changes (background/foreground).
-// state values: see https://facebook.github.io/react-native/docs/appstate.html
-func (b *StatusBackend) AppStateChange(state AppState) {
-	if !state.IsValid() {
-		b.logger.Warn("invalid app state, not reporting app state change", zap.Any("state", state))
-		return
-	}
-
-	var messenger *protocol.Messenger
-
-	b.appState = state
-
+// PausableServices returns the list of services that can be individually paused/resumed.
+func (b *StatusBackend) PausableServices() []node.PausableServiceInfo {
 	if b.statusNode == nil {
-		b.logger.Warn("statusNode nil, not reporting app state change")
-		return
+		return nil
 	}
+	return b.statusNode.ServiceRegistry().ListPausable()
+}
 
-	if b.statusNode.WakuV2ExtService() != nil {
-		messenger = b.statusNode.WakuV2ExtService().Messenger()
+// PauseService pauses a single named service.
+func (b *StatusBackend) PauseService(name string) error {
+	if b.statusNode == nil {
+		return nil
 	}
+	return b.statusNode.ServiceRegistry().Pause(name)
+}
 
-	if messenger == nil {
-		b.logger.Warn("messenger nil, not reporting app state change")
-		return
+// ResumeService resumes a single named service.
+func (b *StatusBackend) ResumeService(name string) error {
+	if b.statusNode == nil {
+		return nil
 	}
+	return b.statusNode.ServiceRegistry().Resume(name)
+}
 
-	if state == AppStateForeground {
-		messenger.ToForeground()
-	} else {
-		messenger.ToBackground()
+// PauseServices pauses a list of named services, collecting any errors.
+func (b *StatusBackend) PauseServices(names []string) error {
+	if b.statusNode == nil {
+		return nil
 	}
+	return b.statusNode.ServiceRegistry().PauseMultiple(names)
+}
 
-	// TODO: put node in low-power mode if the app is in background (or inactive)
-	// and normal mode if the app is in foreground.
+// ResumeServices resumes a list of named services, collecting any errors.
+func (b *StatusBackend) ResumeServices(names []string) error {
+	if b.statusNode == nil {
+		return nil
+	}
+	return b.statusNode.ServiceRegistry().ResumeMultiple(names)
 }
 
 func (b *StatusBackend) StopLocalNotifications() error {

@@ -397,6 +397,8 @@ func SameKeypairs(expected, real *accsmanagementtypes.Keypair) bool {
 		expected.DerivedFrom == real.DerivedFrom &&
 		expected.LastUsedDerivationIndex == real.LastUsedDerivationIndex &&
 		expected.Clock == real.Clock &&
+		expected.XPub == real.XPub &&
+		expected.ColdWallet == real.ColdWallet &&
 		len(expected.Accounts) == len(real.Accounts)
 
 	if same {
@@ -426,6 +428,8 @@ func SameKeypairsWithDifferentSyncedFrom(expected, real *accsmanagementtypes.Key
 		expected.DerivedFrom == real.DerivedFrom &&
 		expected.LastUsedDerivationIndex == real.LastUsedDerivationIndex &&
 		expected.Clock == real.Clock &&
+		expected.XPub == real.XPub &&
+		expected.ColdWallet == real.ColdWallet &&
 		len(expected.Accounts) == len(real.Accounts)
 
 	if same && !ignoreSyncedFrom {

@@ -16,6 +16,7 @@ var (
 type KeypairType string
 type AccountType string
 type AccountOperable string
+type ColdWalletType string
 
 const (
 	KeypairTypeProfile KeypairType = "profile"
@@ -34,20 +35,28 @@ const (
 	AccountNonOperable       AccountOperable = "no"        // an account is non operable it is not a keycard account and there is no keystore file for it and no keystore file for the address it is derived from
 	AccountPartiallyOperable AccountOperable = "partially" // an account is partially operable if it is not a keycard account and there is created keystore file for the address it is derived from
 	AccountFullyOperable     AccountOperable = "fully"     // an account is fully operable if it is not a keycard account and there is a keystore file for it
+)
 
+const (
+	ColdWalletTypeNone          ColdWalletType = ""
+	ColdWalletTypeStatusKeycard ColdWalletType = "status-keycard"
+	ColdWalletTypeLedger        ColdWalletType = "ledger"
+	ColdWalletTypeTrezor        ColdWalletType = "trezor"
 )
 
 type Keypair struct {
-	KeyUID                  string      `json:"key-uid"`
-	Name                    string      `json:"name"`
-	Type                    KeypairType `json:"type"`
-	DerivedFrom             string      `json:"derived-from"`
-	LastUsedDerivationIndex uint64      `json:"last-used-derivation-index,omitempty"`
-	SyncedFrom              string      `json:"synced-from,omitempty"` // keeps an info which device this keypair is added from can be one of two values defined in constants or device name (custom)
-	Clock                   uint64      `json:"clock,omitempty"`
-	Accounts                []*Account  `json:"accounts,omitempty"`
-	Keycards                []*Keycard  `json:"keycards,omitempty"`
-	Removed                 bool        `json:"removed,omitempty"`
+	KeyUID                  string         `json:"key-uid"`
+	Name                    string         `json:"name"`
+	Type                    KeypairType    `json:"type"`
+	DerivedFrom             string         `json:"derived-from"`
+	LastUsedDerivationIndex uint64         `json:"last-used-derivation-index,omitempty"`
+	SyncedFrom              string         `json:"synced-from,omitempty"` // keeps an info which device this keypair is added from can be one of two values defined in constants or device name (custom)
+	Clock                   uint64         `json:"clock,omitempty"`
+	Accounts                []*Account     `json:"accounts,omitempty"`
+	Keycards                []*Keycard     `json:"keycards,omitempty"`
+	Removed                 bool           `json:"removed,omitempty"`
+	XPub                    string         `json:"xpub,omitempty"`
+	ColdWallet              ColdWalletType `json:"cold-wallet,omitempty"`
 }
 
 type AccountCreationDetails struct {
@@ -146,16 +155,18 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 
 func (a *Keypair) MarshalJSON() ([]byte, error) {
 	item := struct {
-		KeyUID                  string      `json:"key-uid"`
-		Name                    string      `json:"name"`
-		Type                    KeypairType `json:"type"`
-		DerivedFrom             string      `json:"derived-from"`
-		LastUsedDerivationIndex uint64      `json:"last-used-derivation-index"`
-		SyncedFrom              string      `json:"synced-from"`
-		Clock                   uint64      `json:"clock"`
-		Accounts                []*Account  `json:"accounts"`
-		Keycards                []*Keycard  `json:"keycards"`
-		Removed                 bool        `json:"removed"`
+		KeyUID                  string         `json:"key-uid"`
+		Name                    string         `json:"name"`
+		Type                    KeypairType    `json:"type"`
+		DerivedFrom             string         `json:"derived-from"`
+		LastUsedDerivationIndex uint64         `json:"last-used-derivation-index"`
+		SyncedFrom              string         `json:"synced-from"`
+		Clock                   uint64         `json:"clock"`
+		Accounts                []*Account     `json:"accounts"`
+		Keycards                []*Keycard     `json:"keycards"`
+		Removed                 bool           `json:"removed"`
+		XPub                    string         `json:"xpub"`
+		ColdWallet              ColdWalletType `json:"cold-wallet"`
 	}{
 		KeyUID:                  a.KeyUID,
 		Name:                    a.Name,
@@ -167,6 +178,8 @@ func (a *Keypair) MarshalJSON() ([]byte, error) {
 		Accounts:                a.Accounts,
 		Keycards:                a.Keycards,
 		Removed:                 a.Removed,
+		XPub:                    a.XPub,
+		ColdWallet:              a.ColdWallet,
 	}
 
 	return json.Marshal(item)
@@ -184,6 +197,8 @@ func (a *Keypair) CopyKeypair() *Keypair {
 		Accounts:                make([]*Account, len(a.Accounts)),
 		Keycards:                make([]*Keycard, len(a.Keycards)),
 		Removed:                 a.Removed,
+		XPub:                    a.XPub,
+		ColdWallet:              a.ColdWallet,
 	}
 
 	for i, acc := range a.Accounts {

@@ -519,6 +519,33 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 	s.Require().Equal(count, 0)
 }
 
+func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval_RespectsPausedLifecycle() {
+	err := s.archiveManager.StartTorrentClient()
+	s.Require().NoError(err)
+	defer s.archiveManager.Stop() //nolint: errcheck
+
+	s.archiveManager.SetPaused(true)
+	defer s.archiveManager.SetPaused(false)
+
+	community, _, err := s.buildCommunityWithChat()
+	s.Require().NoError(err)
+
+	interval := 300 * time.Millisecond
+	go s.archiveManager.StartHistoryArchiveTasksInterval(community, interval)
+
+	time.Sleep(200 * time.Millisecond)
+	s.Require().Equal(1, s.getHistoryTasksCount())
+
+	// Unpause to exercise lifecycle transition handling in the running loop.
+	s.archiveManager.SetPaused(false)
+	time.Sleep(200 * time.Millisecond)
+	s.Require().Equal(1, s.getHistoryTasksCount())
+
+	s.archiveManager.StopHistoryArchiveTasksInterval(community.ID())
+	s.archiveManager.historyArchiveTasksWaitGroup.Wait()
+	s.Require().Equal(0, s.getHistoryTasksCount())
+}
+
 func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
 	err := s.archiveManager.StartTorrentClient()
 	s.Require().NoError(err)

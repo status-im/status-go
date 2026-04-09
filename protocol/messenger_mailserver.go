@@ -340,6 +340,10 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 
 		}
 
+		if m.isPaused() {
+			continue
+		}
+
 		filters := m.messaging.ChatFilters()
 		peerInfo := m.messaging.GetActiveStorenode()
 		m.messaging.SetCriteriaForMissingMessageVerification(peerInfo, filters)

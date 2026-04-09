@@ -516,7 +516,7 @@ vendor-hash:
 	echo "Replaced vendorHash $${CURRENT_VENDOR_HASH} with $${NEW_VENDOR_HASH}"
 
 
-migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
+migration: DEFAULT_MIGRATION_PATH := internal/db/appdatabase/migrations/sql
 migration:
 	touch $(DEFAULT_MIGRATION_PATH)/$$(date '+%s')_$(D).up.sql
 
@@ -534,7 +534,7 @@ version:
 tag-version:
 	bash scripts/tag_version.sh $(TARGET_COMMIT)
 
-migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
+migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := internal/db/walletdatabase/migrations/sql
 migration-wallet:
 	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$$(date +%s)_$(D).up.sql
 

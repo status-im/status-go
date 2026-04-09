@@ -159,20 +159,10 @@ func TestGenerator_DeriveChildrenFromAccount(t *testing.T) {
 	assert.Equal(t, testData.childAccount1.privateKey, children[testData.childAccount1.path].ToIdentifiedAccountInfo().PrivateKey)
 }
 
-func xpubAtPath(t *testing.T, mnemonic, passphrase, path string) string {
-	t.Helper()
-	acc, err := CreateAccountFromMnemonic(mnemonic, passphrase)
-	require.NoError(t, err)
-	derived, err := DeriveChildFromAccount(acc, path)
-	require.NoError(t, err)
-	xpub, err := derived.ExtendedKey().Neuter()
-	require.NoError(t, err)
-	return xpub.String()
-}
-
 func TestDerivePublicKeyInfoFromExtendedPublicKey(t *testing.T) {
 	const hardenedPath = "m/44'/60'/0'" // hardened derivation path for the wallet
-	xpub := xpubAtPath(t, testData.mnemonic, testData.bip39Passphrase, hardenedPath)
+	xpub, err := DeriveExtendedPublicKeyAtPath(testData.mnemonic, testData.bip39Passphrase, hardenedPath)
+	assert.NoError(t, err)
 
 	t.Run("derives correct public key and address for single path", func(t *testing.T) {
 		result, err := DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(xpub, []string{"0/0"})
