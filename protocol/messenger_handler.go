@@ -3185,6 +3185,8 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		SyncedFrom:              message.SyncedFrom,
 		Clock:                   message.Clock,
 		Removed:                 message.Removed,
+		XPub:                    message.Xpub,
+		ColdWallet:              accsmanagementtypes.ColdWalletType(message.ColdWallet),
 	}
 
 	oldAddresses := make(map[types3.Address]bool)

@@ -128,10 +128,10 @@ func (m *Messenger) AddKeypairViaSeedPhrase(mnemonic string, password string, na
 }
 
 func (m *Messenger) AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string,
-	walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
+	xpub string, coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
 
-	keypair, err := m.accountsManager.AddKeypairStoredToKeycard(keyUID, masterAddress, name, walletAccounts, clock)
+	keypair, err := m.accountsManager.AddKeypairStoredToKeycard(keyUID, masterAddress, name, xpub, coldWallet, walletAccounts, clock)
 	if err != nil {
 		return nil, err
 	}
@@ -343,6 +343,8 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accsmanagementtypes.Keypair) (
 		LastUsedDerivationIndex: kp.LastUsedDerivationIndex,
 		SyncedFrom:              kp.SyncedFrom,
 		Removed:                 kp.Removed,
+		Xpub:                    kp.XPub,
+		ColdWallet:              string(kp.ColdWallet),
 	}
 
 	if kp.SyncedFrom == "" {

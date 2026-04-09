@@ -105,8 +105,8 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	return
 }
 
-func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string,
-	walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error) {
+func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string, xpub string,
+	coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error) {
 
 	if len(walletAccounts) == 0 {
 		err = ErrKeypairMustHaveAtLeastOneWalletAccount
@@ -141,6 +141,17 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 		return
 	}
 
+	position, err := m.persistence.GetPositionForNextNewAccount()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, walletAccount := range walletAccounts {
+		walletAccount.Position = position
+		walletAccount.Operable = types.AccountFullyOperable
+		position++
+	}
+
 	// prepare keypair
 	keypair = &types.Keypair{
 		Name:                    name,
@@ -150,6 +161,8 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 		LastUsedDerivationIndex: 0,
 		Clock:                   clock,
 		Accounts:                walletAccounts,
+		XPub:                    xpub,
+		ColdWallet:              coldWallet,
 	}
 
 	// store keypair to db
