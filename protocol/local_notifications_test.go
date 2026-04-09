@@ -175,6 +175,33 @@ func TestShowMessageNotification_GroupChats(t *testing.T) {
 	})
 }
 
+func TestShowMessageNotification_SelfAuthoredMessages(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	pkHex := crypto.PubkeyToHex(&key.PublicKey)
+
+	t.Run("one-to-one self-authored message does not notify", func(t *testing.T) {
+		chat := &Chat{ID: pkHex, ChatType: ChatTypeOneToOne, Active: true}
+		msg := common.NewMessage()
+		msg.ID, msg.ChatId, msg.Text, msg.From = "m1", chat.ID, "hi", pkHex
+		msg.MessageType = protobuf.MessageType_ONE_TO_ONE
+
+		settings := &mockNotificationSettings{oneToOneChats: notifValueSendAlerts}
+		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
+		require.False(t, got)
+	})
+
+	t.Run("private-group self-authored message does not notify", func(t *testing.T) {
+		chat := &Chat{ID: "grp1", ChatType: ChatTypePrivateGroupChat, Active: true, Name: "Group"}
+		msg := common.NewMessage()
+		msg.ID, msg.ChatId, msg.Text, msg.From = "m1", chat.ID, "hi", pkHex
+		msg.MessageType = protobuf.MessageType_PRIVATE_GROUP
+
+		settings := &mockNotificationSettings{groupChats: notifValueSendAlerts}
+		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
+		require.False(t, got)
+	})
+}
+
 func TestShowMessageNotification_PublicChat_Mentions(t *testing.T) {
 	chat := &Chat{ID: "pub1", ChatType: ChatTypePublic, Active: true, Name: "status"}
 	msg := common.NewMessage()
