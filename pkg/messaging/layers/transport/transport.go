@@ -600,6 +600,23 @@ func (t *Transport) DisconnectActiveStorenode(ctx context.Context, backoffReason
 	t.waku.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
 }
 
+// SubscribeFilterMatched returns a channel notified (non-blocking, coalescing) whenever
+// an incoming envelope matches at least one installed filter. Callers must call
+// UnsubscribeFilterMatched with the returned channel when done.
+func (t *Transport) SubscribeFilterMatched() chan struct{} {
+	if t.waku == nil {
+		return nil
+	}
+	return t.waku.SubscribeFilterMatched()
+}
+
+func (t *Transport) UnsubscribeFilterMatched(ch chan struct{}) {
+	if t.waku == nil || ch == nil {
+		return
+	}
+	t.waku.UnsubscribeFilterMatched(ch)
+}
+
 func (t *Transport) OnStorenodeChanged() <-chan peer.ID {
 	return t.waku.OnStorenodeChanged()
 }
