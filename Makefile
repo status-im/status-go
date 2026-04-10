@@ -189,7 +189,6 @@ endif
 $(LIBSTORAGE): clone-storage
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@echo "Building logos-storage: $(LIBSTORAGE)"
-	$(MAKE) -C $(LOGOS_STORAGE_SOURCE_DIR) update
 	$(MAKE) -C $(LOGOS_STORAGE_SOURCE_DIR) libstorage
 else
 	@test -f "$(LIBSTORAGE)" || (echo "Error: libstorage not found at $(LIBSTORAGE)" && exit 1)
