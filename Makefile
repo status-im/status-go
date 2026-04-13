@@ -219,19 +219,18 @@ storage-help: ##@build Show logos-storage build/test toggles and env vars
 	@echo "test-storage always runs with logos-storage support enabled."
 	@echo ""
 	@echo "Variables:"
-	@echo "  USE_LOGOS_STORAGE          (default: false)"
+	@echo "  USE_LOGOS_STORAGE          (default: false, also used by functional tests)"
 	@echo "  LOGOS_STORAGE_SOURCE_DIR   (default: ../logos-storage-nim)"
 	@echo "  LOGOS_STORAGE_VERSION      (default: $(LOGOS_STORAGE_VERSION))"
 	@echo "  LOGOS_STORAGE_LIB_DIR      (default: \$$LOGOS_STORAGE_SOURCE_DIR/build)"
 	@echo "  LOGOS_STORAGE_INC_DIR      (default: \$$LOGOS_STORAGE_SOURCE_DIR/library)"
-	@echo "  FUNCTIONAL_TESTS_USE_LOGOS_STORAGE (default: false)"
 	@echo "  FUNCTIONAL_TESTS_BUILD_TAGS        (default: gowaku_no_rln)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make test-storage"
 	@echo "  make test-unit USE_LOGOS_STORAGE=true"
 	@echo "  make build-storage"
-	@echo "  FUNCTIONAL_TESTS_USE_LOGOS_STORAGE=true ./scripts/run_functional_tests.sh"
+	@echo "  USE_LOGOS_STORAGE=true ./scripts/run_functional_tests.sh"
 
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
@@ -569,6 +568,7 @@ test-unit-race: test-unit ##@tests Run unit and integration tests with -race fla
 test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
+test-functional: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
 test-functional:
 	@./scripts/run_functional_tests.sh
 
