@@ -81,7 +81,15 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 		zap.Any("config", cfg))
 
 	fetch := func() (*communities.Community, StoreNodeRequestStats, error) {
-		return m.fetchCommunity(ctx, communityID, cfg, types2.DefaultShard())
+		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, types2.DefaultShard(), cfg)
+		if err != nil {
+			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
+		}
+		res := <-sub
+		if res.community != nil {
+			return res.community, res.stats, res.err
+		}
+		return nil, StoreNodeRequestStats{}, nil
 	}
 
 	if !cfg.WaitForResponse {
@@ -94,23 +102,8 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 		}()
 		return nil, StoreNodeRequestStats{}, nil
 	}
-	return fetch()
-}
 
-// fetchCommunity fetches a community from the store node.
-func (m *StoreNodeRequestManager) fetchCommunity(ctx context.Context, communityID string, cfg StoreNodeRequestConfig, shards ...*types2.Shard) (*communities.Community, StoreNodeRequestStats, error) {
-	for _, shard := range shards {
-		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, shard, cfg)
-		if err != nil {
-			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
-		}
-		// not doing this concurrently to avoid two filters for the same communityID, not a big deal since it is at most 2 shards and temporary
-		res := <-sub
-		if res.community != nil {
-			return res.community, res.stats, res.err
-		}
-	}
-	return nil, StoreNodeRequestStats{}, nil
+	return fetch()
 }
 
 // FetchContact - similar to FetchCommunity
