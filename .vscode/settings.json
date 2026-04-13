@@ -1,14 +1,22 @@
 {
   "go.testTags": "gowaku_skip_migrations,gowaku_no_rln",
-  "cSpell.words": [
-    "unmarshalling"
-  ],
+  "cSpell.words": ["unmarshalling"],
   "gopls": {
-    "formatting.local": "github.com/status-im/status-go"
+    "formatting.local": "github.com/status-im/status-go",
+    "build.buildFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln"]
   },
   // format all files on save if a formatter is available
   "editor.formatOnSave": true,
-  // I use "goimports" instead of "gofmt"
+  // use "goimports" instead of "gofmt"
   // because it does the same thing but also formats imports
   "go.formatTool": "goimports",
+  "go.toolsEnvVars": {
+    "CGO_ENABLED": "1"
+  },
+  "go.testEnvVars": {
+    "CGO_CFLAGS": "-I${workspaceFolder}/../nim-sds/library",
+    "CGO_LDFLAGS": "-L${workspaceFolder}/../nim-sds/build -lsds -Wl,-rpath,${workspaceFolder}/../nim-sds/build"
+  },
+  "go.buildFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln"],
+  "go.testFlags": ["-tags=gowaku_skip_migrations,gowaku_no_rln"]
 }

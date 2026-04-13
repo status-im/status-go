@@ -121,3 +121,5 @@ go.work.sum
 # Token deployment cache files
 tests-functional/snt_addresses.json*
 
+# Codex AI (chatGPT)
+.codex
