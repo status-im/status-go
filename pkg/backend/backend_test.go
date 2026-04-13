@@ -426,7 +426,7 @@ func TestHashTypedData(t *testing.T) {
 	domain := map[string]json.RawMessage{
 		"name":              json.RawMessage(`"Ether Text"`),
 		"version":           json.RawMessage(`"1"`),
-		"chainId":           json.RawMessage(fmt.Sprintf("%d", walletcommon.StatusNetworkSepolia)),
+		"chainId":           json.RawMessage(fmt.Sprintf("%d", walletcommon.StatusNetworkHoodi)),
 		"verifyingContract": json.RawMessage(`"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`),
 	}
 	msg := map[string]json.RawMessage{

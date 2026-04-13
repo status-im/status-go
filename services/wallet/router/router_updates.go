@@ -112,7 +112,7 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 	case walletCommon.BlastMainnet,
 		walletCommon.BlastSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalBlast)
-	case walletCommon.StatusNetworkSepolia:
+	case walletCommon.StatusNetworkHoodi:
 		ticker = time.NewTicker(newBlockCheckIntervalStatusNetwork)
 	case walletCommon.BSCMainnet,
 		walletCommon.BSCTestnet:

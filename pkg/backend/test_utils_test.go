@@ -17,7 +17,7 @@ import (
 func makeTestNodeConfig(t *testing.T) (*params.NodeConfig, error) {
 	rootDataDir := t.TempDir()
 
-	networkID := walletcommon.StatusNetworkSepolia
+	networkID := walletcommon.StatusNetworkHoodi
 	testDir := filepath.Join(rootDataDir, "StatusChain")
 
 	if common.OperatingSystemIs(common.WindowsPlatform) {

@@ -86,7 +86,7 @@ func GetBlockCreationTimeForChain(chainID uint64) time.Duration {
 
 // IsPartiallyOrFullyGaslessChain returns true if the chain is fully or partially (no base or no priority fee) gasless
 func IsPartiallyOrFullyGaslessChain(chainID uint64) bool {
-	return chainID == StatusNetworkSepolia
+	return chainID == StatusNetworkHoodi
 }
 
 // IsPartiallyOrFullyGaslessChainEIP1559Compatible throws an error if the chain is not partially or fully gasless, if it is, returns true if the chain is EIP-1559 compatible
@@ -94,7 +94,7 @@ func IsPartiallyOrFullyGaslessChainEIP1559Compatible(chainID uint64) (bool, erro
 	if !IsPartiallyOrFullyGaslessChain(chainID) {
 		return false, fmt.Errorf("chain %d is not supposed to be gasless", chainID) // for non-gasless chains, we should not use this function
 	}
-	return chainID == StatusNetworkSepolia, nil
+	return chainID == StatusNetworkHoodi, nil
 }
 
 func ToCallArg(msg ethereum.CallMsg) interface{} {

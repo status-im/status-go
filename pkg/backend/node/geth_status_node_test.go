@@ -16,7 +16,7 @@ import (
 )
 
 func TestStatusNodeStart(t *testing.T) {
-	config, err := params.NewNodeConfig("", walletcommon.StatusNetworkSepolia)
+	config, err := params.NewNodeConfig("", walletcommon.StatusNetworkHoodi)
 	require.NoError(t, err)
 
 	// StatusNode startup always creates & starts TokenManager, which requires at least one active network.

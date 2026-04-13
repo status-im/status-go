@@ -83,7 +83,7 @@ const (
 	BlastMainnet         uint64 = 81457
 	BlastSepolia         uint64 = 168587773
 	EthereumHoodi        uint64 = 560048
-	StatusNetworkSepolia uint64 = 1660990954
+	StatusNetworkHoodi uint64 = 374
 	TestnetChainID       uint64 = 777333
 )
 
@@ -123,7 +123,7 @@ var (
 		ScrollSepolia:        true,
 		BlastSepolia:         true,
 		BSCTestnet:           true,
-		StatusNetworkSepolia: true,
+		StatusNetworkHoodi: true,
 		AnvilMainnet:         true,
 	}
 )
@@ -166,7 +166,7 @@ func (c ChainID) IsMainnet() bool {
 	case EthereumHoodi, EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, LineaSepolia,
 		PolygonZkEVMCardona, UnichainSepolia, KatanaBokuto, InkSepolia, AbstractTestnet, ZkSyncSepolia,
 		SoneiumMinato, ScrollSepolia, BlastSepolia,
-		BSCTestnet, StatusNetworkSepolia:
+		BSCTestnet, StatusNetworkHoodi:
 		return false
 	case UnknownChainID:
 		return false
@@ -205,7 +205,7 @@ func AllChainIDs() []ChainID {
 		ChainID(ScrollSepolia),
 		ChainID(BlastMainnet),
 		ChainID(BlastSepolia),
-		ChainID(StatusNetworkSepolia),
+		ChainID(StatusNetworkHoodi),
 		ChainID(BSCMainnet),
 		ChainID(BSCTestnet),
 		ChainID(TestnetChainID),
@@ -258,7 +258,7 @@ var AverageBlockDurationForChain = map[ChainID]time.Duration{
 	ChainID(BlastSepolia):         time.Duration(2000) * time.Millisecond,
 	ChainID(BSCMainnet):           time.Duration(3000) * time.Millisecond,
 	ChainID(BSCTestnet):           time.Duration(3000) * time.Millisecond,
-	ChainID(StatusNetworkSepolia): time.Duration(2000) * time.Millisecond,
+	ChainID(StatusNetworkHoodi): time.Duration(2000) * time.Millisecond,
 }
 
 const (
@@ -305,7 +305,7 @@ var ethAddressesByChainID = map[uint64]common.Address{
 	SoneiumMinato:        common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	ScrollSepolia:        common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	BlastSepolia:         common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	StatusNetworkSepolia: common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	StatusNetworkHoodi: common.HexToAddress("0x0000000000000000000000000000000000000000"),
 }
 
 // BNB
@@ -340,7 +340,6 @@ var usdcEVMAddressesByChainID = map[uint64]common.Address{
 	ArbitrumSepolia:      common.HexToAddress("0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d"),
 	BaseSepolia:          common.HexToAddress("0x036cbd53842c5426634e7929541ec2318f3dcf7e"),
 	LineaSepolia:         common.HexToAddress("0xfece4462d57bd51a6a552365a011b95f0e16d9b7"),
-	StatusNetworkSepolia: common.HexToAddress("0xc445a18ca49190578dad62fba3048c07efc07ffe"),
 	AbstractMainnet:      common.HexToAddress("0x84a71ccd554cc1b02749b35d22F684cc8ec987e1"),
 	AbstractTestnet:      common.HexToAddress("0x572f4901f03055ffc1d936a60ccc3cbf13911be3"),
 	PolygonZkEVMMainnet:  common.HexToAddress("0x37ea0ef3549a5bb7d431be78a3d99bd360d19e5"),
@@ -371,7 +370,7 @@ var sntAddressesByChainID = map[uint64]common.Address{
 	OptimismSepolia:      common.HexToAddress("0x0b5dad18b8791ddb24252b433ec4f21f9e6e5ed0"),
 	BaseSepolia:          common.HexToAddress("0xfdb3b57944943a7724fcc0520ee2b10659969a06"),
 	LineaSepolia:         common.HexToAddress("0x4f3b44bdddb0e2f94a85d75294d0a38e211be6a8"),
-	StatusNetworkSepolia: common.HexToAddress("0x1c3ac2a186c6149ae7cb4d716ebbd0766e4f898a"),
+	StatusNetworkHoodi: common.HexToAddress("0x14c847ce7ab6c8002616176478b32C237fdF0cBb"),
 }
 
 func allMandatoryTokens() map[uint64][]common.Address {

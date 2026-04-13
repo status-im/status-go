@@ -41,7 +41,7 @@ func getTokenPegMap() map[string]string {
 		"421614-0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d":     "USD",
 		"84532-0x036cbd53842c5426634e7929541ec2318f3dcf7e":      "USD",
 		"11155420-0x5fd84259d66cd46123540766be93dfe6d43130d7":   "USD",
-		"1660990954-0xc445a18ca49190578dad62fba3048c07efc07ffe": "USD",
+		// TODO: add Status Network Hoodi USDC peg once deployed
 
 		// USDP
 		"1-0x8e870d67f660d95d5be530380d0ec0bd388289e1":     "USD",
@@ -53,7 +53,7 @@ func getTokenPegMap() map[string]string {
 		"8453-0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42":       "EUR",
 		"11155111-0x08210f9170f89ab7658f0b5e3ff39b0e03c594d4":   "EUR",
 		"84532-0x808456652fdb597867f38412077a9182bf77359f":      "EUR",
-		"1660990954-0xfe8be27656b1508194d9302d12a940b4d7c35b99": "EUR",
+		// TODO: add Status Network Hoodi EURC peg once deployed
 
 		// SAI
 		"1-0x3567aa22cd3ab9aef23d7e18ee0d7cf16974d7e6":    "USD",

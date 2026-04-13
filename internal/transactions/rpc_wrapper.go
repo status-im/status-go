@@ -67,7 +67,7 @@ func (w *rpcWrapper) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uin
 		return 0, err
 	}
 	method := "eth_estimateGas"
-	if w.chainID == walletCommon.StatusNetworkSepolia {
+	if w.chainID == walletCommon.StatusNetworkHoodi {
 		method = "linea_estimateGas"
 		var result struct {
 			GasLimit hexutil.Uint64 `json:"gasLimit"`

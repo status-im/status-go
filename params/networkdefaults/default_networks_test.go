@@ -60,7 +60,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		case common.ScrollSepolia:
 		case common.BlastMainnet:
 		case common.BlastSepolia:
-		case common.StatusNetworkSepolia:
+		case common.StatusNetworkHoodi:
 		case common.BSCMainnet:
 		case common.BSCTestnet:
 		default:

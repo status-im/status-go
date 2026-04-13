@@ -47,7 +47,7 @@ var (
 const (
 	ProdPreferredChainIDsDefault        = "1:10:42161:8453"
 	TestPreferredChainIDsDefault        = "5:420:421613"
-	TestSepoliaPreferredChainIDsDefault = "11155111:11155420:421614:84532:1660990954"
+	TestSepoliaPreferredChainIDsDefault = "11155111:11155420:421614:84532:374"
 )
 
 // TODO: implement clean full interface. This might require refactoring Database methods
