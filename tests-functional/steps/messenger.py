@@ -734,10 +734,9 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
     start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     total_signals_before = sum(len(v) for v in receiver.received_signals.values())
     logging.info(
-        "community_messages: start_index=%d, total_signals_before=%d, ws_url=%s",
-        start_index,
-        total_signals_before,
-        getattr(receiver, "url", "unknown"),
+        f"community_messages: start_index={start_index}, "
+        f"total_signals_before={total_signals_before}, "
+        f"ws_url={getattr(receiver, 'url', 'unknown')}"
     )
 
     sent_messages = []
@@ -751,12 +750,9 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
     messages_new_after_send = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     total_signals_after_send = sum(len(v) for v in receiver.received_signals.values())
     logging.info(
-        "community_messages: all %d messages sent, MESSAGES_NEW count=%d (was %d), total_signals=%d (was %d)",
-        message_count,
-        messages_new_after_send,
-        start_index,
-        total_signals_after_send,
-        total_signals_before,
+        f"community_messages: all {message_count} messages sent, "
+        f"MESSAGES_NEW count={messages_new_after_send} (was {start_index}), "
+        f"total_signals={total_signals_after_send} (was {total_signals_before})"
     )
 
     for i, expected_message in enumerate(sent_messages):
