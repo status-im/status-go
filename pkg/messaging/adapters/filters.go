@@ -11,8 +11,6 @@ func ChatsToInitializeToTransport(c types.ChatsToInitialize) []transport2.Filter
 		filters[i] = transport2.FiltersToInitialize{
 			ChatID:      chat.ChatID,
 			PubsubTopic: chat.PubsubTopic,
-			// TODO (#6384) temporary flag while migrating community shards
-			DistinctByPubsub: chat.IsCommunity,
 		}
 	}
 	return filters
