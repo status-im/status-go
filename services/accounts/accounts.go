@@ -156,6 +156,11 @@ func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name strin
 	return (*api.messenger).UpdateKeypairName(keyUID, name)
 }
 
+// If xpub is empty, only cold wallet will be updated.
+func (api *API) UpdateKeypairXPub(ctx context.Context, keyUID string, xpub string, coldWallet accsmanagementtypes.ColdWalletType) error {
+	return (*api.messenger).UpdateKeypairXPub(keyUID, xpub, coldWallet)
+}
+
 func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPosition int64) error {
 	return (*api.messenger).MoveWalletAccount(fromPosition, toPosition)
 }

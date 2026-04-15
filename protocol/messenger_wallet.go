@@ -41,6 +41,15 @@ func (m *Messenger) UpdateKeypairName(keyUID string, name string) error {
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
+func (m *Messenger) UpdateKeypairXPub(keyUID string, xpub string, coldWallet accsmanagementtypes.ColdWalletType) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+	err := m.settings.UpdateKeypairXPub(keyUID, xpub, coldWallet, clock)
+	if err != nil {
+		return err
+	}
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
+}
+
 func (m *Messenger) MoveWalletAccount(fromPosition int64, toPosition int64) error {
 	clock, _ := m.getLastClockWithRelatedChat()
 
