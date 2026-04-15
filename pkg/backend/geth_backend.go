@@ -28,21 +28,21 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/accounts-management/common"
-	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiacccommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
-	logutils2 "github.com/status-im/status-go/internal/logutils"
+	logutils "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/rpc"
@@ -74,9 +74,9 @@ var (
 )
 
 type LoginParams struct {
-	ChatAddress  types2.Address         `json:"chatAddress"`
+	ChatAddress  types.Address          `json:"chatAddress"`
 	Password     string                 `json:"password"`
-	MainAccount  types2.Address         `json:"mainAccount"` // TODO: remove this field
+	MainAccount  types.Address          `json:"mainAccount"` // TODO: remove this field
 	MultiAccount *multiaccounts.Account `json:"multiAccount"`
 }
 
@@ -101,7 +101,7 @@ type StatusBackend struct {
 	sentryDSN                string
 
 	logger            *zap.Logger
-	preLoginLogConfig *logutils2.PreLoginLogConfig
+	preLoginLogConfig *logutils.PreLoginLogConfig
 
 	shutdownTasks []func() error
 }
@@ -111,7 +111,7 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 	logger = logger.Named("StatusBackend")
 	backend := &StatusBackend{
 		logger:            logger,
-		preLoginLogConfig: logutils2.NewPreLoginLogConfig(),
+		preLoginLogConfig: logutils.NewPreLoginLogConfig(),
 		shutdownTasks:     []func() error{},
 	}
 	if err := backend.initialize(); err != nil {
@@ -131,7 +131,7 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 	return backend
 }
 
-func (b *StatusBackend) PreLoginLog() *logutils2.PreLoginLogConfig {
+func (b *StatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
 	return b.preLoginLogConfig
 }
 
@@ -509,8 +509,8 @@ func (b *StatusBackend) ensureWalletDBOpened(account multiaccounts.Account, pass
 }
 
 func (b *StatusBackend) SetupLogSettings() error {
-	_ = logutils2.ZapLogger().Sync()
-	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	_ = logutils.ZapLogger().Sync()
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 // Deprecated: Use StartNodeWithAccount instead.
@@ -833,7 +833,7 @@ func (b *StatusBackend) accountsDB() (*accounts.Database, error) {
 	return accounts.NewDB(b.appDB)
 }
 
-func (b *StatusBackend) GetSettings() (*settings2.Settings, error) {
+func (b *StatusBackend) GetSettings() (*settings.Settings, error) {
 	accountsDB, err := b.accountsDB()
 	if err != nil {
 		return nil, err
@@ -1149,7 +1149,7 @@ func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) 
 	return
 }
 
-func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings2.Settings, keycardUID string, oldPassword string, newPassword string) error {
+func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, oldPassword string, newPassword string) error {
 	messenger := b.Messenger()
 	if messenger == nil {
 		return errors.New("cannot resolve messenger instance")
@@ -1178,27 +1178,27 @@ func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings2.KeycardInstanceUID, s.KeycardInstanceUID)
+	err = accountDB.SaveSettingField(settings.KeycardInstanceUID, s.KeycardInstanceUID)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings2.KeycardPairedOn, s.KeycardPairedOn)
+	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPairedOn)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings2.KeycardPairing, s.KeycardPairing)
+	err = accountDB.SaveSettingField(settings.KeycardPairing, s.KeycardPairing)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings2.Mnemonic, nil)
+	err = accountDB.SaveSettingField(settings.Mnemonic, nil)
 	if err != nil {
 		return err
 	}
 
-	err = accountDB.SaveSettingField(settings2.ProfileMigrationNeeded, false)
+	err = accountDB.SaveSettingField(settings.ProfileMigrationNeeded, false)
 	if err != nil {
 		return err
 	}
@@ -1281,7 +1281,7 @@ func (b *StatusBackend) RestoreKeycardAccountAndLogin(request *requests.RestoreA
 }
 
 func (b *StatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
-	genAccount, err := generator2.CreateAccountFromMnemonic(mnemonic, "")
+	genAccount, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 	if err != nil {
 		return "", err
 	}
@@ -1291,7 +1291,7 @@ func (b *StatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
 	return accInfo.KeyUID, nil
 }
 
-func (b *StatusBackend) generateAccount(mnemonic string) (genAcc *generator2.Account, accInfo generator2.GeneratedAccountInfo, err error) {
+func (b *StatusBackend) generateAccount(mnemonic string) (genAcc *generator.Account, accInfo generator.GeneratedAccountInfo, err error) {
 	finalMnemonic := mnemonic
 	if mnemonic == "" {
 		finalMnemonic, err = common.CreateRandomMnemonicWithDefaultLength()
@@ -1300,7 +1300,7 @@ func (b *StatusBackend) generateAccount(mnemonic string) (genAcc *generator2.Acc
 		}
 	}
 
-	genAcc, err = generator2.CreateAccountFromMnemonic(finalMnemonic, "")
+	genAcc, err = generator.CreateAccountFromMnemonic(finalMnemonic, "")
 	if err != nil {
 		return
 	}
@@ -1309,13 +1309,13 @@ func (b *StatusBackend) generateAccount(mnemonic string) (genAcc *generator2.Acc
 	return
 }
 
-func (b *StatusBackend) generateDerivedAddresses(genAcc *generator2.Account, paths []string) (genDerivedAccounts map[string]*generator2.Account, genDerivedAccountsInfo map[string]generator2.AccountInfo, err error) {
-	genDerivedAccounts, err = generator2.DeriveChildrenFromAccount(genAcc, paths)
+func (b *StatusBackend) generateDerivedAddresses(genAcc *generator.Account, paths []string) (genDerivedAccounts map[string]*generator.Account, genDerivedAccountsInfo map[string]generator.AccountInfo, err error) {
+	genDerivedAccounts, err = generator.DeriveChildrenFromAccount(genAcc, paths)
 	if err != nil {
 		return
 	}
 
-	genDerivedAccountsInfo = make(map[string]generator2.AccountInfo, 0)
+	genDerivedAccountsInfo = make(map[string]generator.AccountInfo, 0)
 	for path, acc := range genDerivedAccounts {
 		genDerivedAccountsInfo[path] = acc.ToAccountInfo()
 	}
@@ -1375,7 +1375,7 @@ func (b *StatusBackend) buildAccount(request *requests.CreateAccount, keyUID str
 }
 
 func (b *StatusBackend) prepareSettings(request *requests.CreateAccount, mnemonic string, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator2.AccountInfo, restoreAccount bool) (*settings2.Settings, error) {
+	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (*settings.Settings, error) {
 	s, err := defaultSettings(keyUID, masterAddress, derivedAddresses)
 	if err != nil {
 		return nil, err
@@ -1419,7 +1419,7 @@ func (b *StatusBackend) prepareWalletAccount(request *requests.CreateAccount) *a
 }
 
 func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator2.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
+	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
 	// set up keypair
 	keypair = &accsmanagementtypes.Keypair{
 		Name:                    request.DisplayName,
@@ -1432,9 +1432,9 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 	// add chat account
 	chatDerivedAccount := derivedAddresses[common.PathEIP1581Chat]
 	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
-		PublicKey: types2.Hex2Bytes(chatDerivedAccount.PublicKey),
+		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
 		KeyUID:    keypair.KeyUID,
-		Address:   types2.HexToAddress(chatDerivedAccount.Address),
+		Address:   types.HexToAddress(chatDerivedAccount.Address),
 		Chat:      true,
 		Path:      common.PathEIP1581Chat,
 		Position:  -1, // When creating a new account, the chat account should have position -1, cause it doesn't participate
@@ -1444,9 +1444,9 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 	// add wallet account
 	walletDerivedAccount := derivedAddresses[common.PathDefaultWalletAccount]
 	keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
-		PublicKey:          types2.Hex2Bytes(walletDerivedAccount.PublicKey),
+		PublicKey:          types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:             keypair.KeyUID,
-		Address:            types2.HexToAddress(walletDerivedAccount.Address),
+		Address:            types.HexToAddress(walletDerivedAccount.Address),
 		ColorID:            multiacccommon.CustomizationColor(request.CustomizationColor),
 		Wallet:             true,
 		Path:               common.PathDefaultWalletAccount,
@@ -1460,7 +1460,7 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 }
 
 func (b *StatusBackend) prepareForKeycard(request *requests.CreateAccount, multiAccount *multiaccounts.Account,
-	settings *settings2.Settings, nodeConfig *params.NodeConfig) error {
+	settings *settings.Settings, nodeConfig *params.NodeConfig) error {
 	if request.KeycardInstanceUID == "" {
 		return nil
 	}
@@ -1549,22 +1549,22 @@ func (b *StatusBackend) ConvertToRegularAccount(mnemonic string, currPassword st
 		return err
 	}
 
-	err = db.SaveSettingField(settings2.KeycardInstanceUID, "")
+	err = db.SaveSettingField(settings.KeycardInstanceUID, "")
 	if err != nil {
 		return err
 	}
 
-	err = db.SaveSettingField(settings2.KeycardPairedOn, 0)
+	err = db.SaveSettingField(settings.KeycardPairedOn, 0)
 	if err != nil {
 		return err
 	}
 
-	err = db.SaveSettingField(settings2.KeycardPairing, "")
+	err = db.SaveSettingField(settings.KeycardPairing, "")
 	if err != nil {
 		return err
 	}
 
-	err = db.SaveSettingField(settings2.ProfileMigrationNeeded, false)
+	err = db.SaveSettingField(settings.ProfileMigrationNeeded, false)
 	if err != nil {
 		return err
 	}
@@ -1604,7 +1604,7 @@ func (b *StatusBackend) VerifyDatabasePassword(keyUID string, password string) e
 	return nil
 }
 
-func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey types2.HexBytes) error {
+func EnrichMultiAccountByPublicKey(account *multiaccounts.Account, chatPublicKey types.HexBytes) error {
 	pk := string(chatPublicKey.Bytes())
 	colorHash, err := colorhash.GenerateFor(pk)
 	if err != nil {
@@ -1635,9 +1635,9 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		keyUID                  string
 		masterAddress           string
 		chatPrivateKey          *ecdsa.PrivateKey // set only for keycard account
-		chatPublicKey           types2.HexBytes
+		chatPublicKey           types.HexBytes
 		customizationColorClock uint64 // not sure if we need this customizationColorClock at all since the desktop app doesn't use it
-		derivedAddresses        = map[string]generator2.AccountInfo{
+		derivedAddresses        = map[string]generator.AccountInfo{
 			common.PathWalletRoot:           {},
 			common.PathEIP1581Root:          {},
 			common.PathEIP1581Chat:          {},
@@ -1650,36 +1650,36 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		keyUID = keycardData.KeyUID
 		masterAddress = keycardData.Address
 
-		derivedAddresses[common.PathWalletRoot] = generator2.AccountInfo{
-			AccountPublicInfo: generator2.AccountPublicInfo{
+		derivedAddresses[common.PathWalletRoot] = generator.AccountInfo{
+			AccountPublicInfo: generator.AccountPublicInfo{
 				Address: keycardData.WalletRootAddress,
 			},
 		}
-		derivedAddresses[common.PathEIP1581Root] = generator2.AccountInfo{
-			AccountPublicInfo: generator2.AccountPublicInfo{
+		derivedAddresses[common.PathEIP1581Root] = generator.AccountInfo{
+			AccountPublicInfo: generator.AccountPublicInfo{
 				Address: keycardData.Eip1581Address,
 			},
 		}
-		derivedAddresses[common.PathEIP1581Chat] = generator2.AccountInfo{
-			AccountPublicInfo: generator2.AccountPublicInfo{
+		derivedAddresses[common.PathEIP1581Chat] = generator.AccountInfo{
+			AccountPublicInfo: generator.AccountPublicInfo{
 				Address:   keycardData.WhisperAddress,
 				PublicKey: keycardData.WhisperPublicKey,
 			},
 			PrivateKey: keycardData.WhisperPrivateKey,
 		}
-		derivedAddresses[common.PathDefaultWalletAccount] = generator2.AccountInfo{
-			AccountPublicInfo: generator2.AccountPublicInfo{
+		derivedAddresses[common.PathDefaultWalletAccount] = generator.AccountInfo{
+			AccountPublicInfo: generator.AccountPublicInfo{
 				Address:   keycardData.WalletAddress,
 				PublicKey: keycardData.WalletPublicKey,
 			},
 		}
-		derivedAddresses[common.PathEIP1581Encryption] = generator2.AccountInfo{
-			AccountPublicInfo: generator2.AccountPublicInfo{
+		derivedAddresses[common.PathEIP1581Encryption] = generator.AccountInfo{
+			AccountPublicInfo: generator.AccountPublicInfo{
 				PublicKey: keycardData.EncryptionPublicKey,
 			},
 		}
 	} else {
-		genMasterAcc, err := generator2.CreateAccountFromMnemonic(mnemonic, "")
+		genMasterAcc, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 		if err != nil {
 			return nil, err
 		}
@@ -1705,17 +1705,17 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	}
 
 	if isKeycard {
-		genChatAccount, err := generator2.CreateAccountFromPrivateKey(derivedAddresses[common.PathEIP1581Chat].PrivateKey)
+		genChatAccount, err := generator.CreateAccountFromPrivateKey(derivedAddresses[common.PathEIP1581Chat].PrivateKey)
 		if err != nil {
 			return nil, err
 		}
 
 		chatPrivateKey = genChatAccount.PrivateKey()
-		chatPublicKey = types2.Hex2Bytes(genChatAccount.PublicKeyHex())
+		chatPublicKey = types.Hex2Bytes(genChatAccount.PublicKeyHex())
 
 		request.Password = derivedAddresses[common.PathEIP1581Encryption].PublicKey
 	} else {
-		chatPublicKey = types2.Hex2Bytes(derivedAddresses[common.PathEIP1581Chat].PublicKey)
+		chatPublicKey = types.Hex2Bytes(derivedAddresses[common.PathEIP1581Chat].PublicKey)
 	}
 
 	settings, err := b.prepareSettings(request, mnemonic, keyUID, masterAddress, derivedAddresses, restoreAccount)
@@ -1781,7 +1781,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 func (b *StatusBackend) StartNodeWithAccountAndInitialConfig(
 	multiAccount *multiaccounts.Account,
 	password string,
-	settings settings2.Settings,
+	settings settings.Settings,
 	nodecfg *params.NodeConfig,
 	keypair *accsmanagementtypes.Keypair,
 	chatKey *ecdsa.PrivateKey,
@@ -1810,7 +1810,7 @@ func (b *StatusBackend) StartNodeWithAccountAndInitialConfig(
 	return nil
 }
 
-func (b *StatusBackend) saveKeypairAndSettings(settings settings2.Settings, nodecfg *params.NodeConfig, keypair *accsmanagementtypes.Keypair) error {
+func (b *StatusBackend) saveKeypairAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, keypair *accsmanagementtypes.Keypair) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	accdb, err := accounts.NewDB(b.appDB)
@@ -1986,11 +1986,11 @@ func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
 
 // @deprecated
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *StatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types2.Hash, err error) {
-	return types2.Hash{}, errors.New("method not supported")
+func (b *StatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
+	return types.Hash{}, errors.New("method not supported")
 }
 
-func (b *StatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types2.Hash, err error) {
+func (b *StatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
@@ -2001,82 +2001,82 @@ func (b *StatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wall
 }
 
 // @deprecated
-func (b *StatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types2.Hash, err error) {
-	return types2.Hash{}, errors.New("method not supported")
+func (b *StatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types.Hash, err error) {
+	return types.Hash{}, errors.New("method not supported")
 }
 
 // @deprecated
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.
-func (b *StatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types2.Hash, error) {
-	return wallettypes.SendTxArgs{}, types2.Hash{}, errors.New("method not supported")
+func (b *StatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error) {
+	return wallettypes.SendTxArgs{}, types.Hash{}, errors.New("method not supported")
 }
 
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
-func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (types2.HexBytes, error) {
+func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (types.HexBytes, error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(rpcParams.Address, rpcParams.Password)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
 	return b.signer.Sign(rpcParams, verifiedAccount)
 }
 
 // Recover calls the personalAPI to return address associated with the private
 // key that was used to calculate the signature in the message
-func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (types2.Address, error) {
+func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (types.Address, error) {
 	return b.signer.Recover(rpcParams)
 }
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
-func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types2.HexBytes, error) {
+func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (types.HexBytes, error) {
 	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	sig, err := typeddata.Sign(typed, acc.PrivateKey(), chain)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
 	return sig, err
 }
 
 // SignTypedDataV4 accepts data and password. Gets verified account and signs typed data.
-func (b *StatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types2.HexBytes, error) {
+func (b *StatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error) {
 	acc, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	sig, err := typeddata.SignTypedDataV4(typed, acc.PrivateKey(), chain)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
-	return types2.HexBytes(sig), err
+	return types.HexBytes(sig), err
 }
 
 // HashTypedData generates the hash of TypedData.
-func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (types2.Hash, error) {
+func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (types.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.ValidateAndHash(typed, chain)
 	if err != nil {
-		return types2.Hash{}, err
+		return types.Hash{}, err
 	}
-	return types2.Hash(hash), err
+	return types.Hash(hash), err
 }
 
 // HashTypedDataV4 generates the hash of TypedData.
-func (b *StatusBackend) HashTypedDataV4(typed signercore.TypedData) (types2.Hash, error) {
+func (b *StatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.HashTypedDataV4(typed, chain)
 	if err != nil {
-		return types2.Hash{}, err
+		return types.Hash{}, err
 	}
-	return types2.Hash(hash), err
+	return types.Hash(hash), err
 }
 
-func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*generator2.Account, error) {
-	return b.accountsManager.GetVerifiedWalletAccount(types2.HexToAddress(address), password)
+func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*generator.Account, error) {
+	return b.accountsManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 }
 
 // PausableServices returns the list of services that can be individually paused/resumed.
@@ -2183,8 +2183,8 @@ func (b *StatusBackend) Logout() error {
 // including in release builds, to help diagnose login issues.
 // related issue: https://github.com/status-im/status-mobile/issues/21501
 func (b *StatusBackend) switchToPreLoginLog() error {
-	_ = logutils2.ZapLogger().Sync()
-	return logutils2.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+	_ = logutils.ZapLogger().Sync()
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 func (b *StatusBackend) closeDBs() error {
@@ -2381,7 +2381,7 @@ func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 		return "", fmt.Errorf("SignHash: could not sign the hash: %v", err)
 	}
 
-	hexEncodedSignature := types2.EncodeHex(signature)
+	hexEncodedSignature := types.EncodeHex(signature)
 	return hexEncodedSignature, nil
 }
 
@@ -2456,7 +2456,7 @@ func (b *StatusBackend) SetProfileLogLevel(level string) error {
 	}
 	b.config.LogLevel = level
 
-	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 func (b *StatusBackend) SetLogNamespaces(namespaces string) error {
@@ -2469,7 +2469,7 @@ func (b *StatusBackend) SetLogNamespaces(namespaces string) error {
 	}
 	b.config.LogNamespaces = namespaces
 
-	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 func (b *StatusBackend) SetProfileLogEnabled(enabled bool) error {
@@ -2482,14 +2482,14 @@ func (b *StatusBackend) SetProfileLogEnabled(enabled bool) error {
 	}
 	b.config.LogEnabled = enabled
 
-	return logutils2.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 func (b *StatusBackend) SetPreLoginLogEnabled(enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.preLoginLogConfig.SetEnabled(enabled)
-	return logutils2.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 func (b *StatusBackend) SetPreLoginLogLevel(level string) error {
@@ -2498,7 +2498,7 @@ func (b *StatusBackend) SetPreLoginLogLevel(level string) error {
 	if err := b.preLoginLogConfig.SetLevel(level); err != nil {
 		return err
 	}
-	return logutils2.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 func (b *StatusBackend) wakuMetricsHandler() http.Handler {

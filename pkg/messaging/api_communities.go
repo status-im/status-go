@@ -4,24 +4,24 @@ import (
 	"context"
 	"crypto/ecdsa"
 
-	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 func (a *API) SubscribeToPubsubTopic(topic string) error {
 	return a.core.stack.Transport.SubscribeToPubsubTopic(topic)
 }
 
-func (a *API) GetKeysForGroup(groupID []byte) ([]*encryption2.HashRatchetKeyCompatibility, error) {
+func (a *API) GetKeysForGroup(groupID []byte) ([]*encryption.HashRatchetKeyCompatibility, error) {
 	return a.core.stack.Encryption.GetKeysForGroup(groupID)
 }
 
-func (a *API) GetCurrentKeyForGroup(groupID []byte) (*encryption2.HashRatchetKeyCompatibility, error) {
+func (a *API) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyCompatibility, error) {
 	return a.core.stack.Encryption.GetCurrentKeyForGroup(groupID)
 }
 
-func (a *API) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *types2.ReceivedMessage) error {
+func (a *API) SaveHashRatchetMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
 	return a.core.controller.SaveHashRatchetMessage(groupID, keyID, m)
 }
 
@@ -47,8 +47,8 @@ func (a *API) EncryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []
 
 func (a *API) DecryptWithHashRatchet(keyID []byte, seqNo uint32, payload []byte) ([]byte, error) {
 	data, err := a.core.stack.Encryption.DecryptWithHashRatchet(keyID, seqNo, payload)
-	if err == encryption2.ErrNoRatchetKey {
-		return nil, types2.ErrNoRatchetKey
+	if err == encryption.ErrNoRatchetKey {
+		return nil, types.ErrNoRatchetKey
 	}
 	return data, err
 }
@@ -80,8 +80,8 @@ func ToContentTopic(s string) []byte {
 
 func (a *API) DecryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, data []byte) ([]byte, error) {
 	data, err := a.core.decryptMessage(myIdentityKey, theirPublicKey, data)
-	if err == encryption2.ErrHashRatchetGroupIDNotFound {
-		return nil, types2.ErrHashRatchetGroupIDNotFound
+	if err == encryption.ErrHashRatchetGroupIDNotFound {
+		return nil, types.ErrHashRatchetGroupIDNotFound
 	}
 	return data, err
 }

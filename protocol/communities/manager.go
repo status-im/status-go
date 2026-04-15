@@ -35,7 +35,7 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/pkg/messaging"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	types "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/ens"
@@ -2133,7 +2133,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	return r, nil
 }
 
-func (m *Manager) NewHashRatchetKeys(keys []*types2.HashRatchetInfo) error {
+func (m *Manager) NewHashRatchetKeys(keys []*types.HashRatchetInfo) error {
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
 
@@ -4152,15 +4152,15 @@ func (m *Manager) GetOwnedCommunitiesUniversalChatIDs() (map[string]bool, error)
 	return chatIDs, nil
 }
 
-func (m *Manager) StoreWakuMessage(message *types2.ReceivedMessage) error {
+func (m *Manager) StoreWakuMessage(message *types.ReceivedMessage) error {
 	return m.persistence.SaveWakuMessage(message)
 }
 
-func (m *Manager) StoreWakuMessages(messages []*types2.ReceivedMessage) error {
+func (m *Manager) StoreWakuMessages(messages []*types.ReceivedMessage) error {
 	return m.persistence.SaveWakuMessages(messages)
 }
 
-func (m *Manager) GetLatestWakuMessageTimestamp(topics []types2.ContentTopic) (uint64, error) {
+func (m *Manager) GetLatestWakuMessageTimestamp(topics []types.ContentTopic) (uint64, error) {
 	return m.persistence.GetLatestWakuMessageTimestamp(topics)
 }
 
@@ -5010,7 +5010,7 @@ func (m *Manager) decryptCommunityDescription(keyIDSeqNo string, d []byte) (*Dec
 	}
 
 	decryptedPayload, err := m.messaging.DecryptWithHashRatchet(keyID, uint32(seqNo), d)
-	if err == types2.ErrNoRatchetKey {
+	if err == types.ErrNoRatchetKey {
 		return &DecryptCommunityResponse{
 			KeyID: keyID,
 		}, err

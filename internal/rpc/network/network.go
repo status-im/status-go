@@ -8,10 +8,11 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
-	db2 "github.com/status-im/status-go/internal/rpc/network/db"
+	"github.com/status-im/status-go/internal/rpc/network/db"
+	persistence "github.com/status-im/status-go/internal/rpc/network/db"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -53,7 +54,7 @@ type CombinedNetwork struct {
 type Manager struct {
 	db                 *sql.DB
 	accountsDB         *accounts.Database
-	networkPersistence db2.NetworksPersistenceInterface
+	networkPersistence persistence.NetworksPersistenceInterface
 	embeddedNetworks   []params.Network
 
 	accountsPublisher *pubsub.Publisher
@@ -76,7 +77,7 @@ func NewManager(db *sql.DB, accountsPublisher *pubsub.Publisher) *Manager {
 	return &Manager{
 		db:                 db,
 		accountsDB:         accountsDB,
-		networkPersistence: db2.NewNetworksPersistence(db),
+		networkPersistence: persistence.NewNetworksPersistence(db),
 		accountsPublisher:  accountsPublisher,
 		networksPublisher:  pubsub.NewPublisher(),
 		logger:             logger,
@@ -100,7 +101,7 @@ func (nm *Manager) startSettingsChangeSubscription() {
 	if nm.accountsPublisher == nil {
 		return
 	}
-	ch, unsub := pubsub.Subscribe[settings2.EventSettingChanged](nm.accountsPublisher, 1)
+	ch, unsub := pubsub.Subscribe[settings.EventSettingChanged](nm.accountsPublisher, 1)
 	go func() {
 		defer common.LogOnPanic()
 		defer unsub()
@@ -112,7 +113,7 @@ func (nm *Manager) startSettingsChangeSubscription() {
 				if !ok {
 					return
 				}
-				if ev.Setting.Equals(settings2.TestNetworksEnabled) {
+				if ev.Setting.Equals(settings.TestNetworksEnabled) {
 					nm.onTestNetworksEnabledChanged()
 				}
 			}
@@ -146,9 +147,9 @@ func (nm *Manager) InitEmbeddedNetworks(embeddedNetworks []params.Network) error
 	nm.embeddedNetworks = embeddedNetworks
 
 	// Begin a transaction
-	return db2.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
 		// Create temporary persistence instances with the transaction
-		txNetworksPersistence := db2.NewNetworksPersistence(tx)
+		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
 
 		currentNetworks, err := txNetworksPersistence.GetAllNetworks()
 		if err != nil {
@@ -222,8 +223,8 @@ func (nm *Manager) Upsert(network *params.Network) error {
 	network.IsActive = false
 	network.IsDeactivatable = true
 
-	return db2.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
-		txNetworksPersistence := db2.NewNetworksPersistence(tx)
+	return db.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+		txNetworksPersistence := db.NewNetworksPersistence(tx)
 		err := txNetworksPersistence.UpsertNetwork(nm.networkWithoutEmbeddedProviders(network))
 		if err != nil {
 			return errors.CreateErrorResponseFromError(fmt.Errorf("failed to upsert network: %w", err))
@@ -234,8 +235,8 @@ func (nm *Manager) Upsert(network *params.Network) error {
 
 // Delete removes a network by ChainID, wrapped in a transaction.
 func (nm *Manager) Delete(chainID uint64) error {
-	return db2.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
-		txNetworksPersistence := db2.NewNetworksPersistence(tx)
+	return db.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+		txNetworksPersistence := db.NewNetworksPersistence(tx)
 		err := txNetworksPersistence.DeleteNetwork(chainID)
 		if err != nil {
 			return errors.CreateErrorResponseFromError(fmt.Errorf("failed to delete network: %w", err))

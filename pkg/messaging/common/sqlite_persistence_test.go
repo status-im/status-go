@@ -9,7 +9,7 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging/common/migrations"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 func TestConfirmations(t *testing.T) {
@@ -150,7 +150,7 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 	groupID2 := []byte("group-id-2")
 	keyID := []byte("key-id")
 
-	message1 := &types2.ReceivedMessage{
+	message1 := &types.ReceivedMessage{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
 		Timestamp: 2,
@@ -159,10 +159,10 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 
 	require.NoError(t, p.SaveMessage(groupID1, keyID, message1))
 
-	message2 := &types2.ReceivedMessage{
+	message2 := &types.ReceivedMessage{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		Topic:     types2.BytesToContentTopic([]byte{5}),
+		Topic:     types.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
@@ -190,7 +190,7 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 	groupID := []byte("group-id")
 	keyID := []byte("key-id")
 
-	message1 := &types2.ReceivedMessage{
+	message1 := &types.ReceivedMessage{
 		Hash:      []byte{1},
 		Sig:       []byte{2},
 		Timestamp: 2,
@@ -199,10 +199,10 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 
 	require.NoError(t, p.SaveMessage(groupID, keyID, message1))
 
-	message2 := &types2.ReceivedMessage{
+	message2 := &types.ReceivedMessage{
 		Hash:      []byte{2},
 		Sig:       []byte{2},
-		Topic:     types2.BytesToContentTopic([]byte{5}),
+		Topic:     types.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
@@ -210,10 +210,10 @@ func TestDeleteHashRatchetMessage(t *testing.T) {
 
 	require.NoError(t, p.SaveMessage(groupID, keyID, message2))
 
-	message3 := &types2.ReceivedMessage{
+	message3 := &types.ReceivedMessage{
 		Hash:      []byte{3},
 		Sig:       []byte{2},
-		Topic:     types2.BytesToContentTopic([]byte{5}),
+		Topic:     types.BytesToContentTopic([]byte{5}),
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},

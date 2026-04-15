@@ -13,9 +13,9 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging/adapters"
-	common2 "github.com/status-im/status-go/pkg/messaging/common"
-	processor2 "github.com/status-im/status-go/pkg/messaging/controller/processor"
-	sender2 "github.com/status-im/status-go/pkg/messaging/controller/sender"
+	common "github.com/status-im/status-go/pkg/messaging/common"
+	processor "github.com/status-im/status-go/pkg/messaging/controller/processor"
+	sender "github.com/status-im/status-go/pkg/messaging/controller/sender"
 	"github.com/status-im/status-go/pkg/messaging/events"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -23,12 +23,12 @@ import (
 
 type Controller struct {
 	identity  *ecdsa.PrivateKey
-	stack     *common2.MessagingStack
-	sender    *sender2.Sender
-	processor *processor2.Processor
+	stack     *common.MessagingStack
+	sender    *sender.Sender
+	processor *processor.Processor
 
-	messageConfirmationStorage common2.MessageConfirmationPersistence
-	hashRatchetStorage         common2.HashRatchetPersistence
+	messageConfirmationStorage common.MessageConfirmationPersistence
+	hashRatchetStorage         common.HashRatchetPersistence
 
 	publisher *pubsub.Publisher
 	logger    *zap.Logger
@@ -39,9 +39,9 @@ type Controller struct {
 
 func NewController(
 	identity *ecdsa.PrivateKey,
-	stack *common2.MessagingStack,
-	messageConfirmationStorage common2.MessageConfirmationPersistence,
-	hashRatchetStorage common2.HashRatchetPersistence,
+	stack *common.MessagingStack,
+	messageConfirmationStorage common.MessageConfirmationPersistence,
+	hashRatchetStorage common.HashRatchetPersistence,
 	publisher *pubsub.Publisher,
 	logger *zap.Logger,
 	tracer trace.Tracer,
@@ -49,8 +49,8 @@ func NewController(
 	return &Controller{
 		identity:                   identity,
 		stack:                      stack,
-		sender:                     sender2.NewSender(identity, stack, logger, tracer),
-		processor:                  processor2.NewProcessor(identity, stack, messageConfirmationStorage, hashRatchetStorage, logger, tracer),
+		sender:                     sender.NewSender(identity, stack, logger, tracer),
+		processor:                  processor.NewProcessor(identity, stack, messageConfirmationStorage, hashRatchetStorage, logger, tracer),
 		messageConfirmationStorage: messageConfirmationStorage,
 		hashRatchetStorage:         hashRatchetStorage,
 		publisher:                  publisher,
@@ -119,11 +119,11 @@ func (c *Controller) GetHashRatchetMessagesCountForGroup(groupID []byte) (int, e
 	return c.hashRatchetStorage.GetMessagesCountForGroup(groupID)
 }
 
-func (c *Controller) Sender() *sender2.Sender {
+func (c *Controller) Sender() *sender.Sender {
 	return c.sender
 }
 
-func (c *Controller) Processor() *processor2.Processor {
+func (c *Controller) Processor() *processor.Processor {
 	return c.processor
 }
 
@@ -134,13 +134,13 @@ func (c *Controller) runSubscriptionsLoop() {
 	go func() {
 		defer gocommon.LogOnPanic()
 
-		scheduledSendSub, scheduledSendUnsub := pubsub.Subscribe[sender2.ScheduledReliableSend](c.sender.Publisher(), 100)
+		scheduledSendSub, scheduledSendUnsub := pubsub.Subscribe[sender.ScheduledReliableSend](c.sender.Publisher(), 100)
 		defer scheduledSendUnsub()
 
-		sentSub, sentUnsub := pubsub.Subscribe[sender2.SentMessage](c.sender.Publisher(), 100)
+		sentSub, sentUnsub := pubsub.Subscribe[sender.SentMessage](c.sender.Publisher(), 100)
 		defer sentUnsub()
 
-		unawareOfInstallationSub, unawareOfInstallationUnsub := pubsub.Subscribe[processor2.SenderUnawareOfInstallation](c.processor.Publisher(), 100)
+		unawareOfInstallationSub, unawareOfInstallationUnsub := pubsub.Subscribe[processor.SenderUnawareOfInstallation](c.processor.Publisher(), 100)
 		defer unawareOfInstallationUnsub()
 
 		for {
@@ -154,7 +154,7 @@ func (c *Controller) runSubscriptionsLoop() {
 					continue
 				}
 
-				confirmation := &common2.MessageConfirmation{
+				confirmation := &common.MessageConfirmation{
 					PublicKey:  crypto.CompressPubkey(scheduledSend.Recipient),
 					MessageID:  scheduledSend.MessageID,
 					DataSyncID: scheduledSend.ReliabilityMessageID,

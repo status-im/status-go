@@ -19,10 +19,10 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
-	logutils2 "github.com/status-im/status-go/internal/logutils"
+	logutils "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
-	messaging2 "github.com/status-im/status-go/pkg/messaging"
+	messaging "github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
 	"github.com/status-im/status-go/protocol"
@@ -63,15 +63,15 @@ const (
 
 func init() {
 	flag.Parse()
-	logSettings := logutils2.LogSettings{
+	logSettings := logutils.LogSettings{
 		Enabled: true,
 		Level:   *logLevel,
 	}
-	if err := logutils2.OverrideRootLoggerWithConfig(logSettings); err != nil {
+	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		panic(err)
 	}
 
-	logger = logutils2.ZapLogger()
+	logger = logutils.ZapLogger()
 }
 
 func main() {
@@ -121,8 +121,8 @@ func main() {
 		os.Exit(exitCodeDBMigrationFailed)
 	}
 
-	messaging, err := messaging2.NewCore(
-		messaging2.CoreParams{
+	messaging, err := messaging.NewCore(
+		messaging.CoreParams{
 			Identity: privateKey,
 			NodeKey:  nil,
 			WakuConfig: params.WakuV2Config{
@@ -142,8 +142,8 @@ func main() {
 			InstallationID: installationID,
 			TimeSource:     timesource.DefaultService(),
 		},
-		messaging2.WithLogger(logger.Named("messaging")),
-		messaging2.WithSQLitePersistence(db),
+		messaging.WithLogger(logger.Named("messaging")),
+		messaging.WithSQLitePersistence(db),
 	)
 	if err != nil {
 		os.Exit(exitCodeCreateMessengerFailed)

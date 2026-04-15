@@ -3,7 +3,7 @@ package types
 import (
 	wakuproto "github.com/waku-org/go-waku/waku/v2/protocol"
 
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	wakuv "github.com/status-im/status-go/pkg/messaging/waku"
 )
 
 type Shard struct {
@@ -16,7 +16,7 @@ func (s *Shard) PubsubTopic() string {
 		return ""
 	}
 
-	wakuv2Shard := wakuv2.Shard{
+	wakuv2Shard := wakuv.Shard{
 		Cluster: s.Cluster,
 		Index:   s.Index,
 	}

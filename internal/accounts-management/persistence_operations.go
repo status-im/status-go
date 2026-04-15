@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/internal/accounts-management/common"
-	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/types"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	multiaccscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
@@ -44,9 +44,9 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	}
 
 	// generate accounts from mnemonic
-	var masterAccount *generator2.Account
-	var derivedAccounts map[string]*generator2.Account
-	masterAccount, derivedAccounts, err = generator2.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, "")
+	var masterAccount *generator.Account
+	var derivedAccounts map[string]*generator.Account
+	masterAccount, derivedAccounts, err = generator.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, "")
 	if err != nil {
 		return
 	}
@@ -171,7 +171,7 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 	return
 }
 
-func (m *AccountsManager) prepareKeypair(account *generator2.Account, derivedAccounts map[string]*generator2.Account, keypairName string,
+func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAccounts map[string]*generator.Account, keypairName string,
 	walletAccount *types.AccountCreationDetails, keypairType types.KeypairType, profile bool, clock uint64) (*types.Keypair, error) {
 	// set up keypair
 	keypair := &types.Keypair{
@@ -262,7 +262,7 @@ func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string,
 		return nil, ErrPersistenceMissing
 	}
 
-	masterAccount, err := generator2.CreateAccountFromPrivateKey(privateKey)
+	masterAccount, err := generator.CreateAccountFromPrivateKey(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string,
 // MakeSeedPhraseKeypairFullyOperable checks if corresponding keypair exists in db and if yes, creates the keystore files
 // for the keypair and associated accounts and marks the keypair as fully operable
 func (m *AccountsManager) MakeSeedPhraseKeypairFullyOperable(mnemonic string, password string, clock uint64) (string, error) {
-	acc, err := generator2.CreateAccountFromMnemonic(mnemonic, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 	if err != nil {
 		return "", err
 	}
@@ -336,7 +336,7 @@ func (m *AccountsManager) MakeSeedPhraseKeypairFullyOperable(mnemonic string, pa
 
 // MakePrivateKeyKeypairFullyOperable checks if corresponding keypair exists in db and if yes, creates the keystore file for the keypair
 func (m *AccountsManager) MakePrivateKeyKeypairFullyOperable(privateKey string, password string, clock uint64) (string, error) {
-	acc, err := generator2.CreateAccountFromPrivateKey(privateKey)
+	acc, err := generator.CreateAccountFromPrivateKey(privateKey)
 	if err != nil {
 		return "", err
 	}
@@ -479,7 +479,7 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 		return "", ErrPersistenceMissing
 	}
 
-	acc, err := generator2.CreateAccountFromMnemonic(mnemonic, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 	if err != nil {
 		return "", err
 	}

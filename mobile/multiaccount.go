@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/internal/accounts-management/common"
-	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 )
 
 // MultiAccountImportPrivateKeyParams are the params sent to MultiAccountImportPrivateKey.
@@ -28,7 +28,7 @@ func CreateAccountFromPrivateKey(paramsJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	generatedAccount, err := generator2.CreateAccountFromPrivateKey(p.PrivateKey)
+	generatedAccount, err := generator.CreateAccountFromPrivateKey(p.PrivateKey)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -55,24 +55,24 @@ func CreateAccountFromMnemonicAndDeriveAccountsForPaths(paramsJSON string) strin
 	// remove any duplicate whitespaces
 	mnemonicPhraseNoExtraSpaces := strings.Join(strings.Fields(p.MnemonicPhrase), " ")
 
-	generatedAccount, err := generator2.CreateAccountFromMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
+	generatedAccount, err := generator.CreateAccountFromMnemonic(mnemonicPhraseNoExtraSpaces, p.Bip39Passphrase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	derivedAccounts, err := generator2.DeriveChildrenFromAccount(generatedAccount, p.Paths)
+	derivedAccounts, err := generator.DeriveChildrenFromAccount(generatedAccount, p.Paths)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
 	generatedAccountInfo := generatedAccount.ToIdentifiedAccountInfo()
 
-	derivedAccountsInfo := make(map[string]generator2.AccountInfo)
+	derivedAccountsInfo := make(map[string]generator.AccountInfo)
 	for path, derivedAccount := range derivedAccounts {
 		derivedAccountsInfo[path] = derivedAccount.ToAccountInfo()
 	}
 
-	generatedAndDerivedAccountsInfo := generator2.GeneratedAndDerivedAccountInfo{
+	generatedAndDerivedAccountsInfo := generator.GeneratedAndDerivedAccountInfo{
 		GeneratedAccountInfo: generatedAccountInfo.ToGeneratedAccountInfo(mnemonicPhraseNoExtraSpaces),
 		Derived:              derivedAccountsInfo,
 	}
@@ -108,7 +108,7 @@ func DeriveExtendedPublicKeyAtPath(paramsJSON string) string {
 		return prepareJSONResponse(nil, err)
 	}
 
-	xpub, err := generator2.DeriveExtendedPublicKeyAtPath(p.Mnemonic, p.Passphrase, p.Path)
+	xpub, err := generator.DeriveExtendedPublicKeyAtPath(p.Mnemonic, p.Passphrase, p.Path)
 	if err != nil {
 		return prepareJSONResponse(nil, err)
 	}
@@ -128,7 +128,7 @@ func DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(paramsJSON string) st
 		return prepareJSONResponse(nil, err)
 	}
 
-	result, err := generator2.DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(p.ExtendedPublicKey, p.Paths)
+	result, err := generator.DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(p.ExtendedPublicKey, p.Paths)
 	if err != nil {
 		return prepareJSONResponse(nil, err)
 	}

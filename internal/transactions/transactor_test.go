@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
-	fake2 "github.com/status-im/status-go/internal/transactions/fake"
+	fake "github.com/status-im/status-go/internal/transactions/fake"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -44,7 +44,7 @@ type TransactorSuite struct {
 	server            *gethrpc.Server
 	client            *gethrpc.Client
 	txServiceMockCtrl *gomock.Controller
-	txServiceMock     *fake2.MockPublicTransactionPoolAPI
+	txServiceMock     *fake.MockPublicTransactionPoolAPI
 	nodeConfig        *params.NodeConfig
 
 	manager *Transactor
@@ -53,7 +53,7 @@ type TransactorSuite struct {
 func (s *TransactorSuite) SetupTest() {
 	s.txServiceMockCtrl = gomock.NewController(s.T())
 
-	s.server, s.txServiceMock = fake2.NewTestServer(s.txServiceMockCtrl)
+	s.server, s.txServiceMock = fake.NewTestServer(s.txServiceMockCtrl)
 	s.client = gethrpc.DialInProc(s.server)
 
 	// expected by simulated backend
