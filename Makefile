@@ -200,26 +200,7 @@ test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package
 	gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations"
 
 storage-help: ##@build Show logos-storage build/test toggles and env vars
-	@echo "USE_LOGOS_STORAGE=true enables for builds:"
-	@echo "  - build tag: use_logos_storage"
-	@echo "  - CGO flags for libstorage include/library paths"
-	@echo "  - runtime library path wiring for tests"
-	@echo ""
-	@echo "test-storage always runs with logos-storage support enabled."
-	@echo ""
-	@echo "Variables:"
-	@echo "  USE_LOGOS_STORAGE          (default: false, also used by functional tests)"
-	@echo "  LOGOS_STORAGE_SOURCE_DIR   (default: ../logos-storage-nim)"
-	@echo "  LOGOS_STORAGE_VERSION      (default: $(LOGOS_STORAGE_VERSION))"
-	@echo "  LOGOS_STORAGE_LIB_DIR      (default: \$$LOGOS_STORAGE_SOURCE_DIR/build)"
-	@echo "  LOGOS_STORAGE_INC_DIR      (default: \$$LOGOS_STORAGE_SOURCE_DIR/library)"
-	@echo "  FUNCTIONAL_TESTS_BUILD_TAGS        (default: gowaku_no_rln)"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make test-storage"
-	@echo "  make test-unit USE_LOGOS_STORAGE=true"
-	@echo "  make build-storage"
-	@echo "  USE_LOGOS_STORAGE=true ./scripts/run_functional_tests.sh"
+	@cat services/logosstorage/README.md
 
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
