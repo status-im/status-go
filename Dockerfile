@@ -71,9 +71,9 @@ LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 
 RUN apt-get update \
-    && apt-get install -y ca-certificates bash curl python3 libgomp1 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y ca-certificates bash curl python3 libgomp1 \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /usr/status-user && chmod -R 777 /usr/status-user
 RUN mkdir -p /static/configs
