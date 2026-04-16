@@ -294,6 +294,43 @@ func TestUpdateKeypairName(t *testing.T) {
 	require.True(t, SameKeypairs(kp, dbKp))
 }
 
+func TestUpdateKeypairXPub(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	kp, _, _, err := GetProfileKeypairForTest(true, false, false)
+	require.NoError(t, err)
+
+	kp.XPub = "xpub1234567890"
+	kp.ColdWallet = accsmanagementtypes.ColdWalletTypeStatusKeycard
+	err = db.SaveOrUpdateKeypair(kp)
+	require.NoError(t, err)
+
+	dbKp, err := db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+	require.True(t, SameKeypairs(kp, dbKp))
+
+	kp.XPub = kp.XPub + "updated"
+	kp.ColdWallet = accsmanagementtypes.ColdWalletTypeLedger
+	err = db.UpdateKeypairXPub(kp.KeyUID, kp.XPub, kp.ColdWallet, kp.Clock)
+	require.NoError(t, err)
+
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+	require.True(t, SameKeypairs(kp, dbKp))
+
+	kp.ColdWallet = accsmanagementtypes.ColdWalletTypeTrezor
+	err = db.UpdateKeypairXPub(kp.KeyUID, "", kp.ColdWallet, kp.Clock)
+	require.NoError(t, err)
+
+	dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+	require.True(t, SameKeypairs(kp, dbKp))
+}
+
 func TestKeypairs(t *testing.T) {
 	profileKp, _, _, err := GetProfileKeypairForTest(true, true, true)
 	require.NoError(t, err)

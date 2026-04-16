@@ -996,6 +996,33 @@ func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64, 
 	return nil
 }
 
+func (db *Database) UpdateKeypairXPub(keyUID string, xpub string, coldWallet accsmanagementtypes.ColdWalletType, clock uint64) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	query := "UPDATE keypairs SET xpub = ?, cold_wallet = ? WHERE key_uid = ?"
+	args := []interface{}{xpub, coldWallet, keyUID}
+	if xpub == "" {
+		query = "UPDATE keypairs SET cold_wallet = ? WHERE key_uid = ?"
+		args = []interface{}{coldWallet, keyUID}
+	}
+
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (db *Database) GetWalletAddress() (rst types2.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM keypairs_accounts WHERE wallet = 1").Scan(&rst)
 	return
