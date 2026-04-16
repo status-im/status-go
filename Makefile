@@ -101,9 +101,6 @@ GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
-empty :=
-space := $(empty) $(empty)
-comma := ,
 
 # `nim-sds` variables
 
@@ -545,6 +542,10 @@ test-functional:
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
 	@./scripts/run_benchmark.sh
+
+empty :=
+space := $(empty) $(empty)
+comma := ,
 
 lint-panics: generate
 	GOFLAGS=-tags='$(subst $(space),$(comma),$(strip $(BUILD_TAGS) lint))' \
