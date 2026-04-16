@@ -20,7 +20,7 @@ import (
 
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/pkg/multiformat"
@@ -73,7 +73,7 @@ type Community struct {
 }
 
 type ReadonlyCommunity interface {
-	ID() types2.HexBytes
+	ID() types.HexBytes
 	IsControlNode() bool
 	CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error)
 	IsBanned(pk *ecdsa.PublicKey) bool
@@ -157,7 +157,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID                      types2.HexBytes                      `json:"id"`
+		ID                      types.HexBytes                       `json:"id"`
 		Verified                bool                                 `json:"verified"`
 		Chats                   map[string]CommunityChat             `json:"chats"`
 		Categories              map[string]CommunityCategory         `json:"categories"`
@@ -271,7 +271,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Uri string `json:"uri"`
 	}
 	communityItem := struct {
-		ID                          types2.HexBytes                      `json:"id"`
+		ID                          types.HexBytes                       `json:"id"`
 		MemberRole                  protobuf.CommunityMember_Roles       `json:"memberRole"`
 		IsControlNode               bool                                 `json:"isControlNode"`
 		Verified                    bool                                 `json:"verified"`
@@ -1497,16 +1497,16 @@ func (o *Community) validateRequestToJoinWithoutChatID(request *protobuf.Communi
 	return nil
 }
 
-func (o *Community) ID() types2.HexBytes {
+func (o *Community) ID() types.HexBytes {
 	return crypto.CompressPubkey(o.config.ID)
 }
 
 func (o *Community) IDString() string {
-	return types2.EncodeHex(o.ID())
+	return types.EncodeHex(o.ID())
 }
 
 func (o *Community) UncompressedIDString() string {
-	return types2.EncodeHex(crypto.FromECDSAPub(o.config.ID))
+	return types.EncodeHex(crypto.FromECDSAPub(o.config.ID))
 }
 
 func (o *Community) SerializedID() (string, error) {

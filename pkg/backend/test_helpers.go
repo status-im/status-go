@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
-	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
@@ -47,11 +47,11 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	data.mnemonic, err = accscommon.CreateRandomMnemonicWithDefaultLength()
 	require.NoError(t, err)
 
-	genMasterAcc, err := generator2.CreateAccountFromMnemonic(data.mnemonic, "")
+	genMasterAcc, err := generator.CreateAccountFromMnemonic(data.mnemonic, "")
 	require.NoError(t, err)
 
 	accountsPaths := []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount}
-	derivedAccs, err := generator2.DeriveChildrenFromAccount(genMasterAcc, append([]string{accscommon.PathWalletRoot}, accountsPaths...))
+	derivedAccs, err := generator.DeriveChildrenFromAccount(genMasterAcc, append([]string{accscommon.PathWalletRoot}, accountsPaths...))
 	require.NoError(t, err)
 
 	data.profileKeypair = &accsmanagementtypes.Keypair{
@@ -87,10 +87,10 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	}
 
 	if useDefaultSettings {
-		derivedAddresses := make(map[string]generator2.AccountInfo)
+		derivedAddresses := make(map[string]generator.AccountInfo)
 		for path, acc := range derivedAccs {
-			derivedAddresses[path] = generator2.AccountInfo{
-				AccountPublicInfo: generator2.AccountPublicInfo{
+			derivedAddresses[path] = generator.AccountInfo{
+				AccountPublicInfo: generator.AccountPublicInfo{
 					Address:   acc.Address().Hex(),
 					PublicKey: acc.PublicKeyHex(),
 				},

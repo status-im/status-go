@@ -12,7 +12,7 @@ import (
 	"net"
 	"time"
 
-	logutils2 "github.com/status-im/status-go/internal/logutils"
+	logutils "github.com/status-im/status-go/internal/logutils"
 )
 
 var globalMediaCertificate *tls.Certificate = nil
@@ -83,10 +83,10 @@ func generateMediaTLSCert() (*tls.Certificate, string, error) {
 	now := time.Now()
 	notBefore := now.Add(-365 * 24 * time.Hour * 100)
 	notAfter := now.Add(365 * 24 * time.Hour * 100)
-	logutils2.ZapLogger().Debug("generate media cert",
-		logutils2.UnixTimeMs("system time", time.Now()),
-		logutils2.UnixTimeMs("cert notBefore", notBefore),
-		logutils2.UnixTimeMs("cert notAfter", notAfter),
+	logutils.ZapLogger().Debug("generate media cert",
+		logutils.UnixTimeMs("system time", time.Now()),
+		logutils.UnixTimeMs("cert notBefore", notBefore),
+		logutils.UnixTimeMs("cert notAfter", notAfter),
 	)
 	finalCert, certPem, err := GenerateTLSCert(notBefore, notAfter, []net.IP{}, []string{Localhost})
 	if err != nil {

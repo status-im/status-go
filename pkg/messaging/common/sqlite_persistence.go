@@ -8,7 +8,7 @@ import (
 	"time"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 type SQLiteMessageConfirmationPersistence struct {
@@ -100,13 +100,13 @@ func NewSQLiteHashRatchetPersistence(db *sql.DB) *SQLiteHashRatchetPersistence {
 
 var _ HashRatchetPersistence = (*SQLiteHashRatchetPersistence)(nil)
 
-func (p *SQLiteHashRatchetPersistence) SaveMessage(groupID []byte, keyID []byte, m *types2.ReceivedMessage) error {
+func (p *SQLiteHashRatchetPersistence) SaveMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
 	_, err := p.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages(hash, sig, timestamp, topic, payload, dst, padding, group_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.Hash, m.Sig, m.Timestamp, m.Topic.Bytes(), m.Payload, m.Dst, m.Padding, groupID, keyID)
 	return err
 }
 
-func (p *SQLiteHashRatchetPersistence) GetMessages(keyID []byte) ([]*types2.ReceivedMessage, error) {
-	var messages []*types2.ReceivedMessage
+func (p *SQLiteHashRatchetPersistence) GetMessages(keyID []byte) ([]*types.ReceivedMessage, error) {
+	var messages []*types.ReceivedMessage
 
 	rows, err := p.db.Query(`SELECT hash, sig, timestamp, topic, payload, dst, padding FROM hash_ratchet_encrypted_messages WHERE key_id = ?`, keyID)
 	if err != nil {
@@ -115,14 +115,14 @@ func (p *SQLiteHashRatchetPersistence) GetMessages(keyID []byte) ([]*types2.Rece
 
 	for rows.Next() {
 		var topic []byte
-		message := &types2.ReceivedMessage{}
+		message := &types.ReceivedMessage{}
 
 		err := rows.Scan(&message.Hash, &message.Sig, &message.Timestamp, &topic, &message.Payload, &message.Dst, &message.Padding)
 		if err != nil {
 			return nil, err
 		}
 
-		message.Topic = types2.BytesToContentTopic(topic)
+		message.Topic = types.BytesToContentTopic(topic)
 		messages = append(messages, message)
 	}
 

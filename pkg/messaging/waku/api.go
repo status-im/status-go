@@ -40,8 +40,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/logutils"
-	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"
-	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
+	common "github.com/status-im/status-go/pkg/messaging/waku/common"
+	types "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // List of errors
@@ -63,7 +63,7 @@ type PublicWakuAPI struct {
 	lastUsed map[string]time.Time // keeps track when a filter was polled for the last time.
 }
 
-var _ types2.PublicWakuAPI = (*PublicWakuAPI)(nil)
+var _ types.PublicWakuAPI = (*PublicWakuAPI)(nil)
 
 // NewPublicWakuAPI create a new RPC waku service.
 func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
@@ -120,7 +120,7 @@ func (api *PublicWakuAPI) GetSymKey(ctx context.Context, id string) (hexutil.Byt
 
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
-func (api *PublicWakuAPI) Post(ctx context.Context, req types2.NewMessage) ([]byte, error) {
+func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -143,19 +143,19 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types2.NewMessage) ([]by
 		keyInfo.PrivKey = privKey
 	}
 
-	contentTopic := common2.TopicType(req.Topic)
+	contentTopic := common.TopicType(req.Topic)
 
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
 		keyInfo.Kind = payload.Symmetric
 
-		if contentTopic == (common2.TopicType{}) { // topics are mandatory with symmetric encryption
+		if contentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
 		}
 		if keyInfo.SymKey, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			return nil, err
 		}
-		if !common2.ValidateDataIntegrity(keyInfo.SymKey, common2.AESKeyLength) {
+		if !common.ValidateDataIntegrity(keyInfo.SymKey, common.AESKeyLength) {
 			return nil, ErrInvalidSymmetricKey
 		}
 	}
@@ -212,7 +212,7 @@ func (api *PublicWakuAPI) Unsubscribe(ctx context.Context, id string) {
 
 // Messages set up a subscription that fires events when messages arrive that match
 // the given set of criteria.
-func (api *PublicWakuAPI) Messages(ctx context.Context, crit types2.Criteria) (*rpc.Subscription, error) {
+func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*rpc.Subscription, error) {
 	var (
 		symKeyGiven = len(crit.SymKeyID) > 0
 		pubKeyGiven = len(crit.PrivateKeyID) > 0
@@ -230,8 +230,8 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types2.Criteria) (*
 		return nil, ErrSymAsym
 	}
 
-	filter := common2.Filter{
-		Messages: common2.NewMemoryMessageStore(),
+	filter := common.Filter{
+		Messages: common.NewMemoryMessageStore(),
 	}
 
 	if len(crit.Sig) > 0 {
@@ -240,13 +240,13 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types2.Criteria) (*
 		}
 	}
 
-	contentTopics := make([]common2.TopicType, len(crit.Topics))
+	contentTopics := make([]common.TopicType, len(crit.Topics))
 	for index, tt := range crit.Topics {
-		contentTopics[index] = common2.TopicType(tt)
+		contentTopics[index] = common.TopicType(tt)
 	}
 
 	filter.PubsubTopic = crit.PubsubTopic
-	filter.ContentTopics = common2.NewTopicSet(contentTopics)
+	filter.ContentTopics = common.NewTopicSet(contentTopics)
 
 	// listen for message that are encrypted with the given symmetric key
 	if symKeyGiven {
@@ -257,7 +257,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types2.Criteria) (*
 		if err != nil {
 			return nil, err
 		}
-		if !common2.ValidateDataIntegrity(key, common2.AESKeyLength) {
+		if !common.ValidateDataIntegrity(key, common.AESKeyLength) {
 			return nil, ErrInvalidSymmetricKey
 		}
 		filter.KeySym = key
@@ -341,13 +341,13 @@ func runPausedPollingLoop(initialPaused bool, lifecycleCh <-chan bool, tickerCh 
 }
 
 // ToWakuMessage converts an internal message into an API version.
-func ToWakuMessage(message *common2.ReceivedMessage) *types2.Message {
-	msg := types2.Message{
+func ToWakuMessage(message *common.ReceivedMessage) *types.Message {
+	msg := types.Message{
 		Payload:   message.Data,
 		Padding:   message.Padding,
 		Timestamp: message.Sent,
 		Hash:      message.Hash().Bytes(),
-		Topic:     types2.TopicType(message.ContentTopic),
+		Topic:     types.TopicType(message.ContentTopic),
 	}
 
 	if message.Dst != nil {
@@ -368,8 +368,8 @@ func ToWakuMessage(message *common2.ReceivedMessage) *types2.Message {
 }
 
 // toMessage converts a set of messages to its RPC representation.
-func toMessage(messages []*common2.ReceivedMessage) []*types2.Message {
-	msgs := make([]*types2.Message, len(messages))
+func toMessage(messages []*common.ReceivedMessage) []*types.Message {
+	msgs := make([]*types.Message, len(messages))
 	for i, msg := range messages {
 		msgs[i] = ToWakuMessage(msg)
 	}
@@ -378,7 +378,7 @@ func toMessage(messages []*common2.ReceivedMessage) []*types2.Message {
 
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
-func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types2.Message, error) {
+func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types.Message, error) {
 	api.mu.Lock()
 	f := api.w.getFilter(id)
 	if f == nil {
@@ -389,7 +389,7 @@ func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types2.Message, error
 	api.mu.Unlock()
 
 	receivedMessages := f.Retrieve()
-	messages := make([]*types2.Message, 0, len(receivedMessages))
+	messages := make([]*types.Message, 0, len(receivedMessages))
 	for _, msg := range receivedMessages {
 		messages = append(messages, ToWakuMessage(msg))
 	}
@@ -408,7 +408,7 @@ func (api *PublicWakuAPI) DeleteMessageFilter(id string) (bool, error) {
 
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
-func (api *PublicWakuAPI) NewMessageFilter(req types2.Criteria) (string, error) {
+func (api *PublicWakuAPI) NewMessageFilter(req types.Criteria) (string, error) {
 	var (
 		src     *ecdsa.PublicKey
 		keySym  []byte
@@ -435,7 +435,7 @@ func (api *PublicWakuAPI) NewMessageFilter(req types2.Criteria) (string, error) 
 		if keySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			return "", err
 		}
-		if !common2.ValidateDataIntegrity(keySym, common2.AESKeyLength) {
+		if !common.ValidateDataIntegrity(keySym, common.AESKeyLength) {
 			return "", ErrInvalidSymmetricKey
 		}
 	}
@@ -446,18 +446,18 @@ func (api *PublicWakuAPI) NewMessageFilter(req types2.Criteria) (string, error) 
 		}
 	}
 
-	topics := make([]common2.TopicType, len(req.Topics))
+	topics := make([]common.TopicType, len(req.Topics))
 	for index, tt := range req.Topics {
-		topics[index] = common2.TopicType(tt)
+		topics[index] = common.TopicType(tt)
 	}
 
-	f := &common2.Filter{
+	f := &common.Filter{
 		Src:           src,
 		KeySym:        keySym,
 		KeyAsym:       keyAsym,
 		PubsubTopic:   req.PubsubTopic,
-		ContentTopics: common2.NewTopicSet(topics),
-		Messages:      common2.NewMemoryMessageStore(),
+		ContentTopics: common.NewTopicSet(topics),
+		Messages:      common.NewMemoryMessageStore(),
 	}
 
 	id, err := api.w.subscribe(f)

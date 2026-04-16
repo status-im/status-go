@@ -4,40 +4,40 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
-	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"
-	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
+	common "github.com/status-im/status-go/pkg/messaging/waku/common"
+	types "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // NewWakuV2EnvelopeEventWrapper returns a types.EnvelopeEvent object that mimics Geth's EnvelopeEvent
-func NewWakuV2EnvelopeEventWrapper(envelopeEvent *common2.EnvelopeEvent) *types2.EnvelopeEvent {
+func NewWakuV2EnvelopeEventWrapper(envelopeEvent *common.EnvelopeEvent) *types.EnvelopeEvent {
 	if envelopeEvent == nil {
 		panic("envelopeEvent should not be nil")
 	}
 
 	wrappedData := envelopeEvent.Data
 	switch data := envelopeEvent.Data.(type) {
-	case []common2.EnvelopeError:
-		wrappedData := make([]types2.EnvelopeError, len(data))
+	case []common.EnvelopeError:
+		wrappedData := make([]types.EnvelopeError, len(data))
 		for index := range data {
 			wrappedData[index] = *NewWakuV2EnvelopeErrorWrapper(&data[index])
 		}
 	}
-	return &types2.EnvelopeEvent{
-		Event: types2.EventType(envelopeEvent.Event),
+	return &types.EnvelopeEvent{
+		Event: types.EventType(envelopeEvent.Event),
 		Hash:  cryptotypes.Hash(envelopeEvent.Hash),
 		Batch: cryptotypes.Hash(envelopeEvent.Batch),
-		Peer:  types2.EnodeID(envelopeEvent.Peer),
+		Peer:  types.EnodeID(envelopeEvent.Peer),
 		Data:  wrappedData,
 	}
 }
 
 // NewWakuEnvelopeErrorWrapper returns a types.EnvelopeError object that mimics Geth's EnvelopeError
-func NewWakuV2EnvelopeErrorWrapper(envelopeError *common2.EnvelopeError) *types2.EnvelopeError {
+func NewWakuV2EnvelopeErrorWrapper(envelopeError *common.EnvelopeError) *types.EnvelopeError {
 	if envelopeError == nil {
 		panic("envelopeError should not be nil")
 	}
 
-	return &types2.EnvelopeError{
+	return &types.EnvelopeError{
 		Hash:        cryptotypes.Hash(envelopeError.Hash),
 		Code:        mapGethErrorCode(envelopeError.Code),
 		Description: envelopeError.Description,
@@ -51,11 +51,11 @@ func mapGethErrorCode(code uint) uint {
 	)
 	switch code {
 	case EnvelopeTimeNotSynced:
-		return types2.EnvelopeTimeNotSynced
+		return types.EnvelopeTimeNotSynced
 	case EnvelopeOtherError:
-		return types2.EnvelopeOtherError
+		return types.EnvelopeOtherError
 	}
-	return types2.EnvelopeOtherError
+	return types.EnvelopeOtherError
 }
 
 type gethSubscriptionWrapper struct {
@@ -63,7 +63,7 @@ type gethSubscriptionWrapper struct {
 }
 
 // NewGethSubscriptionWrapper returns an object that wraps Geth's Subscription in a types interface
-func NewGethSubscriptionWrapper(subscription event.Subscription) types2.Subscription {
+func NewGethSubscriptionWrapper(subscription event.Subscription) types.Subscription {
 	if subscription == nil {
 		panic("subscription cannot be nil")
 	}

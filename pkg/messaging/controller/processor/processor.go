@@ -14,10 +14,10 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
-	adapters2 "github.com/status-im/status-go/pkg/messaging/adapters"
-	common2 "github.com/status-im/status-go/pkg/messaging/common"
+	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
+	common "github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller/utils"
-	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -32,10 +32,10 @@ var errReliabilityNotStarted = errors.New("reliability not started")
 
 type Processor struct {
 	identity *ecdsa.PrivateKey
-	stack    *common2.MessagingStack
+	stack    *common.MessagingStack
 
-	messageConfirmationStorage common2.MessageConfirmationPersistence
-	hashRatchetStorage         common2.HashRatchetPersistence
+	messageConfirmationStorage common.MessageConfirmationPersistence
+	hashRatchetStorage         common.HashRatchetPersistence
 
 	ephemeralKeysManager *EphemeralKeysManager
 
@@ -47,9 +47,9 @@ type Processor struct {
 
 func NewProcessor(
 	identity *ecdsa.PrivateKey,
-	stack *common2.MessagingStack,
-	messageConfirmationStorage common2.MessageConfirmationPersistence,
-	hashRatchetStorage common2.HashRatchetPersistence,
+	stack *common.MessagingStack,
+	messageConfirmationStorage common.MessageConfirmationPersistence,
+	hashRatchetStorage common.HashRatchetPersistence,
 	logger *zap.Logger,
 	tracer trace.Tracer,
 ) *Processor {
@@ -152,7 +152,7 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 		span.AddEvent("encryption layer processed")
 	} else {
 		// Hash ratchet with a group id not found yet, save the message for future processing
-		if err == encryption2.ErrHashRatchetGroupIDNotFound && len(responseMessage.EncryptionLayer.HashRatchetInfo) == 1 {
+		if err == encryption.ErrHashRatchetGroupIDNotFound && len(responseMessage.EncryptionLayer.HashRatchetInfo) == 1 {
 			info := responseMessage.EncryptionLayer.HashRatchetInfo[0]
 			span.AddEvent("hash ratchet with group id not found yet", oteltrace.WithAttributes(
 				otelattribute.String("groupID", types.ToHex(info.GroupID)),
@@ -286,7 +286,7 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtype
 		return nil
 	}
 
-	var protocolMessage encryption2.ProtocolMessage
+	var protocolMessage encryption.ProtocolMessage
 	err := proto.Unmarshal(m.TransportLayer.Payload, &protocolMessage)
 	if err != nil {
 		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
@@ -303,18 +303,18 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtype
 	switch err {
 	case nil:
 		m.EncryptionLayer.Payload = response.DecryptedMessage
-		m.EncryptionLayer.Installations = adapters2.FromEncryptionInstallations(response.Installations)
-		m.EncryptionLayer.HashRatchetInfo = adapters2.FromEncryptionHashRatchets(response.HashRatchetInfo)
+		m.EncryptionLayer.Installations = adapters.FromEncryptionInstallations(response.Installations)
+		m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
 
 		err := r.ProcessSharedSecrets(response.SharedSecrets)
 		if err != nil {
 			logger.Error("failed to process shared secrets", zap.Error(err))
 		}
-	case encryption2.ErrHashRatchetGroupIDNotFound:
+	case encryption.ErrHashRatchetGroupIDNotFound:
 		if response != nil {
-			m.EncryptionLayer.HashRatchetInfo = adapters2.FromEncryptionHashRatchets(response.HashRatchetInfo)
+			m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
 		}
-	case encryption2.ErrDeviceNotFound:
+	case encryption.ErrDeviceNotFound:
 		pubsub.Publish(r.publisher, SenderUnawareOfInstallation{
 			PublicKey: m.SigPubKey(),
 		})

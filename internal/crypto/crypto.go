@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/internal/crypto/geth"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	types "github.com/status-im/status-go/internal/crypto/types"
 )
 
 var defaultProvider CryptoProvider = geth.NewGethCryptoProvider()
@@ -50,7 +50,7 @@ func FromECDSAPub(pub *ecdsa.PublicKey) []byte {
 	return defaultProvider.FromECDSAPub(pub)
 }
 
-func PubkeyToAddress(p ecdsa.PublicKey) types2.Address {
+func PubkeyToAddress(p ecdsa.PublicKey) types.Address {
 	return defaultProvider.PubkeyToAddress(p)
 }
 
@@ -74,7 +74,7 @@ func TextAndHash(data []byte) ([]byte, string) {
 	return defaultProvider.TextAndHash(data)
 }
 
-func Keccak256Hash(data ...[]byte) (h types2.Hash) {
+func Keccak256Hash(data ...[]byte) (h types.Hash) {
 	return defaultProvider.Keccak256Hash(data...)
 }
 
@@ -102,7 +102,7 @@ func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
 	return defaultProvider.SigToPub(hash, sig)
 }
 
-func CreateAddress(b types2.Address, nonce uint64) types2.Address {
+func CreateAddress(b types.Address, nonce uint64) types.Address {
 	return defaultProvider.CreateAddress(b, nonce)
 }
 
@@ -147,15 +147,15 @@ func PubkeysToHex(keys []*ecdsa.PublicKey) []string {
 }
 
 func PubkeyToHex(key *ecdsa.PublicKey) string {
-	return types2.EncodeHex(FromECDSAPub(key))
+	return types.EncodeHex(FromECDSAPub(key))
 }
 
-func PubkeyToHexBytes(key *ecdsa.PublicKey) types2.HexBytes {
+func PubkeyToHexBytes(key *ecdsa.PublicKey) types.HexBytes {
 	return FromECDSAPub(key)
 }
 
 func HexToPubkey(pk string) (*ecdsa.PublicKey, error) {
-	bytes, err := types2.DecodeHex(pk)
+	bytes, err := types.DecodeHex(pk)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func ExtractSignature(data, signature []byte) (*ecdsa.PublicKey, error) {
 	return SigToPub(dataHash, signature)
 }
 
-func EcRecover(data types2.HexBytes, sig types2.HexBytes) (types2.Address, error) {
+func EcRecover(data types.HexBytes, sig types.HexBytes) (types.Address, error) {
 	// Returns the address for the Account that was used to create the signature.
 	//
 	// Note, this function is compatible with eth_sign and personal_sign. As such it recovers
@@ -248,16 +248,16 @@ func EcRecover(data types2.HexBytes, sig types2.HexBytes) (types2.Address, error
 	//
 	// https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_ecRecover
 	if len(sig) != 65 {
-		return types2.Address{}, fmt.Errorf("signature must be 65 bytes long")
+		return types.Address{}, fmt.Errorf("signature must be 65 bytes long")
 	}
 	if sig[64] != 27 && sig[64] != 28 {
-		return types2.Address{}, fmt.Errorf("invalid Ethereum signature (V is not 27 or 28)")
+		return types.Address{}, fmt.Errorf("invalid Ethereum signature (V is not 27 or 28)")
 	}
 	sig[64] -= 27 // Transform yellow paper V from 27/28 to 0/1
 	hash := TextHash(data)
 	rpk, err := SigToPub(hash, sig)
 	if err != nil {
-		return types2.Address{}, err
+		return types.Address{}, err
 	}
 	return PubkeyToAddress(*rpk), nil
 }

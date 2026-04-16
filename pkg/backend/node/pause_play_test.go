@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	common2 "github.com/status-im/status-go/common"
+	common "github.com/status-im/status-go/common"
 )
 
 func TestPauseResumeBackgroundLifecycleHooks(t *testing.T) {
@@ -17,7 +17,7 @@ func TestPauseResumeBackgroundLifecycleHooks(t *testing.T) {
 	}
 
 	require.NoError(t, node.Pause())
-	require.Equal(t, common2.ServiceStatePaused, p.PausableState())
+	require.Equal(t, common.ServiceStatePaused, p.PausableState())
 	require.NoError(t, node.Resume())
-	require.Equal(t, common2.ServiceStateRunning, p.PausableState())
+	require.Equal(t, common.ServiceStateRunning, p.PausableState())
 }

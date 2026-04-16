@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	testutils2 "github.com/status-im/status-go/internal/testutils"
+	testutils "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/messaging/types"
@@ -96,7 +96,7 @@ func (s *ArchiveManagerTorrentSuite) buildCommunityWithChat() (*communities.Comm
 }
 
 func (s *ArchiveManagerTorrentSuite) buildManagers(ownerVerifier communities.OwnerVerifier) (*communities.Manager, archive.ArchiveService) {
-	db, err := testutils2.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.Require().NoError(err, "protocol migrate")
@@ -104,7 +104,7 @@ func (s *ArchiveManagerTorrentSuite) buildManagers(ownerVerifier communities.Own
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	logger := testutils2.MustCreateTestLogger()
+	logger := testutils.MustCreateTestLogger()
 
 	m, err := communities.NewManager(key, "", db, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
