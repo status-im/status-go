@@ -182,7 +182,7 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptot
 
 			if acc.Type != types.AccountTypeKey {
 				lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
-				if lastAcccountOfKeypairWithTheSameKey {
+				if lastAcccountOfKeypairWithTheSameKey && kp.DerivedFrom != "" {
 					err = m.deleteAccountFromKeystoreIfExists(cryptotypes.HexToAddress(kp.DerivedFrom), password)
 					if err != nil {
 						return err
@@ -232,7 +232,7 @@ func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types
 		}
 	}
 
-	if anyAccountFullyOrPartiallyOperable && keypair.Type != types.KeypairTypeKey {
+	if anyAccountFullyOrPartiallyOperable && keypair.Type != types.KeypairTypeKey && keypair.DerivedFrom != "" {
 		err = m.deleteAccountFromKeystoreIfExists(cryptotypes.HexToAddress(keypair.DerivedFrom), password)
 		if err != nil {
 			return err
@@ -272,9 +272,11 @@ func (m *AccountsManager) CleanKeystoreFiles(password string) error {
 				}
 			}
 
-			err = m.deleteAccountFromKeystoreIfExists(cryptotypes.HexToAddress(kp.DerivedFrom), password)
-			if err != nil {
-				return err
+			if kp.DerivedFrom != "" {
+				err = m.deleteAccountFromKeystoreIfExists(cryptotypes.HexToAddress(kp.DerivedFrom), password)
+				if err != nil {
+					return err
+				}
 			}
 			continue
 		}
