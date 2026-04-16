@@ -196,10 +196,7 @@ build-storage: $(LIBSTORAGE)
 
 clean-storage: ##@other Remove built native libstorage artifacts
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
-	@echo "Removing local libstorage artifacts from $(LOGOS_STORAGE_LIB_DIR)"
-	@rm -f "$(LOGOS_STORAGE_LIB_DIR)"/libstorage.so "$(LOGOS_STORAGE_LIB_DIR)"/libstorage.dylib "$(LOGOS_STORAGE_LIB_DIR)"/libstorage.dll "$(LOGOS_STORAGE_LIB_DIR)"/libstorage.a
-else
-	@echo "Skipping clean-storage because libstorage is provided from configured paths"
+	@rm -f "$(LOGOS_STORAGE_LIB_DIR)"/libstorage.*
 endif
 
 test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
