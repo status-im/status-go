@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/images"
-	testutils2 "github.com/status-im/status-go/internal/testutils"
+	testutils "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging/types"
@@ -32,7 +32,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
-	v1 "github.com/status-im/status-go/protocol/v1"
+	v "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -59,7 +59,7 @@ func buildTorrentConfig() *params.TorrentConfig {
 }
 
 func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, archive.ArchiveService) {
-	db, err := testutils2.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.Require().NoError(err, "protocol migrate")
@@ -67,7 +67,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, arc
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	logger := testutils2.MustCreateTestLogger()
+	logger := testutils.MustCreateTestLogger()
 
 	m, err := NewManager(key, "", db, logger, nil, ownerVerifier, nil, &TimeSourceStub{}, nil, nil)
 	s.Require().NoError(err)
@@ -210,7 +210,7 @@ func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chain
 }
 
 func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenBalanceManager) {
-	db, err := testutils2.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.NoError(err, "protocol migrate")
@@ -1261,7 +1261,7 @@ func (s *ManagerSuite) TestCommunityQueue() {
 	payload, err := community.MarshaledDescription()
 	s.Require().NoError(err)
 
-	payload, err = v1.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, owner)
+	payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, owner)
 	s.Require().NoError(err)
 
 	// Create a signer, that is not the owner
@@ -1357,7 +1357,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
 	payload, err := community.MarshaledDescription()
 	s.Require().NoError(err)
 
-	payload, err = v1.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, oldOwner)
+	payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, oldOwner)
 	s.Require().NoError(err)
 
 	subscription := m.Subscribe()
@@ -1377,7 +1377,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
 	payload, err = community.MarshaledDescription()
 	s.Require().NoError(err)
 
-	payload, err = v1.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
+	payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
 	s.Require().NoError(err)
 
 	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil)
@@ -1487,7 +1487,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 	payload, err := community.MarshaledDescription()
 	s.Require().NoError(err)
 
-	payload, err = v1.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, oldOwner)
+	payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, oldOwner)
 	s.Require().NoError(err)
 
 	subscription := m.Subscribe()
@@ -1505,7 +1505,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 	payload, err = community.MarshaledDescription()
 	s.Require().NoError(err)
 
-	payload, err = v1.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
+	payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
 	s.Require().NoError(err)
 
 	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil)

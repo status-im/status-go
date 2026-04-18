@@ -5,8 +5,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
-	adapters2 "github.com/status-im/status-go/pkg/messaging/adapters"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
+	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 // These utilities leak transport implementation details and should be eventually removed.
@@ -14,8 +14,8 @@ import (
 // metrics for observability or communicate directly with the Waku node's RPC interface.
 
 // Deprecated: shouldn't be exposed
-func (a *API) GetStats() types2.TransportStats {
-	return adapters2.FromWakuTransportStats(a.core.stack.Transport.GetStats())
+func (a *API) GetStats() types.TransportStats {
+	return adapters.FromWakuTransportStats(a.core.stack.Transport.GetStats())
 }
 
 // Deprecated: shouldn't be exposed
@@ -24,8 +24,8 @@ func (a *API) PeerCount() int {
 }
 
 // Deprecated: shouldn't be exposed
-func (a *API) Peers() types2.PeerStats {
-	return adapters2.FromWakuPeerStats(a.core.stack.Transport.Peers())
+func (a *API) Peers() types.PeerStats {
+	return adapters.FromWakuPeerStats(a.core.stack.Transport.Peers())
 }
 
 // Deprecated: shouldn't be exposed

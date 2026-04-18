@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
-	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -49,7 +49,7 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 	}
 
 	var err error
-	var spec *encryption2.ProtocolMessageSpec
+	var spec *encryption.ProtocolMessageSpec
 	if params.HashRatchet != nil {
 		if params.HashRatchet.Encrypt {
 			logger.Debug("building hash ratchet message")
@@ -61,7 +61,7 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 
 		payload := params.Payload
 		if params.HashRatchet.KeyExType != messagingtypes.KeyExMsgNone {
-			var ratchet *encryption2.HashRatchetKeyCompatibility
+			var ratchet *encryption.HashRatchetKeyCompatibility
 			if params.HashRatchet.KeyExType == messagingtypes.KeyExMsgReuse {
 				ratchet, err = s.stack.Encryption.GetCurrentKeyForGroup(params.HashRatchet.GroupID)
 				if err != nil {

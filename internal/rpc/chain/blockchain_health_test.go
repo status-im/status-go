@@ -10,9 +10,9 @@ import (
 
 	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 
-	healthmanager2 "github.com/status-im/status-go/internal/healthmanager"
+	healthmanager "github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
-	ethclient2 "github.com/status-im/status-go/internal/rpc/chain/ethclient"
+	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	mockEthclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 
 	"github.com/stretchr/testify/require"
@@ -25,16 +25,16 @@ import (
 
 type BlockchainHealthSuite struct {
 	suite.Suite
-	blockchainHealthManager *healthmanager2.BlockchainHealthManager
-	mockProviders           map[uint64]*healthmanager2.ProvidersHealthManager
+	blockchainHealthManager *healthmanager.BlockchainHealthManager
+	mockProviders           map[uint64]*healthmanager.ProvidersHealthManager
 	mockEthClients          map[uint64]*mockEthclient.MockRPSLimitedEthClientInterface
 	clients                 map[uint64]*ClientWithFallback
 	mockCtrl                *gomock.Controller
 }
 
 func (s *BlockchainHealthSuite) SetupTest() {
-	s.blockchainHealthManager = healthmanager2.NewBlockchainHealthManager()
-	s.mockProviders = make(map[uint64]*healthmanager2.ProvidersHealthManager)
+	s.blockchainHealthManager = healthmanager.NewBlockchainHealthManager()
+	s.mockProviders = make(map[uint64]*healthmanager.ProvidersHealthManager)
 	s.mockEthClients = make(map[uint64]*mockEthclient.MockRPSLimitedEthClientInterface)
 	s.clients = make(map[uint64]*ClientWithFallback)
 	s.mockCtrl = gomock.NewController(s.T())
@@ -53,12 +53,12 @@ func (s *BlockchainHealthSuite) setupClients(chainIDs []uint64) {
 		mockEthClient.EXPECT().GetProviderName().AnyTimes().Return(fmt.Sprintf("test_client_chain_%d_provider", chainID))
 		mockEthClient.EXPECT().GetCircuitName().AnyTimes().Return(fmt.Sprintf("test_client_chain_%d_circuit", chainID))
 		mockEthClient.EXPECT().GetLimiter().AnyTimes().Return(nil)
-		mockEthClient.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient2.EthClientInterface) (interface{}, error)) (interface{}, error) {
+		mockEthClient.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient.EthClientInterface) (interface{}, error)) (interface{}, error) {
 			return f(mockEthClient)
 		}).AnyTimes()
 
-		phm := healthmanager2.NewProvidersHealthManager(chainID)
-		client := NewClient([]ethclient2.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
+		phm := healthmanager.NewProvidersHealthManager(chainID)
+		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
 
 		err := s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)
 		require.NoError(s.T(), err)

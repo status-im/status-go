@@ -86,8 +86,8 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
-	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"
-	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
+	common "github.com/status-im/status-go/pkg/messaging/waku/common"
+	types "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 const messageQueueLimit = 1024
@@ -118,9 +118,9 @@ type IMetricsHandler interface {
 	PushMessageCheckFailure()
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
-	PushDialFailure(dialFailure common2.DialError)
-	PushMissedMessage(envelope common2.Envelope)
-	PushMissedRelevantMessage(message *common2.ReceivedMessage)
+	PushDialFailure(dialFailure common.DialError)
+	PushMissedMessage(envelope common.Envelope)
+	PushMissedRelevantMessage(message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed()
 	PushSentMessageTotal(messageSize uint32, publishMethod string)
 	PushRawMessageByType(pubsubTopic string, contentTopic string, messageType string, messageSize uint32)
@@ -138,7 +138,7 @@ type Waku struct {
 	dnsDiscAsyncRetrievedSignal chan struct{}
 
 	// Filter-related
-	filters       *common2.Filters // Message filters installed with Subscribe function
+	filters       *common.Filters // Message filters installed with Subscribe function
 	filterManager *filterapi.FilterManager
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
@@ -154,7 +154,7 @@ type Waku struct {
 
 	missingMsgVerifier *missing.MissingMessageVerifier
 
-	msgQueue chan *common2.ReceivedMessage // Message queue for waku messages that havent been decoded
+	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -172,7 +172,7 @@ type Waku struct {
 
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
 	connectionNotifChan     chan node.PeerConnection
-	connStatusSubscriptions map[string]*types2.ConnStatusSubscription
+	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
 	onlineChecker           *onlinechecker.DefaultOnlineChecker
 	state                   connection.State
@@ -192,14 +192,14 @@ type Waku struct {
 	goingOnline chan struct{}
 
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
-	onPeerStats                     func(types2.ConnStatus)
+	onPeerStats                     func(types.ConnStatus)
 
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
 }
 
-var _ types2.Waku = (*Waku)(nil)
+var _ types.Waku = (*Waku)(nil)
 
 func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
 	w.metricsHandler = client
@@ -215,7 +215,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types2.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -242,10 +242,10 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
 		symKeys:                         make(map[string][]byte),
 		envelopeCache:                   newTTLCache(),
-		msgQueue:                        make(chan *common2.ReceivedMessage, messageQueueLimit),
+		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
 		connectionNotifChan:             make(chan node.PeerConnection, 20),
-		connStatusSubscriptions:         make(map[string]*types2.ConnStatusSubscription),
+		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
 		ctx:                             ctx,
 		cancel:                          cancel,
 		wg:                              sync.WaitGroup{},
@@ -262,7 +262,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
-	waku.filters = common2.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
+	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	if nodeKey == nil {
@@ -352,10 +352,10 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	return waku, nil
 }
 
-func (w *Waku) SubscribeToConnStatusChanges() (*types2.ConnStatusSubscription, error) {
+func (w *Waku) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, error) {
 	w.connStatusMu.Lock()
 	defer w.connStatusMu.Unlock()
-	subscription := types2.NewConnStatusSubscription()
+	subscription := types.NewConnStatusSubscription()
 	w.connStatusSubscriptions[subscription.ID] = subscription
 	return subscription, nil
 }
@@ -574,9 +574,9 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
-func (w *Waku) GetStats() types2.StatsSummary {
+func (w *Waku) GetStats() types.StatsSummary {
 	stats := w.bandwidthCounter.GetBandwidthTotals()
-	return types2.StatsSummary{
+	return types.StatsSummary{
 		UploadRate:   uint64(stats.RateOut),
 		DownloadRate: uint64(stats.RateIn),
 	}
@@ -681,7 +681,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string) error {
 				}
 				return
 			case env := <-sub[0].Ch:
-				err := w.OnNewEnvelopes(env, common2.RelayedMessageType, false)
+				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 				if err != nil {
 					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 				}
@@ -702,18 +702,18 @@ func (w *Waku) CurrentTime() time.Time {
 	return w.timesource.Now()
 }
 
-func (w *Waku) SendEnvelopeEvent(event common2.EnvelopeEvent) int {
+func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 	return w.envelopeFeed.Send(event)
 }
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
 // In order to prevent blocking waku producers events must be amply buffered.
-func (w *Waku) subscribeEnvelopeEvents(events chan<- common2.EnvelopeEvent) event.Subscription {
+func (w *Waku) subscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
 	return w.envelopeFeed.Subscribe(events)
 }
 
-func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types2.EnvelopeEvent) types2.Subscription {
-	events := make(chan common2.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
+	events := make(chan common.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	go func() {
 		defer gocommon.LogOnPanic()
 		for e := range events {
@@ -746,7 +746,7 @@ func (w *Waku) NewKeyPair() (string, error) {
 		return "", fmt.Errorf("failed to generate valid key")
 	}
 
-	id, err := toDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common2.KeyIDSize)
+	id, err := toDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
 	if err != nil {
 		return "", err
 	}
@@ -763,7 +763,7 @@ func (w *Waku) NewKeyPair() (string, error) {
 
 // DeleteKeyPair deletes the specified key if it exists.
 func (w *Waku) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, common2.KeyIDSize)
+	deterministicID, err := toDeterministicID(key, common.KeyIDSize)
 	if err != nil {
 		return false
 	}
@@ -780,7 +780,7 @@ func (w *Waku) DeleteKeyPair(key string) bool {
 
 // AddKeyPair imports a asymmetric private key and returns it identifier.
 func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common2.KeyIDSize)
+	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
 	if err != nil {
 		return "", err
 	}
@@ -798,7 +798,7 @@ func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 // SelectKeyPair adds cryptographic identity, and makes sure
 // that it is the only private key known to the node.
 func (w *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common2.KeyIDSize)
+	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
 	if err != nil {
 		return err
 	}
@@ -825,7 +825,7 @@ func (w *Waku) DeleteKeyPairs() error {
 // HasKeyPair checks if the waku node is configured with the private key
 // of the specified public pair.
 func (w *Waku) HasKeyPair(id string) bool {
-	deterministicID, err := toDeterministicID(id, common2.KeyIDSize)
+	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
 	if err != nil {
 		return false
 	}
@@ -837,7 +837,7 @@ func (w *Waku) HasKeyPair(id string) bool {
 
 // GetPrivateKey retrieves the private key of the specified identity.
 func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
-	deterministicID, err := toDeterministicID(id, common2.KeyIDSize)
+	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
 	if err != nil {
 		return nil, err
 	}
@@ -854,14 +854,14 @@ func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 // GenerateSymKey generates a random symmetric key and stores it under id,
 // which is then returned. Will be used in the future for session key exchange.
 func (w *Waku) GenerateSymKey() (string, error) {
-	key, err := common2.GenerateSecureRandomData(common2.AESKeyLength)
+	key, err := common.GenerateSecureRandomData(common.AESKeyLength)
 	if err != nil {
 		return "", err
-	} else if !common2.ValidateDataIntegrity(key, common2.AESKeyLength) {
+	} else if !common.ValidateDataIntegrity(key, common.AESKeyLength) {
 		return "", fmt.Errorf("error in GenerateSymKey: crypto/rand failed to generate random data")
 	}
 
-	id, err := common2.GenerateRandomID()
+	id, err := common.GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
@@ -878,7 +878,7 @@ func (w *Waku) GenerateSymKey() (string, error) {
 
 // AddSymKey stores the key with a given id.
 func (w *Waku) AddSymKey(id string, key []byte) (string, error) {
-	deterministicID, err := toDeterministicID(id, common2.KeyIDSize)
+	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
 	if err != nil {
 		return "", err
 	}
@@ -895,11 +895,11 @@ func (w *Waku) AddSymKey(id string, key []byte) (string, error) {
 
 // AddSymKeyDirect stores the key, and returns its id.
 func (w *Waku) AddSymKeyDirect(key []byte) (string, error) {
-	if len(key) != common2.AESKeyLength {
+	if len(key) != common.AESKeyLength {
 		return "", fmt.Errorf("wrong key size: %d", len(key))
 	}
 
-	id, err := common2.GenerateRandomID()
+	id, err := common.GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
@@ -916,7 +916,7 @@ func (w *Waku) AddSymKeyDirect(key []byte) (string, error) {
 
 // AddSymKeyFromPassword generates the key from password, stores it, and returns its id.
 func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
-	id, err := common2.GenerateRandomID()
+	id, err := common.GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
@@ -926,7 +926,7 @@ func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
 
 	// kdf should run no less than 0.1 seconds on an average computer,
 	// because it's an once in a session experience
-	derived := pbkdf2.Key([]byte(password), nil, 65356, common2.AESKeyLength, sha256.New)
+	derived := pbkdf2.Key([]byte(password), nil, 65356, common.AESKeyLength, sha256.New)
 
 	w.keyMu.Lock()
 	defer w.keyMu.Unlock()
@@ -970,7 +970,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-func (w *Waku) subscribe(f *common2.Filter) (string, error) {
+func (w *Waku) subscribe(f *common.Filter) (string, error) {
 	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
 	id, err := w.filters.Install(f)
 	if err != nil {
@@ -1006,11 +1006,11 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 }
 
 // GetFilter returns the filter by id.
-func (w *Waku) getFilter(id string) *common2.Filter {
+func (w *Waku) getFilter(id string) *common.Filter {
 	return w.filters.Get(id)
 }
 
-func (w *Waku) GetFilter(id string) types2.Filter {
+func (w *Waku) GetFilter(id string) types.Filter {
 	return w.getFilter(id)
 }
 
@@ -1039,7 +1039,7 @@ func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 
 // OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
 func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
-	return w.OnNewEnvelopes(env, common2.RelayedMessageType, false)
+	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 }
 
 // Starts the background data propagation thread of the Waku protocol.
@@ -1163,9 +1163,9 @@ func (w *Waku) Start() error {
 				case <-telemetryTickerC:
 					w.reportPeerMetrics()
 				case dialErr := <-dialErrSub.Out():
-					errors := common2.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
+					errors := common.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
 					for _, dialError := range errors {
-						w.metricsHandler.PushDialFailure(common2.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
+						w.metricsHandler.PushDialFailure(common.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
 					}
 				case messageSent := <-messageSentSub.Out():
 					w.metricsHandler.PushSentMessageTotal(messageSent.(publish.MessageSent).Size, publishMethod)
@@ -1196,7 +1196,7 @@ func (w *Waku) Start() error {
 				case <-w.ctx.Done():
 					return
 				case envelope := <-w.missingMsgVerifier.C:
-					err = w.OnNewEnvelopes(envelope, common2.MissingMessageType, false)
+					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
 					if err != nil {
 						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 					}
@@ -1255,7 +1255,7 @@ func (w *Waku) checkForConnectionChanges() {
 
 	w.connStatusMu.Lock()
 
-	latestConnStatus := types2.ConnStatus{
+	latestConnStatus := types.ConnStatus{
 		IsOnline: isOnline,
 		Peers:    FormatPeerStats(w.node),
 	}
@@ -1353,17 +1353,17 @@ func (w *Waku) startMessageSender() error {
 				case <-w.ctx.Done():
 					return
 				case hash := <-msgStoredChan:
-					w.SendEnvelopeEvent(common2.EnvelopeEvent{
+					w.SendEnvelopeEvent(common.EnvelopeEvent{
 						Hash:  hash,
-						Event: common2.EventEnvelopeSent,
+						Event: common.EventEnvelopeSent,
 					})
 					if w.metricsHandler != nil {
 						w.metricsHandler.PushMessageCheckSuccess()
 					}
 				case hash := <-msgExpiredChan:
-					w.SendEnvelopeEvent(common2.EnvelopeEvent{
+					w.SendEnvelopeEvent(common.EnvelopeEvent{
 						Hash:  hash,
-						Event: common2.EventEnvelopeExpired,
+						Event: common.EventEnvelopeExpired,
 					})
 					if w.metricsHandler != nil {
 						w.metricsHandler.PushMessageCheckFailure()
@@ -1438,19 +1438,19 @@ func (w *Waku) Stop() error {
 	return nil
 }
 
-func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common2.MessageType, processImmediately bool) error {
+func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType, processImmediately bool) error {
 	if envelope == nil {
 		return nil
 	}
 
-	recvMessage := common2.NewReceivedMessage(envelope, msgType)
+	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	if recvMessage == nil {
 		return nil
 	}
 
 	if w.metricsHandler != nil {
-		if msgType == common2.MissingMessageType {
-			commonEnv := common2.NewWakuEnvelope(envelope.Message(), envelope.PubsubTopic(), envelope.Hash())
+		if msgType == common.MissingMessageType {
+			commonEnv := common.NewWakuEnvelope(envelope.Message(), envelope.PubsubTopic(), envelope.Hash())
 			w.metricsHandler.PushMissedMessage(commonEnv)
 		}
 	}
@@ -1472,7 +1472,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common2.Messa
 		trouble = true
 	}
 
-	common2.EnvelopesValidatedCounter.With(prometheus.Labels{"pubsubTopic": envelope.PubsubTopic(), "type": msgType}).Inc()
+	common.EnvelopesValidatedCounter.With(prometheus.Labels{"pubsubTopic": envelope.PubsubTopic(), "type": msgType}).Inc()
 
 	if trouble {
 		return errors.New("received invalid envelope")
@@ -1482,15 +1482,15 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common2.Messa
 }
 
 // addEnvelope adds an envelope to the envelope map, used for sending
-func (w *Waku) addEnvelope(envelope *common2.ReceivedMessage) {
+func (w *Waku) addEnvelope(envelope *common.ReceivedMessage) {
 	w.poolMu.Lock()
 	// Add the envelope to the cache with Processed set to false
 	w.envelopeCache.Set(envelope.Hash(), false, ttlcache.DefaultTTL)
 	w.poolMu.Unlock()
 }
 
-func (w *Waku) add(recvMessage *common2.ReceivedMessage, processImmediately bool) (bool, error) {
-	common2.EnvelopesReceivedCounter.Inc()
+func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool) (bool, error) {
+	common.EnvelopesReceivedCounter.Inc()
 
 	w.poolMu.Lock()
 	alreadyCached := w.envelopeCache.Has(recvMessage.Hash())
@@ -1507,11 +1507,11 @@ func (w *Waku) add(recvMessage *common2.ReceivedMessage, processImmediately bool
 
 	if alreadyCached {
 		logger.Debug("w envelope already cached")
-		common2.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
+		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
 		logger.Debug("cached w envelope")
-		common2.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
-		common2.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
+		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
+		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
 	}
 
 	if !envelopeProcessed {
@@ -1528,7 +1528,7 @@ func (w *Waku) add(recvMessage *common2.ReceivedMessage, processImmediately bool
 }
 
 // postEvent queues the message for further processing.
-func (w *Waku) postEvent(envelope *common2.ReceivedMessage) {
+func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 	w.msgQueue <- envelope
 }
 
@@ -1546,7 +1546,7 @@ func (w *Waku) processQueueLoop() {
 	}
 }
 
-func (w *Waku) processMessage(e *common2.ReceivedMessage) {
+func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	logger := w.logger.With(
 		zap.Stringer("envelopeHash", e.Envelope.Hash()),
 		zap.String("pubsubTopic", e.PubsubTopic),
@@ -1554,7 +1554,7 @@ func (w *Waku) processMessage(e *common2.ReceivedMessage) {
 		zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
 	)
 
-	if e.MsgType == common2.StoreMessageType {
+	if e.MsgType == common.StoreMessageType {
 		// We need to insert it first, and then remove it if not matched,
 		// as messages are processed asynchronously
 		w.storeMsgIDsMu.Lock()
@@ -1572,16 +1572,16 @@ func (w *Waku) processMessage(e *common2.ReceivedMessage) {
 		w.storeMsgIDsMu.Unlock()
 	} else {
 		logger.Debug("filters did match")
-		if w.metricsHandler != nil && e.MsgType == common2.MissingMessageType {
+		if w.metricsHandler != nil && e.MsgType == common.MissingMessageType {
 			w.metricsHandler.PushMissedRelevantMessage(e)
 		}
 		w.envelopeCache.Set(e.Hash(), true, ttlcache.DefaultTTL)
 	}
 
-	w.envelopeFeed.Send(common2.EnvelopeEvent{
+	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Topic: e.ContentTopic,
 		Hash:  e.Hash(),
-		Event: common2.EventEnvelopeAvailable,
+		Event: common.EventEnvelopeAvailable,
 	})
 }
 
@@ -1613,16 +1613,16 @@ func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }
 
-func (w *Waku) Peers() types2.PeerStats {
+func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
 }
 
-func (w *Waku) RelayPeersByTopic(topic string) (*types2.PeerList, error) {
+func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	if w.cfg.LightClient {
 		return nil, errors.New("only available in relay mode")
 	}
 
-	return &types2.PeerList{
+	return &types.PeerList{
 		FullMeshPeers: w.node.Relay().PubSub().MeshPeers(topic),
 		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
 	}, nil
@@ -1917,10 +1917,10 @@ func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
 }
 
 func (w *Waku) Clean() error {
-	w.msgQueue = make(chan *common2.ReceivedMessage, messageQueueLimit)
+	w.msgQueue = make(chan *common.ReceivedMessage, messageQueueLimit)
 
 	for _, f := range w.filters.All() {
-		f.Messages = common2.NewMemoryMessageStore()
+		f.Messages = common.NewMemoryMessageStore()
 	}
 
 	return nil
@@ -1939,13 +1939,13 @@ func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	if k == nil || k.D == nil || k.D.Sign() == 0 {
 		return false
 	}
-	return common2.ValidatePublicKey(&k.PublicKey)
+	return common.ValidatePublicKey(&k.PublicKey)
 }
 
 // makeDeterministicID generates a deterministic ID, based on a given input
 func makeDeterministicID(input string, keyLen int) (id string, err error) {
 	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
-	if !common2.ValidateDataIntegrity(buf, common2.KeyIDSize) {
+	if !common.ValidateDataIntegrity(buf, common.KeyIDSize) {
 		return "", fmt.Errorf("error in GenerateDeterministicID: failed to generate key")
 	}
 	id = gethcommon.Bytes2Hex(buf)
@@ -1969,10 +1969,10 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	return id, nil
 }
 
-func FormatPeerStats(wakuNode *node.WakuNode) types2.PeerStats {
-	p := make(types2.PeerStats)
+func FormatPeerStats(wakuNode *node.WakuNode) types.PeerStats {
+	p := make(types.PeerStats)
 	for k, v := range wakuNode.PeerStats() {
-		p[k] = types2.WakuV2Peer{
+		p[k] = types.WakuV2Peer{
 			Addresses: utils.EncapsulatePeerID(k, wakuNode.Host().Peerstore().PeerInfo(k).Addrs...),
 			Protocols: v,
 		}
@@ -2024,7 +2024,7 @@ func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 
 func (w *Waku) ProcessMailserverBatch(
 	ctx context.Context,
-	batch types2.MailserverBatch,
+	batch types.MailserverBatch,
 	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
@@ -2033,7 +2033,7 @@ func (w *Waku) ProcessMailserverBatch(
 	pubsubTopic := w.GetPubsubTopic(batch.PubsubTopic)
 	contentTopics := []string{}
 	for _, topic := range batch.Topics {
-		contentTopics = append(contentTopics, common2.BytesToTopic(topic.Bytes()).ContentTopic())
+		contentTopics = append(contentTopics, common.BytesToTopic(topic.Bytes()).ContentTopic())
 	}
 
 	criteria := store.FilterCriteria{
@@ -2063,14 +2063,14 @@ func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Durat
 	}
 }
 
-func (w *Waku) PublicWakuAPI() types2.PublicWakuAPI {
+func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
 	return NewPublicWakuAPI(w)
 }
 
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types2.TopicType) error {
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
 	var cTopics []string
 	for _, ct := range contentTopics {
-		cTopics = append(cTopics, common2.BytesToTopic(ct.Bytes()).ContentTopic())
+		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
 	}
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
@@ -2078,7 +2078,7 @@ func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, 
 	return nil
 }
 
-func (w *Waku) Subscribe(opts *types2.SubscriptionOptions) (string, error) {
+func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 	var (
 		err     error
 		keyAsym *ecdsa.PrivateKey
@@ -2098,12 +2098,12 @@ func (w *Waku) Subscribe(opts *types2.SubscriptionOptions) (string, error) {
 		}
 	}
 
-	f := &common2.Filter{
+	f := &common.Filter{
 		KeyAsym:       keyAsym,
 		KeySym:        keySym,
-		ContentTopics: common2.NewTopicSetFromBytes(opts.Topics),
+		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
 		PubsubTopic:   opts.PubsubTopic,
-		Messages:      common2.NewMemoryMessageStore(),
+		Messages:      common.NewMemoryMessageStore(),
 	}
 
 	return w.subscribe(f)

@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
-	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
+	types "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 func TestRunPausedPollingLoopSkipsWhenPausedAndResumes(t *testing.T) {
@@ -138,9 +138,9 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	t1 := common.TopicType([4]byte{0xde, 0xea, 0xbe, 0xef})
 	t2 := common.TopicType([4]byte{0xca, 0xfe, 0xde, 0xca})
 
-	crit := types2.Criteria{
+	crit := types.Criteria{
 		SymKeyID: keyID,
-		Topics:   []types2.TopicType{types2.TopicType(t1), types2.TopicType(t2)},
+		Topics:   []types.TopicType{types.TopicType(t1), types.TopicType(t2)},
 	}
 
 	_, err = api.NewMessageFilter(crit)

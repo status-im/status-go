@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 )
@@ -18,7 +18,7 @@ var (
 		RootDataDir: "test",
 	}
 	networks    = json.RawMessage("{}")
-	settingsObj = settings2.Settings{
+	settingsObj = settings.Settings{
 		Networks: &networks,
 	}
 )
@@ -26,7 +26,7 @@ var (
 func setupTestDB(t *testing.T) (*WalletSettings, func()) {
 	db, stop, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-wallet-tests-")
 	require.NoError(t, err)
-	settDb, err := settings2.MakeNewDB(db)
+	settDb, err := settings.MakeNewDB(db)
 	require.NoError(t, err)
 	err = settDb.CreateSettings(settingsObj, config)
 	require.NoError(t, err)

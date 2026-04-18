@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/common"
-	logutils2 "github.com/status-im/status-go/internal/logutils"
+	logutils "github.com/status-im/status-go/internal/logutils"
 	statusgo "github.com/status-im/status-go/mobile"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
@@ -23,15 +23,15 @@ var (
 )
 
 func init() {
-	logSettings := logutils2.LogSettings{
+	logSettings := logutils.LogSettings{
 		Enabled: true,
 		Level:   "INFO",
 	}
-	if err := logutils2.OverrideRootLoggerWithConfig(logSettings); err != nil {
+	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		panic(err)
 	}
 
-	logger = logutils2.ZapLogger()
+	logger = logutils.ZapLogger()
 }
 
 func main() {

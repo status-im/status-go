@@ -18,7 +18,7 @@ import (
 	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
-	testutils2 "github.com/status-im/status-go/internal/testutils"
+	testutils "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/backend"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol"
@@ -58,7 +58,7 @@ type SyncDeviceSuite struct {
 }
 
 func (s *SyncDeviceSuite) SetupTest() {
-	s.logger = testutils2.MustCreateTestLogger()
+	s.logger = testutils.MustCreateTestLogger()
 	s.password = "password"
 	s.tmpdir = s.T().TempDir()
 }
@@ -347,7 +347,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
 
 	// Wait for sync messages to be received on client
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := clientMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -404,7 +404,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := clientMessenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -454,7 +454,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err := clientMessenger.RetrieveAll()
 		if err != nil {
 			return err

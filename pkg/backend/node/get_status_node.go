@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	common2 "github.com/status-im/status-go/common"
+	common "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
@@ -81,7 +81,7 @@ type StatusNode struct {
 	config    *params.NodeConfig // Status node configuration
 	rpcClient *rpc.Client        // reference to an RPC client
 
-	services  []common2.StatusService
+	services  []common.StatusService
 	rpcServer *gethrpc.Server
 
 	downloader *ipfs.Downloader
@@ -390,7 +390,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 func (n *StatusNode) populateServiceRegistry() {
 	// Register services implementing Pausable
 	for _, service := range n.services {
-		if p, ok := service.(common2.Pausable); ok {
+		if p, ok := service.(common.Pausable); ok {
 			n.serviceRegistry.Register(p)
 		}
 	}
@@ -402,7 +402,7 @@ func (n *StatusNode) populateServiceRegistry() {
 	if n.downloader != nil {
 		n.serviceRegistry.Register(n.downloader)
 	}
-	if p, ok := n.timeSourceSrvc.(common2.Pausable); ok {
+	if p, ok := n.timeSourceSrvc.(common.Pausable); ok {
 		n.serviceRegistry.Register(p)
 	}
 }

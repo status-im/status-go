@@ -13,10 +13,10 @@ import (
 	"go.uber.org/zap"
 
 	appCommon "github.com/status-im/status-go/common"
-	healthmanager2 "github.com/status-im/status-go/internal/healthmanager"
+	healthmanager "github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/logutils"
-	chain2 "github.com/status-im/status-go/internal/rpc/chain"
-	ethclient2 "github.com/status-im/status-go/internal/rpc/chain/ethclient"
+	chain "github.com/status-im/status-go/internal/rpc/chain"
+	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
@@ -51,25 +51,25 @@ func init() {
 
 type ClientInterface interface {
 	EthClientGetter
-	EthClientWithProvider(chainID uint64, provider string) (ethclient2.EthClientInterface, error)
+	EthClientWithProvider(chainID uint64, provider string) (ethclient.EthClientInterface, error)
 	GetNetworkManager() *network.Manager
 }
 
 type EthClientGetter interface {
-	EthClient(chainID uint64) (ethclient2.EthClientInterface, error)
+	EthClient(chainID uint64) (ethclient.EthClientInterface, error)
 }
 
 // Client manages RPC clients for multiple chains with
 // multiple providers for each chain.
 type Client struct {
 	rpcClientsMutex    sync.RWMutex
-	rpcClients         map[uint64]chain2.ClientInterface
+	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
 	limiterPerProvider map[string]*rpclimiter.RPCRpsLimiter
 
 	networkManager *network.Manager
 
-	healthMgr          *healthmanager2.BlockchainHealthManager
+	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
 	accountsPublisher  *pubsub.Publisher
 	signalsTransmitter *SignalsTransmitter
@@ -106,10 +106,10 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 	c := Client{
 		networkManager:     networkManager,
-		rpcClients:         make(map[uint64]chain2.ClientInterface),
+		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
-		healthMgr:          healthmanager2.NewBlockchainHealthManager(),
+		healthMgr:          healthmanager.NewBlockchainHealthManager(),
 		accountsPublisher:  config.AccountsPublisher,
 		signalsTransmitter: NewSignalsTransmitter(networkManager.GetPublisher()),
 	}
@@ -189,7 +189,7 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 	}
 }
 
-func (c *Client) GetHealthManagerFullStatus() healthmanager2.BlockchainFullStatus {
+func (c *Client) GetHealthManagerFullStatus() healthmanager.BlockchainFullStatus {
 	return c.healthMgr.GetFullStatus()
 }
 
@@ -204,7 +204,7 @@ func (c *Client) GetNetworksPublisher() *pubsub.Publisher {
 	return c.networkManager.GetPublisher()
 }
 
-func (c *Client) getClientUsingCache(chainID uint64) (chain2.ClientInterface, error) {
+func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, error) {
 	c.rpcClientsMutex.Lock()
 	defer c.rpcClientsMutex.Unlock()
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
@@ -221,13 +221,13 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain2.ClientInterface, er
 		return nil, fmt.Errorf("could not find any enabled RPC providers for chain: %d", chainID)
 	}
 
-	phm := healthmanager2.NewProvidersHealthManager(chainID)
+	phm := healthmanager.NewProvidersHealthManager(chainID)
 	err := c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
 	if err != nil {
 		return nil, fmt.Errorf("register providers health manager: %s", err)
 	}
 
-	client := chain2.NewClient(ethClients, chainID, phm)
+	client := chain.NewClient(ethClients, chainID, phm)
 	c.rpcClients[chainID] = client
 	return client, nil
 }
@@ -252,8 +252,8 @@ func (c *Client) getProviderRPCLimiter(provider params.RpcProvider) (*rpclimiter
 	return limiter, limiterKey, nil
 }
 
-func (c *Client) getEthClients(network *params.Network) []ethclient2.RPSLimitedEthClientInterface {
-	var ethClients []ethclient2.RPSLimitedEthClientInterface
+func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEthClientInterface {
+	var ethClients []ethclient.RPSLimitedEthClientInterface
 
 	// Iterate over providers in order
 	for _, provider := range network.RpcProviders {
@@ -262,7 +262,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient2.RPSLimitedE
 			continue
 		}
 
-		rpcClient, err := chain2.CreateEthClientFromProvider(provider, rpcUserAgentName)
+		rpcClient, err := chain.CreateEthClientFromProvider(provider, rpcUserAgentName)
 		if err != nil {
 			c.logger.Error("create eth client failed", zap.String("provider", provider.Name), zap.Error(err))
 			continue
@@ -279,7 +279,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient2.RPSLimitedE
 		}
 
 		// Create ethclient with RPS limiter. If limiter is not enabled, it will be nil
-		ethClient := ethclient2.NewRPSLimitedEthClient(rpcClient, rpcLimiter, limiterKey, provider.Name)
+		ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, limiterKey, provider.Name)
 		ethClients = append(ethClients, ethClient)
 	}
 
@@ -287,7 +287,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient2.RPSLimitedE
 }
 
 // EthClient returns ethclient.Client per chain
-func (c *Client) EthClient(chainID uint64) (ethclient2.EthClientInterface, error) {
+func (c *Client) EthClient(chainID uint64) (ethclient.EthClientInterface, error) {
 	client, err := c.getClientUsingCache(chainID)
 	if err != nil {
 		return nil, err
@@ -296,7 +296,7 @@ func (c *Client) EthClient(chainID uint64) (ethclient2.EthClientInterface, error
 	return client, nil
 }
 
-func (c *Client) EthClientWithProvider(chainID uint64, provider string) (ethclient2.EthClientInterface, error) {
+func (c *Client) EthClientWithProvider(chainID uint64, provider string) (ethclient.EthClientInterface, error) {
 	client, err := c.getClientUsingCache(chainID)
 	if err != nil {
 		return nil, err

@@ -16,7 +16,7 @@ import (
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
 	segmentation2 "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
-	transport2 "github.com/status-im/status-go/pkg/messaging/layers/transport"
+	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
 	transportmigrations "github.com/status-im/status-go/pkg/messaging/layers/transport/migrations"
 	wakumigrations "github.com/status-im/status-go/pkg/messaging/waku/migrations"
 )
@@ -118,17 +118,17 @@ type sqliteTransportPersistence struct {
 	db *sql.DB
 }
 
-var _ transport2.Persistence = (*sqliteTransportPersistence)(nil)
+var _ transport.Persistence = (*sqliteTransportPersistence)(nil)
 
-func (p *sqliteTransportPersistence) KeysStorage() transport2.KeysPersistence {
-	return transport2.NewSQLiteKeysPersistence(p.db)
+func (p *sqliteTransportPersistence) KeysStorage() transport.KeysPersistence {
+	return transport.NewSQLiteKeysPersistence(p.db)
 }
 
-func (p *sqliteTransportPersistence) ProcessedMessageIDsCacheStorage() transport2.ProcessedMessageIDsCachePersistence {
-	return transport2.NewSQLiteProcessedMessageIDsCachePersistence(p.db)
+func (p *sqliteTransportPersistence) ProcessedMessageIDsCacheStorage() transport.ProcessedMessageIDsCachePersistence {
+	return transport.NewSQLiteProcessedMessageIDsCachePersistence(p.db)
 }
 
-func (p *sqlitePersistence) TransportStorage() transport2.Persistence {
+func (p *sqlitePersistence) TransportStorage() transport.Persistence {
 	return &sqliteTransportPersistence{db: p.db}
 }
 
