@@ -973,22 +973,47 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(c
 	inVector := strings.Repeat("?, ", chatIDsCount-1) + "?"
 
 	// nolint: gosec
-	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE chat_id IN (%s) AND NOT deleted`, allFieldsForTableActivityCenterNotification, inVector)
+	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications
+		WHERE chat_id IN (%s)
+		AND NOT deleted`,
+		allFieldsForTableActivityCenterNotification, inVector)
 	rows, err := tx.Query(query, args[1:]...)
 	if err != nil {
 		return nil, err
 	}
 	notifications, err := db.parseRowFromTableActivityCenterNotification(rows, func(notification *ActivityCenterNotification) {
 		notification.Read = true
-		notification.Dismissed = true
 		notification.UpdatedAt = updatedAt
+		if notification.Type != ActivityCenterNotificationTypeMention && notification.Type != ActivityCenterNotificationTypeReply {
+			notification.Dismissed = true
+		}
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	query = "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE chat_id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
-	_, err = tx.Exec(query, args...)
+	// Dismiss everything except mentions and replies.
+	dismissArgs := append(args, ActivityCenterNotificationTypeMention, ActivityCenterNotificationTypeReply)
+	// nolint: gosec
+	_, err = tx.Exec(fmt.Sprintf(`
+		UPDATE activity_center_notifications
+		SET read = 1, dismissed = 1, updated_at = ?
+		WHERE chat_id IN (%s)
+		AND NOT deleted
+		AND notification_type NOT IN (?, ?)`, inVector), dismissArgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark mentions and replies as read without dismissing them.
+	readArgs := append(args, ActivityCenterNotificationTypeMention, ActivityCenterNotificationTypeReply)
+	// nolint: gosec
+	_, err = tx.Exec(fmt.Sprintf(`
+		UPDATE activity_center_notifications
+		SET read = 1, updated_at = ?
+		WHERE chat_id IN (%s)
+		AND NOT deleted
+		AND notification_type IN (?, ?)`, inVector), readArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -1023,24 +1048,44 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chat
 	}
 	notifications, err := db.parseRowFromTableActivityCenterNotification(rows, func(notification *ActivityCenterNotification) {
 		notification.Read = true
-		notification.Dismissed = true
 		notification.UpdatedAt = updatedAt
+		if notification.Type != ActivityCenterNotificationTypeMention && notification.Type != ActivityCenterNotificationTypeReply {
+			notification.Dismissed = true
+		}
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// We exclude notifications related to contacts, since those we don't want to
-	// be cleared.
+	// Exclude contact requests, mentions and replies from dismissal — they must
+	// remain visible in the activity center after marking a chat as read.
 	query = `
 		UPDATE activity_center_notifications
 		SET read = 1, dismissed = 1, updated_at = ?
 		WHERE chat_id = ?
 		    AND NOT deleted
 			AND NOT accepted
-			AND notification_type != ?
+			AND notification_type NOT IN (?, ?, ?)
 	`
-	_, err = tx.Exec(query, updatedAt, chatID, ActivityCenterNotificationTypeContactRequest)
+	_, err = tx.Exec(query, updatedAt, chatID,
+		ActivityCenterNotificationTypeContactRequest,
+		ActivityCenterNotificationTypeMention,
+		ActivityCenterNotificationTypeReply)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark mentions and replies as read without dismissing them.
+	_, err = tx.Exec(`
+		UPDATE activity_center_notifications
+		SET read = 1, updated_at = ?
+		WHERE chat_id = ?
+		    AND NOT deleted
+			AND NOT accepted
+			AND notification_type IN (?, ?)
+	`, updatedAt, chatID,
+		ActivityCenterNotificationTypeMention,
+		ActivityCenterNotificationTypeReply)
 	if err != nil {
 		return nil, err
 	}
