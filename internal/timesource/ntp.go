@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
 )
 
@@ -214,10 +213,6 @@ func (s *ntpTimeSource) updateOffset() error {
 // runPeriodically runs periodically the given function based on ntpTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
 func (s *ntpTimeSource) runPeriodically(ctx context.Context, fn func() error, starWithSlowSyncPeriod bool) {
-	if s.started {
-		return
-	}
-
 	period := s.fastNTPSyncPeriod
 	if starWithSlowSyncPeriod {
 		period = s.slowNTPSyncPeriod
@@ -290,9 +285,11 @@ func (s *ntpTimeSource) Start(ctx context.Context) error {
 	currentTime := s.now()
 	s.lastMonotonic = currentTime
 	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	s.started = true
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer common.LogOnPanic()
 		err := s.updateOffset()
 		if err != nil {
 			// Failure to update can occur if the node is offline.
@@ -300,16 +297,15 @@ func (s *ntpTimeSource) Start(ctx context.Context) error {
 			logutils.ZapLogger().Error("failed to update offset", zap.Error(err))
 		}
 		s.runPeriodically(ctx, s.updateOffset, err == nil)
-		s.started = true
 	}()
-
-	s.cancel = cancel
 
 	return nil
 }
 
 // Stop goroutine that updates time source.
 func (s *ntpTimeSource) Stop() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	if s.cancel == nil {
 		return
 	}
