@@ -19,17 +19,17 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/testutils"
-	common2 "github.com/status-im/status-go/pkg/messaging/common"
+	common "github.com/status-im/status-go/pkg/messaging/common"
 	commonmigrations "github.com/status-im/status-go/pkg/messaging/common/migrations"
-	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
-	segmentation2 "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
+	segmentation "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
-	transport2 "github.com/status-im/status-go/pkg/messaging/layers/transport"
+	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
 	transportmigrations "github.com/status-im/status-go/pkg/messaging/layers/transport/migrations"
 	"github.com/status-im/status-go/pkg/messaging/types"
-	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
+	wakuv "github.com/status-im/status-go/pkg/messaging/waku"
 )
 
 func TestProcessorSuite(t *testing.T) {
@@ -78,10 +78,10 @@ func (s *ProcessorSuite) SetupTest() {
 	err = mvdsmigrations.Migrate(db)
 	s.Require().NoError(err)
 
-	stack := &common2.MessagingStack{}
+	stack := &common.MessagingStack{}
 
-	wakuConfig := wakuv3.DefaultConfig
-	shh, err := wakuv3.New(
+	wakuConfig := wakuv.DefaultConfig
+	shh, err := wakuv.New(
 		nil,
 		&wakuConfig,
 		s.logger,
@@ -92,23 +92,23 @@ func (s *ProcessorSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 
-	stack.Transport, err = transport2.NewTransport(
+	stack.Transport, err = transport.NewTransport(
 		shh,
 		identity,
-		transport2.NewSQLiteKeysPersistence(db),
-		transport2.NewSQLiteProcessedMessageIDsCachePersistence(db),
-		&transport2.EnvelopesMonitorConfig{},
+		transport.NewSQLiteKeysPersistence(db),
+		transport.NewSQLiteProcessedMessageIDsCachePersistence(db),
+		&transport.EnvelopesMonitorConfig{},
 		s.logger,
 	)
 	s.Require().NoError(err)
 
-	stack.Segmentation = segmentation2.NewSegmenter(
-		segmentation2.NewSQLitePersistence(db),
+	stack.Segmentation = segmentation.NewSegmenter(
+		segmentation.NewSQLitePersistence(db),
 		s.logger,
 	)
 
-	stack.Encryption = encryption2.New(
-		encryption2.NewSQLitePersistence(db),
+	stack.Encryption = encryption.New(
+		encryption.NewSQLitePersistence(db),
 		"installation-1",
 		s.logger,
 		trace.NewNoopTracer(),
@@ -126,8 +126,8 @@ func (s *ProcessorSuite) SetupTest() {
 	s.processor = NewProcessor(
 		identity,
 		stack,
-		common2.NewSQLiteMessageConfirmationPersistence(db),
-		common2.NewSQLiteHashRatchetPersistence(db),
+		common.NewSQLiteMessageConfirmationPersistence(db),
+		common.NewSQLiteHashRatchetPersistence(db),
 		s.logger,
 		trace.NewNoopTracer(),
 	)
@@ -198,8 +198,8 @@ func (s *ProcessorSuite) TestProcessMessageDatasyncEncrypted() {
 	}))
 	s.Require().NoError(err)
 
-	senderEncryptionProtocol := encryption2.New(
-		encryption2.NewSQLitePersistence(senderDatabase),
+	senderEncryptionProtocol := encryption.New(
+		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
 		trace.NewNoopTracer(),
@@ -244,8 +244,8 @@ func (s *ProcessorSuite) TestHandleOutOfOrderHashRatchet() {
 	}))
 	s.Require().NoError(err)
 
-	senderEncryptionProtocol := encryption2.New(
-		encryption2.NewSQLitePersistence(senderDatabase),
+	senderEncryptionProtocol := encryption.New(
+		encryption.NewSQLitePersistence(senderDatabase),
 		"installation-2",
 		s.logger,
 		trace.NewNoopTracer(),
@@ -254,7 +254,7 @@ func (s *ProcessorSuite) TestHandleOutOfOrderHashRatchet() {
 	ratchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(groupID)
 	s.Require().NoError(err)
 
-	ratchets := []*encryption2.HashRatchetKeyCompatibility{ratchet}
+	ratchets := []*encryption.HashRatchetKeyCompatibility{ratchet}
 
 	hashRatchetKeyExchangeMessage, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(context.Background(), senderKey, &s.processor.identity.PublicKey, groupID, ratchets)
 	s.Require().NoError(err)
@@ -336,7 +336,7 @@ func (s *ProcessorSuite) TestHandleSegmentMessages() {
 
 	// Receiving another segment after the message has been reassembled is considered an error
 	_, err = s.processor.ProcessMessage(message)
-	s.Require().ErrorIs(err, segmentation2.ErrAlreadyCompleted)
+	s.Require().ErrorIs(err, segmentation.ErrAlreadyCompleted)
 }
 
 func (s *ProcessorSuite) TestGetEphemeralKey() {

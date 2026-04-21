@@ -37,6 +37,8 @@ class SignalType(Enum):
     CONNECTOR_DAPP_PERMISSION_REVOKED = "connector.dAppPermissionRevoked"
     CONNECTOR_DAPP_CHAIN_ID_SWITCHED = "connector.dAppChainIdSwitched"
     COMMUNITY_MEMBER_REEVALUATION_STATUS = "community.memberReevaluationStatus"
+    COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED = "communityToken.communityTokenTransactionStatusChanged"
+    COMMUNITY_TOKEN_ACTION = "communityToken.communityTokenAction"
 
 
 class WalletEventType(Enum):
@@ -167,6 +169,7 @@ class SignalClient:
         self._received_by_type: dict[SignalType, list[dict]] = {signal: [] for signal in SignalType}
         # Global ordered stream: (seq, signal_type, signal_dict)
         self._received_all: list[tuple[int, SignalType, dict]] = []
+        self._should_stop = False
 
         # Public attribute for debugging/inspection in tests if needed.
         # Do NOT mutate it directly.
@@ -179,7 +182,12 @@ class SignalClient:
             Path(SIGNALS_DIR).mkdir(parents=True, exist_ok=True)
 
     def on_message(self, ws, signal):
-        signal_data = json.loads(signal)
+        try:
+            signal_data = json.loads(signal)
+        except Exception:
+            logging.exception(f"SignalClient [{self.url}]: failed to parse signal ({len(signal)} bytes)")
+            return
+
         if LOG_SIGNALS_TO_FILE:
             self.write_signal_to_file(signal_data)
 
@@ -219,27 +227,38 @@ class SignalClient:
         logging.error(f"SignalClient [{self.url}]: websocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logging.debug(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
+        logging.error(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
         logging.debug(f"SignalClient [{self.url}]: websocket connection opened")
 
     def _connect(self):
-        self.wsapp = websocket.WebSocketApp(
-            url=self.url,
-            on_message=self.on_message,
-            on_error=self._on_error,
-            on_open=self._on_open,
-            on_close=self._on_close,
-        )
-        self.wsapp.run_forever()
+        retry_delay = 0.5
+        max_delay = 5.0
+        while not self._should_stop:
+            self.wsapp = websocket.WebSocketApp(
+                url=self.url,
+                on_message=self.on_message,
+                on_error=self._on_error,
+                on_open=self._on_open,
+                on_close=self._on_close,
+            )
+            self.wsapp.run_forever()
+            if self._should_stop:
+                break
+            logging.warning(f"SignalClient [{self.url}]: websocket disconnected, reconnecting in {retry_delay}s")
+            time.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, max_delay)
+        logging.debug(f"SignalClient [{self.url}]: connection loop stopped")
 
     def connect(self):
+        self._should_stop = False
         websocket_thread = threading.Thread(target=self._connect)
         websocket_thread.daemon = True
         websocket_thread.start()
 
     def disconnect(self):
+        self._should_stop = True
         if hasattr(self, "wsapp") and self.wsapp is not None:
             self.wsapp.close()
 

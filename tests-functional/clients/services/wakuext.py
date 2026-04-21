@@ -413,6 +413,11 @@ class WakuextService(Service):
         response = self.rpc_request("checkPermissionsToJoinCommunity", params)
         return response
 
+    def reevaluate_community_members_permissions(self, community_id: str):
+        params = [{"communityId": community_id}]
+        response = self.rpc_request("reevaluateCommunityMembersPermissions", params)
+        return response
+
     def generate_joining_community_requests_for_signing(self, member_pub_key: str, community_id: str, addresses_to_reveal: list[str]):
         params = [member_pub_key, community_id, addresses_to_reveal]
         response = self.rpc_request("generateJoiningCommunityRequestsForSigning", params)

@@ -231,7 +231,7 @@ type RPCRpsLimiter struct {
 	callersOnWaitForRequests      []callerOnWait
 	callersOnWaitForRequestsMutex sync.RWMutex
 
-	quit chan bool
+	quit chan struct{}
 }
 
 func NewRPCRpsLimiter() *RPCRpsLimiter {
@@ -239,7 +239,7 @@ func NewRPCRpsLimiter() *RPCRpsLimiter {
 	limiter := RPCRpsLimiter{
 		uuid:                 uuid.New(),
 		maxRequestsPerSecond: defaultMaxRequestsPerSecond,
-		quit:                 make(chan bool),
+		quit:                 make(chan struct{}),
 	}
 
 	limiter.start()
@@ -257,61 +257,61 @@ func (rl *RPCRpsLimiter) ReduceLimit() {
 }
 
 func (rl *RPCRpsLimiter) start() {
-	ticker := time.NewTicker(tickerInterval)
 	go func() {
 		defer gocommon.LogOnPanic()
+		ticker := time.NewTicker(tickerInterval)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				{
-					rl.requestsMadeWithinSecondMutex.Lock()
-					oldrequestsMadeWithinSecond := rl.requestsMadeWithinSecond
-					if rl.requestsMadeWithinSecond != 0 {
-						rl.requestsMadeWithinSecond = 0
-					}
-					rl.requestsMadeWithinSecondMutex.Unlock()
-					if oldrequestsMadeWithinSecond == 0 {
-						continue
-					}
-				}
-
-				rl.callersOnWaitForRequestsMutex.Lock()
-				numOfRequestsToMakeAvailable := rl.maxRequestsPerSecond
-				for {
-					if numOfRequestsToMakeAvailable == 0 || len(rl.callersOnWaitForRequests) == 0 {
-						break
-					}
-
-					var index = -1
-					for i := 0; i < len(rl.callersOnWaitForRequests); i++ {
-						if rl.callersOnWaitForRequests[i].requests <= numOfRequestsToMakeAvailable {
-							index = i
-							break
-						}
-					}
-
-					if index == -1 {
-						break
-					}
-
-					callerOnWait := rl.callersOnWaitForRequests[index]
-					numOfRequestsToMakeAvailable -= callerOnWait.requests
-					rl.callersOnWaitForRequests = append(rl.callersOnWaitForRequests[:index], rl.callersOnWaitForRequests[index+1:]...)
-
-					callerOnWait.ch <- true
-				}
-				rl.callersOnWaitForRequestsMutex.Unlock()
-
+				rl.onTick()
 			case <-rl.quit:
-				ticker.Stop()
 				return
 			}
 		}
 	}()
 }
 
+func (rl *RPCRpsLimiter) onTick() {
+	rl.requestsMadeWithinSecondMutex.Lock()
+	oldrequestsMadeWithinSecond := rl.requestsMadeWithinSecond
+	if rl.requestsMadeWithinSecond != 0 {
+		rl.requestsMadeWithinSecond = 0
+	}
+	rl.requestsMadeWithinSecondMutex.Unlock()
+	if oldrequestsMadeWithinSecond == 0 {
+		return
+	}
+
+	rl.callersOnWaitForRequestsMutex.Lock()
+	numOfRequestsToMakeAvailable := rl.maxRequestsPerSecond
+	for {
+		if numOfRequestsToMakeAvailable == 0 || len(rl.callersOnWaitForRequests) == 0 {
+			break
+		}
+
+		var index = -1
+		for i := 0; i < len(rl.callersOnWaitForRequests); i++ {
+			if rl.callersOnWaitForRequests[i].requests <= numOfRequestsToMakeAvailable {
+				index = i
+				break
+			}
+		}
+
+		if index == -1 {
+			break
+		}
+
+		callerOnWait := rl.callersOnWaitForRequests[index]
+		numOfRequestsToMakeAvailable -= callerOnWait.requests
+		rl.callersOnWaitForRequests = append(rl.callersOnWaitForRequests[:index], rl.callersOnWaitForRequests[index+1:]...)
+
+		callerOnWait.ch <- true
+	}
+	rl.callersOnWaitForRequestsMutex.Unlock()
+}
+
 func (rl *RPCRpsLimiter) Stop() {
-	rl.quit <- true
 	close(rl.quit)
 	for _, callerOnWait := range rl.callersOnWaitForRequests {
 		close(callerOnWait.ch)

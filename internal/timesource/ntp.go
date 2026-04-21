@@ -137,6 +137,8 @@ var defaultNTPTimeSource = &ntpTimeSource{
 // ntpTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
 type ntpTimeSource struct {
+	common.PauseBroadcaster
+
 	servers           []string
 	allowedFailures   int
 	fastNTPSyncPeriod time.Duration
@@ -211,24 +213,58 @@ func (s *ntpTimeSource) updateOffset() error {
 // runPeriodically runs periodically the given function based on ntpTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
 func (s *ntpTimeSource) runPeriodically(ctx context.Context, fn func() error, starWithSlowSyncPeriod bool) {
-	if s.started {
-		return
-	}
-
 	period := s.fastNTPSyncPeriod
 	if starWithSlowSyncPeriod {
 		period = s.slowNTPSyncPeriod
 	}
 	go func() {
 		defer common.LogOnPanic()
+		sub := s.Subscribe()
+		defer sub.Unsubscribe()
+
+		paused := <-sub.C()
+		if paused && period != s.slowNTPSyncPeriod {
+			period = s.slowNTPSyncPeriod
+		}
+
+		timer := time.NewTimer(period)
+		defer timer.Stop()
+
+		resetTimer := func(d time.Duration) {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(d)
+		}
+
 		for {
 			select {
-			case <-time.After(period):
+			case pausedState, ok := <-sub.C():
+				if !ok {
+					return
+				}
+				paused = pausedState
+				if paused && period != s.slowNTPSyncPeriod {
+					period = s.slowNTPSyncPeriod
+				}
+				resetTimer(period)
+			case <-timer.C:
+				if paused {
+					resetTimer(period)
+					continue
+				}
 				if err := fn(); err == nil {
 					period = s.slowNTPSyncPeriod
 				} else if period != s.slowNTPSyncPeriod {
 					period = s.fastNTPSyncPeriod
 				}
+				if paused && period != s.slowNTPSyncPeriod {
+					period = s.slowNTPSyncPeriod
+				}
+				resetTimer(period)
 
 			case <-ctx.Done():
 				return
@@ -249,25 +285,27 @@ func (s *ntpTimeSource) Start(ctx context.Context) error {
 	currentTime := s.now()
 	s.lastMonotonic = currentTime
 	ctx, cancel := context.WithCancel(ctx)
-
-	// Attempt to update the offset synchronously so that user can have reliable messages right away
-	err := s.updateOffset()
-	if err != nil {
-		// Failure to update can occur if the node is offline.
-		// Instead of returning an error, continue with the process as the update will be retried periodically.
-		logutils.ZapLogger().Error("failed to update offset", zap.Error(err))
-	}
-
-	s.runPeriodically(ctx, s.updateOffset, err == nil)
-
-	s.started = true
 	s.cancel = cancel
+	s.started = true
+
+	go func() {
+		defer common.LogOnPanic()
+		err := s.updateOffset()
+		if err != nil {
+			// Failure to update can occur if the node is offline.
+			// Instead of returning an error, continue with the process as the update will be retried periodically.
+			logutils.ZapLogger().Error("failed to update offset", zap.Error(err))
+		}
+		s.runPeriodically(ctx, s.updateOffset, err == nil)
+	}()
 
 	return nil
 }
 
 // Stop goroutine that updates time source.
 func (s *ntpTimeSource) Stop() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	if s.cancel == nil {
 		return
 	}

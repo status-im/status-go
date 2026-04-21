@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	common2 "github.com/status-im/status-go/common"
+	common "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
@@ -81,7 +81,7 @@ type StatusNode struct {
 	config    *params.NodeConfig // Status node configuration
 	rpcClient *rpc.Client        // reference to an RPC client
 
-	services  []common2.StatusService
+	services  []common.StatusService
 	rpcServer *gethrpc.Server
 
 	downloader *ipfs.Downloader
@@ -129,6 +129,13 @@ type StatusNode struct {
 	accountsPublisher *pubsub.Publisher
 
 	localBackup *backup.Controller
+
+	serviceRegistry *ServiceRegistry
+}
+
+// ServiceRegistry returns the node's service registry for granular pause/resume control.
+func (n *StatusNode) ServiceRegistry() *ServiceRegistry {
+	return n.serviceRegistry
 }
 
 // New makes new instance of StatusNode.
@@ -141,6 +148,7 @@ func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagemen
 		publicMethods:       make(map[string]bool),
 		accountsPublisher:   pubsub.NewPublisher(),
 		rpcServer:           gethrpc.NewServer(),
+		serviceRegistry:     newServiceRegistry(),
 	}
 }
 
@@ -267,6 +275,7 @@ func (n *StatusNode) StartLocalBackup() error {
 		n.localBackup.Register("messenger", n.wakuV2ExtSrvc.Messenger())
 	}
 
+	n.serviceRegistry.Register(n.localBackup)
 	n.localBackup.Start()
 
 	return nil
@@ -371,7 +380,31 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		}
 	}
 
+	n.populateServiceRegistry()
+
 	return nil
+}
+
+// populateServiceRegistry registers all services that implement Pausable and wraps the
+// media server as a pausable. Called once after all services are started.
+func (n *StatusNode) populateServiceRegistry() {
+	// Register services implementing Pausable
+	for _, service := range n.services {
+		if p, ok := service.(common.Pausable); ok {
+			n.serviceRegistry.Register(p)
+		}
+	}
+	// Wrap and register the media server
+	if n.mediaServer != nil {
+		n.serviceRegistry.Register(newPausableMediaServer(n.mediaServer))
+	}
+	// Register infrastructure components that are not go-ethereum services
+	if n.downloader != nil {
+		n.serviceRegistry.Register(n.downloader)
+	}
+	if p, ok := n.timeSourceSrvc.(common.Pausable); ok {
+		n.serviceRegistry.Register(p)
+	}
 }
 
 func (n *StatusNode) createAndStartTokenManager() error {
@@ -488,6 +521,24 @@ func (n *StatusNode) Stop() error {
 // IsRunning confirm that node is running.
 func (n *StatusNode) IsRunning() bool {
 	return n.running.Load()
+}
+
+// Pause reduces non-essential background work while preserving core messaging/Waku runtime.
+// Delegates to the ServiceRegistry so callers can also pause individual services via PauseService.
+func (n *StatusNode) Pause() error {
+	if n.serviceRegistry == nil {
+		return nil
+	}
+	return n.serviceRegistry.PauseAll()
+}
+
+// Resume restores regular service work after paused background mode.
+// Delegates to the ServiceRegistry so callers can also resume individual services via ResumeService.
+func (n *StatusNode) Resume() error {
+	if n.serviceRegistry == nil {
+		return nil
+	}
+	return n.serviceRegistry.ResumeAll()
 }
 
 func (n *StatusNode) CallInProcessRPC(inputJSON string) string {

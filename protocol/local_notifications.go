@@ -110,6 +110,27 @@ func applyMessagePreview(title, message string, messagePreview int) (displayTitl
 	}
 }
 
+// getMessagePreviewText returns a simplified, notification-safe preview of the message text.
+// Uses GetSimplifiedText when possible, falls back to raw Text. Returns empty string if message is nil or extraction fails.
+func getMessagePreviewText(m *common.Message, canonicalNames map[string]string) string {
+	if m == nil {
+		return ""
+	}
+	text, err := m.GetSimplifiedText("", canonicalNames)
+	if err != nil {
+		return strings.TrimSpace(m.Text)
+	}
+	return strings.TrimSpace(text)
+}
+
+// timestampOrZero returns the message's WhisperTimestamp, or 0 if the message is nil.
+func timestampOrZero(m *common.Message) uint64 {
+	if m == nil {
+		return 0
+	}
+	return m.WhisperTimestamp
+}
+
 // applyAuthorPrivacy clears identity-revealing fields from a notification when the privacy
 // level is anonymous. In anonymous mode the OS notification must not expose who sent
 // the message: no sender name, no sender/community/chat icon.
@@ -149,6 +170,10 @@ type NotificationBody struct {
 }
 
 func showMessageNotification(settings NotificationSettingsProvider, publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) bool {
+	if message != nil && message.From == crypto.PubkeyToHex(&publicKey) {
+		return false
+	}
+
 	// For public/community chats, skip inactive (soft-deleted). For 1:1 and group,
 	// still notify — e.g. contact requests or new messages can arrive when Active=false.
 	if chat != nil && !chat.Active && !chat.OneToOne() && !chat.PrivateGroupChat() {
@@ -282,10 +307,7 @@ func NewCommunityRequestToJoinNotification(id string, community *communities.Com
 // NewOutgoingMessageNotification creates a local notification for a message sent by the current user.
 func NewOutgoingMessageNotification(id string, message *common.Message, chat *Chat, community *communities.Community, authorName string, authorIcon string, authorID string) *localnotifications.Notification {
 	title := chat.Name
-	simplifiedText, err := message.GetSimplifiedText("", nil)
-	if err != nil {
-		simplifiedText = message.Text
-	}
+	simplifiedText := getMessagePreviewText(message, nil)
 	notif := &localnotifications.Notification{
 		ID:                  gethcommon.HexToHash(id),
 		BodyType:            localnotifications.TypeMessage,
@@ -389,7 +411,10 @@ func (n NotificationBody) toMessageNotification(id string, resolvePrimaryName fu
 
 func (n NotificationBody) toContactRequestNotification(id string, profilePicturesVisibility int, messagePreview int) (*localnotifications.Notification, error) {
 	title := n.Contact.PrimaryName() + " wants to connect"
-	message := n.Contact.PrimaryName() + " sent you a contact request"
+	message := getMessagePreviewText(n.Message, nil)
+	if message == "" {
+		message = n.Contact.PrimaryName() + " sent you a contact request"
+	}
 	displayTitle, displayMessage := applyMessagePreview(title, message, messagePreview)
 	notif := &localnotifications.Notification{
 		ID:             gethcommon.HexToHash(id),
@@ -407,7 +432,7 @@ func (n NotificationBody) toContactRequestNotification(id string, profilePicture
 			ID:   n.Contact.ID,
 		},
 		ConversationID: n.Chat.ID,
-		Timestamp:      n.Message.WhisperTimestamp,
+		Timestamp:      timestampOrZero(n.Message),
 		IsConversation: true,
 		Image:          "",
 	}
@@ -417,7 +442,10 @@ func (n NotificationBody) toContactRequestNotification(id string, profilePicture
 
 func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePicturesVisibility int, messagePreview int) *localnotifications.Notification {
 	title := n.Contact.PrimaryName() + " invited you to " + n.Chat.Name
-	message := n.Contact.PrimaryName() + " wants you to join group " + n.Chat.Name
+	message := getMessagePreviewText(n.Message, nil)
+	if message == "" {
+		message = n.Contact.PrimaryName() + " wants you to join group " + n.Chat.Name
+	}
 	displayTitle, displayMessage := applyMessagePreview(title, message, messagePreview)
 	notif := &localnotifications.Notification{
 		ID:             gethcommon.HexToHash(id),
@@ -443,7 +471,7 @@ func (n NotificationBody) toPrivateGroupInviteNotification(id string, profilePic
 
 func (n NotificationBody) toCommunityRequestToJoinNotification(id string, profilePicturesVisibility int, messagePreview int) *localnotifications.Notification {
 	title := n.Contact.PrimaryName() + " wants to join " + n.Community.Name()
-	message := n.Contact.PrimaryName() + " wants to join " + n.Community.Name()
+	message := getMessagePreviewText(n.Message, nil)
 	displayTitle, displayMessage := applyMessagePreview(title, message, messagePreview)
 	notif := &localnotifications.Notification{
 		ID:             gethcommon.HexToHash(id),

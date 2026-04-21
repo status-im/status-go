@@ -76,6 +76,66 @@ func TestApplyMessagePreview(t *testing.T) {
 	})
 }
 
+func TestGetMessagePreviewTextNilMessage(t *testing.T) {
+	require.Equal(t, "", getMessagePreviewText(nil, nil))
+}
+
+func TestGetMessagePreviewTextTrimsMessageText(t *testing.T) {
+	msg := &common.Message{
+		ChatMessage: &protobuf.ChatMessage{
+			Text: "  hello world  ",
+		},
+	}
+	require.Equal(t, "hello world", getMessagePreviewText(msg, nil))
+}
+
+func TestTimestampOrZero(t *testing.T) {
+	require.Equal(t, uint64(0), timestampOrZero(nil))
+
+	msg := &common.Message{WhisperTimestamp: 42}
+	require.Equal(t, uint64(42), timestampOrZero(msg))
+}
+
+func TestToContactRequestNotificationFallbackMessageAndZeroTimestamp(t *testing.T) {
+	body := NotificationBody{
+		Contact: &contacts.Contact{
+			ID:          "0xabc",
+			DisplayName: "Alice",
+		},
+		Chat: &Chat{
+			ID:       "chat-1",
+			ChatType: ChatTypeOneToOne,
+		},
+	}
+
+	notif, err := body.toContactRequestNotification("0x1", 0, messagePreviewNameAndMessage)
+	require.NoError(t, err)
+	require.Equal(t, "Alice sent you a contact request", notif.Message)
+	require.Equal(t, uint64(0), notif.Timestamp)
+}
+
+func TestToPrivateGroupInviteNotificationUsesMessagePreviewWhenPresent(t *testing.T) {
+	body := NotificationBody{
+		Contact: &contacts.Contact{
+			ID:          "0xabc",
+			DisplayName: "Alice",
+		},
+		Chat: &Chat{
+			ID:       "group-1",
+			Name:     "Secret Group",
+			ChatType: ChatTypePrivateGroupChat,
+		},
+		Message: &common.Message{
+			ChatMessage: &protobuf.ChatMessage{
+				Text: "  please join us  ",
+			},
+		},
+	}
+
+	notif := body.toPrivateGroupInviteNotification("0x2", 0, messagePreviewNameAndMessage)
+	require.Equal(t, "please join us", notif.Message)
+}
+
 func TestShowMessageNotification_OneToOneChats(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	pkHex := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
@@ -110,6 +170,33 @@ func TestShowMessageNotification_GroupChats(t *testing.T) {
 	})
 	t.Run("TurnOff blocks notification", func(t *testing.T) {
 		settings := &mockNotificationSettings{groupChats: notifValueTurnOff}
+		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
+		require.False(t, got)
+	})
+}
+
+func TestShowMessageNotification_SelfAuthoredMessages(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	pkHex := crypto.PubkeyToHex(&key.PublicKey)
+
+	t.Run("one-to-one self-authored message does not notify", func(t *testing.T) {
+		chat := &Chat{ID: pkHex, ChatType: ChatTypeOneToOne, Active: true}
+		msg := common.NewMessage()
+		msg.ID, msg.ChatId, msg.Text, msg.From = "m1", chat.ID, "hi", pkHex
+		msg.MessageType = protobuf.MessageType_ONE_TO_ONE
+
+		settings := &mockNotificationSettings{oneToOneChats: notifValueSendAlerts}
+		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
+		require.False(t, got)
+	})
+
+	t.Run("private-group self-authored message does not notify", func(t *testing.T) {
+		chat := &Chat{ID: "grp1", ChatType: ChatTypePrivateGroupChat, Active: true, Name: "Group"}
+		msg := common.NewMessage()
+		msg.ID, msg.ChatId, msg.Text, msg.From = "m1", chat.ID, "hi", pkHex
+		msg.MessageType = protobuf.MessageType_PRIVATE_GROUP
+
+		settings := &mockNotificationSettings{groupChats: notifValueSendAlerts}
 		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
 		require.False(t, got)
 	})

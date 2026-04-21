@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	types "github.com/status-im/status-go/internal/crypto/types"
 )
 
 type Account struct {
@@ -38,7 +38,7 @@ func (a *Account) PrivateKey() *ecdsa.PrivateKey {
 }
 
 func (a *Account) PrivateKeyHex() string {
-	return types2.EncodeHex(crypto.FromECDSA(a.privateKey))
+	return types.EncodeHex(crypto.FromECDSA(a.privateKey))
 }
 
 func (a *Account) PublicKey() *ecdsa.PublicKey {
@@ -49,12 +49,12 @@ func (a *Account) PublicKeyHex() string {
 	if a.privateKey == nil {
 		return ""
 	}
-	return types2.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	return types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 }
 
-func (a *Account) Address() types2.Address {
+func (a *Account) Address() types.Address {
 	if a.privateKey == nil {
-		return types2.Address{}
+		return types.Address{}
 	}
 	return crypto.PubkeyToAddress(a.privateKey.PublicKey)
 }
@@ -68,15 +68,15 @@ func (a *Account) KeyUID() string {
 		return ""
 	}
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
-	return types2.EncodeHex(keyUID[:])
+	return types.EncodeHex(keyUID[:])
 }
 
 func (a *Account) ToAccountInfo() AccountInfo {
 	if a.privateKey == nil {
 		return AccountInfo{}
 	}
-	privateKeyHex := types2.EncodeHex(crypto.FromECDSA(a.privateKey))
-	publicKeyHex := types2.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	privateKeyHex := types.EncodeHex(crypto.FromECDSA(a.privateKey))
+	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
 	return AccountInfo{
@@ -94,7 +94,7 @@ func (a *Account) ToIdentifiedAccountInfo() IdentifiedAccountInfo {
 	}
 	info := a.ToAccountInfo()
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
-	keyUIDHex := types2.EncodeHex(keyUID[:])
+	keyUIDHex := types.EncodeHex(keyUID[:])
 	return IdentifiedAccountInfo{
 		AccountInfo: info,
 		KeyUID:      keyUIDHex,

@@ -7,7 +7,7 @@ import (
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 
 	"github.com/status-im/status-go/pkg/messaging/types"
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	wakuv "github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
 )
 
@@ -59,7 +59,7 @@ func (c *Client) PushReceivedMessages(receivedMessages ReceivedMessages) {
 	).Add(float64(len(receivedMessages.Messages)))
 }
 
-func (c *Client) PushSentEnvelope(sentEnvelope wakuv2.SentEnvelope) {
+func (c *Client) PushSentEnvelope(sentEnvelope wakuv.SentEnvelope) {
 	metrics.EnvelopeSentTotal.WithLabelValues(
 		sentEnvelope.Envelope.PubsubTopic(),
 		sentEnvelope.Envelope.Message().ContentTopic,
@@ -67,7 +67,7 @@ func (c *Client) PushSentEnvelope(sentEnvelope wakuv2.SentEnvelope) {
 	).Inc()
 }
 
-func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendingEnvelope) {
+func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv.ErrorSendingEnvelope) {
 	metrics.EnvelopeSentErrors.WithLabelValues(
 		errorSendingEnvelope.SentEnvelope.Envelope.PubsubTopic(),
 		errorSendingEnvelope.SentEnvelope.Envelope.Message().ContentTopic,

@@ -7,8 +7,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
-	adapters2 "github.com/status-im/status-go/pkg/messaging/adapters"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
+	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 // These methods ideally shouldn't be exposed as they reveal implementation details
@@ -45,19 +45,19 @@ func (a *API) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTas
 
 func (a *API) ProcessMailserverBatch(
 	ctx context.Context,
-	batch types2.StoreNodeBatch,
+	batch types.StoreNodeBatch,
 	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return a.core.stack.Transport.ProcessMailserverBatch(ctx, *adapters2.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return a.core.stack.Transport.ProcessMailserverBatch(ctx, *adapters.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	a.core.stack.Transport.SetStorenodeConfigProvider(c)
 }
 
-func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types2.ChatFilters) {
-	a.core.stack.Transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters2.ToTransportFilters(filters))
+func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
+	a.core.stack.Transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
 }

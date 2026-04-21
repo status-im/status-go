@@ -232,6 +232,56 @@ def fetch_community(node, community_id, wait_for_response=True, try_database=Tru
     )
 
 
+def communities_list(communities_response):
+    """Normalize a communities RPC response to a plain list of community dicts."""
+    if isinstance(communities_response, dict):
+        return communities_response.get("communities", []) or []
+    return communities_response or []
+
+
+def wallet_address(backend):
+    """Return the non-chat (wallet) account address for *backend*."""
+    accounts = backend.accounts_service.get_accounts()
+    assert accounts, "No accounts found"
+    wallet_account = next(a for a in accounts if not a.get("chat"))
+    assert wallet_account, "No wallet account found"
+    return wallet_account["address"]
+
+
+def edit_community(owner_backend, community_id):
+    """Edit a community's name and description, returning (new_name, new_description)."""
+    new_name = fake.community_name()
+    new_description = fake.community_description()
+    edit_resp = owner_backend.wakuext_service.edit_community(
+        community_id=community_id,
+        name=new_name,
+        description=new_description,
+    )
+    assert edit_resp is not None
+    return new_name, new_description
+
+
+def spectate_and_fetch_community(backend, community_id, attempts=10, delay=5):
+    """Fetch and spectate a community with retries. Returns the community dict or None."""
+    community = None
+    for attempt in range(attempts):
+        community = fetch_community(backend, community_id)
+        if community:
+            break
+        logging.info(f"Community {community_id} not found yet (attempt {attempt + 1}/{attempts})")
+        time.sleep(delay)
+
+    if not community:
+        return None
+
+    try:
+        backend.wakuext_service.spectate_community(community_id)
+    except ApiResponseError as exc:
+        logging.warning(f"Spectate community failed for {community_id}: {exc}")
+
+    return community
+
+
 def _pick_chat_id(chats: dict) -> str | None:
     if not chats:
         return None
@@ -682,6 +732,14 @@ def one_to_one_message(message_count, sender=None, receiver=None):
 
 def community_messages(message_chat_id, message_count, sender=None, receiver=None):
     start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
+    total_signals_before = sum(len(v) for v in receiver.received_signals.values())
+    logging.info(
+        "community_messages: start_index=%d, total_signals_before=%d, ws_url=%s",
+        start_index,
+        total_signals_before,
+        getattr(receiver, "url", "unknown"),
+    )
+
     sent_messages = []
     for i in range(message_count):
         message_text = f"test_message_{i+1}_{uuid4()}"
@@ -689,6 +747,17 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
         expected_message = get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         sent_messages.append(expected_message)
         time.sleep(0.01)
+
+    messages_new_after_send = len(receiver.received_signals[SignalType.MESSAGES_NEW])
+    total_signals_after_send = sum(len(v) for v in receiver.received_signals.values())
+    logging.info(
+        "community_messages: all %d messages sent, MESSAGES_NEW count=%d (was %d), total_signals=%d (was %d)",
+        message_count,
+        messages_new_after_send,
+        start_index,
+        total_signals_after_send,
+        total_signals_before,
+    )
 
     for i, expected_message in enumerate(sent_messages):
         with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start_index) as exp:

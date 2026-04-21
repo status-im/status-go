@@ -432,6 +432,7 @@ func GetContractAddress(token *tokentypes.Token) (addr common.Address, contractT
 	err = errorNotAvailableOnChainID
 
 	if token.ChainID == walletCommon.EthereumMainnet ||
+		token.ChainID == walletCommon.EthereumHoodi ||
 		token.ChainID == walletCommon.EthereumSepolia {
 		if shouldUseCctpBridge(token) {
 			if addr, ok := hopBridgeContractAddresses[token.ChainID][token.Address][CctpL1Bridge]; ok {

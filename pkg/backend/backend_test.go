@@ -29,11 +29,11 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
@@ -333,38 +333,6 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	wg.Wait()
 }
 
-func TestAppStateChange(t *testing.T) {
-	backend := NewStatusBackend(testutils.MustCreateTestLogger())
-
-	var testCases = []struct {
-		name          string
-		fromState     AppState
-		toState       AppState
-		expectedState AppState
-	}{
-		{
-			name:          "success",
-			fromState:     AppStateInactive,
-			toState:       AppStateBackground,
-			expectedState: AppStateBackground,
-		},
-		{
-			name:          "invalid state",
-			fromState:     AppStateInvalid,
-			toState:       "unexisting",
-			expectedState: AppStateInvalid,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			backend.appState = tc.fromState
-			backend.AppStateChange(tc.toState)
-			assert.Equal(t, tc.expectedState.String(), backend.appState.String())
-		})
-	}
-}
-
 func TestCallRPCWithStoppedNode(t *testing.T) {
 	backend := NewStatusBackend(testutils.MustCreateTestLogger())
 
@@ -474,7 +442,7 @@ func TestHashTypedData(t *testing.T) {
 
 	hash, err := backend.HashTypedData(typed)
 	require.NoError(t, err)
-	assert.NotEqual(t, types2.Hash{}, hash)
+	assert.NotEqual(t, types.Hash{}, hash)
 }
 
 func TestBackendGetVerifiedAccount(t *testing.T) {
@@ -499,7 +467,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	t.Run("PasswordDoesntMatch", func(t *testing.T) {
 		pkey, err := gethcrypto.GenerateKey()
 		require.NoError(t, err)
-		privateKeyHex := types2.EncodeHex(gethcrypto.FromECDSA(pkey))
+		privateKeyHex := types.EncodeHex(gethcrypto.FromECDSA(pkey))
 		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
 
 		_, err = testContext.backend.AccountsManager().CreateKeypairFromPrivateKeyAndStore(privateKeyHex, testPassword, "private key keypair", &accsmanagementtypes.AccountCreationDetails{
@@ -577,10 +545,10 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		pkey, err := crypto.GenerateKey()
 		require.NoError(t, err)
-		privateKeyHex := types2.EncodeHex(crypto.FromECDSA(pkey))
+		privateKeyHex := types.EncodeHex(crypto.FromECDSA(pkey))
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
 		keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&pkey.PublicKey))
-		keyUID := types2.EncodeHex(keyUIDHex[:])
+		keyUID := types.EncodeHex(keyUIDHex[:])
 
 		db, err := accounts.NewDB(testContext.backend.appDB)
 		require.NoError(t, err)
@@ -772,7 +740,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NotNil(t, serverMessenger)
 
 	// Ensure all created accounts are in the keystore and can be loaded
-	masterAddress := types2.HexToAddress(testContext.profileKeypair.DerivedFrom)
+	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
 	ok, err := testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -799,7 +767,7 @@ func TestConvertAccount(t *testing.T) {
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
 
-	keycardSettings := settings2.Settings{
+	keycardSettings := settings.Settings{
 		KeycardInstanceUID: "0xdeadbeef",
 		KeycardPairedOn:    1,
 		KeycardPairing:     "pairing",
@@ -972,7 +940,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 		require.NoError(t, testContext.backend.StopNode())
 	}()
 
-	masterAddress := types2.HexToAddress(testContext.profileKeypair.DerivedFrom)
+	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
 	ok, err := testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -1107,7 +1075,7 @@ func TestSetFleet(t *testing.T) {
 
 	accountsDB, err := testContext.backend.accountsDB()
 	require.NoError(t, err)
-	err = accountsDB.SaveSettingField(settings2.Fleet, params.FleetStatusProd)
+	err = accountsDB.SaveSettingField(settings.Fleet, params.FleetStatusProd)
 	require.NoError(t, err)
 
 	savedSettings, err = testContext.backend.GetSettings()
@@ -1148,6 +1116,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	alchemyAPIKey := fakeToken()
 	raribleMainnetAPIKey := fakeToken()
 	raribleTestnetAPIKey := fakeToken()
+	coingeckoAPIKey := fakeToken()
+	coingeckoDemoAPIKey := fakeToken()
 
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
@@ -1180,6 +1150,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 			AlchemyAPIKey:        alchemyAPIKey,
 			RaribleMainnetAPIKey: raribleMainnetAPIKey,
 			RaribleTestnetAPIKey: raribleTestnetAPIKey,
+			CoingeckoAPIKey:      coingeckoAPIKey,
+			CoingeckoDemoAPIKey:  coingeckoDemoAPIKey,
 		},
 	}
 
@@ -1198,6 +1170,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	require.Equal(t, walletConfig.AlchemyAPIKey, alchemyAPIKey)
 	require.Equal(t, walletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, walletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
+	require.Equal(t, walletConfig.CoingeckoAPIKey, coingeckoAPIKey)
+	require.Equal(t, walletConfig.CoingeckoDemoAPIKey, coingeckoDemoAPIKey)
 
 	require.NoError(t, testContext.backend.Logout())
 }

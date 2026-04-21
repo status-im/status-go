@@ -20,7 +20,7 @@ type AccountsManager interface {
 	CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string,
 		walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error)
 	AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string,
-		walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error)
+		xpub string, coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error)
 	CreateKeypairFromPrivateKeyAndStore(privateKey string, password string, keypairName string,
 		walletAccount *types.AccountCreationDetails, clock uint64) (keypair *types.Keypair, err error)
 	MigrateNonProfileKeycardKeypairToApp(mnemonic string, password string, clock uint64) (string, error)

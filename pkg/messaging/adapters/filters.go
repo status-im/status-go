@@ -1,38 +1,36 @@
 package adapters
 
 import (
-	transport2 "github.com/status-im/status-go/pkg/messaging/layers/transport"
+	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
 	"github.com/status-im/status-go/pkg/messaging/types"
 )
 
-func ChatsToInitializeToTransport(c types.ChatsToInitialize) []transport2.FiltersToInitialize {
-	filters := make([]transport2.FiltersToInitialize, len(c))
+func ChatsToInitializeToTransport(c types.ChatsToInitialize) []transport.FiltersToInitialize {
+	filters := make([]transport.FiltersToInitialize, len(c))
 	for i, chat := range c {
-		filters[i] = transport2.FiltersToInitialize{
+		filters[i] = transport.FiltersToInitialize{
 			ChatID:      chat.ChatID,
 			PubsubTopic: chat.PubsubTopic,
-			// TODO (#6384) temporary flag while migrating community shards
-			DistinctByPubsub: chat.IsCommunity,
 		}
 	}
 	return filters
 }
 
-func CommunityToInitializeToTransport(c *types.CommunityToInitialize) *transport2.CommunityFilterToInitialize {
-	return &transport2.CommunityFilterToInitialize{
+func CommunityToInitializeToTransport(c *types.CommunityToInitialize) *transport.CommunityFilterToInitialize {
+	return &transport.CommunityFilterToInitialize{
 		PrivKey: c.PrivKey,
 	}
 }
 
-func CommunitiesToInitializeToTransport(c types.CommunitiesToInitialize) []transport2.CommunityFilterToInitialize {
-	communityFilters := make([]transport2.CommunityFilterToInitialize, len(c))
+func CommunitiesToInitializeToTransport(c types.CommunitiesToInitialize) []transport.CommunityFilterToInitialize {
+	communityFilters := make([]transport.CommunityFilterToInitialize, len(c))
 	for i, filter := range c {
 		communityFilters[i] = *CommunityToInitializeToTransport(filter)
 	}
 	return communityFilters
 }
 
-func FromTransportFilter(filter *transport2.Filter) *types.ChatFilter {
+func FromTransportFilter(filter *transport.Filter) *types.ChatFilter {
 	if filter == nil {
 		return nil
 	}
@@ -53,7 +51,7 @@ func FromTransportFilter(filter *transport2.Filter) *types.ChatFilter {
 	)
 }
 
-func FromTransportFilters(filters []*transport2.Filter) types.ChatFilters {
+func FromTransportFilters(filters []*transport.Filter) types.ChatFilters {
 	chatFilters := make([]*types.ChatFilter, len(filters))
 	for i, filter := range filters {
 		chatFilters[i] = FromTransportFilter(filter)
@@ -61,8 +59,8 @@ func FromTransportFilters(filters []*transport2.Filter) types.ChatFilters {
 	return chatFilters
 }
 
-func ToTransportFilter(c *types.ChatFilter) *transport2.Filter {
-	return &transport2.Filter{
+func ToTransportFilter(c *types.ChatFilter) *transport.Filter {
+	return &transport.Filter{
 		ChatID:       c.ChatID(),
 		FilterID:     c.FilterID(),
 		Identity:     c.Identity(),
@@ -76,8 +74,8 @@ func ToTransportFilter(c *types.ChatFilter) *transport2.Filter {
 	}
 }
 
-func ToTransportFilters(c types.ChatFilters) []*transport2.Filter {
-	transportFilters := make([]*transport2.Filter, len(c))
+func ToTransportFilters(c types.ChatFilters) []*transport.Filter {
+	transportFilters := make([]*transport.Filter, len(c))
 	for i, filter := range c {
 		transportFilters[i] = ToTransportFilter(filter)
 	}

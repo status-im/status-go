@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -16,6 +16,7 @@ var (
 type KeypairType string
 type AccountType string
 type AccountOperable string
+type ColdWalletType string
 
 const (
 	KeypairTypeProfile KeypairType = "profile"
@@ -34,20 +35,28 @@ const (
 	AccountNonOperable       AccountOperable = "no"        // an account is non operable it is not a keycard account and there is no keystore file for it and no keystore file for the address it is derived from
 	AccountPartiallyOperable AccountOperable = "partially" // an account is partially operable if it is not a keycard account and there is created keystore file for the address it is derived from
 	AccountFullyOperable     AccountOperable = "fully"     // an account is fully operable if it is not a keycard account and there is a keystore file for it
+)
 
+const (
+	ColdWalletTypeNone          ColdWalletType = ""
+	ColdWalletTypeStatusKeycard ColdWalletType = "status-keycard"
+	ColdWalletTypeLedger        ColdWalletType = "ledger"
+	ColdWalletTypeTrezor        ColdWalletType = "trezor"
 )
 
 type Keypair struct {
-	KeyUID                  string      `json:"key-uid"`
-	Name                    string      `json:"name"`
-	Type                    KeypairType `json:"type"`
-	DerivedFrom             string      `json:"derived-from"`
-	LastUsedDerivationIndex uint64      `json:"last-used-derivation-index,omitempty"`
-	SyncedFrom              string      `json:"synced-from,omitempty"` // keeps an info which device this keypair is added from can be one of two values defined in constants or device name (custom)
-	Clock                   uint64      `json:"clock,omitempty"`
-	Accounts                []*Account  `json:"accounts,omitempty"`
-	Keycards                []*Keycard  `json:"keycards,omitempty"`
-	Removed                 bool        `json:"removed,omitempty"`
+	KeyUID                  string         `json:"key-uid"`
+	Name                    string         `json:"name"`
+	Type                    KeypairType    `json:"type"`
+	DerivedFrom             string         `json:"derived-from"`
+	LastUsedDerivationIndex uint64         `json:"last-used-derivation-index,omitempty"`
+	SyncedFrom              string         `json:"synced-from,omitempty"` // keeps an info which device this keypair is added from can be one of two values defined in constants or device name (custom)
+	Clock                   uint64         `json:"clock,omitempty"`
+	Accounts                []*Account     `json:"accounts,omitempty"`
+	Keycards                []*Keycard     `json:"keycards,omitempty"`
+	Removed                 bool           `json:"removed,omitempty"`
+	XPub                    string         `json:"xpub,omitempty"`
+	ColdWallet              ColdWalletType `json:"cold-wallet,omitempty"`
 }
 
 type AccountCreationDetails struct {
@@ -58,14 +67,14 @@ type AccountCreationDetails struct {
 }
 
 type Account struct {
-	Address               types2.Address            `json:"address"`
+	Address               types.Address             `json:"address"`
 	KeyUID                string                    `json:"key-uid"`
 	Wallet                bool                      `json:"wallet"`
 	AddressWasNotShown    bool                      `json:"address-was-not-shown,omitempty"`
 	Chat                  bool                      `json:"chat"`
 	Type                  AccountType               `json:"type,omitempty"`
 	Path                  string                    `json:"path,omitempty"`
-	PublicKey             types2.HexBytes           `json:"public-key,omitempty"`
+	PublicKey             types.HexBytes            `json:"public-key,omitempty"`
 	Name                  string                    `json:"name"`
 	Emoji                 string                    `json:"emoji"`
 	ColorID               common.CustomizationColor `json:"colorId,omitempty"`
@@ -80,11 +89,11 @@ type Account struct {
 }
 
 type Keycard struct {
-	KeycardUID        string           `json:"keycard-uid"`
-	KeycardName       string           `json:"keycard-name"`
-	KeycardLocked     bool             `json:"keycard-locked"`
-	AccountsAddresses []types2.Address `json:"accounts-addresses"`
-	KeyUID            string           `json:"key-uid"`
+	KeycardUID        string          `json:"keycard-uid"`
+	KeycardName       string          `json:"keycard-name"`
+	KeycardLocked     bool            `json:"keycard-locked"`
+	AccountsAddresses []types.Address `json:"accounts-addresses"`
+	KeyUID            string          `json:"key-uid"`
 	Position          uint64
 }
 
@@ -100,14 +109,14 @@ func (a *Account) IsWalletAccountReadyForTransaction() bool {
 
 func (a *Account) MarshalJSON() ([]byte, error) {
 	item := struct {
-		Address               types2.Address            `json:"address"`
+		Address               types.Address             `json:"address"`
 		MixedcaseAddress      string                    `json:"mixedcase-address"`
 		KeyUID                string                    `json:"key-uid"`
 		Wallet                bool                      `json:"wallet"`
 		Chat                  bool                      `json:"chat"`
 		Type                  AccountType               `json:"type"`
 		Path                  string                    `json:"path"`
-		PublicKey             types2.HexBytes           `json:"public-key"`
+		PublicKey             types.HexBytes            `json:"public-key"`
 		Name                  string                    `json:"name"`
 		Emoji                 string                    `json:"emoji"`
 		ColorID               common.CustomizationColor `json:"colorId"`
@@ -146,16 +155,18 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 
 func (a *Keypair) MarshalJSON() ([]byte, error) {
 	item := struct {
-		KeyUID                  string      `json:"key-uid"`
-		Name                    string      `json:"name"`
-		Type                    KeypairType `json:"type"`
-		DerivedFrom             string      `json:"derived-from"`
-		LastUsedDerivationIndex uint64      `json:"last-used-derivation-index"`
-		SyncedFrom              string      `json:"synced-from"`
-		Clock                   uint64      `json:"clock"`
-		Accounts                []*Account  `json:"accounts"`
-		Keycards                []*Keycard  `json:"keycards"`
-		Removed                 bool        `json:"removed"`
+		KeyUID                  string         `json:"key-uid"`
+		Name                    string         `json:"name"`
+		Type                    KeypairType    `json:"type"`
+		DerivedFrom             string         `json:"derived-from"`
+		LastUsedDerivationIndex uint64         `json:"last-used-derivation-index"`
+		SyncedFrom              string         `json:"synced-from"`
+		Clock                   uint64         `json:"clock"`
+		Accounts                []*Account     `json:"accounts"`
+		Keycards                []*Keycard     `json:"keycards"`
+		Removed                 bool           `json:"removed"`
+		XPub                    string         `json:"xpub"`
+		ColdWallet              ColdWalletType `json:"cold-wallet"`
 	}{
 		KeyUID:                  a.KeyUID,
 		Name:                    a.Name,
@@ -167,6 +178,8 @@ func (a *Keypair) MarshalJSON() ([]byte, error) {
 		Accounts:                a.Accounts,
 		Keycards:                a.Keycards,
 		Removed:                 a.Removed,
+		XPub:                    a.XPub,
+		ColdWallet:              a.ColdWallet,
 	}
 
 	return json.Marshal(item)
@@ -184,6 +197,8 @@ func (a *Keypair) CopyKeypair() *Keypair {
 		Accounts:                make([]*Account, len(a.Accounts)),
 		Keycards:                make([]*Keycard, len(a.Keycards)),
 		Removed:                 a.Removed,
+		XPub:                    a.XPub,
+		ColdWallet:              a.ColdWallet,
 	}
 
 	for i, acc := range a.Accounts {
@@ -289,6 +304,6 @@ func (kp *Keycard) FromSyncKeycard(kc *protobuf.SyncKeycard) {
 	kp.Position = kc.Position
 
 	for _, addr := range kc.Addresses {
-		kp.AccountsAddresses = append(kp.AccountsAddresses, types2.BytesToAddress(addr))
+		kp.AccountsAddresses = append(kp.AccountsAddresses, types.BytesToAddress(addr))
 	}
 }

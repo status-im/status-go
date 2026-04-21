@@ -73,7 +73,19 @@ func (api *API) AddKeypairViaSeedPhrase(ctx context.Context, mnemonic string, pa
 
 func (api *API) AddKeypairStoredToKeycard(ctx context.Context, keyUID string, masterAddress string, name string,
 	walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
-	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, walletAccounts)
+	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, "", "", walletAccounts)
+	if err != nil {
+		return nil, err
+	}
+
+	api.publishAccountsEvent(addedKeypair.Accounts, false)
+
+	return addedKeypair, nil
+}
+
+func (api *API) AddKeypairStoredToKeycardNew(ctx context.Context, keyUID string, masterAddress string, name string,
+	xpub string, coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
+	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, xpub, coldWallet, walletAccounts)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +154,11 @@ func (api *API) HasPairedDevices(ctx context.Context) bool {
 // Setting `Keypair` without `Accounts` will update keypair only.
 func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name string) error {
 	return (*api.messenger).UpdateKeypairName(keyUID, name)
+}
+
+// If xpub is empty, only cold wallet will be updated.
+func (api *API) UpdateKeypairXPub(ctx context.Context, keyUID string, xpub string, coldWallet accsmanagementtypes.ColdWalletType) error {
+	return (*api.messenger).UpdateKeypairXPub(keyUID, xpub, coldWallet)
 }
 
 func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPosition int64) error {

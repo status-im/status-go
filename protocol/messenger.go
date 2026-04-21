@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -38,11 +39,14 @@ import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	messaging2 "github.com/status-im/status-go/pkg/messaging"
+	datasync "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/archive"
+	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
@@ -102,7 +106,7 @@ type Messenger struct {
 	pushNotificationClient    *pushnotificationclient.Client
 	pushNotificationServer    PushNotificationServer
 	communitiesManager        *communities.Manager
-	archiveManager            communities.ArchiveService
+	archiveManager            archive.ArchiveService
 	communitiesKeyDistributor communities.KeyDistributor
 	accountsManager           AccountsManager
 	mentionsManager           *MentionManager
@@ -133,6 +137,7 @@ type Messenger struct {
 	httpServer                 *server.MediaServer
 
 	started           bool
+	paused            atomic.Bool
 	quit              chan struct{}
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -366,7 +371,7 @@ func NewMessenger(
 		return nil, err
 	}
 
-	amc := &communities.ArchiveManagerConfig{
+	amc := &archivetypes.ArchiveManagerConfig{
 		TorrentConfig: c.torrentConfig,
 		Logger:        logger,
 		Persistence:   communitiesManager.GetPersistence(),
@@ -378,7 +383,7 @@ func NewMessenger(
 	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
 	// "communities/manager_archive.go" version of this function based on the build instructions for those files.
 	// See those file for more details.
-	archiveManager := communities.NewArchiveManager(amc)
+	archiveManager := archive.NewArchiveManager(amc)
 
 	settings, err := accounts.NewDB(database)
 	if err != nil {
@@ -440,7 +445,12 @@ func NewMessenger(
 		shutdownTasks: []func() error{
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
-			archiveManager.Stop,
+			func() error {
+				if messenger.archiveManager == nil {
+					return nil
+				}
+				return messenger.archiveManager.Stop()
+			},
 		},
 		logger:                           logger,
 		tracer:                           c.tracer,
@@ -490,6 +500,26 @@ func NewMessenger(
 	return messenger, nil
 }
 
+func (m *Messenger) SetupArchiveManager(amc *archivetypes.ArchiveManagerConfig) {
+	if amc.Logger == nil {
+		amc.Logger = m.logger
+	}
+	if amc.Persistence == nil {
+		amc.Persistence = m.communitiesManager.GetPersistence()
+	}
+	if amc.Messaging == nil {
+		amc.Messaging = m.messaging
+	}
+	if amc.Identity == nil {
+		amc.Identity = m.identity
+	}
+	if amc.Publisher == nil {
+		amc.Publisher = m.communitiesManager
+	}
+
+	m.archiveManager = archive.NewArchiveManager(amc)
+}
+
 func (m *Messenger) processSentMessage(id string) error {
 	rawMessage, err := m.persistence.RawMessageByID(id)
 	// If we have no raw message, we create a temporary one, so that
@@ -519,6 +549,7 @@ func (m *Messenger) processSentMessage(id string) error {
 }
 
 func (m *Messenger) ToForeground() {
+	m.SetPaused(false)
 	if m.httpServer != nil {
 		m.httpServer.ToForeground()
 	}
@@ -527,9 +558,37 @@ func (m *Messenger) ToForeground() {
 }
 
 func (m *Messenger) ToBackground() {
+	m.SetPaused(true)
 	if m.httpServer != nil {
 		m.httpServer.ToBackground()
 	}
+}
+
+func (m *Messenger) SetPaused(paused bool) {
+	m.paused.Store(paused)
+	datasync.SetPaused(paused)
+	if m.pushNotificationClient != nil {
+		if paused {
+			m.pushNotificationClient.Offline()
+		} else {
+			m.pushNotificationClient.Online()
+		}
+	}
+	if m.messaging != nil {
+		if paused {
+			m.messaging.PauseTransport()
+		} else {
+			m.messaging.ResumeTransport()
+		}
+	}
+	// ToDo: the current ArchiveManager does not provide SetPaused method yet
+	// if m.archiveManager != nil {
+	// 	m.archiveManager.SetPaused(paused)
+	// }
+}
+
+func (m *Messenger) isPaused() bool {
+	return m.paused.Load()
 }
 
 func (m *Messenger) Start() (*MessengerResponse, error) {
@@ -620,7 +679,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.archiveManager.IsReady() {
+	if m.archiveManager.IsStarted() {
 		m.shutdownWaitGroup.Add(1)
 		go func() {
 			defer gocommon.LogOnPanic()
@@ -751,9 +810,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Update torrent manager
-	if m.archiveManager != nil {
-		m.archiveManager.SetOnline(online)
-	}
+	m.archiveManager.SetOnline(online)
 
 	// Publish contact code
 	if online && m.shouldPublishContactCode {
@@ -1303,6 +1360,9 @@ func (m *Messenger) watchConnectionChange() {
 			case status := <-subscription.C():
 				processNewState(status.IsOnline)
 			case <-ticker.C:
+				if m.isPaused() {
+					continue
+				}
 				processNewState(m.Online())
 			case <-m.quit:
 				return
@@ -1331,6 +1391,15 @@ func (m *Messenger) watchChatsToUnmute() {
 		defer gocommon.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
+			if m.isPaused() {
+				select {
+				case <-time.After(time.Minute):
+				case <-m.quit:
+					return
+				}
+				continue
+			}
+
 			// Execute the check immediately upon starting
 			response := &MessengerResponse{}
 			currTime := time.Now()
@@ -1395,6 +1464,9 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 		for {
 			select {
 			case <-ticker.C:
+				if m.isPaused() {
+					continue
+				}
 				check()
 			case <-m.quit:
 				return
@@ -1459,6 +1531,9 @@ func (m *Messenger) watchPendingCommunityRequestToJoin() {
 		for {
 			select {
 			case <-time.After(time.Minute * 10):
+				if m.isPaused() {
+					continue
+				}
 				_, err := m.CheckAndDeletePendingRequestToJoinCommunity(context.Background(), false)
 				if err != nil {
 					m.logger.Error("failed to check and delete pending request to join community", zap.Error(err))
@@ -2693,17 +2768,40 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	return m.handleRetrievedMessages(chatWithMessages, true, false)
 }
 
-func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
+// retrieveMessagesDebounceInterval coalesces bursts of matched envelopes
+// (e.g. storenode history fetch) into a single ProcessAllMessages call,
+// preserving the same ~1s latency as the previous polling loop.
+const retrieveMessagesDebounceInterval = time.Second
+
+func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
-		ticker := time.NewTicker(tick)
-		defer ticker.Stop()
+
+		matchedCh := m.messaging.SubscribeFilterMatched()
+		defer m.messaging.UnsubscribeFilterMatched(matchedCh)
+
+		var debounceTimer *time.Timer
+		var debounceCh <-chan time.Time
+
 		for {
 			select {
-			case <-ticker.C:
+			case <-matchedCh:
+				// Reset the debounce window on every new match to coalesce bursts.
+				if debounceTimer != nil && !debounceTimer.Stop() {
+					select {
+					case <-debounceTimer.C:
+					default:
+					}
+				}
+				debounceTimer = time.NewTimer(retrieveMessagesDebounceInterval)
+				debounceCh = debounceTimer.C
+
+			case <-debounceCh:
+				debounceCh = nil
 				m.ProcessAllMessages()
+
 			case <-cancel:
 				return
 			case <-m.quit:

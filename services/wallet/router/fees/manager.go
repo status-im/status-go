@@ -128,7 +128,7 @@ func NewFeeManager(ethClientGetter rpc.EthClientGetter, logger *zap.Logger) *Fee
 
 func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
 	switch chainID {
-	case common.EthereumMainnet, common.EthereumSepolia, common.AnvilMainnet, common.BSCMainnet, common.BSCTestnet:
+	case common.EthereumMainnet, common.EthereumHoodi, common.EthereumSepolia, common.AnvilMainnet, common.BSCMainnet, common.BSCTestnet:
 		return gas.ChainClassL1, nil
 	case common.ArbitrumMainnet, common.ArbitrumSepolia:
 		return gas.ChainClassArbStack, nil

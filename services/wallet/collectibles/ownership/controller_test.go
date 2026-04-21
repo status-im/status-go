@@ -3,12 +3,17 @@ package ownership_test
 import (
 	"context"
 	"math/big"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	coretypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc1155"
+	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc721"
+	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
 	"github.com/stretchr/testify/require"
 
@@ -25,6 +30,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/transferdetector"
 
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
@@ -804,4 +810,129 @@ func TestControllerPeriodicalLoads(t *testing.T) {
 	}, 1000*time.Millisecond, 100*time.Millisecond)
 
 	controller.Stop()
+}
+
+func TestControllerTransferDetectionEvents(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	accountsProvider := mock_ownership.NewMockAccountsProvider(mockCtrl)
+	fakeAddress := types.HexToAddress("0x123")
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{fakeAddress}, nil).AnyTimes()
+
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_ownership.NewMockNetworksProvider(mockCtrl)
+	networksPublisher := pubsub.NewPublisher()
+
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{
+		{ChainID: 1, IsActive: true},
+	}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
+
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	emptyCollectiblesContainer := &thirdparty.CollectibleOwnershipContainer{
+		Items:          []thirdparty.CollectibleIDBalance{},
+		NextCursor:     "",
+		PreviousCursor: "",
+		Provider:       "mockProvider",
+	}
+	ownershipFetcher := mock_ownership.NewMockCollectibleOwnershipFetcher(mockCtrl)
+	ownershipFetcher.EXPECT().FetchCollectibleOwnershipByOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
+			return emptyCollectiblesContainer, nil
+		}).AnyTimes()
+
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
+	var estimatedBlockCalls atomic.Int32
+	blockChainStateProvider.EXPECT().GetEstimatedBlockTime(gomock.Any(), uint64(1), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, chainID uint64, blockNumber uint64) (time.Time, error) {
+			estimatedBlockCalls.Add(1)
+			return time.Now(), nil
+		},
+	).AnyTimes()
+
+	publisher := pubsub.NewPublisher()
+	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
+
+	controller := ownership.NewController(
+		ownership.NewOwnershipDB(walletDB),
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
+		ownershipFetcher,
+		publisher,
+		logger,
+	)
+
+	params := ownership.PeriodicalLoaderParams{
+		StartDelay:   1 * time.Second,
+		LoadInterval: 10 * time.Second,
+		LoaderParams: ownership.LoaderParams{
+			LoadDelay:  0 * time.Second,
+			FetchLimit: 50,
+		},
+	}
+	controller.StartWithLoaderParams(params)
+	defer controller.Stop()
+
+	// Ensure initial load completed so ownership timestamp exists.
+	require.Eventually(t, func() bool {
+		return controller.GetLoaderState(walletCommon.ChainID(1), common.Address(fakeAddress)) == ownership.LoaderStateIdle
+	}, 2*time.Second, 50*time.Millisecond)
+
+	otherAddress := common.HexToAddress("0x456")
+	msg := transferdetector.EventTransferDetectionFinished{
+		ChainID:   1,
+		Accounts:  []common.Address{common.Address(fakeAddress)},
+		FromBlock: 100,
+		ToBlock:   200,
+		Events: []eventlog.Event{
+			{
+				EventKey: eventlog.ERC721Transfer,
+				Unpacked: erc721.Erc721Transfer{
+					From: common.Address(fakeAddress),
+					To:   otherAddress,
+					Raw: coretypes.Log{
+						BlockNumber: 123,
+					},
+				},
+			},
+			{
+				EventKey: eventlog.ERC1155TransferSingle,
+				Unpacked: erc1155.Erc1155TransferSingle{
+					From: common.Address(fakeAddress),
+					To:   otherAddress,
+					Raw: coretypes.Log{
+						BlockNumber: 124,
+					},
+				},
+			},
+			{
+				EventKey: eventlog.ERC1155TransferBatch,
+				Unpacked: erc1155.Erc1155TransferBatch{
+					From: common.Address(fakeAddress),
+					To:   otherAddress,
+					Raw: coretypes.Log{
+						BlockNumber: 125,
+					},
+				},
+			},
+			{
+				EventKey: eventlog.ERC721Transfer,
+				Unpacked: struct{}{},
+			},
+		},
+	}
+	pubsub.Publish(transferDetectorPublisher, msg)
+
+	require.Eventually(t, func() bool {
+		return estimatedBlockCalls.Load() >= 3
+	}, 2*time.Second, 50*time.Millisecond)
 }

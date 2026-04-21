@@ -45,12 +45,10 @@ func Solve(ctx context.Context, puzzle *Puzzle) (*Solution, error) {
 
 	// Try different nonces until we find one that meets the difficulty requirement
 	for nonce := uint64(0); nonce < maxAttempts; nonce++ {
-		if nonce%1000 == 0 {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			default:
-			}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
 		}
 
 		// Create input: challenge + salt + nonce

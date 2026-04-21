@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 
-	geth2 "github.com/status-im/status-go/internal/accounts-management/keystore/internal/geth"
+	geth "github.com/status-im/status-go/internal/accounts-management/keystore/internal/geth"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
@@ -173,7 +173,7 @@ func (a *Adapter) ReEncryptKeyStoreDir(oldPass, newPass string) (err error) {
 		err = mapToKeystoreError(err)
 	}()
 
-	err = geth2.ReEncryptKeyStoreDir(a.keystoreDir, oldPass, newPass)
+	err = geth.ReEncryptKeyStoreDir(a.keystoreDir, oldPass, newPass)
 	return
 }
 
@@ -188,7 +188,7 @@ func (a *Adapter) MigrateKeyStoreDir(newDir string) (err error) {
 		addressesStr[i] = address.Address.Hex()
 	}
 
-	err = geth2.MigrateKeyStoreDir(a.keystoreDir, newDir, addressesStr)
+	err = geth.MigrateKeyStoreDir(a.keystoreDir, newDir, addressesStr)
 	if err != nil {
 		return err
 	}

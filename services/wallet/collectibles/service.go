@@ -212,24 +212,31 @@ func (s *Service) GetOwnedCollectibles(
 	}, err
 }
 
-func (s *Service) needsToFetch(chainID walletCommon.ChainID, address common.Address, fetchCriteria FetchCriteria) (bool, error) {
-	mustFetch := false
+func (s *Service) shouldTriggerLoad(chainID walletCommon.ChainID, address common.Address, fetchCriteria FetchCriteria) (bool, error) {
 	switch fetchCriteria.FetchType {
-	case FetchTypeAlwaysFetch:
-		mustFetch = true
 	case FetchTypeNeverFetch:
-		mustFetch = false
+		return false, nil
+	case FetchTypeAlwaysFetch:
+		return true, nil
 	case FetchTypeFetchIfNotCached, FetchTypeFetchIfCacheOld:
 		timestamp, err := s.ownershipDB.GetOwnershipUpdateTimestamp(address, chainID)
 		if err != nil {
 			return false, err
 		}
-		if timestamp == ownership.InvalidTimestamp ||
-			(fetchCriteria.FetchType == FetchTypeFetchIfCacheOld && timestamp+fetchCriteria.MaxCacheAgeSeconds < time.Now().Unix()) {
-			mustFetch = true
+		if timestamp != ownership.InvalidTimestamp &&
+			!(fetchCriteria.FetchType == FetchTypeFetchIfCacheOld && timestamp+fetchCriteria.MaxCacheAgeSeconds < time.Now().Unix()) {
+			return false, nil
 		}
+		// Skip duplicate load unless the loader is missing or errored
+		if fetchCriteria.FetchType == FetchTypeFetchIfNotCached {
+			state := s.ownershipController.GetLoaderState(chainID, address)
+			if state != ownership.LoaderStateNotAvailable && state != ownership.LoaderStateError {
+				return false, nil
+			}
+		}
+		return true, nil
 	}
-	return mustFetch, nil
+	return false, nil
 }
 
 func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs []walletCommon.ChainID, addresses []common.Address, fetchCriteria FetchCriteria) error {
@@ -241,21 +248,20 @@ func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs [
 	wgErr := atomic.NewError(nil)
 	for _, address := range addresses {
 		for _, chainID := range chainIDs {
-			mustFetch, err := s.needsToFetch(chainID, address, fetchCriteria)
-			if err != nil {
+			if ok, err := s.shouldTriggerLoad(chainID, address, fetchCriteria); err != nil {
 				return err
+			} else if !ok {
+				continue
 			}
-			if mustFetch {
-				wg.Add(1)
-				go func() {
-					defer gocommon.LogOnPanic()
-					defer wg.Done()
-					err := s.ownershipController.TriggerLoad(ctx, chainID, address)
-					if err != nil {
-						wgErr.Store(err)
-					}
-				}()
-			}
+
+			wg.Add(1)
+			go func() {
+				defer gocommon.LogOnPanic()
+				defer wg.Done()
+				if err := s.ownershipController.TriggerLoad(ctx, chainID, address); err != nil {
+					wgErr.Store(err)
+				}
+			}()
 		}
 	}
 

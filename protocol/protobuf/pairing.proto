@@ -306,6 +306,8 @@ message SyncKeypair {
   repeated SyncKeycard keycards = 9;
   bool removed = 10;
   bytes keycard_pairings = 11;
+  string xpub = 12;
+  string cold_wallet = 13;
 }
 
 // this message is used for syncing accounts positions only, for syncing any other info consider

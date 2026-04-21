@@ -71,6 +71,8 @@ type Option func(*Transport) error
 
 // Transport is a transport based on Whisper service.
 type Transport struct {
+	gocommon.PauseBroadcaster
+
 	waku        types.Waku
 	api         types.PublicWakuAPI // only PublicWakuAPI implements logic to send messages
 	keysManager *transportKeysManager
@@ -79,8 +81,27 @@ type Transport struct {
 	cache       ProcessedMessageIDsCachePersistence
 
 	envelopesMonitor *EnvelopesMonitor
+	cleanFiltersFn   func() error
 	quit             chan struct{}
 }
+
+// Pause signals Transport's internal goroutines to idle and cascades to EnvelopesMonitor.
+func (t *Transport) Pause() {
+	t.MarkPaused()
+	if t.envelopesMonitor != nil {
+		t.envelopesMonitor.MarkPaused()
+	}
+}
+
+// Resume signals Transport's internal goroutines to resume and cascades to EnvelopesMonitor.
+func (t *Transport) Resume() {
+	t.MarkResumed()
+	if t.envelopesMonitor != nil {
+		t.envelopesMonitor.MarkResumed()
+	}
+}
+
+var cleanFiltersLoopInterval = 5 * time.Minute
 
 // NewTransport returns a new Transport.
 // TODO: leaving a chat should verify that for a given public key
@@ -186,7 +207,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret messagingtypes.NegotiatedSecr
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, "", false)
+	return t.filters.LoadPublic(chatID, "")
 }
 
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
@@ -268,7 +289,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic, false)
+	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +370,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	}
 
 	// We load the filter to make sure we can post on it
-	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic, true)
+	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
@@ -362,6 +383,12 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 }
 
 func (t *Transport) cleanFilters() error {
+	if t.cleanFiltersFn != nil {
+		return t.cleanFiltersFn()
+	}
+	if t.filters == nil {
+		return nil
+	}
 	return t.filters.RemoveNoListenFilters()
 }
 
@@ -428,22 +455,20 @@ func (t *Transport) Stop() error {
 // We therefore periodically clean them up so we don't receive unnecessary data.
 
 func (t *Transport) cleanFiltersLoop() {
-
-	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
 		defer gocommon.LogOnPanic()
-		for {
-			select {
-			case <-t.quit:
-				ticker.Stop()
-				return
-			case <-ticker.C:
+		sub := t.Subscribe()
+		defer sub.Unsubscribe()
+		pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+			Interval: cleanFiltersLoopInterval,
+			OnTick: func() {
 				err := t.cleanFilters()
 				if err != nil {
 					t.logger.Error("failed to clean up topics", zap.Error(err))
 				}
-			}
-		}
+			},
+		}, sub.C())
+		pt.Run(t.quit)
 	}()
 }
 
@@ -573,6 +598,23 @@ func (t *Transport) GetActiveStorenode() peer.AddrInfo {
 
 func (t *Transport) DisconnectActiveStorenode(ctx context.Context, backoffReason time.Duration, shouldCycle bool) {
 	t.waku.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
+}
+
+// SubscribeFilterMatched returns a channel notified (non-blocking, coalescing) whenever
+// an incoming envelope matches at least one installed filter. Callers must call
+// UnsubscribeFilterMatched with the returned channel when done.
+func (t *Transport) SubscribeFilterMatched() chan struct{} {
+	if t.waku == nil {
+		return nil
+	}
+	return t.waku.SubscribeFilterMatched()
+}
+
+func (t *Transport) UnsubscribeFilterMatched(ch chan struct{}) {
+	if t.waku == nil || ch == nil {
+		return
+	}
+	t.waku.UnsubscribeFilterMatched(ch)
 }
 
 func (t *Transport) OnStorenodeChanged() <-chan peer.ID {

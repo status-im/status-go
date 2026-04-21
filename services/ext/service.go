@@ -66,6 +66,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
+	gocommon.PauseBroadcaster
 	messaging       *messaging2.API
 	messenger       *protocol.Messenger
 	cancelMessenger chan struct{}
@@ -239,6 +240,7 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.MarkStarted()
 	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
 
 	if s.config.ShhextConfig.BandwidthStatsEnabled {
@@ -314,6 +316,7 @@ func (s *Service) Stop() error {
 		s.messaging = nil
 	}
 
+	s.MarkStopped()
 	return nil
 }
 

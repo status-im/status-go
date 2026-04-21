@@ -44,16 +44,19 @@ func NewService(db *sql.DB, walletFeed *event.Feed, tokenManager *token.Manager,
 }
 
 func (s *Service) Start(ctx context.Context) {
-	// Update all fiat currency formats in cache
-	fiatFormats, err := s.getAllFiatCurrencyFormats()
-	if err == nil {
-		_ = s.db.UpdateCachedFormats(fiatFormats)
-	}
+	go func() {
+		defer gocommon.LogOnPanic()
+		// Update all fiat currency formats in cache
+		fiatFormats, err := s.getAllFiatCurrencyFormats()
+		if err == nil {
+			_ = s.db.UpdateCachedFormats(fiatFormats)
+		}
 
-	fixedTokenFormats, err := s.getAllFixedTokenCurrencyFormats()
-	if err == nil {
-		_ = s.db.UpdateCachedFormats(fixedTokenFormats)
-	}
+		fixedTokenFormats, err := s.getAllFixedTokenCurrencyFormats()
+		if err == nil {
+			_ = s.db.UpdateCachedFormats(fixedTokenFormats)
+		}
+	}()
 
 	go func() {
 		defer gocommon.LogOnPanic()

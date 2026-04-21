@@ -2,9 +2,9 @@ package accounts
 
 import (
 	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
-	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 )
 
@@ -16,21 +16,21 @@ const (
 
 func GetWatchOnlyAccountsForTest() []*accsmanagementtypes.Account {
 	wo1 := &accsmanagementtypes.Account{
-		Address: types2.Address{0x11},
+		Address: types.Address{0x11},
 		Type:    accsmanagementtypes.AccountTypeWatch,
 		Name:    "WatchOnlyAcc1",
 		ColorID: common.CustomizationColorPrimary,
 		Emoji:   "emoji-1",
 	}
 	wo2 := &accsmanagementtypes.Account{
-		Address: types2.Address{0x12},
+		Address: types.Address{0x12},
 		Type:    accsmanagementtypes.AccountTypeWatch,
 		Name:    "WatchOnlyAcc2",
 		ColorID: common.CustomizationColorPrimary,
 		Emoji:   "emoji-1",
 	}
 	wo3 := &accsmanagementtypes.Account{
-		Address: types2.Address{0x13},
+		Address: types.Address{0x13},
 		Type:    accsmanagementtypes.AccountTypeWatch,
 		Name:    "WatchOnlyAcc3",
 		ColorID: common.CustomizationColorPrimary,
@@ -41,8 +41,8 @@ func GetWatchOnlyAccountsForTest() []*accsmanagementtypes.Account {
 }
 
 func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccount bool, includeAdditionalAccounts bool) (
-	keypair *accsmanagementtypes.Keypair, acc *generator2.Account, derivedAccs map[string]*generator2.Account, err error) {
-	acc, derivedAccs, err = generator2.CreateAndDeriveAccountsFromMnemonic(testProfileMnemonic, []string{
+	keypair *accsmanagementtypes.Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
+	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testProfileMnemonic, []string{
 		accsmanagementcommon.PathEIP1581Chat,
 		accsmanagementcommon.PathDefaultWalletAccount,
 		accsmanagementcommon.CustomWalletPath1,
@@ -67,7 +67,7 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			Chat:                  true,
 			Type:                  accsmanagementtypes.AccountTypeGenerated,
 			Path:                  accsmanagementcommon.PathEIP1581Chat,
-			PublicKey:             types2.Hex2Bytes(derivedAccs[accsmanagementcommon.PathEIP1581Chat].PublicKeyHex()),
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathEIP1581Chat].PublicKeyHex()),
 			Name:                  "Profile Name",
 			Operable:              accsmanagementtypes.AccountFullyOperable,
 			ProdPreferredChainIDs: "1",
@@ -84,7 +84,7 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			Chat:                  false,
 			Type:                  accsmanagementtypes.AccountTypeGenerated,
 			Path:                  accsmanagementcommon.PathDefaultWalletAccount,
-			PublicKey:             types2.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
 			Name:                  "Generated Acc 1",
 			Emoji:                 "emoji-1",
 			ColorID:               common.CustomizationColorPrimary,
@@ -107,7 +107,7 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			Chat:                  false,
 			Type:                  accsmanagementtypes.AccountTypeGenerated,
 			Path:                  accsmanagementcommon.CustomWalletPath1,
-			PublicKey:             types2.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath1].PublicKeyHex()),
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath1].PublicKeyHex()),
 			Name:                  "Generated Acc 2",
 			Emoji:                 "emoji-2",
 			ColorID:               common.CustomizationColorPrimary,
@@ -128,7 +128,7 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			Chat:                  false,
 			Type:                  accsmanagementtypes.AccountTypeGenerated,
 			Path:                  accsmanagementcommon.CustomWalletPath2,
-			PublicKey:             types2.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath2].PublicKeyHex()),
+			PublicKey:             types.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath2].PublicKeyHex()),
 			Name:                  "Generated Acc 3",
 			Emoji:                 "emoji-3",
 			ColorID:               common.CustomizationColorPrimary,
@@ -146,8 +146,8 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 	return
 }
 
-func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator2.Account, derivedAccs map[string]*generator2.Account, err error) {
-	acc, derivedAccs, err = generator2.CreateAndDeriveAccountsFromMnemonic(testSeedMnemonic, []string{
+func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
+	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testSeedMnemonic, []string{
 		accsmanagementcommon.PathDefaultWalletAccount,
 		accsmanagementcommon.CustomWalletPath1,
 	}, "")
@@ -169,7 +169,7 @@ func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc
 		Chat:      false,
 		Type:      accsmanagementtypes.AccountTypeSeed,
 		Path:      accsmanagementcommon.PathDefaultWalletAccount,
-		PublicKey: types2.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
+		PublicKey: types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
 		Name:      "Seed Impo 1 Acc 1",
 		Emoji:     "emoji-1",
 		ColorID:   common.CustomizationColorPrimary,
@@ -188,7 +188,7 @@ func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc
 		Chat:      false,
 		Type:      accsmanagementtypes.AccountTypeSeed,
 		Path:      accsmanagementcommon.CustomWalletPath1,
-		PublicKey: types2.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath1].PublicKeyHex()),
+		PublicKey: types.Hex2Bytes(derivedAccs[accsmanagementcommon.CustomWalletPath1].PublicKeyHex()),
 		Name:      "Seed Impo 1 Acc 2",
 		Emoji:     "emoji-2",
 		ColorID:   common.CustomizationColorPrimary,
@@ -203,8 +203,8 @@ func GetSeedImportedKeypair1ForTest() (keypair *accsmanagementtypes.Keypair, acc
 	return
 }
 
-func GetSeedImportedKeypair2ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator2.Account, derivedAccs map[string]*generator2.Account, err error) {
-	acc, derivedAccs, err = generator2.CreateAndDeriveAccountsFromMnemonic(testSeed2Mnemonic, []string{
+func GetSeedImportedKeypair2ForTest() (keypair *accsmanagementtypes.Keypair, acc *generator.Account, derivedAccs map[string]*generator.Account, err error) {
+	acc, derivedAccs, err = generator.CreateAndDeriveAccountsFromMnemonic(testSeed2Mnemonic, []string{
 		accsmanagementcommon.PathDefaultWalletAccount,
 		accsmanagementcommon.CustomWalletPath1,
 	}, "")
@@ -226,7 +226,7 @@ func GetSeedImportedKeypair2ForTest() (keypair *accsmanagementtypes.Keypair, acc
 		Chat:      false,
 		Type:      accsmanagementtypes.AccountTypeSeed,
 		Path:      accsmanagementcommon.PathDefaultWalletAccount,
-		PublicKey: types2.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
+		PublicKey: types.Hex2Bytes(derivedAccs[accsmanagementcommon.PathDefaultWalletAccount].PublicKeyHex()),
 		Name:      "Seed Impo 2 Acc 1",
 		Emoji:     "emoji-1",
 		ColorID:   common.CustomizationColorPrimary,
@@ -245,7 +245,7 @@ func GetSeedImportedKeypair2ForTest() (keypair *accsmanagementtypes.Keypair, acc
 		Chat:      false,
 		Type:      accsmanagementtypes.AccountTypeSeed,
 		Path:      "m/44'/60'/0'/0/1",
-		PublicKey: types2.Hex2Bytes("0x000000032"),
+		PublicKey: types.Hex2Bytes("0x000000032"),
 		Name:      "Seed Impo 2 Acc 2",
 		Emoji:     "emoji-2",
 		ColorID:   common.CustomizationColorPrimary,
@@ -269,13 +269,13 @@ func GetPrivKeyImportedKeypairForTest() *accsmanagementtypes.Keypair {
 	}
 
 	privKeyWalletAccount := &accsmanagementtypes.Account{
-		Address:   types2.Address{0x41},
+		Address:   types.Address{0x41},
 		KeyUID:    kp.KeyUID,
 		Wallet:    false,
 		Chat:      false,
 		Type:      accsmanagementtypes.AccountTypeKey,
 		Path:      "m",
-		PublicKey: types2.Hex2Bytes("0x000000041"),
+		PublicKey: types.Hex2Bytes("0x000000041"),
 		Name:      "Priv Key Impo Acc",
 		Emoji:     "emoji-1",
 		ColorID:   common.CustomizationColorPrimary,
@@ -294,7 +294,7 @@ func GetProfileKeycardForTest() *accsmanagementtypes.Keycard {
 	if err != nil {
 		panic(err)
 	}
-	keycard1Addresses := []types2.Address{}
+	keycard1Addresses := []types.Address{}
 	for _, acc := range profileKp.Accounts {
 		keycard1Addresses = append(keycard1Addresses, acc.Address)
 	}
@@ -313,7 +313,7 @@ func GetKeycardForSeedImportedKeypair1ForTest() *accsmanagementtypes.Keycard {
 	if err != nil {
 		panic(err)
 	}
-	keycard2Addresses := []types2.Address{}
+	keycard2Addresses := []types.Address{}
 	for _, acc := range seed1Kp.Accounts {
 		keycard2Addresses = append(keycard2Addresses, acc.Address)
 	}
@@ -332,7 +332,7 @@ func GetKeycardForSeedImportedKeypair2ForTest() *accsmanagementtypes.Keycard {
 	if err != nil {
 		panic(err)
 	}
-	keycard4Addresses := []types2.Address{}
+	keycard4Addresses := []types.Address{}
 	for _, acc := range seed2Kp.Accounts {
 		keycard4Addresses = append(keycard4Addresses, acc.Address)
 	}
@@ -397,6 +397,8 @@ func SameKeypairs(expected, real *accsmanagementtypes.Keypair) bool {
 		expected.DerivedFrom == real.DerivedFrom &&
 		expected.LastUsedDerivationIndex == real.LastUsedDerivationIndex &&
 		expected.Clock == real.Clock &&
+		expected.XPub == real.XPub &&
+		expected.ColdWallet == real.ColdWallet &&
 		len(expected.Accounts) == len(real.Accounts)
 
 	if same {
@@ -426,6 +428,8 @@ func SameKeypairsWithDifferentSyncedFrom(expected, real *accsmanagementtypes.Key
 		expected.DerivedFrom == real.DerivedFrom &&
 		expected.LastUsedDerivationIndex == real.LastUsedDerivationIndex &&
 		expected.Clock == real.Clock &&
+		expected.XPub == real.XPub &&
+		expected.ColdWallet == real.ColdWallet &&
 		len(expected.Accounts) == len(real.Accounts)
 
 	if same && !ignoreSyncedFrom {

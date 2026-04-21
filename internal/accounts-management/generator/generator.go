@@ -137,6 +137,22 @@ func derivePublicChildKey(parentPubKeyBytes, chainCode []byte, index uint32) (ch
 	return crypto.CompressPubkey(childPubKey), IR, nil
 }
 
+func DeriveExtendedPublicKeyAtPath(mnemonic, passphrase, path string) (string, error) {
+	acc, err := CreateAccountFromMnemonic(mnemonic, passphrase)
+	if err != nil {
+		return "", err
+	}
+	derived, err := DeriveChildFromAccount(acc, path)
+	if err != nil {
+		return "", err
+	}
+	xpub, err := derived.ExtendedKey().Neuter()
+	if err != nil {
+		return "", err
+	}
+	return xpub.String(), nil
+}
+
 // DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths derives public accounts from an extended public key (xpub) for the given paths.
 // Paths are relative to the provided xpub.
 func DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(xpubString string, paths []string) (map[string]AccountPublicInfo, error) {

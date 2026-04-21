@@ -22,6 +22,8 @@ import (
 
 const nftMetadataBatchLimit = 100
 const contractMetadataBatchLimit = 100
+const fetchNoLimitMaxPages = 10
+const getNFTsForOwnerPageSize = 500
 
 type Params struct {
 	IsProxy          bool
@@ -211,6 +213,8 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	queryParams["owner"] = []string{owner.String()}
 	queryParams["withMetadata"] = []string{"true"}
 	queryParams["orderBy"] = []string{"transferTime"}
+	queryParams["pageSize"] = []string{fmt.Sprintf("%d", getNFTsForOwnerPageSize)}
+	queryParams["excludeFilters"] = []string{"SPAM"}
 
 	if len(cursor) > 0 {
 		queryParams["pageKey"] = []string{cursor}
@@ -222,6 +226,8 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	if err != nil {
 		return nil, err
 	}
+
+	pageCount := 0
 
 	for {
 		url := fmt.Sprintf("%s/getNFTsForOwner?%s", baseURL, queryParams.Encode())
@@ -254,17 +260,20 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 		}
 
 		assets.Items = append(assets.Items, alchemyToCollectiblesData(chainID, container.OwnedNFTs, &owner)...)
+		pageCount++
 		assets.NextCursor = container.PageKey
 
-		if len(assets.NextCursor) == 0 {
+		if len(assets.NextCursor) == 0 ||
+			(limit != thirdparty.FetchNoLimit && len(assets.Items) >= limit) ||
+			(limit == thirdparty.FetchNoLimit && pageCount >= fetchNoLimitMaxPages) {
 			break
 		}
 
-		queryParams["cursor"] = []string{assets.NextCursor}
+		queryParams["pageKey"] = []string{assets.NextCursor}
+	}
 
-		if limit != thirdparty.FetchNoLimit && len(assets.Items) >= limit {
-			break
-		}
+	if limit != thirdparty.FetchNoLimit && len(assets.Items) > limit {
+		assets.Items = assets.Items[:limit]
 	}
 
 	return assets, nil

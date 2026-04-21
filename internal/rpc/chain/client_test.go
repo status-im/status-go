@@ -17,7 +17,7 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	ethclient2 "github.com/status-im/status-go/internal/rpc/chain/ethclient"
+	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 )
 
@@ -25,14 +25,14 @@ func setupClientTest(t *testing.T) (*ClientWithFallback, []*mock_ethclient.MockR
 	mockCtrl := gomock.NewController(t)
 
 	mockEthClients := make([]*mock_ethclient.MockRPSLimitedEthClientInterface, 0)
-	ethClients := make([]ethclient2.RPSLimitedEthClientInterface, 0)
+	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
 
 	for i := 0; i < 3; i++ {
 		ethCl := mock_ethclient.NewMockRPSLimitedEthClientInterface(mockCtrl)
 		ethCl.EXPECT().GetProviderName().AnyTimes().Return("test" + strconv.Itoa(i) + "_provider")
 		ethCl.EXPECT().GetCircuitName().AnyTimes().Return("test" + strconv.Itoa(i) + "_circuit")
 		ethCl.EXPECT().GetLimiter().AnyTimes().Return(nil)
-		ethCl.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient2.EthClientInterface) (interface{}, error)) (interface{}, error) {
+		ethCl.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient.EthClientInterface) (interface{}, error)) (interface{}, error) {
 			return f(ethCl)
 		}).AnyTimes()
 

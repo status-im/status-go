@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 
 	gocommon "github.com/status-im/status-go/common"
 	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto/types"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/messaging"
@@ -40,18 +41,25 @@ var (
 	DefaultFleet = params.FleetStatusProd
 )
 
-func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings2.Settings, error) {
+func ResolveDefaultFleet() string {
+	if envFleet := os.Getenv("STATUS_FLEET"); envFleet != "" && params.IsFleetSupported(envFleet) {
+		return envFleet
+	}
+	return DefaultFleet
+}
+
+func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[accscommon.PathEIP1581Chat].PublicKey
 
-	s := &settings2.Settings{}
+	s := &settings.Settings{}
 	logLevel := "INFO"
 	s.LogLevel = &logLevel
-	s.ProfilePicturesShowTo = settings2.ProfilePicturesShowToEveryone
-	s.ProfilePicturesVisibility = settings2.ProfilePicturesVisibilityEveryone
+	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToEveryone
+	s.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
 	s.KeyUID = keyUID
 	s.Address = types.HexToAddress(address)
 	s.WalletRootAddress = types.HexToAddress(derivedAddresses[accscommon.PathWalletRoot].Address)
-	s.URLUnfurlingMode = settings2.URLUnfurlingAlwaysAsk
+	s.URLUnfurlingMode = settings.URLUnfurlingAlwaysAsk
 
 	// Set the chat key and name
 	name, err := alias.GenerateFromPublicKeyString(chatKeyString)
@@ -192,6 +200,12 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if !request.MarketDataProxyUrl.Empty() {
 		walletConfig.MarketDataProxyConfig.UrlOverride = request.MarketDataProxyUrl
 	}
+	if !request.CoingeckoAPIKey.Empty() {
+		walletConfig.CoingeckoAPIKey = request.CoingeckoAPIKey
+	}
+	if !request.CoingeckoDemoAPIKey.Empty() {
+		walletConfig.CoingeckoDemoAPIKey = request.CoingeckoDemoAPIKey
+	}
 	if request.StatusProxyStageName != "" {
 		walletConfig.MarketDataProxyConfig.StageName = request.StatusProxyStageName
 	}
@@ -316,7 +330,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	fleet := request.WakuV2Fleet
 	if fleet == "" {
-		fleet = DefaultFleet
+		fleet = ResolveDefaultFleet()
 	}
 
 	err := SetFleet(fleet, nodeConfig)

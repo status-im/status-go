@@ -274,6 +274,8 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	}
 
 	expectedTime := convertToMillis(currentTime.Add(responseOffset))
+	err := ts.updateOffset()
+	require.NoError(t, err)
 	n := ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	// test repeat invoke GetCurrentTimeInMillis
@@ -285,6 +287,37 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	n = ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	ts.Stop()
+}
+
+func TestRunPeriodicallyPausesAndResumesByLifecycle(t *testing.T) {
+	source := &ntpTimeSource{
+		fastNTPSyncPeriod: 20 * time.Millisecond,
+		slowNTPSyncPeriod: 120 * time.Millisecond,
+	}
+	source.MarkPaused()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	hitsCh := make(chan struct{}, 4)
+	source.runPeriodically(ctx, func() error {
+		hitsCh <- struct{}{}
+		return nil
+	}, false)
+
+	select {
+	case <-hitsCh:
+		t.Fatal("periodic function ran while paused")
+	case <-time.After(90 * time.Millisecond):
+	}
+
+	source.MarkResumed()
+
+	select {
+	case <-hitsCh:
+	case <-time.After(600 * time.Millisecond):
+		t.Fatal("periodic function did not run after resume")
+	}
 }
 
 func TestGetCurrentTimeOffline(t *testing.T) {

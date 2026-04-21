@@ -18,7 +18,7 @@ type MessengerCommunityChatsUnitSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerCommunityChatsUnitSuite) TestCreateCommunityChat_GlobalCommunityContentTopicFilterSet() {
+func (s *MessengerCommunityChatsUnitSuite) TestCreateCommunityChat_UniversalChatFilterSet() {
 	// Create a community first
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
@@ -34,10 +34,9 @@ func (s *MessengerCommunityChatsUnitSuite) TestCreateCommunityChat_GlobalCommuni
 
 	community := communityResponse.Communities()[0]
 
-	// Verify that the global community content topic filter is set
-	// The universal/global community content topic filter should be created for the community
+	// Verify that the universal chat filter is set for the community
 	universalChatFilter := s.m.messaging.ChatFilterByChatID(community.UniversalChatID())
-	s.Require().NotNil(universalChatFilter, "Global community content topic filter should be set for community")
+	s.Require().NotNil(universalChatFilter, "Universal chat filter should be set for community")
 
 	// Test creating a community chat
 	communityChat := &protobuf.CommunityChat{
@@ -58,13 +57,13 @@ func (s *MessengerCommunityChatsUnitSuite) TestCreateCommunityChat_GlobalCommuni
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Chats(), 1)
 
-	// Verify the global community content topic filter is still set after creating the chat
+	// Verify the universal chat filter is still set after creating the chat
 	universalChatFilterAfter := s.m.messaging.ChatFilterByChatID(community.UniversalChatID())
-	s.Require().NotNil(universalChatFilterAfter, "Global community content topic filter should remain set after creating community chat")
-	s.Require().Equal(universalChatFilter.FilterID(), universalChatFilterAfter.FilterID(), "Global community content topic filter should remain the same")
+	s.Require().NotNil(universalChatFilterAfter, "Universal chat filter should remain set after creating community chat")
+	s.Require().Equal(universalChatFilter.FilterID(), universalChatFilterAfter.FilterID(), "Universal chat filter should remain the same")
 }
 
-func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_GlobalCommunityContentTopicFilterSet() {
+func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_UniversalChatFilterSet() {
 	// Create a community and a chat first
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
@@ -78,9 +77,9 @@ func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_GlobalCommunity
 	community := communityResponse.Communities()[0]
 	s.Require().Len(community.Members(), 1, "Community should have one member initially")
 
-	// Verify that the global community content topic filter is set
+	// Verify that the universal chat filter is set for the community
 	universalChatFilter := s.m.messaging.ChatFilterByChatID(community.UniversalChatID())
-	s.Require().NotNil(universalChatFilter, "Global community content topic filter should be set for community")
+	s.Require().NotNil(universalChatFilter, "Universal chat filter should be set for community")
 
 	// Create initial chat
 	initialChat := &protobuf.CommunityChat{
@@ -120,10 +119,10 @@ func (s *MessengerCommunityChatsUnitSuite) TestEditCommunityChat_GlobalCommunity
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Chats(), 1)
 
-	// Verify the global community content topic filter is still set after editing the chat
+	// Verify the universal chat filter is still set after editing the chat
 	universalChatFilterAfter := s.m.messaging.ChatFilterByChatID(community.UniversalChatID())
-	s.Require().NotNil(universalChatFilterAfter, "Global community content topic filter should remain set after editing community chat")
-	s.Require().Equal(universalChatFilter.FilterID(), universalChatFilterAfter.FilterID(), "Global community content topic filter should remain the same")
+	s.Require().NotNil(universalChatFilterAfter, "Universal chat filter should remain set after editing community chat")
+	s.Require().Equal(universalChatFilter.FilterID(), universalChatFilterAfter.FilterID(), "Universal chat filter should remain the same")
 }
 
 func (s *MessengerCommunityChatsUnitSuite) TestProcessCommunityChat_HandlesUnreadMessagesWithCacheMiss() {

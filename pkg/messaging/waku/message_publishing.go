@@ -12,7 +12,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
-	common2 "github.com/status-im/status-go/pkg/messaging/waku/common"
+	common "github.com/status-im/status-go/pkg/messaging/waku/common"
 )
 
 // Send injects a message into the waku send queue, to be distributed in the
@@ -38,7 +38,7 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 	alreadyCached := w.envelopeCache.Has(gethcommon.BytesToHash(envelope.Hash().Bytes()))
 	w.poolMu.Unlock()
 	if !alreadyCached {
-		recvMessage := common2.NewReceivedMessage(envelope, common2.SendMessageType)
+		recvMessage := common.NewReceivedMessage(envelope, common.SendMessageType)
 		w.postEvent(recvMessage) // notify the local node about the new message
 		w.addEnvelope(recvMessage)
 	}
@@ -89,17 +89,17 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 
 	if err != nil {
 		logger.Error("could not send message", zap.Error(err))
-		w.SendEnvelopeEvent(common2.EnvelopeEvent{
+		w.SendEnvelopeEvent(common.EnvelopeEvent{
 			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-			Event: common2.EventEnvelopeExpired,
+			Event: common.EventEnvelopeExpired,
 		})
 		return
 	}
 
 	if !w.cfg.EnableStoreConfirmationForMessagesSent {
-		w.SendEnvelopeEvent(common2.EnvelopeEvent{
+		w.SendEnvelopeEvent(common.EnvelopeEvent{
 			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-			Event: common2.EventEnvelopeSent,
+			Event: common.EventEnvelopeSent,
 		})
 	}
 }
