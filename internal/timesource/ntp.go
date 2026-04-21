@@ -213,10 +213,6 @@ func (s *ntpTimeSource) updateOffset() error {
 // runPeriodically runs periodically the given function based on ntpTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
 func (s *ntpTimeSource) runPeriodically(ctx context.Context, fn func() error, starWithSlowSyncPeriod bool) {
-	if s.started {
-		return
-	}
-
 	period := s.fastNTPSyncPeriod
 	if starWithSlowSyncPeriod {
 		period = s.slowNTPSyncPeriod
@@ -289,25 +285,27 @@ func (s *ntpTimeSource) Start(ctx context.Context) error {
 	currentTime := s.now()
 	s.lastMonotonic = currentTime
 	ctx, cancel := context.WithCancel(ctx)
-
-	// Attempt to update the offset synchronously so that user can have reliable messages right away
-	err := s.updateOffset()
-	if err != nil {
-		// Failure to update can occur if the node is offline.
-		// Instead of returning an error, continue with the process as the update will be retried periodically.
-		logutils.ZapLogger().Error("failed to update offset", zap.Error(err))
-	}
-
-	s.runPeriodically(ctx, s.updateOffset, err == nil)
-
-	s.started = true
 	s.cancel = cancel
+	s.started = true
+
+	go func() {
+		defer common.LogOnPanic()
+		err := s.updateOffset()
+		if err != nil {
+			// Failure to update can occur if the node is offline.
+			// Instead of returning an error, continue with the process as the update will be retried periodically.
+			logutils.ZapLogger().Error("failed to update offset", zap.Error(err))
+		}
+		s.runPeriodically(ctx, s.updateOffset, err == nil)
+	}()
 
 	return nil
 }
 
 // Stop goroutine that updates time source.
 func (s *ntpTimeSource) Stop() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	if s.cancel == nil {
 		return
 	}

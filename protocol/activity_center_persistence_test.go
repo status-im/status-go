@@ -627,6 +627,10 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DismissAllActivityCenterNotifi
 			ChatID: chatID,
 			Type:   ActivityCenterNotificationTypeMention,
 		},
+		{
+			ChatID: chatID,
+			Type:   ActivityCenterNotificationTypeReply,
+		},
 	})
 
 	_, err = p.DismissAllActivityCenterNotificationsFromChatID(chatID, currentMilliseconds())
@@ -674,13 +678,90 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DismissAllActivityCenterNotifi
 	s.Require().False(notif.Dismissed)
 	s.Require().False(notif.Deleted)
 
-	// Finally, dismiss and mark as read this one notification.
+	// Marks mention as read without dismissing — must stay visible in the AC.
 	notif, err = p.GetActivityCenterNotificationByID(notifications[5].ID)
 	s.Require().NoError(err)
 	s.Require().False(notif.Accepted)
 	s.Require().True(notif.Read)
+	s.Require().False(notif.Dismissed)
+	s.Require().False(notif.Deleted)
+
+	// Marks reply as read without dismissing — must stay visible in the AC.
+	notif, err = p.GetActivityCenterNotificationByID(notifications[6].ID)
+	s.Require().NoError(err)
+	s.Require().False(notif.Accepted)
+	s.Require().True(notif.Read)
+	s.Require().False(notif.Dismissed)
+	s.Require().False(notif.Deleted)
+}
+
+func (s *ActivityCenterPersistenceTestSuite) Test_DismissAllActivityCenterNotificationsFromCommunity() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	p := newSQLitePersistence(db)
+
+	communityID := "community-1"
+	chatID1 := communityID + "-chat-1"
+	chatID2 := communityID + "-chat-2"
+
+	// Save two chats belonging to the community.
+	for _, chatID := range []string{chatID1, chatID2} {
+		chat := CreatePublicChat(chatID, &testTimeSource{})
+		chat.CommunityID = communityID
+		err = p.SaveChat(*chat)
+		s.Require().NoError(err)
+	}
+
+	notifications := s.createNotifications(p, []*ActivityCenterNotification{
+		// Regular notification in community chat — should be dismissed.
+		{ChatID: chatID1, Type: ActivityCenterNotificationTypeNewPrivateGroupChat},
+		// Mention in community chat — must stay visible (read only, not dismissed).
+		{ChatID: chatID1, Type: ActivityCenterNotificationTypeMention},
+		// Reply in community chat — must stay visible (read only, not dismissed).
+		{ChatID: chatID2, Type: ActivityCenterNotificationTypeReply},
+		// Notification from a different community — must not be touched.
+		{ChatID: "other-community-chat", Type: ActivityCenterNotificationTypeMention},
+		// Soft-deleted notification — must not be touched.
+		{ChatID: chatID1, Type: ActivityCenterNotificationTypeMention, Deleted: true},
+	})
+
+	_, err = p.DismissAllActivityCenterNotificationsFromCommunity(communityID, currentMilliseconds())
+	s.Require().NoError(err)
+
+	// Regular notification is dismissed.
+	notif, err := p.GetActivityCenterNotificationByID(notifications[0].ID)
+	s.Require().NoError(err)
+	s.Require().True(notif.Read)
 	s.Require().True(notif.Dismissed)
 	s.Require().False(notif.Deleted)
+
+	// Mention is marked read but NOT dismissed.
+	notif, err = p.GetActivityCenterNotificationByID(notifications[1].ID)
+	s.Require().NoError(err)
+	s.Require().True(notif.Read)
+	s.Require().False(notif.Dismissed)
+	s.Require().False(notif.Deleted)
+
+	// Reply is marked read but NOT dismissed.
+	notif, err = p.GetActivityCenterNotificationByID(notifications[2].ID)
+	s.Require().NoError(err)
+	s.Require().True(notif.Read)
+	s.Require().False(notif.Dismissed)
+	s.Require().False(notif.Deleted)
+
+	// Notification from a different community is untouched.
+	notif, err = p.GetActivityCenterNotificationByID(notifications[3].ID)
+	s.Require().NoError(err)
+	s.Require().False(notif.Read)
+	s.Require().False(notif.Dismissed)
+	s.Require().False(notif.Deleted)
+
+	// Soft-deleted notification is untouched.
+	notif, err = p.GetActivityCenterNotificationByID(notifications[4].ID)
+	s.Require().NoError(err)
+	s.Require().False(notif.Read)
+	s.Require().False(notif.Dismissed)
+	s.Require().True(notif.Deleted)
 }
 
 func (s *ActivityCenterPersistenceTestSuite) Test_ActiveContactRequestNotification() {

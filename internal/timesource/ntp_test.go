@@ -274,6 +274,8 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	}
 
 	expectedTime := convertToMillis(currentTime.Add(responseOffset))
+	err := ts.updateOffset()
+	require.NoError(t, err)
 	n := ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	// test repeat invoke GetCurrentTimeInMillis
