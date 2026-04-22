@@ -37,8 +37,6 @@ import (
 const requestTimeout = 5 * time.Second
 const signalUpdatedCollectiblesDataPageSize = 10
 
-const EventCollectiblesConnectionStatusChanged walletevent.EventType = "wallet-collectible-status-changed"
-
 // ERC721 does not support function "TokenURI" if call
 // returns error starting with one of these strings
 var noTokenURIErrorPrefixes = []string{
@@ -220,8 +218,6 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, ch
 }
 
 func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
-	defer o.checkConnectionStatus(chainID)
-
 	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.AccountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
@@ -251,6 +247,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 	}
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
+	o.applyCallStatuses(chainID, cmdRes.FunctorCallStatuses())
 	if cmdRes.Error() != nil {
 		logutils.ZapLogger().Error("FetchAllAssetsByOwnerAndContractAddress failed for",
 			zap.Stringer("chainID", chainID),
@@ -270,8 +267,6 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 }
 
 func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
-	defer o.checkConnectionStatus(chainID)
-
 	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.AccountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
@@ -302,6 +297,7 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 	}
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
+	o.applyCallStatuses(chainID, cmdRes.FunctorCallStatuses())
 	if cmdRes.Error() != nil {
 		logutils.ZapLogger().Error("FetchAllAssetsByOwner failed for",
 			zap.Stringer("chainID", chainID),
@@ -463,8 +459,6 @@ func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, u
 	group := async.NewAtomicGroup(ctx)
 	for chainID, idsToFetch := range missingIDsPerChainID {
 		group.Add(func(ctx context.Context) error {
-			defer o.checkConnectionStatus(chainID)
-
 			fetchedAssets, err := o.fetchMissingAssetsForChainByCollectibleUniqueID(ctx, chainID, idsToFetch)
 			if err != nil {
 				logutils.ZapLogger().Error("FetchMissingAssetsByCollectibleUniqueID failed for",
@@ -525,6 +519,7 @@ func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Co
 	}
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
+	o.applyCallStatuses(chainID, cmdRes.FunctorCallStatuses())
 	if cmdRes.Error() != nil {
 		logutils.ZapLogger().Error("fetchMissingAssetsForChainByCollectibleUniqueID failed for",
 			zap.Stringer("chainID", chainID),
@@ -547,8 +542,6 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 	group := async.NewAtomicGroup(ctx)
 	for chainID, idsToFetch := range missingIDsPerChainID {
 		group.Add(func(ctx context.Context) error {
-			defer o.checkConnectionStatus(chainID)
-
 			cmd := circuitbreaker.NewCommand(ctx, nil)
 			for _, provider := range o.providers.CollectionDataProviders {
 				if !provider.IsChainSupported(chainID) {
@@ -567,6 +560,7 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 			}
 
 			cmdRes := o.circuitBreaker.Execute(cmd)
+			o.applyCallStatuses(chainID, cmdRes.FunctorCallStatuses())
 			if cmdRes.Error() != nil {
 				logutils.ZapLogger().Error("FetchCollectionsDataByContractID failed for",
 					zap.Stringer("chainID", chainID),
@@ -604,8 +598,6 @@ func (o *Manager) GetCollectibleOwnership(id thirdparty.CollectibleUniqueID) ([]
 }
 
 func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
-	defer o.checkConnectionStatus(chainID)
-
 	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range o.providers.ContractOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
@@ -631,6 +623,7 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 	}
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
+	o.applyCallStatuses(chainID, cmdRes.FunctorCallStatuses())
 	if cmdRes.Error() != nil {
 		logutils.ZapLogger().Error("FetchCollectibleOwnersByContractAddress failed for",
 			zap.Stringer("chainID", chainID),
@@ -1022,37 +1015,6 @@ func (o *Manager) SetCollectibleTransferID(ownerAddress common.Address, id third
 	return nil
 }
 
-// Reset connection status to trigger notifications
-// on the next status update
-func (o *Manager) ResetConnectionStatus() {
-	o.statuses.Range(func(key, value interface{}) bool {
-		value.(*connection.Status).ResetStateValue()
-		return true
-	})
-}
-
-func (o *Manager) checkConnectionStatus(chainID walletCommon.ChainID) {
-	for _, provider := range o.providers.GetProviderList() {
-		if provider.IsChainSupported(chainID) && provider.IsConnected() {
-			if status, ok := o.statuses.Load(chainID.String()); ok {
-				status.(*connection.Status).SetIsConnected(true)
-			}
-			return
-		}
-	}
-
-	// If no chain in statuses, add it
-	statusVal, ok := o.statuses.Load(chainID.String())
-	if !ok {
-		status := connection.NewStatus()
-		status.SetIsConnected(false)
-		o.statuses.Store(chainID.String(), status)
-		o.updateStatusNotifier()
-	} else {
-		statusVal.(*connection.Status).SetIsConnected(false)
-	}
-}
-
 func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniqueID) {
 	// We limit how much collectibles data we send in each event to avoid problems on the client side
 	for startIdx := 0; startIdx < len(ids); startIdx += signalUpdatedCollectiblesDataPageSize {
@@ -1086,8 +1048,8 @@ func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniq
 	}
 }
 
-func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
-	defer o.checkConnectionStatus(chainID)
+func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, text string, cursor string, limit int, providerID string) (res *thirdparty.FullCollectibleDataContainer, err error) {
+	defer func() { o.recordChainOutcome(chainID, err) }()
 
 	anyProviderAvailable := false
 	for _, provider := range o.providers.SearchProviders {
@@ -1102,13 +1064,11 @@ func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.C
 		// TODO (#13951): Be smarter about how we handle the user-entered string
 		collections := []common.Address{}
 
-		container, err := provider.SearchCollectibles(ctx, chainID, collections, text, cursor, limit)
-		if err != nil {
-			logutils.ZapLogger().Error("FetchAllAssetsByOwner failed for",
-				zap.String("provider", provider.ID()),
-				zap.Stringer("chainID", chainID),
-				zap.Error(err),
-			)
+		var container *thirdparty.FullCollectibleDataContainer
+		var perr error
+		container, perr = provider.SearchCollectibles(ctx, chainID, collections, text, cursor, limit)
+		if perr != nil {
+			logProviderSearchErr("SearchCollectibles", provider.ID(), chainID, perr)
 			continue
 		}
 
@@ -1116,18 +1076,19 @@ func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.C
 		if err != nil {
 			return nil, err
 		}
-
 		return container, nil
 	}
 
 	if anyProviderAvailable {
-		return nil, ErrAllProvidersFailedForChainID
+		err = ErrAllProvidersFailedForChainID
+	} else {
+		err = ErrNoProvidersAvailableForChainID
 	}
-	return nil, ErrNoProvidersAvailableForChainID
+	return nil, err
 }
 
-func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.ChainID, query string, cursor string, limit int, providerID string) (*thirdparty.CollectionDataContainer, error) {
-	defer o.checkConnectionStatus(chainID)
+func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.ChainID, query string, cursor string, limit int, providerID string) (res *thirdparty.CollectionDataContainer, err error) {
+	defer func() { o.recordChainOutcome(chainID, err) }()
 
 	anyProviderAvailable := false
 	for _, provider := range o.providers.SearchProviders {
@@ -1140,34 +1101,31 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 		}
 
 		// TODO (#13951): Be smarter about how we handle the user-entered string
-		container, err := provider.SearchCollections(ctx, chainID, query, cursor, limit)
-		if err != nil {
-			logutils.ZapLogger().Error("FetchAllAssetsByOwner failed for",
-				zap.String("provider", provider.ID()),
-				zap.Stringer("chainID", chainID),
-				zap.Error(err),
-			)
+		var container *thirdparty.CollectionDataContainer
+		var perr error
+		container, perr = provider.SearchCollections(ctx, chainID, query, cursor, limit)
+		if perr != nil {
+			logProviderSearchErr("SearchCollections", provider.ID(), chainID, perr)
 			continue
 		}
 
-		err = o.processCollectionData(ctx, container.Items)
-		if err != nil {
+		if err = o.processCollectionData(ctx, container.Items); err != nil {
 			return nil, err
 		}
-
 		return container, nil
 	}
 
 	if anyProviderAvailable {
-		return nil, ErrAllProvidersFailedForChainID
+		err = ErrAllProvidersFailedForChainID
+	} else {
+		err = ErrNoProvidersAvailableForChainID
 	}
-	return nil, ErrNoProvidersAvailableForChainID
+	return nil, err
 }
 
 func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
 	go func() {
 		defer gocommon.LogOnPanic()
-		defer o.checkConnectionStatus(contractID.ChainID)
 
 		socials, err := o.getOrFetchSocialsForCollection(context.Background(), contractID)
 		if err != nil || socials == nil {
@@ -1243,6 +1201,7 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 	}
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
+	o.applyCallStatuses(contractID.ChainID, cmdRes.FunctorCallStatuses())
 	if cmdRes.Error() != nil {
 		logutils.ZapLogger().Error("fetchSocialsForCollection failed for",
 			zap.Stringer("chainID", contractID.ChainID),
@@ -1259,34 +1218,6 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 	}
 
 	return socials, cmdRes.Error()
-}
-
-func (o *Manager) updateStatusNotifier() {
-	o.statusNotifier = createStatusNotifier(o.statuses, o.feed)
-}
-
-func initStatuses(ownershipDB ownership.OwnershipStorage) *sync.Map {
-	statuses := &sync.Map{}
-	for _, chainID := range walletCommon.AllChainIDs() {
-		status := connection.NewStatus()
-		state := status.GetState()
-		latestUpdateTimestamp, err := ownershipDB.GetLatestOwnershipUpdateTimestamp(chainID)
-		if err == nil {
-			state.LastSuccessAt = latestUpdateTimestamp
-			status.SetState(state)
-		}
-		statuses.Store(chainID.String(), status)
-	}
-
-	return statuses
-}
-
-func createStatusNotifier(statuses *sync.Map, feed *event.Feed) *connection.StatusNotifier {
-	return connection.NewStatusNotifier(
-		statuses,
-		EventCollectiblesConnectionStatusChanged,
-		feed,
-	)
 }
 
 // Different providers have API keys per chain or per testnet/mainnet.
