@@ -334,3 +334,110 @@ func mustConnStatus(t *testing.T, statuses *sync.Map, chainID walletCommon.Chain
 	require.True(t, ok)
 	return v.(*connection.Status)
 }
+
+// testSearchProvider implements thirdparty.CollectibleSearchProvider for search status tests.
+type testSearchProvider struct {
+	id      string
+	chainID walletCommon.ChainID
+	scRes   *thirdparty.FullCollectibleDataContainer
+	scErr   error
+	scolRes *thirdparty.CollectionDataContainer
+	scolErr error
+}
+
+func (p *testSearchProvider) ID() string                                   { return p.id }
+func (p *testSearchProvider) IsConnected() bool                            { return true }
+func (p *testSearchProvider) IsChainSupported(c walletCommon.ChainID) bool { return c == p.chainID }
+func (p *testSearchProvider) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, _ []common.Address, _, _ string, _ int) (*thirdparty.FullCollectibleDataContainer, error) {
+	_ = ctx
+	_ = chainID
+	if p.scRes != nil || p.scErr != nil {
+		return p.scRes, p.scErr
+	}
+	return &thirdparty.FullCollectibleDataContainer{}, nil
+}
+func (p *testSearchProvider) SearchCollections(ctx context.Context, chainID walletCommon.ChainID, _, _ string, _ int) (*thirdparty.CollectionDataContainer, error) {
+	_ = ctx
+	_ = chainID
+	if p.scolRes != nil || p.scolErr != nil {
+		return p.scolRes, p.scolErr
+	}
+	return &thirdparty.CollectionDataContainer{}, nil
+}
+
+// TestSearchCollectibles_OnlyIgnorableProviderErrors_DoesNotDisconnect
+// Repro: only context.Canceled (or other ignorable) perrs would leave the final
+// return as ErrAllProvidersFailedForChainID; that sentinel must not drive
+// connection state if every provider error was ignorable.
+func TestSearchCollectibles_OnlyIgnorableProviderErrors_DoesNotDisconnect(t *testing.T) {
+	t.Parallel()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	chainID := walletCommon.ChainID(1)
+	sp := &testSearchProvider{id: "sp1", chainID: chainID, scErr: context.Canceled}
+	manager := NewManager(nil, nil, nil, thirdparty.CollectibleProviders{SearchProviders: []thirdparty.CollectibleSearchProvider{sp}}, nil, new(event.Feed))
+
+	chainKey := chainID.String()
+	statuses := &sync.Map{}
+	statuses.Store(chainKey, connection.NewStatus())
+	manager.statuses = statuses
+	manager.statusNotifier = createStatusNotifier(statuses, manager.feed)
+	cdb := mock_collectibles.NewMockCollectibleDataStorage(mockCtrl)
+	coldb := mock_collectibles.NewMockCollectionDataStorage(mockCtrl)
+	manager.collectiblesDataDB = cdb
+	manager.collectionsDataDB = coldb
+	manager.communityManager = mock_community.NewMockCommunityManagerInterface(mockCtrl)
+	odb := mock_ownership.NewMockOwnershipStorage(mockCtrl)
+	odb.EXPECT().GetLatestOwnershipUpdateTimestamp(gomock.Any()).Return(int64(0), nil).AnyTimes()
+	odb.EXPECT().GetOwnership(gomock.Any()).Return([]thirdparty.AccountBalance{}, nil).AnyTimes()
+	manager.ownershipDB = odb
+
+	_, err := manager.SearchCollectibles(context.Background(), chainID, "q", "", 10, thirdparty.FetchFromAnyProvider)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrAllProvidersFailedForChainID)
+
+	st := mustConnStatus(t, manager.statuses, chainID)
+	assert.Equal(t, connection.StateValueUnknown, st.GetStateValue(), "all-ignorable provider search failures must not mark disconnected")
+}
+
+// TestSearchCollections_ProviderSuccessSetDataError_StaysConnected
+// A successful provider response must set connected before processCollectionData;
+// a DB error there is not a provider connectivity issue.
+func TestSearchCollections_ProviderSuccessSetDataError_StaysConnected(t *testing.T) {
+	t.Parallel()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	chainID := walletCommon.ChainID(1)
+	sp := &testSearchProvider{
+		id:      "sp1",
+		chainID: chainID,
+		scolRes: &thirdparty.CollectionDataContainer{
+			Items: []thirdparty.CollectionData{
+				{ID: thirdparty.ContractID{ChainID: chainID, Address: common.HexToAddress("0x1")}, Name: "a"},
+			},
+		},
+	}
+	manager := NewManager(nil, nil, nil, thirdparty.CollectibleProviders{SearchProviders: []thirdparty.CollectibleSearchProvider{sp}}, nil, new(event.Feed))
+	chainKey := chainID.String()
+	statuses := &sync.Map{}
+	statuses.Store(chainKey, connection.NewStatus())
+	manager.statuses = statuses
+	manager.statusNotifier = createStatusNotifier(statuses, manager.feed)
+	manager.collectiblesDataDB = mock_collectibles.NewMockCollectibleDataStorage(mockCtrl)
+	coldb := mock_collectibles.NewMockCollectionDataStorage(mockCtrl)
+	dbErr := errors.New("set failed")
+	coldb.EXPECT().SetData(gomock.Any(), gomock.Any()).Return(dbErr)
+	manager.collectionsDataDB = coldb
+	odb := mock_ownership.NewMockOwnershipStorage(mockCtrl)
+	odb.EXPECT().GetLatestOwnershipUpdateTimestamp(gomock.Any()).Return(int64(0), nil).AnyTimes()
+	odb.EXPECT().GetOwnership(gomock.Any()).Return([]thirdparty.AccountBalance{}, nil).AnyTimes()
+	manager.ownershipDB = odb
+	manager.communityManager = mock_community.NewMockCommunityManagerInterface(mockCtrl)
+
+	_, err := manager.SearchCollections(context.Background(), chainID, "q", "", 10, thirdparty.FetchFromAnyProvider)
+	require.ErrorIs(t, err, dbErr)
+	st := mustConnStatus(t, manager.statuses, chainID)
+	assert.Equal(t, connection.StateValueConnected, st.GetStateValue(), "local DB error after a successful search provider response must not flip to disconnected")
+}

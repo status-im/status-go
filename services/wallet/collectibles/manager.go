@@ -1048,10 +1048,9 @@ func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniq
 	}
 }
 
-func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, text string, cursor string, limit int, providerID string) (res *thirdparty.FullCollectibleDataContainer, err error) {
-	defer func() { o.recordChainOutcome(chainID, err) }()
-
+func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	anyProviderAvailable := false
+	var firstNonIgnorablePerr error
 	for _, provider := range o.providers.SearchProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
@@ -1062,35 +1061,35 @@ func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.C
 		}
 
 		// TODO (#13951): Be smarter about how we handle the user-entered string
-		collections := []common.Address{}
-
-		var container *thirdparty.FullCollectibleDataContainer
-		var perr error
-		container, perr = provider.SearchCollectibles(ctx, chainID, collections, text, cursor, limit)
+		container, perr := provider.SearchCollectibles(ctx, chainID, []common.Address{}, text, cursor, limit)
 		if perr != nil {
 			logProviderSearchErr("SearchCollectibles", provider.ID(), chainID, perr)
+			if firstNonIgnorablePerr == nil && !isCollectiblesIgnorableError(perr) {
+				firstNonIgnorablePerr = perr
+			}
 			continue
 		}
 
-		_, container.Items, err = o.processFullCollectibleData(ctx, container.Items, true)
-		if err != nil {
+		o.recordChainOutcome(chainID, nil)
+		var err error
+		if _, container.Items, err = o.processFullCollectibleData(ctx, container.Items, true); err != nil {
 			return nil, err
 		}
 		return container, nil
 	}
 
-	if anyProviderAvailable {
-		err = ErrAllProvidersFailedForChainID
-	} else {
-		err = ErrNoProvidersAvailableForChainID
+	if firstNonIgnorablePerr != nil {
+		o.recordChainOutcome(chainID, firstNonIgnorablePerr)
 	}
-	return nil, err
+	if anyProviderAvailable {
+		return nil, ErrAllProvidersFailedForChainID
+	}
+	return nil, ErrNoProvidersAvailableForChainID
 }
 
 func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.ChainID, query string, cursor string, limit int, providerID string) (res *thirdparty.CollectionDataContainer, err error) {
-	defer func() { o.recordChainOutcome(chainID, err) }()
-
 	anyProviderAvailable := false
+	var firstNonIgnorablePerr error
 	for _, provider := range o.providers.SearchProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
@@ -1101,26 +1100,29 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 		}
 
 		// TODO (#13951): Be smarter about how we handle the user-entered string
-		var container *thirdparty.CollectionDataContainer
-		var perr error
-		container, perr = provider.SearchCollections(ctx, chainID, query, cursor, limit)
+		container, perr := provider.SearchCollections(ctx, chainID, query, cursor, limit)
 		if perr != nil {
 			logProviderSearchErr("SearchCollections", provider.ID(), chainID, perr)
+			if firstNonIgnorablePerr == nil && !isCollectiblesIgnorableError(perr) {
+				firstNonIgnorablePerr = perr
+			}
 			continue
 		}
 
+		o.recordChainOutcome(chainID, nil)
 		if err = o.processCollectionData(ctx, container.Items); err != nil {
 			return nil, err
 		}
 		return container, nil
 	}
 
-	if anyProviderAvailable {
-		err = ErrAllProvidersFailedForChainID
-	} else {
-		err = ErrNoProvidersAvailableForChainID
+	if firstNonIgnorablePerr != nil {
+		o.recordChainOutcome(chainID, firstNonIgnorablePerr)
 	}
-	return nil, err
+	if anyProviderAvailable {
+		return nil, ErrAllProvidersFailedForChainID
+	}
+	return nil, ErrNoProvidersAvailableForChainID
 }
 
 func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
