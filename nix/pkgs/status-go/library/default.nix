@@ -11,7 +11,7 @@ let
 in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
-  vendorHash = "sha256-bHCv+xwNsxSStt27KCC2g3gUeKf3WBW6BuDlGGJOYJw=";
+  vendorHash = "sha256-lLiIZ70A9exgqpu2DZAC9mtk4oLfema/NaCJyvwJFEE=";
 
   inherit meta version;
 
@@ -44,10 +44,7 @@ in pkgs.buildGoModule {
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
 
-    make generate \
-        NIM_SDS_INC_DIR="${pkgs.libsds}/include" \
-        NIM_SDS_LIB_DIR="${pkgs.libsds}/lib" \
-        GO_GENERATE_CMD='go generate'
+   make generate GO_GENERATE_CMD='go generate'
   '';
 
   # Build the Go library
@@ -61,8 +58,11 @@ in pkgs.buildGoModule {
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
     make statusgo-library \
+        USE_LOGOS_STORAGE=true \
         NIM_SDS_INC_DIR="${pkgs.libsds}/include" \
         NIM_SDS_LIB_DIR="${pkgs.libsds}/lib" \
+        LOGOS_STORAGE_LIB_DIR="${pkgs.libstorage}/lib" \
+        LOGOS_STORAGE_INC_DIR="${pkgs.libstorage}/include" \
         STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
         STATUS_GO_LIBRARY_OUT="$out" \
         CLEANUP_GENERATED_FILES=false \
