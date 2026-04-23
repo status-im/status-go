@@ -93,21 +93,26 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return nil, err
 		}
 
-		if retryStatusCodes[resp.StatusCode] && attempt < t.maxRetries {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
+		if retryStatusCodes[resp.StatusCode] {
+			if attempt < t.maxRetries {
+				_, _ = io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
 
-			logutils.ZapLogger().Debug("Puzzle auth retry needed",
-				zap.Int("statusCode", resp.StatusCode),
-				zap.Int("attempt", attempt+1))
+				logutils.ZapLogger().Debug("Puzzle auth retry needed",
+					zap.Int("statusCode", resp.StatusCode),
+					zap.Int("attempt", attempt+1))
 
-			t.authService.InvalidateToken()
+				t.authService.InvalidateToken()
 
-			if _, err = t.authService.EnsureToken(ctx); err != nil {
-				return nil, fmt.Errorf("failed to get auth token: %w", err)
+				if _, err = t.authService.EnsureToken(ctx); err != nil {
+					return nil, fmt.Errorf("failed to get auth token: %w", err)
+				}
+
+				continue
 			}
-
-			continue
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("%w: status %d", ErrAuthRotating, resp.StatusCode)
 		}
 
 		return resp, nil
