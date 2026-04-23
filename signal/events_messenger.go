@@ -47,7 +47,7 @@ func SendMediaServerStarted(port int) {
 	send(EventMediaServerStarted, MediaServerStarted{Port: port})
 }
 
-// SendMessageDelivered notifies about delivered message
+// SendCommunityInfoFound notifies when community info is found
 func SendCommunityInfoFound(community interface{}) {
 	send(EventCommunityInfoFound, community)
 }
