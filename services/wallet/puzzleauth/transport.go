@@ -55,30 +55,36 @@ func NewHTTPClient(origin string) *http.Client {
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 
+	var bodyBytes []byte
 	if req.Body != nil && req.GetBody == nil {
-		bodyBytes, err := io.ReadAll(req.Body)
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
-		req.Body.Close()
-		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		req.GetBody = func() (io.ReadCloser, error) {
-			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
-		}
+		_ = req.Body.Close()
 	}
 
 	for attempt := 0; attempt <= t.maxRetries; attempt++ {
 		clonedReq := req.Clone(ctx)
-		if req.GetBody != nil && clonedReq.Body == nil {
-			body, err := req.GetBody()
-			if err != nil {
-				return nil, fmt.Errorf("failed to recreate request body: %w", err)
+
+		if bodyBytes != nil {
+			b := bodyBytes
+			clonedReq.Body = io.NopCloser(bytes.NewReader(b))
+			clonedReq.GetBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewReader(b)), nil
 			}
-			clonedReq.Body = body
+		} else if req.GetBody != nil {
+			if clonedReq.Body == nil {
+				body, err := req.GetBody()
+				if err != nil {
+					return nil, fmt.Errorf("failed to recreate request body: %w", err)
+				}
+				clonedReq.Body = body
+			}
 		}
 
-		token := t.authService.GetToken()
-		if token != "" {
+		if token := t.authService.GetToken(); token != "" {
 			clonedReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		}
 
@@ -97,12 +103,9 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 			t.authService.InvalidateToken()
 
-			token, err := t.authService.EnsureToken(ctx)
-			if err != nil {
+			if _, err = t.authService.EnsureToken(ctx); err != nil {
 				return nil, fmt.Errorf("failed to get auth token: %w", err)
 			}
-
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 			continue
 		}

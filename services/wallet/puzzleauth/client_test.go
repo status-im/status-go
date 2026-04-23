@@ -52,6 +52,38 @@ func TestTransport_Do_Success(t *testing.T) {
 	resp.Body.Close()
 }
 
+func TestTransport_RoundTrip_DoesNotMutateCallerRequestHeaders(t *testing.T) {
+	var resourceReq int32
+	resourceHandler := func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&resourceReq, 1)
+		if n == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("unauthorized"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}
+
+	server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
+	defer server.Close()
+
+	ctx := context.Background()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/resource", nil)
+	require.NoError(t, err)
+	require.Equal(t, "", req.Header.Get("Authorization"))
+
+	transport := NewTransport(server.URL, http.DefaultTransport)
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	require.GreaterOrEqual(t, atomic.LoadInt32(&resourceReq), int32(2))
+	require.Equal(t, "", req.Header.Get("Authorization"), "original request must not get Authorization; only cloned requests use Bearer")
+}
+
 func TestTransport_Do_AuthRetry(t *testing.T) {
 	var resourceReq, puzzleReq, solveReq int32
 	var tokenProvided bool
