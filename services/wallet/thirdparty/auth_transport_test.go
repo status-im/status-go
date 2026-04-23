@@ -163,16 +163,18 @@ func newPuzzleAuthServerForTest(t *testing.T) *httptest.Server {
 	}))
 }
 
-func TestAuthTransport_POW_DelegatesToPuzzleAuth(t *testing.T) {
+func TestAuthTransport_PuzzleOnHTTPClient(t *testing.T) {
 	server := newPuzzleAuthServerForTest(t)
 	defer server.Close()
 
-	puzzleClient := puzzleauth.NewClient(server.URL, nil)
-	authParams := AuthParams{
-		Type:             AuthTypePOW,
-		PuzzleAuthClient: puzzleClient,
+	puzzleClient := &http.Client{
+		Timeout:   time.Minute,
+		Transport: puzzleauth.NewTransport(server.URL, http.DefaultTransport),
 	}
-	transport := NewAuthTransport(&http.Client{Timeout: time.Minute}, authParams, "test-provider")
+	authParams := AuthParams{
+		Type: AuthTypeNone,
+	}
+	transport := NewAuthTransport(puzzleClient, authParams, "test-provider")
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL+"/resource", nil)
 	require.NoError(t, err)
@@ -182,22 +184,6 @@ func TestAuthTransport_POW_DelegatesToPuzzleAuth(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
-}
-
-func TestAuthTransport_POW_NilPuzzleClient(t *testing.T) {
-	authParams := AuthParams{
-		Type:             AuthTypePOW,
-		PuzzleAuthClient: nil,
-	}
-	transport := NewAuthTransport(&http.Client{Timeout: time.Minute}, authParams, "test-provider")
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://localhost:1", nil)
-	require.NoError(t, err)
-
-	resp, err := transport.Do(req)
-	require.Error(t, err)
-	require.Nil(t, resp)
-	require.ErrorIs(t, err, ErrPuzzleAuthClientRequired)
 }
 
 func TestAuthTransport_Auth_Getter(t *testing.T) {
@@ -239,7 +225,6 @@ func TestAuthTransport_AuthTypeName(t *testing.T) {
 	}{
 		{"APIKey", AuthTypeAPIKey, "APIKey"},
 		{"Basic", AuthTypeBasic, "Basic"},
-		{"POW", AuthTypePOW, "POW"},
 		{"None", AuthTypeNone, "None"},
 		{"Unknown", AuthType(99), "Unknown(99)"},
 	}

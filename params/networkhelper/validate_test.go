@@ -88,6 +88,18 @@ func TestValidation(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "PuzzleAuth valid",
+			provider: params.RpcProvider{
+				ChainID:  1,
+				Name:     "Puzzle Provider",
+				URL:      security.NewSensitiveString("https://provider.example.com/ethereum/mainnet/"),
+				Type:     params.EmbeddedEthRpcProxyProviderType,
+				Enabled:  true,
+				AuthType: params.PuzzleAuth,
+			},
+			expectErr: false,
+		},
 	}
 
 	for _, test := range providerTests {

@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
-	"github.com/status-im/status-go/services/wallet/puzzleauth"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -26,12 +25,13 @@ const fetchNoLimitMaxPages = 10
 const getNFTsForOwnerPageSize = 500
 
 type Params struct {
-	IsProxy          bool
-	ProxyCustomURL   string
-	ProxyStageName   string
-	APIKey           security.SensitiveString
-	Creds            *thirdparty.BasicCreds
-	PuzzleAuthClient *puzzleauth.Client
+	IsProxy        bool
+	ProxyCustomURL string
+	ProxyStageName string
+	APIKey         security.SensitiveString
+	Creds          *thirdparty.BasicCreds
+	// HttpClient, if set, is used for HTTP to Alchemy (e.g. with Transport wrapping puzzleauth.NewTransport). Otherwise a default 1m client is used.
+	HttpClient *http.Client
 }
 
 func (o *Client) ID() string {
@@ -73,18 +73,23 @@ func NewClient(apiKey security.SensitiveString) *Client {
 }
 
 func NewClientWithParams(params Params) *Client {
-	if params.APIKey.Empty() && params.Creds == nil && params.PuzzleAuthClient == nil {
-		logutils.ZapLogger().Warn("Alchemy API key, credentials, and puzzle auth not available")
+	if params.APIKey.Empty() && params.Creds == nil && params.HttpClient == nil {
+		logutils.ZapLogger().Warn("Alchemy API key, credentials, and custom HTTP client not available")
+	}
+
+	httpClient := params.HttpClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: time.Minute}
 	}
 
 	authParams := thirdparty.AuthParams{
-		APIKey:           params.APIKey,
-		Creds:            params.Creds,
-		PuzzleAuthClient: params.PuzzleAuthClient,
+		APIKey: params.APIKey,
+		Creds:  params.Creds,
 	}
 	switch {
-	case params.PuzzleAuthClient != nil:
-		authParams.Type = thirdparty.AuthTypePOW
+	case params.HttpClient != nil:
+		// e.g. puzzle [http.Transport] on the client; no Basic in applyAuth
+		authParams.Type = thirdparty.AuthTypeNone
 	case params.Creds != nil:
 		authParams.Type = thirdparty.AuthTypeBasic
 	case params.IsProxy:
@@ -108,7 +113,7 @@ func NewClientWithParams(params Params) *Client {
 	return &Client{
 		id:               clientID,
 		urlResolver:      resolver,
-		authTransport:    thirdparty.NewAuthTransport(&http.Client{Timeout: time.Minute}, authParams, clientID),
+		authTransport:    thirdparty.NewAuthTransport(httpClient, authParams, clientID),
 		connectionStatus: connection.NewStatus(),
 	}
 }

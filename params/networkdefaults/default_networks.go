@@ -87,7 +87,7 @@ type networkSpec struct {
 	isDeactivatable        bool
 }
 
-func buildRpcProvidersFromSpec(spec networkSpec, proxyHost, stageName string, enableRpcProviders bool) []params.RpcProvider {
+func buildRpcProvidersFromSpec(spec networkSpec, proxyHost, stageName string, enableRpcProviders bool, usePuzzleAuth bool) []params.RpcProvider {
 	if !enableRpcProviders {
 		return []params.RpcProvider{}
 	}
@@ -96,9 +96,9 @@ func buildRpcProvidersFromSpec(spec networkSpec, proxyHost, stageName string, en
 	for _, p := range spec.providers {
 		switch p.providerType {
 		case providerTypeEthRpcProxy:
-			out = append(out, *params.NewEthRpcProxyProvider(spec.chainID, p.name, smartProxyUrl(proxyHost, spec.proxyChainName, spec.proxyNetworkName), false))
+			out = append(out, *params.NewEthRpcProxyProvider(spec.chainID, p.name, smartProxyUrl(proxyHost, spec.proxyChainName, spec.proxyNetworkName), false, usePuzzleAuth))
 		case providerTypeEthRpcProxyWithProvider:
-			out = append(out, *params.NewEthRpcProxyProvider(spec.chainID, p.name, smartProxyUrlWithProvider(proxyHost, spec.proxyChainName, spec.proxyNetworkName, p.targetProvider), false))
+			out = append(out, *params.NewEthRpcProxyProvider(spec.chainID, p.name, smartProxyUrlWithProvider(proxyHost, spec.proxyChainName, spec.proxyNetworkName, p.targetProvider), false, usePuzzleAuth))
 		case providerTypeProxy:
 			out = append(out, *params.NewProxyProvider(spec.chainID, p.name, proxyUrl(stageName, p.targetProvider, spec.proxyChainName, spec.proxyNetworkName), false))
 		case providerTypeDirect:
@@ -109,7 +109,7 @@ func buildRpcProvidersFromSpec(spec networkSpec, proxyHost, stageName string, en
 	return out
 }
 
-func buildNetworkFromSpec(spec networkSpec, proxyHost, stageName string, enableRpcProviders bool) params.Network {
+func buildNetworkFromSpec(spec networkSpec, proxyHost, stageName string, enableRpcProviders bool, usePuzzleAuth bool) params.Network {
 	iconURL := fmt.Sprintf("%s%s", iconURLPrefix, spec.proxyChainName)
 	if spec.isTest {
 		iconURL += testNetworkIconSuffix
@@ -117,7 +117,7 @@ func buildNetworkFromSpec(spec networkSpec, proxyHost, stageName string, enableR
 	return params.Network{
 		ChainID:                spec.chainID,
 		ChainName:              spec.chainName,
-		RpcProviders:           buildRpcProvidersFromSpec(spec, proxyHost, stageName, enableRpcProviders),
+		RpcProviders:           buildRpcProvidersFromSpec(spec, proxyHost, stageName, enableRpcProviders, usePuzzleAuth),
 		BlockExplorerURL:       spec.blockExplorerURL,
 		IconURL:                iconURL,
 		ChainColor:             spec.chainColor,
@@ -134,10 +134,10 @@ func buildNetworkFromSpec(spec networkSpec, proxyHost, stageName string, enableR
 	}
 }
 
-func defaultNetworks(proxyHost, stageName string, thirdpartyServicesEnabled bool) []params.Network {
+func defaultNetworks(proxyHost, stageName string, thirdpartyServicesEnabled bool, usePuzzleAuth bool) []params.Network {
 	networks := make([]params.Network, 0, len(defaultNetworkSpecs))
 	for _, spec := range defaultNetworkSpecs {
-		networks = append(networks, buildNetworkFromSpec(spec, proxyHost, stageName, thirdpartyServicesEnabled))
+		networks = append(networks, buildNetworkFromSpec(spec, proxyHost, stageName, thirdpartyServicesEnabled, usePuzzleAuth))
 	}
 	return networks
 }
@@ -172,7 +172,10 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 
 func BuildDefaultNetworks(walletSecretsConfig *requests.WalletSecretsConfig, thirdpartyServicesEnabled bool) []params.Network {
 	proxyHost := getProxyHost(walletSecretsConfig.EthRpcProxyUrl.Reveal(), walletSecretsConfig.StatusProxyStageName)
-	networks := setRPCs(defaultNetworks(proxyHost, walletSecretsConfig.StatusProxyStageName, thirdpartyServicesEnabled), walletSecretsConfig)
+	networks := setRPCs(
+		defaultNetworks(proxyHost, walletSecretsConfig.StatusProxyStageName, thirdpartyServicesEnabled, walletSecretsConfig.EthRpcProxyUsePuzzleAuth),
+		walletSecretsConfig,
+	)
 	return networkhelper.WithCommunitiesSupported(networks)
 }
 

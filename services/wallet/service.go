@@ -89,21 +89,22 @@ func createAlchemyProxyClient(config params.NftProxyConfig) *alchemy.Client {
 		}
 	}
 
-	// Create puzzle auth client if enabled
-	var puzzleClient *puzzleauth.Client
+	var alchemyHTTP *http.Client
 	if config.UsePuzzleAuth {
 		origin := alchemy.GetNftProxyHost(config.UrlOverride.Reveal(), config.StageName)
-		httpClient := &http.Client{Timeout: time.Minute}
-		puzzleClient = puzzleauth.NewClient(origin, httpClient)
+		alchemyHTTP = &http.Client{
+			Timeout:   time.Minute,
+			Transport: puzzleauth.NewTransport(origin, http.DefaultTransport),
+		}
 	}
 
 	return alchemy.NewClientWithParams(alchemy.Params{
-		IsProxy:          true,
-		ProxyCustomURL:   config.UrlOverride.Reveal(),
-		ProxyStageName:   config.StageName,
-		APIKey:           security.SensitiveString{},
-		Creds:            creds,
-		PuzzleAuthClient: puzzleClient,
+		IsProxy:        true,
+		ProxyCustomURL: config.UrlOverride.Reveal(),
+		ProxyStageName: config.StageName,
+		APIKey:         security.SensitiveString{},
+		Creds:          creds,
+		HttpClient:     alchemyHTTP,
 	})
 }
 
