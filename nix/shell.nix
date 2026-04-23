@@ -15,7 +15,7 @@ in mkShell {
     git jq which gcc rustc cargo openjdk openssl nim go
     golangci-lint go-junit-report gopls codecov-cli
     protobuf3_24 protoc-gen-go gotestsum
-    libsds libwaku
+    libsds libwaku libstorage
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper
   ];
@@ -25,10 +25,13 @@ in mkShell {
 
     export LIBWAKU="$(echo ${pkgs.libwaku}/lib/libwaku.*)"
     export LIBSDS="$(echo ${pkgs.libsds}/lib/libsds.*)"
+    export LIBSTORAGE="$(echo ${pkgs.libstorage}/lib/libstorage.*)"
+    export LOGOS_STORAGE_LIB_DIR="${pkgs.libstorage}/lib"
+    export LOGOS_STORAGE_INC_DIR="${pkgs.libstorage}/include"
     export NIM_SDS_INC_DIR="${pkgs.libsds}/include"
     export NIM_SDS_LIB_DIR="${pkgs.libsds}/lib"
 
-    export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [libwaku libsds])}"
+    export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [libwaku libsds libstorage])}"
   '' + lib.optionalString (!isDarwin && isAarch64) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
