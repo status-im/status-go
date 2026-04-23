@@ -52,13 +52,31 @@ func (s *Service) GetToken() string {
 	return ""
 }
 
-// InvalidateToken clears the cached token
+// InvalidateToken clears the cached token (tests and explicit full reset).
 func (s *Service) InvalidateToken() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.tokenCache = nil
 	logutils.ZapLogger().Debug("Puzzle auth token invalidated",
+		zap.String("origin", s.origin))
+}
+
+// InvalidateTokenForRejectedRequest drops the cache only if it still holds the
+// token that was used on a failed request. This avoids a thundering herd on 401/403/429
+// clobbering a token another goroutine just refreshed.
+// If no Bearer was sent (rejected is empty), this is a no-op; callers use EnsureToken only.
+func (s *Service) InvalidateTokenForRejectedRequest(rejectedBearer string) {
+	if rejectedBearer == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tokenCache == nil || s.tokenCache.Token != rejectedBearer {
+		return
+	}
+	s.tokenCache = nil
+	logutils.ZapLogger().Debug("Puzzle auth token invalidated (rejected by server)",
 		zap.String("origin", s.origin))
 }
 

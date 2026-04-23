@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"testing"
+
+	"github.com/status-im/status-go/services/wallet/puzzleauth"
 )
 
 // TestIsConnectionError tests the IsConnectionError function.
@@ -111,5 +114,18 @@ func TestIsConnectionError(t *testing.T) {
 				t.Errorf("IsConnectionError(%v) = %v; want %v", tt.err, got, tt.wantResult)
 			}
 		})
+	}
+}
+
+func TestIsNonCriticalProviderError_PuzzleAuthRotating(t *testing.T) {
+	if !IsNonCriticalProviderError(fmt.Errorf("wrapped: %w", puzzleauth.ErrAuthRotating)) {
+		t.Error("IsNonCriticalProviderError should be true for ErrAuthRotating (wrapped)")
+	}
+	if !IsNonCriticalProviderError(puzzleauth.ErrAuthRotating) {
+		t.Error("IsNonCriticalProviderError should be true for bare ErrAuthRotating")
+	}
+	other := errors.New("not auth rotating")
+	if IsNonCriticalProviderError(other) {
+		t.Error("IsNonCriticalProviderError should be false for unrelated errors")
 	}
 }

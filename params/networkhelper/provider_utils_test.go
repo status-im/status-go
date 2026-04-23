@@ -130,7 +130,7 @@ func TestOverrideBasicAuth(t *testing.T) {
 	}
 }
 
-func TestOverrideBasicAuth_SkipsPuzzleAuth(t *testing.T) {
+func TestOverrideBasicAuth_PuzzleSkipsCredsRespectsEnabled(t *testing.T) {
 	ethPuzzle := *params.NewEthRpcProxyProvider(walletcommon.EthereumMainnet, "SmartPuzzle",
 		security.NewSensitiveString("https://eth.example.com/ethereum/mainnet/"), false, true)
 	require.Equal(t, params.PuzzleAuth, ethPuzzle.AuthType)
@@ -145,6 +145,13 @@ func TestOverrideBasicAuth_SkipsPuzzleAuth(t *testing.T) {
 	p := updated[0].RpcProviders[0]
 	require.Equal(t, params.PuzzleAuth, p.AuthType)
 	require.True(t, p.Enabled)
+	require.True(t, p.AuthLogin.Empty())
+	require.True(t, p.AuthPassword.Empty())
+
+	disabled := networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, false, user, pass)
+	p2 := disabled[0].RpcProviders[0]
+	require.Equal(t, params.PuzzleAuth, p2.AuthType)
+	require.False(t, p2.Enabled)
 }
 
 func TestOverrideDirectProvidersAuth(t *testing.T) {

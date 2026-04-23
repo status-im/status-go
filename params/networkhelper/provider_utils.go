@@ -104,6 +104,7 @@ func OverrideBasicAuth(networks []params.Network, providerType params.RpcProvide
 			provider := &network.RpcProviders[j]
 			if provider.Type == providerType {
 				if provider.AuthType == params.PuzzleAuth {
+					provider.Enabled = enabled
 					continue
 				}
 				provider.Enabled = enabled

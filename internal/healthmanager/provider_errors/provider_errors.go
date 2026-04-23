@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/services/wallet/puzzleauth"
 )
 
 // ProviderErrorType defines the type of non-RPC error for JSON serialization.
@@ -250,6 +251,9 @@ func determineProviderErrorType(err error) ProviderErrorType {
 
 // IsNonCriticalProviderError determines if the non-RPC error is not critical.
 func IsNonCriticalProviderError(err error) bool {
+	if err != nil && errors.Is(err, puzzleauth.ErrAuthRotating) {
+		return true
+	}
 	errorType := determineProviderErrorType(err)
 
 	switch errorType {

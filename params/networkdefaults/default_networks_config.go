@@ -750,7 +750,6 @@ var defaultNetworkSpecs = []networkSpec{
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://bsc-mainnet.infura.io/v3/"), enableRpsLimiter: true},
-			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://bsc.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
 		},
 		blockExplorerURL:       "https://bscscan.com/",

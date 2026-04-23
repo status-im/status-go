@@ -1,7 +1,9 @@
 package puzzleauth
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +20,16 @@ func TestNewHTTPClient(t *testing.T) {
 	require.NotNil(t, c)
 	require.Equal(t, 60*time.Second, c.Timeout)
 	require.NotNil(t, c.Transport)
+}
+
+func TestNewTransport_SameOriginSharesAuthService(t *testing.T) {
+	origin := "https://test.eth-rpc.status.im"
+	a := NewTransport(origin, http.DefaultTransport)
+	b := NewTransport(origin, http.DefaultTransport)
+	require.Same(t, a.authService, b.authService, "all transports for one puzzle-auth host must share JWT cache")
+
+	other := NewTransport("https://other.status.im", http.DefaultTransport)
+	require.NotSame(t, a.authService, other.authService)
 }
 
 func TestTransport_Do_Success(t *testing.T) {
@@ -50,6 +62,41 @@ func TestTransport_Do_Success(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, int32(1), atomic.LoadInt32(&resourceReq))
 	resp.Body.Close()
+}
+
+// Go-ethereum HTTP client sets both Body and GetBody; without buffering the request body, each
+// retry would reuse an exhausted io.Reader and send an empty body (e.g. Cloudflare 400).
+func TestTransport_RoundTrip_401Retry_SendsGetBodyOnEachAttempt(t *testing.T) {
+	payload := []byte(`{"jsonrpc":"2.0","id":1}`)
+	var calls int32
+	resourceHandler := func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, payload, b, "body must be identical on every round-trip (including retries)")
+		n := atomic.AddInt32(&calls, 1)
+		if n == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+
+	server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
+	defer server.Close()
+
+	ctx := context.Background()
+	rdr := bytes.NewReader(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL+"/resource", rdr)
+	require.NoError(t, err)
+	req.ContentLength = int64(len(payload))
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(payload)), nil }
+
+	transport := NewTransport(server.URL, http.DefaultTransport)
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+	require.Equal(t, int32(2), atomic.LoadInt32(&calls), "unauthorized + successful retry")
 }
 
 func TestTransport_RoundTrip_DoesNotMutateCallerRequestHeaders(t *testing.T) {
@@ -184,10 +231,9 @@ func TestTransport_Do_MaxRetriesExceeded(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := client.Do(req)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-	resp.Body.Close()
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrAuthRotating))
+	require.Nil(t, resp)
 
 	numAttempts := atomic.LoadInt32(&attempts)
 	require.Equal(t, int32(3), numAttempts, fmt.Sprintf("Expected 3 attempts, got %d", numAttempts))
