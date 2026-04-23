@@ -102,7 +102,7 @@ require (
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.4.0
 	github.com/status-im/go-wallet-sdk v0.0.0-20260312164506-d7611e385cfd
-	github.com/waku-org/go-waku v0.10.1
+	github.com/waku-org/go-waku v0.10.2-0.20260421101052-de84ba47f9b0
 	github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.uber.org/atomic v1.11.0
@@ -115,6 +115,7 @@ require (
 )
 
 require (
+	github.com/logos-storage/logos-storage-go-bindings v0.0.30
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.26.0

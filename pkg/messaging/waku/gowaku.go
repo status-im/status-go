@@ -1107,7 +1107,9 @@ func (w *Waku) Start() error {
 			case <-w.topicHealthStatusChan:
 				// TODO: https://github.com/status-im/status-go/issues/4628
 			case <-w.connectionNotifChan:
-				w.checkForConnectionChanges()
+				if !paused {
+					w.checkForConnectionChanges()
+				}
 			}
 		}
 	}()

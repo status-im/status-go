@@ -12,11 +12,16 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
 )
+
+// backgroundShutdownTimeout bounds how long Server.ToBackground waits for
+// active HTTP handlers to drain before force-closing remaining connections.
+const backgroundShutdownTimeout = 300 * time.Millisecond
 
 // tcpListenConfig sets SO_REUSEADDR so that after the previous listener is fully
 // closed, the kernel can allow binding the same cached ephemeral port again (e.g.
@@ -254,6 +259,16 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Stop() error {
+	return s.stopWith(context.Background())
+}
+
+// stopWith performs the graceful shutdown sequence bounded by ctx. If ctx
+// expires or is canceled before active connections drain, the server is
+// force-closed via Close so the caller isn't blocked by a slow or stuck
+// handler. Pass context.Background() for the unbounded behaviour expected at
+// teardown/shutdown; use a short deadline for lifecycle events like
+// pause/ToBackground.
+func (s *Server) stopWith(ctx context.Context) error {
 	s.mu.Lock()
 	s.StopTimeout()
 	if !s.running.Load() || s.server == nil {
@@ -268,9 +283,16 @@ func (s *Server) Stop() error {
 	s.running.Store(false)
 	s.mu.Unlock()
 
-	err := currentServer.Shutdown(context.Background())
+	err := currentServer.Shutdown(ctx)
+	if shouldForceCloseOnShutdownError(err) {
+		_ = currentServer.Close()
+	}
 	s.serveWg.Wait()
 	return err
+}
+
+func shouldForceCloseOnShutdownError(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }
 
 func (s *Server) IsRunning() bool {
@@ -284,9 +306,16 @@ func (s *Server) ToForeground() {
 }
 
 func (s *Server) ToBackground() {
-	err := s.Stop()
-	if err != nil {
-		s.logger.Error("server stop failed during background transition", zap.Error(err))
+	ctx, cancel := context.WithTimeout(context.Background(), backgroundShutdownTimeout)
+	defer cancel()
+	if err := s.stopWith(ctx); err != nil {
+		if shouldForceCloseOnShutdownError(err) {
+			s.logger.Warn("server graceful shutdown did not complete in time; forced close",
+				zap.Error(err), zap.Duration("timeout", backgroundShutdownTimeout))
+			return
+		}
+
+		s.logger.Error("server shutdown failed during background transition", zap.Error(err))
 	}
 }
 

@@ -186,17 +186,6 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 		return
 	}
 
-	// A non-2xx status code doesn't cause an error
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		err = fmt.Errorf("HTTP request failed with status code: %d", resp.StatusCode)
-		logutils.ZapLogger().Debug("GET request returned non-2xx status",
-			zap.String("url", url),
-			zap.Int("status", resp.StatusCode))
-		return
-	}
-
-	newEtag = resp.Header.Get("Etag")
-
 	body, err = c.readResponse(resp)
 	if err != nil {
 		logutils.ZapLogger().Debug("Failed to read GET response body",
@@ -204,6 +193,22 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 			zap.Error(err))
 		return
 	}
+
+	// A non-2xx status code doesn't cause an error
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if len(body) > 0 {
+			err = fmt.Errorf("Status code: %d - %s", resp.StatusCode, string(body))
+		} else {
+			err = fmt.Errorf("HTTP request failed with status code: %d", resp.StatusCode)
+		}
+		logutils.ZapLogger().Debug("GET request returned non-2xx status",
+			zap.String("url", url),
+			zap.Int("status", resp.StatusCode),
+			zap.String("body", string(body)))
+		return
+	}
+
+	newEtag = resp.Header.Get("Etag")
 
 	duration := time.Since(startTime)
 	logutils.ZapLogger().Debug("GET request completed",
