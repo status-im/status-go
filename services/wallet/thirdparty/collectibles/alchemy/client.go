@@ -87,12 +87,9 @@ func NewClientWithParams(params Params) *Client {
 		Creds:  params.Creds,
 	}
 	switch {
-	case params.HttpClient != nil:
-		// e.g. puzzle [http.Transport] on the client; no Basic in applyAuth
-		authParams.Type = thirdparty.AuthTypeNone
 	case params.Creds != nil:
 		authParams.Type = thirdparty.AuthTypeBasic
-	case params.IsProxy:
+	case params.IsProxy || params.APIKey.Empty():
 		authParams.Type = thirdparty.AuthTypeNone
 	default:
 		authParams.Type = thirdparty.AuthTypeAPIKey

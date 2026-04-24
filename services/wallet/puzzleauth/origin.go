@@ -13,7 +13,7 @@ func OriginForURL(raw string) (string, error) {
 		return "", err
 	}
 	if u.Scheme == "" || u.Host == "" {
-		return "", fmt.Errorf("incomplete url for puzzle origin: %q", raw)
+		return "", fmt.Errorf("incomplete url for puzzle origin")
 	}
 	return u.Scheme + "://" + strings.ToLower(u.Host), nil
 }

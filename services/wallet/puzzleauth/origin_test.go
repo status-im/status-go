@@ -13,4 +13,8 @@ func TestOriginForURL(t *testing.T) {
 
 	_, err = OriginForURL("not-a-url")
 	require.Error(t, err)
+
+	_, err = OriginForURL("http://user:secrethidden@/path")
+	require.ErrorContains(t, err, "incomplete url for puzzle origin")
+	require.NotContains(t, err.Error(), "secrethidden")
 }
