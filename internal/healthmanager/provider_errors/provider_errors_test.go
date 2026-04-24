@@ -117,6 +117,16 @@ func TestIsConnectionError(t *testing.T) {
 	}
 }
 
+func TestDetermineProviderErrorType_AuthRotating(t *testing.T) {
+	if got := determineProviderErrorType(puzzleauth.ErrAuthRotating); got != ProviderErrorTypeAuthRotating {
+		t.Errorf("determineProviderErrorType(ErrAuthRotating) = %q, want %q", got, ProviderErrorTypeAuthRotating)
+	}
+	wrapped := fmt.Errorf("wrapped: %w", puzzleauth.ErrAuthRotating)
+	if got := determineProviderErrorType(wrapped); got != ProviderErrorTypeAuthRotating {
+		t.Errorf("determineProviderErrorType(wrapped ErrAuthRotating) = %q, want %q", got, ProviderErrorTypeAuthRotating)
+	}
+}
+
 func TestIsNonCriticalProviderError_PuzzleAuthRotating(t *testing.T) {
 	if !IsNonCriticalProviderError(fmt.Errorf("wrapped: %w", puzzleauth.ErrAuthRotating)) {
 		t.Error("IsNonCriticalProviderError should be true for ErrAuthRotating (wrapped)")

@@ -56,9 +56,6 @@ func IsRPCError(err error) (rpc.Error, bool) {
 }
 
 func IsMethodNotFoundError(err error) bool {
-	if err != nil && errors.Is(err, rpc.ErrNotificationsUnsupported) {
-		return true
-	}
 	_, code, ok := safeRPCError(err)
 	return ok && code == -32601
 }

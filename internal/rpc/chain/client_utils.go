@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -38,11 +37,7 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 		if err != nil {
 			return nil, fmt.Errorf("puzzle auth: invalid provider URL for %s: %w", provider.Name, err)
 		}
-		httpClient := &http.Client{
-			Timeout:   1 * time.Minute,
-			Transport: puzzleauth.NewTransport(origin, http.DefaultTransport),
-		}
-		opts = append(opts, rpc.WithHTTPClient(httpClient))
+		opts = append(opts, rpc.WithHTTPClient(puzzleauth.NewHTTPClient(origin)))
 	default:
 		return nil, fmt.Errorf("unknown auth type: %s", provider.AuthType)
 	}

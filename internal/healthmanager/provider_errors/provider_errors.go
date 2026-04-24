@@ -34,6 +34,7 @@ const (
 	ProviderErrorTypeInternalError           ProviderErrorType = "internal"
 	ProviderErrorTypeServiceUnavailable      ProviderErrorType = "service_unavailable"
 	ProviderErrorTypeRateLimit               ProviderErrorType = "rate_limit"
+	ProviderErrorTypeAuthRotating            ProviderErrorType = "auth_rotating"
 	ProviderErrorTypeOther                   ProviderErrorType = "other"
 )
 
@@ -221,6 +222,9 @@ func determineProviderErrorType(err error) ProviderErrorType {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return ProviderErrorTypeContextDeadlineExceeded
 	}
+	if errors.Is(err, puzzleauth.ErrAuthRotating) {
+		return ProviderErrorTypeAuthRotating
+	}
 	if IsConnectionError(err) {
 		return ProviderErrorTypeConnection
 	}
@@ -251,13 +255,10 @@ func determineProviderErrorType(err error) ProviderErrorType {
 
 // IsNonCriticalProviderError determines if the non-RPC error is not critical.
 func IsNonCriticalProviderError(err error) bool {
-	if err != nil && errors.Is(err, puzzleauth.ErrAuthRotating) {
-		return true
-	}
 	errorType := determineProviderErrorType(err)
 
 	switch errorType {
-	case ProviderErrorTypeNone, ProviderErrorTypeContextCanceled, ProviderErrorTypeContentTooLarge, ProviderErrorTypeRateLimit:
+	case ProviderErrorTypeNone, ProviderErrorTypeContextCanceled, ProviderErrorTypeContentTooLarge, ProviderErrorTypeRateLimit, ProviderErrorTypeAuthRotating:
 		return true
 	default:
 		return false
