@@ -750,6 +750,7 @@ var defaultNetworkSpecs = []networkSpec{
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://bsc-mainnet.infura.io/v3/"), enableRpsLimiter: true},
+			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://bsc-dataseed.bnbchain.org"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
 		},
 		blockExplorerURL:       "https://bscscan.com/",
@@ -773,6 +774,7 @@ var defaultNetworkSpecs = []networkSpec{
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://bsc-testnet.infura.io/v3/"), enableRpsLimiter: true},
+			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://bsc-testnet-dataseed.bnbchain.org"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
 		},
 		blockExplorerURL:       "https://testnet.bscscan.com/",
