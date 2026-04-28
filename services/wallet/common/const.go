@@ -137,6 +137,11 @@ const (
 	ContractTypeERC1155
 )
 
+// Based on documentation: https://docs.zksync.io/zk-stack/customizations/custom-base-tokens#custom-base-token-setup
+func ZkSyncETHTokenAddress() common.Address {
+	return common.HexToAddress("0x000000000000000000000000000000000000800a")
+}
+
 func ZeroAddress() common.Address {
 	return common.Address{}
 }
