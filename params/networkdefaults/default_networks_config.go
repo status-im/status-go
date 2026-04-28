@@ -526,7 +526,7 @@ var defaultNetworkSpecs = []networkSpec{
 		chainID:          common.ZkSyncMainnet,
 		proxyChainName:   "zksync",
 		proxyNetworkName: "mainnet",
-		chainName:        "zkSync",
+		chainName:        "ZKsync",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
 			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
@@ -551,7 +551,7 @@ var defaultNetworkSpecs = []networkSpec{
 		chainID:          common.ZkSyncSepolia,
 		proxyChainName:   "zksync",
 		proxyNetworkName: "sepolia",
-		chainName:        "zkSync Sepolia",
+		chainName:        "ZKsync Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
 			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
