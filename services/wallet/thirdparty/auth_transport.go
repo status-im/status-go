@@ -1,16 +1,12 @@
 package thirdparty
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/services/wallet/puzzleauth"
 )
-
-var ErrPuzzleAuthClientRequired = errors.New("PuzzleAuthClient is required for AuthTypePOW")
 
 // AuthType specifies how requests are authenticated.
 type AuthType int
@@ -20,18 +16,15 @@ const (
 	AuthTypeAPIKey AuthType = iota
 	// AuthTypeBasic means Basic auth (user/password) in headers.
 	AuthTypeBasic
-	// AuthTypePOW means proof-of-work auth via puzzleauth.Client.
-	AuthTypePOW
-	// AuthTypeNone means no authentication (e.g. proxy without creds or puzzle).
+	// AuthTypeNone means no custom auth headers (e.g. proxy without creds, or puzzle via custom [http.Client].Transport).
 	AuthTypeNone
 )
 
 // AuthParams holds authentication configuration for AuthTransport.
 type AuthParams struct {
-	Type             AuthType
-	APIKey           security.SensitiveString
-	Creds            *BasicCreds
-	PuzzleAuthClient *puzzleauth.Client
+	Type   AuthType
+	APIKey security.SensitiveString
+	Creds  *BasicCreds
 }
 
 // AuthTransport executes HTTP requests with auth headers and retry logic.
@@ -65,8 +58,6 @@ func (t *AuthTransport) authTypeName() string {
 		return "APIKey"
 	case AuthTypeBasic:
 		return "Basic"
-	case AuthTypePOW:
-		return "POW"
 	case AuthTypeNone:
 		return "None"
 	default:
@@ -84,16 +75,9 @@ func (t *AuthTransport) applyAuth(req *http.Request) {
 		req.SetBasicAuth(t.auth.Creds.User.Reveal(), t.auth.Creds.Password.Reveal())
 	}
 	// AuthTypeAPIKey: key is in URL, no header needed
-	// AuthTypePOW: puzzleauth.Client handles auth internally in DoRequest
-	// AuthTypeNone: no auth headers
+	// AuthTypeNone: no auth headers; optional Transport on httpClient (e.g. puzzle) may add them
 }
 
 func (t *AuthTransport) doWithRetries(req *http.Request) (*http.Response, error) {
-	if t.auth.Type == AuthTypePOW {
-		if t.auth.PuzzleAuthClient == nil {
-			return nil, ErrPuzzleAuthClientRequired
-		}
-		return t.auth.PuzzleAuthClient.DoRequest(req)
-	}
 	return DoWithExponentialBackoff(t.httpClient, req, t.providerID)
 }

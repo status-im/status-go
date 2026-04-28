@@ -43,6 +43,12 @@ func rpcProviderStructLevelValidation(sl validator.StructLevel) {
 			sl.ReportError(provider.AuthLogin, "AuthLogin", "authLogin", "tokenauth_fields_empty", "")
 			sl.ReportError(provider.AuthPassword, "AuthPassword", "authPassword", "tokenauth_fields_empty", "")
 		}
+	case params.PuzzleAuth:
+		if !provider.AuthLogin.Empty() || !provider.AuthPassword.Empty() || !provider.AuthToken.Empty() {
+			sl.ReportError(provider.AuthLogin, "AuthLogin", "authLogin", "puzzleauth_fields_empty", "")
+			sl.ReportError(provider.AuthPassword, "AuthPassword", "authPassword", "puzzleauth_fields_empty", "")
+			sl.ReportError(provider.AuthToken, "AuthToken", "authToken", "puzzleauth_fields_empty", "")
+		}
 	default:
 		sl.ReportError(provider.AuthType, "AuthType", "authType", "invalid_auth_type", "")
 	}

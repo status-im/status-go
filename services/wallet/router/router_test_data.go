@@ -199,8 +199,14 @@ var bsc = params.Network{
 	ChainID:   walletCommon.BSCMainnet,
 	ChainName: "bsc",
 	RpcProviders: []params.RpcProvider{
+		*params.NewEthRpcProxyProvider(
+			walletCommon.BSCMainnet,
+			"status-smart-proxy",
+			security.NewSensitiveString("https://test.eth-rpc.status.im/bsc/mainnet/"),
+			true,
+			false,
+		),
 		*params.NewDirectProvider(walletCommon.BSCMainnet, directInfura, security.NewSensitiveString("https://bsc-mainnet.infura.io/v3/"), true),
-		*params.NewDirectProvider(walletCommon.BSCMainnet, directGrove, security.NewSensitiveString("https://bsc.rpc.grove.city/v1/"), false),
 	},
 	BlockExplorerURL:       "https://bscscan.com/",
 	IconURL:                "network/bsc",

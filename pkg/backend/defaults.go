@@ -241,6 +241,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if !request.EthRpcProxyPassword.Empty() {
 		walletConfig.EthRpcProxyPassword = request.EthRpcProxyPassword
 	}
+	walletConfig.EthRpcProxyUsePuzzleAuth = request.EthRpcProxyUsePuzzleAuth
 
 	// NftProxyConfig
 	if !request.NftProxyUrl.Empty() {
