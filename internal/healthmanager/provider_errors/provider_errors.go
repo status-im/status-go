@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/services/wallet/puzzleauth"
 )
 
 // ProviderErrorType defines the type of non-RPC error for JSON serialization.
@@ -33,6 +34,7 @@ const (
 	ProviderErrorTypeInternalError           ProviderErrorType = "internal"
 	ProviderErrorTypeServiceUnavailable      ProviderErrorType = "service_unavailable"
 	ProviderErrorTypeRateLimit               ProviderErrorType = "rate_limit"
+	ProviderErrorTypeAuthRotating            ProviderErrorType = "auth_rotating"
 	ProviderErrorTypeOther                   ProviderErrorType = "other"
 )
 
@@ -220,6 +222,9 @@ func determineProviderErrorType(err error) ProviderErrorType {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return ProviderErrorTypeContextDeadlineExceeded
 	}
+	if errors.Is(err, puzzleauth.ErrAuthRotating) {
+		return ProviderErrorTypeAuthRotating
+	}
 	if IsConnectionError(err) {
 		return ProviderErrorTypeConnection
 	}
@@ -253,7 +258,7 @@ func IsNonCriticalProviderError(err error) bool {
 	errorType := determineProviderErrorType(err)
 
 	switch errorType {
-	case ProviderErrorTypeNone, ProviderErrorTypeContextCanceled, ProviderErrorTypeContentTooLarge, ProviderErrorTypeRateLimit:
+	case ProviderErrorTypeNone, ProviderErrorTypeContextCanceled, ProviderErrorTypeContentTooLarge, ProviderErrorTypeRateLimit, ProviderErrorTypeAuthRotating:
 		return true
 	default:
 		return false

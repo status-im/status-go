@@ -137,6 +137,11 @@ const (
 	ContractTypeERC1155
 )
 
+// Based on documentation: https://docs.zksync.io/zk-stack/customizations/custom-base-tokens#custom-base-token-setup
+func ZkSyncETHTokenAddress() common.Address {
+	return common.HexToAddress("0x000000000000000000000000000000000000800a")
+}
+
 func ZeroAddress() common.Address {
 	return common.Address{}
 }
@@ -343,7 +348,7 @@ var usdcEVMAddressesByChainID = map[uint64]common.Address{
 	StatusNetworkSepolia: common.HexToAddress("0xc445a18ca49190578dad62fba3048c07efc07ffe"),
 	AbstractMainnet:      common.HexToAddress("0x84a71ccd554cc1b02749b35d22F684cc8ec987e1"),
 	AbstractTestnet:      common.HexToAddress("0x572f4901f03055ffc1d936a60ccc3cbf13911be3"),
-	PolygonZkEVMMainnet:  common.HexToAddress("0x37ea0ef3549a5bb7d431be78a3d99bd360d19e5"),
+	PolygonZkEVMMainnet:  common.HexToAddress("0xa8ce8aee21bc2a48a5ef670afcc9274c7bbbc035"),
 	UnichainMainnet:      common.HexToAddress("0x078d782b760474a361dda0af3839290b0ef57ad6"),
 	UnichainSepolia:      common.HexToAddress("0x31d0220469e10c4e71834a79b1f276d740d3768f"),
 	InkMainnet:           common.HexToAddress("0x2d270e6886d130d724215a266106e6832161eaed"),

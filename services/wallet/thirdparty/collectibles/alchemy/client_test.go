@@ -21,6 +21,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewClientWithParams_ProxyBasicWithCustomClient(t *testing.T) {
+	c := NewClientWithParams(Params{
+		IsProxy:    true,
+		HttpClient: &http.Client{Transport: http.DefaultTransport},
+		Creds: &thirdparty.BasicCreds{
+			User:     security.NewSensitiveString("u"),
+			Password: security.NewSensitiveString("p"),
+		},
+	})
+	require.Equal(t, thirdparty.AuthTypeBasic, c.authTransport.Auth().Type)
+}
+
 func TestUnmarshallCollection(t *testing.T) {
 	expectedCollectionData := thirdparty.CollectionData{
 		ID: thirdparty.ContractID{
