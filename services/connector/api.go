@@ -106,9 +106,10 @@ func NewAPI(s *Service) *API {
 	r.Register("wallet_switchEthereumChain", commands.NewSwitchEthereumChainCommand(s.db, s.nm))
 
 	// Permissions
-	r.Register("wallet_requestPermissions", commands.NewRequestPermissionsCommand(s.db))
+	r.Register("wallet_requestPermissions", commands.NewRequestPermissionsCommand(s.db, c))
 	r.Register("wallet_getPermissions", commands.NewGetPermissionsCommand(s.db))
 	r.Register("wallet_revokePermissions", commands.NewRevokePermissionsCommand(s.db, wcSessionDisconnector))
+	r.Register("wallet_getCapabilities", commands.NewGetCapabilitiesCommand())
 
 	changeAccountCommand := commands.NewChangeAccountCommand(s.db)
 

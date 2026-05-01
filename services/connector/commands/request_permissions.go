@@ -7,15 +7,18 @@ import (
 	"time"
 
 	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/signal"
 )
 
 type RequestPermissionsCommand struct {
-	db *sql.DB
+	db            *sql.DB
+	clientHandler ClientSideHandlerInterface
 }
 
-func NewRequestPermissionsCommand(db *sql.DB) *RequestPermissionsCommand {
+func NewRequestPermissionsCommand(db *sql.DB, clientHandler ClientSideHandlerInterface) *RequestPermissionsCommand {
 	return &RequestPermissionsCommand{
-		db: db,
+		db:            db,
+		clientHandler: clientHandler,
 	}
 }
 
@@ -74,6 +77,15 @@ func (c *RequestPermissionsCommand) getPermissionResponse(url string, methodName
 	}
 }
 
+func findCapability(perms []persistence.Permission, methodName string) ([]persistence.Caveat, bool) {
+	for i := range perms {
+		if perms[i].ParentCapability == methodName {
+			return perms[i].Caveats, true
+		}
+	}
+	return nil, false
+}
+
 func (c *RequestPermissionsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
@@ -91,10 +103,36 @@ func (c *RequestPermissionsCommand) Execute(ctx context.Context, request RPCRequ
 	if err != nil {
 		return "", err
 	}
+	waitedInFlightShare := false
+	if dApp == nil && c.clientHandler != nil {
+		waitedInFlightShare = c.clientHandler.WaitForPendingShareAccount(ctx, request.URL, request.ClientID)
+		dApp, err = persistence.SelectDApp(c.db, request.URL, request.ClientID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Auto-share only when the caller identifies with clientId (trusted in-process desktop). Untrusted
+	// HTTP callers never have ClientID (API strips/forbids it); parallel tests may finish eth_requestAccounts
+	// before we observe pending, so skipping auto-share avoids a second blocking share after reject.
+	autoShared := false
+	if dApp == nil && methodName == "eth_accounts" && !waitedInFlightShare && request.ClientID != "" {
+		dApp, err = shareAndUpsertDApp(c.db, c.clientHandler, request)
+		if err != nil {
+			return "", err
+		}
+		autoShared = true
+	}
 
 	if dApp == nil {
 		return "", ErrDAppNotFound
 	}
+
+	permsBefore, err := persistence.SelectPermissions(c.db, request.URL, request.ClientID)
+	if err != nil {
+		return "", err
+	}
+	existingCaveats, hadCapability := findCapability(permsBefore, methodName)
 
 	createdAt := time.Now().Unix()
 	err = persistence.InsertPermission(c.db, request.URL, request.ClientID, methodName, caveats, createdAt)
@@ -102,6 +140,16 @@ func (c *RequestPermissionsCommand) Execute(ctx context.Context, request RPCRequ
 		return "", err
 	}
 
-	// EIP-2255 - wallet_requestPermissions returns an array
-	return []persistence.Permission{c.getPermissionResponse(request.URL, methodName, caveats)}, nil
+	responseCaveats := caveats
+	if hadCapability {
+		responseCaveats = existingCaveats
+	}
+
+	// Notify UI after trusted auto-share created the dApp row (no prior eth_accounts permission existed).
+	if autoShared {
+		signal.SendConnectorDAppPermissionGranted(connectorDAppFromRequest(request), dApp.SharedAccount, []uint64{dApp.ChainID})
+	}
+
+	// EIP-2255 — return persisted caveats (InsertPermission is a no-op when row already exists).
+	return []persistence.Permission{c.getPermissionResponse(request.URL, methodName, responseCaveats)}, nil
 }

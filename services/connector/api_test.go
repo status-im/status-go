@@ -102,6 +102,35 @@ func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
 	require.NotNil(t, result)
 }
 
+func TestCallRPC_WalletGetCapabilities(t *testing.T) {
+	state := setupTests(t)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeTrusted)
+
+	res, err := state.api.CallRPC(ctx, `{
+		"method": "wallet_getCapabilities",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png",
+		"clientId": "status-desktop"
+	}`)
+	require.NoError(t, err)
+	m, ok := res.(map[string]any)
+	require.True(t, ok)
+	require.Empty(t, m)
+
+	_, err = state.api.CallRPC(ctx, `{
+		"method": "wallet_sendCalls",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png",
+		"clientId": "status-desktop"
+	}`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not allowed")
+}
+
 func TestChangeAccount_UntrustedConnection(t *testing.T) {
 	state := setupTests(t)
 
