@@ -15,7 +15,7 @@ from steps import async_messenger
     "waku_light_client",
     [
         pytest.param(False, id=FULL_NODE),
-        pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.xfail(reason="status-go#7393 filter subscription race", strict=False)),
+        pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.light_client_7393),
     ],
     indirect=True,
 )
