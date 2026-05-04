@@ -143,6 +143,10 @@ STATUS_MEDIA_SERVER_PORT = 8587
 
 NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 
+# Waku light client test IDs
+FULL_NODE = "wakuV2LightClient_False"
+LIGHT_CLIENT = "wakuV2LightClient_True"
+
 # Well-known burn address, used as a generic recipient in tests
 BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD"
 

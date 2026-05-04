@@ -1,6 +1,7 @@
 import re
 from uuid import uuid4
 import pytest
+from resources.constants import FULL_NODE, LIGHT_CLIENT
 from resources.enums import MessageContentType
 from steps import async_messenger
 from clients.api import ApiResponseError
@@ -8,7 +9,14 @@ from clients.api import ApiResponseError
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
-@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+@pytest.mark.parametrize(
+    "waku_light_client",
+    [
+        pytest.param(False, id=FULL_NODE),
+        pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.xfail(reason="status-go#7393 filter subscription race", strict=False)),
+    ],
+    indirect=True,
+)
 class TestContactRequests:
 
     @pytest.fixture

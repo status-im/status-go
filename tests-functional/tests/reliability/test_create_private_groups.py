@@ -3,19 +3,27 @@ from uuid import uuid4
 import pytest
 from steps import messenger
 from clients.signals import SignalType
-from resources.constants import USE_IPV6
+from resources.constants import USE_IPV6, FULL_NODE, LIGHT_CLIENT
 
 
 @pytest.mark.reliability
+@pytest.mark.parametrize(
+    "waku_light_client",
+    [
+        pytest.param(False, id=FULL_NODE),
+        pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.xfail(reason="status-go#7393 filter subscription race", strict=False)),
+    ],
+    indirect=True,
+)
 class TestCreatePrivateGroups:
 
     @pytest.fixture()
-    def community_admin(self, backend_new_profile):
-        return backend_new_profile("community_admin", bridge_network=True)
+    def community_admin(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("community_admin", waku_light_client=waku_light_client, bridge_network=True)
 
     @pytest.fixture()
-    def community_member(self, backend_new_profile):
-        return backend_new_profile("member", bridge_network=True)
+    def community_member(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("member", waku_light_client=waku_light_client, bridge_network=True)
 
     def _run_create_private_group_baseline(self, community_admin, community_member, private_groups_count=1):
         messenger.make_contacts(community_admin, community_member)
