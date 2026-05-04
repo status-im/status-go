@@ -330,30 +330,6 @@ var hopBridgeContractAddresses = map[uint64]map[common.Address]map[string]common
 			L2SaddleLpToken:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
 		},
 	},
-	walletCommon.PolygonZkEVMMainnet: {
-		common.HexToAddress("0x0000000000000000000000000000000000000000"): { // ETH
-			L1CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
-			L1MessengerWrapper: common.HexToAddress("0x2Af8821657973a9CA39248a7586fB588a4686630"),
-			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
-			L2CanonicalToken:   common.HexToAddress("0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9"),
-			L2Bridge:           common.HexToAddress("0x0ce6c85cF43553DE10FC56cecA0aef6Ff0DD444d"),
-			L2HopBridgeToken:   common.HexToAddress("0x652a38FA87f60A122AEF360eEeFcaf6258eDdF6A"),
-			L2AmmWrapper:       common.HexToAddress("0xbd72882120508518FCba2AE58E134EceaD18d979"),
-			L2SaddleSwap:       common.HexToAddress("0x0a6b1904369fE59E002ad0713ae89d4E3dF5A7Cf"),
-			L2SaddleLpToken:    common.HexToAddress("0x611c4F1539653174B05508a4169e188f9521a5bB"),
-		},
-		common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"): { // HOP
-			L1CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
-			L1MessengerWrapper: common.HexToAddress("0x053Aa6D73cd1Ea062130F053c7421724754E08D8"),
-			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
-			L2CanonicalToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
-			L2Bridge:           common.HexToAddress("0x9ec9551d4A1a1593b0ee8124D98590CC71b3B09D"),
-			L2HopBridgeToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
-			L2AmmWrapper:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
-			L2SaddleSwap:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
-			L2SaddleLpToken:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-		},
-	},
 	walletCommon.EthereumSepolia: {
 		common.HexToAddress("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"): { // USDC
 			L1CanonicalToken: common.HexToAddress("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"),

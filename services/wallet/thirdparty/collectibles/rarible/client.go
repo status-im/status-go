@@ -44,13 +44,11 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	case walletCommon.EthereumMainnet,
 		walletCommon.ArbitrumMainnet,
 		walletCommon.BaseMainnet,
-		walletCommon.PolygonZkEVMMainnet,
 		walletCommon.AbstractMainnet,
 		walletCommon.ZkSyncMainnet:
 		return "https://api.rarible.org", nil
 	case walletCommon.EthereumSepolia,
-		walletCommon.BaseSepolia,
-		walletCommon.PolygonZkEVMCardona:
+		walletCommon.BaseSepolia:
 		return "https://testnet-api.rarible.org", nil
 	}
 

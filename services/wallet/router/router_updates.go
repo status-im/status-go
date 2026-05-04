@@ -20,7 +20,6 @@ var (
 	newBlockCheckIntervalArbitrum      = 200 * time.Millisecond
 	newBlockCheckIntervalBase          = 1 * time.Second
 	newBlockCheckIntervalLinea         = 1 * time.Second
-	newBlockCheckIntervalPolygonZkEVM  = 2 * time.Second
 	newBlockCheckIntervalUnichain      = 1 * time.Second
 	newBlockCheckIntervalKatana        = 1 * time.Second
 	newBlockCheckIntervalInk           = 1 * time.Second
@@ -85,9 +84,6 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 	case walletCommon.LineaMainnet,
 		walletCommon.LineaSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalLinea)
-	case walletCommon.PolygonZkEVMMainnet,
-		walletCommon.PolygonZkEVMCardona:
-		ticker = time.NewTicker(newBlockCheckIntervalPolygonZkEVM)
 	case walletCommon.UnichainMainnet,
 		walletCommon.UnichainSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalUnichain)
