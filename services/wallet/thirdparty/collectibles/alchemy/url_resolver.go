@@ -71,10 +71,6 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 		return "https://linea-mainnet.g.alchemy.com", nil
 	case walletCommon.LineaSepolia:
 		return "https://linea-sepolia.g.alchemy.com", nil
-	case walletCommon.PolygonZkEVMMainnet:
-		return "https://polygonzkevm-mainnet.g.alchemy.com", nil
-	case walletCommon.PolygonZkEVMCardona:
-		return "https://polygonzkevm-cardona.g.alchemy.com", nil
 	case walletCommon.UnichainMainnet:
 		return "https://unichain-mainnet.g.alchemy.com", nil
 	case walletCommon.UnichainSepolia:
