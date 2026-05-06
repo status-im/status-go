@@ -673,28 +673,6 @@ var defaultNetworkSpecs = []networkSpec{
 		isDeactivatable:        true,
 	},
 	{
-		chainID:          common.StatusNetworkSepolia,
-		proxyChainName:   "status",
-		proxyNetworkName: "sepolia",
-		chainName:        "Status Network Sepolia",
-		providers: []providerSpec{
-			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeDirect, name: common.DirectStatus, directURL: security.NewSensitiveString("https://public.sepolia.rpc.status.network")},
-		},
-		blockExplorerURL:       "https://sepoliascan.status.network/",
-		chainColor:             "#7140FD",
-		shortName:              "status",
-		nativeCurrencyName:     "Ether",
-		nativeCurrencySymbol:   "ETH",
-		nativeCurrencyDecimals: 18,
-		isTest:                 true,
-		layer:                  2,
-		enabled:                true,
-		relatedChainID:         0, // TODO: update related chain id once decided
-		isActive:               true,
-		isDeactivatable:        true,
-	},
-	{
 		chainID:          common.BSCMainnet,
 		proxyChainName:   "bsc",
 		proxyNetworkName: "mainnet",
