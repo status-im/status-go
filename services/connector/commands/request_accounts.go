@@ -39,29 +39,17 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 		return "", err
 	}
 
-	// FIXME: this may have a security issue in case some malicious software tries to fake the origin
-	if dApp == nil {
-		connectorDApp := signal.ConnectorDApp{
-			URL:      request.URL,
-			Name:     request.Name,
-			IconURL:  request.IconURL,
-			ClientID: request.ClientID,
-		}
-		account, chainID, err := c.clientHandler.RequestShareAccountForDApp(connectorDApp)
+	hasEthAccounts := false
+	if dApp != nil {
+		hasEthAccounts, err = persistence.PermissionExists(c.db, request.URL, request.ClientID, Method_EthAccounts)
 		if err != nil {
 			return "", err
 		}
+	}
 
-		dApp = &persistence.DApp{
-			URL:           request.URL,
-			Name:          request.Name,
-			IconURL:       request.IconURL,
-			ClientID:      request.ClientID,
-			SharedAccount: account,
-			ChainID:       chainID,
-		}
-
-		err = persistence.UpsertDApp(c.db, dApp)
+	// FIXME: this may have a security issue in case some malicious software tries to fake the origin
+	if dApp == nil || !hasEthAccounts {
+		dApp, err = shareAndUpsertDApp(c.db, c.clientHandler, request)
 		if err != nil {
 			return "", err
 		}
@@ -74,7 +62,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 			return "", err
 		}
 
-		signal.SendConnectorDAppPermissionGranted(connectorDApp, account, []uint64{chainID})
+		signal.SendConnectorDAppPermissionGranted(connectorDAppFromRequest(request), dApp.SharedAccount, []uint64{dApp.ChainID})
 	}
 
 	return FormatAccountAddressToResponse(dApp.SharedAccount), nil

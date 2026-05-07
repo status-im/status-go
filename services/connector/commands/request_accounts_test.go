@@ -143,6 +143,8 @@ func TestRequestAccountsWithExistingDApp(t *testing.T) {
 	}
 	err := persistence.UpsertDApp(state.walletDb, dApp)
 	assert.NoError(t, err)
+	err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, Method_EthAccounts, []persistence.Caveat{}, time.Now().Unix())
+	assert.NoError(t, err)
 
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)

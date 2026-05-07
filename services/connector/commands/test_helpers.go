@@ -117,7 +117,7 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	case Method_EthSendTransaction:
 		state.cmd = NewSendTransactionCommand(state.walletDb, state.ethClientGetter, state.feeManager, state.handler)
 	case Method_RequestPermissions:
-		state.cmd = NewRequestPermissionsCommand(state.walletDb)
+		state.cmd = NewRequestPermissionsCommand(state.walletDb, state.handler)
 	case Method_RevokePermissions:
 		state.cmd = NewRevokePermissionsCommand(state.walletDb, wcSessionDisconnector)
 	case Method_SwitchEthereumChain:
