@@ -138,7 +138,7 @@ func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
 		common.KatanaMainnet, common.KatanaBokuto, common.ZkSyncMainnet, common.ZkSyncSepolia,
 		common.ScrollMainnet, common.ScrollSepolia:
 		return gas.ChainClassOPStack, nil
-	case common.StatusNetworkSepolia, common.LineaMainnet, common.LineaSepolia:
+	case common.LineaMainnet, common.LineaSepolia:
 		return gas.ChainClassLineaStack, nil
 	}
 	return "", fmt.Errorf("chainID class identification not handled for chainID: %d", chainID)
@@ -237,20 +237,7 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64, address 
 	}
 
 	noBaseFee = false
-	estimatedBaseFee := feeSuggestions.EstimatedBaseFee
-	if estimatedBaseFee != nil && estimatedBaseFee.Sign() == 0 {
-		if chainID == common.StatusNetworkSepolia {
-			noBaseFee = true
-		}
-	}
-
 	noPriorityFee = false
-	estimatedPriorityFeeLowerBound := feeSuggestions.PriorityFeeLowerBound
-	if estimatedPriorityFeeLowerBound != nil && estimatedPriorityFeeLowerBound.Sign() == 0 {
-		if chainID == common.StatusNetworkSepolia {
-			noPriorityFee = true
-		}
-	}
 
 	f.logger.Debug("Suggested fees",
 		zap.String("chainID", fmt.Sprintf("%d", chainID)),
