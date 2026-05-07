@@ -2,10 +2,12 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -49,7 +51,9 @@ func TestFailToSwitchEthereumChainWithUnsupportedChainId(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = state.cmd.Execute(state.ctx, request)
-	assert.Equal(t, ErrUnsupportedNetwork, err)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrUnsupportedNetwork),
+		"unknown chain error must still satisfy errors.Is(ErrUnsupportedNetwork) for backward compatibility, got %v", err)
 }
 
 func TestSwitchEthereumChainSuccess(t *testing.T) {

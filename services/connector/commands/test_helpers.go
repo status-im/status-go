@@ -59,6 +59,24 @@ type testState struct {
 	mockCtrl        *gomock.Controller
 	ethClientGetter *mock_chainutils.MockEthClientGetter
 	feeManager      *mock_chainutils.MockFeeManager
+	networkManager  *network.Manager
+}
+
+func setupNetworkManager(t *testing.T, db *sql.DB) *network.Manager {
+	t.Helper()
+	networkManager := network.NewManager(db, nil)
+	require.NotNil(t, networkManager)
+
+	initNetworks := []params.Network{
+		*network_testutil.CreateNetwork(walletCommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
+		}),
+		*network_testutil.CreateNetwork(walletCommon.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
+			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.optimism.io")),
+		}),
+	}
+	require.NoError(t, networkManager.InitEmbeddedNetworks(initNetworks))
+	return networkManager
 }
 
 func setupCommand(t *testing.T, method string) (state testState, close func()) {
@@ -71,19 +89,7 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	state.db, closeDb = createDB(t)
 	state.walletDb, closeWalletDb = createWalletDB(t)
 
-	networkManager := network.NewManager(state.db, nil)
-	require.NotNil(t, networkManager)
-
-	initNetworks := []params.Network{
-		*network_testutil.CreateNetwork(walletCommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
-			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
-		}),
-		*network_testutil.CreateNetwork(walletCommon.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
-			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.optimism.io")),
-		}),
-	}
-	err := networkManager.InitEmbeddedNetworks(initNetworks)
-	require.NoError(t, err)
+	state.networkManager = setupNetworkManager(t, state.db)
 
 	state.handler = NewClientSideHandler(state.db, nil)
 
@@ -99,10 +105,10 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	case Method_EthRequestAccounts:
 		state.cmd = NewRequestAccountsCommand(state.walletDb, state.handler)
 	case Method_EthChainId:
-		defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(networkManager)
+		defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(state.networkManager)
 		state.cmd = NewChainIDCommand(state.walletDb, defaultChainIDGetter)
 	case "net_version":
-		defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(networkManager)
+		defaultChainIDGetter := chainutils.NewNetworkManagerAdapter(state.networkManager)
 		state.cmd = NewNetVersionCommand(state.walletDb, defaultChainIDGetter)
 	case Method_PersonalSign:
 		state.cmd = NewSignCommand(state.walletDb, state.handler)
@@ -115,7 +121,7 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	case Method_RevokePermissions:
 		state.cmd = NewRevokePermissionsCommand(state.walletDb, wcSessionDisconnector)
 	case Method_SwitchEthereumChain:
-		state.cmd = NewSwitchEthereumChainCommand(state.walletDb, networkManager)
+		state.cmd = NewSwitchEthereumChainCommand(state.walletDb, state.networkManager)
 	}
 
 	return state, func() {
