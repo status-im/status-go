@@ -6,6 +6,7 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -52,6 +53,12 @@ func overrideCoreWithConfig(filteringCore *namespaceFilteringCore, settings LogS
 			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it
 			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
 			settings.MaxBackups = 1
+		}
+
+		if err := rotateLogFileForNewSession(settings.File); err != nil {
+			ZapLogger().Warn("failed to rotate log file for new session",
+				zap.String("file", settings.File),
+				zap.Error(err))
 		}
 
 		syncers = append(syncers, ZapSyncerWithRotation(FileOptions{
