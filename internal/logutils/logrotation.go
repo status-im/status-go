@@ -1,9 +1,17 @@
 package logutils
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
+
+// processStartTime represents the start time of this process
+var processStartTime = time.Now()
 
 // FileOptions are all options supported by internal rotation module.
 type FileOptions struct {
@@ -25,4 +33,23 @@ func ZapSyncerWithRotation(opts FileOptions) zapcore.WriteSyncer {
 		MaxBackups: opts.MaxBackups,
 		Compress:   opts.Compress,
 	})
+}
+
+// rotateLogFileForNewSession renames an existing log file so the new process writes to a fresh file.
+func rotateLogFileForNewSession(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if !info.ModTime().Before(processStartTime) {
+		return nil
+	}
+	ts := info.ModTime().UTC().Format("2006-01-02T15-04-05Z")
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	archived := base + "-" + ts + ext
+	return os.Rename(path, archived)
 }
