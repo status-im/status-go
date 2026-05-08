@@ -210,14 +210,15 @@ func TestDeleteEphemeralDApps(t *testing.T) {
 		URL:           "https://ephemeral-dapp.com",
 		Name:          "Ephemeral",
 		IconURL:       "",
-		ClientID:      "status-desktop/dapp-browser#ephemeral",
+		ClientID:      "status-desktop/dapp-browser" + persistence.EphemeralClientIDSuffix,
 		SharedAccount: types2.HexToAddress("0x2222"),
 		ChainID:       0x1,
 	}
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &normal))
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &ephemeral))
 
-	require.NoError(t, state.api.DeleteEphemeralDApps())
+	ctx := WithConnectionType(context.Background(), ConnectionTypeTrusted)
+	require.NoError(t, state.api.DeleteEphemeralDApps(ctx))
 
 	gotNormal, err := persistence.SelectDApp(state.walletDb, normal.URL, normal.ClientID)
 	require.NoError(t, err)
@@ -226,6 +227,15 @@ func TestDeleteEphemeralDApps(t *testing.T) {
 	gotEphemeral, err := persistence.SelectDApp(state.walletDb, ephemeral.URL, ephemeral.ClientID)
 	require.NoError(t, err)
 	require.Nil(t, gotEphemeral)
+}
+
+func TestDeleteEphemeralDApps_UntrustedConnection(t *testing.T) {
+	state := setupTests(t)
+
+	ctx := WithConnectionType(context.Background(), ConnectionTypeUntrusted)
+	err := state.api.DeleteEphemeralDApps(ctx)
+	require.Error(t, err)
+	require.Equal(t, ErrNotAllowedForUntrustedConnection, err)
 }
 
 func TestGetWCActiveSessions(t *testing.T) {

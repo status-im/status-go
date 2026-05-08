@@ -60,11 +60,12 @@ type Service struct {
 
 	config *Config
 
-	rpcServer *gethrpc.Server
-	wsServer  *http.Server
-	mu        sync.Mutex
-	paused    bool
-	started   bool
+	rpcServer          *gethrpc.Server
+	wsServer           *http.Server
+	mu                 sync.Mutex
+	paused             bool
+	started            bool
+	purgeEphemeralOnce sync.Once
 }
 
 func (s *Service) Start() error {
@@ -74,10 +75,11 @@ func (s *Service) Start() error {
 		return nil
 	}
 
-	// Purge any ephemeral dApp rows left over from a previous (possibly crashed) run.
-	if err := persistence.DeleteEphemeralDApps(s.db); err != nil {
-		s.logger.Warn("failed to delete ephemeral dapps on start", zap.Error(err))
-	}
+	s.purgeEphemeralOnce.Do(func() {
+		if err := persistence.DeleteEphemeralDApps(s.db); err != nil {
+			s.logger.Warn("failed to delete ephemeral dapps on first start", zap.Error(err))
+		}
+	})
 
 	// Create an RPC server
 	s.rpcServer = gethrpc.NewServer()
@@ -132,17 +134,16 @@ func (s *Service) Start() error {
 func (s *Service) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.stopLocked()
+	err := s.stopLocked()
+	if err2 := persistence.DeleteEphemeralDApps(s.db); err2 != nil {
+		s.logger.Warn("failed to delete ephemeral dapps on stop", zap.Error(err2))
+	}
+	return err
 }
 
 func (s *Service) stopLocked() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-
-	// Purge ephemeral dApp rows on graceful shutdown so they never persist across runs.
-	if err := persistence.DeleteEphemeralDApps(s.db); err != nil {
-		s.logger.Warn("failed to delete ephemeral dapps on stop", zap.Error(err))
-	}
 
 	if s.api != nil && s.api.wcClient != nil {
 		if err := s.api.wcClient.Close(); err != nil {

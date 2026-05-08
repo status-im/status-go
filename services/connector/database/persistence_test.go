@@ -591,9 +591,9 @@ func TestDeleteWCSession(t *testing.T) {
 }
 
 // TestDeleteEphemeralDApps verifies that DeleteEphemeralDApps removes only
-// rows whose clientID contains the "#ephemeral" marker, cascades to their
+// rows whose clientID ends with the "#ephemeral" suffix, cascades to their
 // permissions via the FK, and leaves all other rows (normal sessions,
-// WalletConnect, non-ephemeral uuid suffixes) untouched.
+// WalletConnect, longer suffixes) untouched.
 func TestDeleteEphemeralDApps(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
@@ -604,7 +604,12 @@ func TestDeleteEphemeralDApps(t *testing.T) {
 	}
 	ephemeral := DApp{
 		URL: "https://dapp.com", Name: "Ephemeral", IconURL: "",
-		ClientID: "status-desktop/dapp-browser#ephemeral", SharedAccount: types.HexToAddress("0x2222"), ChainID: 0x1,
+		ClientID: "status-desktop/dapp-browser" + EphemeralClientIDSuffix, SharedAccount: types.HexToAddress("0x2222"), ChainID: 0x1,
+	}
+	require.True(t, IsEphemeralClientID(ephemeral.ClientID))
+	notQuiteEphemeral := DApp{
+		URL: "https://almost.com", Name: "Almost", IconURL: "",
+		ClientID: "status-desktop/dapp-browser#ephemeral-extra", SharedAccount: types.HexToAddress("0x5555"), ChainID: 0x1,
 	}
 	wcDApp := DApp{
 		URL: "https://wc-dapp.com", Name: "WC", IconURL: "",
@@ -612,6 +617,7 @@ func TestDeleteEphemeralDApps(t *testing.T) {
 	}
 	require.NoError(t, UpsertDApp(db, &normal))
 	require.NoError(t, UpsertDApp(db, &ephemeral))
+	require.NoError(t, UpsertDApp(db, &notQuiteEphemeral))
 	require.NoError(t, UpsertDApp(db, &wcDApp))
 	require.NoError(t, InsertPermission(db, ephemeral.URL, ephemeral.ClientID, "eth_accounts", []Caveat{}, 1))
 
@@ -634,6 +640,11 @@ func TestDeleteEphemeralDApps(t *testing.T) {
 
 	// WalletConnect row intact.
 	got, err = SelectDApp(db, wcDApp.URL, wcDApp.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+
+	// Longer suffix than "#ephemeral" must remain.
+	got, err = SelectDApp(db, notQuiteEphemeral.URL, notQuiteEphemeral.ClientID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 }

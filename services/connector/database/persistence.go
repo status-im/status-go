@@ -8,13 +8,21 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 )
 
-const deleteEphemeralDAppsQuery = "DELETE FROM connector_dapps WHERE client_id LIKE '%#ephemeral%'"
+// EphemeralClientIDSuffix marks connector sessions that must not persist across runs.
+const EphemeralClientIDSuffix = "#ephemeral"
 
-// DeleteEphemeralDApps removes connector_dapps rows whose clientID contains
-// the "#ephemeral" marker (e.g. "status-desktop/dapp-browser#ephemeral").
+const deleteEphemeralDAppsQuery = "DELETE FROM connector_dapps WHERE client_id LIKE '%' || ?"
+
+// IsEphemeralClientID reports whether clientID uses the ephemeral suffix convention.
+func IsEphemeralClientID(id string) bool {
+	return strings.HasSuffix(id, EphemeralClientIDSuffix)
+}
+
+// DeleteEphemeralDApps removes connector_dapps rows whose clientID ends with
+// EphemeralClientIDSuffix (e.g. "status-desktop/dapp-browser#ephemeral").
 // Linked connector_permissions rows are removed via FK ON DELETE CASCADE.
 func DeleteEphemeralDApps(db *sql.DB) error {
-	_, err := db.Exec(deleteEphemeralDAppsQuery)
+	_, err := db.Exec(deleteEphemeralDAppsQuery, EphemeralClientIDSuffix)
 	return err
 }
 

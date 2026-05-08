@@ -136,7 +136,7 @@ func TestRequestAccounts_EphemeralDoesNotReuseNormalSession(t *testing.T) {
 	t.Cleanup(close)
 
 	normalClientID := "status-desktop/dapp-browser"
-	ephemeralClientID := "status-desktop/dapp-browser#ephemeral"
+	ephemeralClientID := "status-desktop/dapp-browser" + persistence.EphemeralClientIDSuffix
 
 	origin := "https://some-dapp.com"
 	normalAccount := types.Address{0xAA}
