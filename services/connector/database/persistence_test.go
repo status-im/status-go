@@ -590,6 +590,54 @@ func TestDeleteWCSession(t *testing.T) {
 	require.Nil(t, session)
 }
 
+// TestDeleteEphemeralDApps verifies that DeleteEphemeralDApps removes only
+// rows whose clientID contains the "#ephemeral" marker, cascades to their
+// permissions via the FK, and leaves all other rows (normal sessions,
+// WalletConnect, non-ephemeral uuid suffixes) untouched.
+func TestDeleteEphemeralDApps(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	normal := DApp{
+		URL: "https://dapp.com", Name: "Normal", IconURL: "",
+		ClientID: "status-desktop/dapp-browser", SharedAccount: types.HexToAddress("0x1111"), ChainID: 0x1,
+	}
+	ephemeral := DApp{
+		URL: "https://dapp.com", Name: "Ephemeral", IconURL: "",
+		ClientID: "status-desktop/dapp-browser#ephemeral", SharedAccount: types.HexToAddress("0x2222"), ChainID: 0x1,
+	}
+	wcDApp := DApp{
+		URL: "https://wc-dapp.com", Name: "WC", IconURL: "",
+		ClientID: WCClientID, SharedAccount: types.HexToAddress("0x3333"), ChainID: 0x1,
+	}
+	require.NoError(t, UpsertDApp(db, &normal))
+	require.NoError(t, UpsertDApp(db, &ephemeral))
+	require.NoError(t, UpsertDApp(db, &wcDApp))
+	require.NoError(t, InsertPermission(db, ephemeral.URL, ephemeral.ClientID, "eth_accounts", []Caveat{}, 1))
+
+	require.NoError(t, DeleteEphemeralDApps(db))
+
+	// Ephemeral row gone.
+	got, err := SelectDApp(db, ephemeral.URL, ephemeral.ClientID)
+	require.NoError(t, err)
+	require.Nil(t, got)
+
+	// Permissions cascaded.
+	perms, err := SelectPermissions(db, ephemeral.URL, ephemeral.ClientID)
+	require.NoError(t, err)
+	require.Empty(t, perms)
+
+	// Normal row intact.
+	got, err = SelectDApp(db, normal.URL, normal.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+
+	// WalletConnect row intact.
+	got, err = SelectDApp(db, wcDApp.URL, wcDApp.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+}
+
 func TestDeleteWCSessionIdempotent(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()

@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/services/connector/chainutils"
+	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
 const serviceName = "connector"
@@ -72,6 +73,12 @@ func (s *Service) Start() error {
 	if s.started {
 		return nil
 	}
+
+	// Purge any ephemeral dApp rows left over from a previous (possibly crashed) run.
+	if err := persistence.DeleteEphemeralDApps(s.db); err != nil {
+		s.logger.Warn("failed to delete ephemeral dapps on start", zap.Error(err))
+	}
+
 	// Create an RPC server
 	s.rpcServer = gethrpc.NewServer()
 
@@ -131,6 +138,11 @@ func (s *Service) Stop() error {
 func (s *Service) stopLocked() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+
+	// Purge ephemeral dApp rows on graceful shutdown so they never persist across runs.
+	if err := persistence.DeleteEphemeralDApps(s.db); err != nil {
+		s.logger.Warn("failed to delete ephemeral dapps on stop", zap.Error(err))
+	}
 
 	if s.api != nil && s.api.wcClient != nil {
 		if err := s.api.wcClient.Close(); err != nil {

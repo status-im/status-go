@@ -192,6 +192,11 @@ func (api *API) GetPermittedDAppsList() ([]persistence.DApp, error) {
 	return persistence.SelectAllDApps(api.s.db)
 }
 
+// DeleteEphemeralDApps removes persisted connector rows for ephemeral (incognito) sessions.
+func (api *API) DeleteEphemeralDApps() error {
+	return persistence.DeleteEphemeralDApps(api.s.db)
+}
+
 func (api *API) RequestAccountsAccepted(args commands.RequestAccountsAcceptedArgs) error {
 	return api.c.RequestAccountsAccepted(args)
 }

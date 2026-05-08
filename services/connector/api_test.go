@@ -195,6 +195,39 @@ func TestGetPermittedDAppsList(t *testing.T) {
 	require.Empty(t, dapps)
 }
 
+func TestDeleteEphemeralDApps(t *testing.T) {
+	state := setupTests(t)
+
+	normal := persistence.DApp{
+		URL:           "https://normal-dapp.com",
+		Name:          "Normal",
+		IconURL:       "",
+		ClientID:      "status-desktop/dapp-browser",
+		SharedAccount: types2.HexToAddress("0x1111"),
+		ChainID:       0x1,
+	}
+	ephemeral := persistence.DApp{
+		URL:           "https://ephemeral-dapp.com",
+		Name:          "Ephemeral",
+		IconURL:       "",
+		ClientID:      "status-desktop/dapp-browser#ephemeral",
+		SharedAccount: types2.HexToAddress("0x2222"),
+		ChainID:       0x1,
+	}
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &normal))
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &ephemeral))
+
+	require.NoError(t, state.api.DeleteEphemeralDApps())
+
+	gotNormal, err := persistence.SelectDApp(state.walletDb, normal.URL, normal.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, gotNormal)
+
+	gotEphemeral, err := persistence.SelectDApp(state.walletDb, ephemeral.URL, ephemeral.ClientID)
+	require.NoError(t, err)
+	require.Nil(t, gotEphemeral)
+}
+
 func TestGetWCActiveSessions(t *testing.T) {
 	state := setupTests(t)
 

@@ -8,6 +8,16 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 )
 
+const deleteEphemeralDAppsQuery = "DELETE FROM connector_dapps WHERE client_id LIKE '%#ephemeral%'"
+
+// DeleteEphemeralDApps removes connector_dapps rows whose clientID contains
+// the "#ephemeral" marker (e.g. "status-desktop/dapp-browser#ephemeral").
+// Linked connector_permissions rows are removed via FK ON DELETE CASCADE.
+func DeleteEphemeralDApps(db *sql.DB) error {
+	_, err := db.Exec(deleteEphemeralDAppsQuery)
+	return err
+}
+
 func NormalizeURL(url string) string {
 	return strings.TrimRight(url, "/")
 }

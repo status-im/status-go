@@ -8,7 +8,28 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	persistence "github.com/status-im/status-go/services/connector/database"
 )
+
+func TestService_StopClearsEphemeralDApps(t *testing.T) {
+	state := setupTests(t)
+
+	require.NoError(t, state.service.Start())
+
+	// Insert ephemeral row after Start (simulates a fresh incognito session).
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
+		URL: "https://incognito-dapp2.com", Name: "Incognito DApp 2", IconURL: "",
+		ClientID: "status-desktop/dapp-browser#ephemeral", SharedAccount: types2.Address{}, ChainID: 0x1,
+	}))
+
+	require.NoError(t, state.service.Stop())
+
+	got, err := persistence.SelectDApp(state.walletDb, "https://incognito-dapp2.com", "status-desktop/dapp-browser#ephemeral")
+	require.NoError(t, err)
+	require.Nil(t, got, "ephemeral dApp must be removed on service Stop")
+}
 
 func TestNewService(t *testing.T) {
 	state := setupTests(t)
