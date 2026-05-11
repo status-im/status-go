@@ -130,28 +130,55 @@ func TestOverrideBasicAuth(t *testing.T) {
 	}
 }
 
-func TestOverrideBasicAuth_PuzzleSkipsCredsRespectsEnabled(t *testing.T) {
+func TestOverrideBasicAuth_PuzzleProvidersLeftUntouched(t *testing.T) {
 	ethPuzzle := *params.NewEthRpcProxyProvider(walletcommon.EthereumMainnet, "SmartPuzzle",
 		security.NewSensitiveString("https://eth.example.com/ethereum/mainnet/"), false, true)
 	require.Equal(t, params.PuzzleAuth, ethPuzzle.AuthType)
+	require.True(t, ethPuzzle.Enabled)
+
+	ethNoPuzzleAuth := *params.NewEthRpcProxyProvider(walletcommon.EthereumMainnet, "NoPuzzleAuth",
+		security.NewSensitiveString("https://eth.example.com/ethereum/mainnet/"), false, false)
+	require.Equal(t, params.NoAuth, ethNoPuzzleAuth.AuthType)
+	require.True(t, ethNoPuzzleAuth.AuthLogin.Empty())
+	require.True(t, ethNoPuzzleAuth.AuthPassword.Empty())
+	require.True(t, ethNoPuzzleAuth.Enabled)
 
 	networks := []params.Network{
-		*testutil.CreateNetwork(walletcommon.EthereumMainnet, "Ethereum", []params.RpcProvider{ethPuzzle}),
+		*testutil.CreateNetwork(walletcommon.EthereumMainnet, "Ethereum", []params.RpcProvider{ethPuzzle, ethNoPuzzleAuth}),
 	}
 	user := security.NewSensitiveString("u")
 	pass := security.NewSensitiveString("p")
+
 	updated := networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, user, pass)
 	require.Len(t, updated, 1)
-	p := updated[0].RpcProviders[0]
-	require.Equal(t, params.PuzzleAuth, p.AuthType)
-	require.True(t, p.Enabled)
-	require.True(t, p.AuthLogin.Empty())
-	require.True(t, p.AuthPassword.Empty())
+	for _, p := range updated[0].RpcProviders {
+		if p.AuthType == params.PuzzleAuth {
+			require.Equal(t, params.PuzzleAuth, p.AuthType)
+			require.True(t, p.Enabled) // puzzle provider stays enabled
+			require.True(t, p.AuthLogin.Empty())
+			require.True(t, p.AuthPassword.Empty())
+		} else {
+			require.Equal(t, params.BasicAuth, p.AuthType)
+			require.True(t, p.Enabled) // basic auth provider is enabled
+			require.False(t, p.AuthLogin.Empty())
+			require.False(t, p.AuthPassword.Empty())
+		}
+	}
 
 	disabled := networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, false, user, pass)
-	p2 := disabled[0].RpcProviders[0]
-	require.Equal(t, params.PuzzleAuth, p2.AuthType)
-	require.False(t, p2.Enabled)
+	for _, p := range disabled[0].RpcProviders {
+		if p.AuthType == params.PuzzleAuth {
+			require.Equal(t, params.PuzzleAuth, p.AuthType)
+			require.True(t, p.Enabled) // puzzle provider stays enabled
+			require.True(t, p.AuthLogin.Empty())
+			require.True(t, p.AuthPassword.Empty())
+		} else {
+			require.Equal(t, params.BasicAuth, p.AuthType)
+			require.False(t, p.Enabled) // direct provider is disabled
+			require.False(t, p.AuthLogin.Empty())
+			require.False(t, p.AuthPassword.Empty())
+		}
+	}
 }
 
 func TestOverrideDirectProvidersAuth(t *testing.T) {
