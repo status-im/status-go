@@ -30,7 +30,8 @@ const (
 )
 
 const (
-	EventActivityFetchComplete walletevent.EventType = "wallet-activity-fetch-complete"
+	EventActivityFetchComplete        walletevent.EventType = "wallet-activity-fetch-complete"
+	EventActivityNewTransfersDetected walletevent.EventType = "wallet-activity-new-transfers-detected"
 )
 
 type fetcherID struct {
@@ -243,6 +244,7 @@ func (s *Service) Start(ctx context.Context) {
 	s.startNetworkWatcher()
 	s.startAccountWatcher()
 	s.startTransactionWatcher()
+	s.startBalanceChangeWatcher()
 
 	go func() {
 		defer gocommon.LogOnPanic()
@@ -583,11 +585,26 @@ func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account get
 		return
 	}
 
-	_, err = s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
+	container, err := s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
 	if err != nil {
 		s.logger.Error("Failed to fetch activity", zap.Error(err))
 		return
 	}
+	if len(container.Items) > 0 {
+		// at least one new transfer for detected, so trigger a balance refresh
+		s.emitNewTransfersDetected(chainID, account, len(container.Items))
+	}
+}
+
+func (s *Service) emitNewTransfersDetected(chainID uint64, account gethcommon.Address, count int) {
+	if s.eventFeed == nil {
+		return
+	}
+	s.eventFeed.Send(walletevent.Event{
+		Type:     EventActivityNewTransfersDetected,
+		ChainID:  chainID,
+		Accounts: []gethcommon.Address{account},
+	})
 }
 
 func (s *Service) RefetchTxHistory() error {
