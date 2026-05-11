@@ -78,6 +78,29 @@ func (s *Service) GetClient() *walletconnect.Client {
 	return s.wcClient.Load()
 }
 
+func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) {
+	activeSessions, err := persistence.SelectActiveWCSessions(s.db, time.Now().Unix())
+	if err != nil {
+		s.logger.Error("failed to load active WC sessions", zap.Error(err))
+		return
+	}
+	if len(activeSessions) == 0 {
+		return
+	}
+	restored := make([]walletconnect.RestoredSession, 0, len(activeSessions))
+	for _, session := range activeSessions {
+		restored = append(restored, walletconnect.RestoredSession{
+			Topic:  session.Topic,
+			SymKey: session.SymKey,
+		})
+	}
+	wcClient.RestoreSessions(restored)
+	s.logger.Info("restored WalletConnect sessions", zap.Int("count", len(restored)))
+	if err := wcClient.ConnectAndResubscribe(); err != nil {
+		s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
+	}
+}
+
 // initWCClient creates wcClient when nil. Safe to call without holding s.mu (uses atomic.Pointer).
 func (s *Service) initWCClient() {
 	if s.wcClient.Load() != nil {
@@ -93,23 +116,7 @@ func (s *Service) initWCClient() {
 		return
 	}
 
-	activeSessions, err := persistence.SelectActiveWCSessions(s.db, time.Now().Unix())
-	if err != nil {
-		s.logger.Error("failed to load active WC sessions", zap.Error(err))
-	} else if len(activeSessions) > 0 {
-		restoredSessions := make([]walletconnect.RestoredSession, 0, len(activeSessions))
-		for _, session := range activeSessions {
-			restoredSessions = append(restoredSessions, walletconnect.RestoredSession{
-				Topic:  session.Topic,
-				SymKey: session.SymKey,
-			})
-		}
-		wcClient.RestoreSessions(restoredSessions)
-		s.logger.Info("restored WalletConnect sessions", zap.Int("count", len(restoredSessions)))
-		if err := wcClient.ConnectAndResubscribe(); err != nil {
-			s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
-		}
-	}
+	s.restoreActiveWCSessions(wcClient)
 
 	wcClient.SetSessionDeleteHandler(func(topic string) {
 		s.logger.Info("received wc_sessionDelete", zap.String("topic", topic))
