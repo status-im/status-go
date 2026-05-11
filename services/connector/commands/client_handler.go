@@ -13,7 +13,6 @@ import (
 
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
-	"github.com/status-im/status-go/services/connector/walletconnect"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
@@ -61,10 +60,10 @@ type ClientSideHandler struct {
 	sharePending   map[sharePendingKey]chan struct{}
 }
 
-func NewClientSideHandler(db *sql.DB, wcClient *walletconnect.Client) *ClientSideHandler {
+func NewClientSideHandler(db *sql.DB, getClient WCClientGetter) *ClientSideHandler {
 	return &ClientSideHandler{
 		Db:                    db,
-		wcSessionDisconnector: NewWCSessionDisconnector(db, wcClient),
+		wcSessionDisconnector: NewWCSessionDisconnector(db, getClient),
 		responseChannel:       make(chan Message, 1),
 		isRequestRunning:      0,
 		sharePending:          make(map[sharePendingKey]chan struct{}),

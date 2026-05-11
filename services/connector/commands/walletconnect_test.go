@@ -71,7 +71,7 @@ func TestApproveWCSessionCommand_EmptyChains(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewApproveWCSessionCommand(db, client)
+	cmd := NewApproveWCSessionCommand(db, func() *walletconnect.Client { return client })
 	_, err = cmd.Execute(context.Background(), "proposal1", "0x1234567890abcdef1234567890abcdef12345678", "https://dapp.com", "DApp", "", []uint64{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "supportedChains must not be empty")
@@ -94,7 +94,7 @@ func TestApproveWCSessionCommand_ProposalNotFound(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewApproveWCSessionCommand(db, client)
+	cmd := NewApproveWCSessionCommand(db, func() *walletconnect.Client { return client })
 	_, err = cmd.Execute(context.Background(), "non-existent-proposal", "0x1234567890abcdef1234567890abcdef12345678", "https://dapp.com", "DApp", "", []uint64{1})
 	require.Error(t, err)
 	require.ErrorIs(t, err, walletconnect.ErrProposalNotFound)
@@ -113,7 +113,7 @@ func TestRejectWCSessionCommand_ProposalNotFound(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewRejectWCSessionCommand(client)
+	cmd := NewRejectWCSessionCommand(func() *walletconnect.Client { return client })
 	err = cmd.Execute(context.Background(), "non-existent-proposal")
 	require.Error(t, err)
 	require.ErrorIs(t, err, walletconnect.ErrProposalNotFound)
@@ -132,7 +132,7 @@ func TestApproveWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewApproveWCSessionRequestCommand(client)
+	cmd := NewApproveWCSessionRequestCommand(func() *walletconnect.Client { return client })
 	err = cmd.Execute(context.Background(), "topic", "not-a-number", "0xsignature")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid request ID")
@@ -142,7 +142,7 @@ func TestApproveWCSessionRequestCommand_SessionNotFound(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewApproveWCSessionRequestCommand(client)
+	cmd := NewApproveWCSessionRequestCommand(func() *walletconnect.Client { return client })
 	err = cmd.Execute(context.Background(), "non-existent-topic", "12345", "0xsignature")
 	require.Error(t, err)
 	require.ErrorIs(t, err, walletconnect.ErrSessionNotFound)
@@ -161,7 +161,7 @@ func TestRejectWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewRejectWCSessionRequestCommand(client)
+	cmd := NewRejectWCSessionRequestCommand(func() *walletconnect.Client { return client })
 	err = cmd.Execute(context.Background(), "topic", "not-a-number", 4001, "User rejected")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid request ID")
@@ -171,7 +171,7 @@ func TestRejectWCSessionRequestCommand_SessionNotFound(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewRejectWCSessionRequestCommand(client)
+	cmd := NewRejectWCSessionRequestCommand(func() *walletconnect.Client { return client })
 	err = cmd.Execute(context.Background(), "non-existent-topic", "12345", 4001, "User rejected")
 	require.Error(t, err)
 	require.ErrorIs(t, err, walletconnect.ErrSessionNotFound)
@@ -183,7 +183,7 @@ func TestPairWCCommand_InvalidURI(t *testing.T) {
 	client, err := walletconnect.NewClient("test")
 	require.NoError(t, err)
 
-	cmd := NewPairWCCommand(client)
+	cmd := NewPairWCCommand(func() *walletconnect.Client { return client })
 	// An invalid URI that fails ParseURI before any network access
 	err = cmd.Execute(context.Background(), "not-a-valid-wc-uri")
 	require.Error(t, err)

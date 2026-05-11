@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/connector/walletconnect"
-	"github.com/status-im/status-go/signal"
 )
 
 var (
@@ -27,7 +24,6 @@ type API struct {
 	s                          *Service
 	r                          *CommandRegistry
 	c                          *commands.ClientSideHandler
-	wcClient                   *walletconnect.Client
 	changeAccountCommand       *commands.ChangeAccountCommand
 	pairWCCommand              *commands.PairWCCommand
 	wcSessionDisconnector      commands.WCSessionDisconnector
@@ -41,50 +37,11 @@ type API struct {
 func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
 
-	wcClient, err := walletconnect.NewClient(s.config.ProjectID)
-	if err != nil {
-		s.logger.Error("failed to create WalletConnect client", zap.Error(err))
-	}
+	getWC := func() *walletconnect.Client { return s.GetClient() }
 
-	if wcClient != nil {
-		activeSessions, err := persistence.SelectActiveWCSessions(s.db, time.Now().Unix())
-		if err != nil {
-			s.logger.Error("failed to load active WC sessions", zap.Error(err))
-		} else if len(activeSessions) > 0 {
-			restoredSessions := make([]walletconnect.RestoredSession, 0, len(activeSessions))
-			for _, session := range activeSessions {
-				restoredSessions = append(restoredSessions, walletconnect.RestoredSession{
-					Topic:  session.Topic,
-					SymKey: session.SymKey,
-				})
-			}
-			wcClient.RestoreSessions(restoredSessions)
-			s.logger.Info("restored WalletConnect sessions", zap.Int("count", len(restoredSessions)))
-			if err := wcClient.ConnectAndResubscribe(); err != nil {
-				s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
-			}
-		}
-	}
+	wcSessionDisconnector := commands.NewWCSessionDisconnector(s.db, getWC)
 
-	wcSessionDisconnector := commands.NewWCSessionDisconnector(s.db, wcClient)
-
-	if wcClient != nil {
-		wcClient.SetSessionDeleteHandler(func(topic string) {
-			s.logger.Info("received wc_sessionDelete", zap.String("topic", topic))
-			session, err := persistence.SelectWCSession(s.db, topic)
-			dappURL := ""
-			if err == nil && session != nil {
-				dappURL = session.DAppURL
-			}
-			if err := wcSessionDisconnector.DisconnectSession(context.Background(), topic); err != nil {
-				s.logger.Error("failed to disconnect WC session", zap.String("topic", topic), zap.Error(err))
-			} else {
-				s.logger.Info("WC session disconnected", zap.String("topic", topic), zap.String("dappURL", dappURL))
-			}
-			signal.SendWCSessionDelete(topic, dappURL)
-		})
-	}
-	c := commands.NewClientSideHandler(s.db, wcClient)
+	c := commands.NewClientSideHandler(s.db, getWC)
 
 	// Transactions and signing
 	r.Register("eth_sendTransaction", commands.NewSendTransactionCommand(s.db, s.ethClientGetter, s.feeManager, c))
@@ -117,15 +74,14 @@ func NewAPI(s *Service) *API {
 		s:                          s,
 		r:                          r,
 		c:                          c,
-		wcClient:                   wcClient,
 		changeAccountCommand:       changeAccountCommand,
-		pairWCCommand:              commands.NewPairWCCommand(wcClient),
+		pairWCCommand:              commands.NewPairWCCommand(getWC),
 		wcSessionDisconnector:      wcSessionDisconnector,
 		getWCActiveSessionsCommand: commands.NewGetWCActiveSessionsCommand(s.db),
-		approveWCSessionCommand:    commands.NewApproveWCSessionCommand(s.db, wcClient),
-		rejectWCSessionCommand:     commands.NewRejectWCSessionCommand(wcClient),
-		approveWCSessionRequestCmd: commands.NewApproveWCSessionRequestCommand(wcClient),
-		rejectWCSessionRequestCmd:  commands.NewRejectWCSessionRequestCommand(wcClient),
+		approveWCSessionCommand:    commands.NewApproveWCSessionCommand(s.db, getWC),
+		rejectWCSessionCommand:     commands.NewRejectWCSessionCommand(getWC),
+		approveWCSessionRequestCmd: commands.NewApproveWCSessionRequestCommand(getWC),
+		rejectWCSessionRequestCmd:  commands.NewRejectWCSessionRequestCommand(getWC),
 	}
 }
 
@@ -261,7 +217,8 @@ func (api *API) RejectWCSessionRequest(ctx context.Context, topic, requestIDStr 
 }
 
 func (api *API) UpdateWCSessionChains(ctx context.Context, topic string, account string, chains []uint64) error {
-	if api.wcClient == nil {
+	wcClient := api.s.GetClient()
+	if wcClient == nil {
 		return fmt.Errorf("WalletConnect client not initialized")
 	}
 
@@ -313,7 +270,7 @@ func (api *API) UpdateWCSessionChains(ctx context.Context, topic string, account
 	namespaces, _, _ := walletconnect.BuildNamespaces(meta, proposal)
 
 	// Send session update to dApp
-	if err := api.wcClient.SendSessionUpdate(topic, namespaces); err != nil {
+	if err := wcClient.SendSessionUpdate(topic, namespaces); err != nil {
 		return fmt.Errorf("failed to send session update: %w", err)
 	}
 
@@ -333,7 +290,8 @@ func (api *API) UpdateWCSessionChains(ctx context.Context, topic string, account
 
 // EmitWCSessionEvent sends a wc_sessionEvent to the dapp (e.g., chainChanged, accountsChanged, connect, disconnect).
 func (api *API) EmitWCSessionEvent(ctx context.Context, topic, name, dataJSON, chainID string) error {
-	if api.wcClient == nil {
+	wcClient := api.s.GetClient()
+	if wcClient == nil {
 		return fmt.Errorf("WalletConnect client not initialized")
 	}
 
@@ -349,5 +307,5 @@ func (api *API) EmitWCSessionEvent(ctx context.Context, topic, name, dataJSON, c
 		Data: data,
 	}
 
-	return api.wcClient.SendSessionEvent(topic, event, chainID)
+	return wcClient.SendSessionEvent(topic, event, chainID)
 }
