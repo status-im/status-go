@@ -122,6 +122,8 @@ func TestCall_RetriesOnBrokenWrite(t *testing.T) {
 	r := newTestRelayClient(t, fr)
 
 	require.NoError(t, r.Connect())
+	// Let readLoop observe EOF after forceDrop before Subscribe races a buffered write on a dead conn.
+	time.Sleep(50 * time.Millisecond)
 	_, err := r.Subscribe("topic-a")
 	require.NoError(t, err)
 	require.EqualValues(t, 2, atomic.LoadInt32(&fr.accepted))

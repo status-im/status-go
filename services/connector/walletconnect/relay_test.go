@@ -3,11 +3,37 @@ package walletconnect
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 )
+
+// newRelayTestWSServer starts a minimal echo-style relay endpoint for RelayClient dial tests.
+func newRelayTestWSServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		require.NoError(t, err)
+		defer conn.Close()
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+}
+
+func relayTestWSURL(server *httptest.Server) string {
+	return "ws" + strings.TrimPrefix(server.URL, "http")
+}
 
 func TestTruncate(t *testing.T) {
 	tests := []struct {
@@ -249,4 +275,38 @@ func TestRelayClient_DisconnectRequested(t *testing.T) {
 	client.mu.Unlock()
 
 	require.True(t, requested)
+}
+
+func TestRelayClient_ConnectAfterClose_ReturnsDisconnectRequested(t *testing.T) {
+	server := newRelayTestWSServer(t)
+	defer server.Close()
+
+	client, err := NewRelayClient("test")
+	require.NoError(t, err)
+	client.url = relayTestWSURL(server)
+
+	require.NoError(t, client.Connect())
+	require.NoError(t, client.Close())
+
+	err = client.Connect()
+	require.Error(t, err)
+	require.ErrorContains(t, err, "disconnect requested")
+}
+
+func TestRelayClient_FreshInstance_ConnectsCleanly(t *testing.T) {
+	server := newRelayTestWSServer(t)
+	defer server.Close()
+	wsURL := relayTestWSURL(server)
+
+	a, err := NewRelayClient("test")
+	require.NoError(t, err)
+	a.url = wsURL
+	require.NoError(t, a.Connect())
+	require.NoError(t, a.Close())
+
+	b, err := NewRelayClient("test")
+	require.NoError(t, err)
+	b.url = wsURL
+	require.NoError(t, b.Connect())
+	require.NoError(t, b.Close())
 }
