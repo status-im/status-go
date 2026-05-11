@@ -120,6 +120,7 @@ type RelayClient struct {
 	writeMu      sync.Mutex // serializes writes (gorilla/websocket requires it)
 	reconnectMu  sync.Mutex // serializes reconnect attempts
 	readLoopOnce sync.Once  // starts readLoop at most once per RelayClient lifetime
+	closeOnce    sync.Once  // closes r.done at most once (Close idempotent)
 }
 
 // NewRelayClient creates a new relay client.
@@ -279,12 +280,14 @@ func (r *RelayClient) Close() error {
 	r.conn = nil
 	r.mu.Unlock()
 
-	if conn == nil {
-		return nil
-	}
+	r.closeOnce.Do(func() {
+		close(r.done)
+	})
 
-	close(r.done)
-	err := conn.Close()
+	var err error
+	if conn != nil {
+		err = conn.Close()
+	}
 	r.wg.Wait()
 	return err
 }
@@ -405,14 +408,21 @@ func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 			return nil, fmt.Errorf("reconnect: %w", err)
 		}
 		conn = r.getConn()
+		if conn == nil {
+			return nil, fmt.Errorf("connection lost immediately after reconnect")
+		}
 	}
 
 	if err := r.writeMessage(conn, body); err != nil {
 		r.markBroken(conn)
 		if err2 := r.ensureConnected(); err2 != nil {
-			return nil, fmt.Errorf("write: %w", err)
+			return nil, fmt.Errorf("write failed: %v; reconnect failed: %w", err, err2)
 		}
-		if err := r.writeMessage(r.getConn(), body); err != nil {
+		newConn := r.getConn()
+		if newConn == nil {
+			return nil, fmt.Errorf("write failed: %v; connection lost after reconnect", err)
+		}
+		if err := r.writeMessage(newConn, body); err != nil {
 			return nil, fmt.Errorf("write: %w", err)
 		}
 	}
@@ -535,6 +545,16 @@ func (r *RelayClient) reconnect() error {
 		}
 
 		r.mu.Lock()
+		if r.disconnectRequested {
+			r.mu.Unlock()
+			_ = conn.Close()
+			return fmt.Errorf("disconnect requested during reconnect")
+		}
+		if r.conn != nil {
+			r.mu.Unlock()
+			_ = conn.Close()
+			return nil
+		}
 		r.conn = conn
 		handler := r.reconnectedHandler
 		r.mu.Unlock()
