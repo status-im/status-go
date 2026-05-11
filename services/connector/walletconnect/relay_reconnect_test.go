@@ -142,14 +142,20 @@ func TestCall_SingleFlightReconnect(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	var wg sync.WaitGroup
+	errs := make(chan error, 5)
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, _ = r.Subscribe(fmt.Sprintf("t-%d", i))
+			_, err := r.Subscribe(fmt.Sprintf("t-%d", i))
+			errs <- err
 		}(i)
 	}
 	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
 
 	require.EqualValues(t, 2, atomic.LoadInt32(&fr.accepted))
 	_ = r.Close()
