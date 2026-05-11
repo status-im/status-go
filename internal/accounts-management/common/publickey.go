@@ -5,10 +5,13 @@ import (
 
 	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/pkg/multiformat"
+	identityUtils "github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
 )
 
-// GetPublicKeyData processes a public key and returns its compressed form and emoji hash
+// GetPublicKeyData processes a public key and returns its full visual
+// identity: compressed form, emoji hash, alias, and colorId.
 func GetPublicKeyData(publicKey string) (*types.PublicKeyData, error) {
 	if publicKey == "" {
 		return nil, nil
@@ -24,9 +27,21 @@ func GetPublicKeyData(publicKey string) (*types.PublicKeyData, error) {
 		return nil, err
 	}
 
+	aliasName, err := alias.GenerateFromPublicKeyString(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	colorID, err := identityUtils.ToColorID(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.PublicKeyData{
 		CompressedKey: compressedKey,
 		EmojiHash:     emojiHash,
+		Alias:         aliasName,
+		ColorID:       colorID,
 	}, nil
 }
 
