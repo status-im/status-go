@@ -192,6 +192,15 @@ func (api *API) GetPermittedDAppsList() ([]persistence.DApp, error) {
 	return persistence.SelectAllDApps(api.s.db)
 }
 
+// DeleteEphemeralDApps removes persisted connector rows for ephemeral (incognito) sessions.
+// Untrusted callers (e.g. browser WebSocket) cannot invoke this.
+func (api *API) DeleteEphemeralDApps(ctx context.Context) error {
+	if IsUntrustedConnection(ctx) {
+		return ErrNotAllowedForUntrustedConnection
+	}
+	return persistence.DeleteEphemeralDApps(api.s.db)
+}
+
 func (api *API) RequestAccountsAccepted(args commands.RequestAccountsAcceptedArgs) error {
 	return api.c.RequestAccountsAccepted(args)
 }

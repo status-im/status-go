@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
@@ -125,6 +126,68 @@ func TestRequestAccountsRejected(t *testing.T) {
 
 	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestAccountsRejectedByUser, err)
+}
+
+// TestRequestAccounts_EphemeralDoesNotReuseNormalSession verifies that an
+// ephemeral (incognito) clientID never silently reuses a permission that was
+// granted to the normal-session clientID for the same dApp origin.
+func TestRequestAccounts_EphemeralDoesNotReuseNormalSession(t *testing.T) {
+	state, close := setupCommand(t, Method_EthRequestAccounts)
+	t.Cleanup(close)
+
+	normalClientID := "status-desktop/dapp-browser"
+	ephemeralClientID := "status-desktop/dapp-browser" + persistence.EphemeralClientIDSuffix
+
+	origin := "https://some-dapp.com"
+	normalAccount := types.Address{0xAA}
+	ephemeralAccount := types.Address{0xBB}
+
+	// Pre-populate a normal-session dApp + eth_accounts permission.
+	normalDApp := &persistence.DApp{
+		URL: origin, Name: "SomeDApp", IconURL: "",
+		ClientID: normalClientID, SharedAccount: normalAccount, ChainID: 1,
+	}
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, normalDApp))
+	require.NoError(t, persistence.InsertPermission(state.walletDb, origin, normalClientID, Method_EthAccounts, []persistence.Caveat{}, 1))
+
+	// Now call eth_requestAccounts with the ephemeral clientID for the same origin.
+	// This MUST NOT silently reuse the normal-session permission — it must trigger the share UI.
+	sharePromptInvoked := false
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt EventType
+		require.NoError(t, json.Unmarshal(s, &evt))
+		if evt.Type == signal.EventConnectorSendRequestAccounts {
+			sharePromptInvoked = true
+			var ev signal.ConnectorSendRequestAccountsSignal
+			require.NoError(t, json.Unmarshal(evt.Event, &ev))
+			// Simulate user approving with the ephemeral account.
+			require.NoError(t, state.handler.RequestAccountsAccepted(RequestAccountsAcceptedArgs{
+				RequestID: ev.RequestID,
+				Account:   ephemeralAccount,
+				ChainID:   1,
+			}))
+		}
+	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
+
+	ephemeralDApp := signal.ConnectorDApp{
+		URL: origin, Name: "SomeDApp", IconURL: "", ClientID: ephemeralClientID,
+	}
+	request, err := ConstructRPCRequest(Method_EthRequestAccounts, []interface{}{}, &ephemeralDApp)
+	require.NoError(t, err)
+
+	response, err := state.cmd.Execute(state.ctx, request)
+	require.NoError(t, err)
+	require.True(t, sharePromptInvoked, "share prompt must fire for ephemeral clientID even when normal session has permission")
+
+	// The returned account must be the ephemeral one, not the normal-session one.
+	require.Equal(t, FormatAccountAddressToResponse(ephemeralAccount), response)
+
+	// Normal-session dApp must be completely untouched.
+	got, err := persistence.SelectDApp(state.walletDb, origin, normalClientID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, normalAccount, got.SharedAccount)
 }
 
 func TestRequestAccountsWithExistingDApp(t *testing.T) {

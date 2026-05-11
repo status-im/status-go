@@ -8,7 +8,50 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	types2 "github.com/status-im/status-go/internal/crypto/types"
+	persistence "github.com/status-im/status-go/services/connector/database"
 )
+
+func ephemeralBrowserClientID() string {
+	return "status-desktop/dapp-browser" + persistence.EphemeralClientIDSuffix
+}
+
+func TestService_StartPurgesStaleEphemeralDAppsOnce(t *testing.T) {
+	state := setupTests(t)
+
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
+		URL: "https://stale.com", Name: "Stale", IconURL: "",
+		ClientID:      ephemeralBrowserClientID(),
+		SharedAccount: types2.Address{}, ChainID: 0x1,
+	}))
+
+	require.NoError(t, state.service.Start())
+	require.NoError(t, state.service.Stop())
+
+	got, err := persistence.SelectDApp(state.walletDb, "https://stale.com", ephemeralBrowserClientID())
+	require.NoError(t, err)
+	require.Nil(t, got, "stale ephemeral row must be purged on first Start")
+}
+
+func TestService_StopPurgesEphemeralDApps(t *testing.T) {
+	state := setupTests(t)
+
+	require.NoError(t, state.service.Start())
+
+	// Insert ephemeral row after Start (simulates a fresh incognito session).
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
+		URL: "https://incognito-dapp2.com", Name: "Incognito DApp 2", IconURL: "",
+		ClientID:      ephemeralBrowserClientID(),
+		SharedAccount: types2.Address{}, ChainID: 0x1,
+	}))
+
+	require.NoError(t, state.service.Stop())
+
+	got, err := persistence.SelectDApp(state.walletDb, "https://incognito-dapp2.com", ephemeralBrowserClientID())
+	require.NoError(t, err)
+	require.Nil(t, got, "ephemeral dApp must be removed on service Stop")
+}
 
 func TestNewService(t *testing.T) {
 	state := setupTests(t)
@@ -86,6 +129,33 @@ func TestService_PauseResumeBackground(t *testing.T) {
 
 	err = state.service.Stop()
 	require.NoError(t, err)
+}
+
+func TestService_PauseResumePreservesEphemeralDApps(t *testing.T) {
+	state := setupTests(t)
+	state.service.config.WSEnabled = false
+
+	t.Cleanup(func() { _ = state.service.Stop() })
+
+	require.NoError(t, state.service.Start())
+
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
+		URL: "https://pause-incognito.com", Name: "Pause Test", IconURL: "",
+		ClientID:      ephemeralBrowserClientID(),
+		SharedAccount: types2.Address{}, ChainID: 0x1,
+	}))
+
+	require.NoError(t, state.service.Pause())
+
+	got, err := persistence.SelectDApp(state.walletDb, "https://pause-incognito.com", ephemeralBrowserClientID())
+	require.NoError(t, err)
+	require.NotNil(t, got, "ephemeral dApp must survive Pause")
+
+	require.NoError(t, state.service.Resume())
+
+	got, err = persistence.SelectDApp(state.walletDb, "https://pause-incognito.com", ephemeralBrowserClientID())
+	require.NoError(t, err)
+	require.NotNil(t, got, "ephemeral dApp must survive Resume")
 }
 
 // freeLocalTCPPort reserves an ephemeral TCP port on loopback for the test process.

@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/services/connector/chainutils"
+	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
 const serviceName = "connector"
@@ -59,11 +60,12 @@ type Service struct {
 
 	config *Config
 
-	rpcServer *gethrpc.Server
-	wsServer  *http.Server
-	mu        sync.Mutex
-	paused    bool
-	started   bool
+	rpcServer          *gethrpc.Server
+	wsServer           *http.Server
+	mu                 sync.Mutex
+	paused             bool
+	started            bool
+	purgeEphemeralOnce sync.Once
 }
 
 func (s *Service) Start() error {
@@ -72,6 +74,13 @@ func (s *Service) Start() error {
 	if s.started {
 		return nil
 	}
+
+	s.purgeEphemeralOnce.Do(func() {
+		if err := persistence.DeleteEphemeralDApps(s.db); err != nil {
+			s.logger.Warn("failed to delete ephemeral dapps on first start", zap.Error(err))
+		}
+	})
+
 	// Create an RPC server
 	s.rpcServer = gethrpc.NewServer()
 
@@ -125,7 +134,11 @@ func (s *Service) Start() error {
 func (s *Service) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.stopLocked()
+	err := s.stopLocked()
+	if err2 := persistence.DeleteEphemeralDApps(s.db); err2 != nil {
+		s.logger.Warn("failed to delete ephemeral dapps on stop", zap.Error(err2))
+	}
+	return err
 }
 
 func (s *Service) stopLocked() error {
