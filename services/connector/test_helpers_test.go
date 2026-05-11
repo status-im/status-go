@@ -98,7 +98,7 @@ func setupTests(t *testing.T) (state testState) {
 		&Config{},
 	)
 
-	state.api = NewAPI(state.service)
+	state.api = state.service.api
 
 	return state
 }

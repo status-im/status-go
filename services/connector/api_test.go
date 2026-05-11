@@ -418,7 +418,7 @@ func TestPairWalletConnect_InvalidURI(t *testing.T) {
 
 func TestUpdateWCSessionChains_NilClient(t *testing.T) {
 	state := setupTests(t)
-	state.api.wcClient = nil
+	state.service.wcClient.Store(nil)
 
 	err := state.api.UpdateWCSessionChains(state.ctx, "some-topic", "0x1234", []uint64{1})
 	require.Error(t, err)
@@ -427,7 +427,7 @@ func TestUpdateWCSessionChains_NilClient(t *testing.T) {
 
 func TestEmitWCSessionEvent_NilClient(t *testing.T) {
 	state := setupTests(t)
-	state.api.wcClient = nil
+	state.service.wcClient.Store(nil)
 
 	err := state.api.EmitWCSessionEvent(state.ctx, "some-topic", "accountsChanged", "", "eip155:1")
 	require.Error(t, err)
@@ -458,6 +458,6 @@ func TestNewAPI_WithRestoredSessions(t *testing.T) {
 		&Config{},
 	)
 
-	api := NewAPI(service)
-	require.NotNil(t, api)
+	require.NotNil(t, service.api)
+	require.NotNil(t, service.GetClient())
 }
