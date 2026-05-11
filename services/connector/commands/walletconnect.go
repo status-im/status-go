@@ -12,6 +12,19 @@ import (
 	"github.com/status-im/status-go/services/connector/walletconnect"
 )
 
+var errWCClientNotInitialized = fmt.Errorf("WalletConnect client not initialized")
+
+func (g WCClientGetter) resolve() (*walletconnect.Client, error) {
+	if g == nil {
+		return nil, errWCClientNotInitialized
+	}
+	c := g()
+	if c == nil {
+		return nil, errWCClientNotInitialized
+	}
+	return c, nil
+}
+
 type wcSessionDisconnector struct {
 	db        *sql.DB
 	getClient WCClientGetter
@@ -40,13 +53,11 @@ func (d *wcSessionDisconnector) DisconnectSession(ctx context.Context, topic str
 		_ = persistence.DeleteWCSession(d.db, topic)
 	}
 
-	if d.getClient != nil {
-		if client := d.getClient(); client != nil {
-			go func(ctx context.Context, topic string, client *walletconnect.Client) {
-				defer common.LogOnPanic()
-				_ = client.SendSessionDelete(ctx, topic)
-			}(ctx, topic, client)
-		}
+	if client, err := d.getClient.resolve(); err == nil {
+		go func(ctx context.Context, topic string, client *walletconnect.Client) {
+			defer common.LogOnPanic()
+			_ = client.SendSessionDelete(ctx, topic)
+		}(ctx, topic, client)
 	}
 	return nil
 }
@@ -62,12 +73,9 @@ func NewPairWCCommand(getClient WCClientGetter) *PairWCCommand {
 }
 
 func (c *PairWCCommand) Execute(ctx context.Context, uri string) error {
-	var client *walletconnect.Client
-	if c.getClient != nil {
-		client = c.getClient()
-	}
-	if client == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
 	}
 	return client.Pair(ctx, uri)
 }
@@ -103,12 +111,9 @@ func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, accou
 		return "", fmt.Errorf("invalid account address: %s", account)
 	}
 
-	var client *walletconnect.Client
-	if c.getClient != nil {
-		client = c.getClient()
-	}
-	if client == nil {
-		return "", fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return "", err
 	}
 
 	if len(supportedChains) == 0 {
@@ -167,12 +172,9 @@ func NewRejectWCSessionCommand(getClient WCClientGetter) *RejectWCSessionCommand
 }
 
 func (c *RejectWCSessionCommand) Execute(ctx context.Context, proposalID string) error {
-	var client *walletconnect.Client
-	if c.getClient != nil {
-		client = c.getClient()
-	}
-	if client == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
 	}
 	return client.RejectSession(proposalID)
 }
@@ -188,12 +190,9 @@ func NewApproveWCSessionRequestCommand(getClient WCClientGetter) *ApproveWCSessi
 }
 
 func (c *ApproveWCSessionRequestCommand) Execute(ctx context.Context, topic, requestIDStr, signature string) error {
-	var client *walletconnect.Client
-	if c.getClient != nil {
-		client = c.getClient()
-	}
-	if client == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
 	}
 	var requestID int64
 	if _, err := fmt.Sscanf(requestIDStr, "%d", &requestID); err != nil {
@@ -213,12 +212,9 @@ func NewRejectWCSessionRequestCommand(getClient WCClientGetter) *RejectWCSession
 }
 
 func (c *RejectWCSessionRequestCommand) Execute(ctx context.Context, topic, requestIDStr string, code int, message string) error {
-	var client *walletconnect.Client
-	if c.getClient != nil {
-		client = c.getClient()
-	}
-	if client == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
 	}
 	var requestID int64
 	if _, err := fmt.Sscanf(requestIDStr, "%d", &requestID); err != nil {

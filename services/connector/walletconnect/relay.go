@@ -169,6 +169,28 @@ func (r *RelayClient) ensureConnected() error {
 	return r.reconnect()
 }
 
+// acquireConn returns a live conn. It reconnects if a previous Connect() succeeded;
+// returns "not connected" if Connect() was never called.
+func (r *RelayClient) acquireConn() (*websocket.Conn, error) {
+	if conn := r.getConn(); conn != nil {
+		return conn, nil
+	}
+	r.mu.Lock()
+	everConnected := r.connectedOnce
+	r.mu.Unlock()
+	if !everConnected {
+		return nil, fmt.Errorf("not connected")
+	}
+	if err := r.ensureConnected(); err != nil {
+		return nil, fmt.Errorf("reconnect: %w", err)
+	}
+	conn := r.getConn()
+	if conn == nil {
+		return nil, fmt.Errorf("connection lost after reconnect")
+	}
+	return conn, nil
+}
+
 // dialRelay opens a new WebSocket to r.url with auth query parameters.
 func (r *RelayClient) dialRelay() (*websocket.Conn, error) {
 	jwt, err := r.auth.GenerateJWT(r.url)
@@ -396,33 +418,18 @@ func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 		return nil, err
 	}
 
-	conn := r.getConn()
-	if conn == nil {
-		r.mu.Lock()
-		everConnected := r.connectedOnce
-		r.mu.Unlock()
-		if !everConnected {
-			return nil, fmt.Errorf("not connected")
-		}
-		if err := r.ensureConnected(); err != nil {
-			return nil, fmt.Errorf("reconnect: %w", err)
-		}
-		conn = r.getConn()
-		if conn == nil {
-			return nil, fmt.Errorf("connection lost immediately after reconnect")
-		}
+	conn, err := r.acquireConn()
+	if err != nil {
+		return nil, err
 	}
 
-	if err := r.writeMessage(conn, body); err != nil {
+	if werr := r.writeMessage(conn, body); werr != nil {
 		r.markBroken(conn)
-		if err2 := r.ensureConnected(); err2 != nil {
-			return nil, fmt.Errorf("write failed: %v; reconnect failed: %w", err, err2)
+		conn, err = r.acquireConn()
+		if err != nil {
+			return nil, fmt.Errorf("write %v; %w", werr, err)
 		}
-		newConn := r.getConn()
-		if newConn == nil {
-			return nil, fmt.Errorf("write failed: %v; connection lost after reconnect", err)
-		}
-		if err := r.writeMessage(newConn, body); err != nil {
+		if err := r.writeMessage(conn, body); err != nil {
 			return nil, fmt.Errorf("write: %w", err)
 		}
 	}
@@ -496,20 +503,21 @@ func (r *RelayClient) readLoop() {
 			continue
 		}
 
-		if resp.idString() == "" {
+		id := resp.idString()
+		if id == "" {
 			r.logger.Debug("ignoring relay message with empty ID")
 			continue
 		}
 
 		r.mu.Lock()
-		if ch, ok := r.pending[resp.idString()]; ok {
+		if ch, ok := r.pending[id]; ok {
 			select {
 			case ch <- &resp:
 			default:
 			}
 		} else {
 			r.logger.Debug("received response for unknown request ID",
-				zap.String("id", resp.idString()))
+				zap.String("id", id))
 		}
 		r.mu.Unlock()
 	}
