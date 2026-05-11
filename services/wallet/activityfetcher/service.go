@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -43,10 +44,11 @@ type Service struct {
 	accountsGetter         accounts.AccountsStorage
 	ethClientGetter        rpc.EthClientGetter
 
-	networksPublisher *pubsub.Publisher
-	accountsPublisher *pubsub.Publisher
-	eventFeed         *event.Feed
-	checkRefetchCh    chan bool
+	networksPublisher             *pubsub.Publisher
+	accountsPublisher             *pubsub.Publisher
+	multistandardBalancePublisher *pubsub.Publisher
+	eventFeed                     *event.Feed
+	checkRefetchCh                chan bool
 
 	cancelFnMap      map[fetcherID]context.CancelFunc
 	cancelFnMapMutex sync.RWMutex
@@ -65,22 +67,24 @@ func NewService(
 	accountsPublisher *pubsub.Publisher,
 	ethClientGetter rpc.EthClientGetter,
 	eventFeed *event.Feed,
+	multistandardBalancePublisher *pubsub.Publisher,
 ) *Service {
 	logger := logutils.ZapLogger().Named("ActivityFetcher")
 
 	service := &Service{
-		activityFetcherManager: activityFetcherManager,
-		networksGetter:         networksGetter,
-		accountsGetter:         accountsGetter,
-		ethClientGetter:        ethClientGetter,
-		networksPublisher:      networksGetter.GetPublisher(),
-		accountsPublisher:      accountsPublisher,
-		eventFeed:              eventFeed,
-		checkRefetchCh:         make(chan bool),
-		cancelFnMap:            make(map[fetcherID]context.CancelFunc),
-		targetedFetchCh:        make(chan []fetcherID),
-		logger:                 logger,
-		ch:                     make(chan walletevent.Event, 100),
+		activityFetcherManager:        activityFetcherManager,
+		networksGetter:                networksGetter,
+		accountsGetter:                accountsGetter,
+		ethClientGetter:               ethClientGetter,
+		networksPublisher:             networksGetter.GetPublisher(),
+		accountsPublisher:             accountsPublisher,
+		multistandardBalancePublisher: multistandardBalancePublisher,
+		eventFeed:                     eventFeed,
+		checkRefetchCh:                make(chan bool),
+		cancelFnMap:                   make(map[fetcherID]context.CancelFunc),
+		targetedFetchCh:               make(chan []fetcherID),
+		logger:                        logger,
+		ch:                            make(chan walletevent.Event, 100),
 	}
 
 	return service
@@ -192,6 +196,41 @@ func (s *Service) startAccountWatcher() {
 					return
 				}
 				s.triggerRefetch(false)
+			}
+		}
+	}()
+}
+
+// startBalanceChangeWatcher subscribes to multistandardbalance fetch-finished events and triggers activity fetch
+func (s *Service) startBalanceChangeWatcher() {
+	if s.multistandardBalancePublisher == nil {
+		return
+	}
+
+	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](s.multistandardBalancePublisher, 10)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer unsub()
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
+				}
+				if !event.BalanceChanged {
+					continue
+				}
+				if !s.activityFetcherManager.IsChainSupported(event.Key.ChainID) {
+					continue
+				}
+				ids := []fetcherID{{account: event.Key.Account, chainID: event.Key.ChainID}}
+				select {
+				case s.targetedFetchCh <- ids:
+				case <-s.stopCh:
+					return
+				}
 			}
 		}
 	}()
