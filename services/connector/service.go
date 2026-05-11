@@ -81,6 +81,10 @@ func (s *Service) Start() error {
 		}
 	})
 
+	if s.api == nil {
+		s.api = NewAPI(s)
+	}
+
 	// Create an RPC server
 	s.rpcServer = gethrpc.NewServer()
 
@@ -150,6 +154,7 @@ func (s *Service) stopLocked() error {
 			s.logger.Error("failed to close WalletConnect client", zap.Error(err))
 		}
 	}
+	s.api = nil
 
 	if s.wsServer == nil {
 		s.started = false

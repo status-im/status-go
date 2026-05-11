@@ -89,6 +89,38 @@ func TestService_Stop(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestService_StopStart_RecreatesWalletConnectClient(t *testing.T) {
+	state := setupTests(t)
+
+	require.NoError(t, state.service.Start())
+	initial := state.service.api.wcClient
+	require.NotNil(t, initial)
+
+	require.NoError(t, state.service.Stop())
+	require.NoError(t, state.service.Start())
+
+	require.NotNil(t, state.service.api)
+	require.NotNil(t, state.service.api.wcClient)
+	require.NotSame(t, initial, state.service.api.wcClient,
+		"wcClient must be recreated after Stop/Start to avoid relay disconnect requested")
+}
+
+func TestService_PauseResume_RecreatesWalletConnectClient(t *testing.T) {
+	state := setupTests(t)
+	state.service.config.WSEnabled = false
+
+	require.NoError(t, state.service.Start())
+	initial := state.service.api.wcClient
+	require.NotNil(t, initial)
+
+	require.NoError(t, state.service.Pause())
+	require.NoError(t, state.service.Resume())
+
+	require.NotNil(t, state.service.api)
+	require.NotNil(t, state.service.api.wcClient)
+	require.NotSame(t, initial, state.service.api.wcClient)
+}
+
 func TestService_APIs(t *testing.T) {
 	state := setupTests(t)
 
