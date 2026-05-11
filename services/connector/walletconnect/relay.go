@@ -114,6 +114,7 @@ type RelayClient struct {
 	auth                *Auth
 	done                chan struct{}  // signals shutdown
 	disconnectRequested bool           // true if Close() was called intentionally
+	connectedOnce       bool           // true after first successful Connect(); avoids cold-start dial from call()
 	wg                  sync.WaitGroup // tracks active goroutines
 
 	writeMu      sync.Mutex // serializes writes (gorilla/websocket requires it)
@@ -258,6 +259,7 @@ func (r *RelayClient) Connect() error {
 		return nil
 	}
 	r.conn = conn
+	r.connectedOnce = true
 	r.mu.Unlock()
 
 	r.startHeartbeat(conn)
@@ -393,6 +395,12 @@ func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 
 	conn := r.getConn()
 	if conn == nil {
+		r.mu.Lock()
+		everConnected := r.connectedOnce
+		r.mu.Unlock()
+		if !everConnected {
+			return nil, fmt.Errorf("not connected")
+		}
 		if err := r.ensureConnected(); err != nil {
 			return nil, fmt.Errorf("reconnect: %w", err)
 		}
