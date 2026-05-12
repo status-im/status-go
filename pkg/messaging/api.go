@@ -61,3 +61,13 @@ func (a *API) ResumeTransport() {
 		a.core.stack.Transport.Resume()
 	}
 }
+
+// PauseDataSync idles (paused==true) or re-arms (paused==false) the reliability
+// layer's data-sync node so its outbound loop performs no work while the host is
+// backgrounded.
+func (a *API) PauseDataSync(paused bool) error {
+	if a.core.stack.Reliability == nil {
+		return nil
+	}
+	return a.core.stack.Reliability.SetPaused(paused)
+}
