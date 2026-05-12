@@ -3,7 +3,6 @@ package walletconnect
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,7 +14,7 @@ func TestCall_SingleFlightReconnect(t *testing.T) {
 	r := newTestRelayClient(t, fr)
 
 	require.NoError(t, r.Connect())
-	require.EqualValues(t, 1, atomic.LoadInt32(&fr.accepted))
+	waitAccepted(t, fr, 1)
 
 	fr.DropNow()
 	// Give readLoop a moment to clear conn before hammering Subscribe.
@@ -37,7 +36,7 @@ func TestCall_SingleFlightReconnect(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	require.EqualValues(t, 2, atomic.LoadInt32(&fr.accepted))
+	waitAccepted(t, fr, 2)
 	_ = r.Close()
 }
 
@@ -97,6 +96,6 @@ func TestConnect_IsIdempotentWhenLive(t *testing.T) {
 
 	require.NoError(t, r.Connect())
 	require.NoError(t, r.Connect())
-	require.EqualValues(t, 1, atomic.LoadInt32(&fr.accepted))
+	waitAccepted(t, fr, 1)
 	_ = r.Close()
 }

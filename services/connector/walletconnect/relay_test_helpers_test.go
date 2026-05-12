@@ -109,6 +109,16 @@ func (fr *fakeRelay) DropNow() {
 	}
 }
 
+// waitAccepted waits until fr.accepted reaches want. The client may return from
+// websocket.Dial before the httptest handler goroutine runs AddInt32 after Upgrade,
+// so a plain assert right after Connect() can flake on slow CI.
+func waitAccepted(t *testing.T, fr *fakeRelay, want int32) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&fr.accepted) == want
+	}, 2*time.Second, 5*time.Millisecond, "expected fake relay accepted count %d", want)
+}
+
 func newTestRelayClient(t *testing.T, fr *fakeRelay) *RelayClient {
 	t.Helper()
 	r, err := NewRelayClient("test")
