@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,15 +13,15 @@ import (
 	"github.com/status-im/status-go/services/connector/walletconnect"
 )
 
-var errWCClientNotInitialized = fmt.Errorf("WalletConnect client not initialized")
+var ErrWCClientNotInitialized = errors.New("WalletConnect client not initialized")
 
 func (g WCClientGetter) resolve() (*walletconnect.Client, error) {
 	if g == nil {
-		return nil, errWCClientNotInitialized
+		return nil, ErrWCClientNotInitialized
 	}
 	c := g()
 	if c == nil {
-		return nil, errWCClientNotInitialized
+		return nil, ErrWCClientNotInitialized
 	}
 	return c, nil
 }

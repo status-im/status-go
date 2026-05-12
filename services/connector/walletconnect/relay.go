@@ -235,7 +235,7 @@ func (r *RelayClient) startHeartbeat(conn *websocket.Conn) {
 			case <-ticker.C:
 				r.writeMu.Lock()
 				c := r.getConn()
-				if c != conn || c == nil {
+				if c != conn {
 					r.writeMu.Unlock()
 					return
 				}

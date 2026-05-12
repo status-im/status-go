@@ -219,7 +219,7 @@ func (api *API) RejectWCSessionRequest(ctx context.Context, topic, requestIDStr 
 func (api *API) UpdateWCSessionChains(ctx context.Context, topic string, account string, chains []uint64) error {
 	wcClient := api.s.GetClient()
 	if wcClient == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+		return commands.ErrWCClientNotInitialized
 	}
 
 	if len(chains) == 0 {
@@ -292,7 +292,7 @@ func (api *API) UpdateWCSessionChains(ctx context.Context, topic string, account
 func (api *API) EmitWCSessionEvent(ctx context.Context, topic, name, dataJSON, chainID string) error {
 	wcClient := api.s.GetClient()
 	if wcClient == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+		return commands.ErrWCClientNotInitialized
 	}
 
 	var data interface{}

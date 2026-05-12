@@ -422,7 +422,7 @@ func TestUpdateWCSessionChains_NilClient(t *testing.T) {
 
 	err := state.api.UpdateWCSessionChains(state.ctx, "some-topic", "0x1234", []uint64{1})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, commands.ErrWCClientNotInitialized)
 }
 
 func TestEmitWCSessionEvent_NilClient(t *testing.T) {
@@ -431,7 +431,7 @@ func TestEmitWCSessionEvent_NilClient(t *testing.T) {
 
 	err := state.api.EmitWCSessionEvent(state.ctx, "some-topic", "accountsChanged", "", "eip155:1")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, commands.ErrWCClientNotInitialized)
 }
 
 func TestNewAPI_WithRestoredSessions(t *testing.T) {

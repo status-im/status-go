@@ -84,7 +84,7 @@ func TestApproveWCSessionCommand_NilClient(t *testing.T) {
 	cmd := NewApproveWCSessionCommand(db, nil)
 	_, err := cmd.Execute(context.Background(), "proposal1", "0x1234567890abcdef1234567890abcdef12345678", "https://dapp.com", "DApp", "", []uint64{1})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, ErrWCClientNotInitialized)
 }
 
 func TestApproveWCSessionCommand_ProposalNotFound(t *testing.T) {
@@ -106,7 +106,7 @@ func TestRejectWCSessionCommand_NilClient(t *testing.T) {
 	cmd := NewRejectWCSessionCommand(nil)
 	err := cmd.Execute(context.Background(), "proposal1")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, ErrWCClientNotInitialized)
 }
 
 func TestRejectWCSessionCommand_ProposalNotFound(t *testing.T) {
@@ -125,7 +125,7 @@ func TestApproveWCSessionRequestCommand_NilClient(t *testing.T) {
 	cmd := NewApproveWCSessionRequestCommand(nil)
 	err := cmd.Execute(context.Background(), "topic", "12345", "0xsignature")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, ErrWCClientNotInitialized)
 }
 
 func TestApproveWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
@@ -154,7 +154,7 @@ func TestRejectWCSessionRequestCommand_NilClient(t *testing.T) {
 	cmd := NewRejectWCSessionRequestCommand(nil)
 	err := cmd.Execute(context.Background(), "topic", "12345", 4001, "User rejected")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, ErrWCClientNotInitialized)
 }
 
 func TestRejectWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
