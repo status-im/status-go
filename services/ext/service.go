@@ -252,18 +252,13 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 
 func (s *Service) retrieveStats(tick time.Duration, cancel <-chan struct{}) {
 	defer gocommon.LogOnPanic()
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			response := s.messenger.GetStats()
-			PublisherSignalHandler{}.Stats(response)
-		case <-cancel:
-			return
-		}
-	}
+	sub := s.PauseBroadcaster.Subscribe()
+	defer sub.Unsubscribe()
+	pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+		Interval: tick,
+		OnTick:   func() { PublisherSignalHandler{}.Stats(s.messenger.GetStats()) },
+	}, sub.C())
+	pt.Run(cancel)
 }
 
 func (s *Service) EnableInstallation(installationID string) error {

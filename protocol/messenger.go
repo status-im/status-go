@@ -39,7 +39,6 @@ import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	messaging2 "github.com/status-im/status-go/pkg/messaging"
-	datasync "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
@@ -566,7 +565,6 @@ func (m *Messenger) ToBackground() {
 
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
-	datasync.SetPaused(paused)
 	if m.pushNotificationClient != nil {
 		if paused {
 			m.pushNotificationClient.Offline()
@@ -579,6 +577,9 @@ func (m *Messenger) SetPaused(paused bool) {
 			m.messaging.PauseTransport()
 		} else {
 			m.messaging.ResumeTransport()
+		}
+		if err := m.messaging.PauseDataSync(paused); err != nil {
+			m.logger.Warn("failed to pause data sync", zap.Error(err))
 		}
 	}
 	// ToDo: the current ArchiveManager does not provide SetPaused method yet
