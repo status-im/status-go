@@ -16,4 +16,6 @@ message SegmentMessage {
   uint32 parity_segment_index = 5;
   // Total number of parity segments
   uint32 parity_segments_count = 6;
+  // The original payload length before segmentation (used to truncate recovered segments)
+  uint64 original_payload_length = 7;
 }
