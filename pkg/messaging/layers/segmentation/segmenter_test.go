@@ -186,3 +186,48 @@ func (s *MessageSegmentationSuite) TestProtobufMissDecoding() {
 	// Ensure that the sanity check for the segmented message fails, as expected.
 	s.Require().False(segmentedMessage.IsValid())
 }
+
+// TestReedSolomonLastSegmentRecoveryHashMismatch reproduces issue #7444.
+// When the last data segment is missing and recovered via Reed-Solomon,
+// the recovered segment includes trailing zero-padding that causes a hash mismatch.
+// This test FAILS until the bug is fixed.
+func (s *MessageSegmentationSuite) TestReedSolomonLastSegmentRecoveryHashMismatch() {
+	signer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Create a payload that is NOT a multiple of segmentSize.
+	// We need enough segments to trigger parity generation (parity rate = 0.125).
+	// With 10 segments, we get floor(10 * 0.125) = 1 parity segment.
+	segmentSize := 100
+	payloadSize := 950 // 10 segments: 9×100 + 1×50 bytes
+	payload := make([]byte, payloadSize)
+	for i := 0; i < payloadSize; i++ {
+		payload[i] = byte(i % 256)
+	}
+
+	// Segment the payload (this will create 10 data segments + 1 parity segment).
+	segmentedMessages, err := s.segmenter.Segment(payload, segmentSize)
+	s.Require().NoError(err)
+	s.Require().Len(segmentedMessages, 11) // 10 data + 1 parity
+
+	// Receive all segments EXCEPT the last data segment (index 9).
+	// We receive segments at indices 0-8 and 10 (parity).
+	segmentsToReceive := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 10} // Missing segment 9 (the last data segment)
+
+	var reconstructedPayload []byte
+	var reconstructErr error
+
+	for _, segmentIndex := range segmentsToReceive {
+		reconstructedPayload, _, reconstructErr = s.segmenter.Reconstruct(
+			segmentedMessages[segmentIndex],
+			&signer.PublicKey,
+			nil,
+		)
+	}
+
+	// This SHOULD succeed - Reed-Solomon recovery should work for any single missing segment,
+	// including the last one. Currently this fails with ErrHashMismatch (bug #7444).
+	s.Require().NoError(reconstructErr, "Reconstruction should succeed when recovering last segment via Reed-Solomon")
+	s.Require().NotNil(reconstructedPayload)
+	s.Require().Equal(payload, reconstructedPayload, "Reconstructed payload should match original")
+}
