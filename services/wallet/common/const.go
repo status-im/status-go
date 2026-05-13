@@ -414,5 +414,7 @@ func SkippedTokenKeys() []string {
 	return []string{
 		types.TokenKey(OptimismMainnet, common.HexToAddress("0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000")),
 		types.TokenKey(OptimismSepolia, common.HexToAddress("0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000")),
+		types.TokenKey(BSCMainnet, common.HexToAddress("0x683e9dcf085e5efcc7925858aace94d4b8882024")), // TANGYUAN
+		types.TokenKey(BSCMainnet, common.HexToAddress("0x5ca42204cdaa70d5c773946e69de942b85ca6706")), // POSI
 	}
 }
