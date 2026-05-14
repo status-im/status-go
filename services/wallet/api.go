@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"time"
 
@@ -295,6 +296,10 @@ func (api *API) SearchCollectibles(ctx context.Context, chainID wcommon.ChainID,
 func (api *API) SearchCollections(ctx context.Context, chainID wcommon.ChainID, text string, cursor string, limit int, providerID string) (*thirdparty.CollectionDataContainer, error) {
 	logutils.ZapLogger().Debug("call to SearchCollections")
 	return api.s.collectiblesManager.SearchCollections(ctx, chainID, text, cursor, limit, providerID)
+}
+
+func (api *API) GetUnsupportedCollectibleChainIds(_ context.Context) ([]uint64, error) {
+	return slices.Clone(collectibles.UnsupportedCollectibleChains), nil
 }
 
 /*
