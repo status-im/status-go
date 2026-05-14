@@ -78,6 +78,26 @@ func TestGetNftProxyBaseURL(t *testing.T) {
 			chainID: walletCommon.ChainID(999999),
 			wantErr: true,
 		},
+		{
+			name:    "NFT proxy disabled - Ethereum Hoodi",
+			chainID: walletCommon.ChainID(walletCommon.EthereumHoodi),
+			wantErr: true,
+		},
+		{
+			name:    "NFT proxy disabled - BSC mainnet",
+			chainID: walletCommon.ChainID(walletCommon.BSCMainnet),
+			wantErr: true,
+		},
+		{
+			name:    "NFT proxy disabled - BSC testnet",
+			chainID: walletCommon.ChainID(walletCommon.BSCTestnet),
+			wantErr: true,
+		},
+		{
+			name:    "NFT proxy disabled - Ink mainnet",
+			chainID: walletCommon.ChainID(walletCommon.InkMainnet),
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

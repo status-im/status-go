@@ -40,7 +40,8 @@ type proxyURLResolver struct {
 	stageName string
 }
 
-var alchemyNFTBaseHosts = map[uint64]string{
+// alchemyNFTDirectHosts is the Alchemy NFT API base URL per chain for direct HTTP calls.
+var alchemyNFTDirectHosts = map[uint64]string{
 	walletCommon.EthereumMainnet: "https://eth-mainnet.g.alchemy.com",
 	walletCommon.EthereumSepolia: "https://eth-sepolia.g.alchemy.com",
 	walletCommon.OptimismMainnet: "https://opt-mainnet.g.alchemy.com",
@@ -65,43 +66,22 @@ var alchemyNFTBaseHosts = map[uint64]string{
 	walletCommon.BlastSepolia:    "https://blast-sepolia.g.alchemy.com",
 }
 
-// nftAPIDisabledChains are networks where we intentionally disable Alchemy NFT
-// because endpoint access is unavailable.
-var nftAPIDisabledChains = map[uint64]struct{}{
-	walletCommon.BSCTestnet:    {},
-	walletCommon.EthereumHoodi: {},
-	walletCommon.InkMainnet:    {},
-	walletCommon.InkSepolia:    {},
-	walletCommon.KatanaMainnet: {},
-	walletCommon.KatanaBokuto:  {},
-}
-
-func isNFTAPIDisabledChain(chainID uint64) bool {
-	_, disabled := nftAPIDisabledChains[chainID]
-	return disabled
-}
-
 func (r *proxyURLResolver) GetNFTBaseURL(chainID walletCommon.ChainID) (string, error) {
 	return GetNftProxyBaseURL(r.customURL, r.stageName, chainID)
 }
 
 func (r *proxyURLResolver) IsChainSupported(chainID walletCommon.ChainID) bool {
-	if isNFTAPIDisabledChain(uint64(chainID)) {
-		return false
-	}
 	_, err := GetNftProxyBaseURL(r.customURL, r.stageName, chainID)
 	return err == nil
 }
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
-	if isNFTAPIDisabledChain(uint64(chainID)) {
+	id := uint64(chainID)
+	host, ok := alchemyNFTDirectHosts[id]
+	if !ok {
 		return "", thirdparty.ErrChainIDNotSupported
 	}
-	baseURL, found := alchemyNFTBaseHosts[uint64(chainID)]
-	if !found {
-		return "", thirdparty.ErrChainIDNotSupported
-	}
-	return baseURL, nil
+	return host, nil
 }
 
 func getAPIKeySubpath(apiKey security.SensitiveString) security.SensitiveString {
