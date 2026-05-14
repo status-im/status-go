@@ -175,7 +175,15 @@ type Waku struct {
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
 	onlineChecker           *onlinechecker.DefaultOnlineChecker
-	state                   connection.State
+	// stateMu guards state and stateInitialized. ConnectionChanged is invoked
+	// from the OS/mobile path while checkForConnectionChanges and
+	// handleNetworkChangeFromApp run on the internal poller goroutine, so all
+	// three accesses must be synchronized.
+	stateMu sync.RWMutex
+	state   connection.State
+	// stateInitialized distinguishes "no ConnectionChange received yet" from
+	// "ConnectionChange received with Offline=false"
+	stateInitialized bool
 
 	StorenodeCycle   *history.StorenodeCycle
 	HistoryRetriever *history.HistoryRetriever
@@ -516,6 +524,25 @@ func (w *Waku) discoverAndConnectPeers() {
 	}
 }
 
+// dnsDiscoveryBackoff returns the wait duration before the next DNS discovery
+// retry attempt. attempt is the number of failures so far (0 = sentinel
+// meaning "no retry, no wait"; 1 = first failure just happened, wait 1s
+// before retry; 2 = second failure, 2s; etc). Exponential, capped at 60s.
+// Capped attempt at 30 to avoid shift overflow.
+func dnsDiscoveryBackoff(attempt int) time.Duration {
+	if attempt < 1 {
+		return 0
+	}
+	if attempt > 30 {
+		attempt = 30
+	}
+	backoff := 500 * time.Millisecond * time.Duration(1<<attempt)
+	if backoff > 60*time.Second {
+		return 60 * time.Second
+	}
+	return backoff
+}
+
 func (w *Waku) discoverAndConnect(address string) {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -526,10 +553,32 @@ func (w *Waku) discoverAndConnect(address string) {
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		if err := w.dnsDiscover(w.ctx, address, fnApply, false); err != nil {
+		// Retry on failure with exponential backoff: at cold start on Android,
+		// the device DNS resolver isn't always ready when statusgo starts and
+		// the enrtree:// lookup hits ::1:53 with "connection refused". Without
+		// retry the node stays on whatever DNS-cached store peers it has until
+		// the next real network event (e.g. airplane toggle) calls
+		// discoverAndConnectPeers again. The loop terminates on success or
+		// context cancellation (statusgo shutdown).
+		for attempt := 1; ; attempt++ {
+			err := w.dnsDiscover(w.ctx, address, fnApply, false)
+			if err == nil {
+				return
+			}
+			if w.ctx.Err() != nil {
+				return
+			}
 			w.logger.Error("dns discovery failed",
 				zap.String("dnsDiscURL", address),
+				zap.Int("attempt", attempt),
 				zap.Error(err))
+			t := time.NewTimer(dnsDiscoveryBackoff(attempt))
+			select {
+			case <-t.C:
+			case <-w.ctx.Done():
+				t.Stop()
+				return
+			}
 		}
 	}()
 }
@@ -1277,10 +1326,18 @@ func (w *Waku) checkForConnectionChanges() {
 		w.onPeerStats(latestConnStatus)
 	}
 
-	w.ConnectionChanged(connection.State{
-		Type:    w.state.Type, //setting state type as previous one since there won't be a change here
+	// Build the proposed next state. checkForConnectionChanges never originates
+	// a Type change (the comment below acknowledges this), and it has no OS
+	// visibility to learn about Expensive — both flow through the explicit
+	// mobile.ConnectionChange path.
+	prevState, _ := w.snapshotState()
+	next := connection.State{
+		Type:    prevState.Type, //setting state type as previous one since there won't be a change here
 		Offline: !latestConnStatus.IsOnline,
-	})
+	}
+	if w.shouldFireConnectionChanged(next) {
+		w.ConnectionChanged(next)
+	}
 }
 
 func (w *Waku) reportPeerMetrics() {
@@ -1684,10 +1741,23 @@ func (w *Waku) StopDiscV5() error {
 	return nil
 }
 
+// isNetworkSwitchEvent reports whether next represents a genuine wifi <-> cellular
+// switch (while remaining online) that warrants tearing down peers
+func isNetworkSwitchEvent(prev, next connection.State, prevInitialized bool) bool {
+	if !prevInitialized {
+		return false
+	}
+	if prev.Offline || next.Offline {
+		return false
+	}
+	return prev.Type != next.Type
+}
+
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
+	prevState, prevInitialized := w.snapshotState()
 	//If connection state is reported by something other than peerCount becoming 0 e.g from mobile app, disconnect all peers
 	if (state.Offline && len(w.node.Host().Network().Peers()) > 0) ||
-		(w.state.Type != state.Type && !w.state.Offline && !state.Offline) { // network switched between wifi and cellular
+		isNetworkSwitchEvent(prevState, state, prevInitialized) {
 		w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
 		w.node.DisconnectAllPeers()
 		if w.cfg.LightClient {
@@ -1702,6 +1772,25 @@ func (w *Waku) isGoingOnline(state connection.State) bool {
 
 func (w *Waku) isGoingOffline(state connection.State) bool {
 	return state.Offline && w.onlineChecker.IsOnline()
+}
+
+// shouldFireConnectionChanged reports whether next represents a change in
+// connectivity. The first observation (no state recorded yet) always fires so
+// downstream consumers like the LightClient FilterManager get initialized.
+func (w *Waku) shouldFireConnectionChanged(next connection.State) bool {
+	prev, prevInitialized := w.snapshotState()
+	if !prevInitialized {
+		return true
+	}
+	return prev.Offline != next.Offline || prev.Type != next.Type
+}
+
+// snapshotState returns a copy of the current connection state and the
+// initialization flag under the stateMu read lock
+func (w *Waku) snapshotState() (connection.State, bool) {
+	w.stateMu.RLock()
+	defer w.stateMu.RUnlock()
+	return w.state, w.stateInitialized
 }
 
 func (w *Waku) ConnectionChanged(state connection.State) {
@@ -1735,7 +1824,10 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	}
 	// update state
 	w.onlineChecker.SetOnline(isOnline)
+	w.stateMu.Lock()
 	w.state = state
+	w.stateInitialized = true
+	w.stateMu.Unlock()
 }
 
 // seedBootnodesForDiscV5 tries to fetch bootnodes
