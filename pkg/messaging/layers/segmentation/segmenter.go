@@ -61,11 +61,11 @@ func (s *Segmenter) Segment(payload []byte, segmentSize int) ([][]byte, error) {
 
 		segmentPayload := payload[start:end]
 		segmentWithMetadata := &protobuf.SegmentMessage{
-			EntireMessageHash:       entireMessageHash,
-			Index:                   uint32(index),
-			SegmentsCount:           uint32(segmentsCount),
-			Payload:                 segmentPayload,
-			OriginalPayloadLength:   uint64(entirePayloadSize),
+			EntireMessageHash:     entireMessageHash,
+			Index:                 uint32(index),
+			SegmentsCount:         uint32(segmentsCount),
+			Payload:               segmentPayload,
+			OriginalPayloadLength: uint64(entirePayloadSize),
 		}
 		marshaledSegmentWithMetadata, err := proto.Marshal(segmentWithMetadata)
 		if err != nil {
