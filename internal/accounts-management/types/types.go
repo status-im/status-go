@@ -7,6 +7,8 @@ import (
 type PublicKeyData struct {
 	CompressedKey string   `json:"compressedKey"`
 	EmojiHash     []string `json:"emojiHash"`
+	Alias         string   `json:"alias"`
+	ColorID       int64    `json:"colorId"`
 }
 
 // SelectedExtKey is a container for the selected (logged in) external account.

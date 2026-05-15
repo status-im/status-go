@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -570,6 +571,22 @@ func TestMarshalContactJSON(t *testing.T) {
 	require.True(t, strings.Contains(string(encodedContact), "primaryName\":\"primary-name"))
 	require.True(t, strings.Contains(string(encodedContact), "secondaryName\":\"secondary-name"))
 	require.True(t, strings.Contains(string(encodedContact), "emojiHash"))
+
+	expected, err := accscommon.GetPublicKeyData(contact.ID)
+	require.NoError(t, err)
+	require.NotNil(t, expected)
+
+	var parsed struct {
+		CompressedKey string   `json:"compressedKey"`
+		EmojiHash     []string `json:"emojiHash"`
+		Alias         string   `json:"alias"`
+		ColorID       int64    `json:"colorId"`
+	}
+	require.NoError(t, json.Unmarshal(encodedContact, &parsed))
+	require.Equal(t, expected.CompressedKey, parsed.CompressedKey)
+	require.Equal(t, expected.EmojiHash, parsed.EmojiHash)
+	require.Equal(t, expected.Alias, parsed.Alias)
+	require.Equal(t, expected.ColorID, parsed.ColorID)
 }
 
 func TestContactContactRequestPropagatedStateReceivedOutOfDateLocalStateOnTheirSide(t *testing.T) {
