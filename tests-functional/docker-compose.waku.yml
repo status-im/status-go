@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: wakuorg/nwaku:v0.36.0
+    image: wakuorg/nwaku:v0.38.1
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -18,6 +18,7 @@ services:
       "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",
       "--peer-exchange=true",
       "--relay=true",
+      "--rest=true",
       "--rest-address=0.0.0.0",
       "--rest-admin",
       "--shard=32",
@@ -33,7 +34,7 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: wakuorg/nwaku:v0.36.0
+    image: wakuorg/nwaku:v0.38.1
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -49,6 +50,7 @@ services:
       "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
       "--peer-exchange=false",
       "--relay=true",
+      "--rest=true",
       "--rest-address=0.0.0.0",
       "--rest-admin",
       "--shard=32",
