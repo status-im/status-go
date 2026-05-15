@@ -11,10 +11,33 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
+
+// expectedEnrichedMember returns the JSON-shaped representation of an
+// enriched community member (protobuf fields + PublicKeyData) for a given
+// pubkey + roles. Used by TestMarshalJSON to keep the expected wire
+// format aligned with `enrichMembersMap`'s output.
+func expectedEnrichedMember(pubkey string, roles []interface{}) map[string]interface{} {
+	pkd, err := accscommon.GetPublicKeyData(pubkey)
+	if err != nil || pkd == nil {
+		return map[string]interface{}{"roles": roles}
+	}
+	emojiHash := make([]interface{}, 0, len(pkd.EmojiHash))
+	for _, e := range pkd.EmojiHash {
+		emojiHash = append(emojiHash, e)
+	}
+	return map[string]interface{}{
+		"roles":         roles,
+		"alias":         pkd.Alias,
+		"colorId":       float64(pkd.ColorID),
+		"compressedKey": pkd.CompressedKey,
+		"emojiHash":     emojiHash,
+	}
+}
 
 func TestCommunitySuite(t *testing.T) {
 	suite.Run(t, new(CommunitySuite))
@@ -108,6 +131,84 @@ func (s *CommunitySuite) TestHasPermission() {
 	// return false if user is a member and does not have permissions
 	s.Require().False(community.hasRoles(&memberKey.PublicKey, ownerRole()))
 
+}
+
+func (s *CommunitySuite) TestEnrichMembersMap() {
+	// nil input → nil output (renders as JSON `null`, matching legacy
+	// behavior for clients that distinguish null from `{}`).
+	s.Require().Nil(enrichMembersMap(nil))
+
+	// non-nil empty input → non-nil empty output (renders as `{}`).
+	emptyOut := enrichMembersMap(map[string]*protobuf.CommunityMember{})
+	s.Require().NotNil(emptyOut)
+	s.Require().Len(emptyOut, 0)
+
+	// nil entries are skipped — emitting one would produce a row with
+	// only visual-identity fields and no protobuf payload.
+	mixed := map[string]*protobuf.CommunityMember{
+		s.member1Key: {Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}},
+		s.member2Key: nil,
+		s.member3Key: {Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}},
+	}
+	out := enrichMembersMap(mixed)
+	s.Require().Len(out, 2)
+	s.Require().Contains(out, s.member1Key)
+	s.Require().Contains(out, s.member3Key)
+	s.Require().NotContains(out, s.member2Key)
+
+	// Visual identity values must equal what GetPublicKeyData returns
+	// for the same pubkey (which has its own golden + primitive-cross-
+	// validation tests in `accounts-management/common/publickey_test.go`).
+	for pk, entry := range out {
+		s.Require().NotNil(entry.CommunityMember, "member %s missing protobuf payload", pk)
+		expected, err := accscommon.GetPublicKeyData(pk)
+		s.Require().NoError(err)
+		s.Require().NotNil(expected)
+		s.Require().Equal(expected.CompressedKey, entry.CompressedKey, "compressedKey mismatch for %s", pk)
+		s.Require().Equal(expected.EmojiHash, entry.EmojiHash, "emojiHash mismatch for %s", pk)
+		s.Require().Equal(expected.Alias, entry.Alias, "alias mismatch for %s", pk)
+		s.Require().Equal(expected.ColorID, entry.ColorID, "colorId mismatch for %s", pk)
+	}
+
+	// Original protobuf payload must be preserved alongside the
+	// embedded PublicKeyData.
+	s.Require().Equal(
+		protobuf.CommunityMember_ROLE_OWNER,
+		out[s.member1Key].CommunityMember.Roles[0],
+		"protobuf roles must be preserved")
+	s.Require().Equal(
+		protobuf.CommunityMember_ROLE_ADMIN,
+		out[s.member3Key].CommunityMember.Roles[0])
+}
+
+func (s *CommunitySuite) TestMarshalJSONEnrichesMembers() {
+	org := s.buildCommunity(&s.identity.PublicKey)
+
+	bytes, err := json.Marshal(org)
+	s.Require().NoError(err)
+
+	var parsed struct {
+		Members map[string]struct {
+			CompressedKey   string   `json:"compressedKey"`
+			EmojiHash       []string `json:"emojiHash"`
+			Alias           string   `json:"alias"`
+			ColorID         int64    `json:"colorId"`
+			LastUpdateClock uint64   `json:"last_update_clock"`
+		} `json:"members"`
+	}
+	s.Require().NoError(json.Unmarshal(bytes, &parsed))
+	s.Require().Contains(parsed.Members, s.member1Key)
+	s.Require().Contains(parsed.Members, s.member2Key)
+
+	for pk, m := range parsed.Members {
+		expected, err := accscommon.GetPublicKeyData(pk)
+		s.Require().NoError(err)
+		s.Require().NotNil(expected)
+		s.Require().Equal(expected.CompressedKey, m.CompressedKey, "compressedKey mismatch for %s", pk)
+		s.Require().Equal(expected.EmojiHash, m.EmojiHash, "emojiHash mismatch for %s", pk)
+		s.Require().Equal(expected.Alias, m.Alias, "alias mismatch for %s", pk)
+		s.Require().Equal(expected.ColorID, m.ColorID, "colorId mismatch for %s", pk)
+	}
 }
 
 func (s *CommunitySuite) TestCreateChat() {
@@ -1070,6 +1171,7 @@ func (s *CommunitySuite) TestMarshalJSON() {
 	s.Require().NotNil(communityData["chats"])
 
 	expectedChats := map[string]interface{}{}
+	ownerPubkeyHex := crypto.PubkeyToHex(&ownerKey.PublicKey)
 	expectedChat := map[string]interface{}{
 		"canPost":                 true,
 		"canPostReactions":        true,
@@ -1080,9 +1182,7 @@ func (s *CommunitySuite) TestMarshalJSON() {
 		"emoji":                   "",
 		"hideIfPermissionsNotMet": false,
 		"members": map[string]interface{}{
-			crypto.PubkeyToHex(&ownerKey.PublicKey): map[string]interface{}{
-				"roles": []interface{}{float64(1)},
-			},
+			ownerPubkeyHex: expectedEnrichedMember(ownerPubkeyHex, []interface{}{float64(1)}),
 		},
 		"id":                      testChatID1,
 		"name":                    "",
