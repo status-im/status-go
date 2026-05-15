@@ -56,6 +56,25 @@ func TestService_InvalidateToken(t *testing.T) {
 	require.Nil(t, service.tokenCache)
 }
 
+func TestService_InvalidateTokenForRejectedRequest(t *testing.T) {
+	service := NewService("https://test.nft.status.im", nil)
+	service.mu.Lock()
+	service.tokenCache = &TokenData{
+		Token:     "good",
+		ExpiresAt: time.Now().Add(1 * time.Hour),
+	}
+	service.mu.Unlock()
+
+	service.InvalidateTokenForRejectedRequest("")
+	require.Equal(t, "good", service.GetToken())
+
+	service.InvalidateTokenForRejectedRequest("stale")
+	require.Equal(t, "good", service.GetToken())
+
+	service.InvalidateTokenForRejectedRequest("good")
+	require.Empty(t, service.GetToken())
+}
+
 func TestNewService(t *testing.T) {
 	origin := "https://test.nft.status.im"
 	service := NewService(origin, nil)

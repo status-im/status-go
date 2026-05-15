@@ -12,9 +12,10 @@ import (
 type RpcProviderAuthType string
 
 const (
-	NoAuth    RpcProviderAuthType = "no-auth"    // No authentication
-	BasicAuth RpcProviderAuthType = "basic-auth" // HTTP Header "Authorization: Basic base64(username:password)"
-	TokenAuth RpcProviderAuthType = "token-auth" // URL Token-based authentication "https://api.example.com/YOUR_TOKEN"
+	NoAuth     RpcProviderAuthType = "no-auth"     // No authentication
+	BasicAuth  RpcProviderAuthType = "basic-auth"  // HTTP Header "Authorization: Basic base64(username:password)"
+	TokenAuth  RpcProviderAuthType = "token-auth"  // URL Token-based authentication "https://api.example.com/YOUR_TOKEN"
+	PuzzleAuth RpcProviderAuthType = "puzzle-auth" // Proof-of-work (puzzle) auth via services/wallet/puzzleauth
 )
 
 // RpcProviderType defines the type of RPC provider
@@ -34,13 +35,13 @@ type RpcProvider struct {
 	Name             string                   `json:"name" validate:"required,min=1"`   // Provider name for identification
 	URL              security.SensitiveString `json:"url" validate:"required,url"`      // Current Provider URL
 	EnableRPSLimiter bool                     `json:"enableRpsLimiter"`                 // Enable RPC rate limiting for this provider
-	Type             RpcProviderType          `json:"type" validate:"required,oneof=embedded-proxy embedded-direct user"`
+	Type             RpcProviderType          `json:"type" validate:"required,oneof=embedded-proxy embedded-eth-rpc-proxy embedded-direct user"`
 	Enabled          bool                     `json:"enabled"` // Whether the provider is enabled
 	// Authentication
-	AuthType     RpcProviderAuthType      `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth"` // Type of authentication
-	AuthLogin    security.SensitiveString `json:"authLogin" validate:"omitempty,min=1"`                             // Login for BasicAuth (empty string if not used)
-	AuthPassword security.SensitiveString `json:"authPassword" validate:"omitempty,min=1"`                          // Password for BasicAuth (empty string if not used)
-	AuthToken    security.SensitiveString `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
+	AuthType     RpcProviderAuthType      `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth puzzle-auth"` // Type of authentication
+	AuthLogin    security.SensitiveString `json:"authLogin" validate:"omitempty,min=1"`                                         // Login for BasicAuth (empty string if not used)
+	AuthPassword security.SensitiveString `json:"authPassword" validate:"omitempty,min=1"`                                      // Password for BasicAuth (empty string if not used)
+	AuthToken    security.SensitiveString `json:"authToken" validate:"omitempty,min=1"`                                         // Token for TokenAuth (empty string if not used)
 }
 
 // GetFullURL returns the URL with auth token if TokenAuth is used
@@ -125,8 +126,12 @@ func NewProxyProvider(chainID uint64, name string, url security.SensitiveString,
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedProxyProviderType)
 }
 
-func NewEthRpcProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
-	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedEthRpcProxyProviderType)
+func NewEthRpcProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool, usePuzzleAuth bool) *RpcProvider {
+	p := newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedEthRpcProxyProviderType)
+	if usePuzzleAuth {
+		p.AuthType = PuzzleAuth
+	}
+	return p
 }
 
 func NewDirectProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {

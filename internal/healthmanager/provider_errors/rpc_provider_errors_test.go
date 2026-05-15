@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -156,4 +157,14 @@ func TestNilRPCErrorHandling(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsMethodNotFoundError_NotificationsUnsupported(t *testing.T) {
+	t.Parallel()
+	err := rpc.ErrNotificationsUnsupported
+	require.True(t, IsMethodNotFoundError(err))
+	require.True(t, IsNonCriticalRpcError(err), "HTTP client cannot eth_subscribe; should not mark provider down")
+	wrapped := fmt.Errorf("context: %w", err)
+	require.True(t, IsMethodNotFoundError(wrapped))
+	require.True(t, IsNonCriticalRpcError(wrapped))
 }

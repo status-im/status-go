@@ -239,6 +239,11 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint
 		Chains: enabledChains,
 
 		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
+
+		AdditionalAddressesForNativeToken: map[uint64][]common.Address{
+			walletcommon.ZkSyncMainnet: {walletcommon.ZkSyncETHTokenAddress()},
+			walletcommon.ZkSyncSepolia: {walletcommon.ZkSyncETHTokenAddress()},
+		},
 	}
 
 	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)

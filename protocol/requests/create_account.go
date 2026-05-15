@@ -125,9 +125,10 @@ type WalletSecretsConfig struct {
 	StatusProxyUser     security.SensitiveString `json:"statusProxyBlockchainUser"`
 	StatusProxyPassword security.SensitiveString `json:"statusProxyBlockchainPassword"`
 
-	EthRpcProxyUrl      security.SensitiveString `json:"ethRpcProxyUrl"`
-	EthRpcProxyUser     security.SensitiveString `json:"ethRpcProxyUser"`
-	EthRpcProxyPassword security.SensitiveString `json:"ethRpcProxyPassword"`
+	EthRpcProxyUrl           security.SensitiveString `json:"ethRpcProxyUrl"`
+	EthRpcProxyUser          security.SensitiveString `json:"ethRpcProxyUser"`
+	EthRpcProxyPassword      security.SensitiveString `json:"ethRpcProxyPassword"`
+	EthRpcProxyUsePuzzleAuth bool                     `json:"ethRpcProxyUsePuzzleAuth"`
 
 	NftProxyUrl           security.SensitiveString `json:"nftProxyUrl"`
 	NftProxyStageName     string                   `json:"nftProxyStageName"`

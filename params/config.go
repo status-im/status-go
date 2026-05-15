@@ -237,11 +237,12 @@ type WalletConfig struct {
 	StatusProxyUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
 	StatusProxyPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
 
-	StatusProxyStageName   string                   `json:"StatusProxyStageName"`
-	EnableMercuryoProvider bool                     `json:"EnableMercuryoProvider"`
-	EthRpcProxyUrl         security.SensitiveString `json:"EthRpcProxyUrl"`
-	EthRpcProxyUser        security.SensitiveString `json:"EthRpcProxyUser"`
-	EthRpcProxyPassword    security.SensitiveString `json:"EthRpcProxyPassword"`
+	StatusProxyStageName     string                   `json:"StatusProxyStageName"`
+	EnableMercuryoProvider   bool                     `json:"EnableMercuryoProvider"`
+	EthRpcProxyUrl           security.SensitiveString `json:"EthRpcProxyUrl"`
+	EthRpcProxyUser          security.SensitiveString `json:"EthRpcProxyUser"`
+	EthRpcProxyPassword      security.SensitiveString `json:"EthRpcProxyPassword"`
+	EthRpcProxyUsePuzzleAuth bool                     `json:"EthRpcProxyUsePuzzleAuth"`
 
 	TokensListsAutoRefreshInterval      int `json:"TokensListsAutoRefreshInterval"`      // in seconds
 	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
