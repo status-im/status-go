@@ -621,8 +621,12 @@ func (p *Protocol) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installat
 	return p.multidevice.DisableInstallation(myIdentityKey, installationID)
 }
 
-// DeleteInstallation deletes an installation from this device.
+// DeleteInstallation deletes an installation from this device and associated session.
 func (p *Protocol) DeleteInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	identityBytes := crypto.CompressPubkey(myIdentityKey)
+	if err := p.encryptor.persistence.DeleteSessionsForInstallation(identityBytes, installationID); err != nil {
+		return err
+	}
 	return p.multidevice.DeleteInstallation(myIdentityKey, installationID)
 }
 

@@ -338,6 +338,66 @@ func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
 	s.Nil(ratchetInfo, "It returns nil when no bundle is there")
 }
 
+func (s *SQLLitePersistenceTestSuite) TestDeleteSessionsForInstallation() {
+	identity := []byte("their-identity")
+
+	concrete, ok := s.service.(*SQLitePersistence)
+	s.Require().True(ok)
+
+	setupInstallation := func(installationID string) []byte {
+		key, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+		bundle, err := NewBundleContainer(key, installationID)
+		s.Require().NoError(err)
+		s.Require().NoError(s.service.AddPrivateBundle(bundle))
+		bundleID := bundle.GetBundle().GetSignedPreKeys()[installationID].GetSignedPreKey()
+		s.Require().NoError(s.service.AddRatchetInfo(
+			[]byte("symmetric-key"), identity, bundleID, []byte("ephemeral"), installationID,
+		))
+		sessionID := append(append([]byte{}, bundleID...), []byte(installationID)...)
+		_, err = concrete.DB.Exec(
+			`INSERT INTO sessions(dhr, dhs_public, dhs_private, root_chain_key, send_chain_key, send_chain_n, recv_chain_key, recv_chain_n, step, pn, id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+			[]byte("dhr"), []byte("dhs_pub"), []byte("dhs_priv"), []byte("root"), []byte("send"), 0, []byte("recv"), 0, 0, 0, sessionID,
+		)
+		s.Require().NoError(err)
+		_, err = concrete.DB.Exec(
+			`INSERT INTO keys(public_key, msg_num, message_key, seq_num, session_id) VALUES(?,?,?,?,?)`,
+			[]byte("pk"), 0, []byte("mk"), 0, sessionID,
+		)
+		s.Require().NoError(err)
+		_, err = concrete.DB.Exec(`INSERT INTO secret_installation_ids(id, identity_id) VALUES(?, ?)`, installationID, identity)
+		s.Require().NoError(err)
+		return sessionID
+	}
+
+	_, err := concrete.DB.Exec(`INSERT INTO secrets(identity, secret) VALUES(?, ?)`, identity, []byte("shared-secret"))
+	s.Require().NoError(err)
+
+	targetSessionID := setupInstallation("target-install")
+	otherSessionID := setupInstallation("other-install")
+
+	s.Require().NoError(s.service.DeleteSessionsForInstallation(identity, "target-install"))
+
+	countRows := func(installationID string, sessionID []byte) int {
+		var n int
+		s.Require().NoError(concrete.DB.QueryRow(
+			`SELECT
+				(SELECT COUNT(*) FROM ratchet_info_v2 WHERE identity = ? AND installation_id = ?) +
+				(SELECT COUNT(*) FROM sessions WHERE id = ?) +
+				(SELECT COUNT(*) FROM keys WHERE session_id = ?) +
+				(SELECT COUNT(*) FROM secret_installation_ids WHERE id = ? AND identity_id = ?)`,
+			identity, installationID, sessionID, sessionID, installationID, identity,
+		).Scan(&n))
+		return n
+	}
+
+	s.Equal(0, countRows("target-install", targetSessionID), "target rows should be deleted")
+	s.Equal(4, countRows("other-install", otherSessionID), "other installation's rows should remain")
+
+	s.Require().NoError(s.service.DeleteSessionsForInstallation(identity, "target-install"),
+		"second call should be a no-op")
+}
+
 // TODO: Add test for MarkBundleExpired
 
 func (s *SQLLitePersistenceTestSuite) TestGetHashRatchetKeyByID() {

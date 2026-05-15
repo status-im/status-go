@@ -462,6 +462,85 @@ func (s *SQLitePersistence) RatchetInfoConfirmed(bundleID []byte, theirIdentity 
 	return err
 }
 
+// DeleteSessionsForInstallation removes sessions and keys associated with the given (identity, installationID) pair.
+func (s *SQLitePersistence) DeleteSessionsForInstallation(identity []byte, installationID string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	rows, err := tx.Query(
+		`SELECT bundle_id FROM ratchet_info_v2 WHERE identity = ? AND installation_id = ?`,
+		identity, installationID,
+	)
+	if err != nil {
+		return err
+	}
+	var bundleIDs [][]byte
+	for rows.Next() {
+		var bundleID []byte
+		if err = rows.Scan(&bundleID); err != nil {
+			rows.Close()
+			return err
+		}
+		bundleIDs = append(bundleIDs, bundleID)
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+
+	if len(bundleIDs) > 0 {
+		delKeys, err2 := tx.Prepare(`DELETE FROM keys WHERE session_id = ?`)
+		if err2 != nil {
+			err = err2
+			return err
+		}
+		defer delKeys.Close()
+
+		delSession, err2 := tx.Prepare(`DELETE FROM sessions WHERE id = ?`)
+		if err2 != nil {
+			err = err2
+			return err
+		}
+		defer delSession.Close()
+
+		installationIDBytes := []byte(installationID)
+		for _, b := range bundleIDs {
+			sessionID := make([]byte, 0, len(b)+len(installationIDBytes))
+			sessionID = append(sessionID, b...)
+			sessionID = append(sessionID, installationIDBytes...)
+			if _, err = delKeys.Exec(sessionID); err != nil {
+				return err
+			}
+			if _, err = delSession.Exec(sessionID); err != nil {
+				return err
+			}
+		}
+	}
+
+	if _, err = tx.Exec(
+		`DELETE FROM ratchet_info_v2 WHERE identity = ? AND installation_id = ?`,
+		identity, installationID,
+	); err != nil {
+		return err
+	}
+
+	if _, err = tx.Exec(
+		`DELETE FROM secret_installation_ids WHERE id = ? AND identity_id = ?`,
+		installationID, identity,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 type sqliteKeysStorage struct {
 	db *sql.DB
 }
