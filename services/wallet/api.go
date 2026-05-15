@@ -18,7 +18,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	abi_spec "github.com/status-im/status-go/internal/abi-spec"
-	generator2 "github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/healthmanager"
@@ -463,7 +463,7 @@ func (api *API) GetDerivedAddresses(ctx context.Context, password string, derive
 func (api *API) GetDerivedAddressesForMnemonic(ctx context.Context, mnemonic string, paths []string) ([]*DerivedAddress, error) {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
-	acc, err := generator2.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
+	acc, err := generator.CreateAccountFromMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
 		return nil, err
 	}
@@ -472,13 +472,13 @@ func (api *API) GetDerivedAddressesForMnemonic(ctx context.Context, mnemonic str
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
-func (api *API) getDerivedAddresses(account *generator2.Account, paths []string) ([]*DerivedAddress, error) {
+func (api *API) getDerivedAddresses(account *generator.Account, paths []string) ([]*DerivedAddress, error) {
 	addedAccounts, err := api.s.accountsDB.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}
 
-	childrenAccounts, err := generator2.DeriveChildrenFromAccount(account, paths)
+	childrenAccounts, err := generator.DeriveChildrenFromAccount(account, paths)
 	if err != nil {
 		return nil, err
 	}
