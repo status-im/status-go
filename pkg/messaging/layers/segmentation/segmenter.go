@@ -61,10 +61,11 @@ func (s *Segmenter) Segment(payload []byte, segmentSize int) ([][]byte, error) {
 
 		segmentPayload := payload[start:end]
 		segmentWithMetadata := &protobuf.SegmentMessage{
-			EntireMessageHash: entireMessageHash,
-			Index:             uint32(index),
-			SegmentsCount:     uint32(segmentsCount),
-			Payload:           segmentPayload,
+			EntireMessageHash:     entireMessageHash,
+			Index:                 uint32(index),
+			SegmentsCount:         uint32(segmentsCount),
+			Payload:               segmentPayload,
+			OriginalPayloadLength: uint64(entirePayloadSize),
 		}
 		marshaledSegmentWithMetadata, err := proto.Marshal(segmentWithMetadata)
 		if err != nil {
@@ -105,11 +106,12 @@ func (s *Segmenter) Segment(payload []byte, segmentSize int) ([][]byte, error) {
 	// Create parity messages.
 	for i, index := segmentsCount, 0; i < segmentsCount+paritySegmentsCount; i++ {
 		segmentWithMetadata := &protobuf.SegmentMessage{
-			EntireMessageHash:   entireMessageHash,
-			SegmentsCount:       0, // indicates parity message
-			ParitySegmentIndex:  uint32(index),
-			ParitySegmentsCount: uint32(paritySegmentsCount),
-			Payload:             segmentPayloads[i],
+			EntireMessageHash:     entireMessageHash,
+			SegmentsCount:         0, // indicates parity message
+			ParitySegmentIndex:    uint32(index),
+			ParitySegmentsCount:   uint32(paritySegmentsCount),
+			Payload:               segmentPayloads[i],
+			OriginalPayloadLength: uint64(entirePayloadSize),
 		}
 		marshaledSegmentWithMetadata, err := proto.Marshal(segmentWithMetadata)
 		if err != nil {
@@ -213,7 +215,8 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, tran
 			return nil, nil, ErrInvalidParity
 		}
 
-		if lastNonParitySegmentPayload != nil {
+		// Backwards compatibility: Only use lastNonParitySegmentPayload if OriginalPayloadLength is not set
+		if firstSegmentMessage.OriginalPayloadLength == 0 && lastNonParitySegmentPayload != nil {
 			payloads[firstSegmentMessage.SegmentsCount-1] = lastNonParitySegmentPayload // Bring back last segment with original length.
 		}
 	}
@@ -227,8 +230,14 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, tran
 		}
 	}
 
+	// Truncate to original payload length if specified (fix for issue #7444)
+	reconstructedPayload := entirePayload.Bytes()
+	if firstSegmentMessage.OriginalPayloadLength > 0 && uint64(len(reconstructedPayload)) > firstSegmentMessage.OriginalPayloadLength {
+		reconstructedPayload = reconstructedPayload[:firstSegmentMessage.OriginalPayloadLength]
+	}
+
 	// Sanity check.
-	entirePayloadHash := crypto.Keccak256(entirePayload.Bytes())
+	entirePayloadHash := crypto.Keccak256(reconstructedPayload)
 	if !bytes.Equal(entirePayloadHash, segmentMessage.EntireMessageHash) {
 		return nil, nil, ErrHashMismatch
 	}
@@ -243,7 +252,7 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, tran
 		transportIDs[i] = segment.transportID
 	}
 
-	return entirePayload.Bytes(), transportIDs, nil
+	return reconstructedPayload, transportIDs, nil
 }
 
 func (s *Segmenter) CleanupStaleSegments(olderThan time.Time) error {
