@@ -17,10 +17,10 @@ type AccountsManager interface {
 	MakePrivateKeyKeypairFullyOperable(privateKey string, password string, clock uint64) (string, error)
 	SaveOrUpdateKeycard(keycard *types.Keycard, password string, clock uint64) error
 	AddAccounts(keyUID string, accounts []*types.Account, password string) error
-	CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string,
+	CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string, coldWallet types.ColdWalletType,
 		walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error)
-	AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string,
-		xpub string, coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error)
+	AddKeypairStoredToColdWallet(keyUID string, masterAddress string, name string, walletXPub string,
+		coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error)
 	CreateKeypairFromPrivateKeyAndStore(privateKey string, password string, keypairName string,
 		walletAccount *types.AccountCreationDetails, clock uint64) (keypair *types.Keypair, err error)
 	MigrateNonProfileKeycardKeypairToApp(mnemonic string, password string, clock uint64) (string, error)

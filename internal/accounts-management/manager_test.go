@@ -290,7 +290,7 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 		Path: common.PathDefaultWalletAccount,
 	}
 
-	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(s.mnemonic, s.password, "kp-name", walletAccount, true, 0)
+	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(s.mnemonic, s.password, "kp-name", types.ColdWalletTypeNone, walletAccount, true, 0)
 	s.Require().NoError(err)
 	s.Require().NotEmpty(s.mnemonic)
 	s.Require().NotNil(keypair)

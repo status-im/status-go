@@ -9,6 +9,7 @@ const PathEIP1581Chat = PathEIP1581Root + "/0'/0"
 const PathEIP1581Encryption = PathEIP1581Root + "/1'/0"
 
 const WalletPath = "m/44'"
+const PathWalletXPub = "m/44'/60'/0'"
 const PathWalletRoot = "m/44'/60'/0'/0"
 const PathDefaultWalletAccount = PathWalletRoot + "/0"
 const CustomWalletPath1 = PathWalletRoot + "/1"

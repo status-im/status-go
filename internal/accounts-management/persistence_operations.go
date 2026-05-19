@@ -15,7 +15,7 @@ import (
 // If it's a profile keypair, it also sets the chat account.
 // Passed `walletAccount` is used to generate address using its path and set other details accordingly.
 func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string,
-	walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error) {
+	coldWallet types.ColdWalletType, walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error) {
 
 	if walletAccount == nil {
 		err = ErrKeypairDoesNotHaveWalletAccount
@@ -75,8 +75,14 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 		m.setKeystore(keystore)
 	}
 
+	walletXPub, err := generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletXPub)
+	if err != nil {
+		return
+	}
+
 	// prepare keypair
-	keypair, err = m.prepareKeypair(masterAccount, derivedAccounts, keypairName, walletAccount, keypairType, profile, clock)
+	keypair, err = m.prepareKeypair(masterAccount, derivedAccounts, keypairName, walletAccount, keypairType, profile,
+		walletXPub, coldWallet, clock)
 	if err != nil {
 		return
 	}
@@ -105,7 +111,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	return
 }
 
-func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string, xpub string,
+func (m *AccountsManager) AddKeypairStoredToColdWallet(keyUID string, masterAddress string, name string, walletXPub string,
 	coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error) {
 
 	if len(walletAccounts) == 0 {
@@ -161,7 +167,7 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 		LastUsedDerivationIndex: 0,
 		Clock:                   clock,
 		Accounts:                walletAccounts,
-		XPub:                    xpub,
+		XPub:                    walletXPub,
 		ColdWallet:              coldWallet,
 	}
 
@@ -172,7 +178,8 @@ func (m *AccountsManager) AddKeypairStoredToKeycard(keyUID string, masterAddress
 }
 
 func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAccounts map[string]*generator.Account, keypairName string,
-	walletAccount *types.AccountCreationDetails, keypairType types.KeypairType, profile bool, clock uint64) (*types.Keypair, error) {
+	walletAccount *types.AccountCreationDetails, keypairType types.KeypairType, profile bool, walletXPub string, coldWallet types.ColdWalletType,
+	clock uint64) (*types.Keypair, error) {
 	// set up keypair
 	keypair := &types.Keypair{
 		Name:                    keypairName,
@@ -181,6 +188,8 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 		DerivedFrom:             account.Address().Hex(),
 		LastUsedDerivationIndex: 0,
 		Clock:                   clock,
+		XPub:                    walletXPub,
+		ColdWallet:              coldWallet,
 	}
 
 	// add chat account
@@ -279,7 +288,8 @@ func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string,
 	}
 
 	// prepare keypair
-	keypair, err = m.prepareKeypair(masterAccount, nil, keypairName, walletAccount, types.KeypairTypeKey, false, clock)
+	keypair, err = m.prepareKeypair(masterAccount, nil, keypairName, walletAccount, types.KeypairTypeKey, false, "",
+		types.ColdWalletTypeNone, clock)
 	if err != nil {
 		return nil, err
 	}

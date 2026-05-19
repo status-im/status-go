@@ -14,39 +14,44 @@ accounts-management/
 ├── interface_keystore.go      # KeyStore interface definition
 ├── interface_persistence.go   # Persistence interface definition
 ├── manager_test.go            # Test suite for core functionality
-├── errors.go                  # Error definitions and handling
+├── errors.go                  # Top-level error definitions for the package
+├── errors/                    # Structured error type and helpers
+│   ├── errors.go              # AccountsError, ErrorCode, ErrorCategory
+│   └── *_test.go              # Error tests
 ├── keystore/                  # Cryptographic key storage operations
-│   ├── keystore.go            # Main keystore package with re-exports
-│   ├── types/                 # Keystore-specific types
-│   └── geth/                  # Geth-compatible keystore implementation
-│       ├── adapter.go         # Geth keystore adapter
+│   ├── account.go             # KeystoreAccount type and helpers
+│   ├── adapter.go             # KeyStore adapter wiring
+│   ├── helper.go              # Helper functions
+│   ├── errors.go              # Keystore-specific errors
+│   └── internal/geth/         # Geth-compatible keystore implementation
 │       ├── encryption.go      # Encryption operations
 │       ├── decryption.go      # Decryption operations
 │       ├── reencryption.go    # Re-encryption operations
 │       ├── migration.go       # Migration utilities
-│       ├── helper.go          # Helper functions
 │       └── const.go           # Constants
 ├── generator/                 # Account creation and derivation
-│   ├── generator.go           # Account generation functions
+│   ├── generator.go           # Account generation and derivation functions
 │   ├── types.go               # Account types and methods
 │   ├── path_decoder.go        # BIP32 path parsing
+│   ├── errors.go              # Generator-specific errors
 │   ├── README.md              # Generator-specific documentation
 │   └── *_test.go              # Generator tests
 ├── types/                     # Core type definitions
-│   ├── types.go               # Core type definitions
+│   ├── types.go               # Shared types (PublicKeyData, SelectedExtKey)
 │   ├── key.go                 # Key type structure
-│   ├── account.go             # Account-related types
-│   ├── keypair.go             # Keypair-related types
+│   ├── keypair.go             # Keypair, Account, Keycard, AccountCreationDetails, enums
 │   └── *_test.go              # Type tests
 ├── common/                    # Shared utilities
-│   ├── const.go               # Constants and paths
+│   ├── const.go               # Constants and BIP32/BIP44 paths
 │   ├── mnemonic.go            # Mnemonic generation utilities
 │   ├── address.go             # Address utilities
 │   ├── publickey.go           # Public key utilities
+│   ├── hdkey.go               # HD key helpers
 │   ├── utils.go               # General utilities
 │   └── *_test.go              # Common tests
-└── mock/                      # Mock implementations for testing
-    └── persistence.go         # Mock persistence implementation
+├── mock/                      # Mock implementations for testing
+│   └── persistence.go         # Mock persistence implementation
+└── testdata/                  # Fixture data for tests
 ```
 
 ## Key Components
@@ -62,22 +67,21 @@ The main account management operations are directly in the root package:
 
 ### Errors Package
 
-A structured error handling system in the `errors.go` file:
+The `errors/` subpackage defines the structured error machinery; the package-root `errors.go` declares the concrete error variables and codes used across `accounts-management`:
 
-- **Structured Errors**: Rich error types with codes, categories, and context
-- **Error Codes**: Numeric error codes for programmatic error handling
-- **Error Categories**: Logical grouping for different error types
-- **Context Support**: Add key-value metadata to errors for debugging
-- **Helper Functions**: Pre-built error creation functions for common patterns
+- **Structured Errors**: `AccountsError` with code, category, message, wrapped error, and context map
+- **Error Codes**: Numeric `ErrorCode` constants for programmatic error handling
+- **Error Categories**: `ErrorCategory` values (`account`, `keystore`, `validation`, `database`, `system`, `unknown`)
+- **Context Support**: `(*AccountsError).WithContext(key, value)` adds key-value metadata
+- **Helper Constructors**: `errors.NewError(...)` and `errors.WrapError(...)` for creation and wrapping
 
 ### Keystore Package
 
 Handles secure cryptographic key storage:
 
-- **KeyStore Interface**: Defined in `interface_keystore.go` for keystore implementations
-- **Main Package**: `keystore/keystore.go` provides re-exports and common error constants
-- **Types**: `keystore/types/` contains keystore-specific type definitions
-- **Geth Implementation**: Complete Geth-compatible keystore adapter with encryption, decryption, re-encryption, and migration capabilities
+- **KeyStore Interface**: Defined in `interface_keystore.go` (root package) for keystore implementations
+- **`keystore/` package**: `account.go` defines `KeystoreAccount`; `adapter.go` wires the geth-backed implementation; `helper.go` provides helpers; `errors.go` declares keystore-specific errors
+- **Geth Implementation**: `keystore/internal/geth/` — geth-compatible adapter with encryption, decryption, re-encryption, and migration
 
 ### Persistence Package
 
@@ -129,7 +133,7 @@ package main
 import (
     "log"
 
-    "github.com/status-im/status-go/accounts-management"
+    "github.com/status-im/status-go/internal/accounts-management"
     "go.uber.org/zap"
 )
 
@@ -160,10 +164,10 @@ func main() {
         mnemonic,
         "my-password",
         "My Keypair",
+        types.ColdWalletTypeNone, // cold wallet type (none for hot wallets)
         walletAccount,
-        true,  // profile keypair
-        false, // not keycard
-        0,     // clock
+        true, // profile keypair
+        0,    // clock
     )
     if err != nil {
         log.Fatal(err)
@@ -184,7 +188,7 @@ func main() {
         log.Fatal(err)
     }
 
-    log.Printf("Selected account: %s", selectedAccount.Address().Hex())
+    log.Printf("Selected chat account: %s", selectedAccount.Address().Hex())
 }
 ```
 
@@ -194,15 +198,15 @@ For more advanced usage, you can import specific subpackages:
 
 ```go
 import (
-    "github.com/status-im/status-go/accounts-management"
-    "github.com/status-im/status-go/accounts-management/generator"
-    "github.com/status-im/status-go/accounts-management/types"
-    "github.com/status-im/status-go/accounts-management/errors"
+    "github.com/status-im/status-go/internal/accounts-management"
+    "github.com/status-im/status-go/internal/accounts-management/generator"
+    "github.com/status-im/status-go/internal/accounts-management/types"
+    "github.com/status-im/status-go/internal/accounts-management/errors"
 )
 
 // Use specific types and functions
-account := generator.CreateAccountFromMnemonic(mnemonic, passphrase)
-keypair := &types.Keypair{...}
+account, err := generator.CreateAccountFromMnemonic(mnemonic, passphrase)
+keypair := &types.Keypair{ /* ... */ }
 
 // Use structured error handling
 if err != nil {
@@ -216,10 +220,6 @@ if err != nil {
         }
     }
 }
-
-// Use account management functions
-account := generator.CreateAccountFromMnemonic(mnemonic, passphrase)
-keypair := &types.Keypair{...}
 ```
 
 
@@ -229,25 +229,27 @@ keypair := &types.Keypair{...}
 The errors package provides a structured error handling system:
 
 ```go
-import "github.com/status-im/status-go/accounts-management/errors"
+import (
+    accmgmterrors "github.com/status-im/status-go/internal/accounts-management/errors"
+    accmgmt "github.com/status-im/status-go/internal/accounts-management"
+)
 
-// Create structured errors
-err := errors.NewError(errors.ErrCodeLoggerMissing, "logger is missing", errors.getErrorCategory)
+// Use a pre-declared package error
+err := accmgmt.ErrKeypairAlreadyAdded.WithContext("keyuid", keyUID)
 
-// Add context to errors
-err = err.WithContext("function", "LoadAccount")
+// Wrap an existing error
+wrappedErr := accmgmterrors.WrapError(accmgmt.ErrCodeWrongPasswordProvided, "wrong password", originalErr, nil)
 
-// Wrap existing errors
-wrappedErr := errors.WrapError(errors.ErrCodeWrongPasswordProvided, "wrong password", originalErr, errors.getErrorCategory)
-
-// Use helper functions
-func ErrDerivingAddress(keyUID string, path string) *AccountsError {
-	return NewError(ErrCodeErrorDerivingAddress, "error deriving address from keypair", getErrorCategory).
-        WithContext("keyuid", keyUID).
-        WithContext("path", path)
+// Pattern-match on category
+var accountsErr *accmgmterrors.AccountsError
+if errors.As(err, &accountsErr) {
+    switch accountsErr.Category {
+    case accmgmterrors.ErrorCategoryValidation:
+        // ...
+    case accmgmterrors.ErrorCategoryDatabase:
+        // ...
+    }
 }
-
-err := errors.ErrDerivingAddress("0x123", "m/1'")
 ```
 
 ### Account Generation
@@ -255,19 +257,28 @@ err := errors.ErrDerivingAddress("0x123", "m/1'")
 The generator package provides flexible account creation:
 
 ```go
-import "github.com/status-im/status-go/accounts-management/generator"
+import "github.com/status-im/status-go/internal/accounts-management/generator"
 
 // Create account from mnemonic
-account := generator.CreateAccountFromMnemonic(mnemonic, passphrase)
+account, err := generator.CreateAccountFromMnemonic(mnemonic, passphrase)
 
 // Create account from private key
-account := generator.CreateAccountFromPrivateKey(privateKeyHex)
+account, err := generator.CreateAccountFromPrivateKey(privateKeyHex)
 
 // Derive child account
-childAccount := generator.DeriveChildFromAccount(account, "m/44'/60'/0'/0/1")
+childAccount, err := generator.DeriveChildFromAccount(account, "m/44'/60'/0'/0/1")
 
-// Create multiple accounts
-accounts, mnemonics := generator.CreateAccountsOfMnemonicLength(12, 5, passphrase)
+// Derive multiple children in one call
+children, err := generator.DeriveChildrenFromAccount(account, []string{
+    "m/44'/60'/0'/0/0",
+    "m/44'/60'/0'/0/1",
+})
+
+// Create a single account and derive multiple paths from a mnemonic
+masterAcc, derived, err := generator.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, passphrase)
+
+// Create multiple new accounts (each backed by its own freshly generated mnemonic)
+accounts, mnemonics, err := generator.CreateAccountsOfMnemonicLength(12, 5, passphrase)
 ```
 
 ### Keypair Creation
@@ -284,9 +295,9 @@ keypair, err := manager.CreateKeypairFromMnemonicAndStore(
     mnemonic,
     password,
     "My Keypair",
+    types.ColdWalletTypeNone, // cold wallet type
     walletAccount,
-    true,  // profile keypair
-    false, // not keycard
+    true, // profile keypair
     clock,
 )
 
@@ -307,20 +318,21 @@ keypair, err := manager.CreateKeypairFromPrivateKeyAndStore(
 The main interface for account management:
 
 ```go
-type AccountsManager struct {
-    // Core account management operations
-    CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string, walletAccount *types.AccountCreationDetails, profile bool, keycard bool, clock uint64) (*types.Keypair, error)
-    CreateKeypairFromPrivateKeyAndStore(privateKey string, password string, keypairName string, walletAccount *types.AccountCreationDetails, clock uint64) (*types.Keypair, error)
-    SetChatAccount(address ethtypes.Address, password string, privateKey *ecdsa.PrivateKey) error
-    SelectedChatAccount() (*generator.Account, error)
-    LoadAccount(address ethtypes.Address, password string) (*generator.Account, error)
-    VerifyAccountPassword(address ethtypes.Address, password string) (bool, error)
-    GetVerifiedWalletAccount(address ethtypes.Address, password string) (*generator.Account, error)
-    Logout()
-    Accounts() ([]ethtypes.Address, error)
-}
+// Selected methods on AccountsManager (see manager.go, keystore_operations.go, persistence_operations.go for the full surface):
+func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic, password, keypairName string,
+    coldWallet types.ColdWalletType, walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (*types.Keypair, error)
+func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey, password, keypairName string,
+    walletAccount *types.AccountCreationDetails, clock uint64) (*types.Keypair, error)
+func (m *AccountsManager) AddKeypairStoredToColdWallet(keyUID, masterAddress, name, walletXPub string,
+    coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (*types.Keypair, error)
+func (m *AccountsManager) SetChatAccount(address cryptotypes.Address, password string, privateKey *ecdsa.PrivateKey) error
+func (m *AccountsManager) SelectedChatAccount() (*generator.Account, error)
+func (m *AccountsManager) LoadAccount(address cryptotypes.Address, password string) (*generator.Account, error)
+func (m *AccountsManager) VerifyAccountPassword(address cryptotypes.Address, password string) (bool, error)
+func (m *AccountsManager) GetVerifiedWalletAccount(address cryptotypes.Address, password string) (*generator.Account, error)
+func (m *AccountsManager) Logout()
+func (m *AccountsManager) Accounts() ([]cryptotypes.Address, error)
 ```
-
 
 
 ### KeyStore Interface
@@ -329,9 +341,15 @@ Defines keystore operations:
 
 ```go
 type KeyStore interface {
-    AccountDecryptedKey(address types.Address, password string) (types.KeystoreAccount, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
-    ImportECDSA(priv *ecdsa.PrivateKey, password string) (types.KeystoreAccount, error)
-    // ... other keystore operations
+    ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (keystore.KeystoreAccount, error)
+    ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (keystore.KeystoreAccount, error)
+    AccountDecryptedKey(address cryptotypes.Address, passphrase string) (keystore.KeystoreAccount, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
+    Delete(address cryptotypes.Address, passphrase string) error
+    Find(address cryptotypes.Address) (keystore.KeystoreAccount, error)
+    Accounts() []keystore.KeystoreAccount
+    ReEncryptKeyStoreDir(oldPass, newPass string) error
+    MigrateKeyStoreDir(newDir string) error
+    KeystorePath() string
 }
 ```
 
@@ -341,21 +359,22 @@ Defines data persistence operations:
 
 ```go
 type Persistence interface {
-    AddressExists(address ethtypes.Address) (bool, error)
+    AddressExists(address cryptotypes.Address) (bool, error)
     GetProfileKeypair() (*types.Keypair, error)
-    GetWalletRootAddress() (ethtypes.Address, error)
-    GetPath(address ethtypes.Address) (string, error)
+    GetWalletRootAddress() (cryptotypes.Address, error)
+    GetPath(address cryptotypes.Address) (string, error)
     GetKeypairByKeyUID(keyUID string) (*types.Keypair, error)
     GetActiveKeypairs() ([]*types.Keypair, error)
+    GetAllKeypairs() ([]*types.Keypair, error)
     SaveOrUpdateKeypair(keypair *types.Keypair) error
     SaveOrUpdateAccounts(accounts []*types.Account, updateKeypairClock bool) error
-    SaveOrUpdateKeycard(keycard *types.Keycard, clock uint64, updateKeypairClock bool) error
+    SaveOrUpdateKeycard(keycard types.Keycard, clock uint64, updateKeypairClock bool) error
     MarkKeypairFullyOperable(keyUID string, clock uint64, updateKeypairClock bool) error
-    MarkAccountFullyOperable(address ethtypes.Address) error
+    MarkAccountFullyOperable(address cryptotypes.Address) error
     DeleteAllKeycardsWithKeyUID(keyUID string, clock uint64) error
     GetPositionForNextNewAccount() (int64, error)
-    GetAccountByAddress(address ethtypes.Address) (*types.Account, error)
-    RemoveAccount(address ethtypes.Address, clock uint64) error
+    GetAccountByAddress(address cryptotypes.Address) (*types.Account, error)
+    RemoveAccount(address cryptotypes.Address, clock uint64) error
     RemoveKeypair(keyUID string, clock uint64) error
 }
 ```
@@ -386,17 +405,18 @@ The package provides comprehensive error handling with specific error types:
 
 ```go
 var (
-    ErrLoggerIsMissing                        = core.ErrLoggerIsMissing
-    ErrAccountKeyStoreMissing                 = core.ErrAccountKeyStoreMissing
-    ErrNoAccountSelected                      = core.ErrNoAccountSelected
-    ErrPersistenceIsMissing                   = core.ErrPersistenceIsMissing
-    ErrAccountDoesNotExist                    = core.ErrAccountDoesNotExist
-    ErrAddressAndPasswordOrPrivateKeyRequired = core.ErrAddressAndPasswordOrPrivateKeyRequired
-    ErrAccountIsNil                           = core.ErrAccountIsNil
-    ErrKeypairIsNil                           = core.ErrKeypairIsNil
-    ErrCannotRemoveChatAccount                = core.ErrCannotRemoveChatAccount
-    ErrCannotRemoveDefaultWalletAccount       = core.ErrCannotRemoveDefaultWalletAccount
-    ErrCannotRemoveProfileKeypair             = core.ErrCannotRemoveProfileKeypair
+    ErrLoggerIsMissing                        = errors.NewError(ErrCodeLoggerMissing, "logger is missing", getErrorCategory)
+    ErrKeystoreMissing                        = errors.NewError(ErrCodeKeystoreMissing, "keystore is missing", getErrorCategory)
+    ErrPersistenceMissing                     = errors.NewError(ErrCodePersistenceMissing, "persistence is missing", getErrorCategory)
+    ErrNoAccountSelected                      = errors.NewError(ErrCodeNoAccountSelected, "no account selected", getErrorCategory)
+    ErrAccountDoesNotExist                    = errors.NewError(ErrCodeAccountDoesNotExist, "account does not exist", getErrorCategory)
+    ErrAddressAndPasswordOrPrivateKeyRequired = errors.NewError(ErrCodeAddressAndPasswordOrPrivateKeyRequired, "address and password or private key are required", getErrorCategory)
+    ErrAccountIsNil                           = errors.NewError(ErrCodeAccountIsNil, "account is nil", getErrorCategory)
+    ErrKeypairIsNil                           = errors.NewError(ErrCodeKeypairIsNil, "keypair is nil", getErrorCategory)
+    ErrCannotRemoveDefaultChatAccount         = errors.NewError(ErrCodeCannotRemoveDefaultChatAccount, "cannot remove default chat account", getErrorCategory)
+    ErrCannotRemoveDefaultWalletAccount       = errors.NewError(ErrCodeCannotRemoveDefaultWalletAccount, "cannot remove default wallet account", getErrorCategory)
+    ErrCannotRemoveProfileKeypair             = errors.NewError(ErrCodeCannotRemoveProfileKeypair, "cannot remove profile keypair", getErrorCategory)
+    // ... see errors.go for the full list
 )
 ```
 

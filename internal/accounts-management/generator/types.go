@@ -52,6 +52,17 @@ func (a *Account) PublicKeyHex() string {
 	return types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 }
 
+func (a *Account) ExtendedPublicKey() string {
+	if a.extendedKey == nil {
+		return ""
+	}
+	xpub, err := a.extendedKey.Neuter()
+	if err != nil {
+		return ""
+	}
+	return xpub.String()
+}
+
 func (a *Account) Address() types.Address {
 	if a.privateKey == nil {
 		return types.Address{}
