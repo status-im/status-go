@@ -13,17 +13,22 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
-	"github.com/wealdtech/go-ens/v3"
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/contracts/universalresolver"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/services/ens/ccipread"
+	"github.com/status-im/status-go/services/ens/urlookup"
 )
 
-const contractQueryTimeout = 5000 * time.Millisecond
+// contractQueryTimeout bounds a single verification cycle. ENSv2 resolution
+// can now involve a CCIP-Read gateway round-trip on top of the eth_call, so
+// the budget is larger than the pre-migration 5s.
+const contractQueryTimeout = 12 * time.Second
 
 type Verifier struct {
 	online          bool
@@ -152,7 +157,8 @@ func (v *Verifier) ReverseResolve(ctx context.Context, address gethcommon.Addres
 	}
 
 	ethClient := ethclient.NewClient(rpcClient)
-	return ens.ReverseResolve(ethClient, address)
+	backend := ccipread.New(ethClient)
+	return urlookup.Reverse(ctx, backend, universalresolver.CanonicalAddress, address)
 }
 
 // Verify verifies that a registered ENS name matches the expected public key
@@ -198,7 +204,7 @@ func (v *Verifier) verify(ctx context.Context, rpcEndpoint, contractAddress stri
 			defer gocommon.LogOnPanic()
 			defer v.quitWg.Done()
 			select {
-			case ch <- v.verifyENSName(info, ethClient):
+			case ch <- v.verifyENSName(ctx, info, ethClient):
 				return
 			case <-ctx.Done():
 				return
@@ -251,7 +257,7 @@ func (v *Verifier) verify(ctx context.Context, rpcEndpoint, contractAddress stri
 	return nil
 }
 
-func (v *Verifier) verifyENSName(ensInfo Details, ethclient *ethclient.Client) Response {
+func (v *Verifier) verifyENSName(ctx context.Context, ensInfo Details, ethClient *ethclient.Client) Response {
 	publicKeyStr := ensInfo.PublicKeyString
 	ensName := ensInfo.Name
 	v.logger.Info("Resolving ENS name", zap.String("name", ensName), zap.String("publicKey", publicKeyStr))
@@ -273,21 +279,14 @@ func (v *Verifier) verifyENSName(ensInfo Details, ethclient *ethclient.Client) R
 		return response
 	}
 
-	// Resolve ensName
-	resolver, err := ens.NewResolver(ethclient, ensName)
-	if err != nil {
-		v.logger.Error("error while creating ENS name resolver", zap.Error(err))
-		response.Error = err
-		return response
-	}
-	x, y, err := resolver.PubKey()
+	backend := ccipread.New(ethClient)
+	x, y, err := urlookup.Pubkey(ctx, backend, universalresolver.CanonicalAddress, ensName)
 	if err != nil {
 		v.logger.Error("error while resolving public key from ENS name", zap.Error(err))
 		response.Error = err
 		return response
 	}
 
-	// Assemble the bytes returned for the pubkey
 	pubKeyBytes := elliptic.Marshal(crypto.S256(), new(big.Int).SetBytes(x[:]), new(big.Int).SetBytes(y[:]))
 
 	response.PublicKey = publicKey

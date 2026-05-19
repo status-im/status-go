@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/internal/errors"
+	"github.com/status-im/status-go/services/ens/validate"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
@@ -33,7 +34,7 @@ var (
 	// ErrLockedAmountExceedsTotalSendAmount        = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-014"), Details: "locked amount exceeds the total amount to send"}
 	// ErrLockedAmountLessThanSendAmountAllNetworks = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-015"), Details: "locked amount is less than the total amount to send, but all networks are locked"}
 	// ErrDisabledChainFoundAmongLockedNetworks     = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-016"), Details: "disabled chain found among locked networks"}
-	ErrENSSetPubKeyInvalidUsername = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-017"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
+	ErrENSSetPubKeyInvalidUsername = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-017"), Details: "a valid ENS name is required for ENSSetPubKey"}
 	// ErrLockedAmountExcludesAllSupported = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-018"), Details: "all supported chains are excluded, routing impossible"}
 	// ErrCannotCheckLockedAmounts         = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-019"), Details: "cannot check locked amounts"}
 	ErrNoCommunityParametersProvided = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
@@ -162,7 +163,7 @@ func (i *RouteInputParams) Validate() error {
 			return ErrENSSetPubKeyRequiresUsernameAndPubKey
 		}
 
-		if walletCommon.ValidateENSUsername(i.Username) != nil {
+		if !validate.IsLikelyENSName(i.Username) {
 			return ErrENSSetPubKeyInvalidUsername
 		}
 	}

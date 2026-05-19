@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -66,14 +65,6 @@ func NameHash(name string) common.Hash {
 	}
 
 	return node
-}
-
-func ValidateENSUsername(username string) error {
-	if !strings.HasSuffix(username, ".eth") {
-		return fmt.Errorf("username must end with .eth")
-	}
-
-	return nil
 }
 
 func UsernameToLabel(username string) [32]byte {

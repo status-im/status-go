@@ -2428,12 +2428,8 @@ github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
 github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904 h1:V6nJsnNpSl822Z013bYzh9lXnTfwBdQHptIOd3AVwXc=
 github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904/go.mod h1:GW6bN8Ski1GCOb2f5JbKKstH70wlPen1h8f1nzSDfSI=
-github.com/wealdtech/go-ens/v3 v3.6.0 h1:EAByZlHRQ3vxqzzwNi0GvEq1AjVozfWO4DMldHcoVg8=
-github.com/wealdtech/go-ens/v3 v3.6.0/go.mod h1:hcmMr9qPoEgVSEXU2Bwzrn/9NczTWZ1rE53jIlqUpzw=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=
 github.com/wealdtech/go-multicodec v1.4.0/go.mod h1:aedGMaTeYkIqi/KCPre1ho5rTb3hGpu/snBOS3GQLw4=
-github.com/wealdtech/go-string2eth v1.2.1 h1:u9sofvGFkp+uvTg4Nvsvy5xBaiw8AibGLLngfC4F76g=
-github.com/wealdtech/go-string2eth v1.2.1/go.mod h1:9uwxm18zKZfrReXrGIbdiRYJtbE91iGcj6TezKKEx80=
 github.com/willf/bitset v1.1.3/go.mod h1:RjeCKbqT1RxIR/KWY6phxZiaY1IyutSBfGjNPySAYV4=
 github.com/willf/bitset v1.1.9/go.mod h1:RjeCKbqT1RxIR/KWY6phxZiaY1IyutSBfGjNPySAYV4=
 github.com/willf/bitset v1.1.10/go.mod h1:RjeCKbqT1RxIR/KWY6phxZiaY1IyutSBfGjNPySAYV4=

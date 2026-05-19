@@ -24,8 +24,20 @@ import (
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ens/ensresolver"
+	"github.com/status-im/status-go/services/ens/validate"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
+
+// errNotAnENSName is returned by lookup endpoints when the caller-supplied
+// string does not look like an ENS name. The heuristic is the one
+// recommended by the ENSv2 readiness guide and intentionally accepts
+// non-.eth names (DNS imports, L2 subnames).
+func ensureLikelyName(name string) error {
+	if !validate.IsLikelyENSName(name) {
+		return fmt.Errorf("%q is not a recognizable ENS name", name)
+	}
+	return nil
+}
 
 func NewAPI(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, pendingTracker *pendingtxtracker.PendingTxTracker,
 	config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
@@ -126,6 +138,9 @@ func (api *API) GetRegistrarAddress(ctx context.Context, chainID uint64) (common
 }
 
 func (api *API) Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
+	if err := ensureLikelyName(username); err != nil {
+		return nil, err
+	}
 	return api.ensResolver.Resolver(ctx, chainID, username)
 }
 
@@ -134,18 +149,30 @@ func (api *API) GetName(ctx context.Context, chainID uint64, address common.Addr
 }
 
 func (api *API) OwnerOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
+	if err := ensureLikelyName(username); err != nil {
+		return nil, err
+	}
 	return api.ensResolver.OwnerOf(ctx, chainID, username)
 }
 
 func (api *API) ContentHash(ctx context.Context, chainID uint64, username string) ([]byte, error) {
+	if err := ensureLikelyName(username); err != nil {
+		return nil, err
+	}
 	return api.ensResolver.ContentHash(ctx, chainID, username)
 }
 
 func (api *API) PublicKeyOf(ctx context.Context, chainID uint64, username string) (string, error) {
+	if err := ensureLikelyName(username); err != nil {
+		return "", err
+	}
 	return api.ensResolver.PublicKeyOf(ctx, chainID, username)
 }
 
 func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
+	if err := ensureLikelyName(username); err != nil {
+		return nil, err
+	}
 	return api.ensResolver.AddressOf(ctx, chainID, username)
 }
 
@@ -158,6 +185,9 @@ func (api *API) Price(ctx context.Context, chainID uint64) (string, error) {
 }
 
 func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string) (*URI, error) {
+	if err := ensureLikelyName(username); err != nil {
+		return nil, err
+	}
 	scheme := "https"
 	contentHash, err := api.ContentHash(ctx, chainID, username)
 	if err != nil {
