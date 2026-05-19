@@ -26,6 +26,7 @@ func (s *Service) Resume() error {
 	s.paused = false
 	s.started = false
 	s.mu.Unlock()
+	s.initWCClient()
 	return s.Start()
 }
 

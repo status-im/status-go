@@ -91,6 +91,12 @@ type ClientSideHandlerInterface interface {
 	RequestSign(dApp signal.ConnectorDApp, challenge, address string, method string) (string, error)
 	SignAccepted(args SignAcceptedArgs) error
 	SignRejected(args RejectedArgs) error
+
+	// BeginPendingShareAccount / EndPendingShareAccount bracket shareAndUpsertDApp (UI wait + UpsertDApp).
+	// wallet_requestPermissions uses WaitForPendingShareAccount to avoid racing ahead of that commit.
+	BeginPendingShareAccount(url, clientID string)
+	EndPendingShareAccount(url, clientID string)
+	WaitForPendingShareAccount(ctx context.Context, url, clientID string) bool
 }
 
 type NetworkManagerInterface interface {

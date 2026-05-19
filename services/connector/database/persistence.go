@@ -8,6 +8,24 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 )
 
+// EphemeralClientIDSuffix marks connector sessions that must not persist across runs.
+const EphemeralClientIDSuffix = "#ephemeral"
+
+const deleteEphemeralDAppsQuery = "DELETE FROM connector_dapps WHERE client_id LIKE '%' || ?"
+
+// IsEphemeralClientID reports whether clientID uses the ephemeral suffix convention.
+func IsEphemeralClientID(id string) bool {
+	return strings.HasSuffix(id, EphemeralClientIDSuffix)
+}
+
+// DeleteEphemeralDApps removes connector_dapps rows whose clientID ends with
+// EphemeralClientIDSuffix (e.g. "status-desktop/dapp-browser#ephemeral").
+// Linked connector_permissions rows are removed via FK ON DELETE CASCADE.
+func DeleteEphemeralDApps(db *sql.DB) error {
+	_, err := db.Exec(deleteEphemeralDAppsQuery, EphemeralClientIDSuffix)
+	return err
+}
+
 func NormalizeURL(url string) string {
 	return strings.TrimRight(url, "/")
 }
@@ -22,6 +40,7 @@ const insertPermissionQuery = "INSERT INTO connector_permissions (url, client_id
 const selectPermissionsQuery = "SELECT parent_capability, caveats FROM connector_permissions WHERE url = ? AND client_id = ?"
 const selectPermissionExistsQuery = "SELECT COUNT(*) FROM connector_permissions WHERE url = ? AND client_id = ? AND parent_capability = ?"
 const deletePermissionsQuery = "DELETE FROM connector_permissions WHERE url = ? AND client_id = ?"
+const deletePermissionQuery = "DELETE FROM connector_permissions WHERE url = ? AND client_id = ? AND parent_capability = ?"
 
 type DApp struct {
 	URL           string        `json:"url"`
@@ -152,6 +171,24 @@ func DeletePermissions(db *sql.DB, url string, clientID string) error {
 	normalizedURL := NormalizeURL(url)
 	_, err := db.Exec(deletePermissionsQuery, normalizedURL, clientID)
 	return err
+}
+
+// DeletePermission removes a single EIP-2255 capability row for the dApp.
+func DeletePermission(db *sql.DB, url string, clientID string, parentCapability string) error {
+	normalizedURL := NormalizeURL(url)
+	_, err := db.Exec(deletePermissionQuery, normalizedURL, clientID, parentCapability)
+	return err
+}
+
+// PermissionExists reports whether a parent_capability row exists for the origin.
+func PermissionExists(db *sql.DB, url string, clientID string, parentCapability string) (bool, error) {
+	normalizedURL := NormalizeURL(url)
+	var count int
+	err := db.QueryRow(selectPermissionExistsQuery, normalizedURL, clientID, parentCapability).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 const (

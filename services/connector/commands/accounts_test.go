@@ -2,10 +2,12 @@ package commands
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
 func TestFailToGetAccountWithMissingDAppFields(t *testing.T) {
@@ -40,6 +42,8 @@ func TestGetAccountForPermittedDApp(t *testing.T) {
 	sharedAccount := types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg")
 
 	err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
+	assert.NoError(t, err)
+	err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, Method_EthAccounts, []persistence.Caveat{}, time.Now().Unix())
 	assert.NoError(t, err)
 
 	request, err := ConstructRPCRequest("eth_accounts", []interface{}{}, &testDAppData)

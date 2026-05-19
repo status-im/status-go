@@ -106,8 +106,14 @@ func BuildNamespaces(meta SessionMetadata, proposal *ProposalParams) (map[string
 		eipAccounts[i] = fmt.Sprintf("eip155:%d:%s", cid, meta.Account)
 	}
 
-	// Extract methods and events from proposal
-	methods := []string{"personal_sign", "eth_signTypedData", "eth_signTypedData_v4", "eth_sendTransaction"}
+	// Default methods Status supports for WalletConnect dapps.
+	methods := []string{
+		"personal_sign",
+		"eth_signTypedData",
+		"eth_signTypedData_v4",
+		"eth_sendTransaction",
+		"wallet_switchEthereumChain",
+	}
 	events := []string{"accountsChanged", "chainChanged"}
 
 	if reqEip, hasEip := proposal.RequiredNamespaces["eip155"]; hasEip {

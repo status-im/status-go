@@ -347,7 +347,11 @@ func Test_tokensListsValidity(t *testing.T) {
 					break
 				}
 			}
-			require.Equal(t, 1, numOfOccurrences)
+			if slices.Contains(walletcommon.SkippedTokenKeys(), token.Key()) {
+				require.Equal(t, 0, numOfOccurrences, "token %s is in skipped token keys", token.Key())
+				continue
+			}
+			require.Equal(t, 1, numOfOccurrences, "token %s appears %d times in allTokens", token.Key(), numOfOccurrences)
 		}
 	}
 }

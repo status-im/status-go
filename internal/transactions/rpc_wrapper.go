@@ -66,21 +66,7 @@ func (w *rpcWrapper) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uin
 	if err != nil {
 		return 0, err
 	}
-	method := "eth_estimateGas"
-	if w.chainID == walletCommon.StatusNetworkSepolia {
-		method = "linea_estimateGas"
-		var result struct {
-			GasLimit hexutil.Uint64 `json:"gasLimit"`
-		}
-
-		err := ethClient.CallContext(ctx, &result, method, walletCommon.ToCallArg(msg))
-		if err != nil {
-			return 0, err
-		}
-		return uint64(result.GasLimit), nil
-	}
-
-	err = ethClient.CallContext(ctx, &hex, method, walletCommon.ToCallArg(msg))
+	err = ethClient.CallContext(ctx, &hex, "eth_estimateGas", walletCommon.ToCallArg(msg))
 	if err != nil {
 		return 0, err
 	}
