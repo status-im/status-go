@@ -18,10 +18,7 @@ type DataSync struct {
 	*datasyncnode.Node
 	// NodeTransport is the implementation of the datasync transport interface.
 	*NodeTransport
-	logger *zap.Logger
-	// sendingEnabled gates whether Unwrap feeds received messages into the node
-	// for acknowledgement. Read on the inbound-message goroutine, written by
-	// reliability.SetPaused on the lifecycle goroutine — hence atomic.
+	logger         *zap.Logger
 	sendingEnabled atomic.Bool
 }
 
@@ -56,12 +53,6 @@ func (d *DataSync) Stop() {
 	d.Node.Stop()
 }
 
-// SetSendingEnabled toggles whether Unwrap feeds received datasync messages into
-// the node for acknowledgement. It is flipped to false around a node recreate
-// (see reliability.SetPaused) so Unwrap short-circuits instead of pushing
-// packets onto a transport whose consumer goroutine has exited — AddPacket is
-// non-blocking and buffered, so it wouldn't hang, but those packets would be
-// silently dropped during the recreate window.
 func (d *DataSync) SetSendingEnabled(v bool) {
 	d.sendingEnabled.Store(v)
 }
