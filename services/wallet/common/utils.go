@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"reflect"
 	"time"
@@ -80,21 +79,6 @@ func GetBlockCreationTimeForChain(chainID uint64) time.Duration {
 		blockDuration = AverageBlockDurationForChain[ChainID(UnknownChainID)]
 	}
 	return blockDuration
-}
-
-// Special functions to hardcode the nature of some special chains (eg. Status Network), where we cannot deduce EIP-1559 compatibility in a generic way
-
-// IsPartiallyOrFullyGaslessChain returns true if the chain is fully or partially (no base or no priority fee) gasless
-func IsPartiallyOrFullyGaslessChain(chainID uint64) bool {
-	return chainID == StatusNetworkSepolia
-}
-
-// IsPartiallyOrFullyGaslessChainEIP1559Compatible throws an error if the chain is not partially or fully gasless, if it is, returns true if the chain is EIP-1559 compatible
-func IsPartiallyOrFullyGaslessChainEIP1559Compatible(chainID uint64) (bool, error) {
-	if !IsPartiallyOrFullyGaslessChain(chainID) {
-		return false, fmt.Errorf("chain %d is not supposed to be gasless", chainID) // for non-gasless chains, we should not use this function
-	}
-	return chainID == StatusNetworkSepolia, nil
 }
 
 func ToCallArg(msg ethereum.CallMsg) interface{} {

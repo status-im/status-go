@@ -246,8 +246,8 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 	}
 
 	targetVersion := getMaxMigrationVersion(assetNames, maxVersion)
-	// Never downgrade the version in the migration table!
-	if targetVersion > 0 && targetVersion > storedVersion {
+	storedVersionMissing := storedVersion > 0 && !migrationVersionPresent(assetNames, storedVersion)
+	if targetVersion > 0 && (targetVersion > storedVersion || storedVersionMissing) {
 		// #nosec G201 -- migrationTableName is a trusted constant, not user input
 		deleteQuery := fmt.Sprintf("DELETE FROM %s", migrationTableName)
 		_, err = tx.Exec(deleteQuery)
@@ -265,6 +265,19 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 	err = tx.Commit()
 
 	return err
+}
+
+func migrationVersionPresent(assetNames []string, version uint) bool {
+	for _, name := range assetNames {
+		m, err := source.DefaultParse(name)
+		if err != nil {
+			continue
+		}
+		if m.Version == version {
+			return true
+		}
+	}
+	return false
 }
 
 func getMaxMigrationVersion(assetNames []string, max uint) uint {

@@ -89,6 +89,12 @@ func TestDirectURLResolver_IsChainSupported(t *testing.T) {
 	resolver := &directURLResolver{apiKey: security.NewSensitiveString("key")}
 	require.True(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.EthereumMainnet)))
 	require.True(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.BaseSepolia)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.BSCTestnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.EthereumHoodi)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.InkMainnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.InkSepolia)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaMainnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaBokuto)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(999999)))
 }
 
@@ -96,5 +102,11 @@ func TestProxyURLResolver_IsChainSupported(t *testing.T) {
 	resolver := &proxyURLResolver{customURL: "", stageName: "test"}
 	require.True(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.EthereumMainnet)))
 	require.True(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.ArbitrumSepolia)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.BSCTestnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.EthereumHoodi)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.InkMainnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.InkSepolia)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaMainnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaBokuto)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(999999)))
 }

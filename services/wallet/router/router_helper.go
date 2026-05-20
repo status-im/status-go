@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"slices"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/ethereum/go-ethereum"
@@ -34,10 +36,16 @@ import (
 func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
 	bool, *big.Int, error) {
 	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() || sendType.IsStickersTransfer() {
+		r.logger.Debug("requireApproval: not required (collectible/ens/stickers)",
+			zap.Int("sendType", int(sendType)),
+			zap.Uint64("chainId", params.FromChain.ChainID))
 		return false, nil, nil
 	}
 
 	if params.FromToken.IsNative() {
+		r.logger.Debug("requireApproval: not required (native token)",
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.String("token", params.FromToken.Symbol))
 		return false, nil, nil
 	}
 
@@ -45,10 +53,18 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 
 	contract, err := contractMaker.NewERC20(params.FromChain.ChainID, params.FromToken.Address)
 	if err != nil {
+		r.logger.Error("requireApproval: failed to instantiate ERC20 contract",
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.String("token", params.FromToken.Symbol),
+			zap.Stringer("tokenAddress", params.FromToken.Address),
+			zap.Error(err))
 		return false, nil, err
 	}
 
 	if approvalContractAddress == nil || *approvalContractAddress == walletCommon.ZeroAddress() {
+		r.logger.Debug("requireApproval: not required (no approval contract)",
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.String("token", params.FromToken.Symbol))
 		return false, nil, nil
 	}
 
@@ -61,28 +77,59 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 	}, params.FromAddr, *approvalContractAddress)
 
 	if err != nil {
+		r.logger.Error("requireApproval: failed to read allowance",
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.String("token", params.FromToken.Symbol),
+			zap.Stringer("spender", approvalContractAddress),
+			zap.Error(err))
 		return false, nil, err
 	}
 
 	if allowance.Cmp(params.AmountIn) >= 0 {
+		r.logger.Debug("requireApproval: existing allowance covers amountIn",
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.String("token", params.FromToken.Symbol),
+			zap.Stringer("allowance", allowance),
+			zap.Stringer("amountIn", params.AmountIn))
 		return false, nil, nil
 	}
 
+	r.logger.Debug("requireApproval: approval required",
+		zap.Uint64("chainId", params.FromChain.ChainID),
+		zap.String("token", params.FromToken.Symbol),
+		zap.Stringer("allowance", allowance),
+		zap.Stringer("amountIn", params.AmountIn))
 	return true, params.AmountIn, nil
 }
 
 func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, input []byte) (uint64, error) {
 	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
+		r.logger.Error("estimateGasForApproval: failed to get eth client",
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.Error(err))
 		return 0, err
 	}
 
-	return ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
+	gas, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &params.FromToken.Address,
 		Value: walletCommon.ZeroBigIntValue(),
 		Data:  input,
 	})
+	if err != nil {
+		r.logger.Error("estimateGasForApproval: EstimateGas failed",
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.String("token", params.FromToken.Symbol),
+			zap.Stringer("from", params.FromAddr),
+			zap.Error(err))
+		return 0, err
+	}
+	r.logger.Debug("estimateGasForApproval: gas estimated",
+		zap.Uint64("chainId", params.FromChain.ChainID),
+		zap.String("token", params.FromToken.Symbol),
+		zap.Uint64("gas", gas))
+	return gas, nil
 }
 
 func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
@@ -112,6 +159,8 @@ func CalculateL1Fee(chainID uint64, data []byte, ethClient ethclient.EthClientIn
 
 func (r *Router) getERC1155Balance(ctx context.Context, chainID uint64, token *tokentypes.Token, account common.Address) (*big.Int, error) {
 	if token == nil || token.CollectibleTokenID == nil {
+		r.logger.Error("getERC1155Balance: token or token ID is nil",
+			zap.Uint64("chainId", chainID))
 		return nil, errors.New("token or token ID is nil")
 	}
 
@@ -123,30 +172,66 @@ func (r *Router) getERC1155Balance(ctx context.Context, chainID uint64, token *t
 		[]*bigint.BigInt{&bigint.BigInt{Int: token.CollectibleTokenID.ToInt()}},
 	)
 	if err != nil {
+		r.logger.Error("getERC1155Balance: FetchERC1155Balances failed",
+			zap.Uint64("chainId", chainID),
+			zap.Stringer("tokenAddress", token.Address),
+			zap.Stringer("account", account),
+			zap.Error(err))
 		return nil, err
 	}
 
 	if len(balances) != 1 || balances[0] == nil {
+		r.logger.Error("getERC1155Balance: invalid balance response",
+			zap.Uint64("chainId", chainID),
+			zap.Int("responseLen", len(balances)))
 		return nil, errors.New("invalid ERC1155 balance fetch response")
 	}
 
+	r.logger.Debug("getERC1155Balance: balance fetched",
+		zap.Uint64("chainId", chainID),
+		zap.Stringer("tokenAddress", token.Address),
+		zap.Stringer("balance", balances[0].Int))
 	return balances[0].Int, nil
 }
 
 func (r *Router) getBalance(ctx context.Context, chainID uint64, token *tokentypes.Token, account common.Address) (*big.Int, error) {
-	return r.tokenBalancesFetcher.FetchSingle(ctx, chainID, token.Address, account)
+	balance, err := r.tokenBalancesFetcher.FetchSingle(ctx, chainID, token.Address, account)
+	if err != nil {
+		r.logger.Error("getBalance: FetchSingle failed",
+			zap.Uint64("chainId", chainID),
+			zap.String("token", token.Symbol),
+			zap.Stringer("tokenAddress", token.Address),
+			zap.Stringer("account", account),
+			zap.Error(err))
+		return nil, err
+	}
+	r.logger.Debug("getBalance: balance fetched",
+		zap.Uint64("chainId", chainID),
+		zap.String("token", token.Symbol),
+		zap.Stringer("balance", balance))
+	return balance, nil
 }
 
 func (r *Router) resolveSuggestedNonceForPath(ctx context.Context, path *routes.Path, address common.Address, usedNonces map[uint64]uint64) error {
 	var nextNonce uint64
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		nextNonce = nonce + 1
+		r.logger.Debug("resolveSuggestedNonceForPath: reusing local nonce counter",
+			zap.Uint64("chainId", path.FromChain.ChainID),
+			zap.Uint64("nextNonce", nextNonce))
 	} else {
 		nonce, err := r.transactor.NextNonce(ctx, r.rpcClient, path.FromChain.ChainID, cryptotypes.Address(address))
 		if err != nil {
+			r.logger.Error("resolveSuggestedNonceForPath: NextNonce failed",
+				zap.Uint64("chainId", path.FromChain.ChainID),
+				zap.Stringer("address", address),
+				zap.Error(err))
 			return err
 		}
 		nextNonce = nonce
+		r.logger.Debug("resolveSuggestedNonceForPath: fetched nonce from chain",
+			zap.Uint64("chainId", path.FromChain.ChainID),
+			zap.Uint64("nextNonce", nextNonce))
 	}
 
 	usedNonces[path.FromChain.ChainID] = nextNonce
@@ -168,19 +253,36 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 	defer r.lastInputParamsMutex.Unlock()
 
 	eipP1559EnabledChain := path.FromChain.EIP1559Enabled
+	r.logger.Debug("applyCustomFields: applying fields",
+		zap.String("processor", path.ProcessorName),
+		zap.Uint64("fromChain", path.FromChain.ChainID),
+		zap.Bool("eip1559Enabled", eipP1559EnabledChain),
+		zap.Int("customParamsEntries", len(r.lastInputParams.PathTxCustomParams)))
 
 	if err := r.setSuggestedFields(ctx, path, fetchedFees, usedNonces, eipP1559EnabledChain); err != nil {
+		r.logger.Error("applyCustomFields: setSuggestedFields failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Error(err))
 		return err
 	}
 
 	if err := r.setPathFields(path, fetchedFees); err != nil {
+		r.logger.Error("applyCustomFields: setPathFields failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Error(err))
 		return err
 	}
 
-	// Apply fee modes and custom parameters
 	if len(r.lastInputParams.PathTxCustomParams) == 0 {
+		r.logger.Debug("applyCustomFields: applying default fee modes",
+			zap.String("processor", path.ProcessorName),
+			zap.Int("globalFeeMode", int(r.lastInputParams.GasFeeMode)))
 		return r.applyDefaultFeeModes(path, fetchedFees, eipP1559EnabledChain)
 	}
+	r.logger.Debug("applyCustomFields: applying custom fee modes",
+		zap.String("processor", path.ProcessorName))
 	return r.applyCustomFeeModes(ctx, path, fetchedFees, eipP1559EnabledChain)
 }
 
@@ -244,6 +346,11 @@ func (r *Router) applyDefaultNonEIP1559Fees(path *routes.Path, fetchedFees *fees
 func (r *Router) applyDefaultEIP1559Fees(path *routes.Path, fetchedFees *fees.SuggestedFees) error {
 	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(r.lastInputParams.GasFeeMode)
 	if err != nil {
+		r.logger.Error("applyDefaultEIP1559Fees: FeeFor failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Int("feeMode", int(r.lastInputParams.GasFeeMode)),
+			zap.Error(err))
 		return err
 	}
 
@@ -299,6 +406,11 @@ func (r *Router) applyNonCustomApprovalFees(path *routes.Path, fetchedFees *fees
 
 	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(params.GasFeeMode)
 	if err != nil {
+		r.logger.Error("applyNonCustomApprovalFees: FeeFor failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Int("feeMode", int(params.GasFeeMode)),
+			zap.Error(err))
 		return err
 	}
 
@@ -320,6 +432,10 @@ func (r *Router) applyCustomApprovalFeeMode(ctx context.Context, path *routes.Pa
 
 		estimatedTime, err := r.feesManager.EstimatedTime(ctx, path.FromChain.ChainID, params.GasPrice.ToInt(), nil, nil)
 		if err != nil {
+			r.logger.Error("applyCustomApprovalFeeMode: EstimatedTime (non-EIP1559) failed",
+				zap.String("processor", path.ProcessorName),
+				zap.Uint64("fromChain", path.FromChain.ChainID),
+				zap.Error(err))
 			return err
 		}
 		path.ApprovalEstimatedTime = estimatedTime
@@ -332,6 +448,10 @@ func (r *Router) applyCustomApprovalFeeMode(ctx context.Context, path *routes.Pa
 
 	estimatedTime, err := r.feesManager.EstimatedTime(ctx, path.FromChain.ChainID, nil, path.ApprovalMaxFeesPerGas.ToInt(), path.ApprovalPriorityFee.ToInt())
 	if err != nil {
+		r.logger.Error("applyCustomApprovalFeeMode: EstimatedTime (EIP1559) failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Error(err))
 		return err
 	}
 	path.ApprovalEstimatedTime = estimatedTime
@@ -363,6 +483,11 @@ func (r *Router) applyNonCustomTxFees(path *routes.Path, fetchedFees *fees.Sugge
 
 	maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(params.GasFeeMode)
 	if err != nil {
+		r.logger.Error("applyNonCustomTxFees: FeeFor failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Int("feeMode", int(params.GasFeeMode)),
+			zap.Error(err))
 		return err
 	}
 
@@ -383,6 +508,10 @@ func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fe
 		path.TxGasPrice = params.GasPrice
 		estimatedTime, err := r.feesManager.EstimatedTime(ctx, path.FromChain.ChainID, path.TxGasPrice.ToInt(), nil, nil)
 		if err != nil {
+			r.logger.Error("applyCustomTxFeeMode: EstimatedTime (non-EIP1559) failed",
+				zap.String("processor", path.ProcessorName),
+				zap.Uint64("fromChain", path.FromChain.ChainID),
+				zap.Error(err))
 			return err
 		}
 		path.TxEstimatedTime = estimatedTime
@@ -395,6 +524,10 @@ func (r *Router) applyCustomTxFeeMode(ctx context.Context, path *routes.Path, fe
 
 	estimatedTime, err := r.feesManager.EstimatedTime(ctx, path.FromChain.ChainID, nil, path.TxMaxFeesPerGas.ToInt(), path.TxPriorityFee.ToInt())
 	if err != nil {
+		r.logger.Error("applyCustomTxFeeMode: EstimatedTime (EIP1559) failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Error(err))
 		return err
 	}
 	path.TxEstimatedTime = estimatedTime
@@ -409,6 +542,14 @@ func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.Suggested
 
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
 	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, testsMode bool, testApprovalL1Fee uint64) (err error) {
+	r.logger.Debug("evaluateAndUpdatePathDetails: starting",
+		zap.String("processor", path.ProcessorName),
+		zap.Uint64("fromChain", path.FromChain.ChainID),
+		zap.String("token", path.FromToken.Symbol),
+		zap.Bool("approvalRequired", path.ApprovalRequired),
+		zap.Bool("noBaseFee", noBaseFee),
+		zap.Bool("noPriorityFee", noPriorityFee),
+		zap.Bool("testsMode", testsMode))
 
 	r.updatePathFields(path, fetchedFees, noBaseFee, noPriorityFee)
 
@@ -430,13 +571,25 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 		} else {
 			l1ApprovalFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.ApprovalPackedData)
 			if err != nil {
+				r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for approval failed",
+					zap.String("processor", path.ProcessorName),
+					zap.Uint64("fromChain", path.FromChain.ChainID),
+					zap.Error(err))
 				return err
 			}
+			r.logger.Debug("evaluateAndUpdatePathDetails: approval L1 fee calculated",
+				zap.String("processor", path.ProcessorName),
+				zap.Uint64("fromChain", path.FromChain.ChainID),
+				zap.Stringer("l1ApprovalFeeWei", l1ApprovalFeeWei))
 		}
 	}
 
 	err = r.applyCustomFields(ctx, path, fetchedFees, usedNonces)
 	if err != nil {
+		r.logger.Error("evaluateAndUpdatePathDetails: applyCustomFields failed",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Error(err))
 		return
 	}
 
@@ -444,8 +597,16 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 		if !testsMode {
 			l1TxFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.TxPackedData)
 			if err != nil {
+				r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for tx failed",
+					zap.String("processor", path.ProcessorName),
+					zap.Uint64("fromChain", path.FromChain.ChainID),
+					zap.Error(err))
 				return err
 			}
+			r.logger.Debug("evaluateAndUpdatePathDetails: tx L1 fee calculated",
+				zap.String("processor", path.ProcessorName),
+				zap.Uint64("fromChain", path.FromChain.ChainID),
+				zap.Stringer("l1TxFeeWei", l1TxFeeWei))
 		}
 	}
 
@@ -497,6 +658,14 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	path.RequiredTokenBalance = requiredTokenBalance
 	path.RequiredNativeBalance = requiredNativeBalance
 
+	r.logger.Debug("evaluateAndUpdatePathDetails: completed",
+		zap.String("processor", path.ProcessorName),
+		zap.Uint64("fromChain", path.FromChain.ChainID),
+		zap.Stringer("txFee", txFeeInWei),
+		zap.Stringer("approvalFee", approvalFeeInWei),
+		zap.Stringer("ethTotalFees", ethTotalFees),
+		zap.Stringer("requiredNativeBalance", requiredNativeBalance),
+		zap.Stringer("requiredTokenBalance", requiredTokenBalance))
 	return
 }
 
@@ -543,9 +712,16 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 }
 
 func (r *Router) fetchPrices(sendType sendtype.SendType, tokenKeys []string) (map[string]float64, error) {
+	r.logger.Debug("fetchPrices: requesting prices",
+		zap.Int("sendType", int(sendType)),
+		zap.Strings("tokenKeys", tokenKeys))
+
 	pricesMap, err := r.marketManager.GetOrFetchPrices(tokenKeys, []string{"USD"}, market.MaxAgeInSecondsForFresh)
 
 	if err != nil {
+		r.logger.Error("fetchPrices: GetOrFetchPrices failed",
+			zap.Strings("tokenKeys", tokenKeys),
+			zap.Error(err))
 		return nil, err
 	}
 	prices := make(map[string]float64, 0)
@@ -557,6 +733,7 @@ func (r *Router) fetchPrices(sendType sendtype.SendType, tokenKeys []string) (ma
 			prices[tokenKey] = 0
 		}
 	}
+	r.logger.Debug("fetchPrices: prices fetched", zap.Int("count", len(prices)))
 	return prices, nil
 }
 

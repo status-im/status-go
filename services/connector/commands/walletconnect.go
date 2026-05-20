@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,16 +13,29 @@ import (
 	"github.com/status-im/status-go/services/connector/walletconnect"
 )
 
+var ErrWCClientNotInitialized = errors.New("WalletConnect client not initialized")
+
+func (g WCClientGetter) resolve() (*walletconnect.Client, error) {
+	if g == nil {
+		return nil, ErrWCClientNotInitialized
+	}
+	c := g()
+	if c == nil {
+		return nil, ErrWCClientNotInitialized
+	}
+	return c, nil
+}
+
 type wcSessionDisconnector struct {
-	db       *sql.DB
-	wcClient *walletconnect.Client
+	db        *sql.DB
+	getClient WCClientGetter
 }
 
 // NewWCSessionDisconnector creates a new WCSessionDisconnector
-func NewWCSessionDisconnector(db *sql.DB, wcClient *walletconnect.Client) WCSessionDisconnector {
+func NewWCSessionDisconnector(db *sql.DB, getClient WCClientGetter) WCSessionDisconnector {
 	return &wcSessionDisconnector{
-		db:       db,
-		wcClient: wcClient,
+		db:        db,
+		getClient: getClient,
 	}
 }
 
@@ -40,27 +54,31 @@ func (d *wcSessionDisconnector) DisconnectSession(ctx context.Context, topic str
 		_ = persistence.DeleteWCSession(d.db, topic)
 	}
 
-	if d.wcClient != nil {
-		go func(ctx context.Context, topic string) {
+	if client, err := d.getClient.resolve(); err == nil {
+		go func(ctx context.Context, topic string, client *walletconnect.Client) {
 			defer common.LogOnPanic()
-			_ = d.wcClient.SendSessionDelete(ctx, topic)
-		}(ctx, topic)
+			_ = client.SendSessionDelete(ctx, topic)
+		}(ctx, topic, client)
 	}
 	return nil
 }
 
 type PairWCCommand struct {
-	wcClient *walletconnect.Client
+	getClient WCClientGetter
 }
 
-func NewPairWCCommand(wcClient *walletconnect.Client) *PairWCCommand {
+func NewPairWCCommand(getClient WCClientGetter) *PairWCCommand {
 	return &PairWCCommand{
-		wcClient: wcClient,
+		getClient: getClient,
 	}
 }
 
 func (c *PairWCCommand) Execute(ctx context.Context, uri string) error {
-	return c.wcClient.Pair(ctx, uri)
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
+	}
+	return client.Pair(ctx, uri)
 }
 
 type GetWCActiveSessionsCommand struct {
@@ -78,14 +96,14 @@ func (c *GetWCActiveSessionsCommand) Execute(ctx context.Context, validAtTimesta
 }
 
 type ApproveWCSessionCommand struct {
-	db       *sql.DB
-	wcClient *walletconnect.Client
+	db        *sql.DB
+	getClient WCClientGetter
 }
 
-func NewApproveWCSessionCommand(db *sql.DB, wcClient *walletconnect.Client) *ApproveWCSessionCommand {
+func NewApproveWCSessionCommand(db *sql.DB, getClient WCClientGetter) *ApproveWCSessionCommand {
 	return &ApproveWCSessionCommand{
-		db:       db,
-		wcClient: wcClient,
+		db:        db,
+		getClient: getClient,
 	}
 }
 
@@ -94,8 +112,9 @@ func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, accou
 		return "", fmt.Errorf("invalid account address: %s", account)
 	}
 
-	if c.wcClient == nil {
-		return "", fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return "", err
 	}
 
 	if len(supportedChains) == 0 {
@@ -118,7 +137,7 @@ func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, accou
 		ExpirySec: 0,
 	}
 
-	result, err := c.wcClient.ApproveSession(ctx, proposalID, meta)
+	result, err := client.ApproveSession(ctx, proposalID, meta)
 	if err != nil {
 		return "", fmt.Errorf("approve session: %w", err)
 	}
@@ -144,60 +163,63 @@ func (c *ApproveWCSessionCommand) Execute(ctx context.Context, proposalID, accou
 }
 
 type RejectWCSessionCommand struct {
-	wcClient *walletconnect.Client
+	getClient WCClientGetter
 }
 
-func NewRejectWCSessionCommand(wcClient *walletconnect.Client) *RejectWCSessionCommand {
+func NewRejectWCSessionCommand(getClient WCClientGetter) *RejectWCSessionCommand {
 	return &RejectWCSessionCommand{
-		wcClient: wcClient,
+		getClient: getClient,
 	}
 }
 
 func (c *RejectWCSessionCommand) Execute(ctx context.Context, proposalID string) error {
-	if c.wcClient == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
 	}
-	return c.wcClient.RejectSession(proposalID)
+	return client.RejectSession(proposalID)
 }
 
 type ApproveWCSessionRequestCommand struct {
-	wcClient *walletconnect.Client
+	getClient WCClientGetter
 }
 
-func NewApproveWCSessionRequestCommand(wcClient *walletconnect.Client) *ApproveWCSessionRequestCommand {
+func NewApproveWCSessionRequestCommand(getClient WCClientGetter) *ApproveWCSessionRequestCommand {
 	return &ApproveWCSessionRequestCommand{
-		wcClient: wcClient,
+		getClient: getClient,
 	}
 }
 
 func (c *ApproveWCSessionRequestCommand) Execute(ctx context.Context, topic, requestIDStr, signature string) error {
-	if c.wcClient == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
 	}
 	var requestID int64
 	if _, err := fmt.Sscanf(requestIDStr, "%d", &requestID); err != nil {
 		return fmt.Errorf("invalid request ID: %w", err)
 	}
-	return c.wcClient.RespondToWCSessionRequest(topic, requestID, signature)
+	return client.RespondToWCSessionRequest(topic, requestID, signature)
 }
 
 type RejectWCSessionRequestCommand struct {
-	wcClient *walletconnect.Client
+	getClient WCClientGetter
 }
 
-func NewRejectWCSessionRequestCommand(wcClient *walletconnect.Client) *RejectWCSessionRequestCommand {
+func NewRejectWCSessionRequestCommand(getClient WCClientGetter) *RejectWCSessionRequestCommand {
 	return &RejectWCSessionRequestCommand{
-		wcClient: wcClient,
+		getClient: getClient,
 	}
 }
 
 func (c *RejectWCSessionRequestCommand) Execute(ctx context.Context, topic, requestIDStr string, code int, message string) error {
-	if c.wcClient == nil {
-		return fmt.Errorf("WalletConnect client not initialized")
+	client, err := c.getClient.resolve()
+	if err != nil {
+		return err
 	}
 	var requestID int64
 	if _, err := fmt.Sscanf(requestIDStr, "%d", &requestID); err != nil {
 		return fmt.Errorf("invalid request ID: %w", err)
 	}
-	return c.wcClient.RejectWCSessionRequest(topic, requestID, code, message)
+	return client.RejectWCSessionRequest(topic, requestID, code, message)
 }

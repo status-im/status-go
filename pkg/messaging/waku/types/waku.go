@@ -102,6 +102,13 @@ type Waku interface {
 	Start() error
 	Stop() error
 
+	// Pause signals the waku transport to idle its goroutines (e.g. when the
+	// hosting app is backgrounded). Idempotent. Cascaded from the messenger
+	// transport so the protocol layer can suppress background work.
+	Pause() error
+	// Resume re-arms goroutines suspended by Pause. Idempotent.
+	Resume() error
+
 	// Waku protocol version
 	Version() uint
 
