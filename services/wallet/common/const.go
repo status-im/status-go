@@ -303,7 +303,7 @@ var bnbAddressesByChainID = map[uint64]common.Address{
 	BSCTestnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
 }
 
-// DAI
+// DAI - legacy, rebranded to USDS
 var daiAddressesByChainID = map[uint64]common.Address{
 	EthereumMainnet: common.HexToAddress("0x6b175474e89094c44da98b954eedeac495271d0f"),
 	BSCMainnet:      common.HexToAddress("0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3"),
@@ -314,6 +314,13 @@ var daiAddressesByChainID = map[uint64]common.Address{
 	EthereumSepolia: common.HexToAddress("0x3e622317f8c93f7328350cf0b56d9ed4c620c5d6"),
 	UnichainMainnet: common.HexToAddress("0x20cab320a855b39f724131c69424240519573f81"),
 	UnichainSepolia: common.HexToAddress("0x35f965903a85e7528437c3ce0b4bdfbc4e5fc27c"),
+}
+
+// USDS - stable, rebranded from DAI
+var usdsAddressesByChainID = map[uint64]common.Address{
+	EthereumMainnet: common.HexToAddress("0xdc035d45d973e3ec169d2276ddab16f1e407384f"),
+	BaseMainnet:     common.HexToAddress("0x820c137fa70c8691f0e44dc420a5e53c168921dc"),
+	ArbitrumMainnet: common.HexToAddress("0x6491c05a82219b8d1479057361ff1654749b876b"),
 }
 
 // USDC (EVM)
@@ -370,6 +377,9 @@ func allMandatoryTokens() map[uint64][]common.Address {
 		allAddresses[chainID] = append(allAddresses[chainID], address)
 	}
 	for chainID, address := range daiAddressesByChainID {
+		allAddresses[chainID] = append(allAddresses[chainID], address)
+	}
+	for chainID, address := range usdsAddressesByChainID {
 		allAddresses[chainID] = append(allAddresses[chainID], address)
 	}
 	for chainID, address := range usdcEVMAddressesByChainID {
