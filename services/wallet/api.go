@@ -51,6 +51,8 @@ func NewAPI(s *Service) *API {
 	return &API{s, s.reader}
 }
 
+// #########################################################
+
 // API is class with methods available over RPC.
 type API struct {
 	s      *Service
