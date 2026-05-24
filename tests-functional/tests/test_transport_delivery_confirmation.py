@@ -43,12 +43,15 @@ class TestDeliveryConfirmation:
         messenger.make_contacts(sender, receiver)
 
         message_text = f"delivery_{uuid4()}"
-        with sender.expect_signal(SignalType.MESSAGE_DELIVERED, timeout=120, start="beginning") as delivered:
-            response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
-            message_id = response.get("messages", [])[0].get("id", "")
-            assert message_id, "Sender did not get a message id back"
+        response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
+        message_id = response.get("messages", [])[0].get("id", "")
+        assert message_id, "Sender did not get a message id back"
 
-        assert message_id in str(delivered.result), f"Delivery signal did not reference message {message_id}"
+        # `message_id` is only known after the send, so wait post-hoc and scan
+        # from the beginning to avoid matching delivery signals from make_contacts.
+        with sender.expect_signal(SignalType.MESSAGE_DELIVERED, pattern=message_id, timeout=120, start="beginning"):
+            pass
+
         self._wait_for_outgoing_status(sender, message_id, "delivered")
 
     def test_delivery_confirmation_after_recipient_offline(self, sender, receiver):

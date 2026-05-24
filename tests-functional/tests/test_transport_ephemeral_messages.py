@@ -44,6 +44,10 @@ class TestEphemeralMessages:
         # Receiver is offline while both an ephemeral status update and a normal
         # 1:1 message are published.
         with messenger.node_pause(receiver):
+            # Pause long enough for the libp2p connection to time out and drop,
+            # so relayed messages are genuinely missed (not just buffered at the
+            # socket and replayed on resume) and must be recovered from the store.
+            sleep(60)
             sender.wakuext_service.set_user_status(STATUS_AUTOMATIC, ephemeral_text)
             response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, control_text)
             control_id = response.get("messages", [])[0].get("id", "")
