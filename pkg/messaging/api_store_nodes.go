@@ -43,21 +43,20 @@ func (a *API) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTas
 	return a.core.stack.Transport.PerformStorenodeTask(fn, opts...)
 }
 
-func (a *API) ProcessMailserverBatch(
-	ctx context.Context,
-	batch types.StoreNodeBatch,
-	storenode peer.AddrInfo,
-	pageLimit uint64,
-	shouldProcessNextPage func(int) (bool, uint64),
-	processEnvelopes bool,
-) error {
-	return a.core.stack.Transport.ProcessMailserverBatch(ctx, *adapters.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+// StoreQuery executes an explicit historical message query against a store
+// node, decoupled from chat filters. The caller resolves filters into the
+// criteria carried by req (content topics + pubsub topic + time range); peer
+// selection is delegated to the underlying store ("at own risk").
+func (a *API) StoreQuery(ctx context.Context, req types.StoreQueryRequest) error {
+	batch := types.StoreNodeBatch{
+		From:        req.From,
+		To:          req.To,
+		PubsubTopic: req.PubsubTopic,
+		Topics:      req.ContentTopics,
+	}
+	return a.core.stack.Transport.StoreQuery(ctx, *adapters.ToWakuBatch(&batch), req.PageSize, req.ShouldProcessNextPage, req.ProcessEnvelopes)
 }
 
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	a.core.stack.Transport.SetStorenodeConfigProvider(c)
-}
-
-func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
-	a.core.stack.Transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
 }

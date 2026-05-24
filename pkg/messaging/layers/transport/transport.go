@@ -10,7 +10,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
@@ -575,35 +574,6 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	t.waku.ConfirmMessageDelivered(commHashes)
 }
 
-func (t *Transport) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters []*Filter) {
-	topicMap := make(map[string]map[types.TopicType]struct{})
-	for _, f := range filters {
-		if !f.Listen || f.Ephemeral {
-			continue
-		}
-
-		_, ok := topicMap[f.PubsubTopic]
-		if !ok {
-			topicMap[f.PubsubTopic] = make(map[types.TopicType]struct{})
-		}
-
-		topicMap[f.PubsubTopic][f.ContentTopic] = struct{}{}
-	}
-
-	for pubsubTopic, contentTopics := range topicMap {
-		ctList := maps.Keys(contentTopics)
-		err := t.waku.SetCriteriaForMissingMessageVerification(peerInfo, pubsubTopic, ctList)
-		if err != nil {
-			t.logger.Error("could not check for missing messages",
-				zap.Error(err),
-				zap.Stringer("peerID", peerInfo.ID),
-				zap.String("pubsubTopic", pubsubTopic),
-				zap.Stringers("contentTopics", ctList))
-			return
-		}
-	}
-}
-
 func (t *Transport) GetActiveStorenode() peer.AddrInfo {
 	return t.waku.GetActiveStorenode()
 }
@@ -653,15 +623,14 @@ func (t *Transport) PerformStorenodeTask(fn func() error, opts ...history.Storen
 	return t.waku.PerformStorenodeTask(fn, opts...)
 }
 
-func (t *Transport) ProcessMailserverBatch(
+func (t *Transport) StoreQuery(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return t.waku.ProcessMailserverBatch(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {

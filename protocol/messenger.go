@@ -670,9 +670,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.messaging.SetStorenodeConfigProvider(m)
 
 	m.shutdownWaitGroup.Add(1)
-	go m.checkForMissingMessagesLoop()
-
-	m.shutdownWaitGroup.Add(1)
 	go m.checkForStorenodeCycleSignals()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()

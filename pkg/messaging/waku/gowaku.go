@@ -63,7 +63,6 @@ import (
 	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
-	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -152,8 +151,6 @@ type Waku struct {
 
 	sendQueue *publish.MessageQueue
 
-	missingMsgVerifier *missing.MissingMessageVerifier
-
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
 	ctx    context.Context
@@ -177,8 +174,7 @@ type Waku struct {
 	onlineChecker           *onlinechecker.DefaultOnlineChecker
 	state                   connection.State
 
-	StorenodeCycle   *history.StorenodeCycle
-	HistoryRetriever *history.HistoryRetriever
+	StorenodeCycle *history.StorenodeCycle
 
 	logger *zap.Logger
 
@@ -1060,7 +1056,6 @@ func (w *Waku) Start() error {
 	}
 
 	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, commonapi.NewDefaultPinger(w.node.Host()))
-	w.HistoryRetriever = history.NewHistoryRetriever(missing.NewDefaultStorenodeRequestor(w.node.Store()), NewHistoryProcessorWrapper(w), w.logger)
 
 	w.StorenodeCycle.Start(w.ctx)
 
@@ -1178,34 +1173,6 @@ func (w *Waku) Start() error {
 
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
-
-	if w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
-			missing.NewDefaultStorenodeRequestor(w.node.Store()),
-			w,
-			w.node.Timesource(),
-			w.logger)
-
-		w.missingMsgVerifier.Start(w.ctx)
-		w.logger.Info("Started missing message verifier")
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case envelope := <-w.missingMsgVerifier.C:
-					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
-					if err != nil {
-						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
-					}
-				}
-			}
-		}()
-	}
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
@@ -1392,13 +1359,6 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
-}
-
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
-	if !w.cfg.EnableMissingMessageVerification {
-		return
-	}
-	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1707,12 +1667,6 @@ func (w *Waku) isGoingOffline(state connection.State) bool {
 func (w *Waku) ConnectionChanged(state connection.State) {
 	if w.isGoingOnline(state) {
 		w.discoverAndConnectPeers()
-		if w.cfg.EnableMissingMessageVerification {
-			w.missingMsgVerifier.Start(w.ctx)
-		}
-	}
-	if w.isGoingOffline(state) && w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier.Stop()
 	}
 	isOnline := !state.Offline
 
@@ -2024,10 +1978,13 @@ func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	w.StorenodeCycle.SetStorenodeConfigProvider(c)
 }
 
-func (w *Waku) ProcessMailserverBatch(
+// StoreQuery executes an explicit historical message query against the store,
+// paginating through the results. Peer/store selection is delegated to the
+// underlying store via WithAutomaticPeerSelection (the "at own risk" path):
+// there is no explicit storenode argument and no storenode-cycle gating.
+func (w *Waku) StoreQuery(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
@@ -2044,7 +2001,54 @@ func (w *Waku) ProcessMailserverBatch(
 		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
 	}
 
-	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	logger := w.logger.Named("store-query").With(
+		zap.String("pubsubTopic", pubsubTopic),
+		zap.Strings("contentTopics", contentTopics),
+		zap.Int64("from", batch.From.Unix()),
+		zap.Int64("to", batch.To.Unix()),
+	)
+
+	pageSize := pageLimit
+	result, err := w.node.Store().Query(ctx, criteria,
+		store.WithAutomaticPeerSelection(),
+		store.WithPaging(true, pageSize),
+		store.IncludeData(true),
+	)
+	if err != nil {
+		logger.Error("store query failed", zap.Error(err))
+		return err
+	}
+
+	for {
+		messages := result.Messages()
+		for _, mkv := range messages {
+			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
+			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes); err != nil {
+				return err
+			}
+		}
+
+		logger.Debug("store query page", zap.Int("numMessages", len(messages)), zap.Bool("complete", result.IsComplete()))
+
+		if shouldProcessNextPage != nil {
+			processNext, nextPageSize := shouldProcessNextPage(len(messages))
+			if !processNext {
+				return nil
+			}
+			if nextPageSize != 0 {
+				pageSize = nextPageSize
+			}
+		}
+
+		if result.IsComplete() {
+			return nil
+		}
+
+		if err := result.Next(ctx, store.WithPaging(true, pageSize)); err != nil {
+			logger.Error("store query pagination failed", zap.Error(err))
+			return err
+		}
+	}
 }
 
 func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
@@ -2067,17 +2071,6 @@ func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Durat
 
 func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
 	return NewPublicWakuAPI(w)
-}
-
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
-	var cTopics []string
-	for _, ct := range contentTopics {
-		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
-	}
-	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
-
-	return nil
 }
 
 func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {

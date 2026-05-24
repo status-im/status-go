@@ -141,8 +141,6 @@ type Waku interface {
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
-	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
-
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
 	// BloomFilter returns the aggregated bloom filter for all the topics of interest.
@@ -215,11 +213,12 @@ type Waku interface {
 	// SetStorenodeConfigProvider will set the configuration provider for the storenode cycle
 	SetStorenodeConfigProvider(c history.StorenodeConfigProvider)
 
-	// ProcessMailserverBatch will receive a criteria and storenode and execute a query
-	ProcessMailserverBatch(
+	// StoreQuery executes an explicit historical message query against the
+	// store, paginating through the results. Peer/store selection is delegated
+	// to the underlying store (at own risk); there is no storenode argument.
+	StoreQuery(
 		ctx context.Context,
 		batch MailserverBatch,
-		storenode peer.AddrInfo,
 		pageLimit uint64,
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
