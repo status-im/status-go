@@ -1,5 +1,5 @@
 import logging
-from time import sleep, time
+from time import sleep
 from uuid import uuid4
 
 import pytest
@@ -28,16 +28,13 @@ class TestDeliveryConfirmation:
     def receiver(self, backend_new_profile):
         return backend_new_profile("receiver")
 
-    def _wait_for_outgoing_status(self, node, message_id, expected_status="delivered", timeout=120):
-        start = time()
-        last_status = None
-        while time() - start < timeout:
-            message = node.wakuext_service.message_by_message_id(message_id)
-            last_status = message.get("outgoingStatus", "")
-            if last_status == expected_status:
-                return
-            sleep(2)
-        raise AssertionError(f"Message {message_id} outgoing status was '{last_status}', expected '{expected_status}'")
+    def _assert_outgoing_status(self, node, message_id, expected_status="delivered"):
+        # The status field is written just before the message.delivered signal
+        # fires (same loop in markDeliveredMessages), so once we've seen the
+        # signal a single read is enough — no polling needed.
+        message = node.wakuext_service.message_by_message_id(message_id)
+        actual_status = message.get("outgoingStatus", "")
+        assert actual_status == expected_status, f"Message {message_id} outgoing status was '{actual_status}', expected '{expected_status}'"
 
     def test_delivery_confirmation_online(self, sender, receiver):
         messenger.make_contacts(sender, receiver)
@@ -52,7 +49,7 @@ class TestDeliveryConfirmation:
         with sender.expect_signal(SignalType.MESSAGE_DELIVERED, pattern=message_id, timeout=120, start="beginning"):
             pass
 
-        self._wait_for_outgoing_status(sender, message_id, "delivered")
+        self._assert_outgoing_status(sender, message_id, "delivered")
 
     def test_delivery_confirmation_after_recipient_offline(self, sender, receiver):
         messenger.make_contacts(sender, receiver)
@@ -75,4 +72,4 @@ class TestDeliveryConfirmation:
         with sender.expect_signal(SignalType.MESSAGE_DELIVERED, pattern=message_id, timeout=120, start="beginning"):
             pass
 
-        self._wait_for_outgoing_status(sender, message_id, "delivered")
+        self._assert_outgoing_status(sender, message_id, "delivered")
