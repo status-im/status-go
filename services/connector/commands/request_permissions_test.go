@@ -198,10 +198,10 @@ func TestRequestPermissionsNoDAppFound(t *testing.T) {
 	state, close := setupCommand(t, Method_RequestPermissions)
 	t.Cleanup(close)
 
-	// Don't create a dApp, so it will fail with ErrDAppNotFound
+	// No dApp row: eth_accounts would auto-share (UI flow); use another capability to assert ErrDAppNotFound.
 	params := []interface{}{
 		map[string]interface{}{
-			"eth_accounts": struct{}{},
+			"personal_sign": map[string]interface{}{},
 		},
 	}
 

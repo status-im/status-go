@@ -85,19 +85,31 @@ type Transport struct {
 	quit             chan struct{}
 }
 
-// Pause signals Transport's internal goroutines to idle and cascades to EnvelopesMonitor.
+// Pause signals Transport's internal goroutines to idle and cascades to
+// EnvelopesMonitor and the underlying waku transport.
 func (t *Transport) Pause() {
 	t.MarkPaused()
 	if t.envelopesMonitor != nil {
 		t.envelopesMonitor.MarkPaused()
 	}
+	if t.waku != nil {
+		if err := t.waku.Pause(); err != nil {
+			t.logger.Warn("waku Pause failed", zap.Error(err))
+		}
+	}
 }
 
-// Resume signals Transport's internal goroutines to resume and cascades to EnvelopesMonitor.
+// Resume signals Transport's internal goroutines to resume and cascades to
+// EnvelopesMonitor and the underlying waku transport.
 func (t *Transport) Resume() {
 	t.MarkResumed()
 	if t.envelopesMonitor != nil {
 		t.envelopesMonitor.MarkResumed()
+	}
+	if t.waku != nil {
+		if err := t.waku.Resume(); err != nil {
+			t.logger.Warn("waku Resume failed", zap.Error(err))
+		}
 	}
 }
 

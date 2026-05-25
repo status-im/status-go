@@ -1,6 +1,11 @@
 import copy
 import pytest
-from resources.constants import keycard_1, user_1, wallet_account_details_derivation, keypair_name
+from resources.constants import (
+    keycard_1,
+    user_1,
+    wallet_account_details_derivation,
+    keypair_name,
+)
 
 
 @pytest.mark.rpc
@@ -13,7 +18,11 @@ class TestMigrateNonProfileKeycardKeypairToApp:
     def test_full_migrate_flow(self, backend):
         # 1) Add a seed-derived keypair (simulates a keypair that will later be converted to a keycard)
         add_resp = backend.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, backend.password, keypair_name, wallet_account_details_derivation
+            user_1.passphrase,
+            backend.password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
         )
         assert "error" not in add_resp
         add_result = add_resp

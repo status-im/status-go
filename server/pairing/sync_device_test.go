@@ -152,11 +152,11 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 		Emoji:   "💰",
 		ColorID: "primary",
 	}
-	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", walletAccounts)
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
 	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
 
 	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
-	clientSeedPhraseKp, err := clientAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", walletAccounts)
+	clientSeedPhraseKp, err := clientAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
 	require.NoError(s.T(), err, "saving seed phrase keypair on client without keystore files")
 
 	// check server - server should contain keystore files for imported seed phrase
@@ -343,7 +343,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		Emoji:   "💰",
 		ColorID: "primary",
 	}
-	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic1, s.password, "Seed Phrase Keypair", walletAccounts)
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic1, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
 	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
 
 	// Wait for sync messages to be received on client

@@ -30,8 +30,8 @@ func (s *SQLitePersistence) IsMessageAlreadyCompleted(hash []byte) (bool, error)
 func (s *SQLitePersistence) SaveMessageSegment(segment *Message, sigPubKey *ecdsa.PublicKey, timestamp int64) error {
 	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
 
-	_, err := s.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, parity_segment_index, parity_segments_count, sig_pub_key, payload, timestamp, transport_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, segment.ParitySegmentIndex, segment.ParitySegmentsCount, sigPubKeyBlob, segment.Payload, timestamp, segment.transportID)
+	_, err := s.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, parity_segment_index, parity_segments_count, sig_pub_key, payload, timestamp, transport_id, original_payload_length) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, segment.ParitySegmentIndex, segment.ParitySegmentsCount, sigPubKeyBlob, segment.Payload, timestamp, segment.transportID, segment.OriginalPayloadLength)
 
 	return err
 }
@@ -42,7 +42,7 @@ func (s *SQLitePersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.Pub
 
 	rows, err := s.db.Query(`
 		SELECT
-			hash, segment_index, segments_count, parity_segment_index, parity_segments_count, payload, transport_id
+			hash, segment_index, segments_count, parity_segment_index, parity_segments_count, payload, transport_id, original_payload_length
 		FROM
 			message_segments
 		WHERE
@@ -62,7 +62,7 @@ func (s *SQLitePersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.Pub
 		segment := &Message{
 			SegmentMessage: &protobuf.SegmentMessage{},
 		}
-		err := rows.Scan(&segment.EntireMessageHash, &segment.Index, &segment.SegmentsCount, &segment.ParitySegmentIndex, &segment.ParitySegmentsCount, &segment.Payload, &segment.transportID)
+		err := rows.Scan(&segment.EntireMessageHash, &segment.Index, &segment.SegmentsCount, &segment.ParitySegmentIndex, &segment.ParitySegmentsCount, &segment.Payload, &segment.transportID, &segment.OriginalPayloadLength)
 		if err != nil {
 			return nil, err
 		}

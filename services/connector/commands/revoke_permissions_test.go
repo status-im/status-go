@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -10,6 +11,21 @@ import (
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 )
+
+func trackRevokedSignal(t *testing.T) *bool {
+	t.Helper()
+	revoked := false
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt EventType
+		err := json.Unmarshal(s, &evt)
+		assert.NoError(t, err)
+		if evt.Type == signal.EventConnectorDAppPermissionRevoked {
+			revoked = true
+		}
+	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
+	return &revoked
+}
 
 func TestFailToRevokePermissionsWithMissingDAppFields(t *testing.T) {
 	state, close := setupCommand(t, Method_RevokePermissions)
@@ -40,7 +56,7 @@ func TestRevokePermissionsSucceeded(t *testing.T) {
 	state, close := setupCommand(t, Method_RevokePermissions)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
 	dAppPermissionRevoked := false
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
@@ -76,7 +92,7 @@ func TestRevokePermissionsDeletesWCSessions(t *testing.T) {
 	state, close := setupCommand(t, Method_RevokePermissions)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
 	wcDAppData := signal.ConnectorDApp{
 		URL:      "https://wc-test-dapp.com",
 		Name:     "WC Test DApp",
@@ -125,4 +141,117 @@ func TestRevokePermissionsDeletesWCSessions(t *testing.T) {
 	session2, err := persistence.SelectWCSession(state.walletDb, "topic2")
 	assert.NoError(t, err)
 	assert.Nil(t, session2)
+}
+
+func TestRevokePermissions_TargetedEthAccounts_KeepsDApp_NoRevokedSignal(t *testing.T) {
+	tests := []struct {
+		name         string
+		insertedPerm []string
+		expectedPerm []string
+	}{
+		{
+			name:         "keeps non-revoked permissions",
+			insertedPerm: []string{"eth_accounts", "personal_sign"},
+			expectedPerm: []string{"personal_sign"},
+		},
+		{
+			name:         "removes only permission when single capability exists",
+			insertedPerm: []string{"eth_accounts"},
+			expectedPerm: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state, close := setupCommand(t, Method_RevokePermissions)
+			t.Cleanup(close)
+
+			sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+			revoked := trackRevokedSignal(t)
+
+			err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
+			assert.NoError(t, err)
+			for i, perm := range tt.insertedPerm {
+				err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, perm, []persistence.Caveat{}, time.Now().Unix()+int64(i))
+				assert.NoError(t, err)
+			}
+
+			params := []interface{}{
+				map[string]interface{}{
+					"eth_accounts": map[string]interface{}{},
+				},
+			}
+			request, err := ConstructRPCRequest("wallet_revokePermissions", params, &testDAppData)
+			assert.NoError(t, err)
+
+			_, err = state.cmd.Execute(state.ctx, request)
+			assert.NoError(t, err)
+
+			dApp, err := persistence.SelectDApp(state.walletDb, testDAppData.URL, testDAppData.ClientID)
+			assert.NoError(t, err)
+			assert.NotNil(t, dApp)
+
+			perms, err := persistence.SelectPermissions(state.walletDb, testDAppData.URL, testDAppData.ClientID)
+			assert.NoError(t, err)
+			assert.Len(t, perms, len(tt.expectedPerm))
+			actualPerms := make([]string, 0, len(perms))
+			for _, perm := range perms {
+				actualPerms = append(actualPerms, perm.ParentCapability)
+			}
+			assert.ElementsMatch(t, tt.expectedPerm, actualPerms)
+			assert.False(t, *revoked)
+		})
+	}
+}
+
+func TestRevokePermissions_MultiElementParams_RemovesAllCapabilities(t *testing.T) {
+	state, close := setupCommand(t, Method_RevokePermissions)
+	t.Cleanup(close)
+
+	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+	revoked := trackRevokedSignal(t)
+
+	err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
+	assert.NoError(t, err)
+	err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, "eth_accounts", []persistence.Caveat{}, time.Now().Unix())
+	assert.NoError(t, err)
+	err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, "personal_sign", []persistence.Caveat{}, time.Now().Unix()+1)
+	assert.NoError(t, err)
+
+	params := []interface{}{
+		map[string]interface{}{"eth_accounts": map[string]interface{}{}},
+		map[string]interface{}{"personal_sign": map[string]interface{}{}},
+	}
+	request, err := ConstructRPCRequest("wallet_revokePermissions", params, &testDAppData)
+	assert.NoError(t, err)
+
+	_, err = state.cmd.Execute(state.ctx, request)
+	assert.NoError(t, err)
+
+	dApp, err := persistence.SelectDApp(state.walletDb, testDAppData.URL, testDAppData.ClientID)
+	assert.NoError(t, err)
+	assert.NotNil(t, dApp)
+
+	perms, err := persistence.SelectPermissions(state.walletDb, testDAppData.URL, testDAppData.ClientID)
+	assert.NoError(t, err)
+	assert.Empty(t, perms)
+	assert.False(t, *revoked)
+}
+
+func TestRevokePermissions_InvalidParamsType(t *testing.T) {
+	state, close := setupCommand(t, Method_RevokePermissions)
+	t.Cleanup(close)
+
+	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+	err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
+	assert.NoError(t, err)
+	err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, "eth_accounts", []persistence.Caveat{}, time.Now().Unix())
+	assert.NoError(t, err)
+
+	request, err := ConstructRPCRequest("wallet_revokePermissions", []interface{}{"not-a-map"}, &testDAppData)
+	assert.NoError(t, err)
+
+	_, err = state.cmd.Execute(state.ctx, request)
+	assert.Error(t, err)
+	assert.Equal(t, ErrInvalidParamType, err)
 }

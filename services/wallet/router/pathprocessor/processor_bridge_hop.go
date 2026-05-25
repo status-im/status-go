@@ -407,12 +407,11 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 	}
 
 	hopChainsMap := map[uint64]string{
-		walletCommon.EthereumMainnet:     "ethereum",
-		walletCommon.OptimismMainnet:     "optimism",
-		walletCommon.ArbitrumMainnet:     "arbitrum",
-		walletCommon.BaseMainnet:         "base",
-		walletCommon.LineaMainnet:        "linea",
-		walletCommon.PolygonZkEVMMainnet: "polygonzk",
+		walletCommon.EthereumMainnet: "ethereum",
+		walletCommon.OptimismMainnet: "optimism",
+		walletCommon.ArbitrumMainnet: "arbitrum",
+		walletCommon.BaseMainnet:     "base",
+		walletCommon.LineaMainnet:    "linea",
 	}
 
 	fromChainName, ok := hopChainsMap[params.FromToken.ChainID]

@@ -26,13 +26,14 @@ func TestBuildNamespaces_DefaultMethodsAndEvents(t *testing.T) {
 	require.Contains(t, ns.Methods, "personal_sign")
 	require.Contains(t, ns.Methods, "eth_signTypedData")
 	require.Contains(t, ns.Methods, "eth_signTypedData_v4")
+	require.Contains(t, ns.Methods, "wallet_switchEthereumChain")
 	require.Contains(t, ns.Events, "accountsChanged")
 	require.Contains(t, ns.Events, "chainChanged")
 	require.Contains(t, chains, "eip155:1")
 	require.Contains(t, accounts, "eip155:1:"+meta.Account)
 }
 
-func TestBuildNamespaces_OverridesMethodsFromRequiredNamespaces(t *testing.T) {
+func TestBuildNamespaces_OverwritesWithRequiredMethodsWhenNonEmpty(t *testing.T) {
 	meta := SessionMetadata{
 		Account: "0xabc",
 		ChainID: 1,
@@ -50,8 +51,9 @@ func TestBuildNamespaces_OverridesMethodsFromRequiredNamespaces(t *testing.T) {
 	namespaces, _, _ := BuildNamespaces(meta, proposal)
 
 	ns := namespaces["eip155"]
-	require.Equal(t, []string{"custom_method_a", "custom_method_b"}, ns.Methods)
-	require.Equal(t, []string{"custom_event"}, ns.Events)
+
+	require.ElementsMatch(t, []string{"custom_method_a", "custom_method_b"}, ns.Methods)
+	require.ElementsMatch(t, []string{"custom_event"}, ns.Events)
 }
 
 func TestBuildNamespaces_EmptyRequiredMethodsKeepsDefaults(t *testing.T) {

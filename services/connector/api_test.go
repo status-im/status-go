@@ -102,6 +102,35 @@ func TestCallRPC_TrustedConnectionWithClientID(t *testing.T) {
 	require.NotNil(t, result)
 }
 
+func TestCallRPC_WalletGetCapabilities(t *testing.T) {
+	state := setupTests(t)
+	ctx := WithConnectionType(context.Background(), ConnectionTypeTrusted)
+
+	res, err := state.api.CallRPC(ctx, `{
+		"method": "wallet_getCapabilities",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png",
+		"clientId": "status-desktop"
+	}`)
+	require.NoError(t, err)
+	m, ok := res.(map[string]any)
+	require.True(t, ok)
+	require.Empty(t, m)
+
+	_, err = state.api.CallRPC(ctx, `{
+		"method": "wallet_sendCalls",
+		"params": [],
+		"url": "https://example.com",
+		"name": "Example DApp",
+		"iconUrl": "https://example.com/icon.png",
+		"clientId": "status-desktop"
+	}`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not allowed")
+}
+
 func TestChangeAccount_UntrustedConnection(t *testing.T) {
 	state := setupTests(t)
 
@@ -164,6 +193,49 @@ func TestGetPermittedDAppsList(t *testing.T) {
 	dapps, err := state.api.GetPermittedDAppsList()
 	require.NoError(t, err)
 	require.Empty(t, dapps)
+}
+
+func TestDeleteEphemeralDApps(t *testing.T) {
+	state := setupTests(t)
+
+	normal := persistence.DApp{
+		URL:           "https://normal-dapp.com",
+		Name:          "Normal",
+		IconURL:       "",
+		ClientID:      "status-desktop/dapp-browser",
+		SharedAccount: types2.HexToAddress("0x1111"),
+		ChainID:       0x1,
+	}
+	ephemeral := persistence.DApp{
+		URL:           "https://ephemeral-dapp.com",
+		Name:          "Ephemeral",
+		IconURL:       "",
+		ClientID:      "status-desktop/dapp-browser" + persistence.EphemeralClientIDSuffix,
+		SharedAccount: types2.HexToAddress("0x2222"),
+		ChainID:       0x1,
+	}
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &normal))
+	require.NoError(t, persistence.UpsertDApp(state.walletDb, &ephemeral))
+
+	ctx := WithConnectionType(context.Background(), ConnectionTypeTrusted)
+	require.NoError(t, state.api.DeleteEphemeralDApps(ctx))
+
+	gotNormal, err := persistence.SelectDApp(state.walletDb, normal.URL, normal.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, gotNormal)
+
+	gotEphemeral, err := persistence.SelectDApp(state.walletDb, ephemeral.URL, ephemeral.ClientID)
+	require.NoError(t, err)
+	require.Nil(t, gotEphemeral)
+}
+
+func TestDeleteEphemeralDApps_UntrustedConnection(t *testing.T) {
+	state := setupTests(t)
+
+	ctx := WithConnectionType(context.Background(), ConnectionTypeUntrusted)
+	err := state.api.DeleteEphemeralDApps(ctx)
+	require.Error(t, err)
+	require.Equal(t, ErrNotAllowedForUntrustedConnection, err)
 }
 
 func TestGetWCActiveSessions(t *testing.T) {
@@ -346,20 +418,20 @@ func TestPairWalletConnect_InvalidURI(t *testing.T) {
 
 func TestUpdateWCSessionChains_NilClient(t *testing.T) {
 	state := setupTests(t)
-	state.api.wcClient = nil
+	state.service.wcClient.Store(nil)
 
 	err := state.api.UpdateWCSessionChains(state.ctx, "some-topic", "0x1234", []uint64{1})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, commands.ErrWCClientNotInitialized)
 }
 
 func TestEmitWCSessionEvent_NilClient(t *testing.T) {
 	state := setupTests(t)
-	state.api.wcClient = nil
+	state.service.wcClient.Store(nil)
 
 	err := state.api.EmitWCSessionEvent(state.ctx, "some-topic", "accountsChanged", "", "eip155:1")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "WalletConnect client not initialized")
+	require.ErrorIs(t, err, commands.ErrWCClientNotInitialized)
 }
 
 func TestNewAPI_WithRestoredSessions(t *testing.T) {
@@ -386,6 +458,6 @@ func TestNewAPI_WithRestoredSessions(t *testing.T) {
 		&Config{},
 	)
 
-	api := NewAPI(service)
-	require.NotNil(t, api)
+	require.NotNil(t, service.api)
+	require.NotNil(t, service.GetClient())
 }

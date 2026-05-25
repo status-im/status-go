@@ -39,5 +39,13 @@ func (c *AccountsCommand) Execute(ctx context.Context, request RPCRequest) (inte
 		return []string{}, nil
 	}
 
+	has, err := persistence.PermissionExists(c.db, request.URL, request.ClientID, Method_EthAccounts)
+	if err != nil {
+		return "", err
+	}
+	if !has {
+		return []string{}, nil
+	}
+
 	return FormatAccountAddressToResponse(dApp.SharedAccount), nil
 }

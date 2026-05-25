@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -16,6 +17,9 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/services/connector/chainutils"
+	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/services/connector/walletconnect"
+	"github.com/status-im/status-go/signal"
 )
 
 const serviceName = "connector"
@@ -43,6 +47,7 @@ func NewService(
 		config:          config,
 	}
 	s.api = NewAPI(s)
+	s.initWCClient()
 	return s
 }
 
@@ -59,19 +64,95 @@ type Service struct {
 
 	config *Config
 
-	rpcServer *gethrpc.Server
-	wsServer  *http.Server
-	mu        sync.Mutex
-	paused    bool
-	started   bool
+	rpcServer          *gethrpc.Server
+	wsServer           *http.Server
+	mu                 sync.Mutex
+	paused             bool
+	started            bool
+	purgeEphemeralOnce sync.Once
+
+	wcClient atomic.Pointer[walletconnect.Client] // owned by Service; recreated after Pause/Resume or Stop
+}
+
+func (s *Service) GetClient() *walletconnect.Client {
+	return s.wcClient.Load()
+}
+
+func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) {
+	activeSessions, err := persistence.SelectActiveWCSessions(s.db, time.Now().Unix())
+	if err != nil {
+		s.logger.Error("failed to load active WC sessions", zap.Error(err))
+		return
+	}
+	if len(activeSessions) == 0 {
+		return
+	}
+	restored := make([]walletconnect.RestoredSession, 0, len(activeSessions))
+	for _, session := range activeSessions {
+		restored = append(restored, walletconnect.RestoredSession{
+			Topic:  session.Topic,
+			SymKey: session.SymKey,
+		})
+	}
+	wcClient.RestoreSessions(restored)
+	s.logger.Info("restored WalletConnect sessions", zap.Int("count", len(restored)))
+	if err := wcClient.ConnectAndResubscribe(); err != nil {
+		s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
+	}
+}
+
+// initWCClient creates wcClient when nil. Safe to call without holding s.mu (uses atomic.Pointer).
+func (s *Service) initWCClient() {
+	if s.wcClient.Load() != nil {
+		return
+	}
+
+	wcClient, err := walletconnect.NewClient(s.config.ProjectID)
+	if err != nil {
+		s.logger.Error("failed to create WalletConnect client", zap.Error(err))
+		return
+	}
+	if wcClient == nil {
+		return
+	}
+
+	s.restoreActiveWCSessions(wcClient)
+
+	wcClient.SetSessionDeleteHandler(func(topic string) {
+		s.logger.Info("received wc_sessionDelete", zap.String("topic", topic))
+		session, err := persistence.SelectWCSession(s.db, topic)
+		dappURL := ""
+		if err == nil && session != nil {
+			dappURL = session.DAppURL
+		}
+		if err := s.api.wcSessionDisconnector.DisconnectSession(context.Background(), topic); err != nil {
+			s.logger.Error("failed to disconnect WC session", zap.String("topic", topic), zap.Error(err))
+		} else {
+			s.logger.Info("WC session disconnected", zap.String("topic", topic), zap.String("dappURL", dappURL))
+		}
+		signal.SendWCSessionDelete(topic, dappURL)
+	})
+
+	if !s.wcClient.CompareAndSwap(nil, wcClient) {
+		_ = wcClient.Close()
+	}
 }
 
 func (s *Service) Start() error {
+	s.initWCClient()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.started {
 		return nil
 	}
+
+	s.purgeEphemeralOnce.Do(func() {
+		if err := persistence.DeleteEphemeralDApps(s.db); err != nil {
+			s.logger.Warn("failed to delete ephemeral dapps on first start", zap.Error(err))
+		}
+	})
+
 	// Create an RPC server
 	s.rpcServer = gethrpc.NewServer()
 
@@ -125,15 +206,19 @@ func (s *Service) Start() error {
 func (s *Service) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.stopLocked()
+	err := s.stopLocked()
+	if err2 := persistence.DeleteEphemeralDApps(s.db); err2 != nil {
+		s.logger.Warn("failed to delete ephemeral dapps on stop", zap.Error(err2))
+	}
+	return err
 }
 
 func (s *Service) stopLocked() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	if s.api != nil && s.api.wcClient != nil {
-		if err := s.api.wcClient.Close(); err != nil {
+	if c := s.wcClient.Swap(nil); c != nil {
+		if err := c.Close(); err != nil {
 			s.logger.Error("failed to close WalletConnect client", zap.Error(err))
 		}
 	}

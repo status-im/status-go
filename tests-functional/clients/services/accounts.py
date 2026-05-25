@@ -29,8 +29,8 @@ class AccountService(Service):
         response = self.rpc_request("importMnemonic", params)
         return response
 
-    def add_keypair_via_seed_phrase(self, mnemonic, password, name, wallet_account):
-        params = [mnemonic, password, name, wallet_account]
+    def add_keypair_via_seed_phrase(self, mnemonic, password, name, cold_wallet, wallet_account):
+        params = [mnemonic, password, name, cold_wallet, wallet_account]
         response = self.rpc_request("addKeypairViaSeedPhrase", params)
         return response
 
@@ -159,9 +159,16 @@ class AccountService(Service):
         response = self.rpc_request("getKeycardsWithSameKeyUID", params)
         return response
 
-    def add_keypair_stored_to_keycard(self, key_uid, master_address, name, wallet_accounts):
-        params = [key_uid, master_address, name, wallet_accounts]
-        response = self.rpc_request("addKeypairStoredToKeycard", params)
+    def add_keypair_stored_to_cold_wallet(self, key_uid, master_address, name, wallet_xpub, cold_wallet, wallet_accounts):
+        params = [
+            key_uid,
+            master_address,
+            name,
+            wallet_xpub,
+            cold_wallet,
+            wallet_accounts,
+        ]
+        response = self.rpc_request("addKeypairStoredToColdWallet", params)
         return response
 
     def update_keypair(self, keypair):

@@ -7,12 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
-	"github.com/status-im/status-go/services/connector/walletconnect"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
@@ -45,19 +45,84 @@ type Message struct {
 	Data interface{}
 }
 
+type sharePendingKey struct {
+	normalizedURL string
+	clientID      string
+}
+
 type ClientSideHandler struct {
 	Db                    *sql.DB
 	wcSessionDisconnector WCSessionDisconnector
 	responseChannel       chan Message
 	isRequestRunning      int32
+
+	sharePendingMu sync.Mutex
+	sharePending   map[sharePendingKey]chan struct{}
 }
 
-func NewClientSideHandler(db *sql.DB, wcClient *walletconnect.Client) *ClientSideHandler {
+func NewClientSideHandler(db *sql.DB, getClient WCClientGetter) *ClientSideHandler {
 	return &ClientSideHandler{
 		Db:                    db,
-		wcSessionDisconnector: NewWCSessionDisconnector(db, wcClient),
+		wcSessionDisconnector: NewWCSessionDisconnector(db, getClient),
 		responseChannel:       make(chan Message, 1),
 		isRequestRunning:      0,
+		sharePending:          make(map[sharePendingKey]chan struct{}),
+	}
+}
+
+func (c *ClientSideHandler) sharePendingKey(url, clientID string) sharePendingKey {
+	return sharePendingKey{
+		normalizedURL: persistence.NormalizeURL(url),
+		clientID:      clientID,
+	}
+}
+
+// BeginPendingShareAccount marks that a share-account flow is in progress for this origin.
+// Called from shareAndUpsertDApp before RequestShareAccountForDApp; End runs after UpsertDApp.
+// At most one pending entry exists per (url, clientID) without ref-counting.
+func (c *ClientSideHandler) BeginPendingShareAccount(url, clientID string) {
+	key := c.sharePendingKey(url, clientID)
+	c.sharePendingMu.Lock()
+	defer c.sharePendingMu.Unlock()
+	if _, exists := c.sharePending[key]; exists {
+		return
+	}
+	c.sharePending[key] = make(chan struct{})
+}
+
+// EndPendingShareAccount clears the pending marker after the flow finished (including DB persist).
+func (c *ClientSideHandler) EndPendingShareAccount(url, clientID string) {
+	key := c.sharePendingKey(url, clientID)
+	c.sharePendingMu.Lock()
+	done, ok := c.sharePending[key]
+	if ok {
+		delete(c.sharePending, key)
+	}
+	c.sharePendingMu.Unlock()
+	if ok {
+		close(done)
+	}
+}
+
+// WaitForPendingShareAccount blocks until there is no in-flight share flow for this origin, or ctx is cancelled.
+// Returns true if a pending share entry was observed (the call may have blocked on it).
+func (c *ClientSideHandler) WaitForPendingShareAccount(ctx context.Context, url, clientID string) bool {
+	key := c.sharePendingKey(url, clientID)
+	sawPending := false
+	for {
+		c.sharePendingMu.Lock()
+		done := c.sharePending[key]
+		c.sharePendingMu.Unlock()
+		if done == nil {
+			return sawPending
+		}
+		sawPending = true
+		select {
+		case <-ctx.Done():
+			return sawPending
+		case <-done:
+			return sawPending
+		}
 	}
 }
 

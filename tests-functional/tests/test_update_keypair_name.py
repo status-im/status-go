@@ -17,7 +17,13 @@ class TestUpdateKeypairName:
             backend.accounts_service.update_keypair_name(backend.key_uid, new_name)
 
     def test_update_keypair_name_for_seed_account(self, backend):
-        backend.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, backend.password, keypair_name, wallet_account_details_derivation)
+        backend.accounts_service.add_keypair_via_seed_phrase(
+            user_1.passphrase,
+            backend.password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
+        )
 
         keypairs_response = backend.accounts_service.get_account_keypairs()
         keypairs = keypairs_response
