@@ -48,6 +48,7 @@ import (
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/preferences"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/stickers"
@@ -122,6 +123,7 @@ type StatusNode struct {
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service
 	newsfeedSrvc           *newsfeed.Service
+	preferencesSrvc        *preferences.Service
 	sharedUrlsSrvc         *sharedurls.Service
 	linkPreviewSrvc        *linkpreview.Service
 
@@ -513,6 +515,7 @@ func (n *StatusNode) Stop() error {
 	n.pendingTracker = nil
 	n.appGeneralSrvc = nil
 	n.newsfeedSrvc = nil
+	n.preferencesSrvc = nil
 
 	n.logger.Debug("status node stopped")
 	return errors.Join(errs...)
