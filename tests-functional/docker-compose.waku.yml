@@ -1,6 +1,9 @@
 services:
   boot-1:
     image: wakuorg/nwaku:v0.38.1
+    # Publish the nwaku REST API so tests on the host can reach it.
+    ports:
+      - "127.0.0.1:8645:8645"
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -12,7 +15,7 @@ services:
       "--dns4-domain-name=boot-1",
       "--filter=true",
       "--lightpush=true",
-      "--log-level=INFO",
+      "--log-level=DEBUG",
       "--max-connections=18000",
       "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",
       "--peer-exchange=true",
@@ -35,6 +38,9 @@ services:
 
   store:
     image: wakuorg/nwaku:v0.38.1
+    # Publish the nwaku REST API (incl. Store API) so tests on the host can query it.
+    ports:
+      - "127.0.0.1:8646:8645"
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -44,7 +50,7 @@ services:
       # Docker DNS server
       "--dns-addrs-name-server=127.0.0.11",
       "--dns4-domain-name=store",
-      "--log-level=INFO",
+      "--log-level=DEBUG",
       "--max-connections=18000",
       "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
       "--peer-exchange=false",
