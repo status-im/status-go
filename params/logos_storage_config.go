@@ -1,5 +1,10 @@
 package params
 
+const (
+	// Number of times to retry fetching a block on LogosStorage before giving up.
+	defaultLogosStorageBlockRetries = 50
+)
+
 type LogosStorageNodeConfig struct {
 	// Default: INFO
 	LogLevel string

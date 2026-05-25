@@ -213,6 +213,8 @@ type NodeConfig struct {
 	// OTELConfig provides configuration for OpenTelemetry tracing
 	OTELConfig OTELConfig
 
+	LogosStorageConfig LogosStorageConfig
+
 	OutputMessageCSVEnabled bool
 }
 
@@ -393,6 +395,10 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 		}
 	}
 
+	if c.LogosStorageConfig.Enabled && c.LogosStorageConfig.NodeConfig.DataDir == "" {
+		c.LogosStorageConfig.NodeConfig.DataDir = filepath.Join(c.RootDataDir, "logos-storage", "data")
+	}
+
 	return c.setDefaultPushNotificationsServers()
 }
 
@@ -425,6 +431,15 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			Port:       9025,
 			DataDir:    dataDir + "/archivedata",
 			TorrentDir: dataDir + "/torrents",
+		},
+		LogosStorageConfig: LogosStorageConfig{
+			Enabled: false,
+			NodeConfig: LogosStorageNodeConfig{
+				BlockRetries:   defaultLogosStorageBlockRetries,
+				DataDir:        filepath.Join(dataDir, "logos-storage", "data"),
+				MetricsEnabled: false,
+				LogFormat:      "nocolors",
+			},
 		},
 	}
 
@@ -504,6 +519,9 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	if err := c.TorrentConfig.Validate(validate); err != nil {
 		return err
 	}
+	if err := ValidateLogosStorageConfig(c.LogosStorageConfig, validate); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -533,6 +551,10 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 		return fmt.Errorf("TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be \"\"")
 	}
 	return nil
+}
+
+func ValidateLogosStorageConfig(c LogosStorageConfig, validate *validator.Validate) error {
+	return validate.Struct(c)
 }
 
 // String dumps config object as nicely indented JSON
