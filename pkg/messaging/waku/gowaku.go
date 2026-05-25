@@ -63,6 +63,7 @@ import (
 	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
+	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -174,7 +175,8 @@ type Waku struct {
 	onlineChecker           *onlinechecker.DefaultOnlineChecker
 	state                   connection.State
 
-	StorenodeCycle *history.StorenodeCycle
+	StorenodeCycle   *history.StorenodeCycle
+	HistoryRetriever *history.HistoryRetriever
 
 	logger *zap.Logger
 
@@ -1056,6 +1058,7 @@ func (w *Waku) Start() error {
 	}
 
 	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, commonapi.NewDefaultPinger(w.node.Host()))
+	w.HistoryRetriever = history.NewHistoryRetriever(missing.NewDefaultStorenodeRequestor(w.node.Store()), NewHistoryProcessorWrapper(w), w.logger)
 
 	w.StorenodeCycle.Start(w.ctx)
 
@@ -1979,9 +1982,14 @@ func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 }
 
 // StoreQuery executes an explicit historical message query against the store,
-// paginating through the results. Peer/store selection is delegated to the
-// underlying store via WithAutomaticPeerSelection (the "at own risk" path):
-// there is no explicit storenode argument and no storenode-cycle gating.
+// paginating through the results. The criteria (content topics + pubsub topic +
+// time range) is decoupled from chat filters at the seam; peer selection is
+// internalized here using the currently-elected storenode.
+//
+// NOTE: the actual paging (newest-first cursor walk, 24h windowing, content-topic
+// chunking) is still delegated to go-waku's HistoryRetriever. Replacing that with
+// a direct node.Store().Query walk is deferred together with the StorenodeCycle
+// retirement (gated on logos-delivery owning store/peer selection).
 func (w *Waku) StoreQuery(
 	ctx context.Context,
 	batch types.MailserverBatch,
@@ -2001,54 +2009,13 @@ func (w *Waku) StoreQuery(
 		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
 	}
 
-	logger := w.logger.Named("store-query").With(
-		zap.String("pubsubTopic", pubsubTopic),
-		zap.Strings("contentTopics", contentTopics),
-		zap.Int64("from", batch.From.Unix()),
-		zap.Int64("to", batch.To.Unix()),
-	)
-
-	pageSize := pageLimit
-	result, err := w.node.Store().Query(ctx, criteria,
-		store.WithAutomaticPeerSelection(),
-		store.WithPaging(true, pageSize),
-		store.IncludeData(true),
-	)
-	if err != nil {
-		logger.Error("store query failed", zap.Error(err))
-		return err
+	storenode := w.StorenodeCycle.GetActiveStorenodePeerInfo()
+	if storenode.ID == "" {
+		w.logger.Warn("store query skipped: no active storenode")
+		return nil
 	}
 
-	for {
-		messages := result.Messages()
-		for _, mkv := range messages {
-			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
-			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes); err != nil {
-				return err
-			}
-		}
-
-		logger.Debug("store query page", zap.Int("numMessages", len(messages)), zap.Bool("complete", result.IsComplete()))
-
-		if shouldProcessNextPage != nil {
-			processNext, nextPageSize := shouldProcessNextPage(len(messages))
-			if !processNext {
-				return nil
-			}
-			if nextPageSize != 0 {
-				pageSize = nextPageSize
-			}
-		}
-
-		if result.IsComplete() {
-			return nil
-		}
-
-		if err := result.Next(ctx, store.WithPaging(true, pageSize)); err != nil {
-			logger.Error("store query pagination failed", zap.Error(err))
-			return err
-		}
-	}
+	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
