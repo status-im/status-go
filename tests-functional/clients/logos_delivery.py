@@ -11,18 +11,44 @@ sleeping and hoping.
 import logging
 import time
 
+import docker
 import requests
+from tenacity import retry, stop_after_attempt, wait_fixed
+
+from utils.config import Config
 
 logger = logging.getLogger(__name__)
 
-# Store node REST API, published to the host by docker-compose.waku.yml.
-DEFAULT_STORE_URL = "http://127.0.0.1:8646"
+# Container port the nwaku store node serves its REST API on (mapped to an
+# ephemeral host port by docker-compose.waku.yml).
+STORE_REST_CONTAINER_PORT = "8645/tcp"
 
 
 class LogosDeliveryClient:
-    def __init__(self, base_url: str = DEFAULT_STORE_URL, timeout: float = 10.0):
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str | None = None, timeout: float = 10.0):
+        # The store REST port is published on an ephemeral host port to avoid
+        # collisions on shared CI hosts, so discover it at runtime via the
+        # Docker API (same approach as clients/anvil.py). An explicit base_url
+        # can still be passed (e.g. for --status_backend_url style setups).
+        self.base_url = (base_url or self._discover_store_url()).rstrip("/")
         self.timeout = timeout
+
+    @retry(stop=stop_after_attempt(15), wait=wait_fixed(0.2), reraise=True)
+    def _discover_store_url(self) -> str:
+        docker_client = docker.from_env()
+        project = Config.docker_project_name
+        network = docker_client.networks.get(f"{project}_default")
+        prefix = f"{project}-store"
+        store = next((c for c in network.containers if c.name and prefix in c.name), None)
+        if store is None:
+            raise RuntimeError(f"store container ('{prefix}*') not found")
+        mappings = store.attrs["NetworkSettings"]["Ports"].get(STORE_REST_CONTAINER_PORT) or []
+        if not mappings:
+            raise RuntimeError("store REST port is not exposed")
+        host_ip = mappings[0]["HostIp"] or "127.0.0.1"
+        if host_ip == "0.0.0.0":
+            host_ip = "127.0.0.1"
+        return f"http://{host_ip}:{mappings[0]['HostPort']}"
 
     def get_messages(
         self,

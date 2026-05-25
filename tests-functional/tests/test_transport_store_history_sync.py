@@ -68,12 +68,12 @@ class TestStoreHistorySync:
             sent_ids.append(message["id"])
             time.sleep(1)
 
-        logging.info("Sent %d messages: %s", message_count, sent_ids)
+        logger.info(f"Sent {message_count} messages: {sent_ids}")
 
         # Confirm the messages actually reached the store node before continuing.
         stored = logos_delivery.wait_for_message_count(message_count, start_time=offline_start_ns, timeout=60)
         topic_counts = Counter(m.get("message", {}).get("contentTopic", "?") for m in stored)
-        logger.info("Store holds %d messages since offline start; content topics: %s", len(stored), dict(topic_counts))
+        logger.info(f"Store holds {len(stored)} messages since offline start; content topics: {dict(topic_counts)}")
         assert len(stored) >= message_count, f"Store node only holds {len(stored)} messages, expected at least {message_count}"
 
         # Log the sender out so it cannot MVDS-retransmit once the receiver
