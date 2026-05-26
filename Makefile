@@ -1,8 +1,8 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-ios-library statusgo-android-library
 .PHONY: build-libsds clean-libsds rebuild-libsds
-.PHONY: clone-storage build-storage clean-storage test-storage
-.PHONY: storage-help
+.PHONY: clone-storage build-storage clean-storage test-storage test-torrent
+.PHONY: history-archive-help
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -137,6 +137,7 @@ CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
+USE_TORRENT ?= false
 LOGOS_STORAGE_VERSION ?= 3c09f008bb5266a669fd19f18368f9e8b861b664
 LOGOS_STORAGE_SOURCE_DIR ?= $(GIT_ROOT)/../logos-storage-nim
 
@@ -159,11 +160,15 @@ LIBSTORAGE ?= $(LOGOS_STORAGE_LIB_DIR)/libstorage.$(LIB_EXT)
 RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
-	BUILD_TAGS += use_logos_storage
+	override BUILD_TAGS += use_logos_storage
 	CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
 	CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
 	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
 	LOGOS_STORAGE_BUILD_DEPS += $(LIBSTORAGE)
+endif
+
+ifeq ($(USE_TORRENT),true)
+	override BUILD_TAGS += use_torrent
 endif
 
 clone-storage: ##@build Clone or update logos-storage-nim
@@ -196,8 +201,12 @@ test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package
 	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
 	gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations"
 
-storage-help: ##@build Show logos-storage build/test toggles and env vars
-	@cat services/logosstorage/README.md
+test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations"
+
+history-archive-help: ##@build Show history archive build/test toggles and env vars
+	@cat protocol/communities/archive/README.md
 
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
@@ -521,7 +530,7 @@ test-unit: ##@tests Run unit and integration tests
 
 test-single: test-unit-prep
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go test -v $(PKG) -testify.m $(TEST)
+	go test -v -tags '$(BUILD_TAGS)' $(PKG) -run '$(TEST)' -testify.m '$(TEST)'
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false

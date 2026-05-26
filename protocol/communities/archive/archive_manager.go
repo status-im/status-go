@@ -16,7 +16,6 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	archivetorrent "github.com/status-im/status-go/protocol/communities/archive/torrent"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	archiveutils "github.com/status-im/status-go/protocol/communities/archive/utils"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -50,19 +49,13 @@ type ArchiveManager struct {
 func NewArchiveManager(amc *archivetypes.ArchiveManagerConfig) ArchiveService {
 	// Depending on which config is provided AND enabled, we instantiate the corresponding
 	// concrete ArchiveManager backend implementation.
-	var backend ArchiveServiceBackend
+	backend := newTorrentBackend(amc)
 
-	if amc.TorrentConfig != nil && amc.TorrentConfig.Enabled {
-		// Torrent-based archive backend
-		backend = archivetorrent.NewArchiveManagerTorrent(
-			amc.TorrentConfig,
-			amc.Logger,
-			amc.Persistence,
-			amc.Messaging,
-			amc.Identity,
-			amc.Publisher,
-		)
-	} else {
+	if backend == nil {
+		backend = newLogosStorageBackend(amc)
+	}
+
+	if backend == nil {
 		// No enabled configuration - return the NOP implementation
 		// This ensures we always return a valid instance that safely does nothing
 		return &ArchiveManagerNop{}
@@ -400,19 +393,6 @@ func (m *ArchiveManager) getOldestWakuMessageTimestamp(topics []messagingtypes.C
 
 func (m *ArchiveManager) getLastMessageArchiveEndDate(communityID cryptotypes.HexBytes) (uint64, error) {
 	return m.persistence.GetLastMessageArchiveEndDate(communityID)
-}
-
-// Special functions
-// These functions are not part of the ArchiveService interface.
-// Some legacy tests are accessing implementation details and for this reason
-// we need to expose these special accessors.
-
-// GetTorrentBackend returns the Torrent backend if available, for test purposes
-func (m *ArchiveManager) GetTorrentBackend() (*archivetorrent.ArchiveManagerTorrent, error) {
-	if torrentBackend, ok := m.backend.(*archivetorrent.ArchiveManagerTorrent); ok {
-		return torrentBackend, nil
-	}
-	return nil, errors.New("backend is not ArchiveManagerTorrent")
 }
 
 func (m *ArchiveManager) Wait() {

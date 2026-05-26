@@ -373,12 +373,13 @@ func NewMessenger(
 	}
 
 	amc := &archivetypes.ArchiveManagerConfig{
-		TorrentConfig: c.torrentConfig,
-		Logger:        logger,
-		Persistence:   communitiesManager.GetPersistence(),
-		Messaging:     messaging,
-		Identity:      identity,
-		Publisher:     communitiesManager,
+		TorrentConfig:      c.torrentConfig,
+		LogosStorageConfig: c.logosStorageConfig,
+		Logger:             logger,
+		Persistence:        communitiesManager.GetPersistence(),
+		Messaging:          messaging,
+		Identity:           identity,
+		Publisher:          communitiesManager,
 	}
 
 	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
