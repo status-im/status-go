@@ -545,6 +545,7 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
+test-functional: export USE_TORRENT := $(USE_TORRENT)
 test-functional:
 	@./scripts/run_functional_tests.sh
 

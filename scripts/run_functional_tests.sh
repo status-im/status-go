@@ -15,6 +15,7 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${FUNCTIONAL_TESTS_PARALLEL:=12}"
 : "${PEER_IMAGES:=}"
 : "${PEER_REFS:=}"
+: "${USE_TORRENT:=false}"
 
 echo -e "${GRN}Running functional tests${RST}"
 
@@ -68,10 +69,14 @@ if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
     echo -e "${YEL}No libstorage.so at ${LOGOS_STORAGE_LIB_DIR}; build it first with make build-storage.${RST}"
   fi
 fi
+if [[ "${USE_TORRENT}" == "true" ]]; then
+  build_tags="${build_tags} use_torrent"
+fi
 docker build . \
   --build-arg "build_flags=-cover" \
   --build-arg "build_tags=${build_tags}" \
   --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
+  --build-arg "use_torrent=${USE_TORRENT}" \
   --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 

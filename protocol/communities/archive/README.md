@@ -15,6 +15,10 @@ Make variables:
   LOGOS_STORAGE_INC_DIR         (default: $(LOGOS_STORAGE_SOURCE_DIR)/library unless provided, e.g. by Nix)
   FUNCTIONAL_TESTS_BUILD_TAGS   (default: gowaku_no_rln)
 
+Functional test toggles:
+  USE_LOGOS_STORAGE=true appends use_logos_storage to FUNCTIONAL_TESTS_BUILD_TAGS and passes use_logos_storage=true to Docker/Make
+  USE_TORRENT=true appends use_torrent to FUNCTIONAL_TESTS_BUILD_TAGS and passes use_torrent=true to Docker/Make
+
 Examples:
   make test-unit USE_LOGOS_STORAGE=true
   make test-unit USE_TORRENT=true
