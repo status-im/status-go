@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
+	"github.com/status-im/status-go/services/logosstorage"
 )
 
 // PublicAPI extends whisper public API.
@@ -1384,4 +1385,16 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
+}
+
+func (api *PublicAPI) PeerID() string {
+	return api.service.messaging.PeerID().String()
+}
+
+func (api *PublicAPI) Connect(peerID string, addrs []string) error {
+	return api.service.messenger.Connect(peerID, addrs)
+}
+
+func (api *PublicAPI) Debug() (logosstorage.LogosStorageDebugInfo, error) {
+	return api.service.messenger.Debug()
 }
