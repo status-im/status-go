@@ -21,14 +21,7 @@ import (
 )
 
 // pausedDuration is the tick interval handed to the mvds node while the host is
-// backgrounded. We don't modify the mvds package: the interval is the `duration`
-// argument to Node.Start, so we stop the node and recreate it with a different
-// one. 5 minutes is rare enough that the SoC deep-sleeps essentially the whole
-// interval (battery-wise indistinguishable from never ticking) yet still lets
-// the outbound loop drain its in-memory ack buffer (mvds `payloads`) every 5
-// minutes — so acks owed for messages received while backgrounded go out within
-// ~5 min instead of waiting for the next foreground, and a queued message that
-// ages past its SendEpoch dispatches on the first tick after resume.
+// backgrounded and service paused
 const pausedDuration = 5 * time.Minute
 
 var errNotStarted = errors.New("reliability layer not started")
@@ -139,17 +132,7 @@ func (r *Reliability) mvdsDispatch(receiver mvdsstate.PeerID, payload *mvdsproto
 // loop by stopping the data-sync node and recreating it with a different tick
 // interval (pausedDuration vs DatasyncTicker). While paused the loop's outbound
 // work runs only every pausedDuration; inbound processing and peer-status
-// handling keep running. Safe to call before Start (the state is recorded and
-// applied when Start runs).
-//
-// Caveat: messages queued via WrapAndQueueMessageForDispatch while paused are
-// persisted to SQLite but not transmitted until either the next pausedDuration
-// tick or the next Resume (whichever comes first) — callers that must send
-// promptly while backgrounded (e.g. the Android notification quick-reply) should
-// Resume("messaging") first. Acks owed for messages received while paused live
-// in the mvds node's in-memory `payloads` buffer; the pausedDuration tick drains
-// them, but the resume-recreate drops whatever accumulated since the last tick
-// (senders re-ack on retransmit, so no message loss — only delayed "delivered").
+// handling keep running.
 func (r *Reliability) SetPaused(paused bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -162,11 +145,7 @@ func (r *Reliability) SetPaused(paused bool) error {
 		return nil // not started yet; Start will pick the right interval
 	}
 	start := time.Now()
-	// Stop accepting inbound packets into the (about-to-be-stopped) node: with
-	// AddPacket non-blocking on a buffered channel, an in-flight Unwrap wouldn't
-	// hang here — but once the node's Watch goroutine exits the packets it pushed
-	// would be silently dropped. Short-circuit Unwrap so we don't decode and
-	// then discard packets during the recreate window.
+	// Stop accepting inbound packets into the (about-to-be-stopped) node
 	old.SetSendingEnabled(false)
 	old.Stop()
 	stopDur := time.Since(start)
@@ -176,10 +155,6 @@ func (r *Reliability) SetPaused(paused bool) error {
 	}
 	buildStart := time.Now()
 	if err := r.buildNode(duration); err != nil {
-		// The old node is already stopped; don't leave the atomic pointer aimed
-		// at a corpse. Started() now reports false and Unwrap/WrapAndQueue return
-		// errNotStarted; the next Reliability.Start (e.g. on a connection change)
-		// will rebuild.
 		r.datasync.Store(nil)
 		r.logger.Error("reliability SetPaused: rebuild failed; data-sync node is down until next Start", zap.Error(err))
 		return err
