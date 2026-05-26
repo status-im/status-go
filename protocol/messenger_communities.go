@@ -40,6 +40,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/logosstorage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -3941,6 +3942,10 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
+	if nodeConfig.LogosStorageConfig.Enabled {
+		return fmt.Errorf("cannot enable Torrent archive distribution when LogosStorage archive distribution is already enabled")
+	}
+
 	if nodeConfig.TorrentConfig.Enabled {
 		return nil
 	}
@@ -3978,13 +3983,66 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	return nil
 }
 
+func (m *Messenger) EnableLogosStorageCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	nodeConfig, err := m.settings.GetNodeConfig()
+	if err != nil {
+		return err
+	}
+
+	if nodeConfig.TorrentConfig.Enabled {
+		return fmt.Errorf("cannot enable LogosStorage archive distribution when Torrent archive distribution is already enabled")
+	}
+
+	if nodeConfig.LogosStorageConfig.Enabled {
+		return nil
+	}
+
+	if len(overrides) > 0 {
+		if err := logosstorage.ApplyLogosStorageConfigOverrides(&nodeConfig.LogosStorageConfig, overrides); err != nil {
+			return err
+		}
+	}
+
+	nodeConfig.LogosStorageConfig.Enabled = true
+	err = m.settings.SaveSetting("node-config", nodeConfig)
+	if err != nil {
+		return err
+	}
+
+	m.config.logosStorageConfig = &nodeConfig.LogosStorageConfig
+
+	amc := &archivetypes.ArchiveManagerConfig{
+		LogosStorageConfig: &nodeConfig.LogosStorageConfig,
+	}
+
+	m.SetupArchiveManager(amc)
+
+	err = m.archiveManager.Start()
+	if err != nil {
+		return err
+	}
+
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return err
+	}
+
+	if len(controlledCommunities) > 0 {
+		go m.InitHistoryArchiveTasks(controlledCommunities)
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
+	}
+	return nil
+}
+
 func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 
 	nodeConfig, err := m.settings.GetNodeConfig()
 	if err != nil {
 		return err
 	}
-	if !nodeConfig.TorrentConfig.Enabled {
+	if !nodeConfig.TorrentConfig.Enabled && !nodeConfig.LogosStorageConfig.Enabled {
 		return nil
 	}
 
@@ -3993,16 +4051,23 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		m.logger.Error("failed to stop torrent manager", zap.Error(err))
 	}
 
+	wasTorrentEnabled := nodeConfig.TorrentConfig.Enabled
+	wasLogosStorageEnabled := nodeConfig.LogosStorageConfig.Enabled
 	nodeConfig.TorrentConfig.Enabled = false
+	nodeConfig.LogosStorageConfig.Enabled = false
 	err = m.settings.SaveSetting("node-config", nodeConfig)
 	if err != nil {
 		return err
 	}
 
-	m.config.torrentConfig = &nodeConfig.TorrentConfig
-
-	amc := &archivetypes.ArchiveManagerConfig{
-		TorrentConfig: &nodeConfig.TorrentConfig,
+	amc := &archivetypes.ArchiveManagerConfig{}
+	if wasTorrentEnabled {
+		m.config.torrentConfig = &nodeConfig.TorrentConfig
+		amc.TorrentConfig = &nodeConfig.TorrentConfig
+	}
+	if wasLogosStorageEnabled {
+		m.config.logosStorageConfig = &nodeConfig.LogosStorageConfig
+		amc.LogosStorageConfig = &nodeConfig.LogosStorageConfig
 	}
 
 	m.SetupArchiveManager(amc)

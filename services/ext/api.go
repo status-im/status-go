@@ -1071,6 +1071,10 @@ func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.EnableCommunityHistoryArchiveProtocol()
 }
 
+func (api *PublicAPI) EnableLogosStorageCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	return api.service.messenger.EnableLogosStorageCommunityHistoryArchiveProtocol(overrides)
+}
+
 func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
