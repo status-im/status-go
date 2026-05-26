@@ -216,6 +216,9 @@ type NodeConfig struct {
 	LogosStorageConfig LogosStorageConfig
 
 	OutputMessageCSVEnabled bool
+
+	ImportInitialDelay     int
+	MessageArchiveInterval int
 }
 
 // WalletConfig extra configuration for wallet.Service.

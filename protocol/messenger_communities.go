@@ -59,13 +59,14 @@ var grantUpdateInterval = 24 * time.Hour
 // 4 hours interval
 var grantInvokesProfileDispatchInterval = 4 * time.Hour
 
+var importInitialDelay = time.Minute * 5
+
 const discordTimestampLayout = time.RFC3339
 
 const (
 	importSlowRate          = time.Second / 1
 	importFastRate          = time.Second / 100
 	importMessagesChunkSize = 10
-	importInitialDelay      = time.Minute * 5
 )
 
 const (

@@ -371,6 +371,14 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
 	}
 
+	if request.ImportInitialDelay != nil {
+		nodeConfig.ImportInitialDelay = *request.ImportInitialDelay
+	}
+
+	if request.MessageArchiveInterval != nil {
+		nodeConfig.MessageArchiveInterval = *request.MessageArchiveInterval
+	}
+
 	if request.APIConfig != nil {
 		overrideApiConfig(nodeConfig, request.APIConfig)
 	}
