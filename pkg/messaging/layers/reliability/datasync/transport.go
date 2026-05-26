@@ -17,10 +17,6 @@ const backoffInterval = 60
 
 var errNotInitialized = errors.New("datasync transport not initialized")
 
-// DatasyncTicker is the mvds outbound-loop interval while running. The loop is
-// idled while the host is backgrounded by reliability.SetPaused, which stops the
-// mvds node and recreates it with a much larger tick — see
-// pkg/messaging/layers/reliability/reliability.go.
 const DatasyncTicker = 300 * time.Millisecond
 
 func currentOffsetToSecond() uint64 {
@@ -52,11 +48,6 @@ func (t *NodeTransport) Init(dispatch func(state.PeerID, *protobuf.Payload) erro
 	t.logger = logger
 }
 
-// AddPacket hands an inbound datasync packet to the node's watch loop. The send is
-// non-blocking: if the node isn't currently consuming (e.g. mid-Stop during a pause/resume
-// node recreate, see reliability.SetPaused), the packet is dropped rather than blocking the
-// caller's goroutine forever — the sender re-acks on retransmit, so this is recoverable
-// (mirrors NodeTransport.Send, which also swallows errors for the same reason).
 func (t *NodeTransport) AddPacket(p transport.Packet) {
 	select {
 	case t.packets <- p:

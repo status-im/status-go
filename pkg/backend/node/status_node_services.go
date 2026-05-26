@@ -33,6 +33,7 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/preferences"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/updates"
@@ -82,6 +83,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accDB, mediaServer))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
+	services = appendIf(b.appDB != nil, services, b.preferencesService())
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
@@ -290,6 +292,13 @@ func (b *StatusNode) permissionsService() *permissions.Service {
 		b.permissionsSrvc = permissions.NewService(permissions.NewDB(b.appDB))
 	}
 	return b.permissionsSrvc
+}
+
+func (b *StatusNode) preferencesService() *preferences.Service {
+	if b.preferencesSrvc == nil {
+		b.preferencesSrvc = preferences.NewService(b.appDB)
+	}
+	return b.preferencesSrvc
 }
 
 func (b *StatusNode) appgeneralService() *appgeneral.Service {
