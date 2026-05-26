@@ -288,6 +288,13 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 					)
 				}
 
+				if sub.IndexDownloadCompletedSignal != nil {
+					m.config.messengerSignalsHandler.IndexDownloadCompleted(
+						sub.IndexDownloadCompletedSignal.CommunityID,
+						sub.IndexDownloadCompletedSignal.IndexCid,
+					)
+				}
+
 				if sub.DownloadingHistoryArchivesFinishedSignal != nil {
 					m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(sub.DownloadingHistoryArchivesFinishedSignal.CommunityID)
 				}

@@ -61,6 +61,7 @@ func (m *MessengerSignalsHandlerMock) HistoryArchivesCreated(string, int, int)  
 func (m *MessengerSignalsHandlerMock) HistoryArchivesSeeding(string)             {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesUnseeded(string)            {}
 func (m *MessengerSignalsHandlerMock) HistoryArchiveDownloaded(string, int, int) {}
+func (m *MessengerSignalsHandlerMock) IndexDownloadCompleted(string, string)     {}
 func (m *MessengerSignalsHandlerMock) DownloadingHistoryArchivesStarted(string)  {}
 func (m *MessengerSignalsHandlerMock) DownloadingHistoryArchivesFinished(string) {}
 func (m *MessengerSignalsHandlerMock) ImportingHistoryArchiveMessages(string)    {}

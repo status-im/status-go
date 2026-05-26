@@ -42,6 +42,7 @@ type MessengerSignalsHandler interface {
 	HistoryArchivesSeeding(communityID string)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
+	IndexDownloadCompleted(communityID string, indexCid string)
 	DownloadingHistoryArchivesStarted(communityID string)
 	DownloadingHistoryArchivesFinished(communityID string)
 	ImportingHistoryArchiveMessages(communityID string)
