@@ -29,6 +29,8 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"errors"
+
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/services/logosstorage"
@@ -1397,4 +1399,29 @@ func (api *PublicAPI) Connect(peerID string, addrs []string) error {
 
 func (api *PublicAPI) Debug() (logosstorage.LogosStorageDebugInfo, error) {
 	return api.service.messenger.Debug()
+}
+
+func (api *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
+	return api.service.messenger.IsSeedingHistoryArchive(communityID)
+}
+
+func (api *PublicAPI) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+	return api.service.messenger.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (api *PublicAPI) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+	return api.service.messenger.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	if duration <= 0 {
+		return 0, errors.New("duration must be greater than zero")
+	}
+
+	d := duration * time.Second
+	updatedInterval, err := api.service.messenger.UpdateMessageArchiveInterval(d)
+	if err != nil {
+		return 0, err
+	}
+	return updatedInterval / time.Second, nil
 }

@@ -40,6 +40,11 @@ class SignalType(Enum):
     COMMUNITY_MEMBER_REEVALUATION_STATUS = "community.memberReevaluationStatus"
     COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED = "communityToken.communityTokenTransactionStatusChanged"
     COMMUNITY_TOKEN_ACTION = "communityToken.communityTokenAction"
+    COMMUNITY_HISTORY_ARCHIVES_CREATED = "community.historyArchivesCreated"
+    COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED = "community.indexDownloadCompleted"
+    COMMUNITY_HISTORY_ARCHIVES_SEEDING = "community.historyArchivesSeeding"
+    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED = "community.importingHistoryArchiveMessages"
+    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED = "community.downloadingHistoryArchivesFinished"
 
 
 class CommunityMemberReevaluationStatus(IntEnum):

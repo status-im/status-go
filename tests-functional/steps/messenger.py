@@ -256,8 +256,10 @@ def leave_group(node, group_id, observers=()):
 # --- Community operations ---
 
 
-def create_community(node) -> str:
-    response = node.wakuext_service.create_community(fake.community_name(), fake.community_description())
+def create_community(node, history_archive_support_enabled=False) -> str:
+    response = node.wakuext_service.create_community(
+        fake.community_name(), fake.community_description(), history_archive_support_enabled=history_archive_support_enabled
+    )
     community_id = response.get("communities", [{}])[0].get("id")
     return community_id
 

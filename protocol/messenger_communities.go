@@ -4941,3 +4941,11 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 		}
 	}()
 }
+
+func (m *Messenger) IsSeedingHistoryArchive(communityID types3.HexBytes) bool {
+	lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(communityID)
+	if err != nil {
+		return false
+	}
+	return m.archiveManager.IsSeedingHistoryArchive(communityID, lastSeenArchiveLink)
+}

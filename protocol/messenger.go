@@ -4858,3 +4858,16 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 func (m *Messenger) Messaging() *messaging2.API {
 	return m.messaging
 }
+
+func (m *Messenger) GetDownloadedMessageArchiveIDs(communityID cryptotypes.HexBytes) ([]string, error) {
+	return m.archiveManager.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (m *Messenger) GetMessageArchiveIDsToImport(communityID cryptotypes.HexBytes) ([]string, error) {
+	return m.archiveManager.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	messageArchiveInterval = duration
+	return duration, nil
+}

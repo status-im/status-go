@@ -371,6 +371,14 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
 	}
 
+	if request.LogosStorageConfigEnabled != nil {
+		nodeConfig.LogosStorageConfig.Enabled = *request.LogosStorageConfigEnabled
+	}
+
+	if request.LogosStorageConfigBootstrapNode != nil {
+		nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes = []string{*request.LogosStorageConfigBootstrapNode}
+	}
+
 	if request.ImportInitialDelay != nil {
 		nodeConfig.ImportInitialDelay = *request.ImportInitialDelay
 	}
