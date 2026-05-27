@@ -52,7 +52,6 @@ type Keypair struct {
 	SyncedFrom              string         `json:"synced-from,omitempty"` // keeps an info which device this keypair is added from can be one of two values defined in constants or device name (custom)
 	Clock                   uint64         `json:"clock,omitempty"`
 	Accounts                []*Account     `json:"accounts,omitempty"`
-	Keycards                []*Keycard     `json:"keycards,omitempty"`
 	Removed                 bool           `json:"removed,omitempty"`
 	XPub                    string         `json:"xpub,omitempty"`
 	ColdWallet              ColdWalletType `json:"cold-wallet,omitempty"`
@@ -85,15 +84,6 @@ type Account struct {
 	Position              int64                     `json:"position"`
 	ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`
 	TestPreferredChainIDs string                    `json:"testPreferredChainIds"`
-}
-
-type Keycard struct {
-	KeycardUID        string          `json:"keycard-uid"`
-	KeycardName       string          `json:"keycard-name"`
-	KeycardLocked     bool            `json:"keycard-locked"`
-	AccountsAddresses []types.Address `json:"accounts-addresses"`
-	KeyUID            string          `json:"key-uid"`
-	Position          uint64
 }
 
 // Returns true if an account is a wallet account that logged in user has a control over, otherwise returns false.
@@ -162,7 +152,6 @@ func (a *Keypair) MarshalJSON() ([]byte, error) {
 		SyncedFrom              string         `json:"synced-from"`
 		Clock                   uint64         `json:"clock"`
 		Accounts                []*Account     `json:"accounts"`
-		Keycards                []*Keycard     `json:"keycards"`
 		Removed                 bool           `json:"removed"`
 		XPub                    string         `json:"xpub"`
 		ColdWallet              ColdWalletType `json:"cold-wallet"`
@@ -175,7 +164,6 @@ func (a *Keypair) MarshalJSON() ([]byte, error) {
 		SyncedFrom:              a.SyncedFrom,
 		Clock:                   a.Clock,
 		Accounts:                a.Accounts,
-		Keycards:                a.Keycards,
 		Removed:                 a.Removed,
 		XPub:                    a.XPub,
 		ColdWallet:              a.ColdWallet,
@@ -194,7 +182,6 @@ func (a *Keypair) CopyKeypair() *Keypair {
 		LastUsedDerivationIndex: a.LastUsedDerivationIndex,
 		SyncedFrom:              a.SyncedFrom,
 		Accounts:                make([]*Account, len(a.Accounts)),
-		Keycards:                make([]*Keycard, len(a.Keycards)),
 		Removed:                 a.Removed,
 		XPub:                    a.XPub,
 		ColdWallet:              a.ColdWallet,
@@ -220,16 +207,6 @@ func (a *Keypair) CopyKeypair() *Keypair {
 			Position:              acc.Position,
 			ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
 			TestPreferredChainIDs: acc.TestPreferredChainIDs,
-		}
-	}
-
-	for i, kc := range a.Keycards {
-		kp.Keycards[i] = &Keycard{
-			KeycardUID:        kc.KeycardUID,
-			KeycardName:       kc.KeycardName,
-			KeycardLocked:     kc.KeycardLocked,
-			AccountsAddresses: kc.AccountsAddresses,
-			KeyUID:            kc.KeyUID,
 		}
 	}
 

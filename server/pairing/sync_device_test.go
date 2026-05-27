@@ -376,7 +376,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
 		serverKp.Clock == clientKp.Clock &&
 		len(serverKp.Accounts) == len(clientKp.Accounts) &&
-		len(serverKp.Keycards) == len(clientKp.Keycards))
+		serverKp.ColdWallet == clientKp.ColdWallet)
 
 	// Check server - server should contain keystore files for imported seed phrase
 	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
@@ -427,8 +427,8 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
 		serverKp.Clock == clientKp.Clock &&
 		len(serverKp.Accounts) == len(clientKp.Accounts) &&
-		len(serverKp.Keycards) == len(clientKp.Keycards) &&
-		len(serverKp.Keycards) == 1)
+		serverKp.ColdWallet == clientKp.ColdWallet &&
+		serverKp.ColdWallet == accsmanagementtypes.ColdWalletTypeStatusKeycard)
 
 	// Check server - server should not contain keystore files for imported seed phrase
 	require.False(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
@@ -477,8 +477,8 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
 		serverKp.Clock == clientKp.Clock &&
 		len(serverKp.Accounts) == len(clientKp.Accounts) &&
-		len(serverKp.Keycards) == len(clientKp.Keycards) &&
-		len(serverKp.Keycards) == 0)
+		serverKp.ColdWallet == clientKp.ColdWallet &&
+		serverKp.ColdWallet == accsmanagementtypes.ColdWalletTypeNone)
 
 	// Check server - server should contain keystore files for imported seed phrase
 	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))

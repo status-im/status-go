@@ -25,7 +25,6 @@ const (
 
 	maxNumOfGeneratedAddresses            = uint64(100)
 	numOfGeneratedAddressesRegularKeypair = maxNumOfGeneratedAddresses
-	numOfGeneratedAddressesKeycardKeypair = uint64(10)
 )
 
 var (
@@ -351,15 +350,6 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 		return nil, err
 	}
 
-	for _, kp := range keypairs {
-		keycards, err := db.getKeycards(tx, kp.KeyUID, "")
-		if err != nil {
-			return nil, err
-		}
-
-		kp.Keycards = keycards
-	}
-
 	return keypairs, nil
 }
 
@@ -541,11 +531,6 @@ func (db *Database) markKeypairRemoved(tx *sql.Tx, keyUID string, clock uint64) 
 	defer stmt.Close()
 
 	_, err = stmt.Exec(clock, keyUID)
-	if err != nil {
-		return err
-	}
-
-	err = db.deleteAllKeycardsWithKeyUID(tx, keyUID)
 	return err
 }
 
@@ -879,8 +864,6 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*accsmanagementtypes.Account
 
 // Saves a keypair and its accounts, if a keypair with `key_uid` already exists, it will be updated,
 // if any of its accounts exists it will be updated as well, otherwise it will be added.
-// Since keypair type contains `Keycards` as well, they are excluded from the saving/updating this way regardless they
-// are set or not.
 func (db *Database) SaveOrUpdateKeypair(keypair *accsmanagementtypes.Keypair) error {
 	if keypair == nil {
 		return ErrKeypairIsNil
@@ -1484,15 +1467,7 @@ func (db *Database) resolveNumOfAddressesToGenerate(keypair *accsmanagementtypes
 		return maxNumOfGeneratedAddresses
 	}
 
-	if !keypair.MigratedToColdWallet() {
-		return numOfGeneratedAddressesRegularKeypair
-	}
-
-	final := numOfGeneratedAddressesKeycardKeypair + keypair.LastUsedDerivationIndex
-	if final < maxNumOfGeneratedAddresses {
-		return final
-	}
-	return maxNumOfGeneratedAddresses
+	return numOfGeneratedAddressesRegularKeypair
 }
 
 func (db *Database) GetNumOfAddressesToGenerateForKeypair(keyUID string) (uint64, error) {
