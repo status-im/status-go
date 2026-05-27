@@ -36,6 +36,20 @@ identifier=${FUNCTIONAL_TESTS_CONTAINER_PREFIX:-"status-go-func-tests-$(git rev-
 project_name="${identifier,,}"
 image_name="statusgo-${identifier,,}"
 
+dump_compose_logs_done=0
+dump_compose_logs() {
+  [[ ${dump_compose_logs_done} -eq 1 ]] && return 0
+  dump_compose_logs_done=1
+  {
+    echo "=== docker compose ps ==="
+    docker compose -p "${project_name}" ${all_compose_files} ps -a
+    echo
+    echo "=== docker compose logs ==="
+    docker compose -p "${project_name}" ${all_compose_files} logs --no-color --timestamps
+  } > "${logs_path}/compose.log" 2>&1 || true
+}
+trap dump_compose_logs EXIT
+
 # Remove orphans
 echo -e "${GRN}Cleanup old containers${RST}"
 docker ps -a --filter "name=${project_name}" --filter "status=exited" -q | xargs -r docker rm -f
@@ -120,6 +134,8 @@ exit_code=$?
 # Stop containers
 echo -e "${GRN}Stopping docker containers${RST}"
 docker compose -p ${project_name} ${all_compose_files} stop
+
+dump_compose_logs
 
 # Cleanup containers
 echo -e "${GRN}Removing docker containers${RST}"
