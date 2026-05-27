@@ -502,7 +502,7 @@ func (m *AccountsManager) MigrateColdWalletKeypairToApp(mnemonic string, passwor
 	}
 
 	if !kp.MigratedToColdWallet() {
-		return "", ErrKeypairIsNotKeycard
+		return "", ErrKeypairIsNotColdWallet
 	}
 
 	if kp.Type != types.KeypairTypeProfile {
