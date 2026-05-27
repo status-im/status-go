@@ -767,11 +767,7 @@ func TestConvertAccount(t *testing.T) {
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
 
-	keycardSettings := settings.Settings{
-		KeycardInstanceUID: "0xdeadbeef",
-		KeycardPairedOn:    1,
-		KeycardPairing:     "pairing",
-	}
+	keycardSettings := settings.Settings{}
 
 	// Converting to a keycard account
 	const keycardPassword = "222222" // represents password for a keycard user
