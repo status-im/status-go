@@ -98,13 +98,8 @@ user_keycard_1 = {
     "walletRootAddress": "0xrootaddressrootaddressrootaddressrootaddr",
     "eip1581Address": "0xeip1581address1234567890abcdef1234567890",
     "encryptionPublicKey": "example-encryption-public-key",
-}
-
-keycard_1 = {
-    "keycard-uid": "kc-0xab1948",
-    "keycard-name": "TestKeycard-0xab19",
-    "accounts-addresses": ["0x5e98dbb30871a33f802a710420bf975095c1645c"],
-    "key-uid": "",
+    "walletXPub": "xpub6example",
+    "coldWallet": "status-keycard",
 }
 
 keypair_name = "ImportedKeypairName"
