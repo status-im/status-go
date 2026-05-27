@@ -30,7 +30,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -40,6 +39,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
 	types "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -132,7 +132,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 		return nil, ErrSymAsym
 	}
 
-	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
+	var keyInfo *encoding.KeyInfo = new(encoding.KeyInfo)
 
 	// Set key that is used to sign the message
 	if len(req.SigID) > 0 {
@@ -147,7 +147,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
-		keyInfo.Kind = payload.Symmetric
+		keyInfo.Kind = encoding.Symmetric
 
 		if contentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
@@ -162,7 +162,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 
 	// Set asymmetric key that is used to encrypt the message
 	if pubKeyGiven {
-		keyInfo.Kind = payload.Asymmetric
+		keyInfo.Kind = encoding.Asymmetric
 
 		var pubK *ecdsa.PublicKey
 		if pubK, err = crypto.UnmarshalPubkey(req.PublicKey); err != nil {
@@ -173,7 +173,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 
 	var version uint32 = 1 // Use wakuv1 encryption
 
-	p := new(payload.Payload)
+	p := new(encoding.Payload)
 	p.Data = req.Payload
 	p.Key = keyInfo
 

@@ -11,12 +11,13 @@ import (
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
 )
 
 const testShard = "/waku/2/rs/16/32"
@@ -186,12 +187,12 @@ func cloneFilter(orig *Filter) *Filter {
 }
 
 func generateCompatibleReceivedMessage(t *testing.T, f *Filter) *ReceivedMessage {
-	keyInfo := &payload.KeyInfo{}
-	keyInfo.Kind = payload.Symmetric
+	keyInfo := &encoding.KeyInfo{}
+	keyInfo.Kind = encoding.Symmetric
 	keyInfo.SymKey = f.KeySym
 
 	var version uint32 = 1
-	p := new(payload.Payload)
+	p := new(encoding.Payload)
 	p.Data = make([]byte, 20)
 	_, err := crand.Read(p.Data) // nolint: gosec
 	require.NoError(t, err)

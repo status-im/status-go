@@ -7,12 +7,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/payload"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
 )
 
 // MessageType represents where this message comes from
@@ -164,18 +163,19 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	// TODO: should we update msg instead of creating a new received message?
 	result = new(ReceivedMessage)
 
-	keyInfo := new(payload.KeyInfo)
+	keyInfo := new(encoding.KeyInfo)
 	if watcher.expectsAsymmetricEncryption() {
-		keyInfo.Kind = payload.Asymmetric
+		keyInfo.Kind = encoding.Asymmetric
 		keyInfo.PrivKey = watcher.KeyAsym
 		msg.Dst = &watcher.KeyAsym.PublicKey
 	} else if watcher.expectsSymmetricEncryption() {
-		keyInfo.Kind = payload.Symmetric
+		keyInfo.Kind = encoding.Symmetric
 		keyInfo.SymKey = watcher.KeySym
 		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
-	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)
+	wakuMessage := msg.Envelope.Message()
+	raw, err := encoding.Decode(wakuMessage.GetVersion(), wakuMessage.Payload, keyInfo)
 
 	if err != nil {
 		logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
