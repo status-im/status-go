@@ -42,7 +42,8 @@ def _parallel_teardown(tasks: list[tuple[str, Callable]]):
                 logging.warning(f"[TEARDOWN] {label} failed: {e}")
                 errors.append(e)
     if errors:
-        raise ExceptionGroup("teardown failures", errors)
+        msg = "; ".join(f"{type(e).__name__}: {e}" for e in errors)
+        raise RuntimeError(f"teardown failures: {msg}") from errors[0]
 
 
 @retry(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True)
@@ -290,6 +291,26 @@ def snt_token_overrides(snt_addresses):
 @pytest.fixture(scope="session")
 def community_token_deployer_contract_address(communities_addresses):
     return next(info["value"] for info in communities_addresses.values() if info.get("internal_type") == "contract CommunityTokenDeployer")
+
+
+@pytest.fixture(scope="function", autouse=False)
+def community_token_snt_context(snt_addresses, request):
+    """Opt-in SNT token addresses for community token membership tests."""
+    request.cls.snt_address = snt_addresses["snt"]
+    request.cls.snt_controller_address = snt_addresses["controller"]
+
+
+@pytest.fixture(scope="function", autouse=False)
+def community_token_deploy_context(snt_addresses, communities_addresses, request):
+    """Opt-in deploy context for community token deploy/edit/master tests."""
+    request.cls.snt_address = snt_addresses["snt"]
+    request.cls.snt_controller_address = snt_addresses["controller"]
+    request.cls.community_token_deployer = next(
+        info["value"] for info in communities_addresses.values() if info["internal_type"] == "contract CommunityTokenDeployer"
+    )
+    from steps import community_token_deploy
+
+    request.cls.deploy_state = community_token_deploy.CommunityTokenDeployState()
 
 
 @pytest.fixture(scope="function", autouse=False)
