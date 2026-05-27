@@ -154,7 +154,6 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 
 		topics := make([]string, 0)
 		topics = append(topics, wakuv2.DefaultShardPubsubTopic())
-		topics = append(topics, wakuv2.DefaultNonProtectedPubsubTopic())
 
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey

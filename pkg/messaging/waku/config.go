@@ -111,9 +111,8 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.DefaultShardPubsubTopic == "" {
 		cfg.DefaultShardPubsubTopic = DefaultShardPubsubTopic()
-		//For now populating with both used shards, but this can be populated from user subscribed communities etc once community sharding is implemented
+		// This can be populated from user subscribed communities etc once community sharding is implemented
 		cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, DefaultShardPubsubTopic())
-		cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, DefaultNonProtectedPubsubTopic())
 	}
 
 	return cfg
