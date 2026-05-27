@@ -1,0 +1,104 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.39'
+
+/**
+ * status-app companion build.
+ */
+
+def isPRBuild = utils.isPRBuild()
+
+pipeline {
+  agent {
+    docker {
+      label 'linuxcontainer'
+      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
+      args '--volume=/nix:/nix --volume=/etc/nix:/etc/nix'
+    }
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    timeout(time: 120, unit: 'MINUTES')
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
+    disableRestartFromStage()
+    buildDiscarder(logRotator(
+      numToKeepStr:          '10',
+      daysToKeepStr:         '30',
+      artifactNumToKeepStr:  '1',
+      artifactDaysToKeepStr: '30',
+    ))
+  }
+
+  environment {
+    /* GIT_COMMIT is the status-go commit being tested. status-app's
+     * platform jobs use this to override vendor/status-go. */
+    STATUS_GO_REF = "${env.GIT_COMMIT}"
+  }
+
+  stages {
+    stage('status-app') {
+      parallel {
+        stage('Linux/x86_64') {
+          steps { script {
+            build(
+              job:        'status-app/systems/linux/x86_64/package',
+              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              wait:       true,
+              propagate:  true,
+            )
+          } }
+        }
+        stage('Windows/x86_64') {
+          steps { script {
+            build(
+              job:        'status-app/systems/windows/x86_64/package',
+              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              wait:       true,
+              propagate:  true,
+            )
+          } }
+        }
+        stage('MacOS/aarch64') {
+          steps { script {
+            build(
+              job:        'status-app/systems/macos/aarch64/package',
+              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              wait:       true,
+              propagate:  true,
+            )
+          } }
+        }
+        stage('iOS/aarch64') {
+          steps { script {
+            build(
+              job:        'status-app/systems/ios/aarch64/package',
+              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              wait:       true,
+              propagate:  true,
+            )
+          } }
+        }
+        stage('Android/arm64') {
+          steps { script {
+            build(
+              job:        'status-app/systems/android/arm64/package',
+              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              wait:       true,
+              propagate:  true,
+            )
+          } }
+        }
+      }
+    }
+  }
+
+  post {
+    success { script { github.notifyPR(true)  } }
+    failure { script { github.notifyPR(false) } }
+    cleanup {
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
+  }
+}
