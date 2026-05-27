@@ -200,10 +200,18 @@ test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package
 	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
 	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
 	gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations"
+	LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
+	gotestsum --packages="./protocol" -f testname -- -count 1 -tags "use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations" \
+	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
 
 test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations"
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(BUILD_TAGS) use_torrent gowaku_skip_migrations" \
+	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
 
 history-archive-help: ##@build Show history archive build/test toggles and env vars
 	@cat protocol/communities/archive/README.md
@@ -530,7 +538,7 @@ test-unit: ##@tests Run unit and integration tests
 
 test-single: test-unit-prep
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go test -v -tags '$(BUILD_TAGS)' $(PKG) -run '$(TEST)' -testify.m '$(TEST)'
+	go test -v -tags '$(BUILD_TAGS)' $(PKG) -run '$(TEST)' $(if $(TESTIFY_M),-testify.m '$(TESTIFY_M)')
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false

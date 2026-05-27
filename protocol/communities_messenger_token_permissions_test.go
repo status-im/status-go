@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -148,6 +149,23 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 	collectiblesManagerMock *CollectiblesManagerMock
 	accountsTestData        map[string][]string
 	accountsPasswords       map[string]string
+	nodeConfigs             map[string]*params.NodeConfig
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) defaultNodeCfg(tempDir string) *params.NodeConfig {
+	s.Require().NoError(os.MkdirAll(tempDir, 0o755))
+
+	const defaultNetworkID = 1
+
+	nodeCfg, err := params.NewNodeConfig(tempDir, defaultNetworkID)
+	s.Require().NoError(err)
+
+	// Be explicit so backend-specific tests start from a known disabled state.
+	nodeCfg.LogosStorageConfig.Enabled = false
+	nodeCfg.LogosStorageConfig.NodeConfig.Nat = "none"
+	nodeCfg.TorrentConfig.Enabled = false
+
+	return nodeCfg
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
@@ -162,24 +180,38 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	}
 	s.resetMockedBalances()
 
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{})
+	s.nodeConfigs = make(map[string]*params.NodeConfig)
 
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{})
+	ownerNodeConfig := s.defaultNodeCfg(filepath.Join(s.T().TempDir(), "owner"))
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, "owner", []Option{}, ownerNodeConfig)
+	s.nodeConfigs[s.owner.IdentityPublicKeyString()] = ownerNodeConfig
 
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{})
+	bobNodeConfig := s.defaultNodeCfg(filepath.Join(s.T().TempDir(), "bob"))
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, "bob", []Option{}, bobNodeConfig)
+	s.nodeConfigs[s.bob.IdentityPublicKeyString()] = bobNodeConfig
+
+	aliceNodeConfig := s.defaultNodeCfg(filepath.Join(s.T().TempDir(), "alice"))
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, "alice", []Option{}, aliceNodeConfig)
+	s.nodeConfigs[s.alice.IdentityPublicKeyString()] = aliceNodeConfig
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option) *Messenger {
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, name string, extraOptions []Option, nodeConfig *params.NodeConfig) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
+	testMessengerCfg := testMessengerConfig{
+		extraOptions: extraOptions,
+		name:         name,
+	}
+
+	if nodeConfig != nil {
+		testMessengerCfg.nodeConfig = nodeConfig
+	}
+
 	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
-		testMessengerConfig: testMessengerConfig{
-			extraOptions: extraOptions,
-			name:         name,
-		},
+		testMessengerConfig: testMessengerCfg,
 		password:            password,
 		walletAddresses:     walletAddresses,
 		mockedBalances:      &s.mockedBalances,
@@ -2142,7 +2174,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 	s.Require().Less(elapsed.Seconds(), 2.0)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMessages() {
+func (s *MessengerCommunitiesTokenPermissionsSuite) importDecryptedArchiveMessages() {
 	// 1.1. Create community
 	community, chat := s.createCommunity()
 
