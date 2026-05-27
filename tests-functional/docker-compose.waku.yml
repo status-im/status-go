@@ -74,7 +74,7 @@ services:
       "--staticnode=/dns4/boot-1/tcp/60001/p2p/16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb",
       "--store=true",
       "--store-message-db-url=sqlite:////tmp/waku-store.sqlite3",
-      "--store-message-retention-policy=time:86400",
+      "--store-message-retention-policy=time:60",
       "--tcp-port=60002",
       "--num-shards-in-network=65"
     ]

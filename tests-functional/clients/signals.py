@@ -260,10 +260,12 @@ class SignalClient:
             self.wsapp.run_forever()
             if self._should_stop:
                 break
-            logging.warning(f"SignalClient [{self.url}]: websocket disconnected, reconnecting in {retry_delay}s")
+            if not self._should_stop:
+                logging.warning(f"SignalClient [{self.url}]: websocket disconnected, reconnecting in {retry_delay}s")
             time.sleep(retry_delay)
             retry_delay = min(retry_delay * 2, max_delay)
-        logging.debug(f"SignalClient [{self.url}]: connection loop stopped")
+        if not self._should_stop:
+            logging.debug(f"SignalClient [{self.url}]: connection loop stopped")
 
     def connect(self):
         self._should_stop = False

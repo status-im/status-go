@@ -88,7 +88,7 @@ class TestCommunityArchives:
 
         # Wait for member to receive chat creation signal
         with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id) as exp:
-            messenger.join_community(member=member, admin=creator, community_id=community_id)
+            messenger.join_community(member=member, admin=creator, community_id=community_id, prejoin_warmup=False)
 
         # Send a message to the community chat
         text = f"Hi @{member.public_key}"
@@ -130,7 +130,10 @@ class TestCommunityArchives:
         # immediately after archive index is downloaded from LogosStorage node.
         logging.info("Waiting for community member to download archive index...")
         with member.expect_signal(
-            SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout
+            SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Success! Archive index downloaded!")
@@ -140,7 +143,10 @@ class TestCommunityArchives:
         # recorded in the database as "lastSeenIndexCid".
         logging.info("Waiting for community member to download ALL history archives...")
         with member.expect_signal(
-            SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout
+            SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Success! Community member has downloaded ALL history archives!")
@@ -166,7 +172,7 @@ class TestCommunityArchives:
         # Wait for another member to join the community
         logging.info("Another member is joining the community...")
         with another_member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id) as exp:
-            messenger.join_community(member=another_member, admin=creator, community_id=community_id)
+            messenger.join_community(member=another_member, admin=creator, community_id=community_id, prejoin_warmup=False)
         logging.info("Another member has joined the community.")
 
         # Ensure that another member does not have the message before archive import
@@ -179,7 +185,10 @@ class TestCommunityArchives:
         # for LogosStorage.
         logging.info("Waiting for another member to download archive index...")
         with another_member.expect_signal(
-            SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout
+            SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Success! Archive index downloaded by another member!")
@@ -188,7 +197,10 @@ class TestCommunityArchives:
         # and index should be seeding.
         logging.info("Waiting for another member to download ALL history archives...")
         with another_member.expect_signal(
-            SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout
+            SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Success! Another member has downloaded ALL history archives!")
@@ -211,7 +223,10 @@ class TestCommunityArchives:
         # Wait for the archive import to begin for another member
         logging.info("Waiting for another member to start importing history archive messages...")
         with another_member.expect_signal(
-            SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED.value, timeout=archive_timeout
+            SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Another member has started importing history archive messages.")
@@ -219,7 +234,10 @@ class TestCommunityArchives:
         # Wait for the archive import to complete for another member
         logging.info("Waiting for another member to finish importing history archive messages...")
         with another_member.expect_signal(
-            SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED.value, timeout=archive_timeout
+            SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Another member has finished importing history archive messages.")
@@ -297,7 +315,7 @@ class TestCommunityArchives:
         chat_id = create_resp.get("chats")[0].get("id")
 
         # Join community so the member can receive messages
-        messenger.join_community(member=member, admin=creator, community_id=community_id)
+        messenger.join_community(member=member, admin=creator, community_id=community_id, prejoin_warmup=False)
 
         for i in range(2):
             # Send a message to the default community chat
@@ -318,7 +336,11 @@ class TestCommunityArchives:
             # Wait for the archive index to be downloaded from LogosStorage node.
             logging.info("Waiting for community member to download archive index...")
             with member.expect_signal(
-                SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout, start="now"
+                SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
+                count=i + 1,
+                timeout=archive_timeout,
+                start="beginning",
+                predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
             ) as exp:
                 pass
             logging.info("Success! Archive index downloaded!")
@@ -326,7 +348,11 @@ class TestCommunityArchives:
             # Wait for the seeding signal.
             logging.info("Waiting for community member to download ALL history archives...")
             with member.expect_signal(
-                SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout, start="now"
+                SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
+                count=i + 1,
+                timeout=archive_timeout,
+                start="beginning",
+                predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
             ) as exp:
                 pass
             logging.info("Success! Community member has downloaded ALL history archives!")
@@ -366,7 +392,7 @@ class TestCommunityArchives:
 
         # Wait for member to receive chat creation signal
         with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id) as exp:
-            messenger.join_community(member=member, admin=creator, community_id=community_id)
+            messenger.join_community(member=member, admin=creator, community_id=community_id, prejoin_warmup=False)
 
         # Send a message to the community chat
         text = f"Hi @{member.public_key}"
@@ -411,7 +437,10 @@ class TestCommunityArchives:
         # When wait for index download completed signal.
         logging.info("Waiting for community member to download archive index...")
         with member.expect_signal(
-            SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value, timeout=archive_timeout, start="now"
+            SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Success! Archive index downloaded!")
@@ -419,7 +448,10 @@ class TestCommunityArchives:
         # Wait for the seeding signal.
         logging.info("Waiting for community member to download ALL history archives...")
         with member.expect_signal(
-            SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value, timeout=archive_timeout, start="now"
+            SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
+            timeout=archive_timeout,
+            start="beginning",
+            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
         ) as exp:
             pass
         logging.info("Success! Community member has downloaded ALL history archives!")
