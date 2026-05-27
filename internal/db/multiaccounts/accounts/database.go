@@ -1484,7 +1484,7 @@ func (db *Database) resolveNumOfAddressesToGenerate(keypair *accsmanagementtypes
 		return maxNumOfGeneratedAddresses
 	}
 
-	if !keypair.MigratedToKeycard() {
+	if !keypair.MigratedToColdWallet() {
 		return numOfGeneratedAddressesRegularKeypair
 	}
 

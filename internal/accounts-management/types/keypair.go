@@ -246,8 +246,8 @@ func (a *Keypair) GetChatAccount() *Account {
 	return nil
 }
 
-func (a *Keypair) MigratedToKeycard() bool {
-	return len(a.Keycards) > 0
+func (a *Keypair) MigratedToColdWallet() bool {
+	return a.ColdWallet != ColdWalletTypeNone
 }
 
 // Returns operability of a keypair:
@@ -294,16 +294,4 @@ func (kp *Keycard) ToSyncKeycard() *protobuf.SyncKeycard {
 	}
 
 	return kc
-}
-
-func (kp *Keycard) FromSyncKeycard(kc *protobuf.SyncKeycard) {
-	kp.KeycardUID = kc.Uid
-	kp.KeycardName = kc.Name
-	kp.KeycardLocked = kc.Locked
-	kp.KeyUID = kc.KeyUid
-	kp.Position = kc.Position
-
-	for _, addr := range kc.Addresses {
-		kp.AccountsAddresses = append(kp.AccountsAddresses, types.BytesToAddress(addr))
-	}
 }

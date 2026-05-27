@@ -3202,8 +3202,8 @@ func (m *Messenger) handleProfileKeypairMigration(state *ReceivedMessageState, f
 		return false, nil
 	}
 
-	migrationNeeded := dbKeypair.MigratedToKeycard() && len(message.Keycards) == 0 || // `true` if profile keypair was migrated to the app on one of paired devices
-		!dbKeypair.MigratedToKeycard() && len(message.Keycards) > 0 // `true` if profile keypair was migrated to a Keycard on one of paired devices
+	migrationNeeded := dbKeypair.MigratedToColdWallet() && message.ColdWallet == "" || // `true` if profile keypair cold wallet was removed on one of paired devices
+		!dbKeypair.MigratedToColdWallet() && message.ColdWallet != "" // `true` if profile keypair was migrated to a cold wallet on one of paired devices
 	err = m.settings.SaveSettingField(settings2.ProfileMigrationNeeded, migrationNeeded)
 	if err != nil {
 		return false, err
@@ -3252,12 +3252,12 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		}
 	}
 
-	syncKpMigratedToKeycard := len(message.Keycards) > 0
+	syncKpMigratedToKeycard := message.ColdWallet != ""
 
 	for _, sAcc := range message.Accounts {
 		accountOperability, err := m.resolveAccountOperability(sAcc,
 			syncKpMigratedToKeycard,
-			dbKeypair != nil && dbKeypair.MigratedToKeycard(),
+			dbKeypair != nil && dbKeypair.MigratedToColdWallet(),
 			fromLocalPairing)
 		if err != nil {
 			return nil, err
@@ -3269,7 +3269,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 
 	if !fromLocalPairing &&
 		dbKeypair != nil &&
-		!dbKeypair.MigratedToKeycard() &&
+		!dbKeypair.MigratedToColdWallet() &&
 		syncKpMigratedToKeycard {
 		err = m.settings.MarkKeypairFullyOperable(dbKeypair.KeyUID, 0, false)
 		if err != nil {
@@ -3310,16 +3310,6 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		defer func() {
 			err = acNofificationCallback()
 		}()
-	}
-
-	for _, sKc := range message.Keycards {
-		kc := accsmanagementtypes.Keycard{}
-		kc.FromSyncKeycard(sKc)
-		err = m.settings.SaveOrUpdateKeycard(kc, message.Clock, false)
-		if err != nil {
-			return nil, err
-		}
-		kp.Keycards = append(kp.Keycards, &kc)
 	}
 
 	// getting keypair form the db, cause keypair related accounts positions might be changed
