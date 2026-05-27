@@ -373,17 +373,12 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accsmanagementtypes.Keypair) (
 		message.Accounts = append(message.Accounts, sAcc)
 	}
 
-	syncKcMsgs, err := m.prepareSyncKeycardsMessage(kp.KeyUID)
-	if err != nil {
-		return nil, err
-	}
-	message.Keycards = syncKcMsgs
-
 	if m.walletAPI != nil {
-		message.KeycardPairings, err = m.walletAPI.GetPairingsJSONFileContent()
+		pairings, err := m.walletAPI.GetPairingsJSONFileContent()
 		if err != nil {
 			return nil, err
 		}
+		message.KeycardPairings = pairings
 	}
 
 	return message, nil

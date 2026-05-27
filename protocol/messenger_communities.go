@@ -1364,7 +1364,7 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 			return nil, err
 		}
 
-		if keypair.MigratedToKeycard() {
+		if keypair.MigratedToColdWallet() {
 			return nil, errors.New(ErrSigningJoinRequestForKeycardAccounts)
 		}
 

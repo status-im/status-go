@@ -389,7 +389,7 @@ func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password str
 	}
 
 	for _, kp := range keypairs {
-		if kp.MigratedToKeycard() {
+		if kp.MigratedToColdWallet() {
 			continue
 		}
 
@@ -428,7 +428,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 		return ErrCannotAddAccountsToKeypairImportedViaPrivateKey
 	}
 
-	if !kp.MigratedToKeycard() {
+	if !kp.MigratedToColdWallet() {
 		for _, acc := range accounts {
 			if acc.KeyUID != keyUID {
 				return ErrAccountMismatch.
@@ -469,7 +469,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 		return err
 	}
 
-	if !kp.MigratedToKeycard() {
+	if !kp.MigratedToColdWallet() {
 		for _, acc := range accounts {
 			_, err := m.deriveChildAccountForPathAndStore(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
@@ -503,7 +503,7 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 		return "", ErrCannotMigrateProfileKeypair
 	}
 
-	if !kp.MigratedToKeycard() {
+	if !kp.MigratedToColdWallet() {
 		return "", ErrKeypairIsNotKeycard
 	}
 
@@ -512,7 +512,7 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 		return "", err
 	}
 
-	if !profileKeypair.MigratedToKeycard() {
+	if !profileKeypair.MigratedToColdWallet() {
 		_, err = m.loadAccountInternally(types2.HexToAddress(profileKeypair.DerivedFrom), password)
 		if err != nil {
 			return "", ErrWrongPasswordProvided(err)
@@ -556,7 +556,7 @@ func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, password s
 		return err
 	}
 
-	if !kpDb.MigratedToKeycard() && password != "" {
+	if !kpDb.MigratedToColdWallet() && password != "" {
 		err = m.deleteKeystoreFilesForKeypairInternally(kpDb, password)
 		if err != nil {
 			return err
