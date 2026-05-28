@@ -1262,7 +1262,7 @@ func (w *Waku) Start() error {
 		w.filterManager = filterapi.NewFilterManager(
 			w.ctx,
 			w.logger,
-			w.cfg.MinPeersForFilter,
+			w.cfg.MaxPeersForFilter,
 			w,
 			w.node.FilterLightnode(),
 			filterapi.WithBatchInterval(300*time.Millisecond))
