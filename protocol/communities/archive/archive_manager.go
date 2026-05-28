@@ -27,6 +27,8 @@ type ArchiveManager struct {
 	downloadTasksMu              sync.RWMutex // protects historyArchiveDownloadTasks
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
+	online                       bool
+	onlineMu                     sync.RWMutex
 
 	logger      *zap.Logger
 	persistence archivetypes.PersistenceProvider
@@ -63,6 +65,7 @@ func NewArchiveManager(amc *archivetypes.ArchiveManagerConfig) ArchiveService {
 
 	return &ArchiveManager{
 		historyArchiveDownloadTasks: make(map[string]*archivetypes.HistoryArchiveDownloadTask),
+		online:                      true,
 
 		logger:      amc.Logger,
 		persistence: amc.Persistence,
@@ -77,7 +80,16 @@ func NewArchiveManager(amc *archivetypes.ArchiveManagerConfig) ArchiveService {
 // ArchiveServiceBackend interface implementation - delegates to backend
 
 func (m *ArchiveManager) SetOnline(online bool) {
+	m.onlineMu.Lock()
+	m.online = online
+	m.onlineMu.Unlock()
 	m.backend.SetOnline(online)
+}
+
+func (m *ArchiveManager) isOnline() bool {
+	m.onlineMu.RLock()
+	defer m.onlineMu.RUnlock()
+	return m.online
 }
 
 func (m *ArchiveManager) Start() error {
@@ -262,6 +274,10 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(communityID cryptotype
 	for {
 		select {
 		case <-ticker.C:
+			if !m.isOnline() {
+				continue
+			}
+
 			m.logger.Debug("starting archive task...", zap.String("id", id))
 
 			lastArchiveEndDateTimestamp, err := m.GetHistoryArchivePartitionStartTimestamp(communityID)
