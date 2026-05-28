@@ -73,15 +73,15 @@ const (
 )
 
 const (
-	ErrOwnerTokenNeeded                     = "owner token is needed" // #nosec G101
-	ErrMissingCommunityID                   = "communityID has to be provided"
-	ErrForbiddenProfileOrWatchOnlyAccount   = "cannot join a community using profile chat or watch-only account"
-	ErrSigningJoinRequestForKeycardAccounts = "signing a joining community request for accounts migrated to keycard must be done with a keycard"
-	ErrNotPartOfCommunity                   = "not part of the community"
-	ErrNotAdminOrOwner                      = "not admin or owner"
-	ErrSignerIsNil                          = "signer can't be nil"
-	ErrSyncMessagesSentByNonControlNode     = "accepted/requested to join sync messages can be send only by the control node"
-	ErrReceiverIsNil                        = "receiver can't be nil"
+	ErrOwnerTokenNeeded                        = "owner token is needed" // #nosec G101
+	ErrMissingCommunityID                      = "communityID has to be provided"
+	ErrForbiddenProfileOrWatchOnlyAccount      = "cannot join a community using profile chat or watch-only account"
+	ErrSigningJoinRequestForColdWalletAccounts = "signing a joining community request for accounts migrated to a cold wallet must be done with the cold wallet"
+	ErrNotPartOfCommunity                      = "not part of the community"
+	ErrNotAdminOrOwner                         = "not admin or owner"
+	ErrSignerIsNil                             = "signer can't be nil"
+	ErrSyncMessagesSentByNonControlNode        = "accepted/requested to join sync messages can be send only by the control node"
+	ErrReceiverIsNil                           = "receiver can't be nil"
 )
 
 type FetchCommunityRequest struct {
@@ -1341,8 +1341,8 @@ func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string,
 }
 
 // Signs the provided messages with the provided accounts and password.
-// Provided accounts must not belong to a keypair that is migrated to a keycard.
-// Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
+// Provided accounts must not belong to a keypair that is migrated to a cold wallet.
+// Otherwise, the signing will fail, cause such accounts should be signed with the cold wallet device.
 func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error) {
 	signatures := make([]string, len(signParams))
 	for i, param := range signParams {
@@ -1365,7 +1365,7 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 		}
 
 		if keypair.MigratedToColdWallet() {
-			return nil, errors.New(ErrSigningJoinRequestForKeycardAccounts)
+			return nil, errors.New(ErrSigningJoinRequestForColdWalletAccounts)
 		}
 
 		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(types3.HexToAddress(param.Address), param.Password)

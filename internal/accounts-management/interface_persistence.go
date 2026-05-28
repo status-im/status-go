@@ -26,14 +26,12 @@ type Persistence interface {
 	SaveOrUpdateKeypair(keypair *types.Keypair) error
 	// SaveOrUpdateAccounts saves or updates accounts
 	SaveOrUpdateAccounts(accounts []*types.Account, updateKeypairClock bool) error
-	// SaveOrUpdateKeycard saves or updates a keycard and its accounts
-	SaveOrUpdateKeycard(keycard types.Keycard, clock uint64, updateKeypairClock bool) error
+	// UpdateKeypairXPub updates the xpub and cold-wallet flag of a keypair
+	UpdateKeypairXPub(keyUID string, xpub string, coldWallet types.ColdWalletType, clock uint64) error
 	// MarkKeypairFullyOperable marks a keypair as fully operable
 	MarkKeypairFullyOperable(keyUID string, clock uint64, updateKeypairClock bool) (err error)
 	// MarkAccountFullyOperable marks an account as fully operable
 	MarkAccountFullyOperable(address cryptotypes.Address) (err error)
-	// DeleteAllKeycardsWithKeyUID deletes all keycards with a given keyUID
-	DeleteAllKeycardsWithKeyUID(keyUID string, clock uint64) (err error)
 	// GetPositionForNextNewAccount returns the position for the next new account
 	GetPositionForNextNewAccount() (int64, error)
 	// GetAccountByAddress returns an account by its address

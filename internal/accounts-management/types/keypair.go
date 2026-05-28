@@ -6,7 +6,6 @@ import (
 
 	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 var (
@@ -278,20 +277,4 @@ func GetAccountTypeForKeypairType(kpType KeypairType) AccountType {
 	default:
 		return AccountTypeWatch
 	}
-}
-
-func (kp *Keycard) ToSyncKeycard() *protobuf.SyncKeycard {
-	kc := &protobuf.SyncKeycard{
-		Uid:      kp.KeycardUID,
-		Name:     kp.KeycardName,
-		Locked:   kp.KeycardLocked,
-		KeyUid:   kp.KeyUID,
-		Position: kp.Position,
-	}
-
-	for _, addr := range kp.AccountsAddresses {
-		kc.Addresses = append(kc.Addresses, addr.Bytes())
-	}
-
-	return kc
 }
