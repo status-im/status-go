@@ -1,7 +1,12 @@
 import copy
 import re
 import pytest
-from resources.constants import new_account_data_1, user_1, wallet_account_details_derivation, keypair_name
+from resources.constants import (
+    new_account_data_1,
+    user_1,
+    wallet_account_details_derivation,
+    keypair_name,
+)
 from clients.api import ApiResponseError
 
 
@@ -54,7 +59,10 @@ class TestAddAccount:
 
     def test_add_account_for_empty_address(self, backend, account_data):
         account_data["address"] = ""
-        with pytest.raises(ApiResponseError, match=re.escape("invalid argument 1: hex string has length 0, want 40 for types.Address")):
+        with pytest.raises(
+            ApiResponseError,
+            match=re.escape("invalid argument 1: hex string has length 0, want 40 for types.Address"),
+        ):
             backend.accounts_service.add_account(backend.password, account_data)
 
     def test_add_account_for_empty_path(self, backend, account_data):
@@ -63,7 +71,11 @@ class TestAddAccount:
             backend.accounts_service.add_account(backend.password, account_data)
 
     @pytest.mark.parametrize(
-        "key, error", [("wallet", "[database] cannot add default wallet account"), ("chat", "[database] cannot add default chat account")]
+        "key, error",
+        [
+            ("wallet", "[database] cannot add default wallet account"),
+            ("chat", "[database] cannot add default chat account"),
+        ],
     )
     def test_add_account_with_key_set_on_true__(self, backend, account_data, key, error):
         account_data["key-uid"] = backend.key_uid
@@ -85,7 +97,11 @@ class TestAddAccount:
         used_mnemonic = user_1.passphrase
         profile_password = backend.password
         add_keypair_response = backend.accounts_service.add_keypair_via_seed_phrase(
-            used_mnemonic, profile_password, keypair_name, wallet_account_details_derivation
+            used_mnemonic,
+            profile_password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
         )
 
         path = "m/44'/60'/0'/0/1"

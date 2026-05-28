@@ -11,6 +11,7 @@ class Account:
     private_key: str
     password: str
     passphrase: str
+    wallet_xpub: str = ""  # Extended public key at m/44'/60'/0'
     accounts: Optional[List[Dict[str, Any]]] = None  # Optional list of accounts
     profile_data: Optional[Dict[str, Any]] = None  # Optional profile data
 
@@ -20,12 +21,14 @@ user_1 = Account(
     private_key="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
     password="Strong12345",
     passphrase="test test test test test test test test test test test junk",
+    wallet_xpub="xpub6Ce9NcJvTk36xtLSrJLZqE7wtgA5deCeYs7rSQtreh4cj6ByPtrg9sD7V2FNFLPnf8heNP3FGkeV9qwfzvZNSd54JoNXVsXFYSYwHsnJxqP",
 )
 user_2 = Account(
     address="0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
     private_key="0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
     password="Strong12345",
     passphrase="test test test test test test test test test test nest junk",
+    wallet_xpub="xpub6CwcU2nG6kBxALe9XrJVa7gAvVv53LyAUym3dj1KpU3x5EUQCpDqs33iuoNFAbEuxooXybyAhmmG7YQEjWSWk7m6u2DtGZdUXN5NbSDqzre",
 )
 
 user_mnemonic_12 = Account(

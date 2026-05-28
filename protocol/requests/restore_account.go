@@ -2,6 +2,8 @@ package requests
 
 import (
 	"errors"
+
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 )
 
 var (
@@ -52,14 +54,16 @@ func (c *RestoreAccount) Validate(restoreViaKeycard bool) error {
 }
 
 type KeycardData struct {
-	KeyUID              string `json:"keyUID"`
-	Address             string `json:"address"`
-	WhisperPrivateKey   string `json:"whisperPrivateKey"`
-	WhisperPublicKey    string `json:"whisperPublicKey"`
-	WhisperAddress      string `json:"whisperAddress"`
-	WalletPublicKey     string `json:"walletPublicKey"`
-	WalletAddress       string `json:"walletAddress"`
-	WalletRootAddress   string `json:"walletRootAddress"`
-	Eip1581Address      string `json:"eip1581Address"`
-	EncryptionPublicKey string `json:"encryptionPublicKey"`
+	KeyUID              string                             `json:"keyUID"`
+	Address             string                             `json:"address"`
+	WhisperPrivateKey   string                             `json:"whisperPrivateKey"`
+	WhisperPublicKey    string                             `json:"whisperPublicKey"`
+	WhisperAddress      string                             `json:"whisperAddress"`
+	WalletPublicKey     string                             `json:"walletPublicKey"`
+	WalletAddress       string                             `json:"walletAddress"`
+	WalletRootAddress   string                             `json:"walletRootAddress"`
+	Eip1581Address      string                             `json:"eip1581Address"`
+	EncryptionPublicKey string                             `json:"encryptionPublicKey"`
+	WalletXPub          string                             `json:"walletXPub"`
+	ColdWallet          accsmanagementtypes.ColdWalletType `json:"coldWallet"`
 }

@@ -51,7 +51,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 	require.NoError(t, err)
 
 	accountsPaths := []string{accscommon.PathWalletRoot, accscommon.PathEIP1581Chat, accscommon.PathDefaultWalletAccount}
-	derivedAccs, err := generator.DeriveChildrenFromAccount(genMasterAcc, append([]string{accscommon.PathWalletRoot}, accountsPaths...))
+	derivedAccs, err := generator.DeriveChildrenFromAccount(genMasterAcc, accountsPaths)
 	require.NoError(t, err)
 
 	data.profileKeypair = &accsmanagementtypes.Keypair{
@@ -167,6 +167,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 		require.NoError(t, err)
 
 		keypair, err := data.backend.AccountsManager().CreateKeypairFromMnemonicAndStore(data.mnemonic, password, "Test Keypair",
+			accsmanagementtypes.ColdWalletTypeNone,
 			&accsmanagementtypes.AccountCreationDetails{
 				Path: accscommon.PathDefaultWalletAccount,
 			}, true, 0)

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math"
 	"math/rand"
-	"sync"
 	"time"
 
 	"github.com/status-im/mvds/protobuf"
@@ -17,22 +16,10 @@ import (
 const backoffInterval = 60
 
 var errNotInitialized = errors.New("datasync transport not initialized")
-var DatasyncTicker = 300 * time.Millisecond
-var datasyncTickerMutex sync.RWMutex
 
-func SetPaused(paused bool) {
-	datasyncTickerMutex.Lock()
-	defer datasyncTickerMutex.Unlock()
-	if paused {
-		DatasyncTicker = 2 * time.Second
-	} else {
-		DatasyncTicker = 300 * time.Millisecond
-	}
-}
+const DatasyncTicker = 300 * time.Millisecond
 
 func currentOffsetToSecond() uint64 {
-	datasyncTickerMutex.RLock()
-	defer datasyncTickerMutex.RUnlock()
 	return uint64(math.Ceil(float64(time.Second) / float64(DatasyncTicker)))
 }
 
@@ -44,9 +31,15 @@ type NodeTransport struct {
 
 var _ transport.Transport = (*NodeTransport)(nil)
 
+// packetBufferSize gives AddPacket some slack so a non-blocking send succeeds during
+// normal operation (the watch-loop consumer isn't always precisely parked on the channel);
+// the buffer only fills, and packets only drop, if the consumer is genuinely stalled
+// (e.g. between Stop and the next node being started in reliability.SetPaused).
+const packetBufferSize = 32
+
 func NewNodeTransport() *NodeTransport {
 	return &NodeTransport{
-		packets: make(chan transport.Packet),
+		packets: make(chan transport.Packet, packetBufferSize),
 	}
 }
 
@@ -56,7 +49,13 @@ func (t *NodeTransport) Init(dispatch func(state.PeerID, *protobuf.Payload) erro
 }
 
 func (t *NodeTransport) AddPacket(p transport.Packet) {
-	t.packets <- p
+	select {
+	case t.packets <- p:
+	default:
+		if t.logger != nil {
+			t.logger.Debug("datasync: dropped inbound packet (node not consuming)")
+		}
+	}
 }
 
 func (t *NodeTransport) Watch(ctx context.Context) (*transport.Packet, bool) {

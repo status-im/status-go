@@ -120,6 +120,7 @@ class WalletService(Service):
         signature: str = "",
         owner_token_parameters: Optional[dict] = None,
         master_token_parameters: Optional[dict] = None,
+        deployment_parameters: Optional[dict] = None,
     ):
         community_params = {
             "communityID": community_id,
@@ -133,6 +134,8 @@ class WalletService(Service):
             community_params["ownerTokenParameters"] = owner_token_parameters
         if master_token_parameters:
             community_params["masterTokenParameters"] = master_token_parameters
+        if deployment_parameters:
+            community_params["deploymentParameters"] = deployment_parameters
 
         native_address = "0x0000000000000000000000000000000000000000"
         addr_to = addr_to if addr_to else native_address

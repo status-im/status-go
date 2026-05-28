@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/pkg/security"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 
@@ -104,7 +105,7 @@ func TestGetTokensSuccess(t *testing.T) {
 		"1-0x744d70fdbe2ba4cf95131626614a1763df805b9e":     expected[1],
 	}
 
-	for _, chainID := range common.AllChains {
+	for _, chainID := range walletcommon.AllChainIDsAsUint64() {
 		token := tokentypes.Token{Token: &types.Token{ChainID: chainID}}
 
 		if chainID == common.BSCMainnet || chainID == common.BSCTestnet {

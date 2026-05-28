@@ -90,11 +90,14 @@ class CommunityPermissionsAccess(Enum):
 
 
 class CommunityTokenPermissionType(Enum):
-    BECOME_MEMBER = 1
-    BECOME_ADMIN = 2
-    BECOME_TOKEN_MASTER = 3
-    CAN_VIEW_CHANNEL = 4
-    CAN_VIEW_AND_POST_CHANNEL = 5
+    """Values match protobuf CommunityTokenPermission.Type in protocol/protobuf/communities.proto."""
+
+    BECOME_ADMIN = 1
+    BECOME_MEMBER = 2
+    CAN_VIEW_CHANNEL = 3
+    CAN_VIEW_AND_POST_CHANNEL = 4
+    BECOME_TOKEN_MASTER = 5
+    BECOME_TOKEN_OWNER = 6
 
 
 class CommunityTokenType(Enum):

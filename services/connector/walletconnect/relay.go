@@ -23,6 +23,13 @@ const (
 	defaultMessageTag = 1000
 )
 
+// Tunable intervals for tests (defaults match production behavior).
+var (
+	relayWriteDeadline = 10 * time.Second
+	relayReadDeadline  = 60 * time.Second
+	relayPingInterval  = 30 * time.Second
+)
+
 // truncate safely truncates a string to a maximum length, adding "..." if truncated.
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
@@ -107,7 +114,13 @@ type RelayClient struct {
 	auth                *Auth
 	done                chan struct{}  // signals shutdown
 	disconnectRequested bool           // true if Close() was called intentionally
+	connectedOnce       bool           // true after first successful Connect(); avoids cold-start dial from call()
 	wg                  sync.WaitGroup // tracks active goroutines
+
+	writeMu      sync.Mutex // serializes writes (gorilla/websocket requires it)
+	reconnectMu  sync.Mutex // serializes reconnect attempts
+	readLoopOnce sync.Once  // starts readLoop at most once per RelayClient lifetime
+	closeOnce    sync.Once  // closes r.done at most once (Close idempotent)
 }
 
 // NewRelayClient creates a new relay client.
@@ -127,23 +140,67 @@ func NewRelayClient(projectID string) (*RelayClient, error) {
 	}, nil
 }
 
-// Connect establishes WebSocket connection to the relay server.
-func (r *RelayClient) Connect() error {
+func (r *RelayClient) getConn() *websocket.Conn {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.conn
+}
 
-	if r.conn != nil {
+// markBroken closes conn only if it is still the active connection and clears r.conn.
+func (r *RelayClient) markBroken(conn *websocket.Conn) {
+	if conn == nil {
+		return
+	}
+	r.mu.Lock()
+	if r.conn == conn {
+		_ = r.conn.Close()
+		r.conn = nil
+	}
+	r.mu.Unlock()
+}
+
+// ensureConnected reconnects when r.conn is nil; concurrent callers serialize and share the result.
+func (r *RelayClient) ensureConnected() error {
+	r.reconnectMu.Lock()
+	defer r.reconnectMu.Unlock()
+	if r.getConn() != nil {
 		return nil
 	}
+	return r.reconnect()
+}
 
+// acquireConn returns a live conn. It reconnects if a previous Connect() succeeded;
+// returns "not connected" if Connect() was never called.
+func (r *RelayClient) acquireConn() (*websocket.Conn, error) {
+	if conn := r.getConn(); conn != nil {
+		return conn, nil
+	}
+	r.mu.Lock()
+	everConnected := r.connectedOnce
+	r.mu.Unlock()
+	if !everConnected {
+		return nil, fmt.Errorf("not connected")
+	}
+	if err := r.ensureConnected(); err != nil {
+		return nil, fmt.Errorf("reconnect: %w", err)
+	}
+	conn := r.getConn()
+	if conn == nil {
+		return nil, fmt.Errorf("connection lost after reconnect")
+	}
+	return conn, nil
+}
+
+// dialRelay opens a new WebSocket to r.url with auth query parameters.
+func (r *RelayClient) dialRelay() (*websocket.Conn, error) {
 	jwt, err := r.auth.GenerateJWT(r.url)
 	if err != nil {
-		return fmt.Errorf("generate auth jwt: %w", err)
+		return nil, fmt.Errorf("generate auth jwt: %w", err)
 	}
 
 	u, err := url.Parse(r.url)
 	if err != nil {
-		return fmt.Errorf("parse relay url: %w", err)
+		return nil, fmt.Errorf("parse relay url: %w", err)
 	}
 	q := u.Query()
 	q.Set("auth", jwt)
@@ -152,37 +209,108 @@ func (r *RelayClient) Connect() error {
 
 	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		return fmt.Errorf("dial relay: %w", err)
+		return nil, fmt.Errorf("dial relay: %w", err)
 	}
-	r.conn = conn
+	return conn, nil
+}
+
+// startHeartbeat launches a ping goroutine for conn. The goroutine exits automatically
+// when conn is replaced (c != conn check) or when r.done is closed.
+func (r *RelayClient) startHeartbeat(conn *websocket.Conn) {
+	_ = conn.SetReadDeadline(time.Now().Add(relayReadDeadline))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(relayReadDeadline))
+	})
 
 	r.wg.Add(1)
-	go r.readLoop()
+	go func() {
+		defer common.LogOnPanic()
+		defer r.wg.Done()
+		ticker := time.NewTicker(relayPingInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-r.done:
+				return
+			case <-ticker.C:
+				r.writeMu.Lock()
+				c := r.getConn()
+				if c != conn {
+					r.writeMu.Unlock()
+					return
+				}
+				_ = c.SetWriteDeadline(time.Now().Add(relayWriteDeadline))
+				err := c.WriteMessage(websocket.PingMessage, nil)
+				r.writeMu.Unlock()
+				if err != nil {
+					r.markBroken(c)
+					return
+				}
+			}
+		}
+	}()
+}
+
+// writeMessage sends a text frame under writeMu with a write deadline.
+func (r *RelayClient) writeMessage(conn *websocket.Conn, data []byte) error {
+	r.writeMu.Lock()
+	defer r.writeMu.Unlock()
+	_ = conn.SetWriteDeadline(time.Now().Add(relayWriteDeadline))
+	return conn.WriteMessage(websocket.TextMessage, data)
+}
+
+// Connect establishes WebSocket connection to the relay server.
+func (r *RelayClient) Connect() error {
+	if r.getConn() != nil {
+		return nil
+	}
+
+	conn, err := r.dialRelay()
+	if err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	switch {
+	case r.disconnectRequested:
+		r.mu.Unlock()
+		_ = conn.Close()
+		return fmt.Errorf("disconnect requested")
+	case r.conn != nil:
+		r.mu.Unlock()
+		_ = conn.Close()
+		return nil
+	}
+	r.conn = conn
+	r.connectedOnce = true
+	r.mu.Unlock()
+
+	r.startHeartbeat(conn)
+
+	r.readLoopOnce.Do(func() {
+		r.wg.Add(1)
+		go r.readLoop()
+	})
 	return nil
 }
 
 // Close gracefully shuts down the WebSocket connection and waits for goroutines to finish.
 func (r *RelayClient) Close() error {
 	r.mu.Lock()
-	if r.conn == nil {
-		r.disconnectRequested = true
-		r.mu.Unlock()
-		return nil
-	}
+	r.disconnectRequested = true
 	conn := r.conn
 	r.conn = nil
-	r.disconnectRequested = true
 	r.mu.Unlock()
 
-	// Signal shutdown
-	close(r.done)
+	r.closeOnce.Do(func() {
+		close(r.done)
+	})
 
-	// Close websocket
-	err := conn.Close()
-
-	// Wait for readLoop to finish
+	var err error
+	if conn != nil {
+		err = conn.Close()
+	}
 	r.wg.Wait()
-
 	return err
 }
 
@@ -265,7 +393,6 @@ func (r *RelayClient) SetReconnectedHandler(handler ReconnectedHandler) {
 }
 
 func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
-	// Generate WalletConnect-compliant numeric ID with 19 digits of entropy
 	id := payloadID()
 	idStr := fmt.Sprintf("%d", id)
 
@@ -291,15 +418,20 @@ func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 		return nil, err
 	}
 
-	r.mu.Lock()
-	conn := r.conn
-	r.mu.Unlock()
-	if conn == nil {
-		return nil, fmt.Errorf("not connected")
+	conn, err := r.acquireConn()
+	if err != nil {
+		return nil, err
 	}
 
-	if err := conn.WriteMessage(websocket.TextMessage, body); err != nil {
-		return nil, fmt.Errorf("write: %w", err)
+	if werr := r.writeMessage(conn, body); werr != nil {
+		r.markBroken(conn)
+		conn, err = r.acquireConn()
+		if err != nil {
+			return nil, fmt.Errorf("write %v; %w", werr, err)
+		}
+		if err := r.writeMessage(conn, body); err != nil {
+			return nil, fmt.Errorf("write: %w", err)
+		}
 	}
 
 	select {
@@ -341,15 +473,10 @@ func (r *RelayClient) readLoop() {
 				return
 			}
 
-			r.mu.Lock()
-			if r.conn != nil {
-				r.conn.Close()
-				r.conn = nil
-			}
-			r.mu.Unlock()
+			r.markBroken(conn)
 
 			r.logger.Info("attempting to reconnect to relay")
-			if reconnectErr := r.reconnect(); reconnectErr != nil {
+			if reconnectErr := r.ensureConnected(); reconnectErr != nil {
 				r.logger.Error("failed to reconnect, exiting readLoop", zap.Error(reconnectErr))
 				return
 			}
@@ -376,20 +503,21 @@ func (r *RelayClient) readLoop() {
 			continue
 		}
 
-		if resp.idString() == "" {
+		id := resp.idString()
+		if id == "" {
 			r.logger.Debug("ignoring relay message with empty ID")
 			continue
 		}
 
 		r.mu.Lock()
-		if ch, ok := r.pending[resp.idString()]; ok {
+		if ch, ok := r.pending[id]; ok {
 			select {
 			case ch <- &resp:
 			default:
 			}
 		} else {
 			r.logger.Debug("received response for unknown request ID",
-				zap.String("id", resp.idString()))
+				zap.String("id", id))
 		}
 		r.mu.Unlock()
 	}
@@ -417,24 +545,7 @@ func (r *RelayClient) reconnect() error {
 			return fmt.Errorf("disconnect requested during reconnect")
 		}
 
-		jwt, err := r.auth.GenerateJWT(r.url)
-		if err != nil {
-			r.logger.Debug("failed to generate JWT for reconnect", zap.Error(err))
-			backoff = min(backoff*2, maxBackoff)
-			continue
-		}
-
-		u, err := url.Parse(r.url)
-		if err != nil {
-			r.logger.Error("failed to parse relay URL", zap.Error(err))
-			return fmt.Errorf("parse relay url: %w", err)
-		}
-		q := u.Query()
-		q.Set("auth", jwt)
-		q.Set("projectId", r.projectID)
-		u.RawQuery = q.Encode()
-
-		conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+		conn, err := r.dialRelay()
 		if err != nil {
 			r.logger.Debug("failed to dial relay", zap.Error(err), zap.Int("attempt", attempt))
 			backoff = min(backoff*2, maxBackoff)
@@ -442,14 +553,26 @@ func (r *RelayClient) reconnect() error {
 		}
 
 		r.mu.Lock()
+		if r.disconnectRequested {
+			r.mu.Unlock()
+			_ = conn.Close()
+			return fmt.Errorf("disconnect requested during reconnect")
+		}
+		if r.conn != nil {
+			r.mu.Unlock()
+			_ = conn.Close()
+			return nil
+		}
 		r.conn = conn
-		reconnectedHandler := r.reconnectedHandler
+		handler := r.reconnectedHandler
 		r.mu.Unlock()
+
+		r.startHeartbeat(conn)
 
 		r.logger.Info("successfully reconnected to relay")
 
-		if reconnectedHandler != nil {
-			reconnectedHandler()
+		if handler != nil {
+			handler()
 		}
 
 		return nil

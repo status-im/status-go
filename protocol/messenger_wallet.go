@@ -123,11 +123,11 @@ func (m *Messenger) UpdateKeypair(keypair *accsmanagementtypes.Keypair) error {
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
 }
 
-func (m *Messenger) AddKeypairViaSeedPhrase(mnemonic string, password string, name string,
+func (m *Messenger) AddKeypairViaSeedPhrase(mnemonic string, password string, name string, coldWallet accsmanagementtypes.ColdWalletType,
 	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accsmanagementtypes.Keypair, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
 
-	keypair, err := m.accountsManager.CreateKeypairFromMnemonicAndStore(mnemonic, password, name, walletAccount, false, clock)
+	keypair, err := m.accountsManager.CreateKeypairFromMnemonicAndStore(mnemonic, password, name, coldWallet, walletAccount, false, clock)
 	if err != nil {
 		return nil, err
 	}
@@ -136,11 +136,11 @@ func (m *Messenger) AddKeypairViaSeedPhrase(mnemonic string, password string, na
 		m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
 }
 
-func (m *Messenger) AddKeypairStoredToKeycard(keyUID string, masterAddress string, name string,
-	xpub string, coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
+func (m *Messenger) AddKeypairStoredToColdWallet(keyUID string, masterAddress string, name string,
+	walletXPub string, coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
 
-	keypair, err := m.accountsManager.AddKeypairStoredToKeycard(keyUID, masterAddress, name, xpub, coldWallet, walletAccounts, clock)
+	keypair, err := m.accountsManager.AddKeypairStoredToColdWallet(keyUID, masterAddress, name, walletXPub, coldWallet, walletAccounts, clock)
 	if err != nil {
 		return nil, err
 	}

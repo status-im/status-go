@@ -2,7 +2,13 @@ import copy
 import re
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import user_1, new_account_data_1, wallet_account_details_root, wallet_account_details_derivation, keypair_name
+from resources.constants import (
+    user_1,
+    new_account_data_1,
+    wallet_account_details_root,
+    wallet_account_details_derivation,
+    keypair_name,
+)
 import secrets
 
 
@@ -23,14 +29,25 @@ class TestRemainingKeypairCapacity:
         assert initial_capacity == 4
 
         # 2) Add a keypair via private key
-        backend.accounts_service.add_keypair_via_private_key(user_1.private_key, backend.password, keypair_name, wallet_account_details_root)
+        backend.accounts_service.add_keypair_via_private_key(
+            user_1.private_key,
+            backend.password,
+            keypair_name,
+            wallet_account_details_root,
+        )
 
         # 3) Query remaining capacity again and assert it decreased by exactly 1
         after_capacity = backend.accounts_service.remaining_keypair_capacity()
         assert after_capacity == initial_capacity - 1
 
         # 4) Add a keypair via seed phrase
-        backend.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, backend.password, keypair_name, wallet_account_details_derivation)
+        backend.accounts_service.add_keypair_via_seed_phrase(
+            user_1.passphrase,
+            backend.password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
+        )
 
         # 5) Query remaining capacity again and assert it decreased by exactly 1
         after_capacity2 = backend.accounts_service.remaining_keypair_capacity()
@@ -46,7 +63,13 @@ class TestRemainingKeypairCapacity:
                 passphrase,
                 backend.password,
                 keypair_name,
-                {"name": keypair_name, "path": f"m/44'/60'/0'/0/{i}", "emoji": "🔑", "colorId": "primary"},
+                "",
+                {
+                    "name": keypair_name,
+                    "path": f"m/44'/60'/0'/0/{i}",
+                    "emoji": "🔑",
+                    "colorId": "primary",
+                },
             )
 
         get_keypairs_response = backend.accounts_service.get_account_keypairs()

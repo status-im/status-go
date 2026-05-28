@@ -3,6 +3,7 @@ package datasync
 import (
 	"crypto/ecdsa"
 	"errors"
+	"sync/atomic"
 
 	"github.com/golang/protobuf/proto"
 	datasyncnode "github.com/status-im/mvds/node"
@@ -18,11 +19,13 @@ type DataSync struct {
 	// NodeTransport is the implementation of the datasync transport interface.
 	*NodeTransport
 	logger         *zap.Logger
-	sendingEnabled bool
+	sendingEnabled atomic.Bool
 }
 
 func New(node *datasyncnode.Node, transport *NodeTransport, sendingEnabled bool, logger *zap.Logger) *DataSync {
-	return &DataSync{Node: node, NodeTransport: transport, sendingEnabled: sendingEnabled, logger: logger}
+	d := &DataSync{Node: node, NodeTransport: transport, logger: logger}
+	d.sendingEnabled.Store(sendingEnabled)
+	return d
 }
 
 // Unwrap tries to unwrap datasync message and passes back the message to datasync in order to acknowledge any potential message and mark messages as acknowledged
@@ -38,7 +41,7 @@ func (d *DataSync) Unwrap(sender *ecdsa.PublicKey, payload []byte) (*protobuf.Pa
 		return nil, errors.New("handling non-datasync message")
 	} else {
 		logger.Debug("handling datasync message")
-		if d.sendingEnabled {
+		if d.sendingEnabled.Load() {
 			d.add(sender, &datasyncMessage)
 		}
 	}
@@ -48,6 +51,10 @@ func (d *DataSync) Unwrap(sender *ecdsa.PublicKey, payload []byte) (*protobuf.Pa
 
 func (d *DataSync) Stop() {
 	d.Node.Stop()
+}
+
+func (d *DataSync) SetSendingEnabled(v bool) {
+	d.sendingEnabled.Store(v)
 }
 
 func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage *protobuf.Payload) {

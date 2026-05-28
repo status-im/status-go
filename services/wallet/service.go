@@ -325,7 +325,7 @@ func NewService(
 	alchemyFetcherClient := activityfetcher_alchemy.NewClient(alchemyEthClientGetter)
 	alchemyFetcherManager := alchemymanager.NewManager(alchemyFetcherClient, alchemyFetcherDb)
 	activityFetcherManager := activityfetcher.NewManager(alchemyFetcherManager)
-	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient, feed)
+	activityFetcherService := activityfetcher.NewService(activityFetcherManager, rpcClient.GetNetworkManager(), accountsDB, accountsPublisher, rpcClient, feed, multistandardBalanceController.GetPublisher())
 
 	return &Service{
 		db:                             db,

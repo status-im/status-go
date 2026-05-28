@@ -1419,7 +1419,8 @@ func (b *StatusBackend) prepareWalletAccount(request *requests.CreateAccount) *a
 }
 
 func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID string, masterAddress string,
-	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool) (keypair *accsmanagementtypes.Keypair, err error) {
+	derivedAddresses map[string]generator.AccountInfo, restoreAccount bool, walletXPub string,
+	coldWallet accsmanagementtypes.ColdWalletType) (keypair *accsmanagementtypes.Keypair, err error) {
 	// set up keypair
 	keypair = &accsmanagementtypes.Keypair{
 		Name:                    request.DisplayName,
@@ -1427,6 +1428,8 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 		Type:                    accsmanagementtypes.KeypairTypeProfile,
 		DerivedFrom:             masterAddress,
 		LastUsedDerivationIndex: 0,
+		XPub:                    walletXPub,
+		ColdWallet:              coldWallet,
 	}
 
 	// add chat account
@@ -1644,11 +1647,15 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 			common.PathDefaultWalletAccount: {},
 		}
 		keypairToStoreDirectly *accsmanagementtypes.Keypair
+		walletXPub             string
+		coldWallet             accsmanagementtypes.ColdWalletType
 	)
 
 	if keycardData != nil { // means that the keycard is already set, details already on it
 		keyUID = keycardData.KeyUID
 		masterAddress = keycardData.Address
+		walletXPub = keycardData.WalletXPub
+		coldWallet = keycardData.ColdWallet
 
 		derivedAddresses[common.PathWalletRoot] = generator.AccountInfo{
 			AccountPublicInfo: generator.AccountPublicInfo{
@@ -1698,7 +1705,13 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 			common.PathDefaultWalletAccount,
 			common.PathEIP1581Encryption,
 		}
-		_, derivedAddresses, err = b.generateDerivedAddresses(genMasterAcc, derivationPaths)
+		_, generatedDerivedAddresses, err := b.generateDerivedAddresses(genMasterAcc, derivationPaths)
+		if err != nil {
+			return nil, err
+		}
+		derivedAddresses = generatedDerivedAddresses
+
+		walletXPub, err = generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletRoot)
 		if err != nil {
 			return nil, err
 		}
@@ -1710,6 +1723,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 			return nil, err
 		}
 
+		coldWallet = accsmanagementtypes.ColdWalletTypeStatusKeycard
 		chatPrivateKey = genChatAccount.PrivateKey()
 		chatPublicKey = types.Hex2Bytes(genChatAccount.PublicKeyHex())
 
@@ -1753,14 +1767,15 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 			return nil, errors.Wrap(err, "failed to prepare for keycard")
 		}
 
-		keypairToStoreDirectly, err = b.prepareKeypair(request, keyUID, masterAddress, derivedAddresses, restoreAccount)
+		keypairToStoreDirectly, err = b.prepareKeypair(request, keyUID, masterAddress, derivedAddresses, restoreAccount,
+			walletXPub, coldWallet)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to prepare keypair")
 		}
 	} else {
 		walletAccount := b.prepareWalletAccount(request)
-		_, err := b.accountsManager.CreateKeypairFromMnemonicAndStore(mnemonic, request.Password,
-			request.DisplayName, walletAccount, true, 0)
+		_, err := b.accountsManager.CreateKeypairFromMnemonicAndStore(mnemonic, request.Password, request.DisplayName,
+			coldWallet, walletAccount, true, 0)
 		if err != nil {
 			return nil, err
 		}

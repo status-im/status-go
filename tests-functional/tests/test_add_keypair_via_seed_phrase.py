@@ -1,6 +1,12 @@
 import re
 import pytest
-from resources.constants import user_1, user_2, wallet_account_details_derivation, wallet_account_details_root, keypair_name
+from resources.constants import (
+    user_1,
+    user_2,
+    wallet_account_details_derivation,
+    wallet_account_details_root,
+    keypair_name,
+)
 from clients.api import ApiResponseError
 
 
@@ -13,7 +19,11 @@ class TestAddKeypairViaSeedPhrase:
 
     def test_add_valid_keypair_via_seed_phrase(self, backend):
         add_keypair_response = backend.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, backend.password, keypair_name, wallet_account_details_derivation
+            user_1.passphrase,
+            backend.password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
         )
         add_keypair_result = add_keypair_response
         accounts = add_keypair_result.get("accounts")
@@ -44,10 +54,22 @@ class TestAddKeypairViaSeedPhrase:
         assert add_keypair_result.get("derived-from") == imported_keypairs[0].get("derived-from")
 
     def test_add_a_second_keypair_via_sp_with_same_details(self, backend):
-        backend.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, backend.password, keypair_name, wallet_account_details_derivation)
+        backend.accounts_service.add_keypair_via_seed_phrase(
+            user_1.passphrase,
+            backend.password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
+        )
 
         # different private key but same details
-        backend.accounts_service.add_keypair_via_seed_phrase(user_2.private_key, backend.password, keypair_name, wallet_account_details_derivation)
+        backend.accounts_service.add_keypair_via_seed_phrase(
+            user_2.private_key,
+            backend.password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
+        )
 
         keypairs_response = backend.accounts_service.get_account_keypairs()
         imported_keypairs = [keypair for keypair in keypairs_response if keypair.get("name") == keypair_name]
@@ -55,19 +77,44 @@ class TestAddKeypairViaSeedPhrase:
 
     def test_add_duplicate_keypair_via_sp(self, backend):
         resp1 = backend.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase, backend.password, keypair_name, wallet_account_details_derivation
+            user_1.passphrase,
+            backend.password,
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
         )
 
         # same private key
-        with pytest.raises(ApiResponseError, match=re.escape(f'[validation] keypair already added -  keyuid: {resp1.get("key-uid")}')):
-            backend.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, backend.password, keypair_name, wallet_account_details_derivation)
+        with pytest.raises(
+            ApiResponseError,
+            match=re.escape(f'[validation] keypair already added -  keyuid: {resp1.get("key-uid")}'),
+        ):
+            backend.accounts_service.add_keypair_via_seed_phrase(
+                user_1.passphrase,
+                backend.password,
+                keypair_name,
+                "",
+                wallet_account_details_derivation,
+            )
 
     def test_add_keypair_via_sp_with_wrong_path(self, backend):
         with pytest.raises(
             ApiResponseError,
             match=re.escape("[validation] unsupported profile or seed imported key pair wallet account"),
         ):
-            backend.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, backend.password, keypair_name, wallet_account_details_root)
+            backend.accounts_service.add_keypair_via_seed_phrase(
+                user_1.passphrase,
+                backend.password,
+                keypair_name,
+                "",
+                wallet_account_details_root,
+            )
 
     def test_add_keypair_via_sp_with_empty_password(self, backend):
-        backend.accounts_service.add_keypair_via_seed_phrase(user_1.passphrase, "", keypair_name, wallet_account_details_derivation)
+        backend.accounts_service.add_keypair_via_seed_phrase(
+            user_1.passphrase,
+            "",
+            keypair_name,
+            "",
+            wallet_account_details_derivation,
+        )

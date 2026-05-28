@@ -59,9 +59,9 @@ func (api *API) publishAccountsEvent(accounts []*accsmanagementtypes.Account, re
 }
 
 func (api *API) AddKeypairViaSeedPhrase(ctx context.Context, mnemonic string, password string, name string,
-	walletAccount *accsmanagementtypes.AccountCreationDetails) (*accsmanagementtypes.Keypair, error) {
+	coldWallet accsmanagementtypes.ColdWalletType, walletAccount *accsmanagementtypes.AccountCreationDetails) (*accsmanagementtypes.Keypair, error) {
 
-	addedKeypair, err := (*api.messenger).AddKeypairViaSeedPhrase(mnemonic, password, name, walletAccount)
+	addedKeypair, err := (*api.messenger).AddKeypairViaSeedPhrase(mnemonic, password, name, coldWallet, walletAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -71,21 +71,9 @@ func (api *API) AddKeypairViaSeedPhrase(ctx context.Context, mnemonic string, pa
 	return addedKeypair, nil
 }
 
-func (api *API) AddKeypairStoredToKeycard(ctx context.Context, keyUID string, masterAddress string, name string,
-	walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
-	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, "", "", walletAccounts)
-	if err != nil {
-		return nil, err
-	}
-
-	api.publishAccountsEvent(addedKeypair.Accounts, false)
-
-	return addedKeypair, nil
-}
-
-func (api *API) AddKeypairStoredToKeycardNew(ctx context.Context, keyUID string, masterAddress string, name string,
-	xpub string, coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
-	addedKeypair, err := (*api.messenger).AddKeypairStoredToKeycard(keyUID, masterAddress, name, xpub, coldWallet, walletAccounts)
+func (api *API) AddKeypairStoredToColdWallet(ctx context.Context, keyUID string, masterAddress string, name string,
+	walletXPub string, coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account) (*accsmanagementtypes.Keypair, error) {
+	addedKeypair, err := (*api.messenger).AddKeypairStoredToColdWallet(keyUID, masterAddress, name, walletXPub, coldWallet, walletAccounts)
 	if err != nil {
 		return nil, err
 	}
