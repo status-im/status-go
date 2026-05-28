@@ -194,6 +194,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestUploadDownloadLogosStora
 	s.bob.importDelayer.once.Do(func() {
 		close(s.bob.importDelayer.wait)
 	})
+	s.bob.ratchetNotFoundDelay = 1 * time.Second
 
 	s.bob.downloadAndImportHistoryArchives(community.ID(), indexCid, cancelChan)
 

@@ -151,6 +151,7 @@ type Messenger struct {
 	historicSyncMu            sync.Mutex
 	historicSyncInFlight      bool
 	lastHistoricSyncRequestAt time.Time
+	ratchetNotFoundDelay time.Duration
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
@@ -442,8 +443,9 @@ func NewMessenger(
 			wait chan struct{}
 			once sync.Once
 		}{wait: make(chan struct{})},
-		browserDatabase: c.browserDatabase,
-		httpServer:      c.httpServer,
+		ratchetNotFoundDelay: 1 * time.Hour,
+		browserDatabase:      c.browserDatabase,
+		httpServer:           c.httpServer,
 		shutdownTasks: []func() error{
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,

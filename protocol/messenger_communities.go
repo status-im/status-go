@@ -3821,7 +3821,7 @@ importMessageArchivesLoop:
 			case <-ctx.Done():
 				m.logger.Debug("interrupted importing history archive messages")
 				return nil
-			case <-time.After(1 * time.Hour):
+			case <-time.After(m.ratchetNotFoundDelay):
 				delayImport = false
 			}
 		}
