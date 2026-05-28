@@ -26,19 +26,11 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
-
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
 	types "github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -46,12 +38,10 @@ import (
 
 // List of errors
 var (
-	ErrSymAsym              = errors.New("specify either a symmetric or an asymmetric key")
-	ErrInvalidSymmetricKey  = errors.New("invalid symmetric key")
-	ErrInvalidPublicKey     = errors.New("invalid public key")
-	ErrInvalidSigningPubKey = errors.New("invalid signing public key")
-	ErrTooLowPoW            = errors.New("message rejected, PoW too low")
-	ErrNoTopics             = errors.New("missing topic(s)")
+	ErrSymAsym             = errors.New("specify either a symmetric or an asymmetric key")
+	ErrInvalidSymmetricKey = errors.New("invalid symmetric key")
+	ErrInvalidPublicKey    = errors.New("invalid public key")
+	ErrNoTopics            = errors.New("missing topic(s)")
 )
 
 // PublicWakuAPI provides the waku RPC service that can be
@@ -72,50 +62,6 @@ func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
 		lastUsed: make(map[string]time.Time),
 	}
 	return api
-}
-
-// Info contains diagnostic information.
-type Info struct {
-	Messages       int    `json:"messages"`       // Number of floating messages.
-	MaxMessageSize uint32 `json:"maxMessageSize"` // Maximum accepted message size
-}
-
-// Context is used higher up the food-chain and without significant refactoring is not a simple thing to remove / change
-
-// Info returns diagnostic information about the waku node.
-func (api *PublicWakuAPI) Info(ctx context.Context) Info {
-	return Info{
-		Messages:       len(api.w.msgQueue),
-		MaxMessageSize: api.w.MaxMessageSize(),
-	}
-}
-
-// NewKeyPair generates a new public and private key pair for message decryption and encryption.
-// It returns an ID that can be used to refer to the keypair.
-func (api *PublicWakuAPI) NewKeyPair(ctx context.Context) (string, error) {
-	return api.w.NewKeyPair()
-}
-
-// HasKeyPair returns an indication if the node has a key pair that is associated with the given id.
-func (api *PublicWakuAPI) HasKeyPair(ctx context.Context, id string) bool {
-	return api.w.HasKeyPair(id)
-}
-
-// NewSymKey generate a random symmetric key.
-// It returns an ID that can be used to refer to the key.
-// Can be used encrypting and decrypting messages where the key is known to both parties.
-func (api *PublicWakuAPI) NewSymKey(ctx context.Context) (string, error) {
-	return api.w.GenerateSymKey()
-}
-
-// HasSymKey returns an indication if the node has a symmetric key associated with the given key.
-func (api *PublicWakuAPI) HasSymKey(ctx context.Context, id string) bool {
-	return api.w.HasSymKey(id)
-}
-
-// GetSymKey returns the symmetric key associated with the given id.
-func (api *PublicWakuAPI) GetSymKey(ctx context.Context, id string) (hexutil.Bytes, error) {
-	return api.w.GetSymKey(id)
 }
 
 // Post posts a message on the Waku network.
@@ -200,146 +146,6 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 	return hash, nil
 }
 
-// UninstallFilter is alias for Unsubscribe
-func (api *PublicWakuAPI) UninstallFilter(ctx context.Context, id string) {
-	api.w.Unsubscribe(ctx, id) // nolint: errcheck
-}
-
-// Unsubscribe disables and removes an existing filter.
-func (api *PublicWakuAPI) Unsubscribe(ctx context.Context, id string) {
-	api.w.Unsubscribe(ctx, id) // nolint: errcheck
-}
-
-// Messages set up a subscription that fires events when messages arrive that match
-// the given set of criteria.
-func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*rpc.Subscription, error) {
-	var (
-		symKeyGiven = len(crit.SymKeyID) > 0
-		pubKeyGiven = len(crit.PrivateKeyID) > 0
-		err         error
-	)
-
-	// ensure that the RPC connection supports subscriptions
-	notifier, supported := rpc.NotifierFromContext(ctx)
-	if !supported {
-		return nil, rpc.ErrNotificationsUnsupported
-	}
-
-	// user must specify either a symmetric or an asymmetric key
-	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
-		return nil, ErrSymAsym
-	}
-
-	filter := common.Filter{
-		Messages: common.NewMemoryMessageStore(),
-	}
-
-	if len(crit.Sig) > 0 {
-		if filter.Src, err = crypto.UnmarshalPubkey(crit.Sig); err != nil {
-			return nil, ErrInvalidSigningPubKey
-		}
-	}
-
-	contentTopics := make([]common.TopicType, len(crit.Topics))
-	for index, tt := range crit.Topics {
-		contentTopics[index] = common.TopicType(tt)
-	}
-
-	filter.PubsubTopic = crit.PubsubTopic
-	filter.ContentTopics = common.NewTopicSet(contentTopics)
-
-	// listen for message that are encrypted with the given symmetric key
-	if symKeyGiven {
-		if len(filter.ContentTopics) == 0 {
-			return nil, ErrNoTopics
-		}
-		key, err := api.w.GetSymKey(crit.SymKeyID)
-		if err != nil {
-			return nil, err
-		}
-		if !common.ValidateDataIntegrity(key, common.AESKeyLength) {
-			return nil, ErrInvalidSymmetricKey
-		}
-		filter.KeySym = key
-		filter.SymKeyHash = ethcommon.Hash(crypto.Keccak256Hash(filter.KeySym))
-	}
-
-	// listen for messages that are encrypted with the given public key
-	if pubKeyGiven {
-		filter.KeyAsym, err = api.w.GetPrivateKey(crit.PrivateKeyID)
-		if err != nil || filter.KeyAsym == nil {
-			return nil, ErrInvalidPublicKey
-		}
-	}
-
-	id, err := api.w.subscribe(&filter)
-	if err != nil {
-		return nil, err
-	}
-
-	// create subscription and start waiting for message events
-	rpcSub := notifier.CreateSubscription()
-	go func() {
-		defer gocommon.LogOnPanic()
-		// for now poll internally, refactor waku internal for channel support
-		ticker := time.NewTicker(250 * time.Millisecond)
-		defer ticker.Stop()
-		sub := api.w.PauseBroadcaster.Subscribe()
-		defer sub.Unsubscribe()
-		paused := <-sub.C()
-
-		runPausedPollingLoop(
-			paused,
-			sub.C(),
-			ticker.C,
-			rpcSub.Err(),
-			func() {
-				if filter := api.w.getFilter(id); filter != nil {
-					for _, rpcMessage := range toMessage(filter.Retrieve()) {
-						if err := notifier.Notify(rpcSub.ID, rpcMessage); err != nil {
-							logutils.ZapLogger().Error("Failed to send notification", zap.Error(err))
-						}
-					}
-				}
-			},
-			func() {
-				_ = api.w.Unsubscribe(context.Background(), id)
-			},
-		)
-	}()
-
-	return rpcSub, nil
-}
-
-func runPausedPollingLoop(initialPaused bool, lifecycleCh <-chan bool, tickerCh <-chan time.Time, stopCh <-chan error, onTick func(), onStop func()) {
-	paused := initialPaused
-	var activeTicker <-chan time.Time
-	if !paused {
-		activeTicker = tickerCh
-	}
-
-	for {
-		select {
-		case pausedState, ok := <-lifecycleCh:
-			if !ok {
-				onStop()
-				return
-			}
-			paused = pausedState
-			if paused {
-				activeTicker = nil
-			} else {
-				activeTicker = tickerCh
-			}
-		case <-activeTicker:
-			onTick()
-		case <-stopCh:
-			onStop()
-			return
-		}
-	}
-}
-
 // ToWakuMessage converts an internal message into an API version.
 func ToWakuMessage(message *common.ReceivedMessage) *types.Message {
 	msg := types.Message{
@@ -367,15 +173,6 @@ func ToWakuMessage(message *common.ReceivedMessage) *types.Message {
 	return &msg
 }
 
-// toMessage converts a set of messages to its RPC representation.
-func toMessage(messages []*common.ReceivedMessage) []*types.Message {
-	msgs := make([]*types.Message, len(messages))
-	for i, msg := range messages {
-		msgs[i] = ToWakuMessage(msg)
-	}
-	return msgs
-}
-
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
 func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types.Message, error) {
@@ -395,79 +192,4 @@ func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types.Message, error)
 	}
 
 	return messages, nil
-}
-
-// DeleteMessageFilter deletes a filter.
-func (api *PublicWakuAPI) DeleteMessageFilter(id string) (bool, error) {
-	api.mu.Lock()
-	defer api.mu.Unlock()
-
-	delete(api.lastUsed, id)
-	return true, api.w.Unsubscribe(context.Background(), id)
-}
-
-// NewMessageFilter creates a new filter that can be used to poll for
-// (new) messages that satisfy the given criteria.
-func (api *PublicWakuAPI) NewMessageFilter(req types.Criteria) (string, error) {
-	var (
-		src     *ecdsa.PublicKey
-		keySym  []byte
-		keyAsym *ecdsa.PrivateKey
-
-		symKeyGiven  = len(req.SymKeyID) > 0
-		asymKeyGiven = len(req.PrivateKeyID) > 0
-
-		err error
-	)
-
-	// user must specify either a symmetric or an asymmetric key
-	if (symKeyGiven && asymKeyGiven) || (!symKeyGiven && !asymKeyGiven) {
-		return "", ErrSymAsym
-	}
-
-	if len(req.Sig) > 0 {
-		if src, err = crypto.UnmarshalPubkey(req.Sig); err != nil {
-			return "", ErrInvalidSigningPubKey
-		}
-	}
-
-	if symKeyGiven {
-		if keySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
-			return "", err
-		}
-		if !common.ValidateDataIntegrity(keySym, common.AESKeyLength) {
-			return "", ErrInvalidSymmetricKey
-		}
-	}
-
-	if asymKeyGiven {
-		if keyAsym, err = api.w.GetPrivateKey(req.PrivateKeyID); err != nil {
-			return "", err
-		}
-	}
-
-	topics := make([]common.TopicType, len(req.Topics))
-	for index, tt := range req.Topics {
-		topics[index] = common.TopicType(tt)
-	}
-
-	f := &common.Filter{
-		Src:           src,
-		KeySym:        keySym,
-		KeyAsym:       keyAsym,
-		PubsubTopic:   req.PubsubTopic,
-		ContentTopics: common.NewTopicSet(topics),
-		Messages:      common.NewMemoryMessageStore(),
-	}
-
-	id, err := api.w.subscribe(f)
-	if err != nil {
-		return "", err
-	}
-
-	api.mu.Lock()
-	api.lastUsed[id] = time.Now()
-	api.mu.Unlock()
-
-	return id, nil
 }
