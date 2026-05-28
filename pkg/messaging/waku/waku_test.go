@@ -256,7 +256,7 @@ func TestWakuV2Filter(t *testing.T) {
 	setDefaultConfig(config, true)
 	config.EnablePeerExchangeClient = false
 	config.Port = 0
-	config.MinPeersForFilter = 2
+	config.MaxPeersForFilter = 2
 
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
