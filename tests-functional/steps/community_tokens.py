@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from typing import Optional, List
@@ -16,6 +17,171 @@ from utils import fake
 logger = logging.getLogger(__name__)
 
 NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+
+def community_permission_types(community: dict) -> set[int]:
+    return {p.get("type") for p in (community.get("tokenPermissions") or {}).values()}
+
+
+def community_has_expected_details(community: Optional[dict], expected_name: str, expected_description: str) -> bool:
+    return bool(community and community.get("name") == expected_name and community.get("description") == expected_description)
+
+
+def check_member_community_updated(
+    backend: StatusBackend,
+    community_id: str,
+    expected_name: str,
+    expected_description: str,
+    community: Optional[dict] = None,
+) -> bool:
+    """Return True when any fetched or cached community view matches the expected details."""
+    sources: List[Optional[dict]] = [community]
+
+    for try_database in (False, True):
+        try:
+            sources.append(
+                messenger.fetch_community(
+                    backend,
+                    community_id,
+                    wait_for_response=True,
+                    try_database=try_database,
+                )
+            )
+        except Exception as exc:
+            logger.debug(f"fetch_community failed while checking update for {community_id} " f"(try_database={try_database}): {exc}")
+
+    member_communities = backend.wakuext_service.communities()
+    sources.append(next((c for c in messenger.communities_list(member_communities) if c.get("id") == community_id), None))
+
+    return any(community_has_expected_details(source, expected_name, expected_description) for source in sources)
+
+
+def wait_until_join_permissions_satisfied(
+    backend: StatusBackend,
+    community_id: str,
+    wallet_address: str,
+    attempts: int = 10,
+    delay: int = 2,
+    refresh_community: bool = True,
+) -> dict:
+    """Poll until token-gated join permissions are satisfied for the wallet."""
+    backend.wallet_service.fetch_or_get_cached_wallet_balances([wallet_address], True)
+    permissions_resp = None
+    for _ in range(attempts):
+        if refresh_community:
+            messenger.fetch_community(backend, community_id)
+        permissions_resp = backend.wakuext_service.check_permissions_to_join_community(community_id)
+        if permissions_resp and permissions_resp.get("satisfied"):
+            return permissions_resp
+        backend.wallet_service.fetch_or_get_cached_wallet_balances([wallet_address], True)
+        time.sleep(delay)
+
+    assert permissions_resp, "Failed to check permissions to join community"
+    assert permissions_resp.get("satisfied"), "Permissions to join are not satisfied"
+    return permissions_resp
+
+
+def wait_until_member_sees_community_update(
+    backend: StatusBackend,
+    community_id: str,
+    expected_name: str,
+    expected_description: str,
+    attempts: int = 30,
+    delay: int = 2,
+    spectate: bool = False,
+):
+    """Poll until backend sees the expected community name and description."""
+    if spectate:
+        try:
+            backend.wakuext_service.spectate_community(community_id)
+        except Exception as exc:
+            logger.debug(f"spectate_community failed for {community_id}: {exc}")
+
+    last_community = None
+    for _ in range(attempts):
+        if check_member_community_updated(backend, community_id, expected_name, expected_description):
+            return
+        member_communities = backend.wakuext_service.communities()
+        last_community = next(
+            (c for c in messenger.communities_list(member_communities) if c.get("id") == community_id),
+            None,
+        )
+        time.sleep(delay)
+
+    assert check_member_community_updated(backend, community_id, expected_name, expected_description), (
+        f"{backend} did not see the updated community name/description; "
+        f"expected name={expected_name!r} description={expected_description!r}, "
+        f"last observed name={(last_community or {}).get('name')!r} "
+        f"description={(last_community or {}).get('description')!r}"
+    )
+
+
+def edit_community_and_wait_until_observer_sees_update(
+    editor_backend,
+    observer_backend,
+    community_id: str,
+    attempts: int = 30,
+    spectate_before_wait: bool = False,
+    wait_for_message_signal: bool = True,
+):
+    """Edit a community and wait until *observer_backend* sees the new name/description."""
+    edit_result: dict[str, str] = {}
+
+    def _edit():
+        edit_result["name"], edit_result["description"] = messenger.edit_community(editor_backend, community_id)
+
+    if wait_for_message_signal:
+        try:
+            with observer_backend.expect_signal(
+                SignalType.MESSAGES_NEW,
+                predicate=lambda signal: community_id in json.dumps(signal),
+                timeout=60,
+            ):
+                _edit()
+        except TimeoutError:
+            logger.warning(f"MESSAGES_NEW not received for community {community_id}; polling for update")
+            if "name" not in edit_result:
+                _edit()
+    else:
+        _edit()
+
+    wait_until_member_sees_community_update(
+        observer_backend,
+        community_id,
+        edit_result["name"],
+        edit_result["description"],
+        attempts=attempts,
+        spectate=spectate_before_wait,
+    )
+    return edit_result["name"], edit_result["description"]
+
+
+def join_token_gated_community_as_member(
+    owner_backend,
+    member_backend,
+    community_id: str,
+    wallet_address: str,
+    attempts: int = 10,
+):
+    """Wait for join permissions and accept the member into a token-gated community."""
+    wait_until_join_permissions_satisfied(member_backend, community_id, wallet_address, attempts=attempts)
+    join_community_with_signatures_and_accept(owner_backend, member_backend, community_id, wallet_address)
+
+
+def create_member_b_profile(
+    backend_new_profile,
+    snt_token_overrides,
+    multicall3_deployer,
+    community_token_deployer: str,
+    name: str = "member_b",
+):
+    """Create a second member profile with the same local test-network overrides as owner/member."""
+    return backend_new_profile(
+        name=name,
+        token_overrides=snt_token_overrides,
+        multicall_contract_address=multicall3_deployer.contract_address,
+        community_token_deployer_contract_address=community_token_deployer,
+    )
 
 
 def request_to_join_with_signatures(backend: StatusBackend, community_id: str, addresses: list[str]):
@@ -39,6 +205,7 @@ def create_token_gated_community(
 ):
     """Create a community and add token permissions."""
     if permission_types is None:
+        # Values must match protobuf CommunityTokenPermission.Type in protocol/protobuf/communities.proto
         permission_types = [CommunityTokenPermissionType.BECOME_MEMBER]
     if token_criteria is None:
         token_criteria = [
@@ -116,7 +283,6 @@ def join_community_with_signatures_and_accept(owner_backend, member_backend, com
         assert len(requests) == 1, "Unexpected multiple requests to join community"
         req_id = requests[0].get("id")
 
-    time.sleep(2)
     accept_resp = owner_backend.wakuext_service.accept_request_to_join_community(req_id)
     assert accept_resp is not None, f"Failed to accept request: {accept_resp}"
 
@@ -130,6 +296,7 @@ def wait_for_member_role(
     delay: int = 2,
     fetch_from_store: bool = False,
     required: bool = True,
+    spectate: bool = False,
 ):
     """Poll until *backend* sees *role* on the member identified by *member_key*.
 
@@ -144,6 +311,11 @@ def wait_for_member_role(
     """
     community = None
     for _ in range(attempts):
+        if spectate:
+            try:
+                backend.wakuext_service.spectate_community(community_id)
+            except Exception as exc:
+                logger.debug(f"spectate_community failed while waiting for role {role}: {exc}")
         if fetch_from_store:
             messenger.fetch_community(backend, community_id, try_database=False)
         communities = backend.wakuext_service.communities()
@@ -159,7 +331,31 @@ def wait_for_member_role(
     if required:
         assert community is not None, "Community not found"
         roles = community.get("members", {}).get(member_key, {}).get("roles", [])
-        assert role in roles, f"Member {member_key} did not receive role {role} after {attempts} attempts"
+        assert role in roles, f"Member {member_key} did not receive role {role} after {attempts} attempts; roles={roles}"
     else:
         logger.warning(f"Backend local state may not yet reflect role {role} for {member_key}; proceeding")
+    return community
+
+
+def wait_until_community_has_permission_types(
+    backend: StatusBackend,
+    community_id: str,
+    expected_types: set[int],
+    attempts: int = 15,
+    delay: int = 2,
+) -> dict:
+    """Poll until the community on *backend* includes all expected token permission types."""
+    community = None
+    for _ in range(attempts):
+        community = next(
+            (c for c in messenger.communities_list(backend.wakuext_service.communities()) if c.get("id") == community_id),
+            None,
+        )
+        if community and expected_types.issubset(community_permission_types(community)):
+            return community
+        time.sleep(delay)
+
+    assert community, f"Community {community_id} not found on {backend}"
+    observed = community_permission_types(community)
+    assert expected_types.issubset(observed), f"Expected permission types {expected_types}, got {observed}"
     return community

@@ -37,6 +37,11 @@
     ];
     forAllSystems = f: nixpkgs.lib.genAttrs stableSystems (system: f system);
     pkgsOverlay = import ./nix/overlay.nix;
+    # nim-sds/lmn/logos-storage-nim hardcode XDG_CACHE_HOME=/tmp, which causes
+    # nim cache collisions at /tmp/nim/<name>_d/ on macOS
+    useTmpdirForNimCache = drv: drv.overrideAttrs (old: {
+      preBuild = ''export XDG_CACHE_HOME="$TMPDIR"'' + "\n" + (old.preBuild or "");
+    });
     pkgsFor = forAllSystems (
       system: import nixpkgs {
         inherit system;
@@ -47,9 +52,9 @@
         overlays = [
           pkgsOverlay
           (final: prev: {
-            libwaku = lmn.packages.${system}.libwaku;
-            libsds  = nim-sds.packages.${system}.libsds;
-            libstorage = logos-storage-nim.packages.${system}.libstorage;
+            libwaku    = useTmpdirForNimCache lmn.packages.${system}.libwaku;
+            libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
+            libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
           })
         ];
       }
