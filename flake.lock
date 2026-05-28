@@ -8,16 +8,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1736521871,
-        "narHash": "sha256-d34XNLg9NGPEOARHW+BIOAWalkHdEUAwsv3mpLZQxds=",
+        "lastModified": 1779967405,
+        "narHash": "sha256-UP0D5UinZj36LoMv07BhjZuZxYABNDHz975fUXGxjKU=",
         "owner": "logos-storage",
         "repo": "circom-compat-ffi",
-        "rev": "8cd4ed44fdafe59d4ec1184420639cae4c4dbab9",
+        "rev": "3cca4e91054a4d2bb5335feb19138362ce0fe417",
         "type": "github"
       },
       "original": {
         "owner": "logos-storage",
         "repo": "circom-compat-ffi",
+        "rev": "3cca4e91054a4d2bb5335feb19138362ce0fe417",
         "type": "github"
       }
     },
