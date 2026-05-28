@@ -2701,6 +2701,14 @@ func (m *Messenger) HandleGroupChatInvitation(ctx context.Context, state *Receiv
 }
 
 func (m *Messenger) HandleContactCodeAdvertisement(ctx context.Context, state *ReceivedMessageState, cca *protobuf.ContactCodeAdvertisement, statusMessage *common.StatusMessage) error {
+	publicKey := state.CurrentMessageState.PublicKey
+
+	if m.pushNotificationClient != nil {
+		if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, cca); err != nil {
+			m.logger.Warn("failed to handle ContactCodeAdvertisement push notification info", zap.Error(err))
+		}
+	}
+
 	if cca.ChatIdentity == nil {
 		return nil
 	}
