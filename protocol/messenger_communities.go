@@ -3921,7 +3921,7 @@ func (m *Messenger) dispatchArchiveLinkMessage(communityID string) error {
 		return err
 	}
 
-	chatID := community.MagnetlinkMessageChannelID()
+	chatID := community.UniversalChatID()
 	rawMessage := common.RawMessage{
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
