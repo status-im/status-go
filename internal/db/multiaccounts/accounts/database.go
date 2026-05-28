@@ -1020,7 +1020,7 @@ func (db *Database) UpdateKeypairXPub(keyUID string, xpub string, coldWallet acc
 	if err != nil {
 		return err
 	}
-	return nil
+	return db.updateKeypairClock(tx, keyUID, clock)
 }
 
 func (db *Database) GetWalletAddress() (rst types.Address, err error) {

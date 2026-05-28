@@ -415,15 +415,6 @@ message SyncRawMessage {
   bytes settingsJsonBytes = 3;
 }
 
-message SyncKeycard {
-  string uid = 1;
-  string name = 2;
-  bool locked = 3;
-  string key_uid = 4;
-  repeated bytes addresses = 5;
-  uint64 position = 6;
-}
-
 message SyncSocialLinks {
   repeated SocialLink social_links = 1;
   uint64 clock = 2;

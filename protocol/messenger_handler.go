@@ -3029,19 +3029,10 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount,
 		return dbAccount.Operable, nil
 	}
 
-	if !syncKpMigratedToKeycard {
-		// We're here when we receive a keypair from the paired device which is either:
-		// 1. regular keypair or
-		// 2. was just converted from keycard to a regular keypair.
-		dbKeycardsForKeyUID, err := m.settings.GetKeycardsWithSameKeyUID(syncAcc.KeyUid)
-		if err != nil {
-			return accsmanagementtypes.AccountNonOperable, err
-		}
-
-		if len(dbKeycardsForKeyUID) > 0 {
-			// We're here in case 2. from above and in this case we need to mark all accounts for this keypair non operable
-			return accsmanagementtypes.AccountNonOperable, nil
-		}
+	if !syncKpMigratedToKeycard && dbKpMigratedToKeycard {
+		// We're here when we receive a keypair from the paired device which was just converted from a cold wallet
+		// to a regular keypair so we need to mark all accounts for this keypair non operable
+		return accsmanagementtypes.AccountNonOperable, nil
 	}
 
 	if syncAcc.Chat || syncAcc.Wallet {

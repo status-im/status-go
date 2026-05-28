@@ -395,12 +395,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	//////////////////////////////////////////////////////////////////////////////
 	// Convert it to a keycard keypair on server and sync it to client
 	//////////////////////////////////////////////////////////////////////////////
-	err = serverAccountsAPI.SaveOrUpdateKeycard(ctx, &accsmanagementtypes.Keycard{
-		KeycardUID:        "1234",
-		KeycardName:       "new-keycard",
-		KeyUID:            serverKp.KeyUID,
-		AccountsAddresses: []types.Address{serverKp.Accounts[0].Address, serverKp.Accounts[1].Address},
-	}, s.password)
+	err = serverAccountsAPI.MigrateNonProfileKeypairToColdWallet(ctx, serverKp.KeyUID, s.password, accsmanagementtypes.ColdWalletTypeStatusKeycard)
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client
@@ -450,7 +445,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	//////////////////////////////////////////////////////////////////////////////
 	// Stop using keycard on server and sync it to client
 	//////////////////////////////////////////////////////////////////////////////
-	err = serverAccountsAPI.MigrateNonProfileKeycardKeypairToApp(ctx, seedKeypairMnemonic1, s.password)
+	err = serverAccountsAPI.MigrateNonProfileColdWalletKeypairToApp(ctx, seedKeypairMnemonic1, s.password)
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client

@@ -481,7 +481,9 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 	return nil
 }
 
-func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, password string, clock uint64) (string, error) {
+// MigrateColdWalletKeypairToApp updates a key pair's ColdWallet field to None and
+// restores the keystore files from the provided mnemonic. Works for both profile and non-profile keypairs.
+func (m *AccountsManager) MigrateColdWalletKeypairToApp(mnemonic string, password string, clock uint64) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -499,23 +501,21 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 		return "", err
 	}
 
-	if kp.Type == types.KeypairTypeProfile {
-		return "", ErrCannotMigrateProfileKeypair
-	}
-
 	if !kp.MigratedToColdWallet() {
 		return "", ErrKeypairIsNotKeycard
 	}
 
-	profileKeypair, err := m.persistence.GetProfileKeypair()
-	if err != nil {
-		return "", err
-	}
-
-	if !profileKeypair.MigratedToColdWallet() {
-		_, err = m.loadAccountInternally(types2.HexToAddress(profileKeypair.DerivedFrom), password)
+	if kp.Type != types.KeypairTypeProfile {
+		profileKeypair, err := m.persistence.GetProfileKeypair()
 		if err != nil {
-			return "", ErrWrongPasswordProvided(err)
+			return "", err
+		}
+
+		if !profileKeypair.MigratedToColdWallet() {
+			_, err = m.loadAccountInternally(types2.HexToAddress(profileKeypair.DerivedFrom), password)
+			if err != nil {
+				return "", ErrWrongPasswordProvided(err)
+			}
 		}
 	}
 
@@ -529,16 +529,12 @@ func (m *AccountsManager) MigrateNonProfileKeycardKeypairToApp(mnemonic string, 
 		return "", err
 	}
 
-	return kp.KeyUID, m.persistence.DeleteAllKeycardsWithKeyUID(kp.KeyUID, clock)
+	return kp.KeyUID, m.persistence.UpdateKeypairXPub(kp.KeyUID, "", types.ColdWalletTypeNone, clock)
 }
 
-// SaveOrUpdateKeycard saves or updates a keycard and its accounts
-// In case of migration to a keycard, corresponding keystore files need to be deleted if the keypair being migrated is not already migrated.
-func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, password string, clock uint64) error {
-	if len(keycard.AccountsAddresses) == 0 {
-		return ErrKeycardDoesNotHaveAnyAccounts
-	}
-
+// MigrateKeypairToColdWallet sets ColdWallet field of the keypair to the provided coldWallet type.
+// In case of migration to cold wallet, corresponding keystore files need to be deleted if the keypair being migrated is not already migrated.
+func (m *AccountsManager) MigrateKeypairToColdWallet(keyUID string, password string, coldWallet types.ColdWalletType, clock uint64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -546,12 +542,7 @@ func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, password s
 		return ErrPersistenceMissing
 	}
 
-	kpDb, err := m.persistence.GetKeypairByKeyUID(keycard.KeyUID)
-	if err != nil {
-		return ErrKeycardDoesNotRelateToAnyKeypair(err)
-	}
-
-	err = m.persistence.SaveOrUpdateKeycard(*keycard, clock, true)
+	kpDb, err := m.persistence.GetKeypairByKeyUID(keyUID)
 	if err != nil {
 		return err
 	}
@@ -562,13 +553,13 @@ func (m *AccountsManager) SaveOrUpdateKeycard(keycard *types.Keycard, password s
 			return err
 		}
 
-		err = m.persistence.MarkKeypairFullyOperable(keycard.KeyUID, clock, true)
+		err = m.persistence.MarkKeypairFullyOperable(keyUID, clock, true)
 		if err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return m.persistence.UpdateKeypairXPub(keyUID, "", coldWallet, clock)
 }
 
 func (m *AccountsManager) DeleteAccount(address types2.Address, password string, clock uint64) (account *types.Account, err error) {
