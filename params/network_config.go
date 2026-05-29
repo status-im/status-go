@@ -67,9 +67,6 @@ type Network struct {
 
 	// Deprecated fields (kept for backward compatibility)
 	// FIXME: Removal of deprecated fields in integration PR https://github.com/status-im/status-go/pull/6178
-	DefaultRPCURL       string `json:"defaultRpcUrl" validate:"omitempty,url"`       // Deprecated: proxy rpc url
-	DefaultFallbackURL  string `json:"defaultFallbackURL" validate:"omitempty,url"`  // Deprecated: proxy fallback url
-	DefaultFallbackURL2 string `json:"defaultFallbackURL2" validate:"omitempty,url"` // Deprecated: second proxy fallback url
 	RPCURL              string `json:"rpcUrl" validate:"omitempty,url"`              // Deprecated: direct rpc url
 	OriginalRPCURL      string `json:"originalRpcUrl" validate:"omitempty,url"`      // Deprecated: direct rpc url if user overrides RPCURL
 	FallbackURL         string `json:"fallbackURL" validate:"omitempty,url"`         // Deprecated
