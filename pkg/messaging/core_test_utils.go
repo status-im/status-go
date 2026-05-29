@@ -67,7 +67,7 @@ type testWakuWrapper struct {
 	api *testPublicWakuAPI
 }
 
-func (tw *testWakuWrapper) PublicWakuAPI() types.PublicWakuAPI {
+func (tw *testWakuWrapper) PublicWakuAPI() any {
 	return tw.api
 }
 

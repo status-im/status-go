@@ -2086,7 +2086,9 @@ func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Durat
 	}
 }
 
-func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
+// PublicWakuAPI returns the transport-side messaging API (a
+// transport.MessagingAPI value, typed as any here to avoid a cycle).
+func (w *Waku) PublicWakuAPI() any {
 	return NewPublicWakuAPI(w)
 }
 

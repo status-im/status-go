@@ -32,8 +32,8 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
-	common "github.com/status-im/status-go/pkg/messaging/waku/common"
-	types "github.com/status-im/status-go/pkg/messaging/waku/types"
+	"github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // List of errors
@@ -52,8 +52,6 @@ type PublicWakuAPI struct {
 	mu       sync.Mutex
 	lastUsed map[string]time.Time // keeps track when a filter was polled for the last time.
 }
-
-var _ types.PublicWakuAPI = (*PublicWakuAPI)(nil)
 
 // NewPublicWakuAPI create a new RPC waku service.
 func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {

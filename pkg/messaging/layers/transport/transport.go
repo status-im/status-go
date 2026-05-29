@@ -74,7 +74,7 @@ type Transport struct {
 	gocommon.PauseBroadcaster
 
 	waku        types.Waku
-	api         types.PublicWakuAPI // only PublicWakuAPI implements logic to send messages
+	api         MessagingAPI // backend used to send messages and read received envelopes
 	keysManager *transportKeysManager
 	filters     *FiltersManager
 	logger      *zap.Logger
@@ -140,9 +140,12 @@ func NewTransport(
 		envelopesMonitor.Start()
 	}
 
-	var api types.PublicWakuAPI
+	var api MessagingAPI
 	if waku != nil {
-		api = waku.PublicWakuAPI()
+		var ok bool
+		if api, ok = waku.PublicWakuAPI().(MessagingAPI); !ok {
+			return nil, errors.New("waku does not provide a MessagingAPI")
+		}
 	}
 	t := &Transport{
 		waku:             waku,
