@@ -33,7 +33,7 @@ func TestKeycardPairingsFile(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service, err := NewService(db, accountsDb, appDB, rpcClient, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil, "")
+	service, err := NewService(db, accountsDb, appDB, rpcClient, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	data, err := service.KeycardPairings().GetPairingsJSONFileContent()
