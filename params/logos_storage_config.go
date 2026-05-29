@@ -2,7 +2,7 @@ package params
 
 const (
 	// Number of times to retry fetching a block on LogosStorage before giving up.
-	defaultLogosStorageBlockRetries = 50
+	DefaultLogosStorageBlockRetries = 50
 )
 
 type LogosStorageNodeConfig struct {

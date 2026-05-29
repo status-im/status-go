@@ -438,7 +438,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		LogosStorageConfig: LogosStorageConfig{
 			Enabled: false,
 			NodeConfig: LogosStorageNodeConfig{
-				BlockRetries:   defaultLogosStorageBlockRetries,
+				BlockRetries:   DefaultLogosStorageBlockRetries,
 				DataDir:        filepath.Join(dataDir, "logos-storage", "data"),
 				MetricsEnabled: false,
 				LogFormat:      "nocolors",

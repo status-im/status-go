@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -75,4 +76,22 @@ func TestDefaultNodeConfig_AllowForceCommunityMembersReevaluation(t *testing.T) 
 		require.NoError(t, err)
 		require.False(t, cfg.ShhextConfig.AllowForceCommunityMembersReevaluation)
 	})
+
+func TestDefaultNodeConfigSetsLogosStorageDefaults(t *testing.T) {
+	bootstrapNode := "test-bootstrap-node"
+	request := &requests.CreateAccount{
+		RootDataDir:                     t.TempDir(),
+		LogosStorageConfigBootstrapNode: &bootstrapNode,
+	}
+
+	nodeConfig, err := DefaultNodeConfig("installation-id", "key-uid", request)
+	require.NoError(t, err)
+
+	require.False(t, nodeConfig.LogosStorageConfig.Enabled)
+	require.Equal(t, filepath.Join(request.RootDataDir, "logos-storage", "data"), nodeConfig.LogosStorageConfig.NodeConfig.DataDir)
+	require.Equal(t, params.DefaultLogosStorageBlockRetries, nodeConfig.LogosStorageConfig.NodeConfig.BlockRetries)
+	require.False(t, nodeConfig.LogosStorageConfig.NodeConfig.MetricsEnabled)
+	require.Equal(t, "nocolors", nodeConfig.LogosStorageConfig.NodeConfig.LogFormat)
+	require.Equal(t, []string{bootstrapNode}, nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes)
 }
+

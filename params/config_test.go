@@ -53,6 +53,19 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, 5, c.LogosStorageConfig.NodeConfig.BlockRetries)
 }
 
+func TestNodeConfigUpdateWithDefaultsSetsLogosStorageDataDirWhenEnabled(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := &params.NodeConfig{
+		RootDataDir: tmpDir,
+		LogosStorageConfig: params.LogosStorageConfig{
+			Enabled: true,
+		},
+	}
+
+	require.NoError(t, config.UpdateWithDefaults())
+	require.Equal(t, filepath.Join(tmpDir, "logos-storage", "data"), config.LogosStorageConfig.NodeConfig.DataDir)
+}
+
 // TestNodeConfigValidate checks validation of individual fields.
 func TestNodeConfigValidate(t *testing.T) {
 	testCases := []struct {
