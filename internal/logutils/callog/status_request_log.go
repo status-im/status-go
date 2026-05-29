@@ -40,8 +40,6 @@ var sensitiveKeys = []string{
 	"openSeaApiKey",
 	"marketDataProxyUser",
 	"marketDataProxyPassword",
-	"statusProxyBlockchainUser",
-	"statusProxyBlockchainPassword",
 	"verifyENSURL",
 	"verifyTransactionURL",
 	"gifs/api-key",

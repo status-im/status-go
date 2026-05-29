@@ -119,8 +119,6 @@ type WalletSecretsConfig struct {
 
 	CoingeckoAPIKey     security.SensitiveString `json:"coingeckoApiKey"`
 	CoingeckoDemoAPIKey security.SensitiveString `json:"coingeckoDemoApiKey"`
-	StatusProxyUser     security.SensitiveString `json:"statusProxyBlockchainUser"`
-	StatusProxyPassword security.SensitiveString `json:"statusProxyBlockchainPassword"`
 
 	EthRpcProxyUrl           security.SensitiveString `json:"ethRpcProxyUrl"`
 	EthRpcProxyUser          security.SensitiveString `json:"ethRpcProxyUser"`
