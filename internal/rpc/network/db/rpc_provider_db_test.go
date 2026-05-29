@@ -58,7 +58,7 @@ func (s *RpcProviderPersistenceTestSuite) TestGetRpcProvidersByType() {
 		testutil.CreateProvider(common.EthereumMainnet, "UserProvider1", params.UserProviderType, true, security.NewSensitiveString("https://provider1.example.com")),
 		testutil.CreateProvider(common.EthereumMainnet, "EmbeddedDirect1", params.EmbeddedDirectProviderType, false, security.NewSensitiveString("https://provider2.example.com")),
 		testutil.CreateProvider(common.EthereumMainnet, "UserProvider2", params.UserProviderType, false, security.NewSensitiveString("https://provider3.example.com")),
-		testutil.CreateProvider(common.EthereumMainnet, "EmbeddedProxy1", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://provider4.example.com")),
+		testutil.CreateProvider(common.EthereumMainnet, "EmbeddedEthRpcProxy1", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://provider4.example.com")),
 	}
 
 	for _, provider := range providers {
@@ -75,7 +75,7 @@ func (s *RpcProviderPersistenceTestSuite) TestGetRpcProvidersByType() {
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), []params.RpcProvider{providers[1]}, embeddedDirectProviders)
 
-	embeddedProxyProviders, err := s.rpcPersistence.GetRpcProvidersByType(common.EthereumMainnet, params.EmbeddedProxyProviderType)
+	embeddedProxyProviders, err := s.rpcPersistence.GetRpcProvidersByType(common.EthereumMainnet, params.EmbeddedEthRpcProxyProviderType)
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), []params.RpcProvider{providers[3]}, embeddedProxyProviders)
 }
@@ -132,7 +132,7 @@ func (s *RpcProviderPersistenceTestSuite) TestSetRpcProviders() {
 
 	newProviders := []params.RpcProvider{
 		testutil.CreateProvider(common.EthereumMainnet, "NewProvider1", params.UserProviderType, true, security.NewSensitiveString("https://newprovider1.example.com")),
-		testutil.CreateProvider(common.EthereumMainnet, "NewProvider2", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://newprovider2.example.com")),
+		testutil.CreateProvider(common.EthereumMainnet, "NewProvider2", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://newprovider2.example.com")),
 	}
 
 	err := s.rpcPersistence.SetRpcProviders(common.EthereumMainnet, newProviders)

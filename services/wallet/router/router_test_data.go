@@ -51,7 +51,6 @@ const (
 	stageName = "test"
 
 	// Provider types
-	proxyInfura  = "proxy-infura"
 	directInfura = "direct-infura"
 	directGrove  = "direct-grove"
 )
@@ -103,7 +102,7 @@ var mainnet = params.Network{
 	ChainID:   walletCommon.EthereumMainnet,
 	ChainName: "Ethereum",
 	RpcProviders: []params.RpcProvider{
-		*params.NewProxyProvider(walletCommon.EthereumMainnet, proxyInfura, security.NewSensitiveStringPrintf("https://%s.api.status.im/infura/ethereum/mainnet/", stageName), false),
+		*params.NewEthRpcProxyProvider(walletCommon.EthereumMainnet, "status-smart-proxy", security.NewSensitiveStringPrintf("https://%s.eth-rpc.status.im/ethereum/mainnet/", stageName), false, false),
 		*params.NewDirectProvider(walletCommon.EthereumMainnet, directInfura, security.NewSensitiveString("https://mainnet.infura.io/v3/"), true),
 		*params.NewDirectProvider(walletCommon.EthereumMainnet, directGrove, security.NewSensitiveStringPrintf("https://eth-archival.rpc.grove.city/v1/"), false),
 	},
@@ -127,7 +126,7 @@ var optimism = params.Network{
 	ChainID:   walletCommon.OptimismMainnet,
 	ChainName: "Optimism",
 	RpcProviders: []params.RpcProvider{
-		*params.NewProxyProvider(walletCommon.OptimismMainnet, proxyInfura, security.NewSensitiveStringPrintf("https://%s.api.status.im/infura/optimism/mainnet/", stageName), false),
+		*params.NewEthRpcProxyProvider(walletCommon.OptimismMainnet, "status-smart-proxy", security.NewSensitiveStringPrintf("https://%s.eth-rpc.status.im/optimism/mainnet/", stageName), false, false),
 		*params.NewDirectProvider(walletCommon.OptimismMainnet, directInfura, security.NewSensitiveString("https://optimism-mainnet.infura.io/v3/"), true),
 		*params.NewDirectProvider(walletCommon.OptimismMainnet, directGrove, security.NewSensitiveString("https://optimism.rpc.grove.city/v1/"), false),
 	},
@@ -151,7 +150,7 @@ var arbitrum = params.Network{
 	ChainID:   walletCommon.ArbitrumMainnet,
 	ChainName: "Arbitrum",
 	RpcProviders: []params.RpcProvider{
-		*params.NewProxyProvider(walletCommon.ArbitrumMainnet, proxyInfura, security.NewSensitiveStringPrintf("https://%s.api.status.im/infura/arbitrum/mainnet/", stageName), false),
+		*params.NewEthRpcProxyProvider(walletCommon.ArbitrumMainnet, "status-smart-proxy", security.NewSensitiveStringPrintf("https://%s.eth-rpc.status.im/arbitrum/mainnet/", stageName), false, false),
 		*params.NewDirectProvider(walletCommon.ArbitrumMainnet, directInfura, security.NewSensitiveString("https://arbitrum-mainnet.infura.io/v3/"), true),
 		*params.NewDirectProvider(walletCommon.ArbitrumMainnet, directGrove, security.NewSensitiveString("https://arbitrum-one.rpc.grove.city/v1/"), false),
 	},
@@ -175,7 +174,7 @@ var base = params.Network{
 	ChainID:   walletCommon.BaseMainnet,
 	ChainName: "Base",
 	RpcProviders: []params.RpcProvider{
-		*params.NewProxyProvider(walletCommon.BaseMainnet, proxyInfura, security.NewSensitiveStringPrintf("https://%s.api.status.im/infura/base/mainnet/", stageName), false),
+		*params.NewEthRpcProxyProvider(walletCommon.BaseMainnet, "status-smart-proxy", security.NewSensitiveStringPrintf("https://%s.eth-rpc.status.im/base/mainnet/", stageName), false, false),
 		*params.NewDirectProvider(walletCommon.BaseMainnet, directInfura, security.NewSensitiveString("https://base-mainnet.infura.io/v3/"), true),
 		*params.NewDirectProvider(walletCommon.BaseMainnet, directGrove, security.NewSensitiveString("https://base.rpc.grove.city/v1/"), false),
 	},

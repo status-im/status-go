@@ -57,7 +57,7 @@ func DefaultProviders(chainID uint64) []params.RpcProvider {
 			Name:         "Provider2",
 			ChainID:      chainID,
 			URL:          security.NewSensitiveString("https://rpc.provider2.io"),
-			Type:         params.EmbeddedProxyProviderType,
+			Type:         params.EmbeddedEthRpcProxyProviderType,
 			Enabled:      true,
 			AuthType:     params.BasicAuth,
 			AuthLogin:    security.NewSensitiveString("user1"),
@@ -101,7 +101,7 @@ func (s *NetworksPersistenceTestSuite) verifyNetworkDeletion(chainID uint64) {
 func (s *NetworksPersistenceTestSuite) TestAddAndGetNetworkWithProviders() {
 	network := testutil.CreateNetwork(common.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
 		testutil.CreateProvider(common.OptimismMainnet, "Provider1", params.UserProviderType, true, security.NewSensitiveString("https://rpc.optimism.io")),
-		testutil.CreateProvider(common.OptimismMainnet, "Provider2", params.EmbeddedProxyProviderType, false, security.NewSensitiveString("https://backup.optimism.io")),
+		testutil.CreateProvider(common.OptimismMainnet, "Provider2", params.EmbeddedEthRpcProxyProviderType, false, security.NewSensitiveString("https://backup.optimism.io")),
 	})
 	s.addAndVerifyNetworks([]*params.Network{network})
 }
