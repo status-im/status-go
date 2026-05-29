@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -26,11 +27,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, a := range parsedAST {
-		for _, file := range a.Files {
-			// handle each file and append the output
-			output += handleFile(file)
+	// this generates bindings that are reproducible.
+	funcs := map[string]*ast.FuncDecl{}
+	for _, pkg := range parsedAST {
+		for _, file := range pkg.Files {
+			for name, obj := range file.Scope.Objects {
+				if obj.Kind != ast.Fun || !unicode.IsUpper(rune(name[0])) {
+					continue
+				}
+				funcs[name] = obj.Decl.(*ast.FuncDecl)
+			}
 		}
+	}
+	names := make([]string, 0, len(funcs))
+	for name := range funcs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		output += handleFunction(name, funcs[name])
 	}
 
 	// To free memory allocated to strings
@@ -129,18 +144,5 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 
 	// close function declaration
 	output += "}\n"
-	return output
-}
-
-func handleFile(parsedAST *ast.File) string {
-	output := ""
-	for name, obj := range parsedAST.Scope.Objects {
-		// Ignore non-functions or non exported fields
-		if obj.Kind != ast.Fun || !unicode.IsUpper(rune(name[0])) {
-			continue
-		}
-		output += handleFunction(name, obj.Decl.(*ast.FuncDecl))
-	}
-
 	return output
 }
