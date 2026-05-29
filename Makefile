@@ -185,7 +185,7 @@ endif
 $(LIBSTORAGE): clone-storage
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@echo "Building logos-storage: $(LIBSTORAGE)"
-	$(MAKE) -C $(LOGOS_STORAGE_SOURCE_DIR) libstorage
+	$(MAKE) -C $(LOGOS_STORAGE_SOURCE_DIR) libstorage USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
 endif
 
 build-storage: $(LIBSTORAGE)
