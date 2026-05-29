@@ -13,16 +13,10 @@ import (
 const (
 	// Host suffixes for providers
 	SmartProxyHostSuffix = "eth-rpc.status.im"
-	ProxyHostSuffix      = "api.status.im"
 
 	iconURLPrefix         = "network/"
 	testNetworkIconSuffix = "-test"
 )
-
-// Direct proxy endpoint (1 endpoint per chain/network)
-func proxyUrl(stageName, provider, chainName, networkName string) security.SensitiveString {
-	return security.NewSensitiveStringPrintf("https://%s.%s/%s/%s/%s/", stageName, ProxyHostSuffix, provider, chainName, networkName)
-}
 
 // New eth-rpc-proxy endpoint (provider agnostic)
 func getProxyHost(customUrl, stageName string) string {
@@ -47,7 +41,6 @@ type providerType uint8
 const (
 	providerTypeEthRpcProxy providerType = iota
 	providerTypeEthRpcProxyWithProvider
-	providerTypeProxy
 	providerTypeDirect
 )
 
@@ -59,14 +52,14 @@ type providerSpec struct {
 	// For providerKindDirect
 	directURL security.SensitiveString
 
-	// For providerKindEthRpcProxyWithProvider and providerKindProxy (URL path component)
+	// For providerKindEthRpcProxyWithProvider (URL path component)
 	targetProvider string
 }
 
 type networkSpec struct {
 	chainID uint64
 
-	// Used for status smart-proxy + old proxy URL generation
+	// Used for status smart-proxy URL generation
 	proxyChainName   string
 	proxyNetworkName string
 
@@ -90,7 +83,6 @@ type networkSpec struct {
 // configEnv groups runtime options
 type configEnv struct {
 	ProxyHost          string
-	StageName          string
 	EnableRpcProviders bool
 	UsePuzzleAuth      bool
 }
@@ -107,8 +99,6 @@ func buildRpcProvidersFromSpec(spec networkSpec, env configEnv) []params.RpcProv
 			out = append(out, *params.NewEthRpcProxyProvider(spec.chainID, p.name, smartProxyUrl(env.ProxyHost, spec.proxyChainName, spec.proxyNetworkName), false, env.UsePuzzleAuth))
 		case providerTypeEthRpcProxyWithProvider:
 			out = append(out, *params.NewEthRpcProxyProvider(spec.chainID, p.name, smartProxyUrlWithProvider(env.ProxyHost, spec.proxyChainName, spec.proxyNetworkName, p.targetProvider), false, env.UsePuzzleAuth))
-		case providerTypeProxy:
-			out = append(out, *params.NewProxyProvider(spec.chainID, p.name, proxyUrl(env.StageName, p.targetProvider, spec.proxyChainName, spec.proxyNetworkName), false))
 		case providerTypeDirect:
 			out = append(out, *params.NewDirectProvider(spec.chainID, p.name, p.directURL, p.enableRpsLimiter))
 		}
@@ -142,10 +132,9 @@ func buildNetworkFromSpec(spec networkSpec, env configEnv) params.Network {
 	}
 }
 
-func defaultNetworks(proxyHost, stageName string, thirdpartyServicesEnabled bool, usePuzzleAuth bool) []params.Network {
+func defaultNetworks(proxyHost string, thirdpartyServicesEnabled bool, usePuzzleAuth bool) []params.Network {
 	env := configEnv{
 		ProxyHost:          proxyHost,
-		StageName:          stageName,
 		EnableRpcProviders: thirdpartyServicesEnabled,
 		UsePuzzleAuth:      usePuzzleAuth,
 	}
@@ -172,22 +161,13 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 		walletConfig.EthRpcProxyUser,
 		walletConfig.EthRpcProxyPassword)
 
-	// Apply auth for old proxy
-	hasOldProxyCredentials := !walletConfig.StatusProxyUser.Empty() && !walletConfig.StatusProxyPassword.Empty()
-	networks = networkhelper.OverrideBasicAuth(
-		networks,
-		params.EmbeddedProxyProviderType,
-		hasOldProxyCredentials,
-		walletConfig.StatusProxyUser,
-		walletConfig.StatusProxyPassword)
-
 	return networks
 }
 
 func BuildDefaultNetworks(walletSecretsConfig *requests.WalletSecretsConfig, thirdpartyServicesEnabled bool) []params.Network {
 	proxyHost := getProxyHost(walletSecretsConfig.EthRpcProxyUrl.Reveal(), walletSecretsConfig.StatusProxyStageName)
 	networks := setRPCs(
-		defaultNetworks(proxyHost, walletSecretsConfig.StatusProxyStageName, thirdpartyServicesEnabled, walletSecretsConfig.EthRpcProxyUsePuzzleAuth),
+		defaultNetworks(proxyHost, thirdpartyServicesEnabled, walletSecretsConfig.EthRpcProxyUsePuzzleAuth),
 		walletSecretsConfig,
 	)
 	return networkhelper.WithCommunitiesSupported(networks)

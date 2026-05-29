@@ -241,11 +241,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         if "STATUS_BUILD_PROXY_USER" not in os.environ:
             return data
 
-        user = os.environ["STATUS_BUILD_PROXY_USER"]
-        password = os.environ["STATUS_BUILD_PROXY_PASSWORD"]
-
-        data["StatusProxyBlockchainUser"] = user
-        data["StatusProxyBlockchainPassword"] = password
         data["StatusProxyEnabled"] = True
         data["StatusProxyStageName"] = "test"
         return data
