@@ -1,6 +1,8 @@
 package types
 
 import (
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/internal/crypto/types"
 )
 
@@ -38,4 +40,9 @@ func (t TopicType) Bytes() []byte {
 
 func TopicTypeToByteArray(t TopicType) []byte {
 	return t[:4]
+}
+
+// ContentTopic returns the 23/WAKU2-TOPICS string representation of the topic.
+func (t TopicType) ContentTopic() string {
+	return "/waku/1/" + hexutil.Encode(t[:]) + "/rfc26"
 }
