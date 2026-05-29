@@ -60,12 +60,12 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 
 	networks := []params.Network{
 		*testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
-			*params.NewProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false),
+			*params.NewEthRpcProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false, false),
 		},
 		),
 	}
 
-	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
+	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
 	require.NotEmpty(t, networks)
 
 	config := rpc.ClientConfig{

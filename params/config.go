@@ -231,8 +231,6 @@ type WalletConfig struct {
 	CoingeckoDemoAPIKey   security.SensitiveString `json:"CoingeckoDemoAPIKey"`
 	MarketDataProxyConfig MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
 	NftProxyConfig        NftProxyConfig           `json:"NftProxyConfig"`
-	StatusProxyUser       security.SensitiveString `json:"StatusProxyBlockchainUser"`
-	StatusProxyPassword   security.SensitiveString `json:"StatusProxyBlockchainPassword"`
 
 	StatusProxyStageName     string                   `json:"StatusProxyStageName"`
 	EnableMercuryoProvider   bool                     `json:"EnableMercuryoProvider"`
