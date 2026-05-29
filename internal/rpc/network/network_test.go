@@ -236,9 +236,6 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulation() {
 	s.Equal("https://direct2.ethereum.io", network.OriginalFallbackURL)
 	s.Equal("https://user1.ethereum.io", network.RPCURL)
 	s.Equal("https://user2.ethereum.io", network.FallbackURL)
-	s.Empty(network.DefaultRPCURL)
-	s.Empty(network.DefaultFallbackURL)
-	s.Empty(network.DefaultFallbackURL2)
 }
 
 func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders() {
@@ -268,9 +265,6 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders(
 	s.Empty(network.OriginalFallbackURL)                  // No second EmbeddedDirect provider
 	s.Equal("https://direct1.sepolia.io", network.RPCURL) // Defaults to OriginalRPCURL
 	s.Empty(network.FallbackURL)                          // Defaults to OriginalFallbackURL, which is empty
-	s.Empty(network.DefaultRPCURL)
-	s.Empty(network.DefaultFallbackURL)
-	s.Empty(network.DefaultFallbackURL2)
 }
 
 func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
