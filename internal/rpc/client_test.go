@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
@@ -119,4 +120,53 @@ func TestGetClientsUsingCache(t *testing.T) {
 
 func TestUserAgent(t *testing.T) {
 	require.True(t, strings.HasPrefix(rpcUserAgentName, "procuratee-desktop/"))
+}
+
+func TestGetProviderRPCLimiterCircuitName(t *testing.T) {
+	const host = "test.eth-rpc.status.im"
+
+	newProvider := func(chainID uint64, rpsLimiter bool) params.RpcProvider {
+		return params.RpcProvider{
+			Name:             "smart-proxy",
+			ChainID:          chainID,
+			URL:              security.NewSensitiveString(fmt.Sprintf("https://%s/ethereum/mainnet/", host)),
+			Type:             params.EmbeddedEthRpcProxyProviderType,
+			AuthType:         params.NoAuth,
+			EnableRPSLimiter: rpsLimiter,
+			Enabled:          true,
+		}
+	}
+
+	c := &Client{limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter)}
+
+	// Circuit name must be non-empty even when the RPS limiter is disabled, so the
+	// circuit breaker can short-circuit a consistently failing provider.
+	limiter, circuitChain1, err := c.getProviderRPCLimiter(newProvider(1, false))
+	require.NoError(t, err)
+	require.Nil(t, limiter)
+	require.Equal(t, fmt.Sprintf("%s-%d", host, 1), circuitChain1)
+
+	// Same host but a different chain must yield a different circuit name, so a provider
+	// that fails for one chain does not open the circuit for other chains sharing the host.
+	limiter, circuitChain747474, err := c.getProviderRPCLimiter(newProvider(747474, false))
+	require.NoError(t, err)
+	require.Nil(t, limiter)
+	require.Equal(t, fmt.Sprintf("%s-%d", host, 747474), circuitChain747474)
+	require.NotEqual(t, circuitChain1, circuitChain747474)
+
+	// With the RPS limiter enabled, the circuit name is still isolated per chain+host,
+	// while the limiter itself is shared per host across chains.
+	limiterChain1, circuitChain1Rps, err := c.getProviderRPCLimiter(newProvider(1, true))
+	require.NoError(t, err)
+	require.NotNil(t, limiterChain1)
+	require.Equal(t, fmt.Sprintf("%s-%d", host, 1), circuitChain1Rps)
+
+	limiterChain2, circuitChain2Rps, err := c.getProviderRPCLimiter(newProvider(2, true))
+	require.NoError(t, err)
+	require.NotNil(t, limiterChain2)
+	require.Equal(t, fmt.Sprintf("%s-%d", host, 2), circuitChain2Rps)
+	require.NotEqual(t, circuitChain1Rps, circuitChain2Rps)
+
+	// Limiter is shared per host regardless of chain.
+	require.Same(t, limiterChain1, limiterChain2)
 }
