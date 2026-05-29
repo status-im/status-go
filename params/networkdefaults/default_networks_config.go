@@ -13,7 +13,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Ethereum",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://eth.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -38,7 +37,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Hoodi",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://hoodi.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
 		},
@@ -62,7 +60,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://eth-sepolia-testnet.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -87,7 +84,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Optimism",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://optimism-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://optimism.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -112,7 +108,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Optimism Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://optimism-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://optimism-sepolia-testnet.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -137,7 +132,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Arbitrum",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://arbitrum-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://arbitrum-one.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -162,7 +156,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Arbitrum Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://arbitrum-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://arbitrum-sepolia-testnet.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -187,7 +180,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Base",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://base-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://base.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -212,7 +204,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Base Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://base-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://base-testnet.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -237,7 +228,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Linea",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://linea-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://linea.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -262,7 +252,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Linea Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://linea-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectGrove, directURL: security.NewSensitiveString("https://linea-sepolia-testnet.rpc.grove.city/v1/")},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -287,7 +276,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Unichain",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://unichain-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://mainnet.unichain.org"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -312,7 +300,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Unichain Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://unichain-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://sepolia.unichain.org"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -481,7 +468,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "ZKsync",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://zksync-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://mainnet.era.zksync.io"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -506,7 +492,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "ZKsync Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://zksync-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://sepolia.era.zksync.dev"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -579,7 +564,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Scroll",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://scroll-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://rpc.scroll.io"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -604,7 +588,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Scroll Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://scroll-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://sepolia-rpc.scroll.io"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -629,7 +612,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Blast",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://blast-mainnet.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://rpc.blast.io"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},
@@ -654,7 +636,6 @@ var defaultNetworkSpecs = []networkSpec{
 		chainName:        "Blast Sepolia",
 		providers: []providerSpec{
 			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			{providerType: providerTypeProxy, name: common.ProxyInfura, targetProvider: common.Infura},
 			{providerType: providerTypeDirect, name: common.DirectInfura, directURL: security.NewSensitiveString("https://blast-sepolia.infura.io/v3/"), enableRpsLimiter: true},
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://sepolia.blast.io"), enableRpsLimiter: true},
 			{providerType: providerTypeEthRpcProxyWithProvider, name: common.SmartProxyAlchemy, targetProvider: common.Alchemy},

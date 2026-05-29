@@ -125,7 +125,7 @@ func MinimalActiveNetworks() []params.Network {
 			CreateProvider(
 				common.EthereumMainnet,
 				"Dummy Provider",
-				params.EmbeddedProxyProviderType,
+				params.EmbeddedEthRpcProxyProviderType,
 				true,
 				security.NewSensitiveString("http://localhost:0"),
 			),

@@ -218,12 +218,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if len(walletRequest.CustomTokens) > 0 {
 		walletConfig.CustomTokens = walletRequest.CustomTokens
 	}
-	if !request.StatusProxyUser.Empty() {
-		walletConfig.StatusProxyUser = request.StatusProxyUser
-	}
-	if !request.StatusProxyPassword.Empty() {
-		walletConfig.StatusProxyPassword = request.StatusProxyPassword
-	}
 
 	if !request.EthRpcProxyUrl.Empty() {
 		walletConfig.EthRpcProxyUrl = request.EthRpcProxyUrl

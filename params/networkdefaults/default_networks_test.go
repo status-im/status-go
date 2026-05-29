@@ -5,12 +5,11 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/require"
-
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildDefaultNetworks(t *testing.T) {
@@ -65,16 +64,10 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		// check default chains
-		if n.DefaultRPCURL != "" {
-			require.True(t, strings.Contains(n.DefaultRPCURL, stageName))
-		}
-		if n.DefaultFallbackURL != "" {
-			require.True(t, strings.Contains(n.DefaultFallbackURL, stageName))
-		}
-		if n.DefaultFallbackURL2 != "" {
-			require.True(t, strings.Contains(actualNetworks[0].DefaultFallbackURL2, stageName))
-		}
+		// legacy default proxy fields are no longer populated
+		require.Empty(t, n.DefaultRPCURL)
+		require.Empty(t, n.DefaultFallbackURL)
+		require.Empty(t, n.DefaultFallbackURL2)
 
 		// check fallback options
 		if strings.Contains(n.RPCURL, "infura.io") {
@@ -82,13 +75,6 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		}
 		if strings.Contains(n.FallbackURL, "grove.city") {
 			require.True(t, strings.Contains(n.FallbackURL, poktToken.Reveal()))
-		}
-
-		// Check proxy providers for stageName
-		for _, provider := range n.RpcProviders {
-			if provider.Type == params.EmbeddedProxyProviderType {
-				require.Contains(t, provider.URL.Reveal(), stageName, "Proxy provider URL should contain stageName")
-			}
 		}
 
 		// Check direct providers for tokens
