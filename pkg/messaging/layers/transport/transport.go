@@ -142,10 +142,7 @@ func NewTransport(
 
 	var api MessagingAPI
 	if waku != nil {
-		var ok bool
-		if api, ok = waku.PublicWakuAPI().(MessagingAPI); !ok {
-			return nil, errors.New("waku does not provide a MessagingAPI")
-		}
+		api = waku
 	}
 	t := &Transport{
 		waku:             waku,

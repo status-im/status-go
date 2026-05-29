@@ -97,10 +97,13 @@ type WakuKeyManager interface {
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku interface {
-	// PublicWakuAPI returns the messaging API exposed by this waku instance.
-	// The concrete value satisfies transport.MessagingAPI; the return type is
-	// any to avoid an import cycle (waku/types -> transport -> wakuv2 -> waku/types).
-	PublicWakuAPI() any
+	// Post posts a message on the Whisper network.
+	// returns the hash of the message in case of success.
+	Post(ctx context.Context, req NewMessage) ([]byte, error)
+
+	// GetFilterMessages returns the messages that match the filter criteria and
+	// are received between the last poll and now.
+	GetFilterMessages(id string) ([]*Message, error)
 
 	Start() error
 	Stop() error

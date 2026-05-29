@@ -34,4 +34,3 @@ type Criteria struct {
 	Topics       []TopicType `json:"topics"`
 	AllowP2P     bool        `json:"allowP2P"`
 }
-

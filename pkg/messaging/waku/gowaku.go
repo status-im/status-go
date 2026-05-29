@@ -205,6 +205,9 @@ type Waku struct {
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
+
+	// getFilterMessagesMu serialises GetFilterMessages lookups.
+	getFilterMessagesMu sync.Mutex
 }
 
 var _ types.Waku = (*Waku)(nil)
@@ -2084,12 +2087,6 @@ func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Durat
 	if shouldCycle {
 		w.StorenodeCycle.Cycle(ctx)
 	}
-}
-
-// PublicWakuAPI returns the transport-side messaging API (a
-// transport.MessagingAPI value, typed as any here to avoid a cycle).
-func (w *Waku) PublicWakuAPI() any {
-	return NewPublicWakuAPI(w)
 }
 
 func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {

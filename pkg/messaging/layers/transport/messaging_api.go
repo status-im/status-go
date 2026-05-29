@@ -23,4 +23,4 @@ type MessagingAPI interface {
 }
 
 // Compile-time assertion: the waku adapter satisfies MessagingAPI.
-var _ MessagingAPI = (*wakuv2.PublicWakuAPI)(nil)
+var _ MessagingAPI = (*wakuv2.Waku)(nil)

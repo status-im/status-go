@@ -23,8 +23,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"sync"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -44,27 +42,9 @@ var (
 	ErrNoTopics            = errors.New("missing topic(s)")
 )
 
-// PublicWakuAPI provides the waku RPC service that can be
-// use publicly without security implications.
-type PublicWakuAPI struct {
-	w *Waku
-
-	mu       sync.Mutex
-	lastUsed map[string]time.Time // keeps track when a filter was polled for the last time.
-}
-
-// NewPublicWakuAPI create a new RPC waku service.
-func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
-	api := &PublicWakuAPI{
-		w:        w,
-		lastUsed: make(map[string]time.Time),
-	}
-	return api
-}
-
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
-func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
+func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -80,7 +60,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 
 	// Set key that is used to sign the message
 	if len(req.SigID) > 0 {
-		privKey, err := api.w.GetPrivateKey(req.SigID)
+		privKey, err := w.GetPrivateKey(req.SigID)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +76,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 		if contentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
 		}
-		if keyInfo.SymKey, err = api.w.GetSymKey(req.SymKeyID); err != nil {
+		if keyInfo.SymKey, err = w.GetSymKey(req.SymKeyID); err != nil {
 			return nil, err
 		}
 		if !common.ValidateDataIntegrity(keyInfo.SymKey, common.AESKeyLength) {
@@ -130,12 +110,12 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 		Payload:      payload,
 		Version:      &version,
 		ContentTopic: contentTopic.ContentTopic(),
-		Timestamp:    proto.Int64(api.w.timestamp()),
+		Timestamp:    proto.Int64(w.timestamp()),
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    &req.Ephemeral,
 	}
 
-	hash, err := api.w.Send(req.PubsubTopic, wakuMsg, req.Priority)
+	hash, err := w.Send(req.PubsubTopic, wakuMsg, req.Priority)
 
 	if err != nil {
 		return nil, err
@@ -173,15 +153,14 @@ func ToWakuMessage(message *common.ReceivedMessage) *types.Message {
 
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
-func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types.Message, error) {
-	api.mu.Lock()
-	f := api.w.getFilter(id)
+func (w *Waku) GetFilterMessages(id string) ([]*types.Message, error) {
+	w.getFilterMessagesMu.Lock()
+	f := w.getFilter(id)
 	if f == nil {
-		api.mu.Unlock()
+		w.getFilterMessagesMu.Unlock()
 		return nil, fmt.Errorf("filter not found")
 	}
-	api.lastUsed[id] = time.Now()
-	api.mu.Unlock()
+	w.getFilterMessagesMu.Unlock()
 
 	receivedMessages := f.Retrieve()
 	messages := make([]*types.Message, 0, len(receivedMessages))

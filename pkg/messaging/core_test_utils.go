@@ -64,16 +64,29 @@ func (f *TestMessagingEnvironment) SimulateOffline() func() {
 // Wraps waku to provide ability to subscribe to post events.
 type testWakuWrapper struct {
 	types.Waku
-	api *testPublicWakuAPI
+	postSubscriptions []chan *PostMessageSubscription
 }
 
-func (tw *testWakuWrapper) PublicWakuAPI() any {
-	return tw.api
+// Post overrides the embedded Waku's Post to fan out post events to any
+// subscribers registered via SubscribePostEvents.
+func (tw *testWakuWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
+	id, err := tw.Waku.Post(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range tw.postSubscriptions {
+		select {
+		case s <- &PostMessageSubscription{ID: id, Msg: &req}:
+		default:
+			// subscription channel full
+		}
+	}
+	return id, nil
 }
 
 func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {
 	subscription := make(chan *PostMessageSubscription, 100)
-	tw.api.postSubscriptions = append(tw.api.postSubscriptions, subscription)
+	tw.postSubscriptions = append(tw.postSubscriptions, subscription)
 	return subscription
 }
 
@@ -92,27 +105,6 @@ func (tw *testWakuWrapper) Stop() error {
 type PostMessageSubscription struct {
 	ID  []byte
 	Msg *types.NewMessage
-}
-
-type testPublicWakuAPI struct {
-	*wakuv3.PublicWakuAPI
-
-	postSubscriptions []chan *PostMessageSubscription
-}
-
-func (tp *testPublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
-	id, err := tp.PublicWakuAPI.Post(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	for _, s := range tp.postSubscriptions {
-		select {
-		case s <- &PostMessageSubscription{ID: id, Msg: &req}:
-		default:
-			// subscription channel full
-		}
-	}
-	return id, err
 }
 
 type testTimeSource struct {
@@ -135,12 +127,7 @@ func newTestWakuWrapper() (*testWakuWrapper, error) {
 		return nil, err
 	}
 
-	return &testWakuWrapper{
-		Waku: w,
-		api: &testPublicWakuAPI{
-			PublicWakuAPI: wakuv3.NewPublicWakuAPI(w),
-		},
-	}, nil
+	return &testWakuWrapper{Waku: w}, nil
 }
 
 type TestUtils struct {
