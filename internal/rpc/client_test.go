@@ -43,9 +43,9 @@ func TestGetClientsUsingCache(t *testing.T) {
 
 	// Define paths for providers
 	paths := []string{
-		"/api.status.im/nodefleet/foo",
-		"/api.status.im/infura/bar",
-		"/api.status.im/infura.io/baz",
+		"/eth-rpc.status.im/nodefleet/foo",
+		"/eth-rpc.status.im/infura/bar",
+		"/eth-rpc.status.im/infura.io/baz",
 	}
 	user, password := gofakeit.Username(), gofakeit.LetterN(5)
 
@@ -72,7 +72,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 				Name:         fmt.Sprintf("Provider%d", i+1),
 				ChainID:      1,
 				URL:          security.NewSensitiveString(baseURL).Append(path),
-				Type:         params.EmbeddedProxyProviderType,
+				Type:         params.EmbeddedEthRpcProxyProviderType,
 				AuthType:     params.BasicAuth,
 				AuthLogin:    security.NewSensitiveString("incorrectUser"),
 				AuthPassword: security.NewSensitiveString("incorrectPwd"), // will be replaced by correct values by OverrideBasicAuth
@@ -92,7 +92,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 
 	networks = networkhelper.OverrideBasicAuth(
 		networks,
-		params.EmbeddedProxyProviderType,
+		params.EmbeddedEthRpcProxyProviderType,
 		true,
 		security.NewSensitiveString(user),
 		security.NewSensitiveString(password))
