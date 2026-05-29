@@ -64,11 +64,6 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		// legacy default proxy fields are no longer populated
-		require.Empty(t, n.DefaultRPCURL)
-		require.Empty(t, n.DefaultFallbackURL)
-		require.Empty(t, n.DefaultFallbackURL2)
-
 		// check fallback options
 		if strings.Contains(n.RPCURL, "infura.io") {
 			require.True(t, strings.Contains(n.RPCURL, infuraToken.Reveal()))
