@@ -111,9 +111,7 @@ type WalletSecretsConfig struct {
 	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
 	AlchemyAPIKey        security.SensitiveString `json:"alchemyApiKey"`
 
-	StatusProxyStageName      string                   `json:"statusProxyStageName"`
-	StatusProxyMarketUser     security.SensitiveString `json:"statusProxyMarketUser"`
-	StatusProxyMarketPassword security.SensitiveString `json:"statusProxyMarketPassword"`
+	StatusProxyStageName string `json:"statusProxyStageName"`
 
 	MarketDataProxyUrl      security.SensitiveString `json:"marketDataProxyUrl"`
 	MarketDataProxyUser     security.SensitiveString `json:"marketDataProxyUser"`
@@ -121,7 +119,6 @@ type WalletSecretsConfig struct {
 
 	CoingeckoAPIKey     security.SensitiveString `json:"coingeckoApiKey"`
 	CoingeckoDemoAPIKey security.SensitiveString `json:"coingeckoDemoApiKey"`
-
 	StatusProxyUser     security.SensitiveString `json:"statusProxyBlockchainUser"`
 	StatusProxyPassword security.SensitiveString `json:"statusProxyBlockchainPassword"`
 
