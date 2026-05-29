@@ -986,7 +986,7 @@ class WakuextService(Service):
         response = self.rpc_request("updateMessageArchiveInterval", params)
         return response
 
-    def enable_logos_storage_community_history_archive_protocol(self, overrides: dict = None):
+    def enable_logos_storage_community_history_archive_protocol(self, overrides: dict | None = None):
         if overrides:
             string_overrides = {k: str(v) for k, v in overrides.items()}
             params = [string_overrides]

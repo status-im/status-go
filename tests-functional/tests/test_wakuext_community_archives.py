@@ -10,13 +10,10 @@ from steps import messenger
 @pytest.mark.rpc
 @pytest.mark.logos_storage
 class TestCommunityArchives:
-
     @pytest.fixture()
     def creator(self, backend_new_profile):
         node = backend_new_profile("creator")
-        node.wakuext_service.enable_logos_storage_community_history_archive_protocol(
-            {"NodeConfig.DiscoveryPort": "8091"}
-        )
+        node.wakuext_service.enable_logos_storage_community_history_archive_protocol({"NodeConfig.DiscoveryPort": "8091"})
         return node
 
     @pytest.fixture()
@@ -87,8 +84,13 @@ class TestCommunityArchives:
         chat_id = create_resp.get("chats")[0].get("id")
 
         # Wait for member to receive chat creation signal
-        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id) as exp:
-            messenger.join_community(member=member, admin=creator, community_id=community_id, prejoin_warmup=False)
+        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id):
+            messenger.join_community(
+                member=member,
+                admin=creator,
+                community_id=community_id,
+                prejoin_warmup=False,
+            )
 
         # Send a message to the community chat
         text = f"Hi @{member.public_key}"
@@ -97,7 +99,7 @@ class TestCommunityArchives:
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # Wait for member to receive the new message
-        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=message_id) as exp:
+        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=message_id):
             pass
         member_msgs_resp = member.wakuext_service.chat_messages(chat_id)
         assert member_msgs_resp.get("messages") is not None, "Member should have messages after receiving signal"
@@ -108,8 +110,9 @@ class TestCommunityArchives:
 
         # Wait for the community archive to be created for the community owner
         with creator.expect_signal(
-            SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10
-        ) as exp:
+            SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value,
+            timeout=message_archive_interval + 10,
+        ):
             pass
 
         logging.info("Checking that community owner has local index CID file...")
@@ -133,8 +136,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Success! Archive index downloaded!")
 
@@ -146,8 +149,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Success! Community member has downloaded ALL history archives!")
 
@@ -171,8 +174,13 @@ class TestCommunityArchives:
 
         # Wait for another member to join the community
         logging.info("Another member is joining the community...")
-        with another_member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id) as exp:
-            messenger.join_community(member=another_member, admin=creator, community_id=community_id, prejoin_warmup=False)
+        with another_member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id):
+            messenger.join_community(
+                member=another_member,
+                admin=creator,
+                community_id=community_id,
+                prejoin_warmup=False,
+            )
         logging.info("Another member has joined the community.")
 
         # Ensure that another member does not have the message before archive import
@@ -188,8 +196,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Success! Archive index downloaded by another member!")
 
@@ -200,8 +208,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Success! Another member has downloaded ALL history archives!")
 
@@ -226,8 +234,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Another member has started importing history archive messages.")
 
@@ -237,8 +245,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Another member has finished importing history archive messages.")
 
@@ -251,7 +259,7 @@ class TestCommunityArchives:
         ), "Another member should have the message after importing history archive"
         logging.info("Success! Another member has the message after importing history archive.")
 
-    def test_community_archive_exists_for_default_chat(self, creator, chat_payload):
+    def test_community_archive_exists_for_default_chat(self, creator):
         # Set message archive interval to 10 seconds for faster test,
         # we only want to check that the archive is created for the default chat.
         message_archive_interval = 10
@@ -259,7 +267,9 @@ class TestCommunityArchives:
 
         # Create a community
         response = creator.wakuext_service.create_community(
-            "LogosStorage community", "No one should join", history_archive_support_enabled=True
+            "LogosStorage community",
+            "No one should join",
+            history_archive_support_enabled=True,
         )
         community_id = response.get("communities", [{}])[0].get("id")
         default_chat_id = response.get("chats", [{}])[0].get("id")
@@ -275,15 +285,16 @@ class TestCommunityArchives:
 
         # Wait for the community archive to be created for the community owner
         with creator.expect_signal(
-            SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10
-        ) as exp:
+            SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value,
+            timeout=message_archive_interval + 10,
+        ):
             pass
 
         # Ensure that the archive index is seeding.
         has_archive = creator.wakuext_service.has_community_archive(community_id)
         assert has_archive is True, "Creator should have community archive after messages are sent"
 
-    def test_archive_is_not_created_without_messages(self, creator, chat_payload):
+    def test_archive_is_not_created_without_messages(self, creator):
         # Set message archive interval to 10 seconds for faster test,
         # we only want to check that no archive is created when there is no message.
         message_archive_interval = 10
@@ -291,7 +302,9 @@ class TestCommunityArchives:
 
         # Create a community
         response = creator.wakuext_service.create_community(
-            "LogosStorage community", "No one should join", history_archive_support_enabled=True
+            "LogosStorage community",
+            "No one should join",
+            history_archive_support_enabled=True,
         )
         community_id = response.get("communities", [{}])[0].get("id")
 
@@ -315,7 +328,12 @@ class TestCommunityArchives:
         chat_id = create_resp.get("chats")[0].get("id")
 
         # Join community so the member can receive messages
-        messenger.join_community(member=member, admin=creator, community_id=community_id, prejoin_warmup=False)
+        messenger.join_community(
+            member=member,
+            admin=creator,
+            community_id=community_id,
+            prejoin_warmup=False,
+        )
 
         for i in range(2):
             # Send a message to the default community chat
@@ -326,7 +344,7 @@ class TestCommunityArchives:
                 SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value,
                 timeout=message_archive_interval + 10,
                 start="now",
-            ) as exp:
+            ):
                 pass
 
             # The timeout is arbitrary set to 10 seconds
@@ -340,8 +358,8 @@ class TestCommunityArchives:
                 count=i + 1,
                 timeout=archive_timeout,
                 start="beginning",
-                predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-            ) as exp:
+                predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+            ):
                 pass
             logging.info("Success! Archive index downloaded!")
 
@@ -352,8 +370,8 @@ class TestCommunityArchives:
                 count=i + 1,
                 timeout=archive_timeout,
                 start="beginning",
-                predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-            ) as exp:
+                predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+            ):
                 pass
             logging.info("Success! Community member has downloaded ALL history archives!")
 
@@ -368,7 +386,7 @@ class TestCommunityArchives:
             # should be already updated: archive ID (HASH) should be stored in the database.
             logging.info("Verifying that archive ID (HASH) is recorded in the database...")
             download_archive_ids = member.wakuext_service.get_downloaded_message_archive_ids(community_id)
-            assert len(download_archive_ids) == i + 1, f"Member should have exactly {i+1} archive IDs downloaded"
+            assert len(download_archive_ids) == i + 1, f"Member should have exactly {i + 1} archive IDs downloaded"
             logging.info("Success! Archive ID (HASH) is recorded in the database!")
 
     def test_archive_is_downloaded_after_logout_login(self, creator, member, chat_payload):
@@ -391,8 +409,13 @@ class TestCommunityArchives:
         chat_id = create_resp.get("chats")[0].get("id")
 
         # Wait for member to receive chat creation signal
-        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id) as exp:
-            messenger.join_community(member=member, admin=creator, community_id=community_id, prejoin_warmup=False)
+        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=chat_id):
+            messenger.join_community(
+                member=member,
+                admin=creator,
+                community_id=community_id,
+                prejoin_warmup=False,
+            )
 
         # Send a message to the community chat
         text = f"Hi @{member.public_key}"
@@ -400,7 +423,7 @@ class TestCommunityArchives:
         message_id = send_resp.get("messages", [])[0].get("id", "")
 
         # Wait for member to receive the new message
-        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=message_id) as exp:
+        with member.expect_signal(SignalType.MESSAGES_NEW.value, timeout=10, pattern=message_id):
             pass
 
         # Logout the member to simulate offline scenario
@@ -415,8 +438,9 @@ class TestCommunityArchives:
         logging.info(f"Waiting {message_archive_interval + 10}s for community owner to create archive...")
         # Wait for the community archive to be created for the community owner
         with creator.expect_signal(
-            SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value, timeout=message_archive_interval + 10
-        ) as exp:
+            SignalType.COMMUNITY_HISTORY_ARCHIVES_CREATED.value,
+            timeout=message_archive_interval + 10,
+        ):
             pass
         logging.info("Success! History archive created and dispatched!")
 
@@ -440,8 +464,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Success! Archive index downloaded!")
 
@@ -451,8 +475,8 @@ class TestCommunityArchives:
             SignalType.COMMUNITY_HISTORY_ARCHIVES_SEEDING.value,
             timeout=archive_timeout,
             start="beginning",
-            predicate=lambda signal: signal.get("event", {}).get("communityId") == community_id,
-        ) as exp:
+            predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),
+        ):
             pass
         logging.info("Success! Community member has downloaded ALL history archives!")
 
