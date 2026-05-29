@@ -115,13 +115,33 @@ func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 		Ephemeral:    &req.Ephemeral,
 	}
 
-	hash, err := w.Send(req.PubsubTopic, wakuMsg, req.Priority)
+	hash, err := w.sendEnvelope(req.PubsubTopic, wakuMsg, req.Priority)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return hash, nil
+}
+
+// Send publishes a pre-encoded payload to the messaging network. The payload
+// is expected to be already encoded for WakuMessage version=1 (see
+// transport/encoding.EncodeV1); this method just wraps it in a WakuMessage
+// envelope and hands it to the publish path. Returns the wire hash.
+//
+// ctx is accepted for symmetry with transport.MessagingAPI; the send queue
+// uses the waku instance's own lifecycle context.
+func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
+	var version uint32 = 1 // wire-format discriminator; v1 encryption is applied by the caller
+	msg := &pb.WakuMessage{
+		Payload:      payload,
+		Version:      &version,
+		ContentTopic: contentTopic,
+		Timestamp:    proto.Int64(w.timestamp()),
+		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
+		Ephemeral:    &ephemeral,
+	}
+	return w.sendEnvelope(pubsubTopic, msg, priority)
 }
 
 // ToWakuMessage converts an internal message into an API version.

@@ -63,6 +63,29 @@ type KeyInfo struct {
 	PrivKey *ecdsa.PrivateKey // Set a privkey if the message requires a signature
 }
 
+// EncodeV1 builds a WakuMessage version=1 payload (RFC 26) from raw inputs:
+// it concatenates flags + payload-length + payload + padding + [signature]
+// and encrypts the result — AES-256-GCM when symKey is supplied, ECIES when
+// pubKey is supplied. Exactly one of symKey or pubKey must be non-nil.
+// When sigKey is non-nil, the payload is also signed (ECDSA).
+//
+// This is the high-level entry point for the send side: callers pass
+// already-resolved keys, no key-store lookup is performed here.
+func EncodeV1(payload []byte, symKey []byte, pubKey *ecdsa.PublicKey, sigKey *ecdsa.PrivateKey) ([]byte, error) {
+	keyInfo := &KeyInfo{PrivKey: sigKey}
+	switch {
+	case symKey != nil && pubKey == nil:
+		keyInfo.Kind = Symmetric
+		keyInfo.SymKey = symKey
+	case symKey == nil && pubKey != nil:
+		keyInfo.Kind = Asymmetric
+		keyInfo.PubKey = *pubKey
+	default:
+		return nil, errors.New("encoding: exactly one of symKey or pubKey must be non-nil")
+	}
+	return Payload{Data: payload, Key: keyInfo}.Encode(V1Encryption)
+}
+
 // Encode encodes a payload depending on the version parameter.
 // 0 for raw unencrypted data, and 1 for using WakuV1 encoding.
 func (payload Payload) Encode(version uint32) ([]byte, error) {

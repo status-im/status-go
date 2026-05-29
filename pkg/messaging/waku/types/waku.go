@@ -101,6 +101,11 @@ type Waku interface {
 	// returns the hash of the message in case of success.
 	Post(ctx context.Context, req NewMessage) ([]byte, error)
 
+	// Send publishes a pre-encoded payload on the messaging network. The
+	// payload is expected to be already encoded for WakuMessage version=1
+	// (see transport/encoding.EncodeV1). Returns the wire hash on success.
+	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
+
 	// GetFilterMessages returns the messages that match the filter criteria and
 	// are received between the last poll and now.
 	GetFilterMessages(id string) ([]*Message, error)

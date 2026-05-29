@@ -286,3 +286,75 @@ func TestAesNonce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, aesgcm.NonceSize(), aesNonceLength)
 }
+
+func TestEncodeV1Symmetric(t *testing.T) {
+	data := []byte{0, 1, 2}
+
+	symKey, err := generateSymKey()
+	require.NoError(t, err)
+
+	encoded, err := EncodeV1(data, symKey, nil, nil)
+	require.NoError(t, err)
+
+	decoded, err := Decode(1, encoded, &KeyInfo{Kind: Symmetric, SymKey: symKey})
+	require.NoError(t, err)
+	require.Equal(t, data, decoded.Data)
+	require.Nil(t, decoded.PubKey)
+}
+
+func TestEncodeV1SymmetricSigned(t *testing.T) {
+	data := []byte{0, 1, 2}
+
+	symKey, err := generateSymKey()
+	require.NoError(t, err)
+
+	sigKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	encoded, err := EncodeV1(data, symKey, nil, sigKey)
+	require.NoError(t, err)
+
+	decoded, err := Decode(1, encoded, &KeyInfo{Kind: Symmetric, SymKey: symKey})
+	require.NoError(t, err)
+	require.Equal(t, data, decoded.Data)
+	require.NotNil(t, decoded.PubKey)
+	require.Equal(t, sigKey.PublicKey, *decoded.PubKey)
+}
+
+func TestEncodeV1Asymmetric(t *testing.T) {
+	data := []byte{0, 1, 2}
+
+	recipient, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	sigKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	encoded, err := EncodeV1(data, nil, &recipient.PublicKey, sigKey)
+	require.NoError(t, err)
+
+	decoded, err := Decode(1, encoded, &KeyInfo{Kind: Asymmetric, PrivKey: recipient})
+	require.NoError(t, err)
+	require.Equal(t, data, decoded.Data)
+	require.Equal(t, sigKey.PublicKey, *decoded.PubKey)
+}
+
+func TestEncodeV1RequiresExactlyOneKey(t *testing.T) {
+	data := []byte{0, 1, 2}
+
+	// Both nil.
+	_, err := EncodeV1(data, nil, nil, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exactly one")
+
+	// Both set.
+	symKey, err := generateSymKey()
+	require.NoError(t, err)
+	recipient, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	_, err = EncodeV1(data, symKey, &recipient.PublicKey, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exactly one")
+}
+
