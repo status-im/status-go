@@ -244,11 +244,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         user = os.environ["STATUS_BUILD_PROXY_USER"]
         password = os.environ["STATUS_BUILD_PROXY_PASSWORD"]
 
-        data["StatusProxyMarketUser"] = user
-        data["StatusProxyMarketPassword"] = password
         data["StatusProxyBlockchainUser"] = user
         data["StatusProxyBlockchainPassword"] = password
-
         data["StatusProxyEnabled"] = True
         data["StatusProxyStageName"] = "test"
         return data

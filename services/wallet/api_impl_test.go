@@ -90,7 +90,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	tokenManager, err := token.NewTokenManager(db, c, nil, mockNetworkManager, appDB, nil, nil, nil, accountsDb, 0, 0)
 	require.NoError(t, err)
 
-	service, err := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
+	service, err := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager)
 	require.NoError(t, err)
 
 	tokenbalancesFetcher := mock_tokenbalances.NewMockFetcherIface(mockCtrl)

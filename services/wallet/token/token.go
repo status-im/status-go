@@ -574,7 +574,7 @@ func (tm *Manager) GetTokensOfInterestForActiveNetworksMode() ([]*tokentypes.Tok
 	return tm.GetTokensByKeys(tokensKeys)
 }
 
-// GetTokensForFetchingMarketData returns all unique tokens for fetching market data from Coingecko (doesn't affect CryptoCompare cause it maps tokens differently, by symbol)
+// GetTokensForFetchingMarketData returns all unique tokens for fetching market data from Coingecko.
 // Special handling for test tokens, for fetching market data from Coingecko, cause their API doesn't support test tokens
 // Corresponding mainnet tokens are needed to fetch market data for test tokens.
 // Returns list of test tokens and list of mainnet tokens that have a cross chain id set.
@@ -598,7 +598,7 @@ func (tm *Manager) GetTokensForFetchingMarketData() ([]*tokentypes.Token, error)
 	return tm.GetTokensByKeysForFetchingMarketData(tokensKeys)
 }
 
-// GetTokensByKeysForFetchingMarketData returns all unique tokens for fetching market data from Coingecko (doesn't affect CryptoCompare cause it maps tokens differently, by symbol)
+// GetTokensByKeysForFetchingMarketData returns all unique tokens for fetching market data from Coingecko.
 // Special handling for test tokens, for fetching market data from Coingecko, cause their API doesn't support test tokens
 // Corresponding mainnet tokens are needed to fetch market data for test tokens.
 // Returns list of test tokens that match the given token keys and corresponding mainnet tokens for those test tokens that have a cross chain id set.

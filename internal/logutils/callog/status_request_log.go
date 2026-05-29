@@ -38,8 +38,6 @@ var sensitiveKeys = []string{
 	"alchemyApiKey",
 	"AlchemyApiKey",
 	"openSeaApiKey",
-	"statusProxyMarketUser",
-	"statusProxyMarketPassword",
 	"marketDataProxyUser",
 	"marketDataProxyPassword",
 	"statusProxyBlockchainUser",
