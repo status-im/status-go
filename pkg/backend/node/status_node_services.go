@@ -92,7 +92,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		err := b.createWalletService(accDB, b.appDB, b.accountsPublisher, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
+		err := b.createWalletService(accDB, b.appDB, b.accountsPublisher, &b.walletFeed)
 		if err != nil {
 			return err
 		}
@@ -322,7 +322,7 @@ func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.Communit
 	}
 }
 
-func (b *StatusNode) createWalletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed, statusProxyStageName string) (err error) {
+func (b *StatusNode) createWalletService(accountsDB *accounts.Database, appDB *sql.DB, accountsPublisher *pubsub.Publisher, walletFeed *event.Feed) (err error) {
 	if b.walletSrvc == nil {
 		b.walletSrvc, err = wallet.NewService(
 			b.walletDB, accountsDB, appDB, b.rpcClient, accountsPublisher, b.gethAccountsManager, b.transactor, b.config,
@@ -331,7 +331,6 @@ func (b *StatusNode) createWalletService(accountsDB *accounts.Database, appDB *s
 			walletFeed,
 			b.mediaServer,
 			b.tokenManager,
-			statusProxyStageName,
 		)
 	}
 	return
