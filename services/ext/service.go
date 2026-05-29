@@ -369,6 +369,12 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithDatasync())
 	}
 
+	if config.ShhextConfig.AllowForceCommunityMembersReevaluation {
+		options = append(options, protocol.WithCommunityManagerOptions([]communities.ManagerOption{
+			communities.WithAllowForcingCommunityMembersReevaluation(true),
+		}))
+	}
+
 	settings, err := accountsDB.GetSettings()
 	if err != sql.ErrNoRows && err != nil {
 		return nil, err

@@ -1083,7 +1083,7 @@ def setup_admin_via_token(
             logger.debug(f"spectate/fetch before admin role wait failed (round {round_idx + 1}): {exc}")
         _refresh_admin_token_wallet_state(owner_backend, member_backend, member_wallet, admin_token_address)
 
-        owner_backend.wakuext_service.reevaluate_community_members_permissions(community_id)
+        community_tokens.sync_community_member_permissions(owner_backend, community_id)
         try:
             community_tokens.wait_for_member_role(
                 owner_backend,

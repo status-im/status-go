@@ -356,11 +356,12 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	}
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
-		InstallationID:             installationID,
-		MailServerConfirmations:    true,
-		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
-		DataSyncEnabled:            true,
-		PFSEnabled:                 true,
+		InstallationID:                         installationID,
+		MailServerConfirmations:                true,
+		MaxMessageDeliveryAttempts:             DefaultMaxMessageDeliveryAttempts,
+		DataSyncEnabled:                        true,
+		PFSEnabled:                             true,
+		AllowForceCommunityMembersReevaluation: os.Getenv("STATUS_ALLOW_FORCE_REEVAL") == "1",
 	}
 
 	nodeConfig.ShhextConfig.VerifyENSURL = getMainnetRPCURL(nodeConfig.Networks)

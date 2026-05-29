@@ -35,6 +35,7 @@ Functional tests for status-go
     # Note we tag the image with the commit hash. Functional tests will refer to the same when `--docker-image` is empty.
     docker build --platform linux/amd64 --tag "statusgo-$(git rev-parse --short HEAD)" .
     ```
+
 2. Functional tests rely on local instances of Waku and Anvil.
    Run this command to start all environment dependencies:
     ```sh

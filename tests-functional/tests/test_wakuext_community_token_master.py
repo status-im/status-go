@@ -86,7 +86,7 @@ class TestCommunityTokenMaster:
             anvil_client=anvil_client,
         )
 
-        owner_backend.wakuext_service.reevaluate_community_members_permissions(community_id)
+        community_tokens.sync_community_member_permissions(owner_backend, community_id)
 
         community_tokens.wait_for_member_role(
             owner_backend,

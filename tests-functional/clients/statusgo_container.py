@@ -61,6 +61,7 @@ class StatusGoContainer:
             "labels": {"com.docker.compose.project": docker_project_name},
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
+                "STATUS_ALLOW_FORCE_REEVAL": "1",
             },
             "volumes": {
                 coverage_path: {
