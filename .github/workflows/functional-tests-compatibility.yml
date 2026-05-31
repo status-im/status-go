@@ -1,6 +1,9 @@
 name: Functional Tests - Compatibility
 
 on:
+  push:
+    branches:
+      - test/cross-version-chat-compat
   workflow_dispatch:
     inputs:
       peer_refs:
