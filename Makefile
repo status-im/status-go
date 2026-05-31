@@ -539,6 +539,14 @@ test-functional: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
 test-functional:
 	@./scripts/run_functional_tests.sh
 
+test-functional-compatibility: generate
+test-functional-compatibility: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
+test-functional-compatibility: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
+test-functional-compatibility: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
+test-functional-compatibility: export FUNCTIONAL_TESTS_MARKER := compatibility
+test-functional-compatibility: ##@tests Cross-version chat compatibility smoke tests (set PEER_IMAGES or PEER_REFS)
+	@./scripts/run_functional_tests.sh
+
 benchmark: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 benchmark:
 	@./scripts/run_benchmark.sh

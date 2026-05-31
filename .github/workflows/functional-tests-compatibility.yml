@@ -1,0 +1,56 @@
+name: Functional Tests - Compatibility
+
+on:
+  workflow_dispatch:
+    inputs:
+      peer_refs:
+        description: 'Space-separated release tags to test against (version under test <-> each peer).'
+        required: false
+        default: 'v10.33.0 v10.32.0'
+
+jobs:
+  compatibility:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: tests-functional/requirements.txt
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run compatibility smoke tests
+        env:
+          FUNCTIONAL_TESTS_MARKER: compatibility
+          FUNCTIONAL_TESTS_LOG_LEVEL: INFO
+          PEER_REFS: ${{ inputs.peer_refs }}
+        run: ./scripts/run_functional_tests.sh
+
+      - name: Test report
+        if: always()
+        uses: dorny/test-reporter@95058abb17504553158e70e2c058fe1fda4392c2
+        with:
+          name: Compatibility Test Report
+          path: tests-functional/reports/*.xml
+          reporter: java-junit
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compatibility-logs
+          path: |
+            tests-functional/reports
+            tests-functional/logs

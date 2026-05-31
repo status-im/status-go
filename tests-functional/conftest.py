@@ -34,6 +34,14 @@ def pytest_addoption(parser):
         default="",
     )
     parser.addoption(
+        "--peer-docker-image",
+        action="append",
+        help="status-go image for the OTHER (peer) chat participant in cross-version "
+        "compatibility tests. Repeatable; each value adds one peer version to run against. "
+        "Empty => use --docker-image (vut<->vut).",
+        default=None,
+    )
+    parser.addoption(
         "--codecov_dir",
         action="store",
         help="",
@@ -132,6 +140,7 @@ def pytest_configure(config):
     Config.password = config.getoption("--password")
     Config.docker_project_name = config.getoption("--docker_project_name")
     Config.docker_image = config.getoption("--docker-image")
+    Config.peer_docker_images = config.getoption("--peer-docker-image") or []
     Config.codecov_dir = config.getoption("--codecov_dir")
     Config.logs_dir = config.getoption("--logs-dir")
     Config.benchmark_results_dir = config.getoption("--benchmark-results-dir")
@@ -149,6 +158,7 @@ def pytest_report_header(config):
     port_range_info = f"port range: {port_range[0]}-{port_range[-1]} ({len(port_range)} ports)" if port_range else "port range: empty"
     return [
         f"docker image: {Config.docker_image}",
+        f"peer docker images: {Config.peer_docker_images or '(same as docker image)'}",
         f"waku fleets config file: {config.option.waku_fleets_config}",
         f"waku fleet: {config.option.waku_fleet}",
         f"push fleets config file: {config.option.push_fleets_config}",
