@@ -39,7 +39,7 @@ jobs:
         env:
           FUNCTIONAL_TESTS_MARKER: compatibility
           FUNCTIONAL_TESTS_LOG_LEVEL: INFO
-          PEER_REFS: ${{ inputs.peer_refs }}
+          PEER_REFS: ${{ inputs.peer_refs || 'v10.33.0 v10.32.0' }}
         run: ./scripts/run_functional_tests.sh
 
       - name: Test report
