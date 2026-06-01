@@ -3,10 +3,10 @@ package backend
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
-
-	"github.com/stretchr/testify/require"
 )
 
 func setupConfigs() (*params.NodeConfig, *requests.APIConfig) {
@@ -50,4 +50,29 @@ func TestOverrideApiConfig(t *testing.T) {
 	require.Equal(t, apiConfig.WSEnabled, newNodeConfig.WSEnabled)
 	require.Equal(t, apiConfig.WSHost, newNodeConfig.WSHost)
 	require.Equal(t, apiConfig.WSPort, newNodeConfig.WSPort)
+}
+
+func TestDefaultNodeConfig_AllowForceCommunityMembersReevaluation(t *testing.T) {
+	const installationID = "test-installation"
+	const keyUID = "test-key-uid"
+
+	t.Run("enabled when env is set", func(t *testing.T) {
+		t.Setenv("STATUS_ALLOW_FORCE_REEVAL", "1")
+
+		cfg, err := DefaultNodeConfig(installationID, keyUID, &requests.CreateAccount{
+			RootDataDir: t.TempDir(),
+		})
+		require.NoError(t, err)
+		require.True(t, cfg.ShhextConfig.AllowForceCommunityMembersReevaluation)
+	})
+
+	t.Run("disabled when env is unset", func(t *testing.T) {
+		t.Setenv("STATUS_ALLOW_FORCE_REEVAL", "")
+
+		cfg, err := DefaultNodeConfig(installationID, keyUID, &requests.CreateAccount{
+			RootDataDir: t.TempDir(),
+		})
+		require.NoError(t, err)
+		require.False(t, cfg.ShhextConfig.AllowForceCommunityMembersReevaluation)
+	})
 }
