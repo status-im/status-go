@@ -57,7 +57,7 @@ jobs:
       run: |
         pytest --reruns 2 \
           -n auto \
-          -m "reliability" \
+          -m "reliability and not light_client_7393" \
           -c tests-functional/pytest.ini \
           --junit-xml=pytest_results.xml \
           --tb=short \

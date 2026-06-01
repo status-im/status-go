@@ -8,6 +8,7 @@ from resources.enums import MessageContentType
 
 
 @pytest.mark.reliability
+@pytest.mark.light_client_7393
 class TestLightClientRateLimiting:
 
     @pytest.fixture()

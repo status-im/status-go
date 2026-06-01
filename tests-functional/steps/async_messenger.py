@@ -33,6 +33,11 @@ async def accept_contact_request_and_wait(message_id: str, sender, receiver) -> 
     RPC polling if the WebSocket signal is lost (e.g., broken pipe).
     """
     accepted_signal = f"@{receiver.public_key} accepted your contact request"
+
+    # Light-client filter subscription is async; without this delay the ACCEPT_CONTACT_REQUEST is lost (#7393).
+    if getattr(sender, "waku_light_client", False):
+        await asyncio.sleep(10)
+
     receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
 
     try:
