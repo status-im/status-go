@@ -1,19 +1,28 @@
 from uuid import uuid4
 import pytest
 from steps import messenger
+from resources.constants import FULL_NODE, LIGHT_CLIENT
 from resources.enums import MessageContentType
 
 
 @pytest.mark.rpc
+@pytest.mark.parametrize(
+    "waku_light_client",
+    [
+        pytest.param(False, id=FULL_NODE),
+        pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.light_client_7393),
+    ],
+    indirect=True,
+)
 class TestCreatePrivateGroups:
 
     @pytest.fixture()
-    def community_admin(self, backend_new_profile):
-        return backend_new_profile("community_admin")
+    def community_admin(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("community_admin", waku_light_client=waku_light_client)
 
     @pytest.fixture()
-    def community_member(self, backend_new_profile):
-        return backend_new_profile("community_member")
+    def community_member(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("community_member", waku_light_client=waku_light_client)
 
     def test_create_group_chat_with_members(self, community_admin, community_member):
         messenger.make_contacts(community_admin, community_member)
@@ -60,8 +69,8 @@ class TestCreatePrivateGroups:
         assert len(members_after_leave) == 1
         assert community_admin.public_key not in str(members_after_leave)
 
-    def test_send_group_chat_invitation_request(self, community_admin, community_member, backend_new_profile):
-        third_node = backend_new_profile("third_node")
+    def test_send_group_chat_invitation_request(self, community_admin, community_member, backend_new_profile, waku_light_client):
+        third_node = backend_new_profile("third_node", waku_light_client=waku_light_client)
         messenger.make_contacts(community_admin, third_node)
 
         messenger.make_contacts(community_admin, community_member)
@@ -103,8 +112,8 @@ class TestCreatePrivateGroups:
         assert chats[0].get("invitationAdmin", "") == community_admin.public_key
         assert chats[0].get("name", "") == invitation_group
 
-    def test_add_members_to_group_chat(self, community_admin, community_member, backend_new_profile):
-        third_node = backend_new_profile("third_node")
+    def test_add_members_to_group_chat(self, community_admin, community_member, backend_new_profile, waku_light_client):
+        third_node = backend_new_profile("third_node", waku_light_client=waku_light_client)
         messenger.make_contacts(community_admin, third_node)
 
         messenger.make_contacts(community_admin, community_member)
@@ -146,8 +155,8 @@ class TestCreatePrivateGroups:
             message_pattern=f"@{community_member.public_key} left the group",
         )[0]
 
-    def test_remove_members_from_group_chat(self, community_admin, community_member, backend_new_profile):
-        third_node = backend_new_profile("third_node")
+    def test_remove_members_from_group_chat(self, community_admin, community_member, backend_new_profile, waku_light_client):
+        third_node = backend_new_profile("third_node", waku_light_client=waku_light_client)
         messenger.make_contacts(community_admin, third_node)
 
         messenger.make_contacts(community_admin, community_member)
@@ -211,8 +220,8 @@ class TestCreatePrivateGroups:
         assert chats[0].get("name", "") == new_group_name
 
     @pytest.mark.skip(reason="waiting for https://github.com/status-im/status-go/issues/6752 resolution")
-    def test_get_group_chat_invitations(self, community_admin, community_member, backend_new_profile):
-        third_node = backend_new_profile("third_node")
+    def test_get_group_chat_invitations(self, community_admin, community_member, backend_new_profile, waku_light_client):
+        third_node = backend_new_profile("third_node", waku_light_client=waku_light_client)
         messenger.make_contacts(community_admin, third_node)
 
         messenger.make_contacts(community_admin, community_member)
@@ -230,8 +239,8 @@ class TestCreatePrivateGroups:
         third_node.wakuext_service.get_group_chat_invitations()
         # TODO: Add more assertions on response
 
-    def test_send_group_chat_invitation_rejection(self, community_admin, community_member, backend_new_profile):
-        third_node = backend_new_profile("third_node")
+    def test_send_group_chat_invitation_rejection(self, community_admin, community_member, backend_new_profile, waku_light_client):
+        third_node = backend_new_profile("third_node", waku_light_client=waku_light_client)
         messenger.make_contacts(community_admin, third_node)
 
         messenger.make_contacts(community_admin, community_member)

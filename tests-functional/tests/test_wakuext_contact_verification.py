@@ -3,21 +3,30 @@ from uuid import uuid4
 import pytest
 
 from clients.signals import SignalType
+from resources.constants import FULL_NODE, LIGHT_CLIENT
 from resources.enums import ContactVerificationState, MessageContentType
 from steps import async_messenger
 
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "waku_light_client",
+    [
+        pytest.param(False, id=FULL_NODE),
+        pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.light_client_7393),
+    ],
+    indirect=True,
+)
 class TestContactVerification:
 
     @pytest.fixture
-    async def creator(self, async_backend_new_profile):
-        return await async_backend_new_profile("creator")
+    async def creator(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("creator", waku_light_client=waku_light_client)
 
     @pytest.fixture
-    async def member(self, async_backend_new_profile, creator):
-        m = await async_backend_new_profile("member")
+    async def member(self, async_backend_new_profile, waku_light_client, creator):
+        m = await async_backend_new_profile("member", waku_light_client=waku_light_client)
         await async_messenger.make_contacts(sender=creator, receiver=m)
         return m
 

@@ -3,19 +3,27 @@ from uuid import uuid4
 import pytest
 from steps import messenger
 from clients.signals import SignalType
-from resources.constants import USE_IPV6
+from resources.constants import USE_IPV6, FULL_NODE, LIGHT_CLIENT
 
 
 @pytest.mark.reliability
+@pytest.mark.parametrize(
+    "waku_light_client",
+    [
+        pytest.param(False, id=FULL_NODE),
+        pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.light_client_7393),
+    ],
+    indirect=True,
+)
 class TestOneToOneMessages:
 
     @pytest.fixture()
-    def sender(self, backend_new_profile):
-        return backend_new_profile("sender", bridge_network=True)
+    def sender(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("sender", waku_light_client=waku_light_client, bridge_network=True)
 
     @pytest.fixture()
-    def receiver(self, backend_new_profile):
-        return backend_new_profile("receiver", bridge_network=True)
+    def receiver(self, backend_new_profile, waku_light_client):
+        return backend_new_profile("receiver", waku_light_client=waku_light_client, bridge_network=True)
 
     def _run_one_to_one_message_baseline(self, sender, receiver, message_count=1):
         messenger.one_to_one_message(message_count, sender=sender, receiver=receiver)

@@ -5,6 +5,7 @@ import pytest
 from clients.api import ApiResponseError
 from clients.signals import SignalType
 from resources.enums import MessageContentType
+from resources.constants import FULL_NODE, LIGHT_CLIENT
 from steps import async_messenger
 
 
@@ -20,7 +21,14 @@ class TestMessageReactions:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
-    @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+    @pytest.mark.parametrize(
+        "waku_light_client",
+        [
+            pytest.param(False, id=FULL_NODE),
+            pytest.param(True, id=LIGHT_CLIENT, marks=pytest.mark.light_client_7393),
+        ],
+        indirect=True,
+    )
     async def test_one_to_one_message_reactions(self, sender, receiver, waku_light_client):
         """Test message reactions with different wakuV2LightClient configurations"""
         await async_messenger.make_contacts(sender, receiver)
@@ -89,7 +97,13 @@ class TestMessageReactions:
                 )
             )
 
-    @pytest.mark.parametrize("waku_light_client", [False], indirect=True, ids=["wakuV2LightClient_False"])
+    @pytest.mark.parametrize(
+        "waku_light_client",
+        [
+            pytest.param(False, id=FULL_NODE),
+        ],
+        indirect=True,
+    )
     async def test_limit_of_20_reactions(self, sender, receiver, waku_light_client):
         """Test that you cannot send more than 20 message reactions on a single message"""
         await async_messenger.make_contacts(sender, receiver)
