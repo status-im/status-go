@@ -344,6 +344,9 @@ type ShhextConfig struct {
 
 	// BandwidthStatsEnabled indicates if a signal is going to be emitted to indicate the upload and download rate
 	BandwidthStatsEnabled bool
+
+	// AllowForceCommunityMembersReevaluation enables immediate permission reevaluation via API force flag.
+	AllowForceCommunityMembersReevaluation bool `json:"allowForceCommunityMembersReevaluation"`
 }
 
 // TorrentConfig provides configuration for the BitTorrent client used for message history archives.

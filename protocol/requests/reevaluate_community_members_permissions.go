@@ -8,6 +8,8 @@ import (
 
 type ReevaluateCommunityMembersPermissions struct {
 	CommunityID types.HexBytes `json:"communityId"`
+	// Force runs immediate reevaluation on the control node. Requires forcing to be enabled on the node.
+	Force bool `json:"force"`
 }
 
 func (r *ReevaluateCommunityMembersPermissions) Validate() error {

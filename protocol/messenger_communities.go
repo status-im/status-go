@@ -2655,8 +2655,16 @@ func (m *Messenger) ReevaluateCommunityMembersPermissions(request *requests.Reev
 		return nil, err
 	}
 
+	if request.Force && !m.communitiesManager.ForceMembersReevaluationAllowed() {
+		return nil, errors.New("forcing members reevaluation is not allowed")
+	}
+
 	if community.IsControlNode() {
-		err = m.communitiesManager.ScheduleMembersReevaluation(request.CommunityID)
+		if request.Force {
+			err = m.communitiesManager.ForceMembersReevaluation(request.CommunityID)
+		} else {
+			err = m.communitiesManager.ScheduleMembersReevaluation(request.CommunityID)
+		}
 		if err != nil {
 			return nil, err
 		}
