@@ -116,13 +116,10 @@ if [[ "${FUNCTIONAL_TESTS_MARKER}" == "compatibility" ]]; then
     done
   else
     if [[ -z "${PEER_REFS}" ]]; then
-      git fetch --tags --quiet || true
-      PEER_REFS="$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2 | tr '\n' ' ')"
-    fi
-    if [[ -z "${PEER_REFS}" ]]; then
       echo -e "${RED}No peer refs available. Set PEER_REFS or PEER_IMAGES.${RST}"
       exit 1
     fi
+    # TODO: drop worktree build once released backend images are published to Harbor.
     for ref in ${PEER_REFS}; do
       ref_slug="$(printf '%s' "${ref}" | tr -c 'A-Za-z0-9_.-' '-' | sed 's/^[-.]*//; s/[-.]*$//')"
       peer_image="statusgo-peer-${ref_slug}"
