@@ -8,7 +8,7 @@ from clients.services.wakuext import (
     CommunityTokenPermissionType,
     CommunityTokenType,
 )
-from clients.signals import SignalType
+from clients.signals import CommunityMemberReevaluationStatus, SignalType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
 from steps import messenger
@@ -325,6 +325,7 @@ def wait_for_member_role(
         )
         roles = (community or {}).get("members", {}).get(member_key, {}).get("roles", [])
         if role in roles:
+            assert community is not None, "Community not found"
             return community
         time.sleep(delay)
 
@@ -332,9 +333,62 @@ def wait_for_member_role(
         assert community is not None, "Community not found"
         roles = community.get("members", {}).get(member_key, {}).get("roles", [])
         assert role in roles, f"Member {member_key} did not receive role {role} after {attempts} attempts; roles={roles}"
+        return community
     else:
         logger.warning(f"Backend local state may not yet reflect role {role} for {member_key}; proceeding")
     return community
+
+
+def _wait_for_community_member_reevaluation_done(
+    backend: StatusBackend,
+    community_id: str,
+    timeout: float = 60,
+):
+    """Wait until member permission reevaluation completes for *community_id*."""
+
+    def _predicate(signal: dict) -> bool:
+        event = signal.get("event") or {}
+        if event.get("communityId") != community_id:
+            return False
+        return event.get("status") == CommunityMemberReevaluationStatus.DONE
+
+    with backend.expect_signal(
+        SignalType.COMMUNITY_MEMBER_REEVALUATION_STATUS,
+        predicate=_predicate,
+        timeout=timeout,
+    ):
+        pass
+
+
+def sync_community_member_permissions(
+    owner_backend: StatusBackend,
+    community_id: str,
+    *,
+    timeout: float = 60,
+) -> None:
+    """Force permission reevaluation on the control node and wait until it completes."""
+    owner_backend.wakuext_service.reevaluate_community_members_permissions(community_id, force=True)
+    _wait_for_community_member_reevaluation_done(owner_backend, community_id, timeout=timeout)
+
+
+def wait_until_member_sees_permissions(
+    backend: StatusBackend,
+    community_id: str,
+    *permission_types: CommunityTokenPermissionType,
+    attempts: int = 15,
+    delay: int = 2,
+) -> dict:
+    """Poll until *backend* sees the community with the given token permission types."""
+    expected = {permission_type.value for permission_type in permission_types}
+    return wait_until_community_has_permission_types(
+        backend,
+        community_id,
+        expected,
+        attempts=attempts,
+        delay=delay,
+        fetch=True,
+        spectate=True,
+    )
 
 
 def wait_until_community_has_permission_types(
@@ -343,16 +397,31 @@ def wait_until_community_has_permission_types(
     expected_types: set[int],
     attempts: int = 15,
     delay: int = 2,
+    *,
+    fetch: bool = False,
+    spectate: bool = False,
 ) -> dict:
     """Poll until the community on *backend* includes all expected token permission types."""
     community = None
     for _ in range(attempts):
-        community = next(
-            (c for c in messenger.communities_list(backend.wakuext_service.communities()) if c.get("id") == community_id),
-            None,
-        )
+        if spectate:
+            try:
+                backend.wakuext_service.spectate_community(community_id)
+            except Exception as exc:
+                logger.debug(f"spectate_community failed for {community_id}: {exc}")
+        if fetch:
+            try:
+                community = messenger.fetch_community(backend, community_id)
+            except Exception as exc:
+                logger.debug(f"fetch_community failed for {community_id}: {exc}")
+        if not community:
+            community = next(
+                (c for c in messenger.communities_list(backend.wakuext_service.communities()) if c.get("id") == community_id),
+                None,
+            )
         if community and expected_types.issubset(community_permission_types(community)):
             return community
+        community = None
         time.sleep(delay)
 
     assert community, f"Community {community_id} not found on {backend}"

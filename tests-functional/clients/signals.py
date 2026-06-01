@@ -4,7 +4,7 @@ import os
 import threading
 import time
 from datetime import datetime
-from enum import Enum
+from enum import Enum, IntEnum
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -39,6 +39,14 @@ class SignalType(Enum):
     COMMUNITY_MEMBER_REEVALUATION_STATUS = "community.memberReevaluationStatus"
     COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED = "communityToken.communityTokenTransactionStatusChanged"
     COMMUNITY_TOKEN_ACTION = "communityToken.communityTokenAction"
+
+
+class CommunityMemberReevaluationStatus(IntEnum):
+    """Payload status for community.memberReevaluationStatus — mirrors signal.ReevaluationStatus."""
+
+    NONE = 0
+    IN_PROGRESS = 1
+    DONE = 2
 
 
 class WalletEventType(Enum):

@@ -8,16 +8,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1736521871,
-        "narHash": "sha256-d34XNLg9NGPEOARHW+BIOAWalkHdEUAwsv3mpLZQxds=",
+        "lastModified": 1779967405,
+        "narHash": "sha256-UP0D5UinZj36LoMv07BhjZuZxYABNDHz975fUXGxjKU=",
         "owner": "logos-storage",
         "repo": "circom-compat-ffi",
-        "rev": "8cd4ed44fdafe59d4ec1184420639cae4c4dbab9",
+        "rev": "3cca4e91054a4d2bb5335feb19138362ce0fe417",
         "type": "github"
       },
       "original": {
         "owner": "logos-storage",
         "repo": "circom-compat-ffi",
+        "rev": "3cca4e91054a4d2bb5335feb19138362ce0fe417",
         "type": "github"
       }
     },
@@ -161,18 +162,18 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1762211504,
-        "narHash": "sha256-SbDoBElFYJ4cYebltxlO2lYnz6qOaDAVY6aNJ5bqHDE=",
-        "ref": "refs/heads/master",
-        "rev": "3160d9504d07791f2fc9b610948a6cf9a58ed488",
-        "revCount": 342,
-        "type": "git",
-        "url": "https://github.com/vacp2p/zerokit"
+        "lastModified": 1779969584,
+        "narHash": "sha256-xr45wlSgWn8u6ZmK3gplwCQYDchJoy36hU9LezOEpAA=",
+        "owner": "vacp2p",
+        "repo": "zerokit",
+        "rev": "b1e4e485ad8e7a13b402c0ad2604ef879d927be4",
+        "type": "github"
       },
       "original": {
-        "rev": "3160d9504d07791f2fc9b610948a6cf9a58ed488",
-        "type": "git",
-        "url": "https://github.com/vacp2p/zerokit"
+        "owner": "vacp2p",
+        "repo": "zerokit",
+        "rev": "b1e4e485ad8e7a13b402c0ad2604ef879d927be4",
+        "type": "github"
       }
     }
   },

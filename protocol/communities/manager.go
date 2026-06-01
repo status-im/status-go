@@ -1408,6 +1408,10 @@ func (m *Manager) reevaluateMembersLoop(communityID types3.HexBytes, reevaluateO
 	}
 }
 
+func (m *Manager) ForceMembersReevaluationAllowed() bool {
+	return m.forceMembersReevaluation != nil
+}
+
 func (m *Manager) ForceMembersReevaluation(communityID types3.HexBytes) error {
 	if m.forceMembersReevaluation == nil {
 		return errors.New("forcing members reevaluation is not allowed")

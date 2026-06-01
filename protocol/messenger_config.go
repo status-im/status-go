@@ -353,3 +353,10 @@ func WithCommunitiesRekeyInterval(interval time.Duration) func(c *config) error 
 		return nil
 	}
 }
+
+func WithCommunityManagerOptions(options []communities.ManagerOption) Option {
+	return func(c *config) error {
+		c.communityManagerOptions = options
+		return nil
+	}
+}

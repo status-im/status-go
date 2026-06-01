@@ -69,10 +69,7 @@ class TestCommunityTokenGatedManagement:
             owner_backend, member_backend, community_id, attempts=45, spectate_before_wait=True
         )
 
-        owner_backend.logout()
-        owner_backend.login(owner_backend.key_uid, owner_backend.password)
-        owner_backend.wait_for_login()
-        owner_backend.wait_for_wakuext_ready(timeout=60, start_messenger=True)
+        community_tokens.sync_community_member_permissions(owner_backend, community_id)
         messenger.spectate_and_fetch_community(member_backend, community_id)
 
         community_tokens.edit_community_and_wait_until_observer_sees_update(
@@ -152,6 +149,8 @@ class TestCommunityTokenGatedManagement:
             tokens.owner_token_address,
             tokens.master_token_address,
         )
+
+        community_tokens.sync_community_member_permissions(owner_backend, community_id)
 
         owner_community = next(
             (c for c in messenger.communities_list(owner_backend.wakuext_service.communities()) if c.get("id") == community_id),

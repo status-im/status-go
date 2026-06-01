@@ -416,8 +416,8 @@ class WakuextService(Service):
         response = self.rpc_request("checkPermissionsToJoinCommunity", params)
         return response
 
-    def reevaluate_community_members_permissions(self, community_id: str):
-        params = [{"communityId": community_id}]
+    def reevaluate_community_members_permissions(self, community_id: str, *, force: bool = False):
+        params = [{"communityId": community_id, "force": force}]
         response = self.rpc_request("reevaluateCommunityMembersPermissions", params)
         return response
 

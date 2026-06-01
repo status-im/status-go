@@ -19,10 +19,14 @@
     lmn = {
       url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=cccc8ab6fda0e54752936db0d5c80b02a2c34a3a";
       inputs.nixpkgs.follows = "nixpkgs";
+      # https://github.com/vacp2p/zerokit/commit/b1e4e485ad8e7a13b402c0ad2604ef879d927be4
+      inputs.zerokit.url = "github:vacp2p/zerokit/b1e4e485ad8e7a13b402c0ad2604ef879d927be4";
     };
     logos-storage-nim = {
       url = "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&rev=3c09f008bb5266a669fd19f18368f9e8b861b664";
       inputs.nixpkgs.follows = "nixpkgs";
+      # https://github.com/logos-storage/circom-compat-ffi/pull/11
+      inputs.circom-compat.url = "github:logos-storage/circom-compat-ffi/3cca4e91054a4d2bb5335feb19138362ce0fe417";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=fb8039c5a56086ec7fb3e5e1a5a593bb3756ccb6";

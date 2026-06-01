@@ -1,5 +1,4 @@
 import logging
-import time
 
 import pytest
 
@@ -27,8 +26,11 @@ class TestCommunityTokenMembership:
             owner_backend, self.snt_address, membership=CommunityPermissionsAccess.MANUAL_ACCEPT
         )
 
-        time.sleep(2)
-        messenger.fetch_community(member_backend, community_id)
+        community_tokens.wait_until_member_sees_permissions(
+            member_backend,
+            community_id,
+            CommunityTokenPermissionType.BECOME_MEMBER,
+        )
 
         fake_address = "0x" + "0" * 40
         join_req = community_tokens.request_to_join_with_signatures(member_backend, community_id, [fake_address])
@@ -56,23 +58,21 @@ class TestCommunityTokenMembership:
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
-        time.sleep(2)
-
-        member_community = messenger.spectate_and_fetch_community(member_with_snt_backend, community_id)
-        assert member_community, "Community not found on member"
-        assert CommunityTokenPermissionType.BECOME_MEMBER.value in community_tokens.community_permission_types(
-            member_community
-        ), f"Expected BECOME_MEMBER permission (type=2), got {community_tokens.community_permission_types(member_community)}"
+        community_tokens.wait_until_member_sees_permissions(
+            member_with_snt_backend,
+            community_id,
+            CommunityTokenPermissionType.BECOME_MEMBER,
+        )
 
         member_with_snt_backend.wallet_service.restart_wallet_reload_timer()
-        time.sleep(2)
         community_tokens.join_token_gated_community_as_member(owner_backend, member_with_snt_backend, community_id, member_address)
 
+        community_tokens.sync_community_member_permissions(owner_backend, community_id)
+
+        member_public_key = member_with_snt_backend.public_key
         communities = owner_backend.wakuext_service.communities()
         owner_community = next((c for c in messenger.communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
-
-        member_public_key = member_with_snt_backend.public_key
         assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
         member_roles = owner_community["members"][member_public_key].get("roles", [])
         assert CommunityRoles.ROLE_ADMIN.value not in member_roles, "Member should join without admin role"
@@ -94,30 +94,37 @@ class TestCommunityTokenMembership:
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
-        time.sleep(2)
-
-        response = messenger.spectate_and_fetch_community(member_with_snt_backend, community_id)
-        assert response, "Community not found"
+        response = community_tokens.wait_until_member_sees_permissions(
+            member_with_snt_backend,
+            community_id,
+            CommunityTokenPermissionType.BECOME_MEMBER,
+            CommunityTokenPermissionType.BECOME_ADMIN,
+        )
         assert response["tokenPermissions"], "No token permissions found"
         assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
         perm_types = community_tokens.community_permission_types(response)
         assert CommunityTokenPermissionType.BECOME_MEMBER.value in perm_types
         assert CommunityTokenPermissionType.BECOME_ADMIN.value in perm_types
 
-        community_tokens.join_token_gated_community_as_member(owner_backend, member_with_snt_backend, community_id, member_address, attempts=3)
+        member_with_snt_backend.wallet_service.restart_wallet_reload_timer()
+        community_tokens.join_token_gated_community_as_member(owner_backend, member_with_snt_backend, community_id, member_address)
 
-        communities = owner_backend.wakuext_service.communities()
-        owner_community = next(
-            (c for c in messenger.communities_list(communities) if c.get("id") == community_id),
-            None,
-        )
-        assert owner_community is not None
+        community_tokens.sync_community_member_permissions(owner_backend, community_id)
 
         member_key = member_with_snt_backend.public_key
         owner_key = owner_backend.public_key
 
+        owner_community = community_tokens.wait_for_member_role(
+            owner_backend,
+            community_id,
+            member_key,
+            CommunityRoles.ROLE_ADMIN.value,
+            attempts=15,
+            delay=2,
+        )
+        assert owner_community
+
         assert member_key in owner_community.get("members", {})
-        assert CommunityRoles.ROLE_ADMIN.value in owner_community["members"][member_key].get("roles", [])
 
         assert owner_key in owner_community.get("members", {})
         assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
