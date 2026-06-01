@@ -152,6 +152,46 @@ func TestInstallIdenticalFilters(t *testing.T) {
 	require.NotNil(t, msg)
 }
 
+// TestOpenVersionZeroDecodesAsV1 covers the status-go#7499 migration: an
+// incoming message whose payload is WakuV1-encrypted but whose envelope is
+// labeled version=0 must still be decrypted (treated the same as version=1),
+// and the original envelope must be left untouched.
+func TestOpenVersionZeroDecodesAsV1(t *testing.T) {
+	filter, err := generateFilter(t, true)
+	require.NoError(t, err)
+
+	data := make([]byte, 20)
+	_, err = crand.Read(data) // nolint: gosec
+	require.NoError(t, err)
+
+	p := &payload.Payload{
+		Data: data,
+		Key:  &payload.KeyInfo{Kind: payload.Symmetric, SymKey: filter.KeySym},
+	}
+	encoded, err := p.Encode(1) // WakuV1 encryption
+	require.NoError(t, err)
+
+	// Label the envelope version=0 while the payload stays v1-encrypted.
+	var versionZero uint32
+	msg := &pb.WakuMessage{
+		Payload:      encoded,
+		Version:      &versionZero,
+		ContentTopic: maps.Keys(filter.ContentTopics)[0].ContentTopic(),
+		Timestamp:    proto.Int64(time.Now().UnixNano()),
+		Meta:         []byte{},
+	}
+	envelope := protocol.NewEnvelope(msg, time.Now().UnixNano(), filter.PubsubTopic)
+	received := NewReceivedMessage(envelope, "test")
+	received.SymKeyHash = crypto.Keccak256Hash(filter.KeySym)
+
+	opened := received.Open(filter)
+	require.NotNil(t, opened, "version=0 message should be decoded as WakuV1")
+	require.Equal(t, data, opened.Data)
+
+	// We clone before overriding, so the original envelope keeps version=0.
+	require.Equal(t, uint32(0), received.Envelope.Message().GetVersion())
+}
+
 func TestInstallFilterWithSymAndAsymKeys(t *testing.T) {
 	filters := NewFilters(testShard, createLogger(t))
 	filter1, _ := generateFilter(t, true)
