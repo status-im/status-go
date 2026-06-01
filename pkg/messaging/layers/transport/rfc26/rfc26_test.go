@@ -1,4 +1,4 @@
-package encoding
+package rfc26
 
 import (
 	"crypto/aes"

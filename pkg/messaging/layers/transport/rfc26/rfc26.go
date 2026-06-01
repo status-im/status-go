@@ -1,11 +1,11 @@
-// Package encoding implements the WakuMessage version=1 payload encoding.
+// Package rfc26 implements the WakuMessage version=1 payload codec specified
+// by RFC 26/WAKU2-PAYLOAD (https://rfc.vac.dev/spec/26/). See README.md.
 //
 // This is the legacy wire-format codec applied at the transport boundary: it
 // concatenates flags, payload-length, payload, padding and an optional ECDSA
 // signature, then encrypts the result (AES-256-GCM for symmetric keys, ECIES
-// for asymmetric keys). Despite the "encoding" name, this layer performs real
-// encryption and signing. It is specified by RFC 26/WAKU2-PAYLOAD
-// (https://rfc.vac.dev/spec/26/) for version=1 messages described in
+// for asymmetric keys). Despite living under transport/, this layer performs
+// real encryption and signing. It covers version=1 messages described in
 // 14/WAKU-MESSAGE.
 //
 // The format is frozen and kept solely for wire-compatibility with the existing
@@ -13,7 +13,7 @@
 // encryption (X3DH) layer above, not here. Output MUST stay byte-identical to
 // go-waku's waku/v2/payload package, from which this code was relocated
 // (status-im/status-go#7462).
-package encoding
+package rfc26
 
 import (
 	"crypto/aes"

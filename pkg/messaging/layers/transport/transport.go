@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -403,7 +403,7 @@ func (t *Transport) cleanFilters() error {
 // Exactly one of symKey or recipient must be non-nil. The message is always
 // signed with the local identity key.
 func (t *Transport) encode(payload []byte, symKey []byte, recipient *ecdsa.PublicKey) ([]byte, error) {
-	return encoding.EncodeV1(payload, symKey, recipient, t.keysManager.privateKey)
+	return rfc26.EncodeV1(payload, symKey, recipient, t.keysManager.privateKey)
 }
 
 func (t *Transport) Track(identifier []byte, hashes [][]byte, newMessages []*types.NewMessage) {

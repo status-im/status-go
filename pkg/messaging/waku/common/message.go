@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 )
 
 // MessageType represents where this message comes from
@@ -163,19 +163,19 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	// TODO: should we update msg instead of creating a new received message?
 	result = new(ReceivedMessage)
 
-	keyInfo := new(encoding.KeyInfo)
+	keyInfo := new(rfc26.KeyInfo)
 	if watcher.expectsAsymmetricEncryption() {
-		keyInfo.Kind = encoding.Asymmetric
+		keyInfo.Kind = rfc26.Asymmetric
 		keyInfo.PrivKey = watcher.KeyAsym
 		msg.Dst = &watcher.KeyAsym.PublicKey
 	} else if watcher.expectsSymmetricEncryption() {
-		keyInfo.Kind = encoding.Symmetric
+		keyInfo.Kind = rfc26.Symmetric
 		keyInfo.SymKey = watcher.KeySym
 		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
 	wakuMessage := msg.Envelope.Message()
-	raw, err := encoding.Decode(wakuMessage.GetVersion(), wakuMessage.Payload, keyInfo)
+	raw, err := rfc26.Decode(wakuMessage.GetVersion(), wakuMessage.Payload, keyInfo)
 
 	if err != nil {
 		logutils.ZapLogger().Error("failed to decode message", zap.Error(err))

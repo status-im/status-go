@@ -29,7 +29,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/pkg/messaging/layers/transport/encoding"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -56,7 +56,7 @@ func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 		return nil, ErrSymAsym
 	}
 
-	var keyInfo *encoding.KeyInfo = new(encoding.KeyInfo)
+	var keyInfo *rfc26.KeyInfo = new(rfc26.KeyInfo)
 
 	// Set key that is used to sign the message
 	if len(req.SigID) > 0 {
@@ -71,7 +71,7 @@ func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
-		keyInfo.Kind = encoding.Symmetric
+		keyInfo.Kind = rfc26.Symmetric
 
 		if contentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
@@ -86,7 +86,7 @@ func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 
 	// Set asymmetric key that is used to encrypt the message
 	if pubKeyGiven {
-		keyInfo.Kind = encoding.Asymmetric
+		keyInfo.Kind = rfc26.Asymmetric
 
 		var pubK *ecdsa.PublicKey
 		if pubK, err = crypto.UnmarshalPubkey(req.PublicKey); err != nil {
@@ -97,7 +97,7 @@ func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 
 	var version uint32 = 1 // Use wakuv1 encryption
 
-	p := new(encoding.Payload)
+	p := new(rfc26.Payload)
 	p.Data = req.Payload
 	p.Key = keyInfo
 
@@ -126,7 +126,7 @@ func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 
 // Send publishes a pre-encoded payload to the messaging network. The payload
 // is expected to be already encoded for WakuMessage version=1 (see
-// transport/encoding.EncodeV1); this method just wraps it in a WakuMessage
+// transport/rfc26.EncodeV1); this method just wraps it in a WakuMessage
 // envelope and hands it to the publish path. Returns the wire hash.
 //
 // ctx is accepted for symmetry with transport.MessagingAPI; the send queue

@@ -16,14 +16,14 @@ type MessagingAPI interface {
 	// Post posts a message on the messaging network. The payload is encoded
 	// for WakuMessage version=1 inside the implementation.
 	//
-	// Deprecated: callers should encode via encoding.EncodeV1 and publish
+	// Deprecated: callers should encode via rfc26.EncodeV1 and publish
 	// the result through Send. Post is kept transitionally until the
 	// transport's send paths are routed through Send (#7462).
 	Post(ctx context.Context, req types.NewMessage) ([]byte, error)
 
 	// Send publishes a pre-encoded payload on the messaging network. The
 	// payload is expected to be already encoded for WakuMessage version=1
-	// (see encoding.EncodeV1). Returns the wire hash on success.
+	// (see rfc26.EncodeV1). Returns the wire hash on success.
 	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
 
 	// GetFilterMessages returns the messages that match the filter criteria
