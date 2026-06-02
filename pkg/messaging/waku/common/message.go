@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -175,7 +177,23 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
-	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)
+	wakuMsg := msg.Envelope.Message()
+
+	// Migration to retire the WakuMessage `version` field (status-go#7499):
+	// always decode incoming payloads as WakuV1-encrypted, treating version=0
+	// the same as version=1. status-go only ever emits version=1, so a
+	// version=0 envelope is never genuine plaintext; once later releases start
+	// publishing version=0 with v1-encoded payloads, they must still decrypt
+	// here. We clone before overriding so the original envelope (hash, storage)
+	// is untouched, and only force this when the filter has a decryption key —
+	// keyless filters keep the legacy "return payload as-is" behaviour.
+	if wakuMsg.GetVersion() == 0 && (keyInfo.Kind == payload.Symmetric || keyInfo.Kind == payload.Asymmetric) {
+		wakuMsg = proto.Clone(wakuMsg).(*pb.WakuMessage)
+		forcedVersion := uint32(1)
+		wakuMsg.Version = &forcedVersion
+	}
+
+	raw, err := payload.DecodePayload(wakuMsg, keyInfo)
 
 	if err != nil {
 		logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
