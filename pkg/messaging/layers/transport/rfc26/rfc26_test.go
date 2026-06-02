@@ -13,42 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// encodeDecode round-trips a payload through Encode and Decode, mirroring the
-// behaviour of the former EncodeWakuMessage/DecodeWakuMessage helpers.
-func encodeDecode(version uint32, data []byte, keyInfo *KeyInfo) ([]byte, *DecodedPayload, error) {
-	p := Payload{Data: data, Key: keyInfo}
-	encoded, err := p.Encode(version)
-	if err != nil {
-		return nil, nil, err
-	}
-	decoded, err := Decode(version, encoded, keyInfo)
-	return encoded, decoded, err
-}
-
-func TestEncodeDecodePayload(t *testing.T) {
-	data := []byte{0, 1, 2}
-	version := uint32(0)
-
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = None
-
-	encodedPayload, decodedPayload, err := encodeDecode(version, data, keyInfo)
-	require.NoError(t, err)
-	require.Equal(t, data, encodedPayload)
-	require.Equal(t, data, decodedPayload.Data)
-}
-
-func TestEncodeDecodeVersion0(t *testing.T) {
-	data := []byte{0, 1, 2}
-
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = None
-
-	_, decoded, err := encodeDecode(0, data, keyInfo)
-	require.NoError(t, err)
-	require.Equal(t, data, decoded.Data)
-}
-
 func generateSymKey() ([]byte, error) {
 	key, err := generateSecureRandomData(aesKeyLength)
 	if err != nil {
@@ -60,120 +24,117 @@ func generateSymKey() ([]byte, error) {
 	return key, nil
 }
 
-func TestEncodeDecodeVersion1Symmetric(t *testing.T) {
+func TestEncodeDecodeSymmetric(t *testing.T) {
 	data := []byte{0, 1, 2}
-
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = Symmetric
-
-	var err error
-	keyInfo.SymKey, err = generateSymKey()
-	require.NoError(t, err)
-
-	encoded, decoded, err := encodeDecode(1, data, keyInfo)
-	require.NoError(t, err)
-	require.NotEqual(t, data, encoded)
-	require.NotNil(t, encoded)
-	require.Equal(t, data, decoded.Data)
-}
-
-func TestEncodeDecodeVersion1Asymmetric(t *testing.T) {
-	data := []byte{0, 1, 2}
-
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = Asymmetric
-	keyInfo.PubKey = privKey.PublicKey
-
-	p := Payload{Data: data, Key: keyInfo}
-	encoded, err := p.Encode(1)
-	require.NoError(t, err)
-	require.NotEqual(t, data, encoded)
-	require.NotNil(t, encoded)
-
-	keyInfo.PrivKey = privKey
-	decoded, err := Decode(1, encoded, keyInfo)
-	require.NoError(t, err)
-	require.Equal(t, data, decoded.Data)
-}
-
-func TestEncodeDecodeIncorrectKey(t *testing.T) {
-	data := []byte{0, 1, 2}
-
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
 
 	symKey, err := generateSymKey()
 	require.NoError(t, err)
 
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = Asymmetric
-	keyInfo.SymKey = symKey
+	encoded, err := Encode(data, symKey, nil, nil)
+	require.NoError(t, err)
+	require.NotEqual(t, data, encoded)
+	require.NotNil(t, encoded)
 
-	p := Payload{Data: data, Key: keyInfo}
-	_, err = p.Encode(1)
-	require.Error(t, err)
-
-	keyInfo.SymKey = nil
-	keyInfo.PrivKey = privKey
-
-	p = Payload{Data: data, Key: keyInfo}
-	_, err = p.Encode(1)
-	require.Error(t, err)
+	decoded, err := Decode(encoded, &KeyInfo{Kind: Symmetric, SymKey: symKey})
+	require.NoError(t, err)
+	require.Equal(t, data, decoded.Data)
+	require.Nil(t, decoded.PubKey)
 }
 
-func TestEncodeUnsupportedVersion(t *testing.T) {
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = None
+func TestEncodeDecodeSymmetricSigned(t *testing.T) {
+	data := []byte{0, 1, 2}
 
-	p := Payload{Data: []byte{0, 1, 2}, Key: keyInfo}
-	_, err := p.Encode(99)
-	require.Error(t, err)
-	require.EqualError(t, err, "unsupported wakumessage version")
+	symKey, err := generateSymKey()
+	require.NoError(t, err)
+
+	sigKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	encoded, err := Encode(data, symKey, nil, sigKey)
+	require.NoError(t, err)
+
+	decoded, err := Decode(encoded, &KeyInfo{Kind: Symmetric, SymKey: symKey})
+	require.NoError(t, err)
+	require.Equal(t, data, decoded.Data)
+	require.NotNil(t, decoded.PubKey)
+	require.Equal(t, sigKey.PublicKey, *decoded.PubKey)
 }
 
-func TestDecodeUnsupportedVersion(t *testing.T) {
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = None
+func TestEncodeDecodeAsymmetric(t *testing.T) {
+	data := []byte{0, 1, 2}
 
-	decodedPayload, err := Decode(99, []byte{0, 1, 2}, keyInfo)
+	recipient, err := crypto.GenerateKey()
+	require.NoError(t, err)
 
-	require.Nil(t, decodedPayload)
+	sigKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	encoded, err := Encode(data, nil, &recipient.PublicKey, sigKey)
+	require.NoError(t, err)
+	require.NotEqual(t, data, encoded)
+	require.NotNil(t, encoded)
+
+	decoded, err := Decode(encoded, &KeyInfo{Kind: Asymmetric, PrivKey: recipient})
+	require.NoError(t, err)
+	require.Equal(t, data, decoded.Data)
+	require.Equal(t, sigKey.PublicKey, *decoded.PubKey)
+}
+
+func TestEncodeRequiresExactlyOneKey(t *testing.T) {
+	data := []byte{0, 1, 2}
+
+	// Both nil.
+	_, err := Encode(data, nil, nil, nil)
 	require.Error(t, err)
-	require.EqualError(t, err, "unsupported wakumessage version")
+	require.Contains(t, err.Error(), "exactly one")
+
+	// Both set.
+	symKey, err := generateSymKey()
+	require.NoError(t, err)
+	recipient, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	_, err = Encode(data, symKey, &recipient.PublicKey, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exactly one")
+}
+
+func TestDecodeRequiresKey(t *testing.T) {
+	_, err := Decode([]byte{0, 1, 2}, &KeyInfo{Kind: Symmetric})
+	require.Error(t, err)
+
+	_, err = Decode([]byte{0, 1, 2}, &KeyInfo{Kind: Asymmetric})
+	require.Error(t, err)
+
+	_, err = Decode([]byte{0, 1, 2}, &KeyInfo{Kind: None})
+	require.Error(t, err)
 }
 
 func singleMessageTest(t *testing.T, symmetric bool) {
 	data := []byte{0, 1, 2}
 
-	var err error
-
-	keyInfo := new(KeyInfo)
-	keyInfo.PrivKey, err = crypto.GenerateKey()
+	// The signer is also the recipient: we simulate 'sending' to ourselves.
+	sigKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	if symmetric {
-		keyInfo.Kind = Symmetric
-		keyInfo.SymKey, err = generateSymKey()
-		require.NoError(t, err)
-	} else {
-		keyInfo.Kind = Asymmetric
-		keyInfo.PubKey = keyInfo.PrivKey.PublicKey // We'll simulate 'sending' a message to ourselves
-	}
 
-	p := Payload{Data: data, Key: keyInfo}
-	encoded, err := p.Encode(1)
+	var symKey []byte
+	var encoded []byte
+	if symmetric {
+		symKey, err = generateSymKey()
+		require.NoError(t, err)
+		encoded, err = Encode(data, symKey, nil, sigKey)
+	} else {
+		encoded, err = Encode(data, nil, &sigKey.PublicKey, sigKey)
+	}
 	require.NoError(t, err)
 
 	var decryptedPayload []byte
 	if symmetric {
-		decryptedPayload, err = decryptSymmetric(encoded, keyInfo.SymKey)
-		require.NoError(t, err)
+		decryptedPayload, err = decryptSymmetric(encoded, symKey)
 	} else {
-		decryptedPayload, err = decryptAsymmetric(encoded, keyInfo.PrivKey)
-		require.NoError(t, err)
+		decryptedPayload, err = decryptAsymmetric(encoded, sigKey)
 	}
+	require.NoError(t, err)
 
 	decodedPayload, err := validateAndParse(decryptedPayload)
 	require.NoError(t, err)
@@ -181,7 +142,7 @@ func singleMessageTest(t *testing.T, symmetric bool) {
 
 	require.True(t, isMessageSigned(decryptedPayload[0]))
 	require.Len(t, decodedPayload.Signature, signatureLength)
-	require.Equal(t, keyInfo.PrivKey.PublicKey, *decodedPayload.PubKey)
+	require.Equal(t, sigKey.PublicKey, *decodedPayload.PubKey)
 }
 
 func TestMessageEncryption(t *testing.T) {
@@ -193,12 +154,7 @@ func TestMessageEncryption(t *testing.T) {
 }
 
 func TestEncryptWithZeroKey(t *testing.T) {
-	keyInfo := new(KeyInfo)
-	keyInfo.Kind = Symmetric
-	keyInfo.SymKey = make([]byte, aesKeyLength)
-
-	p := Payload{Data: []byte{0, 1, 2}, Key: keyInfo}
-	_, err := p.Encode(1)
+	_, err := Encode([]byte{0, 1, 2}, make([]byte, aesKeyLength), nil, nil)
 	require.Error(t, err)
 	require.EqualError(t, err, "couldn't encrypt using symmetric key: invalid key provided for symmetric encryption, size: 32")
 }
@@ -220,7 +176,7 @@ func singlePaddingTest(t *testing.T, padSize int) {
 	_, err = crand.Read(p.Padding) // nolint: gosec
 	require.NoError(t, err)
 
-	encodedPayload, err := p.Encode(1)
+	encodedPayload, err := p.encode()
 	require.NoError(t, err)
 
 	decodedData, err := decryptSymmetric(encodedPayload, keyInfo.SymKey)
@@ -286,75 +242,3 @@ func TestAesNonce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, aesgcm.NonceSize(), aesNonceLength)
 }
-
-func TestEncodeV1Symmetric(t *testing.T) {
-	data := []byte{0, 1, 2}
-
-	symKey, err := generateSymKey()
-	require.NoError(t, err)
-
-	encoded, err := EncodeV1(data, symKey, nil, nil)
-	require.NoError(t, err)
-
-	decoded, err := Decode(1, encoded, &KeyInfo{Kind: Symmetric, SymKey: symKey})
-	require.NoError(t, err)
-	require.Equal(t, data, decoded.Data)
-	require.Nil(t, decoded.PubKey)
-}
-
-func TestEncodeV1SymmetricSigned(t *testing.T) {
-	data := []byte{0, 1, 2}
-
-	symKey, err := generateSymKey()
-	require.NoError(t, err)
-
-	sigKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-
-	encoded, err := EncodeV1(data, symKey, nil, sigKey)
-	require.NoError(t, err)
-
-	decoded, err := Decode(1, encoded, &KeyInfo{Kind: Symmetric, SymKey: symKey})
-	require.NoError(t, err)
-	require.Equal(t, data, decoded.Data)
-	require.NotNil(t, decoded.PubKey)
-	require.Equal(t, sigKey.PublicKey, *decoded.PubKey)
-}
-
-func TestEncodeV1Asymmetric(t *testing.T) {
-	data := []byte{0, 1, 2}
-
-	recipient, err := crypto.GenerateKey()
-	require.NoError(t, err)
-
-	sigKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-
-	encoded, err := EncodeV1(data, nil, &recipient.PublicKey, sigKey)
-	require.NoError(t, err)
-
-	decoded, err := Decode(1, encoded, &KeyInfo{Kind: Asymmetric, PrivKey: recipient})
-	require.NoError(t, err)
-	require.Equal(t, data, decoded.Data)
-	require.Equal(t, sigKey.PublicKey, *decoded.PubKey)
-}
-
-func TestEncodeV1RequiresExactlyOneKey(t *testing.T) {
-	data := []byte{0, 1, 2}
-
-	// Both nil.
-	_, err := EncodeV1(data, nil, nil, nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "exactly one")
-
-	// Both set.
-	symKey, err := generateSymKey()
-	require.NoError(t, err)
-	recipient, err := crypto.GenerateKey()
-	require.NoError(t, err)
-
-	_, err = EncodeV1(data, symKey, &recipient.PublicKey, nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "exactly one")
-}
-

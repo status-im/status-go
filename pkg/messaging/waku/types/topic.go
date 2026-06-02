@@ -43,6 +43,10 @@ func TopicTypeToByteArray(t TopicType) []byte {
 }
 
 // ContentTopic returns the 23/WAKU2-TOPICS string representation of the topic.
+//
+// TODO(status-im/status-go#7509): this duplicates common.TopicType.ContentTopic
+// because TopicType itself is duplicated between waku/types and waku/common.
+// Remove once the two TopicType definitions are unified.
 func (t TopicType) ContentTopic() string {
 	return "/waku/1/" + hexutil.Encode(t[:]) + "/rfc26"
 }

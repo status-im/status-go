@@ -1,18 +1,19 @@
-// Package rfc26 implements the WakuMessage version=1 payload codec specified
-// by RFC 26/WAKU2-PAYLOAD (https://rfc.vac.dev/spec/26/). See README.md.
+// Package rfc26 implements the WakuMessage payload encryption codec specified
+// by 26/WAKU2-PAYLOAD (https://lip.logos.co/messaging/draft/26/payload.html).
+// See README.md for why this layer matters in Status.
 //
-// This is the legacy wire-format codec applied at the transport boundary: it
-// concatenates flags, payload-length, payload, padding and an optional ECDSA
-// signature, then encrypts the result (AES-256-GCM for symmetric keys, ECIES
-// for asymmetric keys). Despite living under transport/, this layer performs
-// real encryption and signing. It covers version=1 messages described in
-// 14/WAKU-MESSAGE.
+// It lays out flags + payload-length + payload + padding + [signature] and
+// encrypts the result: AES-256-GCM for symmetric keys, ECIES for asymmetric
+// keys, with an optional ECDSA signature over the payload.
 //
-// The format is frozen and kept solely for wire-compatibility with the existing
-// network; the meaningful end-to-end confidentiality is provided by the
-// encryption (X3DH) layer above, not here. Output MUST stay byte-identical to
-// go-waku's waku/v2/payload package, from which this code was relocated
-// (status-im/status-go#7462).
+// Encryption is unconditional: this codec always encrypts (Encode) and always
+// decrypts (Decode). It is deliberately independent of the WakuMessage
+// `version` field — that field is a wire label owned by the caller, not part
+// of this spec. (The earlier coupling of this codec to version==1 was a
+// misreading of the spec.)
+//
+// Relocated from go-waku's waku/v2/payload package; output stays
+// byte-identical (status-im/status-go#7462).
 package rfc26
 
 import (
@@ -38,9 +39,6 @@ const (
 	None       KeyKind = "None"
 )
 
-const Unencrypted = 0
-const V1Encryption = 1
-
 // Payload contains the data of the message to encode
 type Payload struct {
 	Data    []byte   // Raw message payload
@@ -63,15 +61,15 @@ type KeyInfo struct {
 	PrivKey *ecdsa.PrivateKey // Set a privkey if the message requires a signature
 }
 
-// EncodeV1 builds a WakuMessage version=1 payload (RFC 26) from raw inputs:
-// it concatenates flags + payload-length + payload + padding + [signature]
-// and encrypts the result — AES-256-GCM when symKey is supplied, ECIES when
-// pubKey is supplied. Exactly one of symKey or pubKey must be non-nil.
-// When sigKey is non-nil, the payload is also signed (ECDSA).
+// Encode builds and encrypts an RFC 26 payload from raw inputs: it lays out
+// flags + payload-length + payload + padding + [signature] and encrypts the
+// result — AES-256-GCM when symKey is supplied, ECIES when pubKey is supplied.
+// Exactly one of symKey or pubKey must be non-nil. When sigKey is non-nil the
+// payload is signed (ECDSA) before encryption.
 //
-// This is the high-level entry point for the send side: callers pass
-// already-resolved keys, no key-store lookup is performed here.
-func EncodeV1(payload []byte, symKey []byte, pubKey *ecdsa.PublicKey, sigKey *ecdsa.PrivateKey) ([]byte, error) {
+// Encryption is unconditional. Callers pass already-resolved keys; no
+// key-store lookup is performed here.
+func Encode(payload []byte, symKey []byte, pubKey *ecdsa.PublicKey, sigKey *ecdsa.PrivateKey) ([]byte, error) {
 	keyInfo := &KeyInfo{PrivKey: sigKey}
 	switch {
 	case symKey != nil && pubKey == nil:
@@ -81,86 +79,76 @@ func EncodeV1(payload []byte, symKey []byte, pubKey *ecdsa.PublicKey, sigKey *ec
 		keyInfo.Kind = Asymmetric
 		keyInfo.PubKey = *pubKey
 	default:
-		return nil, errors.New("encoding: exactly one of symKey or pubKey must be non-nil")
+		return nil, errors.New("rfc26: exactly one of symKey or pubKey must be non-nil")
 	}
-	return Payload{Data: payload, Key: keyInfo}.Encode(V1Encryption)
+
+	return Payload{Data: payload, Key: keyInfo}.encode()
 }
 
-// Encode encodes a payload depending on the version parameter.
-// 0 for raw unencrypted data, and 1 for using WakuV1 encoding.
-func (payload Payload) Encode(version uint32) ([]byte, error) {
-	switch version {
-	case 0:
-		return payload.Data, nil
-	case 1:
-		data, err := payload.v1Data()
+// encode lays out the frame, optionally signs it, and encrypts the result.
+// It is the lower-level form of Encode that accepts caller-supplied Padding.
+func (payload Payload) encode() ([]byte, error) {
+	data, err := payload.frameData()
+	if err != nil {
+		return nil, err
+	}
+
+	if payload.Key.PrivKey != nil {
+		data, err = sign(data, *payload.Key.PrivKey)
 		if err != nil {
 			return nil, err
 		}
-
-		if payload.Key.PrivKey != nil {
-			data, err = sign(data, *payload.Key.PrivKey)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		switch payload.Key.Kind {
-		case Symmetric:
-			encoded, err := encryptSymmetric(data, payload.Key.SymKey)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't encrypt using symmetric key: %w", err)
-			}
-
-			return encoded, nil
-		case Asymmetric:
-			encoded, err := encryptAsymmetric(data, &payload.Key.PubKey)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't encrypt using asymmetric key: %w", err)
-			}
-			return encoded, nil
-		case None:
-			return nil, errors.New("non supported KeyKind")
-		}
 	}
-	return nil, errors.New("unsupported wakumessage version")
+
+	switch payload.Key.Kind {
+	case Symmetric:
+		encoded, err := encryptSymmetric(data, payload.Key.SymKey)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't encrypt using symmetric key: %w", err)
+		}
+		return encoded, nil
+	case Asymmetric:
+		encoded, err := encryptAsymmetric(data, &payload.Key.PubKey)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't encrypt using asymmetric key: %w", err)
+		}
+		return encoded, nil
+	default:
+		return nil, errors.New("rfc26: unsupported key kind")
+	}
 }
 
-// Decode decodes a raw version=1 payload (the WakuMessage payload field) using
-// the provided keys. version 0 returns the data unchanged.
-func Decode(version uint32, data []byte, keyInfo *KeyInfo) (*DecodedPayload, error) {
-	switch version {
-	case uint32(0):
-		return &DecodedPayload{Data: data}, nil
-	case uint32(1):
-		switch keyInfo.Kind {
-		case Symmetric:
-			if keyInfo.SymKey == nil {
-				return nil, errors.New("symmetric key is required")
-			}
-
-			decodedData, err := decryptSymmetric(data, keyInfo.SymKey)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't decrypt using symmetric key: %w", err)
-			}
-
-			return validateAndParse(decodedData)
-		case Asymmetric:
-			if keyInfo.PrivKey == nil {
-				return nil, errors.New("private key is required")
-			}
-
-			decodedData, err := decryptAsymmetric(data, keyInfo.PrivKey)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't decrypt using asymmetric key: %w", err)
-			}
-
-			return validateAndParse(decodedData)
-		case None:
-			return nil, errors.New("non supported KeyKind")
+// Decode decrypts and parses an RFC 26 payload using the provided keys.
+// keyInfo.Kind selects symmetric (AES-256-GCM) or asymmetric (ECIES)
+// decryption. Decryption is unconditional and independent of the WakuMessage
+// `version` field.
+func Decode(data []byte, keyInfo *KeyInfo) (*DecodedPayload, error) {
+	switch keyInfo.Kind {
+	case Symmetric:
+		if keyInfo.SymKey == nil {
+			return nil, errors.New("symmetric key is required")
 		}
+
+		decodedData, err := decryptSymmetric(data, keyInfo.SymKey)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't decrypt using symmetric key: %w", err)
+		}
+
+		return validateAndParse(decodedData)
+	case Asymmetric:
+		if keyInfo.PrivKey == nil {
+			return nil, errors.New("private key is required")
+		}
+
+		decodedData, err := decryptAsymmetric(data, keyInfo.PrivKey)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't decrypt using asymmetric key: %w", err)
+		}
+
+		return validateAndParse(decodedData)
+	default:
+		return nil, errors.New("rfc26: unsupported key kind")
 	}
-	return nil, errors.New("unsupported wakumessage version")
 }
 
 const aesNonceLength = 12
@@ -327,7 +315,9 @@ func sign(data []byte, privKey ecdsa.PrivateKey) ([]byte, error) {
 	return result, nil
 }
 
-func (payload Payload) v1Data() ([]byte, error) {
+// frameData lays out the unencrypted RFC 26 frame: flags + payload-length +
+// payload + padding (the signature, if any, is appended later by sign).
+func (payload Payload) frameData() ([]byte, error) {
 	const payloadSizeFieldMaxSize = 4
 	result := make([]byte, 1, flagsLength+payloadSizeFieldMaxSize+len(payload.Data)+len(payload.Padding)+signatureLength+padSizeLimit)
 	result[0] = 0 // set all the flags to zero

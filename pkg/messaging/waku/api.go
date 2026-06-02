@@ -32,11 +32,11 @@ import (
 )
 
 // (Waku.Post was removed: all sends now go through Send with payloads
-// pre-encoded by the transport via rfc26.EncodeV1.)
+// pre-encoded by the transport via rfc26.Encode.)
 
 // Send publishes a pre-encoded payload to the messaging network. The payload
 // is expected to be already encoded for WakuMessage version=1 (see
-// transport/rfc26.EncodeV1); this method just wraps it in a WakuMessage
+// transport/rfc26.Encode); this method just wraps it in a WakuMessage
 // envelope and hands it to the publish path. Returns the wire hash.
 //
 // ctx is accepted for symmetry with transport.MessagingAPI; the send queue

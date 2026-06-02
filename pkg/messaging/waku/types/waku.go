@@ -99,7 +99,7 @@ type WakuKeyManager interface {
 type Waku interface {
 	// Send publishes a pre-encoded payload on the messaging network. The
 	// payload is expected to be already encoded for WakuMessage version=1
-	// (see transport/rfc26.EncodeV1). Returns the wire hash on success.
+	// (see transport/rfc26.Encode). Returns the wire hash on success.
 	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
 
 	// GetFilterMessages returns the messages that match the filter criteria and

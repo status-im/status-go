@@ -69,7 +69,7 @@ type testWakuWrapper struct {
 
 // Send overrides the embedded Waku's Send to fan out post events to any
 // subscribers registered via SubscribePostEvents. Primary sends go through
-// Send (the transport encodes payloads via rfc26.EncodeV1 before publishing).
+// Send (the transport encodes payloads via rfc26.Encode before publishing).
 // Msg is nil because Send takes raw bytes, not a NewMessage; the only
 // consumer (MessagesOrderController) reads ID.
 func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {

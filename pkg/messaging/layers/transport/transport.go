@@ -403,7 +403,7 @@ func (t *Transport) cleanFilters() error {
 // Exactly one of symKey or recipient must be non-nil. The message is always
 // signed with the local identity key.
 func (t *Transport) encode(payload []byte, symKey []byte, recipient *ecdsa.PublicKey) ([]byte, error) {
-	return rfc26.EncodeV1(payload, symKey, recipient, t.keysManager.privateKey)
+	return rfc26.Encode(payload, symKey, recipient, t.keysManager.privateKey)
 }
 
 // Track records sent envelopes for delivery monitoring. It is the
