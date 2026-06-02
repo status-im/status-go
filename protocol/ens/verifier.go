@@ -25,6 +25,8 @@ import (
 
 const contractQueryTimeout = 5000 * time.Millisecond
 
+const ensVerifyInterval = 30 * time.Second
+
 type Verifier struct {
 	online          bool
 	persistence     *Persistence
@@ -35,6 +37,8 @@ type Verifier struct {
 	contractAddress string
 	quit            chan struct{}
 	quitWg          sync.WaitGroup
+
+	pause gocommon.PauseBroadcaster
 }
 
 func New(logger *zap.Logger, timesource timesource.Provider, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
@@ -102,26 +106,33 @@ func (v *Verifier) SetOnline(online bool) {
 	v.online = online
 }
 
+// SetPaused stops/resumes the periodic ENS verification ticker.
+func (v *Verifier) SetPaused(paused bool) {
+	if paused {
+		v.pause.MarkPaused()
+	} else {
+		v.pause.MarkResumed()
+	}
+}
+
 func (v *Verifier) verifyLoop() {
 	defer gocommon.LogOnPanic()
 	defer v.quitWg.Done()
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-v.quit:
-			return
-		case <-ticker.C:
+
+	sub := v.pause.Subscribe()
+	defer sub.Unsubscribe()
+	pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+		Interval: ensVerifyInterval,
+		OnTick: func() {
 			if !v.online || v.rpcEndpoint == "" || v.contractAddress == "" {
-				continue
+				return
 			}
-			err := v.verify(context.Background(), v.rpcEndpoint, v.contractAddress)
-			if err != nil {
+			if err := v.verify(context.Background(), v.rpcEndpoint, v.contractAddress); err != nil {
 				v.logger.Error("verify loop failed", zap.Error(err))
 			}
-
-		}
-	}
+		},
+	}, sub.C())
+	pt.Run(v.quit)
 }
 
 func (v *Verifier) Subscribe() chan []*VerificationRecord {
