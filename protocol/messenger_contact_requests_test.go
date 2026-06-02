@@ -671,8 +671,13 @@ func (s *MessengerContactRequestSuite) TestAliceSeesOnlyOneAcceptFromBob() {
 	s.acceptContactRequest(contactRequest, alice, bob)
 
 	// Accept contact request again
-	_, err := bob.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
+	secondAcceptResp, err := bob.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
+	s.Require().NotNil(secondAcceptResp)
+
+	// A repeated accept must not produce a duplicate "accepted" system message.
+	secondAcceptMutualStateUpdate := s.findFirstByContentType(secondAcceptResp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
+	s.Require().Nil(secondAcceptMutualStateUpdate)
 
 	// Check we don't have extra messages on Alice's side
 	resp, err := WaitOnMessengerResponse(alice,
