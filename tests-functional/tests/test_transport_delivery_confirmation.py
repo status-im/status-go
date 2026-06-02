@@ -92,8 +92,9 @@ class TestDeliveryConfirmation:
             # envelope-sent path and not from an MVDS ACK.
             self._assert_outgoing_status(sender, message_id, "sent")
 
-            # Confirm the envelope actually reached the store node — i.e. it was
-            # published to the network, not just marked locally — over REST, with
-            # MVDS provably out of the picture (recipient offline).
-            stored = logos_delivery.wait_for_message_count(1, start_time=offline_start_ns, timeout=60)
+            # envelope.sent means the envelope already reached a peer, so it is
+            # already persisted at the store node: a single REST read confirms it
+            # was published to the network (not just marked locally), with MVDS
+            # provably out of the picture (recipient offline). No polling needed.
+            stored = logos_delivery.get_messages(start_time=offline_start_ns)
             assert stored, "Store node holds no messages for the offline window; envelope was not published"
