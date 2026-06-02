@@ -171,20 +171,26 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 		keyInfo.PubKey = *pubK
 	}
 
-	var version uint32 = 1 // Use wakuv1 encryption
+	// Migration phase 2 to retire the WakuMessage `version` field (status-go#7499):
+	// keep WakuV1-encrypting the payload (encodeVersion=1) but advertise version=0 on
+	// the wire (labelVersion=0). The two must stay decoupled — payload.Encode(0) would
+	// emit plaintext. Receivers since phase 1 (#7500) decode version=0 as WakuV1 when
+	// they hold a key, so an N-1 neighbour still decrypts this.
+	const encodeVersion uint32 = 1 // Use wakuv1 encryption
+	var labelVersion uint32        // = 0, advertised on the wire
 
 	p := new(payload.Payload)
 	p.Data = req.Payload
 	p.Key = keyInfo
 
-	payload, err := p.Encode(version)
+	payload, err := p.Encode(encodeVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
-		Version:      &version,
+		Version:      &labelVersion,
 		ContentTopic: contentTopic.ContentTopic(),
 		Timestamp:    proto.Int64(api.w.timestamp()),
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
