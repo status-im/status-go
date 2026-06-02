@@ -912,6 +912,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 	previouslyAccepted := request != nil && request.ContactRequestState == common.ContactRequestStateAccepted
 
 	contact := state.CurrentMessageState.Contact
+	wasMutual := contact.Mutual()
 
 	// The request message will be added to the response here
 	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, request, clock)
@@ -941,8 +942,8 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 			chat.Active = true
 		}
 
-		// Add mutual state update message for incoming contact request
-		if !previouslyAccepted {
+		// Add mutual state update message only when transitioning to mutual.
+		if !wasMutual && contact.Mutual() && !previouslyAccepted {
 			clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 
 			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, contacts.MutualStateUpdateTypeAdded, clock, timestamp, false)
