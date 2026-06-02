@@ -60,7 +60,7 @@ func (s *TransactorSuite) SetupTest() {
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{
-		ethclient.NewRPSLimitedEthClient(s.client, rpclimiter.NewRPCRpsLimiter(), "local-1-chain-id-1-circuit", "local-1-chain-id-1-provider"),
+		ethclient.NewRPSLimitedEthClient(s.client, rpclimiter.NewRPCRpsLimiter(nil), "local-1-chain-id-1-circuit", "local-1-chain-id-1-provider"),
 	}
 	localClient := chain.NewClient(ethClients, chainID, nil)
 	ethClientGetter := mock_rpcclient.NewMockEthClientGetter(s.txServiceMockCtrl)

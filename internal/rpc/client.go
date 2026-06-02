@@ -62,6 +62,8 @@ type EthClientGetter interface {
 // Client manages RPC clients for multiple chains with
 // multiple providers for each chain.
 type Client struct {
+	appCommon.PauseBroadcaster
+
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
@@ -246,10 +248,18 @@ func (c *Client) getProviderRPCLimiter(provider params.RpcProvider) (*rpclimiter
 		return limiter, limiterKey, nil
 	}
 
-	// Create a new limiter and store it
-	limiter := rpclimiter.NewRPCRpsLimiter()
+	limiter := rpclimiter.NewRPCRpsLimiter(&c.PauseBroadcaster)
 	c.limiterPerProvider[limiterKey] = limiter
 	return limiter, limiterKey, nil
+}
+
+// SetPaused stops/resumes the 1s tickers of every RPC rate limiter owned by this Client.
+func (c *Client) SetPaused(paused bool) {
+	if paused {
+		c.MarkPaused()
+	} else {
+		c.MarkResumed()
+	}
 }
 
 func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEthClientInterface {
