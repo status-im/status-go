@@ -17,6 +17,7 @@ from resources.constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
 class SignalType(Enum):
     MESSAGES_NEW = "messages.new"
     MESSAGE_DELIVERED = "message.delivered"
+    ENVELOPE_SENT = "envelope.sent"
     NODE_READY = "node.ready"
     NODE_STARTED = "node.started"
     NODE_LOGIN = "node.login"
