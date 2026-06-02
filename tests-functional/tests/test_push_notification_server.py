@@ -10,7 +10,7 @@ from steps import messenger
 from utils import keys
 
 APN_TOPIC = "im.status.ethereum"
-DEFAULT_PUSH_MESSAGE = "You have a new message"
+DEFAULT_PUSH_MESSAGE = "New message in Messenger"
 
 
 @pytest.fixture
