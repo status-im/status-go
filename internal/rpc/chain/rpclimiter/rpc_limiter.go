@@ -232,14 +232,19 @@ type RPCRpsLimiter struct {
 	callersOnWaitForRequestsMutex sync.RWMutex
 
 	quit chan struct{}
+
+	pauseBroadcaster *gocommon.PauseBroadcaster
 }
 
-func NewRPCRpsLimiter() *RPCRpsLimiter {
+// NewRPCRpsLimiter creates a rate limiter. pauseBroadcaster (owned by the rpc.Client) that lets
+// the limiter stop its 1s ticker while the app is backgrounded — RPC traffic is paused then.
+func NewRPCRpsLimiter(pauseBroadcaster *gocommon.PauseBroadcaster) *RPCRpsLimiter {
 
 	limiter := RPCRpsLimiter{
 		uuid:                 uuid.New(),
 		maxRequestsPerSecond: defaultMaxRequestsPerSecond,
 		quit:                 make(chan struct{}),
+		pauseBroadcaster:     pauseBroadcaster,
 	}
 
 	limiter.start()
@@ -259,17 +264,40 @@ func (rl *RPCRpsLimiter) ReduceLimit() {
 func (rl *RPCRpsLimiter) start() {
 	go func() {
 		defer gocommon.LogOnPanic()
-		ticker := time.NewTicker(tickerInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				rl.onTick()
-			case <-rl.quit:
-				return
-			}
+
+		var pauseCh <-chan bool
+		if rl.pauseBroadcaster != nil {
+			sub := rl.pauseBroadcaster.Subscribe()
+			defer sub.Unsubscribe()
+			pauseCh = sub.C()
+		} else {
+			ch := make(chan bool, 1)
+			ch <- false
+			pauseCh = ch
 		}
+
+		pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+			Interval: tickerInterval,
+			OnTick: func() {
+				rl.onTick()
+			},
+			OnPauseChanged: func(paused bool) {
+				if paused {
+					rl.releaseAllWaiters()
+				}
+			},
+		}, pauseCh)
+		pt.Run(rl.quit)
 	}()
+}
+
+func (rl *RPCRpsLimiter) releaseAllWaiters() {
+	rl.callersOnWaitForRequestsMutex.Lock()
+	defer rl.callersOnWaitForRequestsMutex.Unlock()
+	for _, callerOnWait := range rl.callersOnWaitForRequests {
+		callerOnWait.ch <- true
+	}
+	rl.callersOnWaitForRequests = nil
 }
 
 func (rl *RPCRpsLimiter) onTick() {
