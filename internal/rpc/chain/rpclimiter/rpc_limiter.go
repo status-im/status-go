@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/logutils"
 )
 
@@ -264,6 +265,7 @@ func (rl *RPCRpsLimiter) start() {
 		for {
 			select {
 			case <-ticker.C:
+				bgtrace.Tick("rpclimiter.onTick", false, tickerInterval)
 				rl.onTick()
 			case <-rl.quit:
 				return

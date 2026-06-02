@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
@@ -258,6 +259,7 @@ func (s *Service) Start(ctx context.Context) {
 				s.stop()
 				return
 			case <-ticker.C:
+				bgtrace.Tick("wallet.activityFetcher", false, activityFetchInterval)
 				s.fetchActivityForAllAccountsAndChains(ctx, false)
 			case bypassIntervalCheck := <-s.checkRefetchCh:
 				s.fetchActivityForAllAccountsAndChains(ctx, !bypassIntervalCheck)

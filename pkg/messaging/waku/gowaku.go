@@ -82,6 +82,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
@@ -1152,6 +1153,7 @@ func (w *Waku) Start() error {
 					tickerC = ticker.C
 				}
 			case <-tickerC:
+				bgtrace.Tick("waku.connectionChangesLoop", paused, 5*time.Second)
 				w.checkForConnectionChanges()
 			case <-w.topicHealthStatusChan:
 				// TODO: https://github.com/status-im/status-go/issues/4628

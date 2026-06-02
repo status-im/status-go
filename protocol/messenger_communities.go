@@ -25,6 +25,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/crypto"
 	types3 "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
@@ -470,6 +471,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				}
 
 			case <-ticker.C:
+				bgtrace.Tick("messenger.handleCommunitiesSubscription", m.isPaused(), 5*time.Minute)
 				if m.isPaused() {
 					continue
 				}
@@ -520,6 +522,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 		for {
 			select {
 			case <-ticker.C:
+				bgtrace.Tick("messenger.updateActiveMembersLoop", m.isPaused(), 5*time.Minute)
 				if m.isPaused() {
 					continue
 				}
@@ -844,6 +847,7 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 		for {
 			select {
 			case <-ticker.C:
+				bgtrace.Tick("messenger.updateGrantsLoop", m.isPaused(), grantUpdateInterval)
 				m.updateGrantsForControlledCommunities()
 			case <-m.quit:
 				ticker.Stop()
@@ -4371,6 +4375,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 		for {
 			select {
 			case <-ticker.C:
+				bgtrace.Tick("messenger.communityRekeyLoop", m.isPaused(), d)
 				if m.isPaused() {
 					continue
 				}

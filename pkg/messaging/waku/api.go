@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/logutils"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
@@ -332,6 +333,7 @@ func runPausedPollingLoop(initialPaused bool, lifecycleCh <-chan bool, tickerCh 
 				activeTicker = tickerCh
 			}
 		case <-activeTicker:
+			bgtrace.Tick("waku.filterPollLoop", paused, 250*time.Millisecond)
 			onTick()
 		case <-stopCh:
 			onStop()

@@ -19,6 +19,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/timesource"
 )
@@ -112,6 +113,7 @@ func (v *Verifier) verifyLoop() {
 		case <-v.quit:
 			return
 		case <-ticker.C:
+			bgtrace.Tick("ens.verifyLoop", false, 30*time.Second)
 			if !v.online || v.rpcEndpoint == "" || v.contractAddress == "" {
 				continue
 			}

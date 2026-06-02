@@ -13,6 +13,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
@@ -340,6 +341,7 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 
 		}
 
+		bgtrace.Tick("messenger.checkForMissingMessages", m.isPaused(), missingMessageCheckPeriod)
 		if m.isPaused() {
 			continue
 		}

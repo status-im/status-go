@@ -28,6 +28,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/crypto"
@@ -1361,6 +1362,7 @@ func (m *Messenger) watchConnectionChange() {
 			case status := <-subscription.C():
 				processNewState(status.IsOnline)
 			case <-ticker.C:
+				bgtrace.Tick("messenger.connectionKeepAlive", m.isPaused(), keepAlivePeriod)
 				if m.isPaused() {
 					continue
 				}
@@ -1465,6 +1467,7 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 		for {
 			select {
 			case <-ticker.C:
+				bgtrace.Tick("messenger.watchCommunitiesToUnmute", m.isPaused(), time.Minute)
 				if m.isPaused() {
 					continue
 				}

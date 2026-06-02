@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types "github.com/status-im/status-go/internal/crypto/types"
@@ -1906,6 +1907,9 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	b.transactor.SetEthClientGetter(b.statusNode.RPCClient(), rpc.DefaultCallTimeout)
 
+	// bgtrace: start the background-activity watchdog (no-op while foregrounded).
+	bgtrace.StartWatchdog()
+
 	signal.SendNodeStarted()
 
 	if b.statusNode.WalletService() != nil {
@@ -2108,6 +2112,10 @@ func (b *StatusBackend) PauseServices(names []string) error {
 	if b.statusNode == nil {
 		return nil
 	}
+	// bgtrace: mark the app backgrounded and bracket the transition so background-activity
+	// logs are unambiguously attributable to a background episode.
+	bgtrace.SetBackground(true)
+	bgtrace.LogLifecycle(true, names)
 	return b.statusNode.ServiceRegistry().PauseMultiple(names)
 }
 
@@ -2116,6 +2124,9 @@ func (b *StatusBackend) ResumeServices(names []string) error {
 	if b.statusNode == nil {
 		return nil
 	}
+	// bgtrace: mark the app foregrounded and bracket the transition (confirms resume).
+	bgtrace.SetBackground(false)
+	bgtrace.LogLifecycle(false, names)
 	return b.statusNode.ServiceRegistry().ResumeMultiple(names)
 }
 

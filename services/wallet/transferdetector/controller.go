@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/bgtrace"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
@@ -185,6 +186,7 @@ func (c *Controller) startFetcher() {
 			case <-c.stopCh:
 				return
 			case <-ticker.C:
+				bgtrace.Tick("wallet.transferDetector", false, c.config.FetchPeriod)
 				c.run()
 			case <-c.triggerFetchCh:
 				ticker.Reset(c.config.FetchPeriod)
