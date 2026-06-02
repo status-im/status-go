@@ -24,6 +24,10 @@ replace github.com/libp2p/go-libp2p-pubsub v0.13.1 => github.com/waku-org/go-lib
 
 replace github.com/oNaiPs/go-generate-fast v0.3.0 => github.com/status-im/go-generate-fast v0.0.0-20250916164518-c78009bcfa9e
 
+// Temporary: use fork with background-mode filter subscription fix until
+// waku-org/go-waku#1304 is merged and released.
+replace github.com/waku-org/go-waku => github.com/xAlisher/go-waku v0.10.2-0.20260603060940-9f8361930df9
+
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.3.0

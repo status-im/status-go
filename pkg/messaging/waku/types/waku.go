@@ -115,6 +115,11 @@ type Waku interface {
 	Pause() error
 	// Resume re-arms goroutines suspended by Pause. Idempotent.
 	Resume() error
+	// SetFilterBackgroundMode suppresses (background=true) or re-enables
+	// (background=false) filter-subscription renewal in light-client mode.
+	// When suppressed, expiring subscriptions are not renewed until the app
+	// returns to foreground, avoiding spurious LTE radio wakeups.
+	SetFilterBackgroundMode(background bool)
 
 	// Waku protocol version
 	Version() uint

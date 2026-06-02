@@ -137,6 +137,7 @@ type Messenger struct {
 
 	started           bool
 	paused            atomic.Bool
+	backgroundMode    atomic.Bool // true when the app UI is not visible; gates background history syncs
 	quit              chan struct{}
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -552,7 +553,10 @@ func (m *Messenger) ToForeground() {
 	if m.httpServer != nil {
 		m.httpServer.ToForeground()
 	}
-
+	m.backgroundMode.Store(false)
+	if m.messaging != nil {
+		m.messaging.SetFilterBackgroundMode(false)
+	}
 	m.asyncRequestAllHistoricMessages()
 }
 
@@ -560,6 +564,10 @@ func (m *Messenger) ToBackground() {
 	m.SetPaused(true)
 	if m.httpServer != nil {
 		m.httpServer.ToBackground()
+	}
+	m.backgroundMode.Store(true)
+	if m.messaging != nil {
+		m.messaging.SetFilterBackgroundMode(true)
 	}
 }
 
@@ -824,8 +832,10 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		m.shouldPublishContactCode = false
 	}
 
-	// Start fetching messages from store nodes
-	if online {
+	// Start fetching messages from store nodes.
+	// Skip when backgrounded: the sync will run in ToForeground()
+	// when the app returns to foreground.
+	if online && !m.backgroundMode.Load() {
 		m.asyncRequestAllHistoricMessages()
 	}
 
