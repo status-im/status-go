@@ -12,7 +12,7 @@ import requests
 from tenacity import retry, stop_after_delay, wait_fixed, wait_exponential, retry_if_exception_type
 
 import resources.constants as constants
-from clients.api import ApiClient
+from clients.api import ApiClient, ApiResponseError
 from clients.expvar import ExpvarClient
 from clients.metrics import Events, StatusGoMetrics
 from clients.rpc import RpcClient
@@ -406,7 +406,17 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def logout(self, **kwargs):
         method = "Logout"
-        return self.api_request_json(method, {}, **kwargs)
+        try:
+            return self.api_request_json(method, {}, **kwargs)
+        except ApiResponseError as e:
+            # Logout is idempotent: a node that is already logged out (e.g. a
+            # test that logs out explicitly, or a failed login) reports "there
+            # is no running node". Treat that as a successful no-op so teardown
+            # doesn't turn a clean run into an error.
+            if "there is no running node" in str(e):
+                logging.debug("Logout called on an already-logged-out node; treating as no-op")
+                return None
+            raise
 
     def wait_for_login(self):
         """Wait until the backend has completed login.
