@@ -969,6 +969,16 @@ func (w *Waku) subscribe(f *common.Filter) (string, error) {
 	return id, nil
 }
 
+// SetFilterBackgroundMode suppresses (background=true) or re-enables
+// (background=false) filter-subscription renewal in light-client mode.
+// No-op when filterManager is nil (relay mode).
+func (w *Waku) SetFilterBackgroundMode(background bool) {
+	if w.filterManager == nil {
+		return
+	}
+	w.filterManager.SetBackgroundMode(background)
+}
+
 // Unsubscribe removes an installed message handler.
 func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	ok := w.filters.Uninstall(id)

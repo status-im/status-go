@@ -62,6 +62,15 @@ func (a *API) ResumeTransport() {
 	}
 }
 
+// SetFilterBackgroundMode suppresses (background=true) or re-enables
+// (background=false) Waku filter-subscription renewal. Call with background=true
+// when the app UI is hidden to avoid LTE wakeups from expiring subscriptions.
+func (a *API) SetFilterBackgroundMode(background bool) {
+	if a.core.stack.Transport != nil {
+		a.core.stack.Transport.SetFilterBackgroundMode(background)
+	}
+}
+
 // PauseDataSync idles (paused==true) or re-arms (paused==false) the reliability
 // layer's data-sync node so its outbound loop performs no work while the host is
 // backgrounded.
