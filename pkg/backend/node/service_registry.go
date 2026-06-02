@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 )
 
@@ -34,6 +35,35 @@ func (p *PausableMediaServer) Pause() error {
 
 func (p *PausableMediaServer) Resume() error {
 	p.s.ToForeground()
+	p.MarkResumed()
+	return nil
+}
+
+// PausableMessenger wraps a protocol.Messenger to implement common.Pausable.
+// Pause() → ToBackground() and Resume() → ToForeground() so that the Java
+// PauseServices/ResumeServices flow gates filter health-check pings and
+// mailserver history syncs without a separate SetAppBackground API call.
+type PausableMessenger struct {
+	common.PauseBroadcaster
+	m *protocol.Messenger
+}
+
+func newPausableMessenger(m *protocol.Messenger) *PausableMessenger {
+	p := &PausableMessenger{m: m}
+	p.MarkStarted()
+	return p
+}
+
+func (p *PausableMessenger) PausableName() string { return "messenger" }
+
+func (p *PausableMessenger) Pause() error {
+	p.m.ToBackground()
+	p.MarkPaused()
+	return nil
+}
+
+func (p *PausableMessenger) Resume() error {
+	p.m.ToForeground()
 	p.MarkResumed()
 	return nil
 }
