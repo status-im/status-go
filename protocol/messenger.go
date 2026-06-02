@@ -574,6 +574,9 @@ func (m *Messenger) ToBackground() {
 // continues running so push notifications keep working.
 func (m *Messenger) SetAppBackground(background bool) {
 	m.backgroundMode.Store(background)
+	if m.messaging != nil {
+		m.messaging.SetFilterBackgroundMode(background)
+	}
 	if !background {
 		// Returning to foreground: run any deferred history sync now.
 		m.asyncRequestAllHistoricMessages()
