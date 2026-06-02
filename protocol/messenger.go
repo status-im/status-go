@@ -565,6 +565,9 @@ func (m *Messenger) ToBackground() {
 
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
+	if m.ensVerifier != nil {
+		m.ensVerifier.SetPaused(paused)
+	}
 	if m.pushNotificationClient != nil {
 		if paused {
 			m.pushNotificationClient.Offline()
