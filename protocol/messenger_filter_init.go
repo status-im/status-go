@@ -21,11 +21,8 @@ func (m *Messenger) InitFilters() error {
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
 
-	// Community requests will arrive in this pubsub topic
-	// TODO remove once fully migrated to Global Community Control and Content Topic https://github.com/status-im/status-go/issues/6384
-	if err := m.messaging.SubscribeToPubsubTopic(types.DefaultNonProtectedPubsubTopic()); err != nil {
-		return err
-	}
+	// Migration phase 3 (#7498): community control now arrives on the default shard (32);
+	// the non-protected shard (64) subscription has been dropped.
 	filters, publicKeys, err := m.collectFiltersAndKeys()
 	if err != nil {
 		return err

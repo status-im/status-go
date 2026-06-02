@@ -18,20 +18,7 @@ func (s *Shard) PubsubTopic() string {
 
 const MainStatusShardCluster = 16
 const DefaultShardIndex = 32
-const NonProtectedShardIndex = 64
 
 func DefaultShardPubsubTopic() string {
 	return wakuproto.NewStaticShardingPubsubTopic(MainStatusShardCluster, DefaultShardIndex).String()
-}
-
-func DefaultNonProtectedShard() *Shard {
-	return &Shard{
-		Cluster: MainStatusShardCluster,
-		Index:   NonProtectedShardIndex,
-	}
-}
-
-// TODO this is used only for community control messages, we need to stop using it once migration is done
-func DefaultNonProtectedPubsubTopic() string {
-	return DefaultNonProtectedShard().PubsubTopic()
 }
