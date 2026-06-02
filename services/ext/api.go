@@ -2,6 +2,7 @@ package ext
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -1044,6 +1045,14 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 	updatedAt := m.GetCurrentTimeInMillis()
 	_, err := m.MarkActivityCenterNotificationsDeleted(ctx, ids, updatedAt, true)
 	return err
+}
+
+func (api *PublicAPI) SetAppBackground(background bool) error {
+	if api.service.messenger == nil {
+		return errors.New("messenger not initialized")
+	}
+	api.service.messenger.SetAppBackground(background)
+	return nil
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {

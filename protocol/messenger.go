@@ -137,6 +137,7 @@ type Messenger struct {
 
 	started           bool
 	paused            atomic.Bool
+	backgroundMode    atomic.Bool // true when the app UI is not visible; gates background history syncs
 	quit              chan struct{}
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -563,6 +564,22 @@ func (m *Messenger) ToBackground() {
 	}
 }
 
+// SetAppBackground is called by the Android/iOS layer when the app UI moves
+// to background (background=true) or returns to foreground (background=false).
+// It gates automatic mailserver history syncs: syncs triggered by connection
+// change or storenode availability are deferred while backgrounded, and
+// executed immediately on returning to foreground.
+//
+// Unlike SetPaused, this does NOT pause Waku transport or data-sync — Waku
+// continues running so push notifications keep working.
+func (m *Messenger) SetAppBackground(background bool) {
+	m.backgroundMode.Store(background)
+	if !background {
+		// Returning to foreground: run any deferred history sync now.
+		m.asyncRequestAllHistoricMessages()
+	}
+}
+
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
 	if m.pushNotificationClient != nil {
@@ -821,8 +838,10 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		m.shouldPublishContactCode = false
 	}
 
-	// Start fetching messages from store nodes
-	if online {
+	// Start fetching messages from store nodes.
+	// Skip when backgrounded: the sync will run in SetAppBackground(false)
+	// when the app returns to foreground.
+	if online && !m.backgroundMode.Load() {
 		m.asyncRequestAllHistoricMessages()
 	}
 
