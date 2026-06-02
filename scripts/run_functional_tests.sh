@@ -11,6 +11,7 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${FUNCTIONAL_TESTS_BUILD_TAGS:=gowaku_no_rln}"
 : "${USE_LOGOS_STORAGE:=false}"
 : "${FUNCTIONAL_TESTS_MARKER:=rpc}"
+: "${FUNCTIONAL_TESTS_RERUNS:=2}"
 : "${PEER_IMAGES:=}"
 : "${PEER_REFS:=}"
 
@@ -163,7 +164,7 @@ pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-pytest --reruns 2 -m "${FUNCTIONAL_TESTS_MARKER}" -c "${root_path}/pytest.ini" -n 12 \
+pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${FUNCTIONAL_TESTS_MARKER}" -c "${root_path}/pytest.ini" -n 12 \
   --dist load\
   --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
   --docker_project_name="${project_name}" \

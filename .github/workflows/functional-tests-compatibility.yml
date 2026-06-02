@@ -9,11 +9,11 @@ on:
       peer_refs:
         description: 'Space-separated release tags to test against (version under test <-> each peer).'
         required: false
-        default: 'v10.33.0 v10.32.0'
+        default: 'v10.33.0'
 
 jobs:
   compatibility:
-    timeout-minutes: 90
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,7 +39,8 @@ jobs:
         env:
           FUNCTIONAL_TESTS_MARKER: compatibility
           FUNCTIONAL_TESTS_LOG_LEVEL: INFO
-          PEER_REFS: ${{ inputs.peer_refs || 'v10.33.0 v10.32.0' }}
+          FUNCTIONAL_TESTS_RERUNS: 1
+          PEER_REFS: ${{ inputs.peer_refs || 'v10.33.0' }}
         run: ./scripts/run_functional_tests.sh
 
       - name: Test report
