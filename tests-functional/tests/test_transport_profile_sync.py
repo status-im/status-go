@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from clients.signals import SignalType
+from resources.enums import StatusType
 from steps import messenger
 
 logger = logging.getLogger(__name__)
@@ -41,16 +42,16 @@ class TestProfileSync:
     def test_status_update_propagates_to_contact(self, sender, receiver):
         messenger.make_contacts(sender, receiver)
 
-        status_type = 2  # DO_NOT_DISTURB - a persisted (non-ephemeral) status
+        status_type = StatusType.DO_NOT_DISTURB  # a persisted (non-ephemeral) status
         status_text = f"status_{uuid4()}"
 
         with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=status_text, timeout=60, start="beginning"):
-            sender.wakuext_service.set_user_status(status_type, status_text)
+            sender.wakuext_service.set_user_status(status_type.value, status_text)
 
         status_updates = receiver.wakuext_service.status_updates().get("statusUpdates", [])
         matching = [s for s in status_updates if s.get("text") == status_text]
         assert matching, f"Receiver did not see status update with text '{status_text}'"
-        assert matching[0].get("statusType") == status_type
+        assert matching[0].get("statusType") == status_type.value
 
     def _wait_for_contact_display_name(self, node, contact_id, expected_name, timeout=120):
         deadline = time.time() + timeout

@@ -5,15 +5,10 @@ from uuid import uuid4
 import pytest
 
 from clients.signals import SignalType
+from resources.enums import StatusType
 from steps import messenger
 
 logger = logging.getLogger(__name__)
-
-# protobuf.StatusUpdate StatusType values (see protocol/protobuf/status_update.proto).
-# Only AUTOMATIC status updates are published as ephemeral Waku messages, so they
-# are never persisted by the store node.
-STATUS_AUTOMATIC = 1  # ephemeral
-STATUS_DO_NOT_DISTURB = 2  # persisted
 
 
 @pytest.mark.rpc
@@ -48,7 +43,7 @@ class TestEphemeralMessages:
             # so relayed messages are genuinely missed (not just buffered at the
             # socket and replayed on resume) and must be recovered from the store.
             sleep(60)
-            sender.wakuext_service.set_user_status(STATUS_AUTOMATIC, ephemeral_text)
+            sender.wakuext_service.set_user_status(StatusType.AUTOMATIC.value, ephemeral_text)
             response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, control_text)
             control_id = response.get("messages", [])[0].get("id", "")
             assert control_id, "Sender did not get a control message id back"
@@ -76,7 +71,7 @@ class TestEphemeralMessages:
 
         ephemeral_text = f"ephemeral_live_{uuid4()}"
         with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=ephemeral_text, timeout=60, start="beginning"):
-            sender.wakuext_service.set_user_status(STATUS_AUTOMATIC, ephemeral_text)
+            sender.wakuext_service.set_user_status(StatusType.AUTOMATIC.value, ephemeral_text)
 
         status_updates = receiver.wakuext_service.status_updates().get("statusUpdates", []) or []
         matching = [s for s in status_updates if s.get("text") == ephemeral_text]
