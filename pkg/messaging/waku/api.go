@@ -20,8 +20,6 @@ package wakuv2
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
@@ -29,100 +27,12 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-// List of errors
-var (
-	ErrSymAsym             = errors.New("specify either a symmetric or an asymmetric key")
-	ErrInvalidSymmetricKey = errors.New("invalid symmetric key")
-	ErrInvalidPublicKey    = errors.New("invalid public key")
-	ErrNoTopics            = errors.New("missing topic(s)")
-)
-
-// Post posts a message on the Waku network.
-// returns the hash of the message in case of success.
-func (w *Waku) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
-	var (
-		symKeyGiven = len(req.SymKeyID) > 0
-		pubKeyGiven = len(req.PublicKey) > 0
-		err         error
-	)
-
-	// user must specify either a symmetric or an asymmetric key
-	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
-		return nil, ErrSymAsym
-	}
-
-	var keyInfo *rfc26.KeyInfo = new(rfc26.KeyInfo)
-
-	// Set key that is used to sign the message
-	if len(req.SigID) > 0 {
-		privKey, err := w.GetPrivateKey(req.SigID)
-		if err != nil {
-			return nil, err
-		}
-		keyInfo.PrivKey = privKey
-	}
-
-	contentTopic := common.TopicType(req.Topic)
-
-	// Set symmetric key that is used to encrypt the message
-	if symKeyGiven {
-		keyInfo.Kind = rfc26.Symmetric
-
-		if contentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
-			return nil, ErrNoTopics
-		}
-		if keyInfo.SymKey, err = w.GetSymKey(req.SymKeyID); err != nil {
-			return nil, err
-		}
-		if !common.ValidateDataIntegrity(keyInfo.SymKey, common.AESKeyLength) {
-			return nil, ErrInvalidSymmetricKey
-		}
-	}
-
-	// Set asymmetric key that is used to encrypt the message
-	if pubKeyGiven {
-		keyInfo.Kind = rfc26.Asymmetric
-
-		var pubK *ecdsa.PublicKey
-		if pubK, err = crypto.UnmarshalPubkey(req.PublicKey); err != nil {
-			return nil, ErrInvalidPublicKey
-		}
-		keyInfo.PubKey = *pubK
-	}
-
-	var version uint32 = 1 // Use wakuv1 encryption
-
-	p := new(rfc26.Payload)
-	p.Data = req.Payload
-	p.Key = keyInfo
-
-	payload, err := p.Encode(version)
-	if err != nil {
-		return nil, err
-	}
-
-	wakuMsg := &pb.WakuMessage{
-		Payload:      payload,
-		Version:      &version,
-		ContentTopic: contentTopic.ContentTopic(),
-		Timestamp:    proto.Int64(w.timestamp()),
-		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
-		Ephemeral:    &req.Ephemeral,
-	}
-
-	hash, err := w.sendEnvelope(req.PubsubTopic, wakuMsg, req.Priority)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return hash, nil
-}
+// (Waku.Post was removed: all sends now go through Send with payloads
+// pre-encoded by the transport via rfc26.EncodeV1.)
 
 // Send publishes a pre-encoded payload to the messaging network. The payload
 // is expected to be already encoded for WakuMessage version=1 (see

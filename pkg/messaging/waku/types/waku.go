@@ -97,10 +97,6 @@ type WakuKeyManager interface {
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku interface {
-	// Post posts a message on the Whisper network.
-	// returns the hash of the message in case of success.
-	Post(ctx context.Context, req NewMessage) ([]byte, error)
-
 	// Send publishes a pre-encoded payload on the messaging network. The
 	// payload is expected to be already encoded for WakuMessage version=1
 	// (see transport/rfc26.EncodeV1). Returns the wire hash on success.

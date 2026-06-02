@@ -67,39 +67,24 @@ type testWakuWrapper struct {
 	postSubscriptions []chan *PostMessageSubscription
 }
 
-// Post overrides the embedded Waku's Post to fan out post events to any
-// subscribers registered via SubscribePostEvents.
-func (tw *testWakuWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
-	id, err := tw.Waku.Post(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	tw.notifyPostSubscribers(id, &req)
-	return id, nil
-}
-
-// Send overrides the embedded Waku's Send to fan out post events. After the
-// transport's encoding extraction (#7462), primary sends go through Send and
-// no longer through Post, so tests subscribing via SubscribePostEvents need
-// to observe Send as well. Msg is nil because Send takes raw bytes, not a
-// NewMessage; existing consumers (MessagesOrderController) only read ID.
+// Send overrides the embedded Waku's Send to fan out post events to any
+// subscribers registered via SubscribePostEvents. Primary sends go through
+// Send (the transport encodes payloads via rfc26.EncodeV1 before publishing).
+// Msg is nil because Send takes raw bytes, not a NewMessage; the only
+// consumer (MessagesOrderController) reads ID.
 func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
 	id, err := tw.Waku.Send(ctx, pubsubTopic, contentTopic, payload, ephemeral, priority)
 	if err != nil {
 		return nil, err
 	}
-	tw.notifyPostSubscribers(id, nil)
-	return id, nil
-}
-
-func (tw *testWakuWrapper) notifyPostSubscribers(id []byte, msg *types.NewMessage) {
 	for _, s := range tw.postSubscriptions {
 		select {
-		case s <- &PostMessageSubscription{ID: id, Msg: msg}:
+		case s <- &PostMessageSubscription{ID: id}:
 		default:
 			// subscription channel full
 		}
 	}
+	return id, nil
 }
 
 func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {

@@ -406,6 +406,8 @@ func (t *Transport) encode(payload []byte, symKey []byte, recipient *ecdsa.Publi
 	return rfc26.EncodeV1(payload, symKey, recipient, t.keysManager.privateKey)
 }
 
+// Track records sent envelopes for delivery monitoring. It is the
+// single-identifier convenience wrapper around TrackMany.
 func (t *Transport) Track(identifier []byte, hashes [][]byte, newMessages []*types.NewMessage) {
 	t.TrackMany([][]byte{identifier}, hashes, newMessages)
 }
