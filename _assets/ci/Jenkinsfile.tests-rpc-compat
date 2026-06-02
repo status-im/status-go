@@ -43,7 +43,7 @@ pipeline {
     timestamps()
     /* Prevent Jenkins jobs from running forever. Higher than tests-rpc: this job also
        builds the peer (old release) backends from source before running the tests. */
-    timeout(time: 120, unit: 'MINUTES')
+    timeout(time: 90, unit: 'MINUTES')
     disableConcurrentBuilds()
     disableRestartFromStage()
     /* manage how many builds we keep */
