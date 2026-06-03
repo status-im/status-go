@@ -400,6 +400,13 @@ func (n *StatusNode) populateServiceRegistry() {
 	if n.mediaServer != nil {
 		n.serviceRegistry.Register(newPausableMediaServer(n.mediaServer))
 	}
+	// Wrap and register the messenger so that PauseServices/ResumeServices
+	// gate filter health-check pings and mailserver syncs in background.
+	if n.wakuV2ExtSrvc != nil {
+		if m := n.wakuV2ExtSrvc.Messenger(); m != nil {
+			n.serviceRegistry.Register(newPausableMessenger(m))
+		}
+	}
 	// Register infrastructure components that are not go-ethereum services
 	if n.downloader != nil {
 		n.serviceRegistry.Register(n.downloader)
