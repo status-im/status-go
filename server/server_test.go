@@ -3,7 +3,11 @@ package server
 import (
 	"fmt"
 	"net"
+	"net/netip"
+	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/suite"
@@ -51,6 +55,32 @@ func (s *ServerURLSuite) TestServer_MakeImageURL() {
 		s.server.MakeImageURL("0x10aded70ffee"))
 }
 
+func (s *ServerURLSuite) TestServer_MakeImageURL_WhenStopped_UsesCachedPort() {
+	s.server.address = nil
+	s.server.cachedPort = 8543
+	s.server.Server.config = &Config{
+		AddrPort: netip.MustParseAddrPort("127.0.0.1:0"),
+	}
+
+	s.Require().Equal(
+		"http://127.0.0.1:8543/messages/images?messageId=0x10aded70ffee",
+		s.server.MakeImageURL("0x10aded70ffee"),
+	)
+}
+
+func (s *ServerURLSuite) TestServer_MakeImageURL_WhenStopped_UsesConfiguredPort() {
+	s.server.address = nil
+	s.server.cachedPort = 0
+	s.server.Server.config = &Config{
+		AddrPort: netip.MustParseAddrPort("127.0.0.1:9020"),
+	}
+
+	s.Require().Equal(
+		"http://127.0.0.1:9020/messages/images?messageId=0x10aded70ffee",
+		s.server.MakeImageURL("0x10aded70ffee"),
+	)
+}
+
 func (s *ServerURLSuite) TestServer_MakeLinkPreviewThumbnailURL() {
 	s.Require().Equal(
 		s.baseURL+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com",
@@ -79,4 +109,89 @@ func (s *ServerURLSuite) TestServer_MakeContactImageURL() {
 	s.Require().Equal(
 		s.baseURL+"/contactImages?clock=1&imageName=Test&publicKey=0x1",
 		s.server.MakeContactImageURL("0x1", "Test", uint64(1)))
+}
+
+func TestMediaServerURLsRemainAbsoluteAfterBackground(t *testing.T) {
+	mediaServer, err := NewMediaServer(nil, nil, nil, nil, WithMediaServerAddress("127.0.0.1:0"))
+	if err != nil {
+		t.Fatalf("failed to create media server: %v", err)
+	}
+
+	if err := mediaServer.Start(); err != nil {
+		t.Fatalf("failed to start media server: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = mediaServer.Stop()
+	})
+
+	expectedBase := mediaServer.MakeBaseURL().String()
+	if expectedBase == "" {
+		t.Fatalf("expected non-empty base URL after Start")
+	}
+
+	expectedParsed, err := url.Parse(expectedBase)
+	if err != nil {
+		t.Fatalf("failed to parse expected base URL %q: %v", expectedBase, err)
+	}
+	if expectedParsed.Scheme == "" || expectedParsed.Host == "" {
+		t.Fatalf("expected absolute base URL, got %q", expectedBase)
+	}
+
+	if mediaServer.cachedPort == 0 {
+		t.Fatalf("expected cachedPort to be set after Start")
+	}
+	if expectedParsed.Host != net.JoinHostPort("localhost", fmt.Sprintf("%d", mediaServer.cachedPort)) &&
+		expectedParsed.Host != net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", mediaServer.cachedPort)) {
+		t.Fatalf("expected host+cachedPort, got host %q and cachedPort %d", expectedParsed.Host, mediaServer.cachedPort)
+	}
+
+	mediaServer.ToBackground()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if !mediaServer.IsRunning() && mediaServer.address == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if mediaServer.IsRunning() {
+		t.Fatalf("expected media server to stop after ToBackground")
+	}
+	if mediaServer.address != nil {
+		t.Fatalf("expected media server address to be nil after ToBackground, got %v", mediaServer.address)
+	}
+
+	imageURL := mediaServer.MakeImageURL("xyz")
+	imageServerURL := mediaServer.MakeImageServerURL()
+
+	if strings.HasPrefix(imageURL, "/messages/") {
+		t.Fatalf("expected absolute image URL, got relative %q", imageURL)
+	}
+	if strings.HasPrefix(imageServerURL, "/messages/") {
+		t.Fatalf("expected absolute image server URL, got relative %q", imageServerURL)
+	}
+
+	parsedImageURL, err := url.Parse(imageURL)
+	if err != nil {
+		t.Fatalf("failed to parse image URL %q: %v", imageURL, err)
+	}
+	if parsedImageURL.Scheme == "" || parsedImageURL.Host == "" {
+		t.Fatalf("expected absolute image URL, got %q", imageURL)
+	}
+
+	parsedImageServerURL, err := url.Parse(imageServerURL)
+	if err != nil {
+		t.Fatalf("failed to parse image server URL %q: %v", imageServerURL, err)
+	}
+	if parsedImageServerURL.Scheme == "" || parsedImageServerURL.Host == "" {
+		t.Fatalf("expected absolute image server URL, got %q", imageServerURL)
+	}
+
+	if !strings.HasPrefix(imageURL, expectedBase+"/messages/images?") {
+		t.Fatalf("expected image URL to keep base %q, got %q", expectedBase, imageURL)
+	}
+	if !strings.HasPrefix(imageServerURL, expectedBase+"/messages/") {
+		t.Fatalf("expected image server URL to keep base %q, got %q", expectedBase, imageServerURL)
+	}
 }
