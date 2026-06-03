@@ -159,7 +159,7 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 				if ok {
 					signal.SendStoreNodeAvailable(&ms)
 				}
-				// Skip history sync when backgrounded; SetAppBackground(false)
+				// Skip history sync when backgrounded; ToForeground()
 				// will trigger it when the app returns to foreground.
 				if !m.backgroundMode.Load() {
 					m.asyncRequestAllHistoricMessages()

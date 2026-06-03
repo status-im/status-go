@@ -553,7 +553,10 @@ func (m *Messenger) ToForeground() {
 	if m.httpServer != nil {
 		m.httpServer.ToForeground()
 	}
-
+	m.backgroundMode.Store(false)
+	if m.messaging != nil {
+		m.messaging.SetFilterBackgroundMode(false)
+	}
 	m.asyncRequestAllHistoricMessages()
 }
 
@@ -562,24 +565,9 @@ func (m *Messenger) ToBackground() {
 	if m.httpServer != nil {
 		m.httpServer.ToBackground()
 	}
-}
-
-// SetAppBackground is called by the Android/iOS layer when the app UI moves
-// to background (background=true) or returns to foreground (background=false).
-// It gates automatic mailserver history syncs: syncs triggered by connection
-// change or storenode availability are deferred while backgrounded, and
-// executed immediately on returning to foreground.
-//
-// Unlike SetPaused, this does NOT pause Waku transport or data-sync — Waku
-// continues running so push notifications keep working.
-func (m *Messenger) SetAppBackground(background bool) {
-	m.backgroundMode.Store(background)
+	m.backgroundMode.Store(true)
 	if m.messaging != nil {
-		m.messaging.SetFilterBackgroundMode(background)
-	}
-	if !background {
-		// Returning to foreground: run any deferred history sync now.
-		m.asyncRequestAllHistoricMessages()
+		m.messaging.SetFilterBackgroundMode(true)
 	}
 }
 
@@ -842,7 +830,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Start fetching messages from store nodes.
-	// Skip when backgrounded: the sync will run in SetAppBackground(false)
+	// Skip when backgrounded: the sync will run in ToForeground()
 	// when the app returns to foreground.
 	if online && !m.backgroundMode.Load() {
 		m.asyncRequestAllHistoricMessages()

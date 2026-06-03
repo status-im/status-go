@@ -1047,14 +1047,6 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 	return err
 }
 
-func (api *PublicAPI) SetAppBackground(background bool) error {
-	if api.service.messenger == nil {
-		return errors.New("messenger not initialized")
-	}
-	api.service.messenger.SetAppBackground(background)
-	return nil
-}
-
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages(false)
 }
