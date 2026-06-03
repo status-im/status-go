@@ -70,18 +70,14 @@ pipeline {
   stages {
     stage('Compatibility Tests') {
       steps { script {
-        /* withDockerRegistry authenticates Docker Hub so explicit PEER_IMAGES can be pulled
-           and to avoid anonymous pull rate limits on the base images. */
-        withDockerRegistry([credentialsId: 'dockerhub-statusteam-auto', url: '']) {
-          withCredentials([
-            usernamePassword(
-              credentialsId: "api-proxy-devel",
-              usernameVariable: 'STATUS_BUILD_PROXY_USER',
-              passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
-            ),
-          ]) {
-            nix.develop('make test-functional-compatibility', pure: false)
-          }
+        withCredentials([
+          usernamePassword(
+            credentialsId: "api-proxy-devel",
+            usernameVariable: 'STATUS_BUILD_PROXY_USER',
+            passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
+          ),
+        ]) {
+          nix.develop('make test-functional-compatibility', pure: false)
         }
       } }
     }
