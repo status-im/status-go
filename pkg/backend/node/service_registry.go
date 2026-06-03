@@ -40,9 +40,7 @@ func (p *PausableMediaServer) Resume() error {
 }
 
 // PausableMessenger wraps a protocol.Messenger to implement common.Pausable.
-// Pause() → ToBackground() and Resume() → ToForeground() so that the Java
-// PauseServices/ResumeServices flow gates filter health-check pings and
-// mailserver history syncs without a separate SetAppBackground API call.
+// Pause() → SetPaused(true) and Resume() → SetPaused(false)
 type PausableMessenger struct {
 	common.PauseBroadcaster
 	m *protocol.Messenger
@@ -57,13 +55,13 @@ func newPausableMessenger(m *protocol.Messenger) *PausableMessenger {
 func (p *PausableMessenger) PausableName() string { return "messenger" }
 
 func (p *PausableMessenger) Pause() error {
-	p.m.ToBackground()
+	p.m.SetPaused(true)
 	p.MarkPaused()
 	return nil
 }
 
 func (p *PausableMessenger) Resume() error {
-	p.m.ToForeground()
+	p.m.SetPaused(false)
 	p.MarkResumed()
 	return nil
 }
