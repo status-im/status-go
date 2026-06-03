@@ -100,15 +100,6 @@ func (t *Transport) Pause() {
 	}
 }
 
-// SetFilterBackgroundMode suppresses (background=true) or re-enables
-// (background=false) filter-subscription renewal in the underlying waku
-// light-client. No-op when waku is nil or in relay mode.
-func (t *Transport) SetFilterBackgroundMode(background bool) {
-	if t.waku != nil {
-		t.waku.SetFilterBackgroundMode(background)
-	}
-}
-
 // Resume signals Transport's internal goroutines to resume and cascades to
 // EnvelopesMonitor and the underlying waku transport.
 func (t *Transport) Resume() {
