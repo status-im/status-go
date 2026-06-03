@@ -137,7 +137,6 @@ type Messenger struct {
 
 	started           bool
 	paused            atomic.Bool
-	backgroundMode    atomic.Bool // true when the app UI is not visible; gates background history syncs
 	quit              chan struct{}
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -548,29 +547,6 @@ func (m *Messenger) processSentMessage(id string) error {
 	return nil
 }
 
-func (m *Messenger) ToForeground() {
-	m.SetPaused(false)
-	if m.httpServer != nil {
-		m.httpServer.ToForeground()
-	}
-	m.backgroundMode.Store(false)
-	if m.messaging != nil {
-		m.messaging.SetFilterBackgroundMode(false)
-	}
-	m.asyncRequestAllHistoricMessages()
-}
-
-func (m *Messenger) ToBackground() {
-	m.SetPaused(true)
-	if m.httpServer != nil {
-		m.httpServer.ToBackground()
-	}
-	m.backgroundMode.Store(true)
-	if m.messaging != nil {
-		m.messaging.SetFilterBackgroundMode(true)
-	}
-}
-
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
 	if m.ensVerifier != nil {
@@ -592,6 +568,16 @@ func (m *Messenger) SetPaused(paused bool) {
 		if err := m.messaging.PauseDataSync(paused); err != nil {
 			m.logger.Warn("failed to pause data sync", zap.Error(err))
 		}
+	}
+	if !paused {
+		if m.httpServer != nil {
+			m.httpServer.ToForeground()
+		}
+		if m.started {
+			m.asyncRequestAllHistoricMessages()
+		}
+	} else if m.httpServer != nil {
+		m.httpServer.ToBackground()
 	}
 	// ToDo: the current ArchiveManager does not provide SetPaused method yet
 	// if m.archiveManager != nil {
@@ -833,9 +819,8 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Start fetching messages from store nodes.
-	// Skip when backgrounded: the sync will run in ToForeground()
-	// when the app returns to foreground.
-	if online && !m.backgroundMode.Load() {
+	// Skip when backgrounded: the sync will run when the app returns to foreground.
+	if online && !m.isPaused() {
 		m.asyncRequestAllHistoricMessages()
 	}
 
