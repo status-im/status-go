@@ -86,11 +86,13 @@ func NewServer(logger *zap.Logger, config *Config) *Server {
 }
 
 func (s *Server) GetAddrPort() string {
-	if s.address == nil {
-		return ""
+	host := ""
+	if s.address != nil {
+		host = s.address.IP.String()
+	} else if s.config != nil {
+		host = s.config.AddrPort.Addr().String()
 	}
 
-	host := s.address.IP.String()
 	if s.config != nil && s.config.Cert != nil && len(s.config.Cert.Leaf.DNSNames) > 0 {
 		host = s.config.Cert.Leaf.DNSNames[0]
 	}
@@ -98,17 +100,32 @@ func (s *Server) GetAddrPort() string {
 		host = s.config.AdvertizeHost
 	}
 
-	return net.JoinHostPort(host, strconv.Itoa(s.GetPort()))
+	port := s.GetPort()
+	if host == "" || port == 0 {
+		return ""
+	}
+
+	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 func (s *Server) GetPort() int {
-	if s.address == nil {
-		return 0
-	}
 	if s.config != nil && s.config.AdvertizePort != 0 {
 		return s.config.AdvertizePort
 	}
-	return s.address.Port
+
+	if s.address != nil {
+		return s.address.Port
+	}
+
+	if s.cachedPort != 0 {
+		return s.cachedPort
+	}
+
+	if s.config != nil && s.config.AddrPort.Port() != 0 {
+		return int(s.config.AddrPort.Port())
+	}
+
+	return 0
 }
 
 func (s *Server) GetListeningAddrPort() string {
@@ -334,7 +351,8 @@ func (s *Server) AddHandlers(handlers HandlerPatternMap) {
 }
 
 func (s *Server) MakeBaseURL() *url.URL {
-	if s.address == nil {
+	hostPort := s.GetAddrPort()
+	if hostPort == "" {
 		return &url.URL{}
 	}
 
@@ -345,6 +363,6 @@ func (s *Server) MakeBaseURL() *url.URL {
 
 	return &url.URL{
 		Scheme: scheme,
-		Host:   s.GetAddrPort(),
+		Host:   hostPort,
 	}
 }
