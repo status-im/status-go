@@ -2446,8 +2446,8 @@ github.com/wk8/go-ordered-map/v2 v2.1.7/go.mod h1:9Xvgm2mV2kSq2SAm0Y608tBmu8akTz
 github.com/wlynxg/anet v0.0.3/go.mod h1:eay5PRQr7fIVAMbTbchTnO9gG65Hg/uYGdc7mguHxoA=
 github.com/wlynxg/anet v0.0.5 h1:J3VJGi1gvo0JwZ/P1/Yc/8p63SoW98B5dHkYDmpgvvU=
 github.com/wlynxg/anet v0.0.5/go.mod h1:eay5PRQr7fIVAMbTbchTnO9gG65Hg/uYGdc7mguHxoA=
-github.com/xAlisher/go-waku v0.10.2-0.20260602160003-ab4609ef1517 h1:zNOTn6jkgT9iWzlWbLNKGaYgVqk3Bpflkb+UKJQMY8s=
-github.com/xAlisher/go-waku v0.10.2-0.20260602160003-ab4609ef1517/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
+github.com/xAlisher/go-waku v0.10.2-0.20260603060940-9f8361930df9 h1:f1tcz/ftQgHNQkEkfLG8+TBJqluJ10aQO19DpYTUAk8=
+github.com/xAlisher/go-waku v0.10.2-0.20260603060940-9f8361930df9/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
 github.com/xanzy/go-gitlab v0.15.0/go.mod h1:8zdQa/ri1dfn8eS3Ir1SyfvOKlw7WBJ8DVThkpGiXrs=
 github.com/xdg-go/pbkdf2 v1.0.0/go.mod h1:jrpuAogTd400dnrH08LKmI/xc1MbPOebTwRqcT5RDeI=
 github.com/xdg-go/scram v1.0.2/go.mod h1:1WAq6h33pAW+iRreB34OORO2Nf7qel3VV3fjBj+hCSs=

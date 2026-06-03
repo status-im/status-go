@@ -26,7 +26,7 @@ replace github.com/oNaiPs/go-generate-fast v0.3.0 => github.com/status-im/go-gen
 
 // Temporary: use fork with background-mode filter subscription fix until
 // logos-messaging/logos-delivery-go#1304 is merged and released.
-replace github.com/waku-org/go-waku => github.com/xAlisher/go-waku v0.10.2-0.20260602160003-ab4609ef1517
+replace github.com/waku-org/go-waku => github.com/xAlisher/go-waku v0.10.2-0.20260603060940-9f8361930df9
 
 require (
 	github.com/anacrolix/torrent v1.41.0
