@@ -6,11 +6,12 @@ from clients.services.wakuext import SendChatMessagePayload
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps import async_messenger
+from waku_params import parametrize_waku_light_client
 
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
-@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+@parametrize_waku_light_client
 class TestSendingChatMessages:
 
     @pytest.fixture

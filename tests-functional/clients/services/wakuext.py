@@ -4,6 +4,7 @@ from typing import TypedDict, Union, Optional
 
 from clients.rpc import RpcClient
 from clients.services.service import Service
+from utils.rpc_helpers import list_or_empty
 from resources.enums import MessageContentType
 from utils.image_utils import ImageCropRect
 
@@ -555,7 +556,7 @@ class WakuextService(Service):
     def chats(self):
         params = []
         response = self.rpc_request("chats", params)
-        return response
+        return response or []
 
     def chat(self, chat_id: str):
         params = [chat_id]
@@ -565,12 +566,12 @@ class WakuextService(Service):
     def chats_preview(self, filter_type: int):
         params = [filter_type]
         response = self.rpc_request("chatsPreview", params)
-        return response
+        return list_or_empty(response)
 
     def active_chats(self):
         params = []
         response = self.rpc_request("activeChats", params)
-        return response
+        return response or []
 
     def mute_chat(self, chat_id: str):
         params = [chat_id]
@@ -700,12 +701,12 @@ class WakuextService(Service):
     def emoji_reactions_by_chat_id(self, sender_chat_id: str, limit: int):
         params = [sender_chat_id, None, limit]
         response = self.rpc_request(method="emojiReactionsByChatID", params=params)
-        return response
+        return list_or_empty(response)
 
     def emoji_reactions_by_chat_id_message_id(self, sender_chat_id: str, message_id: str):
         params = [sender_chat_id, message_id]
         response = self.rpc_request(method="emojiReactionsByChatIDMessageID", params=params)
-        return response
+        return list_or_empty(response)
 
     def get_saved_addresses(self, params=[]):
         response = self.rpc_request("getSavedAddresses", params)

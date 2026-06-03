@@ -4,20 +4,21 @@ import pytest
 
 from resources.enums import ChatType, ChatPreviewFilterType, MuteType
 from steps import messenger
+from waku_params import parametrize_waku_light_client
 
 
 @pytest.mark.rpc
-@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["waku_light_client_False", "waku_light_client_True"])
+@parametrize_waku_light_client
 @pytest.mark.parametrize("backend_factory", [{"privileged": False}], indirect=True, ids=["privileged_False"])
 class TestChatActions:
 
     @pytest.fixture()
     def sender(self, backend_new_profile, waku_light_client):
-        return backend_new_profile("sender", waku_light_client)
+        return backend_new_profile("sender", waku_light_client=waku_light_client)
 
     @pytest.fixture()
     def receiver(self, backend_new_profile, waku_light_client):
-        return backend_new_profile("receiver", waku_light_client)
+        return backend_new_profile("receiver", waku_light_client=waku_light_client)
 
     def test_all_chats(self, sender, receiver):
         messenger.make_contacts(sender, receiver)
@@ -74,7 +75,6 @@ class TestChatActions:
         private_group_chat_id = messenger.join_private_group(admin=sender, member=receiver)
 
         chats = sender.wakuext_service.active_chats()
-        # TODO: Add more assertions on response
         assert len(chats) == 2
 
         sender.wakuext_service.deactivate_chat(private_group_chat_id, False)

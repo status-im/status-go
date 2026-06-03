@@ -191,7 +191,7 @@ For more specific use cases, you can use these specialized fixtures:
   ```
 
 - **`waku_light_client`** (function-scoped):  
-  A simple parametrization fixture for enabling/disabling Waku light client mode.
+  A parametrization fixture for enabling/disabling Waku light client mode. Use `@parametrize_waku_light_client` from `waku_params.py` to run tests with both `wakuV2LightClient_False` and `wakuV2LightClient_True`. Example: `pytest -m rpc -k 'wakuV2LightClient_True' -v`.
 
 #### 3. Manual/Custom Backend Setup
 

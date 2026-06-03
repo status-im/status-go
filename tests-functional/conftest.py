@@ -182,20 +182,12 @@ class SecretRedactingFilter(logging.Filter):
         return message
 
     def filter(self, record):
-        # Redact secrets in the log message
         if isinstance(record.msg, str):
-            message = record.getMessage()
-            record.msg = self.redact(message)
-
-        # Also redact secrets in args (if used with parameterized logging)
-        if record.args:
-            new_args = []
-            for arg in record.args:
-                redacted_arg = arg
-                if isinstance(arg, str):
-                    redacted_arg = self.redact(arg)
-                new_args.append(redacted_arg)
-            record.args = tuple(new_args)
+            if record.args:
+                record.msg = self.redact(record.getMessage())
+                record.args = ()
+            else:
+                record.msg = self.redact(record.msg)
 
         return True
 
