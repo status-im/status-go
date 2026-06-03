@@ -841,6 +841,33 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	s.Require().True(resp.Contacts[0].Mutual())
 }
 
+func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContactWhenMessageMissing() {
+	messageText := "hello!"
+
+	theirMessenger := s.newMessenger()
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	request := &requests.SendContactRequest{
+		ID:      contactID,
+		Message: messageText,
+	}
+	s.sendContactRequest(request, s.m)
+	contactRequest := s.receiveContactRequest(messageText, theirMessenger)
+
+	err := theirMessenger.persistence.DeleteMessage(contactRequest.ID)
+	s.Require().NoError(err)
+
+	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	resp, err := theirMessenger.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	contactRequestMsg := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+	s.Require().Equal(defaultContactRequestID(myID), contactRequestMsg.ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
+}
+
 func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact() {
 	messageText := "hello!"
 
@@ -869,6 +896,33 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequest.ID)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
 	s.Require().Equal(common.ContactRequestStateDismissed, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+}
+
+func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContactWhenMessageMissing() {
+	messageText := "hello!"
+
+	theirMessenger := s.newMessenger()
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	request := &requests.SendContactRequest{
+		ID:      contactID,
+		Message: messageText,
+	}
+	s.sendContactRequest(request, s.m)
+	contactRequest := s.receiveContactRequest(messageText, theirMessenger)
+
+	err := theirMessenger.persistence.DeleteMessage(contactRequest.ID)
+	s.Require().NoError(err)
+
+	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	resp, err := theirMessenger.DismissLatestContactRequestForContact(context.Background(), &requests.DismissLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	contactRequestMsg := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+	s.Require().Equal(defaultContactRequestID(myID), contactRequestMsg.ID)
+	s.Require().Equal(common.ContactRequestStateDismissed, contactRequestMsg.ContactRequestState)
 }
 
 func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {

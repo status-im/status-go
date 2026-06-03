@@ -1196,9 +1196,10 @@ func (m *Messenger) retrieveLatestContactRequestIDForContact(contactID string) (
 	}
 
 	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contactID)
-	if err == common.ErrRecordNotFound {
+	if err == common.ErrRecordNotFound || (err == nil && contactRequestID == "") {
 		// No pending request found, use a default one
 		contactRequestID = defaultContactRequestID(contactID)
+		err = nil
 	}
 	return contactRequestID, err
 }
