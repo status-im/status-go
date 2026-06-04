@@ -35,7 +35,6 @@ type ProviderID = string
 // Provider IDs
 const (
 	StatusSmartProxy  = "status-smart-proxy"
-	ProxyInfura       = "proxy-infura"
 	SmartProxyAlchemy = "smart-proxy-alchemy"
 	Nodefleet         = "nodefleet"
 	Infura            = "infura"
