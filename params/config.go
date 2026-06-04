@@ -221,21 +221,18 @@ type NodeConfig struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled                   bool
-	RaribleMainnetAPIKey      security.SensitiveString `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey      security.SensitiveString `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKey             security.SensitiveString `json:"AlchemyAPIKey"`
-	InfuraAPIKey              security.SensitiveString `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret        security.SensitiveString `json:"InfuraAPIKeySecret"`
-	StatusProxyMarketUser     security.SensitiveString `json:"StatusProxyMarketUser"`
-	StatusProxyMarketPassword security.SensitiveString `json:"StatusProxyMarketPassword"`
-	CoingeckoAPIKey           security.SensitiveString `json:"CoingeckoAPIKey"`
-	CoingeckoDemoAPIKey       security.SensitiveString `json:"CoingeckoDemoAPIKey"`
-	MarketDataProxyConfig     MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
-	NftProxyConfig            NftProxyConfig           `json:"NftProxyConfig"`
-
-	StatusProxyUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
-	StatusProxyPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
+	Enabled               bool
+	RaribleMainnetAPIKey  security.SensitiveString `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey  security.SensitiveString `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKey         security.SensitiveString `json:"AlchemyAPIKey"`
+	InfuraAPIKey          security.SensitiveString `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret    security.SensitiveString `json:"InfuraAPIKeySecret"`
+	CoingeckoAPIKey       security.SensitiveString `json:"CoingeckoAPIKey"`
+	CoingeckoDemoAPIKey   security.SensitiveString `json:"CoingeckoDemoAPIKey"`
+	MarketDataProxyConfig MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
+	NftProxyConfig        NftProxyConfig           `json:"NftProxyConfig"`
+	StatusProxyUser       security.SensitiveString `json:"StatusProxyBlockchainUser"`
+	StatusProxyPassword   security.SensitiveString `json:"StatusProxyBlockchainPassword"`
 
 	StatusProxyStageName     string                   `json:"StatusProxyStageName"`
 	EnableMercuryoProvider   bool                     `json:"EnableMercuryoProvider"`

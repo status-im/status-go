@@ -185,12 +185,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.AlchemyAPIKey = request.AlchemyAPIKey
 	}
 
-	if !request.StatusProxyMarketUser.Empty() {
-		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
-	}
-	if !request.StatusProxyMarketPassword.Empty() {
-		walletConfig.StatusProxyMarketPassword = request.StatusProxyMarketPassword
-	}
 	if !request.MarketDataProxyUser.Empty() {
 		walletConfig.MarketDataProxyConfig.User = request.MarketDataProxyUser
 	}
@@ -224,7 +218,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if len(walletRequest.CustomTokens) > 0 {
 		walletConfig.CustomTokens = walletRequest.CustomTokens
 	}
-
 	if !request.StatusProxyUser.Empty() {
 		walletConfig.StatusProxyUser = request.StatusProxyUser
 	}
