@@ -1,10 +1,8 @@
 package transport
 
 import (
-	"context"
 	"reflect"
 	"testing"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -54,7 +52,6 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 		nil,
 		EnvelopesMonitorConfig{
 			EnvelopeEventsHandler:            s.eventsHandlerMock,
-			MaxAttempts:                      6,
 			AwaitOnlyMailServerConfirmations: false,
 			IsMailserver:                     func(types2.EnodeID) bool { return false },
 			Logger:                           zap.NewNop(),
@@ -224,64 +221,4 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 func (s *EnvelopesMonitorSuite) TestMultipleHashes_Failure() {
 	err := s.monitor.Add(testIDs, []types3.Hash{{0x01}, {0x02}}, []*types2.NewMessage{{}})
 	s.Require().Error(err)
-}
-
-func (s *EnvelopesMonitorSuite) TestRetryOnce() {
-	s.monitor.api = &mockWakuAPI{}
-	err := s.monitor.Add(testIDs, testHashes, []*types2.NewMessage{{}})
-	s.Require().NoError(err)
-	envelope := s.monitor.envelopes[testHash]
-	envelope.attempts = 2
-	envelope.lastAttemptTime = time.Now().Add(-20 * time.Second)
-	s.monitor.retryQueue = append(s.monitor.retryQueue, envelope)
-
-	s.monitor.retryOnce()
-
-	s.Require().Equal(3, envelope.attempts)
-	s.Require().Len(s.monitor.retryQueue, 0)
-	s.Require().Equal(envelope.envelopeHashID, s.monitor.envelopes[envelope.envelopeHashID].envelopeHashID)
-}
-
-func (s *EnvelopesMonitorSuite) TestRetryLoopSkipsWhenPaused() {
-	s.monitor.MarkPaused()
-	defer s.monitor.MarkResumed()
-
-	mockAPI := &mockWakuAPI{}
-	s.monitor.api = mockAPI
-	err := s.monitor.Add(testIDs, testHashes, []*types2.NewMessage{{}})
-	s.Require().NoError(err)
-	envelope := s.monitor.envelopes[testHash]
-	envelope.attempts = 2
-	envelope.lastAttemptTime = time.Now().Add(-20 * time.Second)
-	s.monitor.retryQueue = append(s.monitor.retryQueue, envelope)
-
-	s.monitor.quit = make(chan struct{})
-	go s.monitor.retryLoop()
-	time.Sleep(1100 * time.Millisecond)
-	close(s.monitor.quit)
-	time.Sleep(50 * time.Millisecond)
-
-	s.Require().Equal(0, mockAPI.postCalls)
-}
-
-type mockWakuAPI struct {
-	postCalls int
-}
-
-func (m *mockWakuAPI) Post(ctx context.Context, msg types2.NewMessage) ([]byte, error) {
-	m.postCalls++
-	return []byte{0x01}, nil
-}
-
-func (m *mockWakuAPI) AddPrivateKey(ctx context.Context, privateKey types3.HexBytes) (string, error) {
-	return "", nil
-}
-func (m *mockWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
-	return false, nil
-}
-func (m *mockWakuAPI) NewMessageFilter(req types2.Criteria) (string, error) {
-	return "", nil
-}
-func (m *mockWakuAPI) GetFilterMessages(id string) ([]*types2.Message, error) {
-	return nil, nil
 }
