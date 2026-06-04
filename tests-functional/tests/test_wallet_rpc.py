@@ -9,6 +9,11 @@ TOKENS_KEYS = [
     "1-0x744d70fdbe2ba4cf95131626614a1763df805b9e",  # SNT
 ]
 
+# Live CoinGecko / market.status.im — https://github.com/status-im/status-app/issues/21135
+_SKIP_LIVE_MARKET_RPC = pytest.mark.skip(
+    reason="https://github.com/status-im/status-app/issues/21135 — re-enable when market proxy puzzle auth is wired in functional tests"
+)
+
 
 @pytest.mark.wallet
 @pytest.mark.rpc
@@ -93,16 +98,19 @@ class TestRpc:
         result = self.rpc_client.wallet_service.get_cached_currency_formats()
         assert result.get("AED").get("key") == "AED"
 
+    @_SKIP_LIVE_MARKET_RPC
     def test_fetch_prices(self):
         result = self.rpc_client.wallet_service.fetch_prices(TOKENS_KEYS, ["usd"])
         for key in TOKENS_KEYS:
             assert key.lower() in result
 
+    @_SKIP_LIVE_MARKET_RPC
     def test_fetch_market_values(self):
         result = self.rpc_client.wallet_service.fetch_market_values(TOKENS_KEYS, "usd")
         for key in TOKENS_KEYS:
             assert key.lower() in result
 
+    @_SKIP_LIVE_MARKET_RPC
     def test_fetch_token_details(self):
         result = self.rpc_client.wallet_service.fetch_token_details(TOKENS_KEYS)
         for key in TOKENS_KEYS:
