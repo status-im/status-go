@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBuildDefaultNetworks(t *testing.T) {
