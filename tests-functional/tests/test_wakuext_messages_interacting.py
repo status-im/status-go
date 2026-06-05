@@ -3,10 +3,11 @@ import pytest
 from steps import messenger
 from clients.services.wakuext import SendPinMessagePayload
 from clients.api import ApiResponseError
+from waku_params import parametrize_waku_light_client
 
 
 @pytest.mark.rpc
-@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+@parametrize_waku_light_client
 class TestInteractingWithChatMessages:
 
     @pytest.fixture()
