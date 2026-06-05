@@ -33,6 +33,8 @@ const (
 	oneMonthDuration = 31 * oneDayDuration
 
 	backoffByUserAction = 0 * time.Second
+
+	historicSyncMinInterval = 20 * time.Second
 )
 
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
@@ -275,6 +277,35 @@ func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResp
 	if m.mailserversDatabase == nil {
 		return nil, nil
 	}
+
+	now := time.Now()
+	m.historicSyncMu.Lock()
+	if m.historicSyncInFlight {
+		m.historicSyncMu.Unlock()
+		m.logger.Debug("skip historic sync request (already in progress)")
+		return nil, nil
+	}
+
+	if !m.lastHistoricSyncRequestAt.IsZero() {
+		elapsed := now.Sub(m.lastHistoricSyncRequestAt)
+		if elapsed < historicSyncMinInterval {
+			m.historicSyncMu.Unlock()
+			m.logger.Debug("skip historic sync request (throttled)",
+				zap.Duration("elapsed", elapsed),
+				zap.Duration("minInterval", historicSyncMinInterval),
+			)
+			return nil, nil
+		}
+	}
+
+	m.historicSyncInFlight = true
+	m.lastHistoricSyncRequestAt = now
+	m.historicSyncMu.Unlock()
+	defer func() {
+		m.historicSyncMu.Lock()
+		m.historicSyncInFlight = false
+		m.historicSyncMu.Unlock()
+	}()
 
 	allResponses := &MessengerResponse{}
 
