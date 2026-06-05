@@ -366,6 +366,9 @@ func WithCommunitiesRekeyInterval(interval time.Duration) func(c *config) error 
 func WithCommunityManagerOptions(options []communities.ManagerOption) Option {
 	return func(c *config) error {
 		c.communityManagerOptions = options
+		return nil
+	}
+}
 
 func WithImportInitialDelay(delay int) Option {
 	return func(c *config) error {
@@ -386,4 +389,3 @@ func WithMessageArchiveInterval(interval int) Option {
 		return nil
 	}
 }
-

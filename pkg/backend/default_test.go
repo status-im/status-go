@@ -76,6 +76,7 @@ func TestDefaultNodeConfig_AllowForceCommunityMembersReevaluation(t *testing.T) 
 		require.NoError(t, err)
 		require.False(t, cfg.ShhextConfig.AllowForceCommunityMembersReevaluation)
 	})
+}
 
 func TestDefaultNodeConfigSetsLogosStorageDefaults(t *testing.T) {
 	bootstrapNode := "test-bootstrap-node"
@@ -94,4 +95,3 @@ func TestDefaultNodeConfigSetsLogosStorageDefaults(t *testing.T) {
 	require.Equal(t, "nocolors", nodeConfig.LogosStorageConfig.NodeConfig.LogFormat)
 	require.Equal(t, []string{bootstrapNode}, nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes)
 }
-
