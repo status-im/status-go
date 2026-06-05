@@ -283,7 +283,61 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 		return nil, nil
 	}
 
-	now := time.Now()
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return nil, err
+	}
+	if !canSync {
+		return nil, nil
+	}
+
+	return m.withHistoricSyncInFlight(time.Now(), func() (*MessengerResponse, error) {
+		var allResponses *MessengerResponse
+		if aggregateResponses {
+			allResponses = &MessengerResponse{}
+		}
+
+		filters := m.messaging.ChatFilters()
+		err = m.updateFiltersPriority(filters)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update filters priority: %w", err)
+		}
+		defer func() {
+			err := m.resetFiltersPriority(filters)
+			if err != nil {
+				m.logger.Error("failed to reset filters priority", zap.Error(err))
+			}
+		}()
+
+		peerInfo := m.messaging.GetActiveStorenode()
+
+		if withRetries {
+			response, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
+				return m.syncFilters(peerInfo, filters)
+			}, history.WithPeerID(peerInfo.ID))
+			if err != nil {
+				return nil, err
+			}
+			if aggregateResponses && response != nil {
+				allResponses.AddChats(response.Chats())
+				allResponses.AddMessages(response.Messages())
+			}
+			return allResponses, nil
+		}
+
+		response, err := m.syncFilters(peerInfo, filters)
+		if err != nil {
+			return nil, err
+		}
+		if aggregateResponses && response != nil {
+			allResponses.AddChats(response.Chats())
+			allResponses.AddMessages(response.Messages())
+		}
+		return allResponses, nil
+	})
+}
+
+func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
 	m.historicSyncMu.Lock()
 	if m.historicSyncInFlight {
 		m.historicSyncMu.Unlock()
@@ -312,48 +366,7 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 		m.historicSyncMu.Unlock()
 	}()
 
-	var allResponses *MessengerResponse
-	if aggregateResponses {
-		allResponses = &MessengerResponse{}
-	}
-
-	filters := m.messaging.ChatFilters()
-	err = m.updateFiltersPriority(filters)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update filters priority: %w", err)
-	}
-	defer func() {
-		err := m.resetFiltersPriority(filters)
-		if err != nil {
-			m.logger.Error("failed to reset filters priority", zap.Error(err))
-		}
-	}()
-
-	peerInfo := m.messaging.GetActiveStorenode()
-
-	if withRetries {
-		response, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-			return m.syncFilters(peerInfo, filters)
-		}, history.WithPeerID(peerInfo.ID))
-		if err != nil {
-			return nil, err
-		}
-		if aggregateResponses && response != nil {
-			allResponses.AddChats(response.Chats())
-			allResponses.AddMessages(response.Messages())
-		}
-		return allResponses, nil
-	}
-
-	response, err := m.syncFilters(peerInfo, filters)
-	if err != nil {
-		return nil, err
-	}
-	if aggregateResponses && response != nil {
-		allResponses.AddChats(response.Chats())
-		allResponses.AddMessages(response.Messages())
-	}
-	return allResponses, nil
+	return fn()
 }
 
 const missingMessageCheckPeriod = 30 * time.Second
