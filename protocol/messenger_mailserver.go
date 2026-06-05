@@ -408,7 +408,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		return nil, err
 	}
 
-	topicsData := make(map[string]mailservers.MailserverTopic)
+	topicsData := make(map[string]mailservers.MailserverTopic, len(topicInfo))
 	for _, topic := range topicInfo {
 		topicsData[fmt.Sprintf("%s-%s", topic.PubsubTopic, topic.ContentTopic)] = topic
 	}
@@ -416,7 +416,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 	batches := make(map[string]map[int]types2.StoreNodeBatch)
 
 	to := m.calculateMailserverTo()
-	var syncedTopics []mailservers.MailserverTopic
+	syncedTopics := make([]mailservers.MailserverTopic, 0, len(filters))
 
 	sort.Slice(filters[:], func(i, j int) bool {
 		p1 := filters[i].Priority()
@@ -435,7 +435,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		return nil, err
 	}
 
-	contentTopicsPerPubsubTopic := make(map[string]map[string]*types2.ChatFilter)
+	contentTopicsPerPubsubTopic := make(map[string]map[string]*types2.ChatFilter, len(filters))
 	for _, filter := range filters {
 		if !filter.IsListening() || filter.IsEphemeral() {
 			continue
@@ -550,7 +550,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		return nil, err
 	}
 
-	var messagesToBeSaved []*common.Message
+	messagesToBeSaved := make([]*common.Message, 0, len(syncedTopics))
 	for _, batches := range batches {
 		for _, batch := range batches {
 			for _, id := range batch.ChatIDs {
