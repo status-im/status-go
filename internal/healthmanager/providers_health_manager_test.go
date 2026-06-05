@@ -59,7 +59,7 @@ func (s *ProvidersHealthManagerSuite) assertChainStatus(expected rpcstatus.Statu
 }
 
 func (s *ProvidersHealthManagerSuite) TestInitialStatus() {
-	s.assertChainStatus(rpcstatus.StatusDown)
+	s.assertChainStatus(rpcstatus.StatusUnknown)
 }
 
 func (s *ProvidersHealthManagerSuite) TestUpdateProviderStatuses() {
@@ -123,7 +123,7 @@ func (s *ProvidersHealthManagerSuite) TestUpdateProviderStatuses() {
 func (s *ProvidersHealthManagerSuite) TestChainStatusUpdatesOnce() {
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
-	s.assertChainStatus(rpcstatus.StatusDown)
+	s.assertChainStatus(rpcstatus.StatusUnknown)
 
 	// Update providers to Down
 	statuses := []rpcstatus.RpcProviderCallStatus{
