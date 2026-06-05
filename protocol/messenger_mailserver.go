@@ -263,8 +263,13 @@ func (m *Messenger) resetFiltersPriority(filters types2.ChatFilters) error {
 	return nil
 }
 
-// RequestAllHistoricMessages requests all the historic messages for any topic
+// RequestAllHistoricMessages requests all the historic messages for any topic.
+// It keeps aggregating all responses for callers that need the merged payload.
 func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResponse, error) {
+	return m.requestAllHistoricMessages(withRetries, true)
+}
+
+func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateResponses bool) (*MessengerResponse, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		return nil, err
@@ -307,7 +312,10 @@ func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResp
 		m.historicSyncMu.Unlock()
 	}()
 
-	allResponses := &MessengerResponse{}
+	var allResponses *MessengerResponse
+	if aggregateResponses {
+		allResponses = &MessengerResponse{}
+	}
 
 	filters := m.messaging.ChatFilters()
 	err = m.updateFiltersPriority(filters)
@@ -330,7 +338,7 @@ func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResp
 		if err != nil {
 			return nil, err
 		}
-		if response != nil {
+		if aggregateResponses && response != nil {
 			allResponses.AddChats(response.Chats())
 			allResponses.AddMessages(response.Messages())
 		}
@@ -341,7 +349,7 @@ func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResp
 	if err != nil {
 		return nil, err
 	}
-	if response != nil {
+	if aggregateResponses && response != nil {
 		allResponses.AddChats(response.Chats())
 		allResponses.AddMessages(response.Messages())
 	}
