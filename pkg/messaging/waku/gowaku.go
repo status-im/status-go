@@ -819,6 +819,7 @@ func (w *Waku) publishMessageReceived(e *common.ReceivedMessage) {
 		Payload:      msg.Payload,
 		Ephemeral:    msg.GetEphemeral(),
 		Meta:         msg.Meta,
+		PubsubTopic:  e.PubsubTopic,
 		Version:      msg.GetVersion(),
 		Timestamp:    msg.GetTimestamp(),
 	}

@@ -9,9 +9,10 @@ package types
 // TODO(status-im/status-go#7522): shrink to the pure send-symmetric shape
 // {Hash, ContentTopic, Payload, Ephemeral, Meta} once the v1->v0 cutover
 // (pm#420) removes the decode's dependency on Version and Timestamp is sourced
-// elsewhere. They are carried transitionally because the rfc26 decode still
-// needs Version (for the version==0 passthrough) and the processor needs
-// Timestamp (Message.Timestamp / "sent" time).
+// elsewhere. PubsubTopic, Version and Timestamp are carried transitionally:
+// PubsubTopic is still paired with ContentTopic for routing (logos-delivery
+// shards it internally), the rfc26 decode needs Version (version==0
+// passthrough), and the processor needs Timestamp ("sent" time).
 type ReceivedMessage struct {
 	Hash         []byte
 	ContentTopic string
@@ -20,6 +21,7 @@ type ReceivedMessage struct {
 	Meta         []byte
 
 	// Transitional (see TODO above).
-	Version   uint32
-	Timestamp int64
+	PubsubTopic string
+	Version     uint32
+	Timestamp   int64
 }

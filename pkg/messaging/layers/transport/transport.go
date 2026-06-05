@@ -209,46 +209,38 @@ func (t *Transport) receiveLoop() {
 	}
 }
 
-// handleReceivedMessage decodes a received message against every listening
-// filter interested in its content topic and buffers the decoded result.
+// handleReceivedMessage routes a received message to every listening filter on
+// its (pubsub, content) topic and buffers the decoded result. A content topic
+// is only a 4-byte hash of the chat id, so distinct chats can collide on it;
+// each candidate is therefore decoded with its own key, and a successful
+// authenticated decrypt is what confirms the message belongs to that filter
+// (replacing the old per-filter key-hash match).
 func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
 	if msg == nil {
 		return
 	}
 
-	candidates := t.filters.WatchersByContentTopic(msg.ContentTopic)
+	candidates := t.filters.WatchersByTopic(msg.PubsubTopic, msg.ContentTopic)
 	if len(candidates) == 0 {
 		return
 	}
 
-	// Decrypt once and reuse across candidates: filters sharing a content topic
-	// share the same chat key, so a single decode serves them all.
-	var (
-		decoded     *rfc26.DecodedPayload
-		decodedDone bool
-		matched     bool
-	)
-
+	var matched bool
 	for _, filter := range candidates {
 		// Filters that exist only so we can publish never receive.
 		if !filter.Listen {
 			continue
 		}
 
-		symKey, privKey, ok := t.filters.DecodeKey(filter.FilterID)
-		if !ok {
+		symKey, privKey, err := t.filterKeys(filter)
+		if err != nil {
 			continue
 		}
 
-		if !decodedDone {
-			d, err := t.decode(msg, symKey, privKey)
-			decodedDone = true
-			if err != nil {
-				t.logger.Debug("failed to decode received message",
-					zap.String("contentTopic", msg.ContentTopic), zap.Error(err))
-				return
-			}
-			decoded = d
+		decoded, err := t.decode(msg, symKey, privKey)
+		if err != nil {
+			// Wrong key for this filter (e.g. a colliding chat's message); skip.
+			continue
 		}
 
 		t.receivedMu.Lock()
@@ -260,6 +252,22 @@ func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
 	if matched {
 		t.matchedPublisher.Publish(struct{}{})
 	}
+}
+
+// filterKeys resolves the key material used to decode messages received on a
+// filter. Symmetric keys come from the waku key store via the filter's SymKeyID
+// (the same path the send side uses); asymmetric private keys come from the
+// FiltersManager's runtime map. Exactly one of the returned keys is non-nil.
+func (t *Transport) filterKeys(filter *Filter) (symKey []byte, privKey *ecdsa.PrivateKey, err error) {
+	if filter.SymKeyID != "" {
+		symKey, err = t.keysManager.RawSymKey(filter.SymKeyID)
+		return symKey, nil, err
+	}
+	privKey, ok := t.filters.AsymKey(filter.FilterID)
+	if !ok {
+		return nil, nil, errors.New("no decode key for filter")
+	}
+	return nil, privKey, nil
 }
 
 // decode reverses the rfc26 payload codec using the filter's key material. A

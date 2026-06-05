@@ -74,6 +74,7 @@ func TestReceivePushPath(t *testing.T) {
 	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
 		Hash:         hash,
 		ContentTopic: filter.ContentTopic.ContentTopic(),
+		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
 		Payload:      encoded,
 		Version:      1,
 		Timestamp:    time.Now().UnixNano(),
@@ -98,7 +99,28 @@ func TestReceivePushPath(t *testing.T) {
 	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
 		Hash:         []byte{0x01},
 		ContentTopic: "/waku/2/unknown/proto",
+		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
 		Payload:      encoded,
+		Version:      1,
+		Timestamp:    time.Now().UnixNano(),
+	})
+	result, err = tr.RetrieveRawAll()
+	require.NoError(t, err)
+	require.Empty(t, result)
+
+	// A message on the right (pubsub, content) topic but encrypted with the wrong
+	// key is dropped: the authenticated decrypt fails. This is exactly how a
+	// colliding chat (content topics are a 4-byte hash) is disambiguated.
+	wrongKey := make([]byte, len(symKey))
+	copy(wrongKey, symKey)
+	wrongKey[0] ^= 0xFF
+	badPayload, err := rfc26.Encode(payload, wrongKey, nil, identity)
+	require.NoError(t, err)
+	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
+		Hash:         []byte{0x02},
+		ContentTopic: filter.ContentTopic.ContentTopic(),
+		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		Payload:      badPayload,
 		Version:      1,
 		Timestamp:    time.Now().UnixNano(),
 	})
