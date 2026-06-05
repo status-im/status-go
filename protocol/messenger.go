@@ -149,6 +149,9 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
+	historicSyncMu            sync.Mutex
+	historicSyncInFlight      bool
+	lastHistoricSyncRequestAt time.Time
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
