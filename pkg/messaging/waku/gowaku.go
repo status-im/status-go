@@ -208,7 +208,17 @@ type Waku struct {
 
 	// getFilterMessagesMu serialises GetFilterMessages lookups.
 	getFilterMessagesMu sync.Mutex
+
+	// messageReceivedMu guards messageReceivedCh, the single reliable
+	// push channel of neutral ReceivedMessages handed to the transport.
+	messageReceivedMu sync.RWMutex
+	messageReceivedCh chan *types.ReceivedMessage
 }
+
+// messageReceivedBufferSize bounds how far processQueueLoop may run ahead of the
+// transport's receive handler before publishing applies backpressure. Sized to
+// absorb storenode history bursts without dropping messages.
+const messageReceivedBufferSize = 1000
 
 var _ types.Waku = (*Waku)(nil)
 
@@ -782,6 +792,57 @@ func (w *Waku) SubscribeFilterMatched() chan struct{} {
 
 func (w *Waku) UnsubscribeFilterMatched(ch chan struct{}) {
 	w.filters.UnsubscribeFilterMatched(ch)
+}
+
+// SubscribeMessageReceived returns the reliable channel of neutral
+// ReceivedMessages. There is a single consumer (the transport); repeated calls
+// return the same channel.
+func (w *Waku) SubscribeMessageReceived() chan *types.ReceivedMessage {
+	w.messageReceivedMu.Lock()
+	defer w.messageReceivedMu.Unlock()
+	if w.messageReceivedCh == nil {
+		w.messageReceivedCh = make(chan *types.ReceivedMessage, messageReceivedBufferSize)
+	}
+	return w.messageReceivedCh
+}
+
+// UnsubscribeMessageReceived stops delivery to ch. The channel is not closed (a
+// concurrent publish may be in flight); dropping the reference is enough.
+func (w *Waku) UnsubscribeMessageReceived(ch chan *types.ReceivedMessage) {
+	w.messageReceivedMu.Lock()
+	defer w.messageReceivedMu.Unlock()
+	if w.messageReceivedCh == ch {
+		w.messageReceivedCh = nil
+	}
+}
+
+// publishMessageReceived hands a received envelope to the transport as a neutral
+// ReceivedMessage. The send is reliable: it blocks until the consumer has room
+// (backpressure) or the node is shutting down. It is a no-op when nobody has
+// subscribed yet.
+func (w *Waku) publishMessageReceived(e *common.ReceivedMessage) {
+	w.messageReceivedMu.RLock()
+	ch := w.messageReceivedCh
+	w.messageReceivedMu.RUnlock()
+	if ch == nil {
+		return
+	}
+
+	msg := e.Envelope.Message()
+	received := &types.ReceivedMessage{
+		Hash:         e.Hash().Bytes(),
+		ContentTopic: msg.ContentTopic,
+		Payload:      msg.Payload,
+		Ephemeral:    msg.GetEphemeral(),
+		Meta:         msg.Meta,
+		Version:      msg.GetVersion(),
+		Timestamp:    msg.GetTimestamp(),
+	}
+
+	select {
+	case ch <- received:
+	case <-w.ctx.Done():
+	}
 }
 
 // DeleteKeyPair deletes the specified key if it exists.
@@ -1568,6 +1629,11 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		}
 		w.envelopeCache.Set(e.Hash(), true, ttlcache.DefaultTTL)
 	}
+
+	// Push the raw envelope to the transport as a neutral ReceivedMessage. Runs
+	// in parallel with NotifyWatchers for now; the transport-side decode/match
+	// will become the sole reception path once it consumes this channel.
+	w.publishMessageReceived(e)
 
 	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Topic: e.ContentTopic,

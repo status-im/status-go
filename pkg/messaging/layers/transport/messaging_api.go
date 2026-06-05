@@ -21,6 +21,13 @@ type MessagingAPI interface {
 	// GetFilterMessages returns the messages that match the filter criteria
 	// and were received between the last poll and now.
 	GetFilterMessages(id string) ([]*types.Message, error)
+
+	// SubscribeMessageReceived returns a reliable channel delivering every
+	// message received from the network as a neutral ReceivedMessage. The
+	// transport decodes, routes by content topic, and matches against its own
+	// filters. Call UnsubscribeMessageReceived when done.
+	SubscribeMessageReceived() chan *types.ReceivedMessage
+	UnsubscribeMessageReceived(ch chan *types.ReceivedMessage)
 }
 
 // Compile-time assertion: the waku adapter satisfies MessagingAPI.

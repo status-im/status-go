@@ -172,6 +172,13 @@ type Waku interface {
 	SubscribeFilterMatched() chan struct{}
 	UnsubscribeFilterMatched(ch chan struct{})
 
+	// SubscribeMessageReceived returns a channel delivering every message received
+	// from the network as a neutral ReceivedMessage (no local decoding/matching).
+	// The send is reliable (buffered, with backpressure), so callers must drain the
+	// channel; call UnsubscribeMessageReceived when done to stop delivery.
+	SubscribeMessageReceived() chan *ReceivedMessage
+	UnsubscribeMessageReceived(ch chan *ReceivedMessage)
+
 	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 	// DeleteKeyPair deletes the key with the specified ID if it exists.
