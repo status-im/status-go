@@ -323,9 +323,6 @@ var defaultNetworkSpecs = []networkSpec{
 		proxyNetworkName: "mainnet",
 		chainName:        "Katana",
 		providers: []providerSpec{
-			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			// no support for katana on infura
-			// no support for katana on alchemy
 			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://rpc.katana.network"), enableRpsLimiter: true},
 		},
 		blockExplorerURL:       "https://katanascan.com/",
