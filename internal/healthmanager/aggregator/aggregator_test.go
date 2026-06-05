@@ -137,7 +137,7 @@ func (suite *StatusAggregatorTestSuite) TestUpdate() {
 func (suite *StatusAggregatorTestSuite) TestComputeAggregatedStatus_NoProviders() {
 	aggStatus := suite.aggregator.ComputeAggregatedStatus()
 
-	assert.Equal(suite.T(), rpcstatus.StatusDown, aggStatus.Status, "Aggregated status should be 'down' when no providers are registered")
+	assert.Equal(suite.T(), rpcstatus.StatusUnknown, aggStatus.Status, "Aggregated status should be 'unknown' when there is no provider data yet")
 	assert.True(suite.T(), aggStatus.LastSuccessAt.IsZero(), "LastSuccessAt should be zero when no providers are registered")
 	assert.True(suite.T(), aggStatus.LastErrorAt.IsZero(), "LastErrorAt should be zero when no providers are registered")
 }
