@@ -165,9 +165,6 @@ type Waku struct {
 
 	envelopeFeed event.Feed
 
-	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
-	storeMsgIDsMu sync.RWMutex
-
 	messageSender *publish.MessageSender
 
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
@@ -205,9 +202,6 @@ type Waku struct {
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
-
-	// getFilterMessagesMu serialises GetFilterMessages lookups.
-	getFilterMessagesMu sync.Mutex
 
 	// messageReceivedMu guards messageReceivedCh, the single reliable
 	// push channel of neutral ReceivedMessages handed to the transport.
@@ -273,9 +267,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
-		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
 		timesource:                      ts,
-		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
@@ -283,7 +275,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
-	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
+	waku.filters = common.NewFilters(waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	if nodeKey == nil {
@@ -784,14 +776,6 @@ func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) t
 	}()
 
 	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
-}
-
-func (w *Waku) SubscribeFilterMatched() chan struct{} {
-	return w.filters.SubscribeFilterMatched()
-}
-
-func (w *Waku) UnsubscribeFilterMatched(ch chan struct{}) {
-	w.filters.UnsubscribeFilterMatched(ch)
 }
 
 // SubscribeMessageReceived returns the reliable channel of neutral
@@ -1973,19 +1957,8 @@ func (w *Waku) DropPeer(peerID peer.ID) error {
 	return w.node.ClosePeerById(peerID)
 }
 
-func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
-	w.storeMsgIDsMu.Lock()
-	defer w.storeMsgIDsMu.Unlock()
-	delete(w.storeMsgIDs, hash)
-}
-
 func (w *Waku) Clean() error {
 	w.msgQueue = make(chan *common.ReceivedMessage, messageQueueLimit)
-
-	for _, f := range w.filters.All() {
-		f.Messages = common.NewMemoryMessageStore()
-	}
-
 	return nil
 }
 
@@ -2162,7 +2135,6 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 		KeySym:        keySym,
 		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
 		PubsubTopic:   opts.PubsubTopic,
-		Messages:      common.NewMemoryMessageStore(),
 	}
 
 	return w.subscribe(f)

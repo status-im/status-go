@@ -672,10 +672,6 @@ func (t *Transport) DropPeer(peerID peer.ID) error {
 	return t.waku.DropPeer(peerID)
 }
 
-func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
-	t.waku.MarkP2PMessageAsProcessed(hash)
-}
-
 func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
 }

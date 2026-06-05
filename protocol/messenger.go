@@ -23,7 +23,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -3347,12 +3346,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilt
 			}
 
 			m.processCommunityChanges(messageState)
-
-			// NOTE: for now we confirm messages as processed regardless whether we
-			// actually processed them, this is because we need to differentiate
-			// from messages that we want to retry to process and messages that
-			// are never going to be processed
-			m.messaging.MarkP2PMessageAsProcessed(gethcommon.BytesToHash(shhMessage.Hash))
 
 			if allMessagesProcessed {
 				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))

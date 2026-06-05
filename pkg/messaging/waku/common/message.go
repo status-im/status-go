@@ -2,21 +2,13 @@ package common
 
 import (
 	"crypto/ecdsa"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/internal/logutils"
-	// NOTE: wrong-direction dependency. waku/ should not depend on the
-	// transport layer above it; the correct direction is transport -> waku.
-	// This import only exists to keep the reception pipeline (Open) decoding
-	// in place during the staged refactor, and will be removed once decoding
-	// moves up into the transport layer (status-im/status-go#7462, pm#380).
-	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 )
 
 // MessageType represents where this message comes from
@@ -78,33 +70,6 @@ type MessagesResponse struct {
 	Errors []EnvelopeError
 }
 
-func (msg *ReceivedMessage) isSymmetricEncryption() bool {
-	return msg.SymKeyHash != common.Hash{}
-}
-
-func (msg *ReceivedMessage) isAsymmetricEncryption() bool {
-	return msg.Dst != nil
-}
-
-// MessageStore defines interface for temporary message store.
-type MessageStore interface {
-	Add(*ReceivedMessage) error
-	Pop() ([]*ReceivedMessage, error)
-}
-
-// NewMemoryMessageStore returns pointer to an instance of the MemoryMessageStore.
-func NewMemoryMessageStore() *MemoryMessageStore {
-	return &MemoryMessageStore{
-		messages: map[common.Hash]*ReceivedMessage{},
-	}
-}
-
-// MemoryMessageStore represents messages stored in a memory hash table.
-type MemoryMessageStore struct {
-	mu       sync.Mutex
-	messages map[common.Hash]*ReceivedMessage
-}
-
 func NewReceivedMessage(env Envelope, msgType MessageType) *ReceivedMessage {
 	ct, err := ExtractTopicFromContentTopic(env.Message().ContentTopic)
 	if err != nil {
@@ -130,90 +95,4 @@ func (msg *ReceivedMessage) Hash() common.Hash {
 		msg.hash = common.BytesToHash(msg.Envelope.Hash().Bytes())
 	}
 	return msg.hash
-}
-
-// Add adds message to store.
-func (store *MemoryMessageStore) Add(msg *ReceivedMessage) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	if _, exist := store.messages[msg.Hash()]; !exist {
-		store.messages[msg.Hash()] = msg
-	}
-	return nil
-}
-
-// Pop returns all available messages and cleans the store.
-func (store *MemoryMessageStore) Pop() ([]*ReceivedMessage, error) {
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	all := make([]*ReceivedMessage, 0, len(store.messages))
-	for hash, msg := range store.messages {
-		delete(store.messages, hash)
-		all = append(all, msg)
-	}
-	return all, nil
-}
-
-// Open tries to decrypt an message, and populates the message fields in case of success.
-func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
-	if watcher == nil {
-		return nil
-	}
-
-	// The API interface forbids filters doing both symmetric and asymmetric encryption.
-	if watcher.expectsAsymmetricEncryption() && watcher.expectsSymmetricEncryption() {
-		return nil
-	}
-
-	// TODO: should we update msg instead of creating a new received message?
-	result = new(ReceivedMessage)
-
-	keyInfo := new(rfc26.KeyInfo)
-	if watcher.expectsAsymmetricEncryption() {
-		keyInfo.Kind = rfc26.Asymmetric
-		keyInfo.PrivKey = watcher.KeyAsym
-		msg.Dst = &watcher.KeyAsym.PublicKey
-	} else if watcher.expectsSymmetricEncryption() {
-		keyInfo.Kind = rfc26.Symmetric
-		keyInfo.SymKey = watcher.KeySym
-		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
-	}
-
-	wakuMessage := msg.Envelope.Message()
-
-	// rfc26 always encrypts/decrypts and is independent of the WakuMessage
-	// version field. The version==0 (unencrypted) passthrough is a
-	// WakuMessage-level concern, handled here to keep reception behaviour
-	// identical for now.
-	var raw *rfc26.DecodedPayload
-	if wakuMessage.GetVersion() == 0 {
-		raw = &rfc26.DecodedPayload{Data: wakuMessage.Payload}
-	} else {
-		var err error
-		raw, err = rfc26.Decode(wakuMessage.Payload, keyInfo)
-		if err != nil {
-			logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
-			return nil
-		}
-	}
-
-	result.Envelope = msg.Envelope
-	result.Data = raw.Data
-	result.Padding = raw.Padding
-	result.Signature = raw.Signature
-	result.Src = raw.PubKey
-	result.SymKeyHash = msg.SymKeyHash
-	result.Dst = msg.Dst
-	result.Sent = uint32(msg.Envelope.Message().GetTimestamp() / int64(time.Second))
-
-	ct, err := ExtractTopicFromContentTopic(msg.Envelope.Message().ContentTopic)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
-		return nil
-	}
-
-	result.PubsubTopic = watcher.PubsubTopic
-	result.ContentTopic = ct
-
-	return result
 }

@@ -4,28 +4,18 @@ import (
 	crand "crypto/rand"
 	mrand "math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
-	"google.golang.org/protobuf/proto"
-
-	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
-	// NOTE: wrong-direction dependency. waku/ should not depend on the
-	// transport layer above it; the correct direction is transport -> waku.
-	// Used here only to build encrypted fixtures while reception decoding
-	// still lives in waku/. Removed once decoding moves up to the transport
-	// layer (status-im/status-go#7462, pm#380).
-	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 )
 
-const testShard = "/waku/2/rs/16/32"
+// Since the reception pipeline moved into the transport
+// (status-im/status-go#7464), the waku-side Filters collection is only a
+// wire-subscription registry. These tests cover that registry; decoding,
+// matching and buffering are covered by the transport's tests.
 
 type FilterTestCase struct {
 	f      *Filter
@@ -44,8 +34,6 @@ func createLogger(t *testing.T) *zap.Logger {
 
 func generateFilter(t *testing.T, symmetric bool) (*Filter, error) {
 	var f Filter
-	f.Messages = NewMemoryMessageStore()
-
 	f.PubsubTopic = "test"
 
 	const topicNum = 8
@@ -89,7 +77,7 @@ func generateTestCases(t *testing.T, SizeTestFilters int) []FilterTestCase {
 
 func TestInstallFilters(t *testing.T) {
 	const SizeTestFilters = 256
-	filters := NewFilters(testShard, createLogger(t))
+	filters := NewFilters(createLogger(t))
 	tst := generateTestCases(t, SizeTestFilters)
 
 	var err error
@@ -116,7 +104,7 @@ func TestInstallFilters(t *testing.T) {
 }
 
 func TestInstallSymKeyGeneratesHash(t *testing.T) {
-	filters := NewFilters(testShard, createLogger(t))
+	filters := NewFilters(createLogger(t))
 	filter, _ := generateFilter(t, true)
 
 	// save the current SymKeyHash for comparison
@@ -135,16 +123,15 @@ func TestInstallSymKeyGeneratesHash(t *testing.T) {
 }
 
 func TestInstallIdenticalFilters(t *testing.T) {
-	filters := NewFilters(testShard, createLogger(t))
+	filters := NewFilters(createLogger(t))
 	filter1, _ := generateFilter(t, true)
 
 	// Copy the first filter since some of its fields
-	// are randomly gnerated.
+	// are randomly generated.
 	filter2 := &Filter{
 		KeySym:        filter1.KeySym,
 		PubsubTopic:   filter1.PubsubTopic,
 		ContentTopics: filter1.ContentTopics,
-		Messages:      NewMemoryMessageStore(),
 	}
 
 	_, err := filters.Install(filter1)
@@ -152,166 +139,24 @@ func TestInstallIdenticalFilters(t *testing.T) {
 
 	_, err = filters.Install(filter2)
 	require.NoError(t, err)
-
-	recvMessage := generateCompatibleReceivedMessage(t, filter1)
-	msg := recvMessage.Open(filter1)
-	require.NotNil(t, msg)
 }
 
 func TestInstallFilterWithSymAndAsymKeys(t *testing.T) {
-	filters := NewFilters(testShard, createLogger(t))
+	filters := NewFilters(createLogger(t))
 	filter1, _ := generateFilter(t, true)
 
 	asymKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
 	// Copy the first filter since some of its fields
-	// are randomly gnerated.
+	// are randomly generated.
 	filter := &Filter{
 		KeySym:        filter1.KeySym,
 		KeyAsym:       asymKey,
 		PubsubTopic:   filter1.PubsubTopic,
 		ContentTopics: filter1.ContentTopics,
-		Messages:      NewMemoryMessageStore(),
 	}
 
 	_, err = filters.Install(filter)
 	require.Error(t, err)
-}
-
-func cloneFilter(orig *Filter) *Filter {
-	var clone Filter
-	clone.Messages = NewMemoryMessageStore()
-	clone.Src = orig.Src
-	clone.KeyAsym = orig.KeyAsym
-	clone.KeySym = orig.KeySym
-	clone.PubsubTopic = orig.PubsubTopic
-	clone.ContentTopics = orig.ContentTopics
-	clone.SymKeyHash = orig.SymKeyHash
-	return &clone
-}
-
-func generateCompatibleReceivedMessage(t *testing.T, f *Filter) *ReceivedMessage {
-	data := make([]byte, 20)
-	_, err := crand.Read(data) // nolint: gosec
-	require.NoError(t, err)
-
-	payload, err := rfc26.Encode(data, f.KeySym, nil, nil)
-	require.NoError(t, err)
-
-	var version uint32 = 1
-	msg := &pb.WakuMessage{
-		Payload:      payload,
-		Version:      &version,
-		ContentTopic: maps.Keys(f.ContentTopics)[2].ContentTopic(),
-		Timestamp:    proto.Int64(time.Now().UnixNano()),
-		Meta:         []byte{},
-	}
-	envelope := protocol.NewEnvelope(msg, time.Now().UnixNano(), f.PubsubTopic)
-
-	result := NewReceivedMessage(envelope, "test")
-	result.SymKeyHash = crypto.Keccak256Hash(f.KeySym)
-
-	return result
-}
-
-func TestWatchers(t *testing.T) {
-	const NumFilters = 16
-	const NumMessages = 256
-	var i int
-	var j uint32
-	var e *ReceivedMessage
-	var x, firstID string
-	var err error
-
-	filters := NewFilters("/waku/2/rs/16/32", createLogger(t))
-	tst := generateTestCases(t, NumFilters)
-	for i = 0; i < NumFilters; i++ {
-		tst[i].f.Src = nil
-		x, err = filters.Install(tst[i].f)
-		require.NoError(t, err)
-
-		tst[i].id = x
-		if len(firstID) == 0 {
-			firstID = x
-		}
-	}
-
-	lastID := x
-
-	var envelopes [NumMessages]*ReceivedMessage
-	for i = 0; i < NumMessages; i++ {
-		j = mrand.Uint32() % NumFilters // nolint: gosec
-		e = generateCompatibleReceivedMessage(t, tst[j].f)
-		envelopes[i] = e
-		tst[j].msgCnt++
-	}
-
-	for i = 0; i < NumMessages; i++ {
-		filters.NotifyWatchers(envelopes[i])
-	}
-
-	var total int
-	var mail []*ReceivedMessage
-	var count [NumFilters]int
-
-	for i = 0; i < NumFilters; i++ {
-		mail = tst[i].f.Retrieve()
-		count[i] = len(mail)
-		total += len(mail)
-	}
-	require.Equal(t, total, NumMessages)
-
-	for i = 0; i < NumFilters; i++ {
-		mail = tst[i].f.Retrieve()
-		require.Zero(t, len(mail))
-		require.Equal(t, tst[i].msgCnt, count[i])
-	}
-
-	// another round with a cloned filter
-
-	clone := cloneFilter(tst[0].f)
-	filters.Uninstall(lastID)
-	total = 0
-	last := NumFilters - 1
-	tst[last].f = clone
-	_, err = filters.Install(clone)
-	require.NoError(t, err)
-
-	for i = 0; i < NumFilters; i++ {
-		tst[i].msgCnt = 0
-		count[i] = 0
-	}
-
-	// make sure that the first watcher receives at least one message
-	e = generateCompatibleReceivedMessage(t, tst[0].f)
-	envelopes[0] = e
-	tst[0].msgCnt++
-	for i = 1; i < NumMessages; i++ {
-		j = mrand.Uint32() % NumFilters // nolint: gosec
-		e = generateCompatibleReceivedMessage(t, tst[j].f)
-		envelopes[i] = e
-		tst[j].msgCnt++
-	}
-
-	for i = 0; i < NumMessages; i++ {
-		filters.NotifyWatchers(envelopes[i])
-	}
-
-	for i = 0; i < NumFilters; i++ {
-		mail = tst[i].f.Retrieve()
-		count[i] = len(mail)
-		total += len(mail)
-	}
-
-	combined := tst[0].msgCnt + tst[last].msgCnt
-	require.Equal(t, total, NumMessages+count[0])
-	require.Equal(t, combined, count[0])
-	require.Equal(t, combined, count[last])
-
-	for i = 1; i < NumFilters-1; i++ {
-		mail = tst[i].f.Retrieve()
-		require.Zero(t, len(mail))
-		require.Equal(t, tst[i].msgCnt, count[i])
-	}
 }

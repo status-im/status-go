@@ -287,13 +287,25 @@ func TestWakuV2Filter(t *testing.T) {
 	_, err = rand.Read(contentTopicBytes)
 	require.NoError(t, err)
 	filter := &common.Filter{
-		Messages:      common.NewMemoryMessageStore(),
 		PubsubTopic:   testPubsubTopic,
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
 	}
 
 	fID, err := w.subscribe(filter)
 	require.NoError(t, err)
+
+	// Reception now flows through the neutral push channel (decoding/matching
+	// live in the transport); drain it instead of the old per-filter buffer.
+	received := w.SubscribeMessageReceived()
+	defer w.UnsubscribeMessageReceived(received)
+	requireReceived := func() {
+		select {
+		case msg := <-received:
+			require.NotNil(t, msg)
+		case <-time.After(5 * time.Second):
+			t.Fatal("expected a received message")
+		}
+	}
 
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
@@ -311,8 +323,7 @@ func TestWakuV2Filter(t *testing.T) {
 	subscriptions := w.node.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
-	messages := filter.Retrieve()
-	require.Len(t, messages, 1)
+	requireReceived()
 
 	// Mock peers going down
 	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
@@ -334,8 +345,7 @@ func TestWakuV2Filter(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 
-	messages = filter.Retrieve()
-	require.Len(t, messages, 1)
+	requireReceived()
 	err = w.Unsubscribe(context.Background(), fID)
 	require.NoError(t, err)
 	require.NoError(t, w.Stop())
