@@ -1599,40 +1599,11 @@ func (w *Waku) processQueueLoop() {
 }
 
 func (w *Waku) processMessage(e *common.ReceivedMessage) {
-	logger := w.logger.With(
-		zap.Stringer("envelopeHash", e.Envelope.Hash()),
-		zap.String("pubsubTopic", e.PubsubTopic),
-		zap.String("contentTopic", e.ContentTopic.ContentTopic()),
-		zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
-	)
-
-	if e.MsgType == common.StoreMessageType {
-		// We need to insert it first, and then remove it if not matched,
-		// as messages are processed asynchronously
-		w.storeMsgIDsMu.Lock()
-		w.storeMsgIDs[e.Hash()] = true
-		w.storeMsgIDsMu.Unlock()
-	}
-
-	matched := w.filters.NotifyWatchers(e)
-
-	// If not matched we remove it
-	if !matched {
-		logger.Debug("filters did not match")
-		w.storeMsgIDsMu.Lock()
-		delete(w.storeMsgIDs, e.Hash())
-		w.storeMsgIDsMu.Unlock()
-	} else {
-		logger.Debug("filters did match")
-		if w.metricsHandler != nil && e.MsgType == common.MissingMessageType {
-			w.metricsHandler.PushMissedRelevantMessage(e)
-		}
-		w.envelopeCache.Set(e.Hash(), true, ttlcache.DefaultTTL)
-	}
-
-	// Push the raw envelope to the transport as a neutral ReceivedMessage. Runs
-	// in parallel with NotifyWatchers for now; the transport-side decode/match
-	// will become the sole reception path once it consumes this channel.
+	// Decoding, content-topic routing and filter matching all happen in the
+	// transport now (status-im/status-go#7464). The adapter just forwards every
+	// received envelope as a neutral ReceivedMessage; de-duplication is owned by
+	// the transport's persistent processed-message cache, so nothing is marked
+	// processed here.
 	w.publishMessageReceived(e)
 
 	w.envelopeFeed.Send(common.EnvelopeEvent{

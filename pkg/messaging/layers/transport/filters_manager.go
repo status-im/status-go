@@ -39,6 +39,15 @@ type FiltersService interface {
 	UnsubscribeMany(ids []string) error
 }
 
+// filterDecodeKey holds the raw key material needed to decode messages received
+// on a filter. It lives only in memory (never on the persisted Filter), and
+// mirrors what the waku-side common.Filter used to carry (KeySym / KeyAsym).
+// Exactly one of symKey / privKey is set.
+type filterDecodeKey struct {
+	symKey  []byte
+	privKey *ecdsa.PrivateKey
+}
+
 type FiltersManager struct {
 	service     FiltersService
 	persistence KeysPersistence
@@ -47,6 +56,9 @@ type FiltersManager struct {
 	logger      *zap.Logger
 	mutex       sync.Mutex
 	filters     map[string]*Filter
+	// decodeKeys maps a filter's FilterID to the key material used to decode
+	// messages received on it. Populated at subscribe time; runtime-only.
+	decodeKeys map[string]filterDecodeKey
 }
 
 // NewFiltersManager returns a new filtersManager.
@@ -66,8 +78,35 @@ func NewFiltersManager(persistence KeysPersistence, service FiltersService, priv
 		persistence: persistence,
 		keys:        keys,
 		filters:     make(map[string]*Filter),
+		decodeKeys:  make(map[string]filterDecodeKey),
 		logger:      logger.With(zap.Namespace("filtersManager")),
 	}, nil
+}
+
+// WatchersByContentTopic returns the filters interested in the given content
+// topic (the full "/waku/1/.../rfc26" string). Routing is by content topic
+// alone, matching the logos-delivery Messaging API which carries no pubsub
+// topic; content-topic -> shard is deterministic.
+func (f *FiltersManager) WatchersByContentTopic(contentTopic string) []*Filter {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	var res []*Filter
+	for _, filter := range f.filters {
+		if filter.ContentTopic.ContentTopic() == contentTopic {
+			res = append(res, filter)
+		}
+	}
+	return res
+}
+
+// DecodeKey returns the key material used to decode messages received on the
+// filter with the given FilterID.
+func (f *FiltersManager) DecodeKey(filterID string) (symKey []byte, privKey *ecdsa.PrivateKey, ok bool) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	k, ok := f.decodeKeys[filterID]
+	return k.symKey, k.privKey, ok
 }
 
 func (f *FiltersManager) Init(
@@ -281,6 +320,7 @@ func (f *FiltersManager) Remove(ctx context.Context, filtersToRemove ...*Filter)
 		if filter.SymKeyID != "" {
 			f.service.DeleteSymKey(filter.SymKeyID)
 		}
+		delete(f.decodeKeys, filter.FilterID)
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
 				delete(f.filters, k)
@@ -312,6 +352,7 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 		if filter.SymKeyID != "" {
 			f.service.DeleteSymKey(filter.SymKeyID)
 		}
+		delete(f.decodeKeys, filter.FilterID)
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
 				delete(f.filters, k)
@@ -641,6 +682,8 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFi
 		return nil, err
 	}
 
+	f.decodeKeys[id] = filterDecodeKey{symKey: symKey}
+
 	return &RawFilter{
 		FilterID: id,
 		SymKeyID: symKeyID,
@@ -677,6 +720,9 @@ func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identi
 	if err != nil {
 		return nil, err
 	}
+
+	f.decodeKeys[id] = filterDecodeKey{privKey: identity}
+
 	return &RawFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
 }
 
