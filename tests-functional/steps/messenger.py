@@ -779,7 +779,7 @@ def one_to_one_message(message_count, sender=None, receiver=None):
 def community_messages(message_chat_id, message_count, sender=None, receiver=None):
     start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     total_signals_before = sum(len(v) for v in receiver.received_signals.values())
-    logging.info(
+    logger.info(
         f"community_messages: start_index={start_index}, "
         f"total_signals_before={total_signals_before}, "
         f"ws_url={getattr(receiver, 'url', 'unknown')}"
@@ -795,7 +795,7 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
 
     messages_new_after_send = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     total_signals_after_send = sum(len(v) for v in receiver.received_signals.values())
-    logging.info(
+    logger.info(
         f"community_messages: all {message_count} messages sent, "
         f"MESSAGES_NEW count={messages_new_after_send} (was {start_index}), "
         f"total_signals={total_signals_after_send} (was {total_signals_before})"
