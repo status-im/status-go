@@ -28,8 +28,8 @@ import (
 
 // (Waku.Post was removed: all sends now go through Send with payloads
 // pre-encoded by the transport via rfc26.Encode. Reception was moved to the
-// transport too: the adapter publishes raw envelopes via SubscribeMessageReceived
-// and no longer decodes/polls — status-im/status-go#7464.)
+// transport too: the adapter forwards raw envelopes on the envelope feed
+// (EventEnvelopeAvailable) and no longer decodes/polls — status-im/status-go#7464.)
 
 // Send publishes a pre-encoded payload to the messaging network. The payload
 // is expected to be already encoded for WakuMessage version=1 (see

@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/internal/connection"
 	testutils "github.com/status-im/status-go/internal/testutils"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -294,16 +295,23 @@ func TestWakuV2Filter(t *testing.T) {
 	fID, err := w.subscribe(filter)
 	require.NoError(t, err)
 
-	// Reception now flows through the neutral push channel (decoding/matching
-	// live in the transport); drain it instead of the old per-filter buffer.
-	received := w.SubscribeMessageReceived()
-	defer w.UnsubscribeMessageReceived(received)
+	// Reception now flows on the envelope feed (decoding/matching live in the
+	// transport); wait for the EventEnvelopeAvailable carrying the message.
+	events := make(chan types.EnvelopeEvent, 100)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
 	requireReceived := func() {
-		select {
-		case msg := <-received:
-			require.NotNil(t, msg)
-		case <-time.After(5 * time.Second):
-			t.Fatal("expected a received message")
+		deadline := time.After(5 * time.Second)
+		for {
+			select {
+			case e := <-events:
+				if e.Event == types.EventEnvelopeAvailable {
+					require.NotNil(t, e.Data)
+					return
+				}
+			case <-deadline:
+				t.Fatal("expected a received message")
+			}
 		}
 	}
 

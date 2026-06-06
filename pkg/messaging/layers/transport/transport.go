@@ -191,19 +191,30 @@ func NewTransport(
 	return t, nil
 }
 
-// receiveLoop drains the adapter's reliable ReceivedMessage channel until the
-// transport stops.
+// receiveLoop consumes the backend's envelope-event stream and turns every
+// EventEnvelopeAvailable into the decode/route step. The feed is a broadcast, so
+// multiple transports sharing one backend (as in tests) each see every event and
+// route it against their own filters. The events channel is amply buffered so
+// the backend's producer is never blocked.
 func (t *Transport) receiveLoop() {
 	defer gocommon.LogOnPanic()
 
-	ch := t.api.SubscribeMessageReceived()
-	defer t.api.UnsubscribeMessageReceived(ch)
+	events := make(chan types.EnvelopeEvent, 100)
+	sub := t.api.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
 
 	for {
 		select {
 		case <-t.quit:
 			return
-		case msg := <-ch:
+		case event := <-events:
+			if event.Event != types.EventEnvelopeAvailable {
+				continue
+			}
+			msg, ok := event.Data.(*types.ReceivedMessage)
+			if !ok {
+				continue
+			}
 			t.handleReceivedMessage(msg)
 		}
 	}

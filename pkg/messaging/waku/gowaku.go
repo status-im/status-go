@@ -202,17 +202,7 @@ type Waku struct {
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
-
-	// messageReceivedMu guards messageReceivedCh, the single reliable
-	// push channel of neutral ReceivedMessages handed to the transport.
-	messageReceivedMu sync.RWMutex
-	messageReceivedCh chan *types.ReceivedMessage
 }
-
-// messageReceivedBufferSize bounds how far processQueueLoop may run ahead of the
-// transport's receive handler before publishing applies backpressure. Sized to
-// absorb storenode history bursts without dropping messages.
-const messageReceivedBufferSize = 1000
 
 var _ types.Waku = (*Waku)(nil)
 
@@ -778,42 +768,12 @@ func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) t
 	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
 }
 
-// SubscribeMessageReceived returns the reliable channel of neutral
-// ReceivedMessages. There is a single consumer (the transport); repeated calls
-// return the same channel.
-func (w *Waku) SubscribeMessageReceived() chan *types.ReceivedMessage {
-	w.messageReceivedMu.Lock()
-	defer w.messageReceivedMu.Unlock()
-	if w.messageReceivedCh == nil {
-		w.messageReceivedCh = make(chan *types.ReceivedMessage, messageReceivedBufferSize)
-	}
-	return w.messageReceivedCh
-}
-
-// UnsubscribeMessageReceived stops delivery to ch. The channel is not closed (a
-// concurrent publish may be in flight); dropping the reference is enough.
-func (w *Waku) UnsubscribeMessageReceived(ch chan *types.ReceivedMessage) {
-	w.messageReceivedMu.Lock()
-	defer w.messageReceivedMu.Unlock()
-	if w.messageReceivedCh == ch {
-		w.messageReceivedCh = nil
-	}
-}
-
-// publishMessageReceived hands a received envelope to the transport as a neutral
-// ReceivedMessage. The send is reliable: it blocks until the consumer has room
-// (backpressure) or the node is shutting down. It is a no-op when nobody has
-// subscribed yet.
-func (w *Waku) publishMessageReceived(e *common.ReceivedMessage) {
-	w.messageReceivedMu.RLock()
-	ch := w.messageReceivedCh
-	w.messageReceivedMu.RUnlock()
-	if ch == nil {
-		return
-	}
-
+// newReceivedMessage builds the neutral, transport-agnostic view of a received
+// envelope that travels on the envelope feed (EventEnvelopeAvailable.Data) for
+// the transport to decode and route.
+func newReceivedMessage(e *common.ReceivedMessage) *types.ReceivedMessage {
 	msg := e.Envelope.Message()
-	received := &types.ReceivedMessage{
+	return &types.ReceivedMessage{
 		Hash:         e.Hash().Bytes(),
 		ContentTopic: msg.ContentTopic,
 		Payload:      msg.Payload,
@@ -822,11 +782,6 @@ func (w *Waku) publishMessageReceived(e *common.ReceivedMessage) {
 		PubsubTopic:  e.PubsubTopic,
 		Version:      msg.GetVersion(),
 		Timestamp:    msg.GetTimestamp(),
-	}
-
-	select {
-	case ch <- received:
-	case <-w.ctx.Done():
 	}
 }
 
@@ -1586,15 +1541,15 @@ func (w *Waku) processQueueLoop() {
 func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	// Decoding, content-topic routing and filter matching all happen in the
 	// transport now (status-im/status-go#7464). The adapter just forwards every
-	// received envelope as a neutral ReceivedMessage; de-duplication is owned by
-	// the transport's persistent processed-message cache, so nothing is marked
-	// processed here.
-	w.publishMessageReceived(e)
-
+	// received envelope on the envelope feed, carrying the neutral
+	// ReceivedMessage as the EventEnvelopeAvailable payload; the transport
+	// decodes and routes it. De-duplication is owned by the transport's
+	// persistent processed-message cache, so nothing is marked processed here.
 	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Topic: e.ContentTopic,
 		Hash:  e.Hash(),
 		Event: common.EventEnvelopeAvailable,
+		Data:  newReceivedMessage(e),
 	})
 }
 
