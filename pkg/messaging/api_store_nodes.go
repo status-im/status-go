@@ -35,23 +35,19 @@ func (a *API) OnStorenodeAvailable() <-chan peer.ID {
 	return a.core.stack.Transport.OnStorenodeAvailable()
 }
 
-func (a *API) WaitForAvailableStoreNode(ctx context.Context) bool {
-	return a.core.stack.Transport.WaitForAvailableStoreNode(ctx)
-}
-
-func (a *API) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
-	return a.core.stack.Transport.PerformStorenodeTask(fn, opts...)
-}
-
-func (a *API) ProcessMailserverBatch(
+// Query retrieves historic messages for a single batch (one pubsub topic and its
+// content topics over [batch.From, batch.To]). The store node is selected
+// internally — callers no longer pass a peer. shouldProcessNextPage (may be nil)
+// is the per-page early-stop; processEnvelopes controls synchronous handling of
+// fetched envelopes.
+func (a *API) Query(
 	ctx context.Context,
 	batch types.StoreNodeBatch,
-	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return a.core.stack.Transport.ProcessMailserverBatch(ctx, *adapters.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return a.core.stack.Transport.Query(ctx, *adapters.ToWakuBatch(&batch), pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {

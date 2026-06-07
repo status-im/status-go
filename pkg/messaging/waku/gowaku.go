@@ -43,7 +43,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
-	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 
@@ -74,7 +73,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/waku-org/go-waku/waku/v2/node"
@@ -183,6 +181,7 @@ type Waku struct {
 
 	StorenodeCycle   *history.StorenodeCycle
 	HistoryRetriever *history.HistoryRetriever
+	storeClient      *StoreClient
 
 	logger *zap.Logger
 
@@ -1034,6 +1033,7 @@ func (w *Waku) Start() error {
 
 	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, commonapi.NewDefaultPinger(w.node.Host()))
 	w.HistoryRetriever = history.NewHistoryRetriever(missing.NewDefaultStorenodeRequestor(w.node.Store()), NewHistoryProcessorWrapper(w), w.logger)
+	w.storeClient = NewStoreClient(w.StorenodeCycle, w.HistoryRetriever, w.GetPubsubTopic, w.logger)
 
 	w.StorenodeCycle.Start(w.ctx)
 
@@ -1951,43 +1951,24 @@ func (w *Waku) OnStorenodeAvailable() <-chan peer.ID {
 	return w.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
 }
 
-func (w *Waku) WaitForAvailableStoreNode(ctx context.Context) bool {
-	return w.StorenodeCycle.WaitForAvailableStoreNode(ctx)
-}
-
 func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	w.StorenodeCycle.SetStorenodeConfigProvider(c)
 }
 
-func (w *Waku) ProcessMailserverBatch(
+// StoreQuery retrieves historic messages for a single batch via the StoreClient
+// facade, which selects the store node itself (no peer argument).
+func (w *Waku) StoreQuery(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	pubsubTopic := w.GetPubsubTopic(batch.PubsubTopic)
-	contentTopics := []string{}
-	for _, topic := range batch.Topics {
-		contentTopics = append(contentTopics, common.BytesToTopic(topic.Bytes()).ContentTopic())
-	}
-
-	criteria := store.FilterCriteria{
-		TimeStart:     proto.Int64(batch.From.UnixNano()),
-		TimeEnd:       proto.Int64(batch.To.UnixNano()),
-		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
-	}
-
-	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
 	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
-}
-
-func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
-	return w.StorenodeCycle.PerformStorenodeTask(fn, opts...)
 }
 
 func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
