@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -54,15 +53,6 @@ const (
 	// EventBackupPerformed is triggered when a backup has been performed
 	EventBackupPerformed = "backup.performed"
 
-	// EventMailserverAvailable is triggered when a mailserver becomes available
-	EventMailserverAvailable = "mailserver.available"
-
-	// EventMailserverChanged is triggered when switching the active mailserver
-	EventMailserverChanged = "mailserver.changed"
-
-	// EventMailserverNotWorking is triggered when the mailserver has failed to connect or failed to respond to requests
-	EventMailserverNotWorking = "mailserver.not.working"
-
 	// EventUpdateAvailable is triggered after a update verification is performed
 	EventUpdateAvailable = "update.available"
 )
@@ -105,11 +95,6 @@ type DecryptMessageFailedSignal struct {
 type BundleAddedSignal struct {
 	Identity       string `json:"identity"`
 	InstallationID string `json:"installationID"`
-}
-
-type StoreNodeSignal struct {
-	Address *multiaddr.Multiaddr `json:"address"`
-	ID      string               `json:"id"`
 }
 
 type Filter struct {
@@ -218,25 +203,4 @@ func SendNewMessages(obj json.Marshaler) {
 
 func LocalMessageBackupDone() {
 	send(EventLocalMessageBackupDone, interface{}(nil))
-}
-
-func sendStoreNodeSignal(ms *types2.StoreNode, event string) {
-	msSignal := StoreNodeSignal{}
-	if ms != nil {
-		msSignal.Address = ms.Addr
-		msSignal.ID = ms.ID
-	}
-	send(event, msSignal)
-}
-
-func SendStoreNodeAvailable(ms *types2.StoreNode) {
-	sendStoreNodeSignal(ms, EventMailserverAvailable)
-}
-
-func SendStoreNodeChanged(ms *types2.StoreNode) {
-	sendStoreNodeSignal(ms, EventMailserverChanged)
-}
-
-func SendStoreNodeNotWorking() {
-	sendStoreNodeSignal(nil, EventMailserverNotWorking)
 }
