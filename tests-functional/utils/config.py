@@ -12,6 +12,7 @@ class Config:
     password: str = ""  # FIXME: remove
     docker_project_name: str = ""
     docker_image: str = ""
+    peer_docker_images: List[str] = field(default_factory=list)
     codecov_dir: str = ""
     logs_dir: str = ""
     benchmark_results_dir: str = ""
