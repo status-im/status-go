@@ -214,6 +214,45 @@ def private_group_message(message_count, private_group_id, sender=None, receiver
         )
 
 
+def add_group_member(admin, group_id, new_member, observers):
+    start = {observer.public_key: len(observer.received_signals[SignalType.MESSAGES_NEW]) for observer in observers}
+    response = admin.wakuext_service.add_members_to_group_chat(group_id, [new_member.public_key])
+    expected_message = get_message_by_content_type(
+        response,
+        content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+        message_pattern=f"@{admin.public_key} has added @{new_member.public_key}",
+    )[0]
+    for observer in observers:
+        with observer.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start[observer.public_key]):
+            pass
+    return response
+
+
+def remove_group_member(admin, group_id, member, observers):
+    start = {observer.public_key: len(observer.received_signals[SignalType.MESSAGES_NEW]) for observer in observers}
+    response = admin.wakuext_service.remove_member_from_group_chat(group_id, member.public_key)
+    expected_message = get_message_by_content_type(
+        response,
+        content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
+        message_pattern=f"@{member.public_key} left the group",
+    )[0]
+    for observer in observers:
+        with observer.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=60, start=start[observer.public_key]):
+            pass
+    return response
+
+
+def leave_group(node, group_id, observers=()):
+    start = {observer.public_key: len(observer.received_signals[SignalType.MESSAGES_NEW]) for observer in observers}
+    response = node.wakuext_service.leave_group_chat(group_id, True)
+    for observer in observers:
+        with observer.expect_signal(
+            SignalType.MESSAGES_NEW, pattern=f"@{node.public_key} left the group", timeout=60, start=start[observer.public_key]
+        ):
+            pass
+    return response
+
+
 # --- Community operations ---
 
 
@@ -696,6 +735,13 @@ def check_node_joined_community(node, joined, community_id):
     assert response.get("joined") is joined
 
 
+def ban_community_member(owner, community_id, member):
+    response = owner.wakuext_service.ban_user_from_community(community_id, member.public_key)
+    communities = [c for c in response.get("communities", []) if c.get("id") == community_id]
+    assert communities, f"banned community {community_id} not in response"
+    return response
+
+
 # --- One-to-one message operations ---
 
 
@@ -733,11 +779,10 @@ def one_to_one_message(message_count, sender=None, receiver=None):
 def community_messages(message_chat_id, message_count, sender=None, receiver=None):
     start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     total_signals_before = sum(len(v) for v in receiver.received_signals.values())
-    logging.info(
-        "community_messages: start_index=%d, total_signals_before=%d, ws_url=%s",
-        start_index,
-        total_signals_before,
-        getattr(receiver, "url", "unknown"),
+    logger.info(
+        f"community_messages: start_index={start_index}, "
+        f"total_signals_before={total_signals_before}, "
+        f"ws_url={getattr(receiver, 'url', 'unknown')}"
     )
 
     sent_messages = []
@@ -750,13 +795,10 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
 
     messages_new_after_send = len(receiver.received_signals[SignalType.MESSAGES_NEW])
     total_signals_after_send = sum(len(v) for v in receiver.received_signals.values())
-    logging.info(
-        "community_messages: all %d messages sent, MESSAGES_NEW count=%d (was %d), total_signals=%d (was %d)",
-        message_count,
-        messages_new_after_send,
-        start_index,
-        total_signals_after_send,
-        total_signals_before,
+    logger.info(
+        f"community_messages: all {message_count} messages sent, "
+        f"MESSAGES_NEW count={messages_new_after_send} (was {start_index}), "
+        f"total_signals={total_signals_after_send} (was {total_signals_before})"
     )
 
     for i, expected_message in enumerate(sent_messages):

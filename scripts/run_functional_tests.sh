@@ -10,6 +10,10 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${FUNCTIONAL_TESTS_REPORT_CODECOV:=false}"
 : "${FUNCTIONAL_TESTS_BUILD_TAGS:=gowaku_no_rln}"
 : "${USE_LOGOS_STORAGE:=false}"
+: "${FUNCTIONAL_TESTS_MARKER:=rpc}"
+: "${FUNCTIONAL_TESTS_RERUNS:=2}"
+: "${PEER_IMAGES:=}"
+: "${PEER_REFS:=}"
 
 echo -e "${GRN}Running functional tests${RST}"
 
@@ -87,6 +91,52 @@ fi
 
 echo -e "${GRN}wakufleet-scanner completed successfully${RST}"
 
+# Resolve peer (old) backend images for cross-version compatibility tests.
+peer_image_args=()
+if [[ "${FUNCTIONAL_TESTS_MARKER}" == "compatibility" ]]; then
+  echo -e "${GRN}Preparing peer images for compatibility tests${RST}"
+  resolved_peer_images=()
+  if [[ -n "${PEER_IMAGES}" ]]; then
+    for img in ${PEER_IMAGES}; do
+      docker pull "${img}" || { echo -e "${RED}Failed to pull peer image ${img}${RST}"; exit 1; }
+      resolved_peer_images+=("${img}")
+    done
+  else
+   if [[ -z "${PEER_REFS}" ]]; then
+      echo "${GRN}Fetching git tags to determine peer refs${RST}"
+      git fetch --tags --quiet || true
+      PEER_REFS="$(git tag --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. '!seen[$1"."$2]++' | head -2 | paste -sd' ' -)"
+    fi
+    if [[ -z "${PEER_REFS}" ]]; then
+      echo -e "${RED}No peer refs available. Set PEER_REFS or PEER_IMAGES.${RST}"
+      exit 1
+    fi
+    echo "${GRN}Peer refs:${RST} ${PEER_REFS}"
+    # TODO: drop worktree build once released backend images are published to Harbor.
+    for ref in ${PEER_REFS}; do
+      ref_slug="$(printf '%s' "${ref}" | tr -c 'A-Za-z0-9_.-' '-' | sed 's/^[-.]*//; s/[-.]*$//')"
+      peer_image="statusgo-peer-${ref_slug}"
+      if ! docker image inspect "${peer_image}" > /dev/null 2>&1; then
+        echo -e "${GRN}Building peer backend ${ref} -> ${peer_image}${RST}"
+        git rev-parse --verify --quiet "${ref}^{commit}" > /dev/null || git fetch --tags origin "${ref}"
+        peer_worktree="$(mktemp -d)"
+        git worktree add --force --detach "${peer_worktree}" "${ref}"
+        if ! docker build "${peer_worktree}" --build-arg "build_tags=${FUNCTIONAL_TESTS_BUILD_TAGS}" --tag "${peer_image}"; then
+          echo -e "${RED}Failed to build peer backend ${ref}${RST}"
+          git worktree remove --force "${peer_worktree}" || true
+          exit 1
+        fi
+        git worktree remove --force "${peer_worktree}"
+      fi
+      resolved_peer_images+=("${peer_image}")
+    done
+  fi
+  for img in ${resolved_peer_images[@]+"${resolved_peer_images[@]}"}; do
+    peer_image_args+=(--peer-docker-image="${img}")
+  done
+  echo -e "${GRN}Peer images:${RST} ${resolved_peer_images[*]+${resolved_peer_images[*]}}"
+fi
+
 # Set up virtual environment
 venv_path="${root_path}/.venv"
 
@@ -106,11 +156,12 @@ pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-pytest --reruns 2 -m rpc -c "${root_path}/pytest.ini" -n 12 \
+pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${FUNCTIONAL_TESTS_MARKER}" -c "${root_path}/pytest.ini" -n 12 \
   --dist load\
   --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
   --docker_project_name="${project_name}" \
   --docker-image=${image_name} \
+  ${peer_image_args[@]+"${peer_image_args[@]}"} \
   --codecov_dir="${binary_coverage_reports_path}" \
   --logs-dir="${logs_path}" \
   --junitxml="${test_results_path}/report.xml" \
