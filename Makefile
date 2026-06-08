@@ -105,7 +105,7 @@ BUILD_TAGS ?= gowaku_no_rln
 # `nim-sds` variables
 
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
-NIM_SDS_VERSION ?= v0.2.4
+NIM_SDS_VERSION ?= v0.4.0-rc.2
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
@@ -134,6 +134,14 @@ endif
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+
+ifeq ($(detected_OS),Darwin)
+    NIM_SDS_NIMBLE_TASK := libsdsDynamicMac
+else ifeq ($(detected_OS),Windows)
+    NIM_SDS_NIMBLE_TASK := libsdsDynamicWindows
+else
+    NIM_SDS_NIMBLE_TASK := libsdsDynamicLinux
+endif
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -308,8 +316,8 @@ endif
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
+	cd $(NIM_SDS_SOURCE_DIR) && nimble setup -l
+	cd $(NIM_SDS_SOURCE_DIR) && nimble $(NIM_SDS_NIMBLE_TASK)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
 endif
