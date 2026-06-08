@@ -63,7 +63,6 @@ func WithEnvelopeEventsConfig(econf *types2.EnvelopeEventsConfig) Options {
 	return func(c *config) {
 		if econf != nil {
 			c.envelopesMonitorConfig.EnvelopeEventsHandler = econf.EnvelopeEventsHandler
-			c.envelopesMonitorConfig.MaxAttempts = econf.MaxMessageDeliveryAttempts
 			c.envelopesMonitorConfig.AwaitOnlyMailServerConfirmations = econf.MailServerConfirmations
 		}
 	}
