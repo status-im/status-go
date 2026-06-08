@@ -1,6 +1,8 @@
 package types
 
 import (
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/internal/crypto/types"
 )
 
@@ -38,4 +40,13 @@ func (t TopicType) Bytes() []byte {
 
 func TopicTypeToByteArray(t TopicType) []byte {
 	return t[:4]
+}
+
+// ContentTopic returns the 23/WAKU2-TOPICS string representation of the topic.
+//
+// TODO(status-im/status-go#7509): this duplicates common.TopicType.ContentTopic
+// because TopicType itself is duplicated between waku/types and waku/common.
+// Remove once the two TopicType definitions are unified.
+func (t TopicType) ContentTopic() string {
+	return "/waku/1/" + hexutil.Encode(t[:]) + "/rfc26"
 }

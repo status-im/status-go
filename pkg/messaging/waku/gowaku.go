@@ -86,8 +86,8 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
-	common "github.com/status-im/status-go/pkg/messaging/waku/common"
-	types "github.com/status-im/status-go/pkg/messaging/waku/types"
+	"github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 const messageQueueLimit = 1024
@@ -205,6 +205,9 @@ type Waku struct {
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
+
+	// getFilterMessagesMu serialises GetFilterMessages lookups.
+	getFilterMessagesMu sync.Mutex
 }
 
 var _ types.Waku = (*Waku)(nil)
@@ -781,35 +784,6 @@ func (w *Waku) UnsubscribeFilterMatched(ch chan struct{}) {
 	w.filters.UnsubscribeFilterMatched(ch)
 }
 
-// NewKeyPair generates a new cryptographic identity for the client, and injects
-// it into the known identities for message decryption. Returns ID of the new key pair.
-func (w *Waku) NewKeyPair() (string, error) {
-	key, err := crypto.GenerateKey()
-	if err != nil || !validatePrivateKey(key) {
-		key, err = crypto.GenerateKey() // retry once
-	}
-	if err != nil {
-		return "", err
-	}
-	if !validatePrivateKey(key) {
-		return "", fmt.Errorf("failed to generate valid key")
-	}
-
-	id, err := toDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return "", err
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.privateKeys[id] != nil {
-		return "", fmt.Errorf("failed to generate unique ID")
-	}
-	w.privateKeys[id] = key
-	return id, nil
-}
-
 // DeleteKeyPair deletes the specified key if it exists.
 func (w *Waku) DeleteKeyPair(key string) bool {
 	deterministicID, err := toDeterministicID(key, common.KeyIDSize)
@@ -898,48 +872,6 @@ func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 		return nil, fmt.Errorf("invalid id")
 	}
 	return key, nil
-}
-
-// GenerateSymKey generates a random symmetric key and stores it under id,
-// which is then returned. Will be used in the future for session key exchange.
-func (w *Waku) GenerateSymKey() (string, error) {
-	key, err := common.GenerateSecureRandomData(common.AESKeyLength)
-	if err != nil {
-		return "", err
-	} else if !common.ValidateDataIntegrity(key, common.AESKeyLength) {
-		return "", fmt.Errorf("error in GenerateSymKey: crypto/rand failed to generate random data")
-	}
-
-	id, err := common.GenerateRandomID()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate ID: %s", err)
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.symKeys[id] != nil {
-		return "", fmt.Errorf("failed to generate unique ID")
-	}
-	w.symKeys[id] = key
-	return id, nil
-}
-
-// AddSymKey stores the key with a given id.
-func (w *Waku) AddSymKey(id string, key []byte) (string, error) {
-	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
-	if err != nil {
-		return "", err
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.symKeys[deterministicID] != nil {
-		return "", fmt.Errorf("key already exists: %v", id)
-	}
-	w.symKeys[deterministicID] = key
-	return deterministicID, nil
 }
 
 // AddSymKeyDirect stores the key, and returns its id.
@@ -2155,10 +2087,6 @@ func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Durat
 	if shouldCycle {
 		w.StorenodeCycle.Cycle(ctx)
 	}
-}
-
-func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
-	return NewPublicWakuAPI(w)
 }
 
 func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {

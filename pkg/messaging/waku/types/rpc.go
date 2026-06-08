@@ -1,9 +1,5 @@
 package types
 
-import (
-	"context"
-)
-
 // NewMessage represents a new whisper message that is posted through the RPC.
 type NewMessage struct {
 	SymKeyID    string    `json:"symKeyID"`
@@ -37,16 +33,4 @@ type Criteria struct {
 	PubsubTopic  string      `json:"pubsubTopic"`
 	Topics       []TopicType `json:"topics"`
 	AllowP2P     bool        `json:"allowP2P"`
-}
-
-// PublicWakuAPI provides the waku RPC service that can be
-// use publicly without security implications.
-type PublicWakuAPI interface {
-	// Post posts a message on the Whisper network.
-	// returns the hash of the message in case of success.
-	Post(ctx context.Context, req NewMessage) ([]byte, error)
-
-	// GetFilterMessages returns the messages that match the filter criteria and
-	// are received between the last poll and now.
-	GetFilterMessages(id string) ([]*Message, error)
 }

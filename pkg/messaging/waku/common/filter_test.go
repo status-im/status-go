@@ -11,12 +11,18 @@ import (
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	// NOTE: wrong-direction dependency. waku/ should not depend on the
+	// transport layer above it; the correct direction is transport -> waku.
+	// Used here only to build encrypted fixtures while reception decoding
+	// still lives in waku/. Removed once decoding moves up to the transport
+	// layer (status-im/status-go#7462, pm#380).
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 )
 
 const testShard = "/waku/2/rs/16/32"
@@ -186,19 +192,14 @@ func cloneFilter(orig *Filter) *Filter {
 }
 
 func generateCompatibleReceivedMessage(t *testing.T, f *Filter) *ReceivedMessage {
-	keyInfo := &payload.KeyInfo{}
-	keyInfo.Kind = payload.Symmetric
-	keyInfo.SymKey = f.KeySym
+	data := make([]byte, 20)
+	_, err := crand.Read(data) // nolint: gosec
+	require.NoError(t, err)
+
+	payload, err := rfc26.Encode(data, f.KeySym, nil, nil)
+	require.NoError(t, err)
 
 	var version uint32 = 1
-	p := new(payload.Payload)
-	p.Data = make([]byte, 20)
-	_, err := crand.Read(p.Data) // nolint: gosec
-	require.NoError(t, err)
-	p.Key = keyInfo
-	payload, err := p.Encode(version)
-	require.NoError(t, err)
-
 	msg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      &version,

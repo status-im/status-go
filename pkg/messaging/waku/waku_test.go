@@ -298,7 +298,7 @@ func TestWakuV2Filter(t *testing.T) {
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-	_, err = w.Send(testPubsubTopic, &pb.WakuMessage{
+	_, err = w.sendEnvelope(testPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
@@ -325,7 +325,7 @@ func TestWakuV2Filter(t *testing.T) {
 	require.Greater(t, len(subscriptions), 0)
 
 	// Ensure that messages are retrieved with a fresh sub
-	_, err = w.Send(testPubsubTopic, &pb.WakuMessage{
+	_, err = w.sendEnvelope(testPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5, 6},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),

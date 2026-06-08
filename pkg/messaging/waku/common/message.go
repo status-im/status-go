@@ -7,12 +7,16 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/payload"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/internal/logutils"
+	// NOTE: wrong-direction dependency. waku/ should not depend on the
+	// transport layer above it; the correct direction is transport -> waku.
+	// This import only exists to keep the reception pipeline (Open) decoding
+	// in place during the staged refactor, and will be removed once decoding
+	// moves up into the transport layer (status-im/status-go#7462, pm#380).
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 )
 
 // MessageType represents where this message comes from
@@ -164,22 +168,33 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	// TODO: should we update msg instead of creating a new received message?
 	result = new(ReceivedMessage)
 
-	keyInfo := new(payload.KeyInfo)
+	keyInfo := new(rfc26.KeyInfo)
 	if watcher.expectsAsymmetricEncryption() {
-		keyInfo.Kind = payload.Asymmetric
+		keyInfo.Kind = rfc26.Asymmetric
 		keyInfo.PrivKey = watcher.KeyAsym
 		msg.Dst = &watcher.KeyAsym.PublicKey
 	} else if watcher.expectsSymmetricEncryption() {
-		keyInfo.Kind = payload.Symmetric
+		keyInfo.Kind = rfc26.Symmetric
 		keyInfo.SymKey = watcher.KeySym
 		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
-	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)
+	wakuMessage := msg.Envelope.Message()
 
-	if err != nil {
-		logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
-		return nil
+	// rfc26 always encrypts/decrypts and is independent of the WakuMessage
+	// version field. The version==0 (unencrypted) passthrough is a
+	// WakuMessage-level concern, handled here to keep reception behaviour
+	// identical for now.
+	var raw *rfc26.DecodedPayload
+	if wakuMessage.GetVersion() == 0 {
+		raw = &rfc26.DecodedPayload{Data: wakuMessage.Payload}
+	} else {
+		var err error
+		raw, err = rfc26.Decode(wakuMessage.Payload, keyInfo)
+		if err != nil {
+			logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
+			return nil
+		}
 	}
 
 	result.Envelope = msg.Envelope

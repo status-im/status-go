@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -74,7 +75,7 @@ type Transport struct {
 	gocommon.PauseBroadcaster
 
 	waku        types.Waku
-	api         types.PublicWakuAPI // only PublicWakuAPI implements logic to send messages
+	api         MessagingAPI // backend used to send messages and read received envelopes
 	keysManager *transportKeysManager
 	filters     *FiltersManager
 	logger      *zap.Logger
@@ -140,9 +141,9 @@ func NewTransport(
 		envelopesMonitor.Start()
 	}
 
-	var api types.PublicWakuAPI
+	var api MessagingAPI
 	if waku != nil {
-		api = waku.PublicWakuAPI()
+		api = waku
 	}
 	t := &Transport{
 		waku:             waku,
@@ -297,27 +298,25 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 // For public filters, chat name is used as an ID as well as
 // a topic.
 func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
-		return nil, err
-	}
-
 	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.SymKeyID = filter.SymKeyID
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PubsubTopic = filter.PubsubTopic
-
-	return t.api.Post(ctx, *newMessage)
-}
-
-func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
+	symKey, err := t.keysManager.RawSymKey(filter.SymKeyID)
+	if err != nil {
 		return nil, err
 	}
 
+	encoded, err := t.encode(newMessage.Payload, symKey, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
+}
+
+func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
 	filter, err := t.filters.LoadNegotiated(messagingtypes.NegotiatedSecret{
 		PublicKey: publicKey,
 		Key:       secret,
@@ -326,46 +325,45 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	newMessage.SymKeyID = filter.SymKeyID
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.PublicKey = nil
-
-	return t.api.Post(ctx, *newMessage)
-}
-
-func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
+	symKey, err := t.keysManager.RawSymKey(filter.SymKeyID)
+	if err != nil {
 		return nil, err
 	}
 
+	encoded, err := t.encode(newMessage.Payload, symKey, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
+}
+
+func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	filter, err := t.filters.LoadPartitioned(publicKey, t.keysManager.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
-
-	return t.api.Post(ctx, *newMessage)
-}
-
-func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
+	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
+	if err != nil {
 		return nil, err
 	}
 
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
+}
+
+func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	filter, err := t.filters.LoadPersonal(publicKey, t.keysManager.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
+	if err != nil {
+		return nil, err
+	}
 
-	return t.api.Post(ctx, *newMessage)
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
 func (t *Transport) PersonalTopicFilter() *Filter {
@@ -377,21 +375,18 @@ func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
 }
 
 func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
-		return nil, err
-	}
-
 	// We load the filter to make sure we can post on it
 	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
+	if err != nil {
+		return nil, err
+	}
 
-	return t.api.Post(ctx, *newMessage)
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
 func (t *Transport) cleanFilters() error {
@@ -404,15 +399,15 @@ func (t *Transport) cleanFilters() error {
 	return t.filters.RemoveNoListenFilters()
 }
 
-func (t *Transport) addSig(newMessage *types.NewMessage) error {
-	sigID, err := t.keysManager.AddOrGetKeyPair(t.keysManager.privateKey)
-	if err != nil {
-		return err
-	}
-	newMessage.SigID = sigID
-	return nil
+// encode produces the WakuMessage version=1 payload for the given plaintext.
+// Exactly one of symKey or recipient must be non-nil. The message is always
+// signed with the local identity key.
+func (t *Transport) encode(payload []byte, symKey []byte, recipient *ecdsa.PublicKey) ([]byte, error) {
+	return rfc26.Encode(payload, symKey, recipient, t.keysManager.privateKey)
 }
 
+// Track records sent envelopes for delivery monitoring. It is the
+// single-identifier convenience wrapper around TrackMany.
 func (t *Transport) Track(identifier []byte, hashes [][]byte, newMessages []*types.NewMessage) {
 	t.TrackMany([][]byte{identifier}, hashes, newMessages)
 }
