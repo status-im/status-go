@@ -545,11 +545,6 @@ test-functional-compatibility: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional-compatibility: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
 test-functional-compatibility: export FUNCTIONAL_TESTS_MARKER := compatibility
 test-functional-compatibility: export FUNCTIONAL_TESTS_RERUNS := 1
-test-functional-compatibility: export PEER_REFS ?= $(if $(PEER_IMAGES),,$(shell git fetch --tags --quiet 2>/dev/null; \
-  git tag --sort=-v:refname 2>/dev/null \
-  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' \
-  | awk -F. '!seen[$$1"."$$2]++' \
-  | head -2 | paste -sd' ' -))
 test-functional-compatibility: ##@tests Cross-version chat compatibility smoke tests (set PEER_IMAGES or PEER_REFS)
 	@./scripts/run_functional_tests.sh
 
