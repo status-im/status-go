@@ -446,6 +446,11 @@ class WakuextService(Service):
         response = self.rpc_request("leaveCommunity", params)
         return response
 
+    def ban_user_from_community(self, community_id: str, user: str, delete_all_messages: bool = False):
+        params = [{"communityId": community_id, "user": user, "deleteAllMessages": delete_all_messages}]
+        response = self.rpc_request("banUserFromCommunity", params)
+        return response
+
     def set_light_client(self, enabled=True):
         params = [{"enabled": enabled}]
         response = self.rpc_request("setLightClient", params)

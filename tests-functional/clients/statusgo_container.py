@@ -26,7 +26,7 @@ class StatusGoContainer:
     container = None
     _port_lock = threading.Lock()  # Thread-safe port allocation for parallel backend creation
 
-    def __init__(self, cmd, ports=None, privileged=False, container_name_suffix=""):
+    def __init__(self, cmd, ports=None, privileged=False, container_name_suffix="", image=None):
         if ports is None:
             ports = {}
 
@@ -46,7 +46,7 @@ class StatusGoContainer:
         self.network_name = f"{docker_project_name}_default"
         git_commit = os.popen("git rev-parse --short HEAD").read().strip()
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
-        image_name = Config.docker_image or f"statusgo-{identifier}:latest"
+        image_name = image or Config.docker_image or f"statusgo-{identifier}:latest"
         self.container_name = f"{docker_project_name}-{identifier}{container_name_suffix}"
         coverage_path = Config.codecov_dir if Config.codecov_dir else os.path.abspath("./coverage/binary")
 
@@ -409,6 +409,7 @@ class PushNotificationServerContainer(StatusGoContainer):
 class StatusBackendContainer(StatusGoContainer):
     def __init__(self, privileged=False, ipv6=False, **kwargs):
         connector_enabled = kwargs.get("connector_enabled", False)
+        image = kwargs.get("image")
 
         self.ipv6 = ipv6
         self.ports = StatusPortsMappings(
@@ -428,7 +429,9 @@ class StatusBackendContainer(StatusGoContainer):
         self.url = f"http://{_localhost(ipv6)}:{self.ports.backend.host_port}"
         self.connector_ws_url = f"ws://{_localhost(ipv6)}:{self.ports.connector.host_port}" if self.ports.connector else ""
 
-        super().__init__(entrypoint, self.ports.ports(ipv6), privileged, container_name_suffix=f"-status-backend-{self.ports.backend.host_port}")
+        super().__init__(
+            entrypoint, self.ports.ports(ipv6), privileged, container_name_suffix=f"-status-backend-{self.ports.backend.host_port}", image=image
+        )
 
         if kwargs.get("bridge_network", False):
             self.connect_to_bridge_network()

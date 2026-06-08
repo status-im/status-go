@@ -1,0 +1,111 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.39'
+
+pipeline {
+  agent {
+    docker {
+      label 'linuxcontainer'
+      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
+      args '--volume=/nix:/nix ' +
+           '--volume=/etc/nix:/etc/nix ' +
+           '--volume=/var/run/docker.sock:/var/run/docker.sock ' +
+           '--network=host ' +
+           '--user jenkins'
+    }
+  }
+
+  parameters {
+    string(
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
+    string(
+      name: 'PEER_IMAGES',
+      defaultValue: '',
+      description: 'Space-separated peer (old release) backend images. Highest priority. ' +
+                   'Empty => resolved from PEER_REFS.'
+    )
+    string(
+      name: 'PEER_REFS',
+      defaultValue: '',
+      description: 'Space-separated git refs to resolve peer images from (e.g. "v10.33.0 v10.32.0"). ' +
+                   'Empty => 2 latest release tags.'
+    )
+    choice(
+      name: 'FUNCTIONAL_TESTS_LOG_LEVEL',
+      choices: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+      description: 'pytest log level'
+    )
+  }
+
+  options {
+    timestamps()
+    /* Prevent Jenkins jobs from running forever. Higher than tests-rpc: this job also
+       builds the peer (old release) backends from source before running the tests. */
+    timeout(time: 90, unit: 'MINUTES')
+    disableConcurrentBuilds()
+    disableRestartFromStage()
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '10',
+      daysToKeepStr: '30',
+      artifactNumToKeepStr: '10',
+      artifactDaysToKeepStr: '30',
+    ))
+  }
+
+  environment {
+    PLATFORM = 'tests-rpc-compat'
+    PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
+
+    /* Hack-fix for params not being set in env on first job run. */
+    BRANCH =                     "${params.BRANCH}"
+    PEER_IMAGES =                "${params.PEER_IMAGES}"
+    PEER_REFS =                  "${params.PEER_REFS}"
+    FUNCTIONAL_TESTS_LOG_LEVEL = "${params.FUNCTIONAL_TESTS_LOG_LEVEL}"
+    FUNCTIONAL_TESTS_CONTAINER_PREFIX = "${env.BUILD_TAG}"
+  }
+
+  stages {
+    stage('Compatibility Tests') {
+      steps { script {
+        withCredentials([
+          usernamePassword(
+            credentialsId: "api-proxy-devel",
+            usernameVariable: 'STATUS_BUILD_PROXY_USER',
+            passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
+          ),
+        ]) {
+          nix.develop('make test-functional-compatibility', pure: false)
+        }
+      } }
+    }
+  } // stages
+
+  post {
+    always {
+      script {
+        archiveArtifacts(
+          artifacts: 'tests-functional/reports/*.xml, tests-functional/logs/*.log',
+          allowEmptyArchive: true,
+        )
+        junit(
+          testResults: 'tests-functional/reports/*.xml',
+          skipOldReports: true,
+          skipPublishingChecks: true,
+          skipMarkingBuildUnstable: true,
+        )
+      }
+    }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    cleanup {
+      sh '''
+        docker ps -a --filter "name=${FUNCTIONAL_TESTS_CONTAINER_PREFIX}" -q | xargs -r docker rm -f
+      '''
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
+  } // post
+} // pipeline
