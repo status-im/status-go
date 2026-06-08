@@ -666,13 +666,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.messaging.SetStorenodeConfigProvider(m)
-
-	m.shutdownWaitGroup.Add(1)
-	go m.checkForMissingMessagesLoop()
-
-	m.shutdownWaitGroup.Add(1)
-	go m.checkForStorenodeCycleSignals()
+	m.messaging.SetStorenodes(response.StoreNodes)
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
@@ -684,15 +678,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		go func() {
 			defer gocommon.LogOnPanic()
 			defer m.shutdownWaitGroup.Done()
-
-			select {
-			case <-m.quit:
-				return
-			case <-m.ctx.Done():
-				return
-			case <-m.messaging.OnStorenodeAvailable():
-			}
-
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
 	}

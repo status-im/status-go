@@ -29,17 +29,13 @@ const (
 	oneDayDuration   = 24 * time.Hour
 	oneMonthDuration = 31 * oneDayDuration
 
-	backoffByUserAction = 0 * time.Second
-
 	historicSyncMinInterval = 20 * time.Second
 )
 
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
-	if !m.started ||
-		m.messaging.GetActiveStorenode().ID == "" ||
-		!m.Online() {
+	if !m.started || !m.Online() {
 		return false, nil
 	}
 
@@ -48,8 +44,15 @@ func (m *Messenger) shouldSync() (bool, error) {
 		m.logger.Error("failed to get use mailservers", zap.Error(err))
 		return false, err
 	}
+	if !useMailserver {
+		return false, nil
+	}
 
-	return useMailserver, nil
+	mailservers, err := m.AllMailservers()
+	if err != nil {
+		return false, err
+	}
+	return len(mailservers) > 0, nil
 }
 
 func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
@@ -308,39 +311,6 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 	}()
 
 	return fn()
-}
-
-const missingMessageCheckPeriod = 30 * time.Second
-
-func (m *Messenger) checkForMissingMessagesLoop() {
-	defer gocommon.LogOnPanic()
-	defer m.shutdownWaitGroup.Done()
-
-	t := time.NewTicker(missingMessageCheckPeriod)
-	defer t.Stop()
-
-	mailserverAvailableSignal := m.messaging.OnStorenodeAvailable()
-
-	for {
-		select {
-		case <-m.quit:
-			return
-
-		// Wait for mailserver available, also triggered on mailserver change
-		case <-mailserverAvailableSignal:
-
-		case <-t.C:
-
-		}
-
-		if m.isPaused() {
-			continue
-		}
-
-		filters := m.messaging.ChatFilters()
-		peerInfo := m.messaging.GetActiveStorenode()
-		m.messaging.SetCriteriaForMissingMessageVerification(peerInfo, filters)
-	}
 }
 
 func getPrioritizedBatches() []int {
@@ -742,8 +712,6 @@ func (m *Messenger) ToggleUseMailservers(value bool) error {
 	if err != nil {
 		return err
 	}
-
-	m.messaging.DisconnectActiveStorenode(m.ctx, backoffByUserAction, value)
 
 	return nil
 }
