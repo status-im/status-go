@@ -129,6 +129,59 @@ func TestReceivePushPath(t *testing.T) {
 	require.Empty(t, result)
 }
 
+// TestReceiveVersionZeroDecodesAsV1 covers the WakuMessage version-field
+// migration (status-im/status-go#7499): an incoming message whose payload is
+// rfc26-encrypted but whose envelope advertises version=0 must still be
+// decrypted on a keyed filter (treated the same as version=1), now that senders
+// advertise version=0. Previously version=0 was passed through as plaintext.
+func TestReceiveVersionZeroDecodesAsV1(t *testing.T) {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: migrations.AssetNames(), AssetFunc: migrations.Asset},
+	}))
+	require.NoError(t, err)
+
+	logger := testutils.MustCreateTestLogger()
+	defer func() { _ = logger.Sync() }()
+
+	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil, func([]byte, peer.AddrInfo, error) {}, nil)
+	require.NoError(t, err)
+
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	tr, err := NewTransport(waku, identity, NewSQLiteKeysPersistence(db), NewSQLiteProcessedMessageIDsCachePersistence(db), nil, logger)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tr.Stop() })
+
+	filter, err := tr.JoinPublic("test-public-chat")
+	require.NoError(t, err)
+
+	symKey, err := tr.keysManager.RawSymKey(filter.SymKeyID)
+	require.NoError(t, err)
+
+	payload := []byte("hello version zero")
+	encoded, err := rfc26.Encode(payload, symKey, nil, identity)
+	require.NoError(t, err)
+
+	// The payload is rfc26-encrypted but the envelope is labeled version=0.
+	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
+		Hash:         []byte{0xde, 0xad},
+		ContentTopic: filter.ContentTopic.ContentTopic(),
+		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		Payload:      encoded,
+		Version:      0,
+		Timestamp:    time.Now().UnixNano(),
+	})
+
+	result, err := tr.RetrieveRawAll()
+	require.NoError(t, err)
+
+	msgs := result[*filter]
+	require.Len(t, msgs, 1, "version=0 message should be decoded as WakuV1")
+	require.Equal(t, payload, msgs[0].Payload)
+	require.Equal(t, crypto.FromECDSAPub(&identity.PublicKey), msgs[0].Sig)
+}
+
 func TestCleanFiltersLoopPausesAndResumesByLifecycle(t *testing.T) {
 	originalInterval := cleanFiltersLoopInterval
 	cleanFiltersLoopInterval = 20 * time.Millisecond
