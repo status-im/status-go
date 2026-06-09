@@ -39,7 +39,12 @@ import (
 // ctx is accepted for symmetry with transport.MessagingAPI; the send queue
 // uses the waku instance's own lifecycle context.
 func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
-	var version uint32 = 1 // wire-format discriminator; v1 encryption is applied by the caller
+	// Phase 2 of the WakuMessage version-field migration (status-im/status-go#7499):
+	// advertise version=0 on the wire while the payload stays WakuV1-encoded by the
+	// caller (transport/rfc26.Encode). The wire label is decoupled from the encode
+	// version on purpose — receivers since Phase 1 (#7500, on develop via #7537)
+	// decode version=0 as WakuV1, and logos-delivery ignores the field entirely.
+	var version uint32 = 0 // wire-format discriminator; v1 encryption is applied by the caller
 	msg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      &version,
