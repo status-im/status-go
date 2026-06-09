@@ -287,14 +287,17 @@ func (t *Transport) filterKeys(filter *Filter) (symKey []byte, privKey *ecdsa.Pr
 	return nil, privKey, nil
 }
 
-// decode reverses the rfc26 payload codec using the filter's key material. A
-// WakuMessage with version==0 is unencrypted and passed through unchanged
-// (preserving prior reception behaviour).
+// decode reverses the rfc26 payload codec using the filter's key material.
+//
+// The WakuMessage `version` field is deliberately ignored here, as part of the
+// migration to retire it (status-im/status-go#7499): the rfc26 codec is
+// independent of `version`, and the caller only reaches this point with a
+// decryption key (keyless filters are skipped in handleReceivedMessage), so we
+// always decrypt. status-go only ever emitted version==1, so a keyed version==0
+// envelope is never genuine plaintext; once senders start advertising version==0
+// (a later migration step) those messages must still decrypt here. Previously
+// version==0 was passed through unencrypted — that phase-0 behaviour is removed.
 func (t *Transport) decode(msg *types.ReceivedMessage, symKey []byte, privKey *ecdsa.PrivateKey) (*rfc26.DecodedPayload, error) {
-	if msg.Version == 0 {
-		return &rfc26.DecodedPayload{Data: msg.Payload}, nil
-	}
-
 	keyInfo := &rfc26.KeyInfo{}
 	switch {
 	case privKey != nil:
