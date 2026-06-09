@@ -172,6 +172,11 @@ func (p *ProvidersHealthManager) ChainID() uint64 {
 	return p.chainID
 }
 
+// SetDownDebounce overrides the Down emission debounce window.
+func (p *ProvidersHealthManager) SetDownDebounce(d time.Duration) {
+	p.downDebounce = d
+}
+
 // emitChainStatus sends a notification to all subscribers.
 func (p *ProvidersHealthManager) emitChainStatus(ctx context.Context) {
 	if p.subscriptionManager == nil {
