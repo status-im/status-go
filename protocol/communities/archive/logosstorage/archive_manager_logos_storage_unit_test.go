@@ -5,6 +5,7 @@ package logosstorage_test
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type ArchiveManagerLogosStorageCancellationSuite struct {
+type ArchiveManagerLogosStorageMockSuite struct {
 	suite.Suite
 	ctrl             *gomock.Controller
 	mockLogosStorage *mocklogosstorage.MockLogosStorageClientInterface
@@ -36,7 +37,7 @@ type ArchiveManagerLogosStorageCancellationSuite struct {
 	manager          *communities.Manager
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) buildManagers() (*communities.Manager, archive.ArchiveService) {
+func (s *ArchiveManagerLogosStorageMockSuite) buildManagers() (*communities.Manager, archive.ArchiveService) {
 	db, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err, "creating sqlite db instance")
 	s.Require().NoError(sqlite.Migrate(db), "protocol migrate")
@@ -62,19 +63,19 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) buildManagers() (*communit
 	return m, archive.NewArchiveManager(amc)
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) getArchiveManager() *archive.ArchiveManager {
+func (s *ArchiveManagerLogosStorageMockSuite) getArchiveManager() *archive.ArchiveManager {
 	archiveManager, ok := s.archiveService.(*archive.ArchiveManager)
 	s.Require().True(ok)
 	return archiveManager
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) setDownloadTimeout(timeout time.Duration) {
+func (s *ArchiveManagerLogosStorageMockSuite) setDownloadTimeout(timeout time.Duration) {
 	backend, err := s.getArchiveManager().GetLogosStorageBackend()
 	s.Require().NoError(err, "Failed to get LogosStorage backend")
 	backend.SetDownloadTimeout(timeout)
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) SetupTest() {
+func (s *ArchiveManagerLogosStorageMockSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
 	s.mockLogosStorage = mocklogosstorage.NewMockLogosStorageClientInterface(s.ctrl)
 
@@ -88,12 +89,74 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) SetupTest() {
 	backend.SetLogosStorageClient(s.mockLogosStorage)
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) TearDownTest() {
+func (s *ArchiveManagerLogosStorageMockSuite) TearDownTest() {
 	s.ctrl.Finish()
 	s.Require().NoError(s.manager.Stop())
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellationBeforeIndexIsDownloaded() {
+func (s *ArchiveManagerLogosStorageMockSuite) TestSeedHistoryArchiveSkipsEmptyLink() {
+	communityID := types.HexBytes("seed-empty-link")
+
+	s.Require().NoError(s.archiveService.SeedHistoryArchive(communityID, ""))
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestSeedHistoryArchiveSkipsWhenNotStarted() {
+	backend, err := s.getArchiveManager().GetLogosStorageBackend()
+	s.Require().NoError(err, "Failed to get LogosStorage backend")
+	backend.SetLogosStorageClient(nil)
+
+	communityID := types.HexBytes("seed-not-started")
+
+	s.Require().NoError(s.archiveService.SeedHistoryArchive(communityID, "index-cid"))
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestSeedHistoryArchiveSkipsWhenAlreadySeeding() {
+	communityID := types.HexBytes("seed-already-seeding")
+	archiveLink := "index-cid"
+
+	s.mockLogosStorage.EXPECT().
+		HasCid(archiveLink).
+		Return(true, nil).
+		Times(1)
+
+	s.Require().NoError(s.archiveService.SeedHistoryArchive(communityID, archiveLink))
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestSeedHistoryArchiveTriggersDownloadWhenNotSeeding() {
+	communityID := types.HexBytes("seed-trigger-download")
+	archiveLink := "index-cid"
+
+	s.mockLogosStorage.EXPECT().
+		HasCid(archiveLink).
+		Return(false, nil).
+		Times(1)
+	s.mockLogosStorage.EXPECT().
+		TriggerDownload(archiveLink).
+		Return(logosstorage.LogosStorageManifest{Cid: archiveLink}, nil).
+		Times(1)
+
+	s.Require().NoError(s.archiveService.SeedHistoryArchive(communityID, archiveLink))
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestSeedHistoryArchiveReturnsTriggerDownloadError() {
+	communityID := types.HexBytes("seed-trigger-download-error")
+	archiveLink := "index-cid"
+	expectedErr := errors.New("trigger download failed")
+
+	s.mockLogosStorage.EXPECT().
+		HasCid(archiveLink).
+		Return(false, nil).
+		Times(1)
+	s.mockLogosStorage.EXPECT().
+		TriggerDownload(archiveLink).
+		Return(logosstorage.LogosStorageManifest{}, expectedErr).
+		Times(1)
+
+	err := s.archiveService.SeedHistoryArchive(communityID, archiveLink)
+	s.Require().ErrorIs(err, expectedErr)
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestMockDownloadCancellationBeforeIndexIsDownloaded() {
 	subscription := s.manager.Subscribe()
 
 	indexCid := "test-index-cid-xyz789"
@@ -142,7 +205,7 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellati
 	s.Require().False(indexDownloadCompletedReceived, "IndexDownloadCompletedSignal should not be received when cancelled early")
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellationDuringIndexDownload() {
+func (s *ArchiveManagerLogosStorageMockSuite) TestMockDownloadCancellationDuringIndexDownload() {
 	subscription := s.manager.Subscribe()
 
 	archiveData := make([]byte, 1024)
@@ -201,7 +264,7 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellati
 	s.Require().False(indexDownloadCompletedReceived, "Should NOT have received IndexDownloadCompletedSignal when download is cancelled")
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellationDuringArchiveDownload() {
+func (s *ArchiveManagerLogosStorageMockSuite) TestMockDownloadCancellationDuringArchiveDownload() {
 	subscription := s.manager.Subscribe()
 
 	archives := []struct {
@@ -323,7 +386,7 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellati
 	s.Require().Equal(1, taskInfo.TotalDownloadedArchivesCount, "Should have downloaded exactly 1 archive")
 }
 
-func (s *ArchiveManagerLogosStorageCancellationSuite) TestDownloadDoesNotAbortWhenExistingAndIncomingArchiveCountsMatchButHashesDiffer() {
+func (s *ArchiveManagerLogosStorageMockSuite) TestDownloadDoesNotAbortWhenExistingAndIncomingArchiveCountsMatchButHashesDiffer() {
 	indexCid := "test-index-cid-same-count-different-hash"
 	communityID := types.HexBytes("mock-same-count-different-hash")
 	cancelChan := make(chan struct{})
@@ -372,6 +435,6 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) TestDownloadDoesNotAbortWh
 	s.Require().ElementsMatch([]string{"archive-1", "archive-2"}, downloadedArchiveIDs)
 }
 
-func TestArchiveManagerLogosStorageCancellationSuite(t *testing.T) {
-	suite.Run(t, new(ArchiveManagerLogosStorageCancellationSuite))
+func TestArchiveManagerLogosStorageMockSuite(t *testing.T) {
+	suite.Run(t, new(ArchiveManagerLogosStorageMockSuite))
 }
