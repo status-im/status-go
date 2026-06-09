@@ -691,6 +691,12 @@ func (s *ServerSuite) TestBuildPushNotificationReport() {
 		ChatId:      chatID,
 		AccessToken: accessToken,
 	}
+	validContactRequestPN := &protobuf.PushNotification{
+		Type:        protobuf.PushNotification_CONTACT_REQUEST,
+		ChatId:      chatID,
+		Author:      author,
+		AccessToken: accessToken,
+	}
 	validRegistration := &protobuf.PushNotificationRegistration{
 		AccessToken:             accessToken,
 		BlockedChatList:         blockedChatList,
@@ -725,6 +731,17 @@ func (s *ServerSuite) TestBuildPushNotificationReport() {
 		{
 			name:         "valid mention",
 			pn:           validMentionPN,
+			registration: validRegistration,
+			expectedResponse: &reportResult{
+				sendNotification: true,
+				report: &protobuf.PushNotificationReport{
+					Success: true,
+				},
+			},
+		},
+		{
+			name:         "valid contact request",
+			pn:           validContactRequestPN,
 			registration: validRegistration,
 			expectedResponse: &reportResult{
 				sendNotification: true,
@@ -872,6 +889,22 @@ func (s *ServerSuite) TestBuildPushNotificationReport() {
 			name: "blocked chat list mention",
 			pn: &protobuf.PushNotification{
 				Type:        protobuf.PushNotification_MENTION,
+				Author:      blockedAuthor,
+				ChatId:      chatID,
+				AccessToken: accessToken,
+			},
+			registration: validRegistration,
+			expectedResponse: &reportResult{
+				sendNotification: false,
+				report: &protobuf.PushNotificationReport{
+					Success: true,
+				},
+			},
+		},
+		{
+			name: "blocked contact request author",
+			pn: &protobuf.PushNotification{
+				Type:        protobuf.PushNotification_CONTACT_REQUEST,
 				Author:      blockedAuthor,
 				ChatId:      chatID,
 				AccessToken: accessToken,
