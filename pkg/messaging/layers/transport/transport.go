@@ -86,11 +86,13 @@ type Transport struct {
 	cleanFiltersFn   func() error
 	quit             chan struct{}
 
-	// received buffers decoded messages pushed from the waku adapter, keyed by
-	// FilterID, until RetrieveRawAll drains them. It replaces the per-filter
-	// buffer the waku adapter used to keep.
+	// received buffers decoded messages pushed from the waku adapter until
+	// RetrieveRawAll drains them. It is keyed by FilterID and then by message
+	// hash so that the same envelope pushed more than once before a drain is
+	// stored only once — mirroring the hash-keyed per-filter store the waku
+	// adapter used to keep (the persistent cache only dedups across drains).
 	receivedMu sync.Mutex
-	received   map[string][]*types.Message
+	received   map[string]map[string]*types.Message
 
 	// matchedPublisher notifies subscribers (the messenger's retrieve loop)
 	// whenever a received message matched at least one listening filter.
@@ -170,7 +172,7 @@ func NewTransport(
 		},
 		filters:          filtersManager,
 		logger:           logger.With(zap.Namespace("Transport")),
-		received:         make(map[string][]*types.Message),
+		received:         make(map[string]map[string]*types.Message),
 		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
 	}
 
@@ -254,8 +256,14 @@ func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
 			continue
 		}
 
+		message := toMessage(decoded, filter, msg, privKey)
 		t.receivedMu.Lock()
-		t.received[filter.FilterID] = append(t.received[filter.FilterID], toMessage(decoded, filter, msg, privKey))
+		byHash := t.received[filter.FilterID]
+		if byHash == nil {
+			byHash = make(map[string]*types.Message)
+			t.received[filter.FilterID] = byHash
+		}
+		byHash[types2.EncodeHex(message.Hash)] = message
 		t.receivedMu.Unlock()
 		matched = true
 	}
@@ -405,11 +413,11 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 
 	t.receivedMu.Lock()
 	drained := t.received
-	t.received = make(map[string][]*types.Message)
+	t.received = make(map[string]map[string]*types.Message)
 	t.receivedMu.Unlock()
 
-	for filterID, msgs := range drained {
-		if len(msgs) == 0 {
+	for filterID, byHash := range drained {
+		if len(byHash) == 0 {
 			continue
 		}
 
@@ -419,9 +427,9 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			continue
 		}
 
-		ids := make([]string, len(msgs))
-		for i := range msgs {
-			ids[i] = types2.EncodeHex(msgs[i].Hash)
+		ids := make([]string, 0, len(byHash))
+		for id := range byHash {
+			ids = append(ids, id)
 		}
 
 		hits, err := t.cache.Hits(ids)
@@ -430,13 +438,13 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			return nil, err
 		}
 
-		for i := range msgs {
+		for _, id := range ids {
 			// Exclude anything the processed-message cache has already seen.
-			if !hits[ids[i]] {
-				result[*filter] = append(result[*filter], msgs[i])
-				logger.Debug("message not cached", zap.String("hash", ids[i]))
+			if !hits[id] {
+				result[*filter] = append(result[*filter], byHash[id])
+				logger.Debug("message not cached", zap.String("hash", id))
 			} else {
-				logger.Debug("message cached", zap.String("hash", ids[i]))
+				logger.Debug("message cached", zap.String("hash", id))
 			}
 		}
 	}
