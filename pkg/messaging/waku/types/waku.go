@@ -15,7 +15,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/internal/connection"
 )
@@ -38,11 +37,6 @@ func (m PeerStats) MarshalJSON() ([]byte, error) {
 type WakuV2Peer struct {
 	Protocols []protocol.ID         `json:"protocols"`
 	Addresses []multiaddr.Multiaddr `json:"addresses"`
-}
-
-type PeerList struct {
-	FullMeshPeers peer.IDSlice `json:"fullMesh"`
-	AllPeers      peer.IDSlice `json:"all"`
 }
 
 type ConnStatusSubscription struct {
@@ -118,12 +112,8 @@ type Waku interface {
 	// PeerCount
 	PeerCount() int
 
-	ListenAddresses() ([]multiaddr.Multiaddr, error)
-
-	RelayPeersByTopic(topic string) (*PeerList, error)
-
-	ENR() (*enode.Node, error)
-
+	// Peers is retained only for the Python functional tests (see tests-functional);
+	// it is not used by status-app.
 	Peers() PeerStats
 
 	StartDiscV5() error
@@ -134,25 +124,9 @@ type Waku interface {
 
 	UnsubscribeFromPubsubTopic(topic string) error
 
-	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
-
-	DialPeer(address multiaddr.Multiaddr) error
-
-	DialPeerByID(peerID peer.ID) error
-
-	DropPeer(peerID peer.ID) error
-
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
 	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
-
-	// MinPow returns the PoW value required by this node.
-	MinPow() float64
-	// BloomFilter returns the aggregated bloom filter for all the topics of interest.
-	// The nodes are required to send only messages that match the advertised bloom filter.
-	// If a message does not match the bloom, it will tantamount to spam, and the peer will
-	// be disconnected.
-	BloomFilter() []byte
 
 	// GetCurrentTime returns current time.
 	GetCurrentTime() uint64
@@ -171,8 +145,6 @@ type Waku interface {
 	DeleteSymKey(id string) bool
 	GetSymKey(id string) ([]byte, error)
 	MaxMessageSize() uint32
-
-	GetStats() StatsSummary
 
 	Subscribe(opts *SubscriptionOptions) (string, error)
 	GetFilter(id string) Filter

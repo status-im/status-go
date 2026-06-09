@@ -74,7 +74,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
@@ -616,14 +615,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses connect, so it will execute identify as part of its
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
-}
-
-func (w *Waku) GetStats() types.StatsSummary {
-	stats := w.bandwidthCounter.GetBandwidthTotals()
-	return types.StatsSummary{
-		UploadRate:   uint64(stats.RateOut),
-		DownloadRate: uint64(stats.RateIn),
-	}
 }
 
 func (w *Waku) runPeerExchangeLoop() {
@@ -1581,32 +1572,10 @@ func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }
 
+// Peers is retained only for the Python functional tests (see tests-functional);
+// it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
-}
-
-func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
-	if w.cfg.LightClient {
-		return nil, errors.New("only available in relay mode")
-	}
-
-	return &types.PeerList{
-		FullMeshPeers: w.node.Relay().PubSub().MeshPeers(topic),
-		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
-	}, nil
-}
-
-func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return w.node.ListenAddresses(), nil
-}
-
-func (w *Waku) ENR() (*enode.Node, error) {
-	enr := w.node.ENR()
-	if enr == nil {
-		return nil, errors.New("enr not available")
-	}
-
-	return enr, nil
 }
 
 func (w *Waku) SubscribeToPubsubTopic(topic string) error {
@@ -1887,30 +1856,6 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
-}
-
-func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer([]multiaddr.Multiaddr{address}, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
-	if err != nil {
-		return "", err
-	}
-	return peerID, nil
-}
-
-func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-	defer cancel()
-	return w.node.DialPeerWithMultiAddress(ctx, address)
-}
-
-func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-	defer cancel()
-	return w.node.DialPeerByID(ctx, peerID)
-}
-
-func (w *Waku) DropPeer(peerID peer.ID) error {
-	return w.node.ClosePeerById(peerID)
 }
 
 func (w *Waku) Clean() error {

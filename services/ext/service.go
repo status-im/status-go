@@ -243,22 +243,7 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	s.MarkStarted()
 	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
 
-	if s.config.ShhextConfig.BandwidthStatsEnabled {
-		go s.retrieveStats(5*time.Second, s.cancelMessenger)
-	}
-
 	return response, nil
-}
-
-func (s *Service) retrieveStats(tick time.Duration, cancel <-chan struct{}) {
-	defer gocommon.LogOnPanic()
-	sub := s.PauseBroadcaster.Subscribe()
-	defer sub.Unsubscribe()
-	pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
-		Interval: tick,
-		OnTick:   func() { PublisherSignalHandler{}.Stats(s.messenger.GetStats()) },
-	}, sub.C())
-	pt.Run(cancel)
 }
 
 func (s *Service) EnableInstallation(installationID string) error {

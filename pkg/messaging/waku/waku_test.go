@@ -59,7 +59,7 @@ func TestDiscoveryV5(t *testing.T) {
 	require.NoError(t, w.Start())
 
 	err = testutils.RetryWithBackOff(func() error {
-		if len(w.Peers()) == 0 {
+		if w.PeerCount() == 0 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -67,7 +67,7 @@ func TestDiscoveryV5(t *testing.T) {
 
 	require.NoError(t, err)
 
-	require.NotEqual(t, 0, len(w.Peers()))
+	require.NotEqual(t, 0, w.PeerCount())
 	require.NoError(t, w.Stop())
 }
 
@@ -91,7 +91,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = testutils.RetryWithBackOff(func() error {
-		if len(w.Peers()) == 0 {
+		if w.PeerCount() == 0 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -106,7 +106,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	}
 
 	err = testutils.RetryWithBackOff(func() error {
-		if len(w.Peers()) == 0 {
+		if w.PeerCount() == 0 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -114,30 +114,8 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, w.seededBootnodesForDiscV5)
-	require.NotEqual(t, 0, len(w.Peers()))
+	require.NotEqual(t, 0, w.PeerCount())
 	require.NoError(t, w.Stop())
-}
-
-func TestRelayPeers(t *testing.T) {
-	config := &Config{
-		EnableMissingMessageVerification: true,
-	}
-	setDefaultConfig(config, false)
-	w, err := New(nil, config, nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, w.Start())
-	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
-	require.NoError(t, err)
-
-	// Ensure function returns an error for lightclient
-	config = &Config{}
-	config.ClusterID = 16
-	config.LightClient = true
-	w, err = New(nil, config, nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, w.Start())
-	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
-	require.Error(t, err)
 }
 
 func parseNodes(rec []string) []*enode.Node {
