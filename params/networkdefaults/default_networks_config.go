@@ -323,7 +323,9 @@ var defaultNetworkSpecs = []networkSpec{
 		proxyNetworkName: "mainnet",
 		chainName:        "Katana",
 		providers: []providerSpec{
-			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://rpc.katana.network"), enableRpsLimiter: true},
+			{providerType: providerTypeDirect, name: common.DirectKatana, directURL: security.NewSensitiveString("https://rpc.katana.network"), enableRpsLimiter: true},
+			{providerType: providerTypeDirect, name: common.DirectConduit, directURL: security.NewSensitiveString("https://rpc.katanarpc.com"), enableRpsLimiter: true},
+			{providerType: providerTypeDirect, name: common.DirectTenderly, directURL: security.NewSensitiveString("https://katana.gateway.tenderly.co"), enableRpsLimiter: true},
 		},
 		blockExplorerURL:       "https://katanascan.com/",
 		chainColor:             "#F6FF0D",
@@ -344,10 +346,9 @@ var defaultNetworkSpecs = []networkSpec{
 		proxyNetworkName: "bokuto",
 		chainName:        "Katana Bokuto",
 		providers: []providerSpec{
-			{providerType: providerTypeEthRpcProxy, name: common.StatusSmartProxy},
-			// no support for katana on infura
-			// no support for katana on alchemy
-			{providerType: providerTypeDirect, name: common.DirectCustom, directURL: security.NewSensitiveString("https://rpc-bokuto.katanarpc.com"), enableRpsLimiter: true},
+			// no support for katana on infura or alchemy
+			{providerType: providerTypeDirect, name: common.DirectConduit, directURL: security.NewSensitiveString("https://rpc-bokuto.katanarpc.com"), enableRpsLimiter: true},
+			{providerType: providerTypeDirect, name: common.DirectTenderly, directURL: security.NewSensitiveString("https://katana-bokuto.gateway.tenderly.co"), enableRpsLimiter: true},
 		},
 		blockExplorerURL:       "https://bokuto.katanascan.com/",
 		chainColor:             "#F6FF0D",
