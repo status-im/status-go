@@ -19,9 +19,17 @@ type ProvidersHealthManagerSuite struct {
 	phm *ProvidersHealthManager
 }
 
+// newTestProvidersHealthManager builds a ProvidersHealthManager with a short Down debounce for tests.
+func newTestProvidersHealthManager(chainID uint64) *ProvidersHealthManager {
+	phm := NewProvidersHealthManager(chainID)
+	phm.downDebounce = 20 * time.Millisecond
+	return phm
+}
+
 // SetupTest initializes the ProvidersHealthManager before each test
 func (s *ProvidersHealthManagerSuite) SetupTest() {
 	s.phm = NewProvidersHealthManager(1)
+	s.phm.downDebounce = 20 * time.Millisecond
 }
 
 // Helper method to update providers and wait for a notification on the given channel
@@ -260,6 +268,84 @@ func (s *ProvidersHealthManagerSuite) TestReset() {
 
 	// Verify chain ID remains the same
 	s.Equal(uint64(1), s.phm.ChainID(), "Chain ID should remain unchanged after reset")
+}
+
+// expectNotification fails if no notification arrives on ch within timeout.
+func (s *ProvidersHealthManagerSuite) expectNotification(ch <-chan struct{}, timeout time.Duration) {
+	select {
+	case <-ch:
+	case <-time.After(timeout):
+		s.Fail("Timeout waiting for chain status notification")
+	}
+}
+
+// expectNoNotification fails if any notification arrives on ch within timeout.
+func (s *ProvidersHealthManagerSuite) expectNoNotification(ch <-chan struct{}, timeout time.Duration) {
+	select {
+	case <-ch:
+		s.Fail("Unexpected chain status notification")
+	case <-time.After(timeout):
+	}
+}
+
+func downStatus(name string) []rpcstatus.RpcProviderCallStatus {
+	return []rpcstatus.RpcProviderCallStatus{{Name: name, Timestamp: time.Now(), Err: errors.New("critical error")}}
+}
+
+func upStatus(name string) []rpcstatus.RpcProviderCallStatus {
+	return []rpcstatus.RpcProviderCallStatus{{Name: name, Timestamp: time.Now(), Err: nil}}
+}
+
+func (s *ProvidersHealthManagerSuite) TestDownEmissionIsDebounced() {
+	s.phm.downDebounce = 150 * time.Millisecond
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNotification(ch, time.Second)
+	s.assertChainStatus(rpcstatus.StatusUp)
+
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	s.assertChainStatus(rpcstatus.StatusDown)
+	s.expectNoNotification(ch, 50*time.Millisecond)
+
+	s.expectNotification(ch, time.Second)
+	s.assertChainStatus(rpcstatus.StatusDown)
+
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	s.expectNoNotification(ch, 50*time.Millisecond)
+}
+
+func (s *ProvidersHealthManagerSuite) TestShortDownDoesNotEmit() {
+	s.phm.downDebounce = 300 * time.Millisecond
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNotification(ch, time.Second)
+
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	time.Sleep(50 * time.Millisecond)
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+
+	s.expectNoNotification(ch, 400*time.Millisecond)
+	s.assertChainStatus(rpcstatus.StatusUp)
+}
+
+func (s *ProvidersHealthManagerSuite) TestRecoveryEmitsImmediately() {
+	s.phm.downDebounce = 100 * time.Millisecond
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNotification(ch, time.Second)
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	s.expectNotification(ch, time.Second)
+	s.assertChainStatus(rpcstatus.StatusDown)
+
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNotification(ch, 50*time.Millisecond)
+	s.assertChainStatus(rpcstatus.StatusUp)
 }
 
 func TestProvidersHealthManagerSuite(t *testing.T) {
