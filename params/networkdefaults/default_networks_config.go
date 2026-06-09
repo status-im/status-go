@@ -72,10 +72,10 @@ var defaultNetworkSpecs = []networkSpec{
 		nativeCurrencyDecimals: 18,
 		isTest:                 true,
 		layer:                  1,
-		enabled:                false,
+		enabled:                true,
 		relatedChainID:         common.EthereumMainnet,
-		isActive:               false,
-		isDeactivatable:        true,
+		isActive:               true,
+		isDeactivatable:        false,
 	},
 	{
 		chainID:          common.OptimismMainnet,
