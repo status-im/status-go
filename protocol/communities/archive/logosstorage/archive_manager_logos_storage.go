@@ -1,5 +1,4 @@
 //go:build !disable_history_archives && use_logos_storage
-// +build !disable_history_archives,use_logos_storage
 
 package logosstorage
 
@@ -387,11 +386,9 @@ func (m *ArchiveManagerLogosStorage) CreateHistoryArchiveFromDB(communityID cryp
 func (m *ArchiveManagerLogosStorage) CreateAndSeedHistoryArchive(communityID cryptotypes.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	lastSeenArchiveLink, err := m.persistence.GetLastSeenArchiveLink(communityID)
 	if err != nil {
-		m.UnseedHistoryArchive(communityID, lastSeenArchiveLink)
+		m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] failed to get last seen archive link - proceeding without un-seeding", zap.Error(err))
 	} else {
-		if err != nil {
-			m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] failed to get last seen archive link - proceeding without un-seeding", zap.Error(err))
-		}
+		m.UnseedHistoryArchive(communityID, lastSeenArchiveLink)
 	}
 	archiveCreatedSuccessfully := true
 	archiveIDs, err := m.CreateHistoryArchiveFromDB(communityID, topics, startDate, endDate, partition, encrypt)
@@ -570,10 +567,7 @@ func (m *ArchiveManagerLogosStorage) createHistoryArchiveLogosStorage(communityI
 		zap.Any("endDate", endDate),
 		zap.Duration("partition", partition),
 	)
-	for {
-		if from.Equal(endDate) || from.After(endDate) {
-			break
-		}
+	for from.Before(endDate) {
 		m.logger.Debug("creating message archive",
 			zap.Any("from", from),
 			zap.Any("to", to),
@@ -775,6 +769,7 @@ func (m *ArchiveManagerLogosStorage) createWakuMessageArchive(from time.Time, to
 // These functions are not part of the ArchiveServiceBackend interface.
 // We still have some tests that are accessing implementation details and for this reason
 // we need to expose these special accessors.
+
 func (m *ArchiveManagerLogosStorage) GetClient() logosstorage.LogosStorageClientInterface {
 	return m.GetLogosStorageClient()
 }

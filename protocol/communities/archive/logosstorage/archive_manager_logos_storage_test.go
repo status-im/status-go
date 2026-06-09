@@ -1,5 +1,4 @@
 //go:build use_logos_storage
-// +build use_logos_storage
 
 package logosstorage_test
 

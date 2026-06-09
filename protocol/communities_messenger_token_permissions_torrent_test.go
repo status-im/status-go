@@ -1,5 +1,4 @@
 //go:build use_torrent
-// +build use_torrent
 
 package protocol
 

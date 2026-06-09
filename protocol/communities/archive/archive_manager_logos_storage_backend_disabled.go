@@ -1,5 +1,4 @@
 //go:build !disable_history_archives && !use_logos_storage
-// +build !disable_history_archives,!use_logos_storage
 
 package archive
 

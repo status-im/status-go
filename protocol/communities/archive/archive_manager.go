@@ -1,6 +1,5 @@
 //go:build !disable_history_archives
 
-// // +build !disable_history_archives
 package archive
 
 import (
@@ -238,7 +237,6 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID cr
 
 func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID cryptotypes.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	err := m.backend.CreateAndSeedHistoryArchive(communityID, topics, startDate, endDate, partition, encrypt)
-
 	if err != nil {
 		m.logger.Error("failed to create and seed history archive", zap.Error(err))
 		return err
@@ -384,7 +382,7 @@ func (m *ArchiveManager) SetMessageArchiveIDImported(communityID cryptotypes.Hex
 func (m *ArchiveManager) GetHistoryTasksCount() int {
 	// sync.Map doesn't have a Len function, so we need to count manually
 	count := 0
-	m.historyArchiveTasks.Range(func(_, _ interface{}) bool {
+	m.historyArchiveTasks.Range(func(_, _ any) bool {
 		count++
 		return true
 	})
@@ -393,7 +391,7 @@ func (m *ArchiveManager) GetHistoryTasksCount() int {
 
 // private methods
 func (m *ArchiveManager) stopHistoryArchiveTasksIntervals() {
-	m.historyArchiveTasks.Range(func(_, task interface{}) bool {
+	m.historyArchiveTasks.Range(func(_, task any) bool {
 		close(task.(chan struct{})) // Need to cast to the chan
 		return true
 	})

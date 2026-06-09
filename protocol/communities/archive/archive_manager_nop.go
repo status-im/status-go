@@ -1,5 +1,4 @@
 //go:build disable_history_archives
-// +build disable_history_archives
 
 package archive
 

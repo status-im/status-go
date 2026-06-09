@@ -1,5 +1,4 @@
 //go:build !disable_history_archives && !use_torrent
-// +build !disable_history_archives,!use_torrent
 
 package archive
 
