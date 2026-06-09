@@ -1,50 +1,28 @@
 package wakuv2
 
 import (
-	"context"
 	"math/rand"
-	"net"
-	"runtime"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// bootstrapDNS overrides the system resolver on mobile, where DNS resolution is
-// unreliable (status-mobile #19581).
-const bootstrapDNS = "8.8.8.8:53"
-
-var overrideDNS = runtime.GOOS == "android" || runtime.GOOS == "ios"
-
-var dnsOverrideOnce sync.Once
-
-func applyMobileDNSOverride() {
-	if !overrideDNS {
-		return
-	}
-	dnsOverrideOnce.Do(func() {
-		var dialer net.Dialer
-		net.DefaultResolver = &net.Resolver{
-			PreferGo: false,
-			Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return dialer.DialContext(ctx, "udp", bootstrapDNS)
-			},
-		}
-	})
-}
+// storeFailureBackoff is how long a storenode is deprioritized after a failed query.
+const storeFailureBackoff = 2 * time.Minute
 
 // storeSelector hands out storenodes to query. With no health checks there is no
-// "active"/"available" node and no background cycle: it simply holds the
-// configured list (set once) and offers candidates in random order so a query can
-// fail over from one node to the next.
+// "active"/"available" node and no background cycle: it holds the configured list
+// (set once) and offers candidates in random order, deprioritizing nodes that
+// recently failed a query so a healthy node is tried first.
 type storeSelector struct {
-	mu    sync.RWMutex
-	nodes []peer.AddrInfo
+	mu           sync.RWMutex
+	nodes        []peer.AddrInfo
+	backoffUntil map[peer.ID]time.Time
 }
 
 func newStoreSelector() *storeSelector {
-	applyMobileDNSOverride()
-	return &storeSelector{}
+	return &storeSelector{backoffUntil: make(map[peer.ID]time.Time)}
 }
 
 // setStorenodes replaces the candidate list. Called once at startup.
@@ -60,14 +38,38 @@ func (s *storeSelector) hasStorenodes() bool {
 	return len(s.nodes) > 0
 }
 
-// candidates returns the storenodes to try for one query, shuffled so load is
-// spread and so Query can attempt them in turn until one answers.
+// markFailure deprioritizes a storenode for storeFailureBackoff after a failed query.
+func (s *storeSelector) markFailure(id peer.ID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.backoffUntil[id] = time.Now().Add(storeFailureBackoff)
+}
+
+// markSuccess clears any backoff for a storenode after a successful query.
+func (s *storeSelector) markSuccess(id peer.ID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.backoffUntil, id)
+}
+
+// candidates returns the storenodes to try for one query: nodes not in failure
+// backoff first (shuffled to spread load), then recently-failed nodes (also
+// shuffled) as a last resort — so Query prefers healthy nodes but can still fall
+// back when every node has failed recently.
 func (s *storeSelector) candidates() []peer.AddrInfo {
 	s.mu.RLock()
-	nodes := make([]peer.AddrInfo, len(s.nodes))
-	copy(nodes, s.nodes)
+	now := time.Now()
+	var ready, backedOff []peer.AddrInfo
+	for _, n := range s.nodes {
+		if until, ok := s.backoffUntil[n.ID]; ok && now.Before(until) {
+			backedOff = append(backedOff, n)
+		} else {
+			ready = append(ready, n)
+		}
+	}
 	s.mu.RUnlock()
 
-	rand.Shuffle(len(nodes), func(i, j int) { nodes[i], nodes[j] = nodes[j], nodes[i] })
-	return nodes
+	rand.Shuffle(len(ready), func(i, j int) { ready[i], ready[j] = ready[j], ready[i] })
+	rand.Shuffle(len(backedOff), func(i, j int) { backedOff[i], backedOff[j] = backedOff[j], backedOff[i] })
+	return append(ready, backedOff...)
 }

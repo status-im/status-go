@@ -12,6 +12,8 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+
+	gocommon "github.com/status-im/status-go/common"
 )
 
 const (
@@ -20,7 +22,8 @@ const (
 	// maxStoreRequestWindow caps a single request's time range; larger ranges are
 	// walked one window at a time, newest first.
 	maxStoreRequestWindow = 24 * time.Hour
-	// maxConcurrentStoreRequests bounds in-flight requests within one Query.
+	// maxConcurrentStoreRequests bounds in-flight store requests across the whole
+	// pager (shared by every concurrent Query, not per-Query).
 	maxConcurrentStoreRequests = 3
 	storeRequestTimeout        = 30 * time.Second
 )
@@ -40,6 +43,10 @@ type storePager struct {
 	requestor storeRequestor
 	processor envelopeProcessor
 	logger    *zap.Logger
+
+	// sem bounds concurrent store requests across all run calls (a single pager
+	// instance is shared by every Query), not just within one run.
+	sem chan struct{}
 }
 
 func newStorePager(requestor storeRequestor, processor envelopeProcessor, logger *zap.Logger) *storePager {
@@ -47,13 +54,19 @@ func newStorePager(requestor storeRequestor, processor envelopeProcessor, logger
 		requestor: requestor,
 		processor: processor,
 		logger:    logger.Named("store-pager"),
+		sem:       make(chan struct{}, maxConcurrentStoreRequests),
 	}
 }
 
 // run fetches [from,to] for pubsubTopic+contentTopics from peerInfo. pageLimit is
 // the first page size; shouldProcessNextPage (may be nil) decides per page whether
 // to continue and with which size; processEnvelopes controls synchronous handling.
-// Content-topic chunks are fetched concurrently; the first error aborts the rest.
+//
+// Content-topic chunks are fetched concurrently, EXCEPT when shouldProcessNextPage
+// is set: an early-stop callback is stateful (it tracks what it has found and
+// mutates the page size), so chunks then run sequentially to keep its semantics
+// deterministic. Either way, the pager-wide semaphore bounds total in-flight
+// requests.
 func (p *storePager) run(
 	ctx context.Context,
 	peerInfo peer.AddrInfo,
@@ -64,28 +77,33 @@ func (p *storePager) run(
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
+	chunks := chunkContentTopics(contentTopics, maxContentTopicsPerRequest)
+
+	// Sequential when the caller needs ordered early-stop semantics, or when
+	// there is nothing to parallelize.
+	if shouldProcessNextPage != nil || len(chunks) <= 1 {
+		for _, chunk := range chunks {
+			if err := p.fetchChunkBounded(ctx, peerInfo, pubsubTopic, chunk, from, to, pageLimit, shouldProcessNextPage, processEnvelopes); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var (
 		wg       sync.WaitGroup
-		sem      = make(chan struct{}, maxConcurrentStoreRequests)
 		mu       sync.Mutex
 		firstErr error
 	)
-
-	for _, chunk := range chunkContentTopics(contentTopics, maxContentTopicsPerRequest) {
+	for _, chunk := range chunks {
 		wg.Add(1)
 		go func(contentTopics []string) {
+			defer gocommon.LogOnPanic()
 			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
-				return
-			}
-
-			if err := p.fetchChunk(ctx, peerInfo, pubsubTopic, contentTopics, from, to, pageLimit, shouldProcessNextPage, processEnvelopes); err != nil {
+			if err := p.fetchChunkBounded(ctx, peerInfo, pubsubTopic, contentTopics, from, to, pageLimit, shouldProcessNextPage, processEnvelopes); err != nil {
 				mu.Lock()
 				if firstErr == nil {
 					firstErr = err
@@ -98,6 +116,26 @@ func (p *storePager) run(
 
 	wg.Wait()
 	return firstErr
+}
+
+// fetchChunkBounded acquires the pager-wide concurrency slot, then paginates the chunk.
+func (p *storePager) fetchChunkBounded(
+	ctx context.Context,
+	peerInfo peer.AddrInfo,
+	pubsubTopic string,
+	contentTopics []string,
+	from, to time.Time,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	select {
+	case p.sem <- struct{}{}:
+		defer func() { <-p.sem }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return p.fetchChunk(ctx, peerInfo, pubsubTopic, contentTopics, from, to, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 // fetchChunk paginates one content-topic chunk over [from,to], newest <=24h window

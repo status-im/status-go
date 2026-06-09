@@ -69,6 +69,27 @@ func TestStoreSelectorCandidates(t *testing.T) {
 	require.ElementsMatch(t, nodes, s.candidates())
 }
 
+func TestStoreSelectorDownScoresFailedNode(t *testing.T) {
+	s := newStoreSelector()
+	s.setStorenodes([]peer.AddrInfo{{ID: "a"}, {ID: "b"}, {ID: "c"}})
+
+	// A failed node falls to the back of the candidate list but stays present as a fallback.
+	s.markFailure("b")
+	got := s.candidates()
+	require.Len(t, got, 3)
+	require.Equal(t, peer.ID("b"), got[len(got)-1].ID)
+
+	// With only one node not in backoff, it is always offered first.
+	s.markFailure("a")
+	require.Equal(t, peer.ID("c"), s.candidates()[0].ID)
+
+	// A successful query clears the backoff, so that node is no longer forced last.
+	s.markSuccess("a")
+	got = s.candidates()
+	require.Equal(t, peer.ID("b"), got[len(got)-1].ID)
+	require.NotEqual(t, peer.ID("b"), got[0].ID)
+}
+
 // --- chunking ---
 
 func TestChunkContentTopics(t *testing.T) {

@@ -78,11 +78,13 @@ func (sc *StoreClient) Query(
 		}
 		err := sc.pager.run(ctx, node, pubsubTopic, contentTopics, batch.From, batch.To, pageLimit, shouldProcessNextPage, processEnvelopes)
 		if err == nil {
+			sc.selector.markSuccess(node.ID)
 			return nil
 		}
 		if ctx.Err() != nil {
 			return err // caller cancelled — don't keep trying
 		}
+		sc.selector.markFailure(node.ID)
 		lastErr = err
 		sc.logger.Debug("store query failed, trying next storenode",
 			zap.Stringer("peerID", node.ID), zap.Error(err))
