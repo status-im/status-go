@@ -15,9 +15,11 @@ import (
 const defaultNewMessageNotificationText = "New message in Messenger"
 const defaultMentionNotificationText = "New mention or reply in Communities"
 const defaultRequestToJoinCommunityNotificationText = "Someone requested to join a community you are an admin of"
+const defaultContactRequestNotificationText = "Someone sent you a contact request"
 
-const deepLinkChats = "status-app://chats"       // plain messages -> messenger
-const deepLinkActivityCenter = "status-app://ac" // mentions, community requests, etc. -> activity center
+const deepLinkChats = "status-app://chats"                      // plain messages -> messenger
+const deepLinkActivityCenter = "status-app://ac"                // mentions, community requests, etc. -> activity center
+const deepLinkContactRequests = "status-app://contact-requests" // contact requests -> activity center contact requests
 
 type GoRushRequestData struct {
 	EncryptedMessage string `json:"encryptedMessage"`
@@ -67,6 +69,8 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 			text = defaultNewMessageNotificationText
 		} else if request.Type == protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY {
 			text = defaultRequestToJoinCommunityNotificationText
+		} else if request.Type == protobuf.PushNotification_CONTACT_REQUEST {
+			text = defaultContactRequestNotificationText
 		} else {
 			text = defaultMentionNotificationText
 		}
@@ -78,6 +82,8 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 			pushType = "alert"
 			if request.Type == protobuf.PushNotification_MESSAGE {
 				deepLink = deepLinkChats
+			} else if request.Type == protobuf.PushNotification_CONTACT_REQUEST {
+				deepLink = deepLinkContactRequests
 			} else {
 				deepLink = deepLinkActivityCenter
 			}
