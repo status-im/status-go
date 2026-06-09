@@ -316,6 +316,14 @@ endif
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
+ifeq ($(detected_OS),Windows)
+	# nimble vendors deep deps (lsquic -> boringssl) under nimbledeps/pkgs2; on
+	# Windows that overruns MAX_PATH unless git uses long paths, and autocrlf
+	# would change the locked nim package checksum. Mirrors what makes the
+	# logos-delivery Windows build pass.
+	git config --global core.longpaths true
+	git config --global core.autocrlf false
+endif
 	cd $(NIM_SDS_SOURCE_DIR) && nimble setup -l
 	cd $(NIM_SDS_SOURCE_DIR) && nimble $(NIM_SDS_NIMBLE_TASK)
 else
