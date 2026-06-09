@@ -2464,6 +2464,11 @@ func (m *Messenger) DefaultFilters(o *communities.Community) types2.ChatsToIniti
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultNonProtectedPubsubTopic()},
+		// Migration phase 1 (#7498): also listen for community control messages on
+		// the default shard (32), so that when publishing moves off the non-protected
+		// shard (64) to 32 (phase 2, separate PR) clients already receive them.
+		// Sending is unchanged here.
+		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultShardPubsubTopic()},
 	}
 }
 
