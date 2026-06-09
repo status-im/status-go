@@ -32,25 +32,18 @@ type MessageParams struct {
 	Padding []byte
 }
 
-// ReceivedMessage represents a data packet to be received through the
-// WakuV2 protocol and successfully decrypted.
+// ReceivedMessage is the adapter's view of a data packet received through the
+// WakuV2 protocol. It stays encrypted here: decoding and matching happen in
+// the transport (status-im/status-go#7464).
 type ReceivedMessage struct {
 	Envelope Envelope // Wrapped Waku Message
 
 	MsgType MessageType
 
-	Data      []byte
-	Padding   []byte
-	Signature []byte
-
-	Sent uint32           // Time when the message was posted into the network in seconds
-	Src  *ecdsa.PublicKey // Message recipient (identity used to decode the message)
-	Dst  *ecdsa.PublicKey // Message recipient (identity used to decode the message)
+	Sent uint32 // Time when the message was posted into the network in seconds
 
 	PubsubTopic  string
 	ContentTopic TopicType
-
-	SymKeyHash common.Hash // The Keccak256Hash of the key
 
 	hash common.Hash
 }

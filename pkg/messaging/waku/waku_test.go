@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -265,12 +264,7 @@ func TestWakuV2Filter(t *testing.T) {
 	contentTopicBytes := make([]byte, 4)
 	_, err = rand.Read(contentTopicBytes)
 	require.NoError(t, err)
-	filter := &common.Filter{
-		PubsubTopic:   testPubsubTopic,
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
-	}
-
-	fID, err := w.subscribe(filter)
+	fID, err := w.Subscribe(testPubsubTopic, [][]byte{contentTopicBytes})
 	require.NoError(t, err)
 
 	// Reception now flows on the envelope feed (decoding/matching live in the
@@ -294,7 +288,7 @@ func TestWakuV2Filter(t *testing.T) {
 	}
 
 	msgTimestamp := w.timestamp()
-	contentTopic := maps.Keys(filter.ContentTopics)[0]
+	contentTopic := common.BytesToTopic(contentTopicBytes)
 
 	_, err = w.sendEnvelope(testPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
@@ -371,7 +365,6 @@ func TestOnlineChecker(t *testing.T) {
 	require.NoError(t, err)
 
 	require.False(t, lightNode.onlineChecker.IsOnline())
-	f := &common.Filter{}
-	lightNode.filterManager.SubscribeFilter("test", protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...))
+	lightNode.filterManager.SubscribeFilter("test", protocol.NewContentFilter(""))
 
 }

@@ -136,8 +136,7 @@ type Waku struct {
 	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
 	dnsDiscAsyncRetrievedSignal chan struct{}
 
-	// Filter-related
-	filters       *common.Filters // Message filters installed with Subscribe function
+	// Light-client filter protocol; tracks wire subscriptions made via Subscribe.
 	filterManager *filterapi.FilterManager
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
@@ -264,7 +263,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
-	waku.filters = common.NewFilters(waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	if nodeKey == nil {
@@ -941,59 +939,42 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 	return nil, fmt.Errorf("non-existent key ID")
 }
 
-// Subscribe installs a new message handler used for filtering, decrypting
-// and subsequent storing of incoming messages.
-func (w *Waku) subscribe(f *common.Filter) (string, error) {
-	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
-	id, err := w.filters.Install(f)
+// Subscribe registers a wire subscription for the given content topics on the
+// given pubsub topic and returns its id. Decoding, matching and buffering of
+// received messages all happen in the transport (status-im/status-go#7464), so
+// no key material is involved: for light clients the subscription is forwarded
+// to the filter protocol's FilterManager, while relay clients already receive
+// everything on the pubsub topics they subscribe to and only need the id.
+func (w *Waku) Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error) {
+	id, err := common.GenerateRandomID()
 	if err != nil {
-		return id, err
+		return "", err
 	}
 
-	if w.cfg.LightClient {
-		if w.filterManager == nil {
-			return id, nil
-		}
-		cf := protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...)
+	if w.cfg.LightClient && w.filterManager != nil {
+		pubsubTopic = w.GetPubsubTopic(pubsubTopic)
+		cf := protocol.NewContentFilter(pubsubTopic, common.NewTopicSetFromBytes(contentTopics).ContentTopics()...)
 		w.filterManager.SubscribeFilter(id, cf)
 	}
 
 	return id, nil
 }
 
-// Unsubscribe removes an installed message handler.
+// Unsubscribe removes a wire subscription made with Subscribe.
 func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
-	ok := w.filters.Uninstall(id)
-	if !ok {
-		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
-	}
-
-	if w.cfg.LightClient {
-		if w.filterManager == nil {
-			return nil
-		}
+	if w.cfg.LightClient && w.filterManager != nil {
 		w.filterManager.UnsubscribeFilter(id)
 	}
 
 	return nil
 }
 
-// GetFilter returns the filter by id.
-func (w *Waku) getFilter(id string) *common.Filter {
-	return w.filters.Get(id)
-}
-
-func (w *Waku) GetFilter(id string) types.Filter {
-	return w.getFilter(id)
-}
-
-// Unsubscribe removes an installed message handler.
+// UnsubscribeMany removes a batch of wire subscriptions made with Subscribe.
 func (w *Waku) UnsubscribeMany(ids []string) error {
 	for _, id := range ids {
 		w.logger.Debug("cleaning up filter", zap.String("id", id))
-		ok := w.filters.Uninstall(id)
-		if !ok {
-			w.logger.Warn("could not remove filter with id", zap.String("id", id))
+		if w.cfg.LightClient && w.filterManager != nil {
+			w.filterManager.UnsubscribeFilter(id)
 		}
 	}
 	return nil
@@ -2009,36 +1990,6 @@ func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, 
 	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
 
 	return nil
-}
-
-func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
-	var (
-		err     error
-		keyAsym *ecdsa.PrivateKey
-		keySym  []byte
-	)
-
-	if opts.SymKeyID != "" {
-		keySym, err = w.GetSymKey(opts.SymKeyID)
-		if err != nil {
-			return "", err
-		}
-	}
-	if opts.PrivateKeyID != "" {
-		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	f := &common.Filter{
-		KeyAsym:       keyAsym,
-		KeySym:        keySym,
-		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
-		PubsubTopic:   opts.PubsubTopic,
-	}
-
-	return w.subscribe(f)
 }
 
 func (w *Waku) Version() uint {

@@ -15,10 +15,6 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-const (
-	minPow = 0.0
-)
-
 type RawFilter struct {
 	FilterID string
 	Topic    types.TopicType
@@ -34,7 +30,7 @@ type FiltersService interface {
 	GetSymKey(id string) ([]byte, error)
 	DeleteSymKey(id string) bool
 
-	Subscribe(opts *types.SubscriptionOptions) (string, error)
+	Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error)
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 }
@@ -202,7 +198,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey
 			identityStr := PublicKeyToStr(pk)
-			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
+			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey)
 			if err != nil {
 				f.logger.Debug("could not register community filter", zap.Error(err))
 				return nil, err
@@ -415,7 +411,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, "", identity, listen)
+	filter, err := f.addAsymmetric(chatID, "", identity)
 	if err != nil {
 		f.logger.Debug("could not register personal topic filter", zap.Error(err))
 		return nil, err
@@ -453,7 +449,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, "", identity, listen)
+	filter, err := f.addAsymmetric(chatID, "", identity)
 	if err != nil {
 		f.logger.Debug("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -544,7 +540,7 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 		OneToOne:  true,
 	}
 
-	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey, true)
+	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey)
 	if err != nil {
 		f.logger.Debug("could not register discovery topic", zap.String("chatID", personalDiscoveryChat.ChatID), zap.Error(err))
 		return nil, err
@@ -676,12 +672,7 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFi
 		}
 	}
 
-	id, err := f.service.Subscribe(&types.SubscriptionOptions{
-		SymKeyID:    symKeyID,
-		PoW:         minPow,
-		Topics:      topics,
-		PubsubTopic: pubsubTopic,
-	})
+	id, err := f.service.Subscribe(pubsubTopic, topics)
 	if err != nil {
 		return nil, err
 	}
@@ -693,32 +684,18 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFi
 	}, nil
 }
 
-// addAsymmetricFilter adds a filter with our private key
-// and set minPow according to the listen parameter.
-func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identity *ecdsa.PrivateKey, listen bool) (*RawFilter, error) {
-	var (
-		err error
-		pow = 1.0 // use PoW high enough to discard all messages for the filter
-	)
-
-	if listen {
-		pow = minPow
-	}
-
+// addAsymmetricFilter adds a filter with our private key. Whether the filter
+// actually receives messages is governed by its Listen flag: non-listening
+// filters are skipped during routing in handleReceivedMessage.
+func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identity *ecdsa.PrivateKey) (*RawFilter, error) {
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
-	privateKeyID, err := f.service.AddKeyPair(identity)
-	if err != nil {
+	if _, err := f.service.AddKeyPair(identity); err != nil {
 		return nil, err
 	}
 
-	id, err := f.service.Subscribe(&types.SubscriptionOptions{
-		PrivateKeyID: privateKeyID,
-		PoW:          pow,
-		Topics:       topics,
-		PubsubTopic:  pubsubTopic,
-	})
+	id, err := f.service.Subscribe(pubsubTopic, topics)
 	if err != nil {
 		return nil, err
 	}
