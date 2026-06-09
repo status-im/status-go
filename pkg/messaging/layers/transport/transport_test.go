@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"crypto/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -180,6 +181,87 @@ func TestReceiveVersionZeroDecodesAsV1(t *testing.T) {
 	require.Len(t, msgs, 1, "version=0 message should be decoded as WakuV1")
 	require.Equal(t, payload, msgs[0].Payload)
 	require.Equal(t, crypto.FromECDSAPub(&identity.PublicKey), msgs[0].Sig)
+}
+
+// TestReceiveSharedKeyFanOut covers the decode-once grouping in
+// handleReceivedMessage: filters listening on the same (pubsub, content) topic
+// with the same symmetric key form one key group — the payload is decrypted
+// once and the decoded message fanned out to every filter in the group — while
+// a colliding filter (same topic, different key) stays in its own group and
+// receives nothing because its decrypt fails.
+func TestReceiveSharedKeyFanOut(t *testing.T) {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: migrations.AssetNames(), AssetFunc: migrations.Asset},
+	}))
+	require.NoError(t, err)
+
+	logger := testutils.MustCreateTestLogger()
+	defer func() { _ = logger.Sync() }()
+
+	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil, func([]byte, peer.AddrInfo, error) {}, nil)
+	require.NoError(t, err)
+
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	tr, err := NewTransport(waku, identity, NewSQLiteKeysPersistence(db), NewSQLiteProcessedMessageIDsCachePersistence(db), nil, logger)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tr.Stop() })
+
+	sharedKey := make([]byte, 32)
+	_, err = rand.Read(sharedKey)
+	require.NoError(t, err)
+	sharedKeyID, err := waku.AddSymKeyDirect(sharedKey)
+	require.NoError(t, err)
+
+	otherKey := make([]byte, 32)
+	_, err = rand.Read(otherKey)
+	require.NoError(t, err)
+	otherKeyID, err := waku.AddSymKeyDirect(otherKey)
+	require.NoError(t, err)
+
+	// Install three listening filters on the same (pubsub, content) topic
+	// directly in the manager: two sharing a key, one colliding with its own.
+	contentTopic := wakutypes.BytesToTopic(ToTopic("shared-chat"))
+	mkFilter := func(filterID, chatID, symKeyID string) *Filter {
+		return &Filter{
+			ChatID:       chatID,
+			FilterID:     filterID,
+			SymKeyID:     symKeyID,
+			ContentTopic: contentTopic,
+			PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+			Listen:       true,
+		}
+	}
+	sharedA := mkFilter("filter-shared-a", "chat-a", sharedKeyID)
+	sharedB := mkFilter("filter-shared-b", "chat-b", sharedKeyID)
+	collider := mkFilter("filter-collider", "chat-c", otherKeyID)
+	for _, f := range []*Filter{sharedA, sharedB, collider} {
+		tr.filters.filters[f.FilterID] = f
+	}
+
+	payload := []byte("fan out once")
+	encoded, err := rfc26.Encode(payload, sharedKey, nil, identity)
+	require.NoError(t, err)
+
+	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
+		Hash:         []byte{0xfa, 0x07},
+		ContentTopic: contentTopic.ContentTopic(),
+		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		Payload:      encoded,
+		Version:      1,
+		Timestamp:    time.Now().UnixNano(),
+	})
+
+	result, err := tr.RetrieveRawAll()
+	require.NoError(t, err)
+
+	// Both shared-key filters got the decoded message; the collider got nothing.
+	require.Len(t, result[*sharedA], 1)
+	require.Equal(t, payload, result[*sharedA][0].Payload)
+	require.Len(t, result[*sharedB], 1)
+	require.Equal(t, payload, result[*sharedB][0].Payload)
+	require.Empty(t, result[*collider])
 }
 
 func TestCleanFiltersLoopPausesAndResumesByLifecycle(t *testing.T) {
