@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
+	status_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/healthmanager/aggregator"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
 )
+
+// DefaultDownDebounce delays Down emission to suppress short provider blips.
+const DefaultDownDebounce = 30 * time.Second
 
 type ProvidersHealthManager struct {
 	mu                  sync.RWMutex
@@ -15,6 +20,9 @@ type ProvidersHealthManager struct {
 	aggregator          *aggregator.Aggregator
 	subscriptionManager *SubscriptionManager
 	lastStatus          *rpcstatus.ProviderStatus
+
+	downDebounce time.Duration
+	downTimer    *time.Timer
 }
 
 // NewProvidersHealthManager creates a new instance of ProvidersHealthManager with the given chain ID.
@@ -25,6 +33,7 @@ func NewProvidersHealthManager(chainID uint64) *ProvidersHealthManager {
 		chainID:             chainID,
 		aggregator:          agg,
 		subscriptionManager: NewSubscriptionManager(),
+		downDebounce:        DefaultDownDebounce,
 	}
 }
 
@@ -56,11 +65,69 @@ func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcs
 		return
 	}
 
+	// Defer Down emission until it persists; emit recovery to Up/Unknown immediately.
+	if newStatus.Status == rpcstatus.StatusDown {
+		p.armDownTimer()
+		return
+	}
+
+	p.stopDownTimer()
 	p.emitChainStatus(ctx)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.lastStatus = &newStatus
+}
+
+func (p *ProvidersHealthManager) armDownTimer() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.downTimer != nil {
+		return
+	}
+	debounce := p.downDebounce
+	if debounce <= 0 {
+		debounce = DefaultDownDebounce
+	}
+	p.downTimer = time.AfterFunc(debounce, p.emitDownIfStillDown)
+}
+
+func (p *ProvidersHealthManager) stopDownTimer() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.downTimer != nil {
+		p.downTimer.Stop()
+		p.downTimer = nil
+	}
+}
+
+// Uses background context because the request ctx is usually cancelled by the time the timer fires.
+func (p *ProvidersHealthManager) emitDownIfStillDown() {
+	defer status_common.LogOnPanic()
+
+	p.mu.Lock()
+	p.downTimer = nil
+
+	if p.aggregator == nil {
+		p.mu.Unlock()
+		return
+	}
+
+	current := p.aggregator.GetAggregatedStatus()
+	if current.Status != rpcstatus.StatusDown {
+		p.mu.Unlock()
+		return
+	}
+	if p.lastStatus != nil && p.lastStatus.Status == rpcstatus.StatusDown {
+		p.mu.Unlock()
+		return
+	}
+
+	statusCopy := current
+	p.lastStatus = &statusCopy
+	p.mu.Unlock()
+
+	p.emitChainStatus(context.Background())
 }
 
 // GetStatuses returns a copy of the current provider statuses.
@@ -84,6 +151,10 @@ func (p *ProvidersHealthManager) Unsubscribe(ch chan struct{}) {
 func (p *ProvidersHealthManager) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.downTimer != nil {
+		p.downTimer.Stop()
+		p.downTimer = nil
+	}
 	newAgg := aggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
 	p.aggregator = newAgg
 	p.lastStatus = nil
