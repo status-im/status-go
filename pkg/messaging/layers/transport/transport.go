@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
+	"github.com/status-im/status-go/pkg/pubsub"
 )
 
 var (
@@ -84,6 +85,19 @@ type Transport struct {
 	envelopesMonitor *EnvelopesMonitor
 	cleanFiltersFn   func() error
 	quit             chan struct{}
+
+	// received buffers decoded messages pushed from the waku adapter until
+	// RetrieveRawAll drains them. It is keyed by FilterID and then by message
+	// hash so that the same envelope pushed more than once before a drain is
+	// stored only once — mirroring the hash-keyed per-filter store the waku
+	// adapter used to keep (the persistent cache only dedups across drains).
+	receivedMu sync.Mutex
+	received   map[string]map[string]*types.Message
+
+	// matchedPublisher notifies subscribers (the messenger's retrieve loop)
+	// whenever a received message matched at least one listening filter.
+	// Non-blocking, coalescing — the buffer above holds the actual data.
+	matchedPublisher *pubsub.TypePublisher[struct{}]
 }
 
 // Pause signals Transport's internal goroutines to idle and cascades to
@@ -156,8 +170,10 @@ func NewTransport(
 			privateKey:        privateKey,
 			passToSymKeyCache: make(map[string]string),
 		},
-		filters: filtersManager,
-		logger:  logger.With(zap.Namespace("Transport")),
+		filters:          filtersManager,
+		logger:           logger.With(zap.Namespace("Transport")),
+		received:         make(map[string]map[string]*types.Message),
+		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
 	}
 
 	for _, opt := range opts {
@@ -168,7 +184,151 @@ func NewTransport(
 
 	t.cleanFiltersLoop()
 
+	// Consume the adapter's push stream of received messages: decode, route by
+	// content topic, match against our filters, and buffer for RetrieveRawAll.
+	if t.api != nil {
+		go t.receiveLoop()
+	}
+
 	return t, nil
+}
+
+// receiveLoop consumes the backend's envelope-event stream and turns every
+// EventEnvelopeAvailable into the decode/route step. The feed is a broadcast, so
+// multiple transports sharing one backend (as in tests) each see every event and
+// route it against their own filters. The events channel is amply buffered so
+// the backend's producer is never blocked.
+func (t *Transport) receiveLoop() {
+	defer gocommon.LogOnPanic()
+
+	events := make(chan types.EnvelopeEvent, 100)
+	sub := t.api.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		case <-t.quit:
+			return
+		case event := <-events:
+			if event.Event != types.EventEnvelopeAvailable {
+				continue
+			}
+			msg, ok := event.Data.(*types.ReceivedMessage)
+			if !ok {
+				continue
+			}
+			t.handleReceivedMessage(msg)
+		}
+	}
+}
+
+// handleReceivedMessage routes a received message to every listening filter on
+// its (pubsub, content) topic and buffers the decoded result. A content topic
+// is only a 4-byte hash of the chat id, so distinct chats can collide on it;
+// each candidate is therefore decoded with its own key, and a successful
+// authenticated decrypt is what confirms the message belongs to that filter
+// (replacing the old per-filter key-hash match).
+func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
+	if msg == nil {
+		return
+	}
+
+	candidates := t.filters.WatchersByTopic(msg.PubsubTopic, msg.ContentTopic)
+	if len(candidates) == 0 {
+		return
+	}
+
+	var matched bool
+	for _, filter := range candidates {
+		// Filters that exist only so we can publish never receive.
+		if !filter.Listen {
+			continue
+		}
+
+		symKey, privKey, err := t.filterKeys(filter)
+		if err != nil {
+			continue
+		}
+
+		decoded, err := t.decode(msg, symKey, privKey)
+		if err != nil {
+			// Wrong key for this filter (e.g. a colliding chat's message); skip.
+			continue
+		}
+
+		message := toMessage(decoded, filter, msg, privKey)
+		t.receivedMu.Lock()
+		byHash := t.received[filter.FilterID]
+		if byHash == nil {
+			byHash = make(map[string]*types.Message)
+			t.received[filter.FilterID] = byHash
+		}
+		byHash[types2.EncodeHex(message.Hash)] = message
+		t.receivedMu.Unlock()
+		matched = true
+	}
+
+	if matched {
+		t.matchedPublisher.Publish(struct{}{})
+	}
+}
+
+// filterKeys resolves the key material used to decode messages received on a
+// filter. Symmetric keys come from the waku key store via the filter's SymKeyID
+// (the same path the send side uses); asymmetric private keys come from the
+// FiltersManager's runtime map. Exactly one of the returned keys is non-nil.
+func (t *Transport) filterKeys(filter *Filter) (symKey []byte, privKey *ecdsa.PrivateKey, err error) {
+	if filter.SymKeyID != "" {
+		symKey, err = t.keysManager.RawSymKey(filter.SymKeyID)
+		return symKey, nil, err
+	}
+	privKey, ok := t.filters.AsymKey(filter.FilterID)
+	if !ok {
+		return nil, nil, errors.New("no decode key for filter")
+	}
+	return nil, privKey, nil
+}
+
+// decode reverses the rfc26 payload codec using the filter's key material. A
+// WakuMessage with version==0 is unencrypted and passed through unchanged
+// (preserving prior reception behaviour).
+func (t *Transport) decode(msg *types.ReceivedMessage, symKey []byte, privKey *ecdsa.PrivateKey) (*rfc26.DecodedPayload, error) {
+	if msg.Version == 0 {
+		return &rfc26.DecodedPayload{Data: msg.Payload}, nil
+	}
+
+	keyInfo := &rfc26.KeyInfo{}
+	switch {
+	case privKey != nil:
+		keyInfo.Kind = rfc26.Asymmetric
+		keyInfo.PrivKey = privKey
+	case symKey != nil:
+		keyInfo.Kind = rfc26.Symmetric
+		keyInfo.SymKey = symKey
+	default:
+		return nil, errors.New("no decode key for filter")
+	}
+
+	return rfc26.Decode(msg.Payload, keyInfo)
+}
+
+// toMessage assembles the transport's *types.Message from a decoded payload,
+// the matched filter and the raw received message.
+func toMessage(decoded *rfc26.DecodedPayload, filter *Filter, raw *types.ReceivedMessage, privKey *ecdsa.PrivateKey) *types.Message {
+	m := &types.Message{
+		Payload:   decoded.Data,
+		Padding:   decoded.Padding,
+		Timestamp: uint32(raw.Timestamp / int64(time.Second)),
+		Hash:      raw.Hash,
+		Topic:     filter.ContentTopic,
+	}
+	if privKey != nil {
+		m.Dst = crypto.FromECDSAPub(&privKey.PublicKey)
+	}
+	if decoded.PubKey != nil {
+		m.Sig = crypto.FromECDSAPub(decoded.PubKey)
+	}
+	return m
 }
 
 func (t *Transport) InitFilters(chatIDs []FiltersToInitialize, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
@@ -244,32 +404,32 @@ func (t *Transport) GetStats() types.StatsSummary {
 	return t.waku.GetStats()
 }
 
+// RetrieveRawAll drains the messages pushed in by the waku adapter and decoded
+// by receiveLoop, dropping any the persistent processed-message cache has
+// already seen, and returns them grouped by filter.
 func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 	result := make(map[Filter][]*types.Message)
 	logger := t.logger.With(zap.String("site", "retrieveRawAll"))
 
-	for _, filter := range t.filters.Filters() {
-		msgs, err := t.api.GetFilterMessages(filter.FilterID)
-		if err != nil {
-			logger.Warn("failed to fetch messages", zap.Error(err))
-			continue
-		}
-		// Don't pull from filters we don't listen to
-		if !filter.Listen {
-			for _, msg := range msgs {
-				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msg.Hash))
-			}
+	t.receivedMu.Lock()
+	drained := t.received
+	t.received = make(map[string]map[string]*types.Message)
+	t.receivedMu.Unlock()
+
+	for filterID, byHash := range drained {
+		if len(byHash) == 0 {
 			continue
 		}
 
-		if len(msgs) == 0 {
+		filter := t.filters.FilterByFilterID(filterID)
+		if filter == nil {
+			// Filter was removed between receipt and drain; drop its messages.
 			continue
 		}
 
-		ids := make([]string, len(msgs))
-		for i := range msgs {
-			id := types2.EncodeHex(msgs[i].Hash)
-			ids[i] = id
+		ids := make([]string, 0, len(byHash))
+		for id := range byHash {
+			ids = append(ids, id)
 		}
 
 		hits, err := t.cache.Hits(ids)
@@ -278,17 +438,15 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			return nil, err
 		}
 
-		for i := range msgs {
-			// Exclude anything that is a cache hit
-			if !hits[types2.EncodeHex(msgs[i].Hash)] {
-				result[*filter] = append(result[*filter], msgs[i])
-				logger.Debug("message not cached", zap.String("hash", types2.EncodeHex(msgs[i].Hash)))
+		for _, id := range ids {
+			// Exclude anything the processed-message cache has already seen.
+			if !hits[id] {
+				result[*filter] = append(result[*filter], byHash[id])
+				logger.Debug("message not cached", zap.String("hash", id))
 			} else {
-				logger.Debug("message cached", zap.String("hash", types2.EncodeHex(msgs[i].Hash)))
-				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msgs[i].Hash))
+				logger.Debug("message cached", zap.String("hash", id))
 			}
 		}
-
 	}
 
 	return result, nil
@@ -541,10 +699,6 @@ func (t *Transport) DropPeer(peerID peer.ID) error {
 	return t.waku.DropPeer(peerID)
 }
 
-func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
-	t.waku.MarkP2PMessageAsProcessed(hash)
-}
-
 func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
 }
@@ -611,17 +765,14 @@ func (t *Transport) DisconnectActiveStorenode(ctx context.Context, backoffReason
 // an incoming envelope matches at least one installed filter. Callers must call
 // UnsubscribeFilterMatched with the returned channel when done.
 func (t *Transport) SubscribeFilterMatched() chan struct{} {
-	if t.waku == nil {
-		return nil
-	}
-	return t.waku.SubscribeFilterMatched()
+	return t.matchedPublisher.Subscribe(1)
 }
 
 func (t *Transport) UnsubscribeFilterMatched(ch chan struct{}) {
-	if t.waku == nil || ch == nil {
+	if ch == nil {
 		return
 	}
-	t.waku.UnsubscribeFilterMatched(ch)
+	t.matchedPublisher.Unsubscribe(ch)
 }
 
 func (t *Transport) OnStorenodeChanged() <-chan peer.ID {

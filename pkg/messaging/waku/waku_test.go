@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/internal/connection"
 	testutils "github.com/status-im/status-go/internal/testutils"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -287,13 +288,32 @@ func TestWakuV2Filter(t *testing.T) {
 	_, err = rand.Read(contentTopicBytes)
 	require.NoError(t, err)
 	filter := &common.Filter{
-		Messages:      common.NewMemoryMessageStore(),
 		PubsubTopic:   testPubsubTopic,
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
 	}
 
 	fID, err := w.subscribe(filter)
 	require.NoError(t, err)
+
+	// Reception now flows on the envelope feed (decoding/matching live in the
+	// transport); wait for the EventEnvelopeAvailable carrying the message.
+	events := make(chan types.EnvelopeEvent, 100)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+	requireReceived := func() {
+		deadline := time.After(5 * time.Second)
+		for {
+			select {
+			case e := <-events:
+				if e.Event == types.EventEnvelopeAvailable {
+					require.NotNil(t, e.Data)
+					return
+				}
+			case <-deadline:
+				t.Fatal("expected a received message")
+			}
+		}
+	}
 
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
@@ -311,8 +331,7 @@ func TestWakuV2Filter(t *testing.T) {
 	subscriptions := w.node.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
-	messages := filter.Retrieve()
-	require.Len(t, messages, 1)
+	requireReceived()
 
 	// Mock peers going down
 	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
@@ -334,8 +353,7 @@ func TestWakuV2Filter(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 
-	messages = filter.Retrieve()
-	require.Len(t, messages, 1)
+	requireReceived()
 	err = w.Unsubscribe(context.Background(), fID)
 	require.NoError(t, err)
 	require.NoError(t, w.Stop())

@@ -102,10 +102,6 @@ type Waku interface {
 	// (see transport/rfc26.Encode). Returns the wire hash on success.
 	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
 
-	// GetFilterMessages returns the messages that match the filter criteria and
-	// are received between the last poll and now.
-	GetFilterMessages(id string) ([]*Message, error)
-
 	Start() error
 	Stop() error
 
@@ -166,12 +162,6 @@ type Waku interface {
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
-	// SubscribeFilterMatched returns a channel that is notified (non-blocking, coalescing)
-	// whenever an incoming envelope matches at least one installed filter.
-	// Callers must call UnsubscribeFilterMatched when done to avoid a channel leak.
-	SubscribeFilterMatched() chan struct{}
-	UnsubscribeFilterMatched(ch chan struct{})
-
 	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 	// DeleteKeyPair deletes the key with the specified ID if it exists.
@@ -188,9 +178,6 @@ type Waku interface {
 	GetFilter(id string) Filter
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
-
-	// MarkP2PMessageAsProcessed tells the waku layer that a P2P message has been processed
-	MarkP2PMessageAsProcessed(common.Hash)
 
 	// ConnectionChanged is called whenever the client knows its connection status has changed
 	ConnectionChanged(connection.State)

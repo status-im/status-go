@@ -20,19 +20,16 @@ package wakuv2
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-
-	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/pkg/messaging/waku/common"
-	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // (Waku.Post was removed: all sends now go through Send with payloads
-// pre-encoded by the transport via rfc26.Encode.)
+// pre-encoded by the transport via rfc26.Encode. Reception was moved to the
+// transport too: the adapter forwards raw envelopes on the envelope feed
+// (EventEnvelopeAvailable) and no longer decodes/polls — status-im/status-go#7464.)
 
 // Send publishes a pre-encoded payload to the messaging network. The payload
 // is expected to be already encoded for WakuMessage version=1 (see
@@ -52,51 +49,4 @@ func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, paylo
 		Ephemeral:    &ephemeral,
 	}
 	return w.sendEnvelope(pubsubTopic, msg, priority)
-}
-
-// ToWakuMessage converts an internal message into an API version.
-func ToWakuMessage(message *common.ReceivedMessage) *types.Message {
-	msg := types.Message{
-		Payload:   message.Data,
-		Padding:   message.Padding,
-		Timestamp: message.Sent,
-		Hash:      message.Hash().Bytes(),
-		Topic:     types.TopicType(message.ContentTopic),
-	}
-
-	if message.Dst != nil {
-		b := crypto.FromECDSAPub(message.Dst)
-		if b != nil {
-			msg.Dst = b
-		}
-	}
-
-	if message.Src != nil {
-		b := crypto.FromECDSAPub(message.Src)
-		if b != nil {
-			msg.Sig = b
-		}
-	}
-
-	return &msg
-}
-
-// GetFilterMessages returns the messages that match the filter criteria and
-// are received between the last poll and now.
-func (w *Waku) GetFilterMessages(id string) ([]*types.Message, error) {
-	w.getFilterMessagesMu.Lock()
-	f := w.getFilter(id)
-	if f == nil {
-		w.getFilterMessagesMu.Unlock()
-		return nil, fmt.Errorf("filter not found")
-	}
-	w.getFilterMessagesMu.Unlock()
-
-	receivedMessages := f.Retrieve()
-	messages := make([]*types.Message, 0, len(receivedMessages))
-	for _, msg := range receivedMessages {
-		messages = append(messages, ToWakuMessage(msg))
-	}
-
-	return messages, nil
 }

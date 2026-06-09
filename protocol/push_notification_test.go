@@ -215,6 +215,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
+	// Each paired device advertises only its own installation's push info on the
+	// shared contact-code topic, and processing one such advertisement stamps a
+	// query timestamp that suppresses the authoritative server query for
+	// staleQueryTimeInSeconds. alice only subscribes to that topic when she starts
+	// the chat above, so a device that advertised earlier is missed. Re-advertise
+	// from both devices now that she is listening so she receives both.
+	s.Require().NoError(bob1.PublishIdentityImage())
+	s.Require().NoError(bob2.PublishIdentityImage())
+
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
 	err = testutils2.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
@@ -1117,6 +1126,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	messageIDString := response.Messages()[0].ID
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
+
+	// Each paired device advertises only its own installation's push info on the
+	// shared contact-code topic, and processing one such advertisement stamps a
+	// query timestamp that suppresses the authoritative server query for
+	// staleQueryTimeInSeconds. alice only subscribes to that topic when she starts
+	// the chat above, so a device that advertised earlier is missed. Re-advertise
+	// from both devices now that she is listening so she receives both.
+	s.Require().NoError(bob1.PublishIdentityImage())
+	s.Require().NoError(bob2.PublishIdentityImage())
 
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
 	err = testutils2.RetryWithBackOff(func() error {

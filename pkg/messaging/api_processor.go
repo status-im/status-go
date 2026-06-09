@@ -3,8 +3,6 @@ package messaging
 import (
 	"crypto/ecdsa"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-
 	"github.com/status-im/status-go/internal/connection"
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
 	types "github.com/status-im/status-go/pkg/messaging/types"
@@ -36,10 +34,6 @@ func (a *API) CleanMessagesProcessed(timestamp uint64) error {
 
 func (a *API) ClearProcessedMessageIDsCache() error {
 	return a.core.stack.Transport.ClearProcessedMessageIDsCache()
-}
-
-func (a *API) MarkP2PMessageAsProcessed(hash ethcommon.Hash) {
-	a.core.stack.Transport.MarkP2PMessageAsProcessed(hash)
 }
 
 func (a *API) SetEnvelopeEventsHandler(handler types.EnvelopeEventsHandler) error {

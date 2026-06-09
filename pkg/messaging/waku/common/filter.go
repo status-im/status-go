@@ -28,12 +28,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-// Filter represents a Waku message filter
+// Filter represents a Waku message filter. Since the move of the reception
+// pipeline into the transport (status-im/status-go#7464), the waku-side filter
+// is only a wire-subscription record: which content topics on which pubsub
+// topic the node asks the network for. Decoding, matching and buffering all
+// happen in the transport now.
 type Filter struct {
 	Src           *ecdsa.PublicKey  // Sender of the message
 	KeyAsym       *ecdsa.PrivateKey // Private Key of recipient
@@ -42,31 +43,12 @@ type Filter struct {
 	ContentTopics TopicSet          // ContentTopics to filter messages with
 	SymKeyHash    common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
 	id            string            // unique identifier
-
-	Messages MessageStore
 }
-
-type FilterSet = map[*Filter]struct{}
-type ContentTopicToFilter = map[TopicType]FilterSet
-type PubsubTopicToContentTopic = map[string]ContentTopicToFilter
 
 // Filters represents a collection of filters
 type Filters struct {
 	// Map of random ID to Filter
 	watchers map[string]*Filter
-
-	// Pubsub topic to use when no pubsub topic is specified on a filter
-	defaultPubsubTopic string
-
-	// map a topic to the filters that are interested in being notified when a message matches that topic
-	topicMatcher PubsubTopicToContentTopic
-
-	// list all the filters that will be notified of a new message, no matter what its topic is
-	allTopicsMatcher map[*Filter]struct{}
-
-	// matchedPublisher notifies subscribers when at least one filter matched an incoming envelope.
-	// Uses non-blocking sends so processQueueLoop is never stalled.
-	matchedPublisher *pubsub.TypePublisher[struct{}]
 
 	logger *zap.Logger
 
@@ -74,14 +56,10 @@ type Filters struct {
 }
 
 // NewFilters returns a newly created filter collection
-func NewFilters(defaultPubsubTopic string, logger *zap.Logger) *Filters {
+func NewFilters(logger *zap.Logger) *Filters {
 	return &Filters{
-		watchers:           make(map[string]*Filter),
-		topicMatcher:       make(PubsubTopicToContentTopic),
-		allTopicsMatcher:   make(map[*Filter]struct{}),
-		defaultPubsubTopic: defaultPubsubTopic,
-		matchedPublisher:   pubsub.NewTypePublisher[struct{}](),
-		logger:             logger,
+		watchers: make(map[string]*Filter),
+		logger:   logger,
 	}
 }
 
@@ -110,7 +88,6 @@ func (fs *Filters) Install(watcher *Filter) (string, error) {
 	watcher.id = id
 
 	fs.watchers[id] = watcher
-	fs.addTopicMatcher(watcher)
 
 	fs.logger.Debug("filters install", zap.String("id", id))
 	return id, err
@@ -123,84 +100,12 @@ func (fs *Filters) Uninstall(id string) bool {
 	defer fs.Unlock()
 	watcher := fs.watchers[id]
 	if watcher != nil {
-		fs.removeFromTopicMatchers(watcher)
 		delete(fs.watchers, id)
 
 		fs.logger.Debug("filters uninstall", zap.String("id", id))
 		return true
 	}
 	return false
-}
-
-func (fs *Filters) AllTopics() []TopicType {
-	var topics []TopicType
-	fs.Lock()
-	defer fs.Unlock()
-	for _, topicsPerPubsubTopic := range fs.topicMatcher {
-		for t := range topicsPerPubsubTopic {
-			topics = append(topics, t)
-		}
-	}
-
-	return topics
-}
-
-// addTopicMatcher adds a filter to the topic matchers.
-// If the filter's Topics array is empty, it will be tried on every topic.
-// Otherwise, it will be tried on the topics specified.
-func (fs *Filters) addTopicMatcher(watcher *Filter) {
-	if len(watcher.ContentTopics) == 0 && (watcher.PubsubTopic == fs.defaultPubsubTopic || watcher.PubsubTopic == "") {
-		fs.allTopicsMatcher[watcher] = struct{}{}
-	} else {
-		filtersPerContentTopic, ok := fs.topicMatcher[watcher.PubsubTopic]
-		if !ok {
-			filtersPerContentTopic = make(ContentTopicToFilter)
-		}
-
-		for topic := range watcher.ContentTopics {
-			if filtersPerContentTopic[topic] == nil {
-				filtersPerContentTopic[topic] = make(FilterSet)
-			}
-			filtersPerContentTopic[topic][watcher] = struct{}{}
-		}
-
-		fs.topicMatcher[watcher.PubsubTopic] = filtersPerContentTopic
-	}
-}
-
-// removeFromTopicMatchers removes a filter from the topic matchers
-func (fs *Filters) removeFromTopicMatchers(watcher *Filter) {
-	delete(fs.allTopicsMatcher, watcher)
-
-	filtersPerContentTopic, ok := fs.topicMatcher[watcher.PubsubTopic]
-	if !ok {
-		return
-	}
-
-	for topic := range watcher.ContentTopics {
-		delete(filtersPerContentTopic[topic], watcher)
-	}
-
-	fs.topicMatcher[watcher.PubsubTopic] = filtersPerContentTopic
-}
-
-// GetWatchersByTopic returns a slice containing the filters that
-// match a specific topic
-func (fs *Filters) GetWatchersByTopic(pubsubTopic string, contentTopic TopicType) []*Filter {
-	res := make([]*Filter, 0, len(fs.allTopicsMatcher))
-	for watcher := range fs.allTopicsMatcher {
-		res = append(res, watcher)
-	}
-
-	filtersPerContentTopic, ok := fs.topicMatcher[pubsubTopic]
-	if !ok {
-		return res
-	}
-
-	for watcher := range filtersPerContentTopic[contentTopic] {
-		res = append(res, watcher)
-	}
-	return res
 }
 
 // Get returns a filter from the collection with a specific ID
@@ -226,111 +131,8 @@ func (fs *Filters) GetFilters() map[string]*Filter {
 	return maps.Clone(fs.watchers)
 }
 
-// NotifyWatchers notifies any filter that has declared interest
-// for the envelope's topic.
-func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
-	var decodedMsg *ReceivedMessage
-
-	fs.RLock()
-	defer fs.RUnlock()
-
-	var matched bool
-	candidates := fs.GetWatchersByTopic(recvMessage.PubsubTopic, recvMessage.ContentTopic)
-
-	if len(candidates) == 0 {
-		logutils.ZapLogger().Debug("no filters available for this topic",
-			zap.Stringer("message", recvMessage.Hash()),
-			zap.String("pubsubTopic", recvMessage.PubsubTopic),
-			zap.Stringer("contentTopic", &recvMessage.ContentTopic),
-		)
-	}
-
-	for _, watcher := range candidates {
-		// Messages are decrypted successfully only once
-		if decodedMsg == nil {
-			decodedMsg = recvMessage.Open(watcher)
-			if decodedMsg == nil {
-				logutils.ZapLogger().Debug("processing message: failed to open",
-					zap.Stringer("message", recvMessage.Hash()),
-					zap.String("filter", watcher.id),
-				)
-				continue
-			}
-		}
-
-		if watcher.MatchMessage(decodedMsg) {
-			matched = true
-			logutils.ZapLogger().Debug("processing message: decrypted", zap.Stringer("envelopeHash", recvMessage.Hash()))
-			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
-				watcher.Trigger(decodedMsg)
-			}
-		}
-	}
-
-	if matched {
-		fs.matchedPublisher.Publish(struct{}{})
-	}
-
-	return matched
-}
-
-// SubscribeFilterMatched returns a channel that receives a notification whenever
-// an incoming envelope matches at least one filter. The channel has a buffer of 1
-// so sends are non-blocking and bursts coalesce naturally.
-func (fs *Filters) SubscribeFilterMatched() chan struct{} {
-	return fs.matchedPublisher.Subscribe(1)
-}
-
-// UnsubscribeFilterMatched removes and closes the subscription channel returned
-// by SubscribeFilterMatched.
-func (fs *Filters) UnsubscribeFilterMatched(ch chan struct{}) {
-	fs.matchedPublisher.Unsubscribe(ch)
-}
-
-func (f *Filter) expectsAsymmetricEncryption() bool {
-	return f.KeyAsym != nil
-}
-
 func (f *Filter) expectsSymmetricEncryption() bool {
 	return f.KeySym != nil
-}
-
-// Trigger adds a yet-unknown message to the filter's list of
-// received messages.
-func (f *Filter) Trigger(msg *ReceivedMessage) {
-	err := f.Messages.Add(msg)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to add msg into the filters store",
-			zap.Stringer("hash", msg.Hash()),
-			zap.Error(err),
-		)
-	}
-}
-
-// Retrieve will return the list of all received messages associated
-// to a filter.
-func (f *Filter) Retrieve() []*ReceivedMessage {
-	msgs, err := f.Messages.Pop()
-	if err != nil {
-		logutils.ZapLogger().Error("failed to retrieve messages from filter store", zap.Error(err))
-		return nil
-	}
-	return msgs
-}
-
-// MatchMessage checks if the filter matches an already decrypted
-// message (i.e. a Message that has already been handled by
-// MatchEnvelope when checked by a previous filter).
-// Topics are not checked here, since this is done by topic matchers.
-func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
-	if f.expectsAsymmetricEncryption() && msg.isAsymmetricEncryption() {
-		return IsPubKeyEqual(&f.KeyAsym.PublicKey, msg.Dst)
-	} else if f.expectsSymmetricEncryption() && msg.isSymmetricEncryption() {
-		return f.SymKeyHash == msg.SymKeyHash
-	} else if !f.expectsAsymmetricEncryption() && !f.expectsSymmetricEncryption() && !msg.isAsymmetricEncryption() && !msg.isSymmetricEncryption() {
-		return true
-	}
-	return false
 }
 
 func (f *Filter) ID() string {

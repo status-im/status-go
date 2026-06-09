@@ -637,12 +637,19 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	s.Require().NoError(err)
 
 	contactID := types2.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	// The showcased communities are validated and populated asynchronously: the
+	// first profile-showcase update can arrive before bob has validated alice's
+	// membership in the encrypted community, so the entry may not be present yet.
+	// Wait until both showcased communities are stored before asserting, rather
+	// than on the first showcase update — otherwise the result is reception-order
+	// dependent (see status-im/status-go#3869).
 	_, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool {
-			return r.updatedProfileShowcaseContactIDs[contactID] == true
+			ps, e := bob.GetProfileShowcaseForContact(contactID, true)
+			return e == nil && ps != nil && len(ps.Communities) == 2
 		},
-		"no messages",
+		"profile showcase with 2 communities not received",
 	)
 	s.Require().NoError(err)
 

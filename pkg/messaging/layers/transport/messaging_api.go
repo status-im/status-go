@@ -18,9 +18,12 @@ type MessagingAPI interface {
 	// (see rfc26.Encode). Returns the wire hash on success.
 	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
 
-	// GetFilterMessages returns the messages that match the filter criteria
-	// and were received between the last poll and now.
-	GetFilterMessages(id string) ([]*types.Message, error)
+	// SubscribeEnvelopeEvents returns the backend's event stream. The transport
+	// consumes it both for reception (EventEnvelopeAvailable carries a neutral
+	// *types.ReceivedMessage in Data, which the transport decodes and routes to
+	// its filters) and for the send-side lifecycle events the EnvelopesMonitor
+	// tracks. This is the single, logos-delivery-shaped event seam.
+	SubscribeEnvelopeEvents(events chan<- types.EnvelopeEvent) types.Subscription
 }
 
 // Compile-time assertion: the waku adapter satisfies MessagingAPI.

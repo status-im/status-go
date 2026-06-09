@@ -165,9 +165,6 @@ type Waku struct {
 
 	envelopeFeed event.Feed
 
-	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
-	storeMsgIDsMu sync.RWMutex
-
 	messageSender *publish.MessageSender
 
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
@@ -205,9 +202,6 @@ type Waku struct {
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
-
-	// getFilterMessagesMu serialises GetFilterMessages lookups.
-	getFilterMessagesMu sync.Mutex
 }
 
 var _ types.Waku = (*Waku)(nil)
@@ -263,9 +257,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
-		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
 		timesource:                      ts,
-		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
@@ -273,7 +265,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
-	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
+	waku.filters = common.NewFilters(waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	if nodeKey == nil {
@@ -776,12 +768,21 @@ func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) t
 	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
 }
 
-func (w *Waku) SubscribeFilterMatched() chan struct{} {
-	return w.filters.SubscribeFilterMatched()
-}
-
-func (w *Waku) UnsubscribeFilterMatched(ch chan struct{}) {
-	w.filters.UnsubscribeFilterMatched(ch)
+// newReceivedMessage builds the neutral, transport-agnostic view of a received
+// envelope that travels on the envelope feed (EventEnvelopeAvailable.Data) for
+// the transport to decode and route.
+func newReceivedMessage(e *common.ReceivedMessage) *types.ReceivedMessage {
+	msg := e.Envelope.Message()
+	return &types.ReceivedMessage{
+		Hash:         e.Hash().Bytes(),
+		ContentTopic: msg.ContentTopic,
+		Payload:      msg.Payload,
+		Ephemeral:    msg.GetEphemeral(),
+		Meta:         msg.Meta,
+		PubsubTopic:  e.PubsubTopic,
+		Version:      msg.GetVersion(),
+		Timestamp:    msg.GetTimestamp(),
+	}
 }
 
 // DeleteKeyPair deletes the specified key if it exists.
@@ -1538,41 +1539,17 @@ func (w *Waku) processQueueLoop() {
 }
 
 func (w *Waku) processMessage(e *common.ReceivedMessage) {
-	logger := w.logger.With(
-		zap.Stringer("envelopeHash", e.Envelope.Hash()),
-		zap.String("pubsubTopic", e.PubsubTopic),
-		zap.String("contentTopic", e.ContentTopic.ContentTopic()),
-		zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
-	)
-
-	if e.MsgType == common.StoreMessageType {
-		// We need to insert it first, and then remove it if not matched,
-		// as messages are processed asynchronously
-		w.storeMsgIDsMu.Lock()
-		w.storeMsgIDs[e.Hash()] = true
-		w.storeMsgIDsMu.Unlock()
-	}
-
-	matched := w.filters.NotifyWatchers(e)
-
-	// If not matched we remove it
-	if !matched {
-		logger.Debug("filters did not match")
-		w.storeMsgIDsMu.Lock()
-		delete(w.storeMsgIDs, e.Hash())
-		w.storeMsgIDsMu.Unlock()
-	} else {
-		logger.Debug("filters did match")
-		if w.metricsHandler != nil && e.MsgType == common.MissingMessageType {
-			w.metricsHandler.PushMissedRelevantMessage(e)
-		}
-		w.envelopeCache.Set(e.Hash(), true, ttlcache.DefaultTTL)
-	}
-
+	// Decoding, content-topic routing and filter matching all happen in the
+	// transport now (status-im/status-go#7464). The adapter just forwards every
+	// received envelope on the envelope feed, carrying the neutral
+	// ReceivedMessage as the EventEnvelopeAvailable payload; the transport
+	// decodes and routes it. De-duplication is owned by the transport's
+	// persistent processed-message cache, so nothing is marked processed here.
 	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Topic: e.ContentTopic,
 		Hash:  e.Hash(),
 		Event: common.EventEnvelopeAvailable,
+		Data:  newReceivedMessage(e),
 	})
 }
 
@@ -1936,19 +1913,8 @@ func (w *Waku) DropPeer(peerID peer.ID) error {
 	return w.node.ClosePeerById(peerID)
 }
 
-func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
-	w.storeMsgIDsMu.Lock()
-	defer w.storeMsgIDsMu.Unlock()
-	delete(w.storeMsgIDs, hash)
-}
-
 func (w *Waku) Clean() error {
 	w.msgQueue = make(chan *common.ReceivedMessage, messageQueueLimit)
-
-	for _, f := range w.filters.All() {
-		f.Messages = common.NewMemoryMessageStore()
-	}
-
 	return nil
 }
 
@@ -2125,7 +2091,6 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 		KeySym:        keySym,
 		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
 		PubsubTopic:   opts.PubsubTopic,
-		Messages:      common.NewMemoryMessageStore(),
 	}
 
 	return w.subscribe(f)
