@@ -151,7 +151,7 @@ type Messenger struct {
 	historicSyncMu            sync.Mutex
 	historicSyncInFlight      bool
 	lastHistoricSyncRequestAt time.Time
-	ratchetNotFoundDelay time.Duration
+	ratchetNotFoundDelay      time.Duration
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker

@@ -1388,10 +1388,6 @@ func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteComm
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
 }
 
-func (api *PublicAPI) PeerID() string {
-	return api.service.messaging.PeerID().String()
-}
-
 func (api *PublicAPI) Connect(peerID string, addrs []string) error {
 	return api.service.messenger.Connect(peerID, addrs)
 }
