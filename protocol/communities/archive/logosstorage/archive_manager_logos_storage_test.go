@@ -19,6 +19,8 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/messaging"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/archive"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
@@ -96,6 +98,40 @@ func (s *ArchiveManagerLogosStorageSuite) CreateCommunity() *communities.Communi
 	s.Require().NotNil(community)
 
 	return community
+}
+
+func (s *ArchiveManagerLogosStorageSuite) createCommunityWithChat() (*communities.Community, string) {
+	community := s.CreateCommunity()
+	chat := &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "added-chat",
+			Description: "description",
+		},
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		},
+		Members: make(map[string]*protobuf.CommunityMember),
+	}
+	changes, err := s.manager.CreateChat(community.ID(), chat, true, "")
+	s.Require().NoError(err)
+	s.Require().Len(changes.ChatsAdded, 1)
+	chatID := ""
+	for cID := range changes.ChatsAdded {
+		chatID = cID
+		break
+	}
+	return community, chatID
+}
+
+func buildLogosStorageMessage(timestamp time.Time, topic messagingtypes.ContentTopic, hash []byte) messagingtypes.ReceivedMessage {
+	return messagingtypes.ReceivedMessage{
+		Sig:       []byte{1},
+		Timestamp: uint32(timestamp.Unix()),
+		Topic:     topic,
+		Payload:   []byte{1},
+		Padding:   []byte{1},
+		Hash:      hash,
+	}
 }
 
 func (s *ArchiveManagerLogosStorageSuite) SetupTest() {
@@ -255,6 +291,64 @@ func (s *ArchiveManagerLogosStorageSuite) TestDownloadingArchivesFromLogosStorag
 		s.Require().Equal(archive.from, loadedMetadata.Metadata.From, "From timestamp should match for archive %s", archive.hash)
 		s.Require().Equal(archive.to, loadedMetadata.Metadata.To, "To timestamp should match for archive %s", archive.hash)
 	}
+}
+
+func (s *ArchiveManagerLogosStorageSuite) TestCreateAndSeedHistoryArchiveKeepsCumulativeIndexAndUnseedsOldIndex() {
+	community, chatID := s.createCommunityWithChat()
+	topic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(chatID))
+	topics := []messagingtypes.ContentTopic{topic}
+
+	startDate := time.Date(2026, 6, 9, 0, 0, 0, 0, time.UTC)
+	partition := 10 * time.Second
+
+	message1 := buildLogosStorageMessage(startDate.Add(1*time.Second), topic, []byte{1})
+	s.Require().NoError(s.manager.StoreWakuMessages([]*messagingtypes.ReceivedMessage{&message1}))
+
+	s.Require().NoError(s.archiveService.CreateAndSeedHistoryArchive(
+		community.ID(), topics, startDate, startDate.Add(partition), partition, false,
+	))
+
+	backend, err := s.getArchiveManager().GetLogosStorageBackend()
+	s.Require().NoError(err)
+
+	firstIndexCid, err := s.manager.GetPersistence().GetLastSeenArchiveLink(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEmpty(firstIndexCid)
+	s.uploadedCIDs = append(s.uploadedCIDs, firstIndexCid)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	firstIndex, err := backend.LoadHistoryArchiveIndex(ctx, s.identity, community.ID(), firstIndexCid, true)
+	s.Require().NoError(err)
+	s.Require().Len(firstIndex.Archives, 1)
+
+	message2 := buildLogosStorageMessage(startDate.Add(partition).Add(1*time.Second), topic, []byte{2})
+	s.Require().NoError(s.manager.StoreWakuMessages([]*messagingtypes.ReceivedMessage{&message2}))
+
+	s.Require().NoError(s.archiveService.CreateAndSeedHistoryArchive(
+		community.ID(), topics, startDate.Add(partition), startDate.Add(2*partition), partition, false,
+	))
+
+	secondIndexCid, err := s.manager.GetPersistence().GetLastSeenArchiveLink(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEmpty(secondIndexCid)
+	s.Require().NotEqual(firstIndexCid, secondIndexCid)
+	s.uploadedCIDs = append(s.uploadedCIDs, secondIndexCid)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	secondIndex, err := backend.LoadHistoryArchiveIndex(ctx, s.identity, community.ID(), secondIndexCid, true)
+	s.Require().NoError(err)
+	s.Require().Len(secondIndex.Archives, 2)
+
+	for archiveID := range firstIndex.Archives {
+		s.Require().Contains(secondIndex.Archives, archiveID)
+	}
+
+	s.Require().Eventually(func() bool {
+		hasCid, err := s.logosStorageClient.HasCid(firstIndexCid)
+		return err == nil && !hasCid
+	}, 2*time.Second, 100*time.Millisecond, "old index CID should be unseeded after new cumulative index is created")
 }
 
 func TestArchiveManagerLogosStorageSuite(t *testing.T) {

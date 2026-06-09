@@ -323,6 +323,55 @@ func (s *ArchiveManagerLogosStorageCancellationSuite) TestMockDownloadCancellati
 	s.Require().Equal(1, taskInfo.TotalDownloadedArchivesCount, "Should have downloaded exactly 1 archive")
 }
 
+func (s *ArchiveManagerLogosStorageCancellationSuite) TestDownloadDoesNotAbortWhenExistingAndIncomingArchiveCountsMatchButHashesDiffer() {
+	indexCid := "test-index-cid-same-count-different-hash"
+	communityID := types.HexBytes("mock-same-count-different-hash")
+	cancelChan := make(chan struct{})
+	defer close(cancelChan)
+
+	s.Require().NoError(s.archiveService.SaveMessageArchiveID(communityID, "archive-1"))
+
+	index := &protobuf.LogosStorageWakuMessageArchiveIndex{
+		Archives: map[string]*protobuf.LogosStorageWakuMessageArchiveIndexMetadata{
+			"archive-2": {
+				Cid:      "cid-2",
+				Metadata: &protobuf.WakuMessageArchiveMetadata{From: 2000, To: 3000},
+			},
+		},
+	}
+	logosStorageIndexBytes, err := proto.Marshal(index)
+	s.Require().NoError(err)
+
+	s.mockLogosStorage.EXPECT().
+		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
+		DoAndReturn(func(ctx context.Context, cid string, output io.Writer) error {
+			_, _ = output.Write(logosStorageIndexBytes)
+			return nil
+		}).
+		Times(1)
+
+	s.mockLogosStorage.EXPECT().
+		TriggerDownloadWithContext(gomock.Any(), "cid-2").
+		Return(logosstorage.LogosStorageManifest{Cid: "cid-2"}, nil).
+		Times(1)
+
+	s.mockLogosStorage.EXPECT().
+		HasCid("cid-2").
+		Return(true, nil).
+		AnyTimes()
+
+	s.setDownloadTimeout(5 * time.Second)
+	taskInfo, err := s.archiveService.DownloadHistoryArchives(communityID, indexCid, cancelChan)
+	s.Require().NoError(err)
+	s.Require().NotNil(taskInfo)
+	s.Require().Equal(1, taskInfo.TotalArchivesCount)
+	s.Require().Equal(2, taskInfo.TotalDownloadedArchivesCount)
+
+	downloadedArchiveIDs, err := s.archiveService.GetDownloadedMessageArchiveIDs(communityID)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]string{"archive-1", "archive-2"}, downloadedArchiveIDs)
+}
+
 func TestArchiveManagerLogosStorageCancellationSuite(t *testing.T) {
 	suite.Run(t, new(ArchiveManagerLogosStorageCancellationSuite))
 }

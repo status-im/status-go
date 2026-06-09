@@ -269,7 +269,20 @@ func (m *ArchiveManagerLogosStorage) DownloadHistoryArchives(communityID cryptot
 	downloadTaskInfo.TotalDownloadedArchivesCount = len(existingArchiveIDs)
 	downloadTaskInfo.TotalArchivesCount = len(index.Archives)
 
-	if len(existingArchiveIDs) == len(index.Archives) {
+	existingArchiveIDSet := make(map[string]struct{}, len(existingArchiveIDs))
+	for _, archiveID := range existingArchiveIDs {
+		existingArchiveIDSet[archiveID] = struct{}{}
+	}
+
+	hasNewArchive := false
+	for archiveID := range index.Archives {
+		if _, ok := existingArchiveIDSet[archiveID]; !ok {
+			hasNewArchive = true
+			break
+		}
+	}
+
+	if !hasNewArchive {
 		m.logger.Debug("[LogosStorage] aborting download, no new archives")
 		return downloadTaskInfo, nil
 	}
@@ -384,33 +397,30 @@ func (m *ArchiveManagerLogosStorage) CreateHistoryArchiveFromDB(communityID cryp
 }
 
 func (m *ArchiveManagerLogosStorage) CreateAndSeedHistoryArchive(communityID cryptotypes.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
-	lastSeenArchiveLink, err := m.persistence.GetLastSeenArchiveLink(communityID)
+	oldArchiveLink, err := m.persistence.GetLastSeenArchiveLink(communityID)
+	oldArchiveLinkValid := err == nil
 	if err != nil {
-		m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] failed to get last seen archive link - proceeding without un-seeding", zap.Error(err))
-	} else {
-		m.UnseedHistoryArchive(communityID, lastSeenArchiveLink)
-	}
-	archiveCreatedSuccessfully := true
-	archiveIDs, err := m.CreateHistoryArchiveFromDB(communityID, topics, startDate, endDate, partition, encrypt)
-	if err != nil {
-		archiveCreatedSuccessfully = false
-		m.logger.Error("[LogosStorage][CreateAndSeedHistoryArchive] failed to create history archive LogosStorage", zap.Error(err))
-	} else {
-		if len(archiveIDs) == 0 {
-			// no new LogosStorage archives were created - no need to distribute new index cid
-			// but we need to (re)start seeding that we stopped above
-			archiveCreatedSuccessfully = false
-			m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] no new LogosStorage archive links were created - re-seeding existing archive link")
-			if err = m.SeedHistoryArchive(communityID, lastSeenArchiveLink); err != nil {
-				m.logger.Error("[LogosStorage][CreateAndSeedHistoryArchive] failed to seed existing history archive LogosStorage archive link", zap.Error(err))
-			}
-		}
-		// else: we created new LogosStorage archives and they are already published to LogosStorage
-		// in CreateHistoryArchiveLogosStorageFromDB (thus they are seeded)
+		m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] failed to get last seen archive link - proceeding without old index cleanup", zap.Error(err))
 	}
 
-	if !archiveCreatedSuccessfully {
+	archiveIDs, err := m.CreateHistoryArchiveFromDB(communityID, topics, startDate, endDate, partition, encrypt)
+	if err != nil {
+		m.logger.Error("[LogosStorage][CreateAndSeedHistoryArchive] failed to create history archive LogosStorage", zap.Error(err))
 		return err
+	}
+
+	if len(archiveIDs) == 0 {
+		// No new LogosStorage archives were created; keep the previous index seeded.
+		return nil
+	}
+
+	if oldArchiveLinkValid && oldArchiveLink != "" {
+		newArchiveLink, err := m.persistence.GetLastSeenArchiveLink(communityID)
+		if err != nil {
+			m.logger.Debug("[LogosStorage][CreateAndSeedHistoryArchive] failed to get new archive link - skipping old index cleanup", zap.Error(err))
+		} else if oldArchiveLink != newArchiveLink {
+			m.UnseedHistoryArchive(communityID, oldArchiveLink)
+		}
 	}
 
 	return nil

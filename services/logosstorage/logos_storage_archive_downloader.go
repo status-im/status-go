@@ -281,7 +281,8 @@ func (d *LogosStorageArchiveDownloader) downloadAllArchives() {
 						d.totalDownloadedArchivesCount++
 						d.mu.Unlock()
 
-						d.logger.Debug("[LogosStorage] archive download completed",
+						d.logger.Debug(
+							"[LogosStorage] archive download completed",
 							zap.String("cid", archiveCid),
 							zap.String("totalDownloadedArchivesCount", fmt.Sprintf("%d", d.totalDownloadedArchivesCount)),
 						)
@@ -299,7 +300,7 @@ func (d *LogosStorageArchiveDownloader) downloadAllArchives() {
 }
 
 // triggerSingleArchiveDownload downloads a single archive by its CID
-func (d *LogosStorageArchiveDownloader) triggerSingleArchiveDownload(hash, cid string, cancelChan <-chan struct{}) error {
+func (d *LogosStorageArchiveDownloader) triggerSingleArchiveDownload(_, cid string, cancelChan <-chan struct{}) error {
 	defer common.LogOnPanic()
 	// Create a context that can be cancelled via our cancel channel
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
