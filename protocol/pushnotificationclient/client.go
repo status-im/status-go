@@ -1073,8 +1073,13 @@ func (c *Client) handleDirectMessageSent(sentMessage *messagingevents.SentMessag
 		chatID = message.ChatId
 	}
 
+	notificationType := protobuf.PushNotification_MESSAGE
+	if message.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
+		notificationType = protobuf.PushNotification_CONTACT_REQUEST
+	}
+
 	// we send the notifications and return the info of the devices notified
-	infos, err := c.SendNotification(publicKey, installationIDs, trackedMessageIDs[0], chatID, protobuf.PushNotification_MESSAGE)
+	infos, err := c.SendNotification(publicKey, installationIDs, trackedMessageIDs[0], chatID, notificationType)
 	if err != nil {
 		return err
 	}
@@ -1084,7 +1089,7 @@ func (c *Client) handleDirectMessageSent(sentMessage *messagingevents.SentMessag
 		for _, messageID := range trackedMessageIDs {
 
 			c.config.Logger.Debug("marking as sent ", zap.String("messageID", types.EncodeHex(messageID)), zap.String("id", i.InstallationID))
-			if err := c.notifiedOn(publicKey, i.InstallationID, messageID, chatID, protobuf.PushNotification_MESSAGE); err != nil {
+			if err := c.notifiedOn(publicKey, i.InstallationID, messageID, chatID, notificationType); err != nil {
 				return err
 			}
 
