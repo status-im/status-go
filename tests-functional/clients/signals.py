@@ -238,9 +238,15 @@ class SignalClient:
             return [signal.get("event") for signal in signals]
 
     def _on_error(self, ws, error):
+        if self._should_stop:
+            logging.debug(f"SignalClient [{self.url}]: websocket error during shutdown: {error}")
+            return
         logging.error(f"SignalClient [{self.url}]: websocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
+        if self._should_stop:
+            logging.debug(f"SignalClient [{self.url}]: websocket connection closed during shutdown")
+            return
         logging.error(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
