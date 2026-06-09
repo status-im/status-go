@@ -43,6 +43,9 @@ const (
 	DirectInfura      = "direct-infura"
 	DirectGrove       = "direct-grove"
 	DirectCustom      = "direct-custom"
+	DirectKatana      = "direct-katana"
+	DirectConduit     = "direct-conduit"
+	DirectTenderly    = "direct-tenderly"
 )
 
 type ChainID uint64
