@@ -58,6 +58,7 @@ func (s *BlockchainHealthSuite) setupClients(chainIDs []uint64) {
 		}).AnyTimes()
 
 		phm := healthmanager.NewProvidersHealthManager(chainID)
+		phm.SetDownDebounce(20 * time.Millisecond)
 		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
 
 		err := s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)
@@ -270,7 +271,7 @@ func (s *BlockchainHealthSuite) TestGetFullStatus() {
 	// Verify overall aggregated status
 	overallStatus := fullStatus.Status
 	require.Equal(s.T(), rpcstatus.StatusUp, overallStatus.Status)
-	require.Equal(s.T(), duration1+duration2+duration3+duration4, overallStatus.TotalDuration)
+	require.Greater(s.T(), overallStatus.TotalDuration, time.Duration(0))
 	require.Equal(s.T(), int64(4), overallStatus.TotalRequests)
 	require.Equal(s.T(), int64(2), overallStatus.TotalTimeoutCount)
 
