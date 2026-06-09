@@ -69,6 +69,19 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				TokenType:   protobuf.PushNotificationRegistration_FIREBASE_TOKEN,
 			},
 		},
+		{
+			Request: &protobuf.PushNotification{
+				ChatId:         chatID,
+				Type:           protobuf.PushNotification_CONTACT_REQUEST,
+				PublicKey:      publicKey2,
+				InstallationId: installationID3,
+				Message:        message3,
+			},
+			Registration: &protobuf.PushNotificationRegistration{
+				DeviceToken: token3,
+				TokenType:   protobuf.PushNotificationRegistration_APN_TOKEN,
+			},
+		},
 	}
 
 	expectedRequests := &GoRushRequest{
@@ -106,6 +119,21 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 					EncryptedMessage: hexMessage3,
 					ChatID:           types.EncodeHex(chatID),
 					PublicKey:        types.EncodeHex(publicKey2),
+				},
+			},
+			{
+				Tokens:           []string{token3},
+				Platform:         platform1,
+				Message:          defaultContactRequestNotificationText,
+				ContentAvailable: true,
+				Sound:            "default",
+				Priority:         "high",
+				PushType:         "alert",
+				Data: &GoRushRequestData{
+					EncryptedMessage: hexMessage3,
+					ChatID:           types.EncodeHex(chatID),
+					PublicKey:        types.EncodeHex(publicKey2),
+					DeepLink:         deepLinkContactRequests,
 				},
 			},
 		},
@@ -153,6 +181,7 @@ func TestGoRushRequestDeepLinkByType(t *testing.T) {
 		{"message", protobuf.PushNotification_MESSAGE, deepLinkChats},
 		{"mention", protobuf.PushNotification_MENTION, deepLinkActivityCenter},
 		{"community request", protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY, deepLinkActivityCenter},
+		{"contact request", protobuf.PushNotification_CONTACT_REQUEST, deepLinkContactRequests},
 		{"unknown", protobuf.PushNotification_UNKNOWN_PUSH_NOTIFICATION_TYPE, deepLinkActivityCenter},
 	}
 	for _, tc := range cases {
