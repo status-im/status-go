@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
@@ -15,7 +14,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
@@ -400,10 +398,6 @@ func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) 
 	return filters, nil
 }
 
-func (t *Transport) GetStats() types.StatsSummary {
-	return t.waku.GetStats()
-}
-
 // RetrieveRawAll drains the messages pushed in by the waku adapter and decoded
 // by receiveLoop, dropping any the persistent processed-message cache has
 // already seen, and returns them grouped by filter.
@@ -641,6 +635,8 @@ func (t *Transport) PeerCount() int {
 	return t.waku.PeerCount()
 }
 
+// Peers is retained only for the Python functional tests (see tests-functional);
+// it is not used by status-app.
 func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
@@ -673,30 +669,6 @@ func (t *Transport) ClearProcessedMessageIDsCache() error {
 
 func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types2.EncodeHex(crypto.FromECDSAPub(key))
-}
-
-func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return t.waku.ListenAddresses()
-}
-
-func (t *Transport) ENR() (*enode.Node, error) {
-	return t.waku.ENR()
-}
-
-func (t *Transport) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return t.waku.AddRelayPeer(address)
-}
-
-func (t *Transport) DialPeer(address multiaddr.Multiaddr) error {
-	return t.waku.DialPeer(address)
-}
-
-func (t *Transport) DialPeerByID(peerID peer.ID) error {
-	return t.waku.DialPeerByID(peerID)
-}
-
-func (t *Transport) DropPeer(peerID peer.ID) error {
-	return t.waku.DropPeer(peerID)
 }
 
 func (t *Transport) ConnectionChanged(state connection.State) {

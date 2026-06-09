@@ -811,17 +811,6 @@ func (m *Messenger) ToggleUseMailservers(value bool) error {
 	return nil
 }
 
-func (m *Messenger) SetPinnedMailservers(mailservers map[string]string) error {
-	err := m.settings.SetPinnedMailservers(mailservers)
-	if err != nil {
-		return err
-	}
-
-	m.messaging.DisconnectActiveStorenode(m.ctx, backoffByUserAction, true)
-
-	return nil
-}
-
 func (m *Messenger) RemoveFilters(filters []*types2.ChatFilter) error {
 	return m.messaging.RemoveFilters(filters)
 }

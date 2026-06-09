@@ -686,10 +686,6 @@ func (db *Database) GetRecentStickers() (rst *json.RawMessage, err error) {
 	return
 }
 
-func (db *Database) SetPinnedMailservers(mailservers map[string]string) error {
-	return db.SaveSettingField(PinnedMailservers, mailservers)
-}
-
 func (db *Database) SetUseMailservers(value bool) error {
 	return db.SaveSettingField(UseMailservers, value)
 }

@@ -31,6 +31,11 @@ func (a *API) GetCurrentTime() uint64 {
 	return a.core.stack.Transport.GetCurrentTime()
 }
 
+// Online reports whether the transport currently has at least one connected peer.
+func (a *API) Online() bool {
+	return a.core.stack.Transport.PeerCount() > 0
+}
+
 // SubscribeFilterMatched returns a channel that is notified whenever an incoming
 // envelope matches at least one installed filter. bufSize should be 1.
 // Callers must call UnsubscribeFilterMatched when done.
