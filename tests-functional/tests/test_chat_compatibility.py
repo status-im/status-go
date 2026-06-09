@@ -12,20 +12,33 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.mark.compatibility
+@pytest.mark.parametrize(
+    ("vut_light", "peer_light"),
+    [
+        pytest.param(False, False, id="full-full"),
+        pytest.param(False, True, id="full-light"),
+        pytest.param(True, False, id="light-full"),
+        pytest.param(True, True, id="light-light"),
+    ],
+)
 class TestChatCompatibility:
-    """Cross-version chat smoke: vut (build under test) talks to peer (a released backend)."""
+    """Cross-version chat smoke: vut (build under test) talks to peer (a released backend).
+
+    Each test runs in a full/light waku mode matrix: vut runs in the first mode,
+    peer and third run in the second.
+    """
 
     @pytest.fixture()
-    def vut(self, backend_new_profile):
-        return backend_new_profile("vut")
+    def vut(self, backend_new_profile, vut_light):
+        return backend_new_profile("vut", waku_light_client=vut_light)
 
     @pytest.fixture()
-    def peer(self, backend_new_profile, peer_image):
-        return backend_new_profile("peer", image=peer_image)
+    def peer(self, backend_new_profile, peer_image, peer_light):
+        return backend_new_profile("peer", image=peer_image, waku_light_client=peer_light)
 
     @pytest.fixture()
-    def third(self, backend_new_profile, peer_image):
-        return backend_new_profile("third", image=peer_image)
+    def third(self, backend_new_profile, peer_image, peer_light):
+        return backend_new_profile("third", image=peer_image, waku_light_client=peer_light)
 
     def test_one_to_one_compatibility(self, vut, peer):
         messenger.make_contacts(vut, peer)
