@@ -102,7 +102,7 @@ require (
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.4.0
 	github.com/status-im/go-wallet-sdk v0.0.0-20260428172609-d99313975e5c
-	github.com/waku-org/go-waku v0.10.2-0.20260518064454-d6d39395ac48
+	github.com/waku-org/go-waku v0.10.2
 	github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.uber.org/atomic v1.11.0
