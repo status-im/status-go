@@ -146,8 +146,10 @@ type Waku interface {
 	GetSymKey(id string) ([]byte, error)
 	MaxMessageSize() uint32
 
-	Subscribe(opts *SubscriptionOptions) (string, error)
-	GetFilter(id string) Filter
+	// Subscribe registers a wire subscription for the given content topics on
+	// the given pubsub topic and returns its id. No key material is involved:
+	// decoding and matching of received messages happen in the transport.
+	Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error)
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 
