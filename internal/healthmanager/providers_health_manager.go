@@ -23,6 +23,7 @@ type ProvidersHealthManager struct {
 
 	downDebounce time.Duration
 	downTimer    *time.Timer
+	paused       bool
 }
 
 // NewProvidersHealthManager creates a new instance of ProvidersHealthManager with the given chain ID.
@@ -61,17 +62,29 @@ func (p *ProvidersHealthManager) doUpdate(callStatuses []rpcstatus.RpcProviderCa
 // Update processes a batch of provider call statuses, updates the aggregated status, and emits chain status changes if necessary.
 func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcstatus.RpcProviderCallStatus) {
 	shouldEmit, newStatus := p.doUpdate(callStatuses)
-	if !shouldEmit {
+
+	p.mu.RLock()
+	paused := p.paused
+	p.mu.RUnlock()
+	if paused {
+		if newStatus.Status != rpcstatus.StatusDown {
+			p.stopDownTimer()
+		}
 		return
 	}
 
 	// Defer Down emission until it persists; emit recovery to Up/Unknown immediately.
 	if newStatus.Status == rpcstatus.StatusDown {
-		p.armDownTimer()
+		if shouldEmit {
+			p.armDownTimer()
+		}
 		return
 	}
 
 	p.stopDownTimer()
+	if !shouldEmit {
+		return
+	}
 	p.emitChainStatus(ctx)
 
 	p.mu.Lock()
@@ -114,6 +127,10 @@ func (p *ProvidersHealthManager) emitDownIfStillDown() {
 	}
 
 	current := p.aggregator.GetAggregatedStatus()
+	if p.paused {
+		p.mu.Unlock()
+		return
+	}
 	if current.Status != rpcstatus.StatusDown {
 		p.mu.Unlock()
 		return
@@ -174,7 +191,50 @@ func (p *ProvidersHealthManager) ChainID() uint64 {
 
 // SetDownDebounce overrides the Down emission debounce window.
 func (p *ProvidersHealthManager) SetDownDebounce(d time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.downDebounce = d
+}
+
+// Pause prevents emissions and clears any pending Down debounce timer.
+func (p *ProvidersHealthManager) Pause() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.paused = true
+	if p.downTimer != nil {
+		p.downTimer.Stop()
+		p.downTimer = nil
+	}
+}
+
+// Resume reenables emissions and coalesces status updates to a single notification.
+func (p *ProvidersHealthManager) Resume() {
+	p.mu.Lock()
+	p.paused = false
+	if p.aggregator == nil {
+		p.mu.Unlock()
+		return
+	}
+
+	current := p.aggregator.GetAggregatedStatus()
+	shouldEmit := p.lastStatus == nil || p.lastStatus.Status != current.Status
+	p.mu.Unlock()
+
+	if !shouldEmit {
+		return
+	}
+
+	if current.Status == rpcstatus.StatusDown {
+		p.armDownTimer()
+		return
+	}
+
+	p.emitChainStatus(context.Background())
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	statusCopy := current
+	p.lastStatus = &statusCopy
 }
 
 // emitChainStatus sends a notification to all subscribers.
