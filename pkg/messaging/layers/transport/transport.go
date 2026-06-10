@@ -21,7 +21,6 @@ import (
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -60,12 +59,6 @@ type Transport struct {
 	// whenever a received message matched at least one listening filter.
 	// Non-blocking, coalescing — the buffer above holds the actual data.
 	matchedPublisher *pubsub.TypePublisher[struct{}]
-
-	// wireSubs tracks the (pubsub, content) topic pairs currently subscribed
-	// on the backend, diffed against the filters' desired set by
-	// syncFilterSubscriptions after every filter mutation.
-	wireSubsMu sync.Mutex
-	wireSubs   map[types.TopicSubscription]struct{}
 }
 
 // Pause signals Transport's internal goroutines to idle and cascades to
@@ -112,7 +105,12 @@ func NewTransport(
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Transport, error) {
-	filtersManager, err := NewFiltersManager(keysPersistence, privateKey, logger)
+	var api MessagingAPI
+	if waku != nil {
+		api = waku
+	}
+
+	filtersManager, err := NewFiltersManager(keysPersistence, api, privateKey, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +119,6 @@ func NewTransport(
 	if envelopesMonitorConfig != nil {
 		envelopesMonitor = NewEnvelopesMonitor(waku, *envelopesMonitorConfig)
 		envelopesMonitor.Start()
-	}
-
-	var api MessagingAPI
-	if waku != nil {
-		api = waku
 	}
 	t := &Transport{
 		waku:             waku,
@@ -138,7 +131,6 @@ func NewTransport(
 		logger:           logger.With(zap.Namespace("Transport")),
 		received:         make(map[string]map[string]*types.Message),
 		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
-		wireSubs:         make(map[types.TopicSubscription]struct{}),
 	}
 
 	for _, opt := range opts {
@@ -334,75 +326,12 @@ func toMessage(decoded *rfc26.DecodedPayload, filter *Filter, raw *types.Receive
 	return m
 }
 
-// syncFilterSubscriptions reconciles the backend's wire subscriptions with the
-// (pubsub, content) topic pairs of the currently installed filters; it must be
-// called after every filter mutation. The desired set is re-derived from the
-// filters each time and diffed against the pairs currently subscribed, so a
-// pair is subscribed when the first filter on it appears and unsubscribed when
-// the last one is removed — distinct filters sharing a topic pair (colliding
-// chats) collapse into a single wire subscription, with no reference counts to
-// drift. The pubsub topic is normalized the same way received messages are
-// routed (WatchersByTopic), so a filter listening on the default shard
-// implicitly and one declaring it explicitly are the same wire subscription.
-func (t *Transport) syncFilterSubscriptions(ctx context.Context) error {
-	if t.api == nil {
-		return nil
-	}
-
-	t.wireSubsMu.Lock()
-	defer t.wireSubsMu.Unlock()
-
-	filters := t.filters.Filters()
-	desired := make(map[types.TopicSubscription]struct{}, len(filters))
-	for _, filter := range filters {
-		pubsubTopic := filter.PubsubTopic
-		if pubsubTopic == "" {
-			pubsubTopic = wakuv2.DefaultShardPubsubTopic()
-		}
-		desired[types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: filter.ContentTopic}] = struct{}{}
-	}
-
-	for sub := range t.wireSubs {
-		if _, ok := desired[sub]; ok {
-			continue
-		}
-		if err := t.api.Unsubscribe(ctx, sub); err != nil {
-			return err
-		}
-		delete(t.wireSubs, sub)
-	}
-
-	for sub := range desired {
-		if _, ok := t.wireSubs[sub]; ok {
-			continue
-		}
-		if err := t.api.Subscribe(ctx, sub); err != nil {
-			return err
-		}
-		t.wireSubs[sub] = struct{}{}
-	}
-
-	return nil
-}
-
-// syncAfter returns v unchanged after reconciling wire subscriptions, so
-// filter-mutating wrappers can sync in their return statement.
-func syncAfter[T any](ctx context.Context, t *Transport, v T, err error) (T, error) {
-	if err != nil {
-		var zero T
-		return zero, err
-	}
-	return v, t.syncFilterSubscriptions(ctx)
-}
-
 func (t *Transport) InitFilters(chatIDs []FiltersToInitialize, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
-	filters, err := t.filters.Init(chatIDs, publicKeys)
-	return syncAfter(context.Background(), t, filters, err)
+	return t.filters.Init(chatIDs, publicKeys)
 }
 
 func (t *Transport) InitPublicFilters(filtersToInit []FiltersToInitialize) ([]*Filter, error) {
-	filters, err := t.filters.InitPublicFilters(filtersToInit)
-	return syncAfter(context.Background(), t, filters, err)
+	return t.filters.InitPublicFilters(filtersToInit)
 }
 
 func (t *Transport) Filters() []*Filter {
@@ -422,42 +351,35 @@ func (t *Transport) FiltersByIdentities(identities []string) []*Filter {
 }
 
 func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
-	filters, err := t.filters.InitCommunityFilters(communityFiltersToInitialize)
-	return syncAfter(context.Background(), t, filters, err)
+	return t.filters.InitCommunityFilters(communityFiltersToInitialize)
 }
 
 func (t *Transport) RemoveFilters(filters []*Filter) error {
-	if err := t.filters.Remove(filters...); err != nil {
-		return err
-	}
-	return t.syncFilterSubscriptions(context.Background())
+	return t.filters.Remove(filters...)
 }
 
 func (t *Transport) RemoveFilterByChatID(chatID string) (*Filter, error) {
-	filter, err := t.filters.RemoveFilterByChatID(chatID)
-	return syncAfter(context.Background(), t, filter, err)
+	return t.filters.RemoveFilterByChatID(chatID)
 }
 
 func (t *Transport) ResetFilters(ctx context.Context) error {
-	if err := t.filters.Reset(); err != nil {
-		return err
-	}
-	return t.syncFilterSubscriptions(ctx)
+	return t.filters.Reset()
 }
 
 func (t *Transport) ProcessNegotiatedSecret(secret messagingtypes.NegotiatedSecret) (*Filter, error) {
 	filter, err := t.filters.LoadNegotiated(secret)
-	return syncAfter(context.Background(), t, filter, err)
+	if err != nil {
+		return nil, err
+	}
+	return filter, nil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	filter, err := t.filters.LoadPublic(chatID, "")
-	return syncAfter(context.Background(), t, filter, err)
+	return t.filters.LoadPublic(chatID, "")
 }
 
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
-	filter, err := t.filters.LoadContactCode(publicKey)
-	return syncAfter(context.Background(), t, filter, err)
+	return t.filters.LoadContactCode(publicKey)
 }
 
 func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
@@ -470,7 +392,7 @@ func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) 
 		filters = append(filters, f)
 
 	}
-	return syncAfter(context.Background(), t, filters, nil)
+	return filters, nil
 }
 
 // RetrieveRawAll drains the messages pushed in by the waku adapter and decoded
@@ -530,10 +452,6 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	if err := t.syncFilterSubscriptions(ctx); err != nil {
-		return nil, err
-	}
-
 	symKey, ok := t.filters.SymKey(filter.FilterID)
 	if !ok {
 		return nil, errors.New("no sym key found for filter")
@@ -556,10 +474,6 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	if err := t.syncFilterSubscriptions(ctx); err != nil {
-		return nil, err
-	}
-
 	symKey, ok := t.filters.SymKey(filter.FilterID)
 	if !ok {
 		return nil, errors.New("no sym key found for filter")
@@ -579,10 +493,6 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 		return nil, err
 	}
 
-	if err := t.syncFilterSubscriptions(ctx); err != nil {
-		return nil, err
-	}
-
 	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
 	if err != nil {
 		return nil, err
@@ -594,10 +504,6 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	filter, err := t.filters.LoadPersonal(publicKey, t.privateKey, false)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := t.syncFilterSubscriptions(ctx); err != nil {
 		return nil, err
 	}
 
@@ -614,18 +520,13 @@ func (t *Transport) PersonalTopicFilter() *Filter {
 }
 
 func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
-	filter, err := t.filters.LoadEphemeral(&key.PublicKey, key, true)
-	return syncAfter(context.Background(), t, filter, err)
+	return t.filters.LoadEphemeral(&key.PublicKey, key, true)
 }
 
 func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	// We load the filter to make sure we can post on it
 	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := t.syncFilterSubscriptions(ctx); err != nil {
 		return nil, err
 	}
 
@@ -644,10 +545,7 @@ func (t *Transport) cleanFilters() error {
 	if t.filters == nil {
 		return nil
 	}
-	if err := t.filters.RemoveNoListenFilters(); err != nil {
-		return err
-	}
-	return t.syncFilterSubscriptions(context.Background())
+	return t.filters.RemoveNoListenFilters()
 }
 
 // encode produces the WakuMessage version=1 payload for the given plaintext.

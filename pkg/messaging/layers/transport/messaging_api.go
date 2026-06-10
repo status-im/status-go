@@ -27,13 +27,12 @@ type MessagingAPI interface {
 
 	// Subscribe and Unsubscribe register and remove a wire subscription for a
 	// single (pubsubTopic, contentTopic) pair, keyed by the pair itself: the
-	// transport subscribes when the first filter on a pair appears and
-	// unsubscribes when the last one is removed (see
-	// syncFilterSubscriptions). How a subscription maps onto the wire — the
-	// Waku Filter protocol for light clients, nothing at all for relay
-	// clients — is the backend's concern, as is any subscription identifier
-	// it keeps for its own bookkeeping. Both are idempotent, mirroring the
-	// logos-delivery messaging API.
+	// FiltersManager subscribes when the first filter on a pair is installed
+	// and unsubscribes when the last one is removed (see WireSubscriber). How
+	// a subscription maps onto the wire — the Waku Filter protocol for light
+	// clients, nothing at all for relay clients — is the backend's concern,
+	// as is any subscription identifier it keeps for its own bookkeeping.
+	// Both are idempotent, mirroring the logos-delivery messaging API.
 	Subscribe(ctx context.Context, sub types.TopicSubscription) error
 	Unsubscribe(ctx context.Context, sub types.TopicSubscription) error
 }
