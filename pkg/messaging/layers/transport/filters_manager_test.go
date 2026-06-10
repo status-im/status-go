@@ -87,7 +87,7 @@ func (s *FiltersManagerSuite) SetupTest() {
 
 	keysPersistence := newTestKeysPersistence()
 
-	s.chats, err = NewFiltersManager(keysPersistence, nil, s.manager[0].privateKey, s.logger)
+	s.chats, err = NewFiltersManager(keysPersistence, s.manager[0].privateKey, s.logger)
 	s.Require().NoError(err)
 }
 

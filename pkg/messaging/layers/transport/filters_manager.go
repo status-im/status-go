@@ -17,17 +17,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-// FilterObserver is notified as filters are installed and removed (with the
-// manager's mutex held). The transport observes the lifecycle to maintain the
-// backend's wire subscriptions — the FiltersManager itself stays a pure
-// status-go filtering concern. An OnFilterAdded error aborts the install.
-type FilterObserver interface {
-	OnFilterAdded(*Filter) error
-	OnFilterRemoved(*Filter)
-}
-
 type FiltersManager struct {
-	observer    FilterObserver
 	persistence KeysPersistence
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
@@ -45,7 +35,7 @@ type FiltersManager struct {
 }
 
 // NewFiltersManager returns a new filtersManager.
-func NewFiltersManager(persistence KeysPersistence, observer FilterObserver, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*FiltersManager, error) {
+func NewFiltersManager(persistence KeysPersistence, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*FiltersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -56,7 +46,6 @@ func NewFiltersManager(persistence KeysPersistence, observer FilterObserver, pri
 	}
 
 	return &FiltersManager{
-		observer:    observer,
 		privateKey:  privateKey,
 		persistence: persistence,
 		keys:        keys,
@@ -65,23 +54,6 @@ func NewFiltersManager(persistence KeysPersistence, observer FilterObserver, pri
 		symKeys:     make(map[string][]byte),
 		logger:      logger.With(zap.Namespace("filtersManager")),
 	}, nil
-}
-
-// notifyAdded reports an installed filter to the observer. Called with
-// f.mutex held.
-func (f *FiltersManager) notifyAdded(filter *Filter) error {
-	if f.observer == nil {
-		return nil
-	}
-	return f.observer.OnFilterAdded(filter)
-}
-
-// notifyRemoved reports a removed filter to the observer. Called with f.mutex
-// held.
-func (f *FiltersManager) notifyRemoved(filter *Filter) {
-	if f.observer != nil {
-		f.observer.OnFilterRemoved(filter)
-	}
 }
 
 // SymKey returns the symmetric key used to encode and decode messages on the
@@ -254,9 +226,6 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 			}
 
 			f.filters[filterID] = filter
-			if err := f.notifyAdded(filter); err != nil {
-				return nil, err
-			}
 
 			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", topic.String()))
 
@@ -266,7 +235,8 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	return filters, nil
 }
 
-func (f *FiltersManager) Reset() error {
+// Reset removes all the installed filters and returns them.
+func (f *FiltersManager) Reset() ([]*Filter, error) {
 	var filters []*Filter
 
 	f.mutex.Lock()
@@ -275,7 +245,7 @@ func (f *FiltersManager) Reset() error {
 	}
 	f.mutex.Unlock()
 
-	return f.Remove(filters...)
+	return filters, f.Remove(filters...)
 }
 
 func (f *FiltersManager) Filters() (result []*Filter) {
@@ -355,12 +325,9 @@ func (f *FiltersManager) Remove(filtersToRemove ...*Filter) error {
 	defer f.mutex.Unlock()
 
 	for _, filter := range filtersToRemove {
-		// Release the wire subscription only for entries actually installed,
-		// so removing the same filter twice cannot double-decrement.
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
 				delete(f.filters, k)
-				f.notifyRemoved(v)
 			}
 		}
 		f.deleteSymKey(filter.FilterID)
@@ -370,8 +337,9 @@ func (f *FiltersManager) Remove(filtersToRemove ...*Filter) error {
 	return nil
 }
 
-// Remove remove all the filters associated with a chat/identity
-func (f *FiltersManager) RemoveNoListenFilters() error {
+// RemoveNoListenFilters removes all the non-listening (publish-only) filters
+// and returns them.
+func (f *FiltersManager) RemoveNoListenFilters() ([]*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	var filters []*Filter
@@ -386,14 +354,13 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
 				delete(f.filters, k)
-				f.notifyRemoved(v)
 			}
 		}
 		f.deleteSymKey(filter.FilterID)
 		delete(f.asymKeys, filter.FilterID)
 	}
 
-	return nil
+	return filters, nil
 }
 
 // RemoveFilterByChatID removes the filters associated with a chat/identity
@@ -460,9 +427,6 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 	}
 
 	f.filters[chatID] = chat
-	if err := f.notifyAdded(chat); err != nil {
-		return nil, err
-	}
 
 	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "personal"), zap.String("topic", topic.String()))
 
@@ -502,9 +466,6 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 	}
 
 	f.filters[chatID] = chat
-	if err := f.notifyAdded(chat); err != nil {
-		return nil, err
-	}
 
 	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "partitioned"), zap.String("topic", topic.String()))
 
@@ -540,9 +501,6 @@ func (f *FiltersManager) LoadNegotiated(secret messagingtypes.NegotiatedSecret) 
 	}
 
 	f.filters[chat.ChatID] = chat
-	if err := f.notifyAdded(chat); err != nil {
-		return nil, err
-	}
 
 	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "negotiated"), zap.String("topic", topic.String()))
 
@@ -591,9 +549,6 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 	personalDiscoveryChat.FilterID = id
 
 	f.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
-	if err := f.notifyAdded(personalDiscoveryChat); err != nil {
-		return nil, err
-	}
 
 	f.logger.Debug("registering filter for", zap.String("chatID", personalDiscoveryChat.ChatID), zap.String("type", "discovery"), zap.String("topic", personalDiscoveryChat.ContentTopic.String()))
 
@@ -619,12 +574,8 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 				zap.String("oldTopic", chat.PubsubTopic),
 				zap.String("newTopic", pubsubTopic),
 			)
-			f.notifyRemoved(chat)
 			chat.PubsubTopic = pubsubTopic
 			f.filters[chatID] = chat
-			if err := f.notifyAdded(chat); err != nil {
-				return nil, err
-			}
 		}
 		return chat, nil
 	}
@@ -645,9 +596,6 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 	}
 
 	f.filters[chatID] = chat
-	if err := f.notifyAdded(chat); err != nil {
-		return nil, err
-	}
 
 	f.logger.Debug("registering filter for",
 		zap.String("chatID", chatID),
@@ -685,9 +633,6 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 	}
 
 	f.filters[chatID] = chat
-	if err := f.notifyAdded(chat); err != nil {
-		return nil, err
-	}
 
 	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "contact-code"), zap.String("topic", topic.String()))
 
