@@ -25,13 +25,17 @@ type MessagingAPI interface {
 	// tracks. This is the single, logos-delivery-shaped event seam.
 	SubscribeEnvelopeEvents(events chan<- types.EnvelopeEvent) types.Subscription
 
-	// SyncSubscriptions reconciles the backend's wire subscriptions with the
-	// desired set of (pubsubTopic, contentTopic) pairs. The transport declares
-	// the full set after every filter change; how a declaration maps onto the
-	// wire — the Waku Filter protocol for light clients, nothing at all for
-	// relay clients — is the backend's concern, as is any subscription
-	// identifier it keeps for its own bookkeeping.
-	SyncSubscriptions(ctx context.Context, desired []types.TopicSubscription) error
+	// Subscribe and Unsubscribe register and remove a wire subscription for a
+	// single (pubsubTopic, contentTopic) pair, keyed by the pair itself: the
+	// transport subscribes when the first filter on a pair appears and
+	// unsubscribes when the last one is removed (see
+	// syncFilterSubscriptions). How a subscription maps onto the wire — the
+	// Waku Filter protocol for light clients, nothing at all for relay
+	// clients — is the backend's concern, as is any subscription identifier
+	// it keeps for its own bookkeeping. Both are idempotent, mirroring the
+	// logos-delivery messaging API.
+	Subscribe(ctx context.Context, sub types.TopicSubscription) error
+	Unsubscribe(ctx context.Context, sub types.TopicSubscription) error
 }
 
 // Compile-time assertion: the waku adapter satisfies MessagingAPI.

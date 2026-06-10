@@ -78,8 +78,8 @@ func (u *ConnStatusSubscription) Send(s ConnStatus) bool {
 }
 
 // TopicSubscription identifies a single (pubsub topic, content topic) pair the
-// transport wants to receive messages on. It is the unit of wire-subscription
-// reconciliation: see MessagingAPI.SyncSubscriptions in the transport layer.
+// transport wants to receive messages on. It is the unit of wire subscription:
+// see MessagingAPI.Subscribe/Unsubscribe in the transport layer.
 type TopicSubscription struct {
 	PubsubTopic  string
 	ContentTopic TopicType
@@ -130,9 +130,10 @@ type Waku interface {
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
-	// SyncSubscriptions reconciles the wire subscriptions with the desired set
-	// of (pubsubTopic, contentTopic) pairs. See transport.MessagingAPI.
-	SyncSubscriptions(ctx context.Context, desired []TopicSubscription) error
+	// Subscribe/Unsubscribe register and remove a wire subscription for a
+	// single (pubsubTopic, contentTopic) pair. See transport.MessagingAPI.
+	Subscribe(ctx context.Context, sub TopicSubscription) error
+	Unsubscribe(ctx context.Context, sub TopicSubscription) error
 
 	MaxMessageSize() uint32
 

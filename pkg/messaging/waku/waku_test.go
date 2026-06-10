@@ -264,9 +264,8 @@ func TestWakuV2Filter(t *testing.T) {
 	contentTopicBytes := make([]byte, 4)
 	_, err = rand.Read(contentTopicBytes)
 	require.NoError(t, err)
-	err = w.SyncSubscriptions(context.Background(), []types.TopicSubscription{
-		{PubsubTopic: testPubsubTopic, ContentTopic: types.BytesToTopic(contentTopicBytes)},
-	})
+	topicSub := types.TopicSubscription{PubsubTopic: testPubsubTopic, ContentTopic: types.BytesToTopic(contentTopicBytes)}
+	err = w.Subscribe(context.Background(), topicSub)
 	require.NoError(t, err)
 
 	// Reception now flows on the envelope feed (decoding/matching live in the
@@ -328,7 +327,7 @@ func TestWakuV2Filter(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	requireReceived()
-	err = w.SyncSubscriptions(context.Background(), nil)
+	err = w.Unsubscribe(context.Background(), topicSub)
 	require.NoError(t, err)
 	require.NoError(t, w.Stop())
 }

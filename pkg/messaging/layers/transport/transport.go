@@ -60,6 +60,12 @@ type Transport struct {
 	// whenever a received message matched at least one listening filter.
 	// Non-blocking, coalescing — the buffer above holds the actual data.
 	matchedPublisher *pubsub.TypePublisher[struct{}]
+
+	// wireSubs tracks the (pubsub, content) topic pairs currently subscribed
+	// on the backend, diffed against the filters' desired set by
+	// syncFilterSubscriptions after every filter mutation.
+	wireSubsMu sync.Mutex
+	wireSubs   map[types.TopicSubscription]struct{}
 }
 
 // Pause signals Transport's internal goroutines to idle and cascades to
@@ -132,6 +138,7 @@ func NewTransport(
 		logger:           logger.With(zap.Namespace("Transport")),
 		received:         make(map[string]map[string]*types.Message),
 		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
+		wireSubs:         make(map[types.TopicSubscription]struct{}),
 	}
 
 	for _, opt := range opts {
@@ -329,33 +336,53 @@ func toMessage(decoded *rfc26.DecodedPayload, filter *Filter, raw *types.Receive
 
 // syncFilterSubscriptions reconciles the backend's wire subscriptions with the
 // (pubsub, content) topic pairs of the currently installed filters; it must be
-// called after every filter mutation. Distinct filters sharing a topic pair
-// (colliding chats) collapse into a single wire subscription. The pubsub topic
-// is normalized the same way received messages are routed (WatchersByTopic),
-// so a filter listening on the default shard implicitly and one declaring it
-// explicitly are the same wire subscription.
+// called after every filter mutation. The desired set is re-derived from the
+// filters each time and diffed against the pairs currently subscribed, so a
+// pair is subscribed when the first filter on it appears and unsubscribed when
+// the last one is removed — distinct filters sharing a topic pair (colliding
+// chats) collapse into a single wire subscription, with no reference counts to
+// drift. The pubsub topic is normalized the same way received messages are
+// routed (WatchersByTopic), so a filter listening on the default shard
+// implicitly and one declaring it explicitly are the same wire subscription.
 func (t *Transport) syncFilterSubscriptions(ctx context.Context) error {
 	if t.api == nil {
 		return nil
 	}
 
+	t.wireSubsMu.Lock()
+	defer t.wireSubsMu.Unlock()
+
 	filters := t.filters.Filters()
-	seen := make(map[types.TopicSubscription]struct{}, len(filters))
-	desired := make([]types.TopicSubscription, 0, len(filters))
+	desired := make(map[types.TopicSubscription]struct{}, len(filters))
 	for _, filter := range filters {
 		pubsubTopic := filter.PubsubTopic
 		if pubsubTopic == "" {
 			pubsubTopic = wakuv2.DefaultShardPubsubTopic()
 		}
-		sub := types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: filter.ContentTopic}
-		if _, ok := seen[sub]; ok {
-			continue
-		}
-		seen[sub] = struct{}{}
-		desired = append(desired, sub)
+		desired[types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: filter.ContentTopic}] = struct{}{}
 	}
 
-	return t.api.SyncSubscriptions(ctx, desired)
+	for sub := range t.wireSubs {
+		if _, ok := desired[sub]; ok {
+			continue
+		}
+		if err := t.api.Unsubscribe(ctx, sub); err != nil {
+			return err
+		}
+		delete(t.wireSubs, sub)
+	}
+
+	for sub := range desired {
+		if _, ok := t.wireSubs[sub]; ok {
+			continue
+		}
+		if err := t.api.Subscribe(ctx, sub); err != nil {
+			return err
+		}
+		t.wireSubs[sub] = struct{}{}
+	}
+
+	return nil
 }
 
 // syncAfter returns v unchanged after reconciling wire subscriptions, so
