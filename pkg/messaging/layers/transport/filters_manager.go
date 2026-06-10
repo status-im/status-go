@@ -18,12 +18,6 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-type RawFilter struct {
-	FilterID string
-	Topic    types.TopicType
-	SymKeyID string
-}
-
 type FiltersService interface {
 	Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error)
 	Unsubscribe(ctx context.Context, id string) error
@@ -38,16 +32,12 @@ type FiltersManager struct {
 	logger      *zap.Logger
 	mutex       sync.Mutex
 	filters     map[string]*Filter
-	// asymKeys maps an asymmetric filter's FilterID to the private key used to
-	// decode messages received on it. Symmetric keys are resolved on demand via
-	// SymKey(SymKeyID) (the same path the send side uses), so only the
-	// asymmetric keys — which are not otherwise reachable from a persisted
-	// Filter — are held here. Runtime-only; never persisted.
+	// asymKeys and symKeys map a filter's FilterID to the key material used to
+	// encode and decode messages on it (exactly one of them has an entry per
+	// keyed filter). Runtime-only: FilterIDs are regenerated when filters are
+	// recreated on startup, and the password-derived symmetric key material
+	// itself is cached by chat id in keys and persisted.
 	asymKeys map[string]*ecdsa.PrivateKey
-	// symKeys maps a filter's SymKeyID to the symmetric key used to encode and
-	// decode messages on it. Runtime-only: ids are regenerated when filters are
-	// recreated on startup; the password-derived key material itself is cached
-	// by chat id in keys and persisted.
 	symKeyMu sync.RWMutex
 	symKeys  map[string][]byte
 }
@@ -75,41 +65,31 @@ func NewFiltersManager(persistence KeysPersistence, service FiltersService, priv
 	}, nil
 }
 
-// SymKey returns the symmetric key stored under the given id, as referenced by
-// a filter's SymKeyID.
-func (f *FiltersManager) SymKey(id string) ([]byte, error) {
+// SymKey returns the symmetric key used to encode and decode messages on the
+// filter with the given FilterID, if it is a symmetric filter.
+func (f *FiltersManager) SymKey(filterID string) ([]byte, bool) {
 	f.symKeyMu.RLock()
 	defer f.symKeyMu.RUnlock()
-	if key := f.symKeys[id]; key != nil {
-		return key, nil
-	}
-	return nil, errors.New("non-existent key ID")
+	key, ok := f.symKeys[filterID]
+	return key, ok
 }
 
-// addSymKey stores the key under a freshly generated id and returns it.
-func (f *FiltersManager) addSymKey(key []byte) (string, error) {
+// addSymKey stores the symmetric key of the filter with the given FilterID.
+func (f *FiltersManager) addSymKey(filterID string, key []byte) error {
 	if len(key) != wakucommon.AESKeyLength {
-		return "", errors.Errorf("wrong key size: %d", len(key))
-	}
-
-	id, err := wakucommon.GenerateRandomID()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to generate ID")
+		return errors.Errorf("wrong key size: %d", len(key))
 	}
 
 	f.symKeyMu.Lock()
 	defer f.symKeyMu.Unlock()
-	if f.symKeys[id] != nil {
-		return "", errors.New("failed to generate unique ID")
-	}
-	f.symKeys[id] = key
-	return id, nil
+	f.symKeys[filterID] = key
+	return nil
 }
 
-func (f *FiltersManager) deleteSymKey(id string) {
+func (f *FiltersManager) deleteSymKey(filterID string) {
 	f.symKeyMu.Lock()
 	defer f.symKeyMu.Unlock()
-	delete(f.symKeys, id)
+	delete(f.symKeys, filterID)
 }
 
 // WatchersByTopic returns the filters interested in the given (pubsubTopic,
@@ -237,7 +217,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey
 			identityStr := PublicKeyToStr(pk)
-			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey)
+			id, topic, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey)
 			if err != nil {
 				f.logger.Debug("could not register community filter", zap.Error(err))
 				return nil, err
@@ -246,9 +226,9 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 			filterID := identityStr + "-admin" + pubsubTopic
 			filter := &Filter{
 				ChatID:       filterID,
-				FilterID:     rawFilter.FilterID,
+				FilterID:     id,
 				PubsubTopic:  pubsubTopic,
-				ContentTopic: rawFilter.Topic,
+				ContentTopic: topic,
 				Identity:     identityStr,
 				Listen:       true,
 				OneToOne:     true,
@@ -256,7 +236,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 
 			f.filters[filterID] = filter
 
-			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", rawFilter.Topic.String()))
+			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", topic.String()))
 
 			filters = append(filters, filter)
 		}
@@ -356,9 +336,7 @@ func (f *FiltersManager) Remove(ctx context.Context, filtersToRemove ...*Filter)
 		if err := f.service.Unsubscribe(ctx, filter.FilterID); err != nil {
 			return err
 		}
-		if filter.SymKeyID != "" {
-			f.deleteSymKey(filter.SymKeyID)
-		}
+		f.deleteSymKey(filter.FilterID)
 		delete(f.asymKeys, filter.FilterID)
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
@@ -388,9 +366,7 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 	}
 
 	for _, filter := range filters {
-		if filter.SymKeyID != "" {
-			f.deleteSymKey(filter.SymKeyID)
-		}
+		f.deleteSymKey(filter.FilterID)
 		delete(f.asymKeys, filter.FilterID)
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
@@ -450,7 +426,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, "", identity)
+	id, topic, err := f.addAsymmetric(chatID, "", identity)
 	if err != nil {
 		f.logger.Debug("could not register personal topic filter", zap.Error(err))
 		return nil, err
@@ -458,8 +434,8 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 
 	chat := &Filter{
 		ChatID:       chatID,
-		FilterID:     filter.FilterID,
-		ContentTopic: filter.Topic,
+		FilterID:     id,
+		ContentTopic: topic,
 		Identity:     PublicKeyToStr(publicKey),
 		Listen:       listen,
 		OneToOne:     true,
@@ -467,7 +443,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "personal"), zap.String("topic", filter.Topic.String()))
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "personal"), zap.String("topic", topic.String()))
 
 	return chat, nil
 
@@ -488,7 +464,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, "", identity)
+	id, topic, err := f.addAsymmetric(chatID, "", identity)
 	if err != nil {
 		f.logger.Debug("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -496,8 +472,8 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 
 	chat := &Filter{
 		ChatID:       chatID,
-		FilterID:     filter.FilterID,
-		ContentTopic: filter.Topic,
+		FilterID:     id,
+		ContentTopic: topic,
 		Identity:     PublicKeyToStr(publicKey),
 		Listen:       listen,
 		Ephemeral:    ephemeral,
@@ -506,7 +482,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "partitioned"), zap.String("topic", filter.Topic.String()))
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "partitioned"), zap.String("topic", topic.String()))
 
 	return chat, nil
 }
@@ -523,7 +499,7 @@ func (f *FiltersManager) LoadNegotiated(secret messagingtypes.NegotiatedSecret) 
 	}
 
 	keyString := hex.EncodeToString(secret.Key)
-	filter, err := f.addSymmetric(keyString, "")
+	id, topic, err := f.addSymmetric(keyString, "")
 	if err != nil {
 		f.logger.Debug("could not register negotiated topic", zap.Error(err))
 		return nil, err
@@ -531,9 +507,8 @@ func (f *FiltersManager) LoadNegotiated(secret messagingtypes.NegotiatedSecret) 
 
 	chat := &Filter{
 		ChatID:       chatID,
-		ContentTopic: filter.Topic,
-		SymKeyID:     filter.SymKeyID,
-		FilterID:     filter.FilterID,
+		ContentTopic: topic,
+		FilterID:     id,
 		Identity:     PublicKeyToStr(secret.PublicKey),
 		Negotiated:   true,
 		Listen:       true,
@@ -542,7 +517,7 @@ func (f *FiltersManager) LoadNegotiated(secret messagingtypes.NegotiatedSecret) 
 
 	f.filters[chat.ChatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "negotiated"), zap.String("topic", filter.Topic.String()))
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "negotiated"), zap.String("topic", topic.String()))
 
 	return chat, nil
 }
@@ -579,14 +554,14 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 		OneToOne:  true,
 	}
 
-	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey)
+	id, topic, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey)
 	if err != nil {
 		f.logger.Debug("could not register discovery topic", zap.String("chatID", personalDiscoveryChat.ChatID), zap.Error(err))
 		return nil, err
 	}
 
-	personalDiscoveryChat.ContentTopic = discoveryResponse.Topic
-	personalDiscoveryChat.FilterID = discoveryResponse.FilterID
+	personalDiscoveryChat.ContentTopic = topic
+	personalDiscoveryChat.FilterID = id
 
 	f.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
 
@@ -620,7 +595,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 		return chat, nil
 	}
 
-	filterAndTopic, err := f.addSymmetric(chatID, pubsubTopic)
+	id, topic, err := f.addSymmetric(chatID, pubsubTopic)
 	if err != nil {
 		f.logger.Debug("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -628,9 +603,8 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 
 	chat := &Filter{
 		ChatID:       chatID,
-		FilterID:     filterAndTopic.FilterID,
-		SymKeyID:     filterAndTopic.SymKeyID,
-		ContentTopic: filterAndTopic.Topic,
+		FilterID:     id,
+		ContentTopic: topic,
 		PubsubTopic:  pubsubTopic,
 		Listen:       true,
 		OneToOne:     false,
@@ -641,7 +615,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 	f.logger.Debug("registering filter for",
 		zap.String("chatID", chatID),
 		zap.String("type", "public"),
-		zap.String("ContentTopic", filterAndTopic.Topic.String()),
+		zap.String("ContentTopic", topic.String()),
 		zap.String("PubsubTopic", pubsubTopic),
 	)
 
@@ -659,7 +633,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		return f.filters[chatID], nil
 	}
 
-	contactCodeFilter, err := f.addSymmetric(chatID, "")
+	id, topic, err := f.addSymmetric(chatID, "")
 	if err != nil {
 		f.logger.Debug("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -667,22 +641,22 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 
 	chat := &Filter{
 		ChatID:       chatID,
-		FilterID:     contactCodeFilter.FilterID,
-		ContentTopic: contactCodeFilter.Topic,
-		SymKeyID:     contactCodeFilter.SymKeyID,
+		FilterID:     id,
+		ContentTopic: topic,
 		Identity:     PublicKeyToStr(pubKey),
 		Listen:       true,
 	}
 
 	f.filters[chatID] = chat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "contact-code"), zap.String("topic", contactCodeFilter.Topic.String()))
+	f.logger.Debug("registering filter for", zap.String("chatID", chatID), zap.String("type", "contact-code"), zap.String("topic", topic.String()))
 
 	return chat, nil
 }
 
-// addSymmetric adds a symmetric key filter
-func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFilter, error) {
+// addSymmetric registers a symmetric filter's wire subscription and key,
+// returning the new FilterID and the filter's content topic.
+func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (string, types.TopicType, error) {
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
@@ -694,42 +668,38 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFi
 		f.keys[chatID] = symKey
 
 		if err := f.persistence.Add(chatID, symKey); err != nil {
-			return nil, err
+			return "", types.TopicType{}, err
 		}
-	}
-
-	symKeyID, err := f.addSymKey(symKey)
-	if err != nil {
-		return nil, err
 	}
 
 	id, err := f.service.Subscribe(pubsubTopic, topics)
 	if err != nil {
-		return nil, err
+		return "", types.TopicType{}, err
 	}
 
-	return &RawFilter{
-		FilterID: id,
-		SymKeyID: symKeyID,
-		Topic:    types.BytesToTopic(topic),
-	}, nil
+	if err := f.addSymKey(id, symKey); err != nil {
+		return "", types.TopicType{}, err
+	}
+
+	return id, types.BytesToTopic(topic), nil
 }
 
-// addAsymmetricFilter adds a filter with our private key. Whether the filter
-// actually receives messages is governed by its Listen flag: non-listening
-// filters are skipped during routing in handleReceivedMessage.
-func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identity *ecdsa.PrivateKey) (*RawFilter, error) {
+// addAsymmetric registers an asymmetric filter's wire subscription and key,
+// returning the new FilterID and the filter's content topic. Whether the
+// filter actually receives messages is governed by its Listen flag:
+// non-listening filters are skipped during routing in handleReceivedMessage.
+func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identity *ecdsa.PrivateKey) (string, types.TopicType, error) {
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
 	id, err := f.service.Subscribe(pubsubTopic, topics)
 	if err != nil {
-		return nil, err
+		return "", types.TopicType{}, err
 	}
 
 	f.asymKeys[id] = identity
 
-	return &RawFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
+	return id, types.BytesToTopic(topic), nil
 }
 
 // GetNegotiated returns a negotiated chat given an identity

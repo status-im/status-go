@@ -268,19 +268,17 @@ func (t *Transport) bufferMessage(filterID string, message *types.Message) {
 }
 
 // filterKeys resolves the key material used to decode messages received on a
-// filter. Symmetric keys come from the FiltersManager's key store via the
-// filter's SymKeyID (the same path the send side uses); asymmetric private keys
-// come from its runtime map. Exactly one of the returned keys is non-nil.
+// filter. Both symmetric and asymmetric keys come from the FiltersManager's
+// runtime maps, keyed by FilterID (the same path the send side uses). Exactly
+// one of the returned keys is non-nil.
 func (t *Transport) filterKeys(filter *Filter) (symKey []byte, privKey *ecdsa.PrivateKey, err error) {
-	if filter.SymKeyID != "" {
-		symKey, err = t.filters.SymKey(filter.SymKeyID)
-		return symKey, nil, err
+	if symKey, ok := t.filters.SymKey(filter.FilterID); ok {
+		return symKey, nil, nil
 	}
-	privKey, ok := t.filters.AsymKey(filter.FilterID)
-	if !ok {
-		return nil, nil, errors.New("no decode key for filter")
+	if privKey, ok := t.filters.AsymKey(filter.FilterID); ok {
+		return nil, privKey, nil
 	}
-	return nil, privKey, nil
+	return nil, nil, errors.New("no decode key for filter")
 }
 
 // decode reverses the rfc26 payload codec using the filter's key material.
@@ -454,9 +452,9 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	symKey, err := t.filters.SymKey(filter.SymKeyID)
-	if err != nil {
-		return nil, err
+	symKey, ok := t.filters.SymKey(filter.FilterID)
+	if !ok {
+		return nil, errors.New("no sym key found for filter")
 	}
 
 	encoded, err := t.encode(newMessage.Payload, symKey, nil)
@@ -476,9 +474,9 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	symKey, err := t.filters.SymKey(filter.SymKeyID)
-	if err != nil {
-		return nil, err
+	symKey, ok := t.filters.SymKey(filter.FilterID)
+	if !ok {
+		return nil, errors.New("no sym key found for filter")
 	}
 
 	encoded, err := t.encode(newMessage.Payload, symKey, nil)

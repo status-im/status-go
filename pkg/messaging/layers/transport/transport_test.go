@@ -64,8 +64,8 @@ func TestReceivePushPath(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, filter.Listen)
 
-	symKey, err := tr.filters.SymKey(filter.SymKeyID)
-	require.NoError(t, err)
+	symKey, ok := tr.filters.SymKey(filter.FilterID)
+	require.True(t, ok)
 
 	payload := []byte("hello receive path")
 	encoded, err := rfc26.Encode(payload, symKey, nil, identity)
@@ -157,8 +157,8 @@ func TestReceiveVersionZeroDecodesAsV1(t *testing.T) {
 	filter, err := tr.JoinPublic("test-public-chat")
 	require.NoError(t, err)
 
-	symKey, err := tr.filters.SymKey(filter.SymKeyID)
-	require.NoError(t, err)
+	symKey, ok := tr.filters.SymKey(filter.FilterID)
+	require.True(t, ok)
 
 	payload := []byte("hello version zero")
 	encoded, err := rfc26.Encode(payload, symKey, nil, identity)
@@ -211,31 +211,27 @@ func TestReceiveSharedKeyFanOut(t *testing.T) {
 	sharedKey := make([]byte, 32)
 	_, err = rand.Read(sharedKey)
 	require.NoError(t, err)
-	sharedKeyID, err := tr.filters.addSymKey(sharedKey)
-	require.NoError(t, err)
 
 	otherKey := make([]byte, 32)
 	_, err = rand.Read(otherKey)
-	require.NoError(t, err)
-	otherKeyID, err := tr.filters.addSymKey(otherKey)
 	require.NoError(t, err)
 
 	// Install three listening filters on the same (pubsub, content) topic
 	// directly in the manager: two sharing a key, one colliding with its own.
 	contentTopic := wakutypes.BytesToTopic(ToTopic("shared-chat"))
-	mkFilter := func(filterID, chatID, symKeyID string) *Filter {
+	mkFilter := func(filterID, chatID string, symKey []byte) *Filter {
+		require.NoError(t, tr.filters.addSymKey(filterID, symKey))
 		return &Filter{
 			ChatID:       chatID,
 			FilterID:     filterID,
-			SymKeyID:     symKeyID,
 			ContentTopic: contentTopic,
 			PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
 			Listen:       true,
 		}
 	}
-	sharedA := mkFilter("filter-shared-a", "chat-a", sharedKeyID)
-	sharedB := mkFilter("filter-shared-b", "chat-b", sharedKeyID)
-	collider := mkFilter("filter-collider", "chat-c", otherKeyID)
+	sharedA := mkFilter("filter-shared-a", "chat-a", sharedKey)
+	sharedB := mkFilter("filter-shared-b", "chat-b", sharedKey)
+	collider := mkFilter("filter-collider", "chat-c", otherKey)
 	for _, f := range []*Filter{sharedA, sharedB, collider} {
 		tr.filters.filters[f.FilterID] = f
 	}
