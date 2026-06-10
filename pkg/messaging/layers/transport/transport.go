@@ -110,7 +110,7 @@ func NewTransport(
 		api = waku
 	}
 
-	filtersManager, err := NewFiltersManager(keysPersistence, api, privateKey, logger)
+	filtersManager, err := NewFiltersManager(keysPersistence, newWireSubscriptions(api, logger), privateKey, logger)
 	if err != nil {
 		return nil, err
 	}

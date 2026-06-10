@@ -2,7 +2,6 @@ package transport
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
@@ -18,29 +17,23 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-// WireSubscriber is the wire-subscription part of the transport's
-// MessagingAPI: the FiltersManager subscribes a (pubsub, content) topic pair
-// when the first filter on it is installed and unsubscribes it when the last
-// one is removed. Subscriptions are keyed by the pair itself — any identifier
-// the backend keeps for a pair is its own bookkeeping.
-type WireSubscriber interface {
-	Subscribe(ctx context.Context, sub types.TopicSubscription) error
-	Unsubscribe(ctx context.Context, sub types.TopicSubscription) error
+// FilterObserver is notified as filters are installed and removed (with the
+// manager's mutex held). The transport observes the lifecycle to maintain the
+// backend's wire subscriptions — the FiltersManager itself stays a pure
+// status-go filtering concern. An OnFilterAdded error aborts the install.
+type FilterObserver interface {
+	OnFilterAdded(*Filter) error
+	OnFilterRemoved(*Filter)
 }
 
 type FiltersManager struct {
-	wire        WireSubscriber
+	observer    FilterObserver
 	persistence KeysPersistence
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
 	logger      *zap.Logger
 	mutex       sync.Mutex
 	filters     map[string]*Filter
-	// subCounts counts, per (pubsub, content) topic pair, the installed
-	// filters listening on it, driving the wire Subscribe on the first and
-	// the wire Unsubscribe after the last. Guarded by mutex, which every
-	// install/remove site already holds.
-	subCounts map[types.TopicSubscription]int
 	// asymKeys and symKeys map a filter's FilterID to the key material used to
 	// encode and decode messages on it (exactly one of them has an entry per
 	// keyed filter). Runtime-only: FilterIDs are regenerated when filters are
@@ -52,7 +45,7 @@ type FiltersManager struct {
 }
 
 // NewFiltersManager returns a new filtersManager.
-func NewFiltersManager(persistence KeysPersistence, wire WireSubscriber, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*FiltersManager, error) {
+func NewFiltersManager(persistence KeysPersistence, observer FilterObserver, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*FiltersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -63,73 +56,31 @@ func NewFiltersManager(persistence KeysPersistence, wire WireSubscriber, private
 	}
 
 	return &FiltersManager{
-		wire:        wire,
+		observer:    observer,
 		privateKey:  privateKey,
 		persistence: persistence,
 		keys:        keys,
 		filters:     make(map[string]*Filter),
-		subCounts:   make(map[types.TopicSubscription]int),
 		asymKeys:    make(map[string]*ecdsa.PrivateKey),
 		symKeys:     make(map[string][]byte),
 		logger:      logger.With(zap.Namespace("filtersManager")),
 	}, nil
 }
 
-// subscriptionPair returns the wire-subscription pair a filter listens on,
-// normalized the same way received messages are routed (WatchersByTopic): an
-// empty pubsub topic means the default shard.
-func subscriptionPair(filter *Filter) types.TopicSubscription {
-	pubsubTopic := filter.PubsubTopic
-	if pubsubTopic == "" {
-		pubsubTopic = wakuv2.DefaultShardPubsubTopic()
-	}
-	return types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: filter.ContentTopic}
-}
-
-// acquireSubscription counts an installed filter against its topic pair and
-// subscribes the pair on the wire when it first appears. Called with f.mutex
-// held.
-func (f *FiltersManager) acquireSubscription(filter *Filter) error {
-	if f.wire == nil {
-		return nil
-	}
-
-	pair := subscriptionPair(filter)
-	f.subCounts[pair]++
-	if f.subCounts[pair] > 1 {
-		return nil
-	}
-
-	if err := f.wire.Subscribe(context.Background(), pair); err != nil {
-		delete(f.subCounts, pair)
-		return err
-	}
-	return nil
-}
-
-// releaseSubscription un-counts a removed filter from its topic pair and
-// unsubscribes the pair on the wire when its last filter is gone. Called with
+// notifyAdded reports an installed filter to the observer. Called with
 // f.mutex held.
-func (f *FiltersManager) releaseSubscription(filter *Filter) {
-	if f.wire == nil {
-		return
+func (f *FiltersManager) notifyAdded(filter *Filter) error {
+	if f.observer == nil {
+		return nil
 	}
+	return f.observer.OnFilterAdded(filter)
+}
 
-	pair := subscriptionPair(filter)
-	if f.subCounts[pair] == 0 {
-		return
-	}
-	f.subCounts[pair]--
-	if f.subCounts[pair] > 0 {
-		return
-	}
-	delete(f.subCounts, pair)
-
-	if err := f.wire.Unsubscribe(context.Background(), pair); err != nil {
-		f.logger.Warn("failed to remove wire subscription",
-			zap.String("pubsubTopic", pair.PubsubTopic),
-			zap.String("contentTopic", pair.ContentTopic.String()),
-			zap.Error(err))
+// notifyRemoved reports a removed filter to the observer. Called with f.mutex
+// held.
+func (f *FiltersManager) notifyRemoved(filter *Filter) {
+	if f.observer != nil {
+		f.observer.OnFilterRemoved(filter)
 	}
 }
 
@@ -303,7 +254,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 			}
 
 			f.filters[filterID] = filter
-			if err := f.acquireSubscription(filter); err != nil {
+			if err := f.notifyAdded(filter); err != nil {
 				return nil, err
 			}
 
@@ -409,7 +360,7 @@ func (f *FiltersManager) Remove(filtersToRemove ...*Filter) error {
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
 				delete(f.filters, k)
-				f.releaseSubscription(v)
+				f.notifyRemoved(v)
 			}
 		}
 		f.deleteSymKey(filter.FilterID)
@@ -435,7 +386,7 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 		for k, v := range f.filters {
 			if filter.FilterID == v.FilterID {
 				delete(f.filters, k)
-				f.releaseSubscription(v)
+				f.notifyRemoved(v)
 			}
 		}
 		f.deleteSymKey(filter.FilterID)
@@ -509,7 +460,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 	}
 
 	f.filters[chatID] = chat
-	if err := f.acquireSubscription(chat); err != nil {
+	if err := f.notifyAdded(chat); err != nil {
 		return nil, err
 	}
 
@@ -551,7 +502,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 	}
 
 	f.filters[chatID] = chat
-	if err := f.acquireSubscription(chat); err != nil {
+	if err := f.notifyAdded(chat); err != nil {
 		return nil, err
 	}
 
@@ -589,7 +540,7 @@ func (f *FiltersManager) LoadNegotiated(secret messagingtypes.NegotiatedSecret) 
 	}
 
 	f.filters[chat.ChatID] = chat
-	if err := f.acquireSubscription(chat); err != nil {
+	if err := f.notifyAdded(chat); err != nil {
 		return nil, err
 	}
 
@@ -640,7 +591,7 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 	personalDiscoveryChat.FilterID = id
 
 	f.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
-	if err := f.acquireSubscription(personalDiscoveryChat); err != nil {
+	if err := f.notifyAdded(personalDiscoveryChat); err != nil {
 		return nil, err
 	}
 
@@ -668,10 +619,10 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 				zap.String("oldTopic", chat.PubsubTopic),
 				zap.String("newTopic", pubsubTopic),
 			)
-			f.releaseSubscription(chat)
+			f.notifyRemoved(chat)
 			chat.PubsubTopic = pubsubTopic
 			f.filters[chatID] = chat
-			if err := f.acquireSubscription(chat); err != nil {
+			if err := f.notifyAdded(chat); err != nil {
 				return nil, err
 			}
 		}
@@ -694,7 +645,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 	}
 
 	f.filters[chatID] = chat
-	if err := f.acquireSubscription(chat); err != nil {
+	if err := f.notifyAdded(chat); err != nil {
 		return nil, err
 	}
 
@@ -734,7 +685,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 	}
 
 	f.filters[chatID] = chat
-	if err := f.acquireSubscription(chat); err != nil {
+	if err := f.notifyAdded(chat); err != nil {
 		return nil, err
 	}
 
