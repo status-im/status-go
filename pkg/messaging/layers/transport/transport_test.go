@@ -64,7 +64,7 @@ func TestReceivePushPath(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, filter.Listen)
 
-	symKey, err := tr.keysManager.RawSymKey(filter.SymKeyID)
+	symKey, err := tr.filters.SymKey(filter.SymKeyID)
 	require.NoError(t, err)
 
 	payload := []byte("hello receive path")
@@ -157,7 +157,7 @@ func TestReceiveVersionZeroDecodesAsV1(t *testing.T) {
 	filter, err := tr.JoinPublic("test-public-chat")
 	require.NoError(t, err)
 
-	symKey, err := tr.keysManager.RawSymKey(filter.SymKeyID)
+	symKey, err := tr.filters.SymKey(filter.SymKeyID)
 	require.NoError(t, err)
 
 	payload := []byte("hello version zero")
@@ -211,13 +211,13 @@ func TestReceiveSharedKeyFanOut(t *testing.T) {
 	sharedKey := make([]byte, 32)
 	_, err = rand.Read(sharedKey)
 	require.NoError(t, err)
-	sharedKeyID, err := waku.AddSymKeyDirect(sharedKey)
+	sharedKeyID, err := tr.filters.addSymKey(sharedKey)
 	require.NoError(t, err)
 
 	otherKey := make([]byte, 32)
 	_, err = rand.Read(otherKey)
 	require.NoError(t, err)
-	otherKeyID, err := waku.AddSymKeyDirect(otherKey)
+	otherKeyID, err := tr.filters.addSymKey(otherKey)
 	require.NoError(t, err)
 
 	// Install three listening filters on the same (pubsub, content) topic

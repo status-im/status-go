@@ -25,7 +25,6 @@ package wakuv2
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
@@ -46,11 +45,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -136,10 +133,6 @@ type Waku struct {
 
 	// Light-client filter protocol; tracks wire subscriptions made via Subscribe.
 	filterManager *filterapi.FilterManager
-
-	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
-	symKeys     map[string][]byte            // Symmetric key storage
-	keyMu       sync.RWMutex                 // Mutex associated with key stores
 
 	envelopeCache *ttlcache.Cache[gethcommon.Hash, bool] // [Hash of envelope -> Processed] cache
 	poolMu        sync.RWMutex                           // Mutex to sync the message and expiration pools
@@ -241,8 +234,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 
 	waku := &Waku{
 		cfg:                             cfg,
-		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
-		symKeys:                         make(map[string][]byte),
 		envelopeCache:                   newTTLCache(),
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
@@ -771,171 +762,6 @@ func newReceivedMessage(e *common.ReceivedMessage) *types.ReceivedMessage {
 		Version:      msg.GetVersion(),
 		Timestamp:    msg.GetTimestamp(),
 	}
-}
-
-// DeleteKeyPair deletes the specified key if it exists.
-func (w *Waku) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, common.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.privateKeys[deterministicID] != nil {
-		delete(w.privateKeys, deterministicID)
-		return true
-	}
-	return false
-}
-
-// AddKeyPair imports a asymmetric private key and returns it identifier.
-func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return "", err
-	}
-	if w.HasKeyPair(id) {
-		return id, nil // no need to re-inject
-	}
-
-	w.keyMu.Lock()
-	w.privateKeys[id] = key
-	w.keyMu.Unlock()
-
-	return id, nil
-}
-
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (w *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return err
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	w.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	w.privateKeys[id] = key
-
-	return nil
-}
-
-// DeleteKeyPairs removes all cryptographic identities known to the node
-func (w *Waku) DeleteKeyPairs() error {
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	w.privateKeys = make(map[string]*ecdsa.PrivateKey)
-
-	return nil
-}
-
-// HasKeyPair checks if the waku node is configured with the private key
-// of the specified public pair.
-func (w *Waku) HasKeyPair(id string) bool {
-	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	return w.privateKeys[deterministicID] != nil
-}
-
-// GetPrivateKey retrieves the private key of the specified identity.
-func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
-	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
-	if err != nil {
-		return nil, err
-	}
-
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	key := w.privateKeys[deterministicID]
-	if key == nil {
-		return nil, fmt.Errorf("invalid id")
-	}
-	return key, nil
-}
-
-// AddSymKeyDirect stores the key, and returns its id.
-func (w *Waku) AddSymKeyDirect(key []byte) (string, error) {
-	if len(key) != common.AESKeyLength {
-		return "", fmt.Errorf("wrong key size: %d", len(key))
-	}
-
-	id, err := common.GenerateRandomID()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate ID: %s", err)
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.symKeys[id] != nil {
-		return "", fmt.Errorf("failed to generate unique ID")
-	}
-	w.symKeys[id] = key
-	return id, nil
-}
-
-// AddSymKeyFromPassword generates the key from password, stores it, and returns its id.
-func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
-	id, err := common.GenerateRandomID()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate ID: %s", err)
-	}
-	if w.HasSymKey(id) {
-		return "", fmt.Errorf("failed to generate unique ID")
-	}
-
-	// kdf should run no less than 0.1 seconds on an average computer,
-	// because it's an once in a session experience
-	derived := pbkdf2.Key([]byte(password), nil, 65356, common.AESKeyLength, sha256.New)
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	// double check is necessary, because deriveKeyMaterial() is very slow
-	if w.symKeys[id] != nil {
-		return "", fmt.Errorf("critical error: failed to generate unique ID")
-	}
-	w.symKeys[id] = derived
-	return id, nil
-}
-
-// HasSymKey returns true if there is a key associated with the given id.
-// Otherwise returns false.
-func (w *Waku) HasSymKey(id string) bool {
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	return w.symKeys[id] != nil
-}
-
-// DeleteSymKey deletes the key associated with the name string if it exists.
-func (w *Waku) DeleteSymKey(id string) bool {
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-	if w.symKeys[id] != nil {
-		delete(w.symKeys, id)
-		return true
-	}
-	return false
-}
-
-// GetSymKey returns the symmetric key associated with the given id.
-func (w *Waku) GetSymKey(id string) ([]byte, error) {
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	if w.symKeys[id] != nil {
-		return w.symKeys[id], nil
-	}
-	return nil, fmt.Errorf("non-existent key ID")
 }
 
 // Subscribe registers a wire subscription for the given content topics on the
@@ -1850,41 +1676,6 @@ func (w *Waku) PeerID() peer.ID {
 
 func (w *Waku) Peerstore() peerstore.Peerstore {
 	return w.node.Host().Peerstore()
-}
-
-// validatePrivateKey checks the format of the given private key.
-func validatePrivateKey(k *ecdsa.PrivateKey) bool {
-	if k == nil || k.D == nil || k.D.Sign() == 0 {
-		return false
-	}
-	return common.ValidatePublicKey(&k.PublicKey)
-}
-
-// makeDeterministicID generates a deterministic ID, based on a given input
-func makeDeterministicID(input string, keyLen int) (id string, err error) {
-	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
-	if !common.ValidateDataIntegrity(buf, common.KeyIDSize) {
-		return "", fmt.Errorf("error in GenerateDeterministicID: failed to generate key")
-	}
-	id = gethcommon.Bytes2Hex(buf)
-	return id, err
-}
-
-// toDeterministicID reviews incoming id, and transforms it to format
-// expected internally be private key store. Originally, public keys
-// were used as keys, now random keys are being used. And in order to
-// make it easier to consume, we now allow both random IDs and public
-// keys to be passed.
-func toDeterministicID(id string, expectedLen int) (string, error) {
-	if len(id) != (expectedLen * 2) { // we received hex key, so number of chars in id is doubled
-		var err error
-		id, err = makeDeterministicID(id, expectedLen)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return id, nil
 }
 
 func FormatPeerStats(wakuNode *node.WakuNode) types.PeerStats {

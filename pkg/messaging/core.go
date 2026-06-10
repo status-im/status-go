@@ -29,10 +29,6 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-var (
-	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
-)
-
 type Core struct {
 	config
 
@@ -260,16 +256,6 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	// Inject the identity into Waku
-	err = waku.DeleteKeyPairs()
-	if err != nil {
-		return nil, err
-	}
-	_, err = waku.AddKeyPair(params.identity)
-	if err != nil {
-		return nil, ErrWakuIdentityInjectionFailure
 	}
 
 	return waku, nil

@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"encoding/hex"
 	"sync"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/pbkdf2"
 
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	wakucommon "github.com/status-im/status-go/pkg/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -22,14 +25,6 @@ type RawFilter struct {
 }
 
 type FiltersService interface {
-	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	DeleteKeyPair(keyID string) bool
-
-	AddSymKeyDirect(key []byte) (string, error)
-	AddSymKeyFromPassword(password string) (string, error)
-	GetSymKey(id string) ([]byte, error)
-	DeleteSymKey(id string) bool
-
 	Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error)
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
@@ -45,10 +40,16 @@ type FiltersManager struct {
 	filters     map[string]*Filter
 	// asymKeys maps an asymmetric filter's FilterID to the private key used to
 	// decode messages received on it. Symmetric keys are resolved on demand via
-	// keysManager.RawSymKey(SymKeyID) (the same path the send side uses), so only
-	// the asymmetric keys — which are not otherwise reachable from a persisted
+	// SymKey(SymKeyID) (the same path the send side uses), so only the
+	// asymmetric keys — which are not otherwise reachable from a persisted
 	// Filter — are held here. Runtime-only; never persisted.
 	asymKeys map[string]*ecdsa.PrivateKey
+	// symKeys maps a filter's SymKeyID to the symmetric key used to encode and
+	// decode messages on it. Runtime-only: ids are regenerated when filters are
+	// recreated on startup; the password-derived key material itself is cached
+	// by chat id in keys and persisted.
+	symKeyMu sync.RWMutex
+	symKeys  map[string][]byte
 }
 
 // NewFiltersManager returns a new filtersManager.
@@ -69,8 +70,46 @@ func NewFiltersManager(persistence KeysPersistence, service FiltersService, priv
 		keys:        keys,
 		filters:     make(map[string]*Filter),
 		asymKeys:    make(map[string]*ecdsa.PrivateKey),
+		symKeys:     make(map[string][]byte),
 		logger:      logger.With(zap.Namespace("filtersManager")),
 	}, nil
+}
+
+// SymKey returns the symmetric key stored under the given id, as referenced by
+// a filter's SymKeyID.
+func (f *FiltersManager) SymKey(id string) ([]byte, error) {
+	f.symKeyMu.RLock()
+	defer f.symKeyMu.RUnlock()
+	if key := f.symKeys[id]; key != nil {
+		return key, nil
+	}
+	return nil, errors.New("non-existent key ID")
+}
+
+// addSymKey stores the key under a freshly generated id and returns it.
+func (f *FiltersManager) addSymKey(key []byte) (string, error) {
+	if len(key) != wakucommon.AESKeyLength {
+		return "", errors.Errorf("wrong key size: %d", len(key))
+	}
+
+	id, err := wakucommon.GenerateRandomID()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate ID")
+	}
+
+	f.symKeyMu.Lock()
+	defer f.symKeyMu.Unlock()
+	if f.symKeys[id] != nil {
+		return "", errors.New("failed to generate unique ID")
+	}
+	f.symKeys[id] = key
+	return id, nil
+}
+
+func (f *FiltersManager) deleteSymKey(id string) {
+	f.symKeyMu.Lock()
+	defer f.symKeyMu.Unlock()
+	delete(f.symKeys, id)
 }
 
 // WatchersByTopic returns the filters interested in the given (pubsubTopic,
@@ -318,7 +357,7 @@ func (f *FiltersManager) Remove(ctx context.Context, filtersToRemove ...*Filter)
 			return err
 		}
 		if filter.SymKeyID != "" {
-			f.service.DeleteSymKey(filter.SymKeyID)
+			f.deleteSymKey(filter.SymKeyID)
 		}
 		delete(f.asymKeys, filter.FilterID)
 		for k, v := range f.filters {
@@ -350,7 +389,7 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 
 	for _, filter := range filters {
 		if filter.SymKeyID != "" {
-			f.service.DeleteSymKey(filter.SymKeyID)
+			f.deleteSymKey(filter.SymKeyID)
 		}
 		delete(f.asymKeys, filter.FilterID)
 		for k, v := range f.filters {
@@ -644,32 +683,24 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 
 // addSymmetric adds a symmetric key filter
 func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFilter, error) {
-	var symKeyID string
-	var err error
-
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
 	symKey, ok := f.keys[chatID]
-	if ok {
-		symKeyID, err = f.service.AddSymKeyDirect(symKey)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		symKeyID, err = f.service.AddSymKeyFromPassword(chatID)
-		if err != nil {
-			return nil, err
-		}
-		if symKey, err = f.service.GetSymKey(symKeyID); err != nil {
-			return nil, err
-		}
+	if !ok {
+		// kdf should run no less than 0.1 seconds on an average computer,
+		// because it's an once in a session experience
+		symKey = pbkdf2.Key([]byte(chatID), nil, 65356, wakucommon.AESKeyLength, sha256.New)
 		f.keys[chatID] = symKey
 
-		err = f.persistence.Add(chatID, symKey)
-		if err != nil {
+		if err := f.persistence.Add(chatID, symKey); err != nil {
 			return nil, err
 		}
+	}
+
+	symKeyID, err := f.addSymKey(symKey)
+	if err != nil {
+		return nil, err
 	}
 
 	id, err := f.service.Subscribe(pubsubTopic, topics)
@@ -690,10 +721,6 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFi
 func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identity *ecdsa.PrivateKey) (*RawFilter, error) {
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
-
-	if _, err := f.service.AddKeyPair(identity); err != nil {
-		return nil, err
-	}
 
 	id, err := f.service.Subscribe(pubsubTopic, topics)
 	if err != nil {
