@@ -108,8 +108,34 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 DEFAULT_TIMEOUT_MINUTES=5
 PROTOCOL_TIMEOUT_MINUTES=45
 DEFAULT_PROTOCOL_SHARDS=5
-MIN_PROTOCOL_SHARDS=3
-MAX_PROTOCOL_SHARDS=5
+MIN_PROTOCOL_SHARDS=1
+MAX_PROTOCOL_SHARDS=32
+
+resolve_protocol_shards() {
+  local shards
+
+  if [[ -n "${UNIT_TEST_PROTOCOL_SHARDS}" ]]; then
+    shards="${UNIT_TEST_PROTOCOL_SHARDS}"
+  else
+    shards="$(nproc 2>/dev/null || echo "${DEFAULT_PROTOCOL_SHARDS}")"
+    echo -e "${GRN}Protocol shards:${RST} auto-detected ${shards} from nproc (override with UNIT_TEST_PROTOCOL_SHARDS)" >&2
+  fi
+
+  if ! [[ "${shards}" =~ ^[0-9]+$ ]]; then
+    echo -e "${YLW}Invalid UNIT_TEST_PROTOCOL_SHARDS='${shards}', using ${DEFAULT_PROTOCOL_SHARDS}${RST}" >&2
+    shards="${DEFAULT_PROTOCOL_SHARDS}"
+  fi
+  if [[ "${shards}" -lt "${MIN_PROTOCOL_SHARDS}" ]]; then
+    echo -e "${YLW}Protocol shards=${shards} is too low, clamping to ${MIN_PROTOCOL_SHARDS}${RST}" >&2
+    shards="${MIN_PROTOCOL_SHARDS}"
+  fi
+  if [[ "${shards}" -gt "${MAX_PROTOCOL_SHARDS}" ]]; then
+    echo -e "${YLW}Protocol shards=${shards} is too high, clamping to ${MAX_PROTOCOL_SHARDS}${RST}" >&2
+    shards="${MAX_PROTOCOL_SHARDS}"
+  fi
+
+  echo "${shards}"
+}
 
 HAS_PROTOCOL_PACKAGE=true
 if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; then
@@ -129,19 +155,7 @@ else
   bg_pids+=("$!")
 
   if [[ $UNIT_TEST_COUNT -eq 1 ]]; then
-    protocol_shards="${UNIT_TEST_PROTOCOL_SHARDS:-${DEFAULT_PROTOCOL_SHARDS}}"
-    if ! [[ "${protocol_shards}" =~ ^[0-9]+$ ]]; then
-      echo -e "${YLW}Invalid UNIT_TEST_PROTOCOL_SHARDS='${protocol_shards}', using default ${DEFAULT_PROTOCOL_SHARDS}${RST}"
-      protocol_shards="${DEFAULT_PROTOCOL_SHARDS}"
-    fi
-    if [[ "${protocol_shards}" -lt "${MIN_PROTOCOL_SHARDS}" ]]; then
-      echo -e "${YLW}UNIT_TEST_PROTOCOL_SHARDS=${protocol_shards} is too low, clamping to ${MIN_PROTOCOL_SHARDS}${RST}"
-      protocol_shards="${MIN_PROTOCOL_SHARDS}"
-    fi
-    if [[ "${protocol_shards}" -gt "${MAX_PROTOCOL_SHARDS}" ]]; then
-      echo -e "${YLW}UNIT_TEST_PROTOCOL_SHARDS=${protocol_shards} is too high, clamping to ${MAX_PROTOCOL_SHARDS}${RST}"
-      protocol_shards="${MAX_PROTOCOL_SHARDS}"
-    fi
+    protocol_shards="$(resolve_protocol_shards)"
 
     protocol_list_cmd=(go test -list '^Test')
     if [[ -n "${BUILD_TAGS}" ]]; then
