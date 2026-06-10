@@ -224,6 +224,9 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	}
 
 	phm := healthmanager.NewProvidersHealthManager(chainID)
+	if c.IsPaused() {
+		phm.Pause()
+	}
 	err := c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
 	if err != nil {
 		return nil, fmt.Errorf("register providers health manager: %s", err)
@@ -265,8 +268,10 @@ func (c *Client) getProviderRPCLimiter(provider params.RpcProvider) (*rpclimiter
 func (c *Client) SetPaused(paused bool) {
 	if paused {
 		c.MarkPaused()
+		c.healthMgr.Pause()
 	} else {
 		c.MarkResumed()
+		c.healthMgr.Resume()
 	}
 }
 

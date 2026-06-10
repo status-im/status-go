@@ -348,6 +348,63 @@ func (s *ProvidersHealthManagerSuite) TestRecoveryEmitsImmediately() {
 	s.assertChainStatus(rpcstatus.StatusUp)
 }
 
+func (s *ProvidersHealthManagerSuite) TestDownDebounceResetsAfterSilentRecovery() {
+	s.phm.downDebounce = 120 * time.Millisecond
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNotification(ch, time.Second)
+
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	s.expectNoNotification(ch, 40*time.Millisecond)
+
+	// This recovery does not emit (lastStatus is still Up), but must still stop the previous timer.
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNoNotification(ch, 10*time.Millisecond)
+
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	// If the first timer was not stopped, we'd see a Down event too early here.
+	s.expectNoNotification(ch, 90*time.Millisecond)
+	s.expectNotification(ch, 200*time.Millisecond)
+	s.assertChainStatus(rpcstatus.StatusDown)
+}
+
+func (s *ProvidersHealthManagerSuite) TestPauseStopsPendingDownTimer() {
+	s.phm.downDebounce = 100 * time.Millisecond
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNotification(ch, time.Second)
+
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	s.expectNoNotification(ch, 30*time.Millisecond)
+
+	s.phm.Pause()
+	s.expectNoNotification(ch, 150*time.Millisecond)
+}
+
+func (s *ProvidersHealthManagerSuite) TestResumeCoalescesPausedUpdates() {
+	s.phm.downDebounce = 80 * time.Millisecond
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNotification(ch, time.Second)
+	s.assertChainStatus(rpcstatus.StatusUp)
+
+	s.phm.Pause()
+	s.phm.Update(context.Background(), downStatus("Provider1"))
+	s.expectNoNotification(ch, 120*time.Millisecond)
+
+	// Resume should emit one coalesced Down only after debounce.
+	s.phm.Resume()
+	s.expectNoNotification(ch, 30*time.Millisecond)
+	s.expectNotification(ch, 200*time.Millisecond)
+	s.assertChainStatus(rpcstatus.StatusDown)
+}
+
 func TestProvidersHealthManagerSuite(t *testing.T) {
 	suite.Run(t, new(ProvidersHealthManagerSuite))
 }

@@ -133,14 +133,13 @@ func (b *BlockchainHealthManager) aggregateStatus() BlockchainStatus {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Collect statuses from all providers
-	providerStatuses := make([]rpcstatus.ProviderStatus, 0)
+	// Rebuild the blockchain aggregator from current per-chain snapshots.
+	// Avoids double-counting when multiple provider updates trigger re-aggregation.
+	newAgg := aggregator.NewAggregator("blockchain")
 	for _, provider := range b.providers {
-		providerStatuses = append(providerStatuses, provider.Status())
+		newAgg.Update(provider.Status())
 	}
-
-	// Update the aggregator with the new list of provider statuses
-	b.aggregator.UpdateBatch(providerStatuses)
+	b.aggregator = newAgg
 
 	// Get the new aggregated full and short status
 	return b.getStatusPerChain()
@@ -232,4 +231,32 @@ func (b *BlockchainHealthManager) Status() rpcstatus.ProviderStatus {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.aggregator.GetAggregatedStatus()
+}
+
+// Pause pauses all registered providers health managers.
+func (b *BlockchainHealthManager) Pause() {
+	b.mu.RLock()
+	providers := make([]*ProvidersHealthManager, 0, len(b.providers))
+	for _, provider := range b.providers {
+		providers = append(providers, provider)
+	}
+	b.mu.RUnlock()
+
+	for _, provider := range providers {
+		provider.Pause()
+	}
+}
+
+// Resume resumes all registered providers health managers.
+func (b *BlockchainHealthManager) Resume() {
+	b.mu.RLock()
+	providers := make([]*ProvidersHealthManager, 0, len(b.providers))
+	for _, provider := range b.providers {
+		providers = append(providers, provider)
+	}
+	b.mu.RUnlock()
+
+	for _, provider := range providers {
+		provider.Resume()
+	}
 }

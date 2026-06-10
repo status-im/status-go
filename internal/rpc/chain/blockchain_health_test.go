@@ -210,6 +210,11 @@ func (s *BlockchainHealthSuite) TestGetFullStatus() {
 	// Wait for status event to be triggered before getting full status
 	s.waitForStatus(statusCh, rpcstatus.StatusUp)
 
+	// Wait until all provider updates from both chains are aggregated.
+	require.Eventually(s.T(), func() bool {
+		return s.blockchainHealthManager.GetFullStatus().Status.TotalRequests == 4
+	}, 2*time.Second, 10*time.Millisecond)
+
 	// Get the full status from the BlockchainHealthManager
 	fullStatus := s.blockchainHealthManager.GetFullStatus()
 
@@ -271,7 +276,7 @@ func (s *BlockchainHealthSuite) TestGetFullStatus() {
 	// Verify overall aggregated status
 	overallStatus := fullStatus.Status
 	require.Equal(s.T(), rpcstatus.StatusUp, overallStatus.Status)
-	require.Greater(s.T(), overallStatus.TotalDuration, time.Duration(0))
+	require.Equal(s.T(), duration1+duration2+duration3+duration4, overallStatus.TotalDuration)
 	require.Equal(s.T(), int64(4), overallStatus.TotalRequests)
 	require.Equal(s.T(), int64(2), overallStatus.TotalTimeoutCount)
 
