@@ -27,7 +27,7 @@ type MessagingAPI interface {
 
 	// Subscribe and Unsubscribe register and remove a wire subscription for a
 	// single (pubsubTopic, contentTopic) pair, keyed by the pair itself: the
-	// transport's wireSubscriptions subscribes when the first filter on a
+	// transport's FilterSubscriptions subscribes when the first filter on a
 	// pair is installed and unsubscribes when the last one is removed. How a
 	// subscription maps onto the wire — the Waku Filter protocol for light
 	// clients, nothing at all for relay clients — is the backend's concern,

@@ -61,9 +61,9 @@ type Transport struct {
 	matchedPublisher *pubsub.TypePublisher[struct{}]
 
 	// subs owns the backend's wire subscriptions: every filter returned by a
-	// FiltersManager mutation is accounted here, and every removed filter
+	// FiltersManager mutation is acquired here, and every removed filter
 	// released.
-	subs *wireSubscriptions
+	subs *FilterSubscriptions
 }
 
 // Pause signals Transport's internal goroutines to idle and cascades to
@@ -136,7 +136,7 @@ func NewTransport(
 		logger:           logger.With(zap.Namespace("Transport")),
 		received:         make(map[string]map[string]*types.Message),
 		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
-		subs:             newWireSubscriptions(api, logger),
+		subs:             newFilterSubscriptions(api, logger),
 	}
 
 	for _, opt := range opts {
@@ -337,7 +337,7 @@ func (t *Transport) InitFilters(chatIDs []FiltersToInitialize, publicKeys []*ecd
 	if err != nil {
 		return nil, err
 	}
-	if err := t.subs.account(filters...); err != nil {
+	if err := t.subs.Acquire(filters...); err != nil {
 		return nil, err
 	}
 	return filters, nil
@@ -348,7 +348,7 @@ func (t *Transport) InitPublicFilters(filtersToInit []FiltersToInitialize) ([]*F
 	if err != nil {
 		return nil, err
 	}
-	if err := t.subs.account(filters...); err != nil {
+	if err := t.subs.Acquire(filters...); err != nil {
 		return nil, err
 	}
 	return filters, nil
@@ -375,7 +375,7 @@ func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []Communit
 	if err != nil {
 		return nil, err
 	}
-	if err := t.subs.account(filters...); err != nil {
+	if err := t.subs.Acquire(filters...); err != nil {
 		return nil, err
 	}
 	return filters, nil
@@ -385,7 +385,7 @@ func (t *Transport) RemoveFilters(filters []*Filter) error {
 	if err := t.filters.Remove(filters...); err != nil {
 		return err
 	}
-	t.subs.release(filters...)
+	t.subs.Release(filters...)
 	return nil
 }
 
@@ -395,7 +395,7 @@ func (t *Transport) RemoveFilterByChatID(chatID string) (*Filter, error) {
 		return nil, err
 	}
 	if filter != nil {
-		t.subs.release(filter)
+		t.subs.Release(filter)
 	}
 	return filter, nil
 }
@@ -405,7 +405,7 @@ func (t *Transport) ResetFilters(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	t.subs.release(removed...)
+	t.subs.Release(removed...)
 	return nil
 }
 
@@ -414,7 +414,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret messagingtypes.NegotiatedSecr
 	if err != nil {
 		return nil, err
 	}
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 	return filter, nil
@@ -425,7 +425,7 @@ func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 	return filter, nil
@@ -436,7 +436,7 @@ func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 	return filter, nil
@@ -452,7 +452,7 @@ func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) 
 		filters = append(filters, f)
 
 	}
-	if err := t.subs.account(filters...); err != nil {
+	if err := t.subs.Acquire(filters...); err != nil {
 		return nil, err
 	}
 	return filters, nil
@@ -515,7 +515,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 
@@ -541,7 +541,7 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 
@@ -564,7 +564,7 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 		return nil, err
 	}
 
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 
@@ -582,7 +582,7 @@ func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *
 		return nil, err
 	}
 
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 
@@ -603,7 +603,7 @@ func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 	return filter, nil
@@ -616,7 +616,7 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 		return nil, err
 	}
 
-	if err := t.subs.account(filter); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 
@@ -639,7 +639,7 @@ func (t *Transport) cleanFilters() error {
 	if err != nil {
 		return err
 	}
-	t.subs.release(removed...)
+	t.subs.Release(removed...)
 	return nil
 }
 
