@@ -177,17 +177,14 @@ type Waku interface {
 	// OnStorenodeAvailable is triggered when there is a new active storenode selected
 	OnStorenodeAvailable() <-chan peer.ID
 
-	// WaitForAvailableStoreNode will wait for a storenode to be available depending on the context
-	WaitForAvailableStoreNode(ctx context.Context) bool
-
 	// SetStorenodeConfigProvider will set the configuration provider for the storenode cycle
 	SetStorenodeConfigProvider(c history.StorenodeConfigProvider)
 
-	// ProcessMailserverBatch will receive a criteria and storenode and execute a query
-	ProcessMailserverBatch(
+	// StoreQuery retrieves historic messages for a single batch, selecting the
+	// store node internally (no peer argument). See waku.StoreClient.
+	StoreQuery(
 		ctx context.Context,
 		batch MailserverBatch,
-		storenode peer.AddrInfo,
 		pageLimit uint64,
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
@@ -195,8 +192,6 @@ type Waku interface {
 
 	// IsStorenodeAvailable is used to determine whether a storenode is available or not
 	IsStorenodeAvailable(peerID peer.ID) bool
-
-	PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error
 
 	// DisconnectActiveStorenode will trigger a disconnection of the active storenode, and potentially execute a cycling so a new storenode is promoted
 	DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool)

@@ -3574,8 +3574,6 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 	defer utils.LogOnPanic()
 	m.logger.Debug("initializing history archive tasks")
 
-	peerInfo := m.messaging.GetActiveStorenode()
-
 	for _, c := range communities {
 
 		if c.Joined() {
@@ -3642,7 +3640,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			_, err = m.syncFiltersFrom(peerInfo, filters, uint32(latestWakuMessageTimestamp))
+			_, err = m.syncFiltersFrom(filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.logger.Error("failed to request missing messages", zap.Error(err))
 				continue

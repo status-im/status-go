@@ -799,27 +799,20 @@ func (t *Transport) OnStorenodeAvailable() <-chan peer.ID {
 	return t.waku.OnStorenodeAvailable()
 }
 
-func (t *Transport) WaitForAvailableStoreNode(ctx context.Context) bool {
-	return t.waku.WaitForAvailableStoreNode(ctx)
-}
-
 func (t *Transport) IsStorenodeAvailable(peerID peer.ID) bool {
 	return t.waku.IsStorenodeAvailable(peerID)
 }
 
-func (t *Transport) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
-	return t.waku.PerformStorenodeTask(fn, opts...)
-}
-
-func (t *Transport) ProcessMailserverBatch(
+// Query retrieves historic messages for a single batch, selecting the store node
+// internally (no peer argument). See waku.StoreClient.
+func (t *Transport) Query(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return t.waku.ProcessMailserverBatch(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
