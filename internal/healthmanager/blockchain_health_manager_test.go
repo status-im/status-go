@@ -384,6 +384,34 @@ func (s *BlockchainHealthManagerSuite) TestDelayedChainUpdate() {
 	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[2].Status) // Chain 2 is down
 }
 
+func (s *BlockchainHealthManagerSuite) TestPauseResumeSuppressesAndCoalescesProviderUpdates() {
+	phm := newTestProvidersHealthManager(1)
+	phm.SetDownDebounce(50 * time.Millisecond)
+	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm)
+	s.Require().NoError(err)
+
+	ch := s.manager.Subscribe()
+	defer s.manager.Unsubscribe(ch)
+
+	phm.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{
+		{Name: "provider1", Timestamp: time.Now(), Err: nil},
+	})
+	s.waitForUpdate(ch, rpcstatus.StatusUp, time.Second)
+
+	s.manager.Pause()
+	phm.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{
+		{Name: "provider1", Timestamp: time.Now(), Err: errors.New("down")},
+	})
+	select {
+	case <-ch:
+		s.Fail("unexpected blockchain update while paused")
+	case <-time.After(120 * time.Millisecond):
+	}
+
+	s.manager.Resume()
+	s.waitForUpdate(ch, rpcstatus.StatusDown, 400*time.Millisecond)
+}
+
 func TestBlockchainHealthManagerSuite(t *testing.T) {
 	suite.Run(t, new(BlockchainHealthManagerSuite))
 }

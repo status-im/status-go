@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	healthmanager "github.com/status-im/status-go/internal/healthmanager"
+	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
@@ -169,4 +172,44 @@ func TestGetProviderRPCLimiterCircuitName(t *testing.T) {
 
 	// Limiter is shared per host regardless of chain.
 	require.Same(t, limiterChain1, limiterChain2)
+}
+
+func TestSetPausedPropagatesToProvidersHealthManager(t *testing.T) {
+	c := &Client{
+		healthMgr: healthmanager.NewBlockchainHealthManager(),
+	}
+	defer c.healthMgr.Stop()
+
+	phm := healthmanager.NewProvidersHealthManager(1)
+	phm.SetDownDebounce(50 * time.Millisecond)
+	require.NoError(t, c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm))
+
+	ch := phm.Subscribe()
+	defer phm.Unsubscribe(ch)
+
+	phm.Update(context.Background(), []rpcstatus.RpcProviderCallStatus{
+		{Name: "provider1", Timestamp: time.Now(), Err: nil},
+	})
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for initial Up notification")
+	}
+
+	c.SetPaused(true)
+	phm.Update(context.Background(), []rpcstatus.RpcProviderCallStatus{
+		{Name: "provider1", Timestamp: time.Now(), Err: fmt.Errorf("down")},
+	})
+	select {
+	case <-ch:
+		t.Fatal("unexpected notification while client is paused")
+	case <-time.After(120 * time.Millisecond):
+	}
+
+	c.SetPaused(false)
+	select {
+	case <-ch:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timeout waiting for debounced Down notification after resume")
+	}
 }
