@@ -131,8 +131,15 @@ type Waku struct {
 	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
 	dnsDiscAsyncRetrievedSignal chan struct{}
 
-	// Light-client filter protocol; tracks wire subscriptions made via Subscribe.
+	// Light-client filter protocol; tracks the wire subscriptions declared via
+	// SyncSubscriptions.
 	filterManager *filterapi.FilterManager
+
+	// subscriptions maps each (pubsub, content) topic pair declared by the
+	// transport via SyncSubscriptions to the internal subscription id it is
+	// registered under in the filterManager. The id never leaves the adapter.
+	subscriptionsMu sync.Mutex
+	subscriptions   map[types.TopicSubscription]string
 
 	envelopeCache *ttlcache.Cache[gethcommon.Hash, bool] // [Hash of envelope -> Processed] cache
 	poolMu        sync.RWMutex                           // Mutex to sync the message and expiration pools
@@ -234,6 +241,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 
 	waku := &Waku{
 		cfg:                             cfg,
+		subscriptions:                   make(map[types.TopicSubscription]string),
 		envelopeCache:                   newTTLCache(),
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
@@ -764,44 +772,51 @@ func newReceivedMessage(e *common.ReceivedMessage) *types.ReceivedMessage {
 	}
 }
 
-// Subscribe registers a wire subscription for the given content topics on the
-// given pubsub topic and returns its id. Decoding, matching and buffering of
-// received messages all happen in the transport (status-im/status-go#7464), so
-// no key material is involved: for light clients the subscription is forwarded
-// to the filter protocol's FilterManager, while relay clients already receive
-// everything on the pubsub topics they subscribe to and only need the id.
-func (w *Waku) Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error) {
-	id, err := common.GenerateRandomID()
-	if err != nil {
-		return "", err
+// SyncSubscriptions reconciles the wire subscriptions with the desired set of
+// (pubsubTopic, contentTopic) pairs declared by the transport. Decoding,
+// matching and buffering of received messages all happen in the transport
+// (status-im/status-go#7464), so no key material is involved: for light
+// clients each added pair is registered with the filter protocol's
+// FilterManager under an internal subscription id and each dropped pair is
+// unsubscribed, while relay clients already receive everything on the pubsub
+// topics they subscribe to, making reconciliation pure bookkeeping.
+func (w *Waku) SyncSubscriptions(ctx context.Context, desired []types.TopicSubscription) error {
+	w.subscriptionsMu.Lock()
+	defer w.subscriptionsMu.Unlock()
+
+	want := make(map[types.TopicSubscription]struct{}, len(desired))
+	for _, sub := range desired {
+		want[sub] = struct{}{}
 	}
 
-	if w.cfg.LightClient && w.filterManager != nil {
-		pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-		cf := protocol.NewContentFilter(pubsubTopic, common.NewTopicSetFromBytes(contentTopics).ContentTopics()...)
-		w.filterManager.SubscribeFilter(id, cf)
-	}
-
-	return id, nil
-}
-
-// Unsubscribe removes a wire subscription made with Subscribe.
-func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
-	if w.cfg.LightClient && w.filterManager != nil {
-		w.filterManager.UnsubscribeFilter(id)
-	}
-
-	return nil
-}
-
-// UnsubscribeMany removes a batch of wire subscriptions made with Subscribe.
-func (w *Waku) UnsubscribeMany(ids []string) error {
-	for _, id := range ids {
-		w.logger.Debug("cleaning up filter", zap.String("id", id))
+	for sub, id := range w.subscriptions {
+		if _, ok := want[sub]; ok {
+			continue
+		}
+		w.logger.Debug("cleaning up wire subscription", zap.String("id", id))
 		if w.cfg.LightClient && w.filterManager != nil {
 			w.filterManager.UnsubscribeFilter(id)
 		}
+		delete(w.subscriptions, sub)
 	}
+
+	for sub := range want {
+		if _, ok := w.subscriptions[sub]; ok {
+			continue
+		}
+		id, err := common.GenerateRandomID()
+		if err != nil {
+			return err
+		}
+		if w.cfg.LightClient && w.filterManager != nil {
+			pubsubTopic := w.GetPubsubTopic(sub.PubsubTopic)
+			contentTopics := [][]byte{types.TopicTypeToByteArray(sub.ContentTopic)}
+			cf := protocol.NewContentFilter(pubsubTopic, common.NewTopicSetFromBytes(contentTopics).ContentTopics()...)
+			w.filterManager.SubscribeFilter(id, cf)
+		}
+		w.subscriptions[sub] = id
+	}
+
 	return nil
 }
 

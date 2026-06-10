@@ -2,7 +2,6 @@ package transport
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
@@ -18,14 +17,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-type FiltersService interface {
-	Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error)
-	Unsubscribe(ctx context.Context, id string) error
-	UnsubscribeMany(ids []string) error
-}
-
 type FiltersManager struct {
-	service     FiltersService
 	persistence KeysPersistence
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
@@ -43,7 +35,7 @@ type FiltersManager struct {
 }
 
 // NewFiltersManager returns a new filtersManager.
-func NewFiltersManager(persistence KeysPersistence, service FiltersService, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*FiltersManager, error) {
+func NewFiltersManager(persistence KeysPersistence, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*FiltersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -55,7 +47,6 @@ func NewFiltersManager(persistence KeysPersistence, service FiltersService, priv
 
 	return &FiltersManager{
 		privateKey:  privateKey,
-		service:     service,
 		persistence: persistence,
 		keys:        keys,
 		filters:     make(map[string]*Filter),
@@ -217,7 +208,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey
 			identityStr := PublicKeyToStr(pk)
-			id, topic, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey)
+			id, topic, err := f.addAsymmetric(identityStr, cf.PrivKey)
 			if err != nil {
 				f.logger.Debug("could not register community filter", zap.Error(err))
 				return nil, err
@@ -244,7 +235,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	return filters, nil
 }
 
-func (f *FiltersManager) Reset(ctx context.Context) error {
+func (f *FiltersManager) Reset() error {
 	var filters []*Filter
 
 	f.mutex.Lock()
@@ -253,7 +244,7 @@ func (f *FiltersManager) Reset(ctx context.Context) error {
 	}
 	f.mutex.Unlock()
 
-	return f.Remove(ctx, filters...)
+	return f.Remove(filters...)
 }
 
 func (f *FiltersManager) Filters() (result []*Filter) {
@@ -328,14 +319,11 @@ func (f *FiltersManager) FilterByChatID(chatID string) *Filter {
 }
 
 // Remove removes all the filtersToRemove
-func (f *FiltersManager) Remove(ctx context.Context, filtersToRemove ...*Filter) error {
+func (f *FiltersManager) Remove(filtersToRemove ...*Filter) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
 	for _, filter := range filtersToRemove {
-		if err := f.service.Unsubscribe(ctx, filter.FilterID); err != nil {
-			return err
-		}
 		f.deleteSymKey(filter.FilterID)
 		delete(f.asymKeys, filter.FilterID)
 		for k, v := range f.filters {
@@ -352,17 +340,12 @@ func (f *FiltersManager) Remove(ctx context.Context, filtersToRemove ...*Filter)
 func (f *FiltersManager) RemoveNoListenFilters() error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
-	var filterIDs []string
 	var filters []*Filter
 
 	for _, v := range f.filters {
 		if !v.Listen {
-			filterIDs = append(filterIDs, v.FilterID)
 			filters = append(filters, v)
 		}
-	}
-	if err := f.service.UnsubscribeMany(filterIDs); err != nil {
-		return err
 	}
 
 	for _, filter := range filters {
@@ -395,7 +378,7 @@ func (f *FiltersManager) RemoveFilterByChatID(chatID string) (*Filter, error) {
 		return nil, nil
 	}
 
-	err := f.Remove(context.Background(), toRemove...)
+	err := f.Remove(toRemove...)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +409,7 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	id, topic, err := f.addAsymmetric(chatID, "", identity)
+	id, topic, err := f.addAsymmetric(chatID, identity)
 	if err != nil {
 		f.logger.Debug("could not register personal topic filter", zap.Error(err))
 		return nil, err
@@ -464,7 +447,7 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	id, topic, err := f.addAsymmetric(chatID, "", identity)
+	id, topic, err := f.addAsymmetric(chatID, identity)
 	if err != nil {
 		f.logger.Debug("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -499,7 +482,7 @@ func (f *FiltersManager) LoadNegotiated(secret messagingtypes.NegotiatedSecret) 
 	}
 
 	keyString := hex.EncodeToString(secret.Key)
-	id, topic, err := f.addSymmetric(keyString, "")
+	id, topic, err := f.addSymmetric(keyString)
 	if err != nil {
 		f.logger.Debug("could not register negotiated topic", zap.Error(err))
 		return nil, err
@@ -554,7 +537,7 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 		OneToOne:  true,
 	}
 
-	id, topic, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey)
+	id, topic, err := f.addAsymmetric(personalDiscoveryChat.ChatID, f.privateKey)
 	if err != nil {
 		f.logger.Debug("could not register discovery topic", zap.String("chatID", personalDiscoveryChat.ChatID), zap.Error(err))
 		return nil, err
@@ -595,7 +578,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 		return chat, nil
 	}
 
-	id, topic, err := f.addSymmetric(chatID, pubsubTopic)
+	id, topic, err := f.addSymmetric(chatID)
 	if err != nil {
 		f.logger.Debug("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -633,7 +616,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		return f.filters[chatID], nil
 	}
 
-	id, topic, err := f.addSymmetric(chatID, "")
+	id, topic, err := f.addSymmetric(chatID)
 	if err != nil {
 		f.logger.Debug("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -654,11 +637,11 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 	return chat, nil
 }
 
-// addSymmetric registers a symmetric filter's wire subscription and key,
-// returning the new FilterID and the filter's content topic.
-func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (string, types.TopicType, error) {
+// addSymmetric generates a symmetric filter's FilterID and stores its key,
+// deriving it from the chat id if it is not already known. The wire
+// subscription is the transport's concern (syncFilterSubscriptions).
+func (f *FiltersManager) addSymmetric(chatID string) (string, types.TopicType, error) {
 	topic := ToTopic(chatID)
-	topics := [][]byte{topic}
 
 	symKey, ok := f.keys[chatID]
 	if !ok {
@@ -672,7 +655,7 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (string
 		}
 	}
 
-	id, err := f.service.Subscribe(pubsubTopic, topics)
+	id, err := wakucommon.GenerateRandomID()
 	if err != nil {
 		return "", types.TopicType{}, err
 	}
@@ -684,15 +667,15 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (string
 	return id, types.BytesToTopic(topic), nil
 }
 
-// addAsymmetric registers an asymmetric filter's wire subscription and key,
-// returning the new FilterID and the filter's content topic. Whether the
-// filter actually receives messages is governed by its Listen flag:
-// non-listening filters are skipped during routing in handleReceivedMessage.
-func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identity *ecdsa.PrivateKey) (string, types.TopicType, error) {
+// addAsymmetric generates an asymmetric filter's FilterID and stores its
+// private key. The wire subscription is the transport's concern
+// (syncFilterSubscriptions). Whether the filter actually receives messages is
+// governed by its Listen flag: non-listening filters are skipped during
+// routing in handleReceivedMessage.
+func (f *FiltersManager) addAsymmetric(chatID string, identity *ecdsa.PrivateKey) (string, types.TopicType, error) {
 	topic := ToTopic(chatID)
-	topics := [][]byte{topic}
 
-	id, err := f.service.Subscribe(pubsubTopic, topics)
+	id, err := wakucommon.GenerateRandomID()
 	if err != nil {
 		return "", types.TopicType{}, err
 	}
