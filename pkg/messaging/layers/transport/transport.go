@@ -220,12 +220,15 @@ func (t *Transport) receiveLoop() {
 	}
 }
 
-// handleReceivedMessage routes a received message to every listening filter on
+// handleReceivedMessage routes a received message to the listening filters on
 // its (pubsub, content) topic and buffers the decoded result. A content topic
 // is only a 4-byte hash of the chat id, so distinct chats can collide on it;
-// each candidate is therefore decoded with its own key, and a successful
-// authenticated decrypt is what confirms the message belongs to that filter
-// (replacing the old per-filter key-hash match).
+// a successful authenticated decrypt is what confirms which key — and hence
+// which filters — the message belongs to (replacing the old per-filter
+// key-hash match). Since a message decrypts with exactly one key, candidates
+// are grouped by key: decoding is attempted at most once per distinct key,
+// stops at the first key that succeeds, and the decoded message is fanned out
+// to every filter sharing that key.
 func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
 	if msg == nil {
 		return
@@ -236,7 +239,13 @@ func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
 		return
 	}
 
-	var matched bool
+	type keyGroup struct {
+		symKey  []byte
+		privKey *ecdsa.PrivateKey
+		filters []*Filter
+	}
+	var order []string // group iteration order, deterministic over candidates
+	groups := make(map[string]*keyGroup)
 	for _, filter := range candidates {
 		// Filters that exist only so we can publish never receive.
 		if !filter.Listen {
@@ -248,27 +257,55 @@ func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
 			continue
 		}
 
-		decoded, err := t.decode(msg, symKey, privKey)
+		var fingerprint string
+		if symKey != nil {
+			fingerprint = "s:" + string(symKey)
+		} else {
+			fingerprint = "a:" + string(crypto.FromECDSAPub(&privKey.PublicKey))
+		}
+
+		group := groups[fingerprint]
+		if group == nil {
+			group = &keyGroup{symKey: symKey, privKey: privKey}
+			groups[fingerprint] = group
+			order = append(order, fingerprint)
+		}
+		group.filters = append(group.filters, filter)
+	}
+
+	var matched bool
+	for _, fingerprint := range order {
+		group := groups[fingerprint]
+
+		decoded, err := t.decode(msg, group.symKey, group.privKey)
 		if err != nil {
-			// Wrong key for this filter (e.g. a colliding chat's message); skip.
+			// Wrong key (e.g. a colliding chat's message); try the next one.
 			continue
 		}
 
-		message := toMessage(decoded, filter, msg, privKey)
-		t.receivedMu.Lock()
-		byHash := t.received[filter.FilterID]
-		if byHash == nil {
-			byHash = make(map[string]*types.Message)
-			t.received[filter.FilterID] = byHash
+		for _, filter := range group.filters {
+			t.bufferMessage(filter.FilterID, toMessage(decoded, filter, msg, group.privKey))
 		}
-		byHash[types2.EncodeHex(message.Hash)] = message
-		t.receivedMu.Unlock()
 		matched = true
+		break // only one key can authenticate a given message
 	}
 
 	if matched {
 		t.matchedPublisher.Publish(struct{}{})
 	}
+}
+
+// bufferMessage stores a decoded message in the per-filter receive buffer,
+// keyed by envelope hash, until RetrieveRawAll drains it.
+func (t *Transport) bufferMessage(filterID string, message *types.Message) {
+	t.receivedMu.Lock()
+	defer t.receivedMu.Unlock()
+	byHash := t.received[filterID]
+	if byHash == nil {
+		byHash = make(map[string]*types.Message)
+		t.received[filterID] = byHash
+	}
+	byHash[types2.EncodeHex(message.Hash)] = message
 }
 
 // filterKeys resolves the key material used to decode messages received on a
