@@ -2,7 +2,14 @@ package thirdparty
 
 //go:generate go tool mockgen -package=mock_thirdparty -source=market_types.go -destination=mock/market_types.go
 
-import tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+import (
+	"fmt"
+
+	provider_errors "github.com/status-im/status-go/internal/healthmanager/provider_errors"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+)
+
+var ErrTokenNotMapped = fmt.Errorf("%w: token not mapped to market data provider", provider_errors.ErrDataUnavailable)
 
 type HistoricalPrice struct {
 	Timestamp int64   `json:"time"`

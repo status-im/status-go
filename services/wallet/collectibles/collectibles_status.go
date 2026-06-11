@@ -1,7 +1,6 @@
 package collectibles
 
 import (
-	"context"
 	"errors"
 	"sync"
 
@@ -86,19 +85,7 @@ func (o *Manager) setChainConnected(chainID walletCommon.ChainID, connected bool
 }
 
 func isCollectiblesIgnorableError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, context.Canceled) {
-		return true
-	}
-	if provider_errors.IsNonCriticalRpcError(err) {
-		return true
-	}
-	if provider_errors.IsNonCriticalProviderError(err) {
-		return true
-	}
-	return false
+	return provider_errors.IsIgnorableForConnectivity(err)
 }
 
 func logProviderSearchErr(method, providerID string, chainID walletCommon.ChainID, err error) {
