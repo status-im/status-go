@@ -55,9 +55,10 @@ func (cr *CommandResult) addCallStatus(providerName string, err error, startTime
 }
 
 type Command struct {
-	ctx      context.Context
-	functors []*Functor
-	cancel   atomic.Bool
+	ctx                       context.Context
+	functors                  []*Functor
+	cancel                    atomic.Bool
+	nonFailureErrorClassifier func(error) bool
 }
 
 func NewCommand(ctx context.Context, functors []*Functor) *Command {
@@ -77,6 +78,14 @@ func (cmd *Command) IsEmpty() bool {
 
 func (cmd *Command) Cancel() {
 	cmd.cancel.Store(true)
+}
+
+func (cmd *Command) SetNonFailureErrorClassifier(classifier func(error) bool) {
+	cmd.nonFailureErrorClassifier = classifier
+}
+
+func (cmd *Command) shouldIgnoreFailure(err error) bool {
+	return err != nil && cmd.nonFailureErrorClassifier != nil && cmd.nonFailureErrorClassifier(err)
 }
 
 type Config struct {
@@ -185,6 +194,7 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 		}
 
 		var err error
+		var skippedErr error
 		circuitName := f.circuitName
 		providerName := f.providerName
 		if cb.circuitNameHandler != nil {
@@ -231,6 +241,10 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 					shared.markCancelled()
 					return nil
 				}
+				if cmd.shouldIgnoreFailure(err) {
+					skippedErr = err
+					return nil
+				}
 				if err != nil {
 					logutils.ZapLogger().Warn("hystrix error",
 						zap.String("provider", f.providerName),
@@ -239,6 +253,9 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 				}
 				return err
 			}, nil)
+		}
+		if err == nil && skippedErr != nil {
+			err = skippedErr
 		}
 		if err == nil {
 			break

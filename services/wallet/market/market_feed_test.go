@@ -50,11 +50,8 @@ func (s *MarketTestSuite) TestEventOnRpsError() {
 	// WHEN
 	_, err := manager.FetchPrices(s.tokensKeys, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
-	event, ok := s.feedSub.WaitForEvent(5 * time.Second)
-	s.Require().True(ok, "expected an event, but none was received")
-
-	// THEN
-	s.Require().Equal(event.Type, EventMarketStatusChanged)
+	_, ok := s.feedSub.WaitForEvent(500 * time.Millisecond)
+	s.Require().False(ok, "expected no status event for non-critical rate limit error")
 }
 
 func (s *MarketTestSuite) TestEventOnNetworkError() {

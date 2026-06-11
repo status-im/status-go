@@ -647,3 +647,32 @@ func TestCircuitBreaker_ErrorLogging(t *testing.T) {
 		assert.True(t, duration >= 0)
 	})
 }
+
+func TestExecuteIgnoresNonFailureErrorForCircuitAndTriesNextProvider(t *testing.T) {
+	cb := NewCircuitBreaker(Config{
+		Timeout:               1000,
+		MaxConcurrentRequests: 10,
+		SleepWindow:           1000,
+		ErrorPercentThreshold: 1,
+	})
+	mappingErr := errors.New("token not mapped")
+
+	first := NewFunctor(func() ([]any, error) {
+		return nil, mappingErr
+	}, "market-provider-1", "provider-1")
+	second := NewFunctor(func() ([]any, error) {
+		return []any{"ok"}, nil
+	}, "market-provider-2", "provider-2")
+
+	cmd := NewCommand(context.Background(), []*Functor{first, second})
+	cmd.SetNonFailureErrorClassifier(func(err error) bool {
+		return errors.Is(err, mappingErr)
+	})
+
+	result := cb.Execute(cmd)
+	require.NoError(t, result.Error())
+	require.Equal(t, []any{"ok"}, result.Result())
+	require.Len(t, result.FunctorCallStatuses(), 2)
+	require.Error(t, result.FunctorCallStatuses()[0].Err)
+	require.NoError(t, result.FunctorCallStatuses()[1].Err)
+}

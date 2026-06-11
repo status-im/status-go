@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
@@ -46,6 +48,24 @@ type TokenList struct {
 	*types.TokenList
 
 	Tokens []*Token `json:"tokens"` // tokens from the `types.TokenList` are shadowed by this field
+}
+
+// EthereumMainnetSibling returns the Ethereum mainnet token sharing the same CrossChainID
+func EthereumMainnetSibling(token *Token, candidates []*Token) *Token {
+	if token == nil || token.CrossChainID == "" ||
+		token.ChainID == walletcommon.EthereumMainnet {
+		return nil
+	}
+
+	for _, candidate := range candidates {
+		if candidate != nil &&
+			candidate.ChainID == walletcommon.EthereumMainnet &&
+			candidate.CrossChainID == token.CrossChainID {
+			return candidate
+		}
+	}
+
+	return nil
 }
 
 func ParseCollectibleKey(tokenKey string) (chainID uint64, contractAddress common.Address, collectibleTokenID *big.Int, success bool) {
