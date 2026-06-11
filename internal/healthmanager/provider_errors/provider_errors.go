@@ -277,6 +277,19 @@ func IsIgnorableForConnectivity(err error) bool {
 	if err == nil {
 		return false
 	}
+	// For joined errors ignore only if all components are ignorable
+	if u, ok := err.(interface{ Unwrap() []error }); ok {
+		errs := u.Unwrap()
+		if len(errs) == 0 {
+			return false
+		}
+		for _, e := range errs {
+			if !IsIgnorableForConnectivity(e) {
+				return false
+			}
+		}
+		return true
+	}
 	return errors.Is(err, context.Canceled) ||
 		IsNonCriticalRpcError(err) ||
 		IsNonCriticalProviderError(err)
