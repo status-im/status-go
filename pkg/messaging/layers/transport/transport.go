@@ -30,55 +30,18 @@ var (
 	ErrNoMailservers = errors.New("no configured mailservers")
 )
 
-type transportKeysManager struct {
-	waku types.Waku
-
-	// Identity of the current user.
-	privateKey *ecdsa.PrivateKey
-
-	passToSymKeyMutex sync.RWMutex
-	passToSymKeyCache map[string]string
-}
-
-func (m *transportKeysManager) AddOrGetKeyPair(priv *ecdsa.PrivateKey) (string, error) {
-	// caching is handled in waku
-	return m.waku.AddKeyPair(priv)
-}
-
-func (m *transportKeysManager) AddOrGetSymKeyFromPassword(password string) (string, error) {
-	m.passToSymKeyMutex.Lock()
-	defer m.passToSymKeyMutex.Unlock()
-
-	if val, ok := m.passToSymKeyCache[password]; ok {
-		return val, nil
-	}
-
-	id, err := m.waku.AddSymKeyFromPassword(password)
-	if err != nil {
-		return id, err
-	}
-
-	m.passToSymKeyCache[password] = id
-
-	return id, nil
-}
-
-func (m *transportKeysManager) RawSymKey(id string) ([]byte, error) {
-	return m.waku.GetSymKey(id)
-}
-
 type Option func(*Transport) error
 
 // Transport is a transport based on Whisper service.
 type Transport struct {
 	gocommon.PauseBroadcaster
 
-	waku        types.Waku
-	api         MessagingAPI // backend used to send messages and read received envelopes
-	keysManager *transportKeysManager
-	filters     *FiltersManager
-	logger      *zap.Logger
-	cache       ProcessedMessageIDsCachePersistence
+	waku       types.Waku
+	api        MessagingAPI      // backend used to send messages and read received envelopes
+	privateKey *ecdsa.PrivateKey // identity of the current user
+	filters    *FiltersManager
+	logger     *zap.Logger
+	cache      ProcessedMessageIDsCachePersistence
 
 	envelopesMonitor *EnvelopesMonitor
 	cleanFiltersFn   func() error
@@ -163,11 +126,7 @@ func NewTransport(
 		cache:            messageIDsCachePersistence,
 		envelopesMonitor: envelopesMonitor,
 		quit:             make(chan struct{}),
-		keysManager: &transportKeysManager{
-			waku:              waku,
-			privateKey:        privateKey,
-			passToSymKeyCache: make(map[string]string),
-		},
+		privateKey:       privateKey,
 		filters:          filtersManager,
 		logger:           logger.With(zap.Namespace("Transport")),
 		received:         make(map[string]map[string]*types.Message),
@@ -309,19 +268,17 @@ func (t *Transport) bufferMessage(filterID string, message *types.Message) {
 }
 
 // filterKeys resolves the key material used to decode messages received on a
-// filter. Symmetric keys come from the waku key store via the filter's SymKeyID
-// (the same path the send side uses); asymmetric private keys come from the
-// FiltersManager's runtime map. Exactly one of the returned keys is non-nil.
+// filter. Both symmetric and asymmetric keys come from the FiltersManager's
+// runtime maps, keyed by FilterID (the same path the send side uses). Exactly
+// one of the returned keys is non-nil.
 func (t *Transport) filterKeys(filter *Filter) (symKey []byte, privKey *ecdsa.PrivateKey, err error) {
-	if filter.SymKeyID != "" {
-		symKey, err = t.keysManager.RawSymKey(filter.SymKeyID)
-		return symKey, nil, err
+	if symKey, ok := t.filters.SymKey(filter.FilterID); ok {
+		return symKey, nil, nil
 	}
-	privKey, ok := t.filters.AsymKey(filter.FilterID)
-	if !ok {
-		return nil, nil, errors.New("no decode key for filter")
+	if privKey, ok := t.filters.AsymKey(filter.FilterID); ok {
+		return nil, privKey, nil
 	}
-	return nil, privKey, nil
+	return nil, nil, errors.New("no decode key for filter")
 }
 
 // decode reverses the rfc26 payload codec using the filter's key material.
@@ -495,9 +452,9 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	symKey, err := t.keysManager.RawSymKey(filter.SymKeyID)
-	if err != nil {
-		return nil, err
+	symKey, ok := t.filters.SymKey(filter.FilterID)
+	if !ok {
+		return nil, errors.New("no sym key found for filter")
 	}
 
 	encoded, err := t.encode(newMessage.Payload, symKey, nil)
@@ -517,9 +474,9 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	symKey, err := t.keysManager.RawSymKey(filter.SymKeyID)
-	if err != nil {
-		return nil, err
+	symKey, ok := t.filters.SymKey(filter.FilterID)
+	if !ok {
+		return nil, errors.New("no sym key found for filter")
 	}
 
 	encoded, err := t.encode(newMessage.Payload, symKey, nil)
@@ -531,7 +488,7 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 }
 
 func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	filter, err := t.filters.LoadPartitioned(publicKey, t.keysManager.privateKey, false)
+	filter, err := t.filters.LoadPartitioned(publicKey, t.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +502,7 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 }
 
 func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	filter, err := t.filters.LoadPersonal(publicKey, t.keysManager.privateKey, false)
+	filter, err := t.filters.LoadPersonal(publicKey, t.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +552,7 @@ func (t *Transport) cleanFilters() error {
 // Exactly one of symKey or recipient must be non-nil. The message is always
 // signed with the local identity key.
 func (t *Transport) encode(payload []byte, symKey []byte, recipient *ecdsa.PublicKey) ([]byte, error) {
-	return rfc26.Encode(payload, symKey, recipient, t.keysManager.privateKey)
+	return rfc26.Encode(payload, symKey, recipient, t.privateKey)
 }
 
 // Track records sent envelopes for delivery monitoring. It is the

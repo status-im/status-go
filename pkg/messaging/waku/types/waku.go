@@ -2,7 +2,6 @@ package types
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"sync"
 	"time"
@@ -78,16 +77,6 @@ func (u *ConnStatusSubscription) Send(s ConnStatus) bool {
 	return true
 }
 
-type WakuKeyManager interface {
-	// GetPrivateKey retrieves the private key of the specified identity.
-	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
-	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
-	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	// DeleteKeyPairs deletes all the keys
-	DeleteKeyPairs() error
-	GetSymKey(id string) ([]byte, error)
-}
-
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku interface {
@@ -131,19 +120,8 @@ type Waku interface {
 	// GetCurrentTime returns current time.
 	GetCurrentTime() uint64
 
-	// GetPrivateKey retrieves the private key of the specified identity.
-	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
-
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
-	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
-	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	// DeleteKeyPair deletes the key with the specified ID if it exists.
-	DeleteKeyPair(keyID string) bool
-	AddSymKeyDirect(key []byte) (string, error)
-	AddSymKeyFromPassword(password string) (string, error)
-	DeleteSymKey(id string) bool
-	GetSymKey(id string) ([]byte, error)
 	MaxMessageSize() uint32
 
 	// Subscribe registers a wire subscription for the given content topics on
