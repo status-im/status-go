@@ -110,7 +110,7 @@ func (s *FilterSubscriptions) acquire(pair types.TopicSubscription) error {
 	if s.counts[pair] > 1 {
 		return nil
 	}
-	if err := s.api.Subscribe(context.Background(), pair); err != nil {
+	if err := s.api.Subscribe(context.Background(), pair.PubsubTopic, []types.TopicType{pair.ContentTopic}); err != nil {
 		delete(s.counts, pair)
 		return err
 	}
@@ -129,7 +129,7 @@ func (s *FilterSubscriptions) release(pair types.TopicSubscription) {
 	}
 	delete(s.counts, pair)
 
-	if err := s.api.Unsubscribe(context.Background(), pair); err != nil {
+	if err := s.api.Unsubscribe(context.Background(), pair.PubsubTopic, []types.TopicType{pair.ContentTopic}); err != nil {
 		s.logger.Warn("failed to remove wire subscription",
 			zap.String("pubsubTopic", pair.PubsubTopic),
 			zap.String("contentTopic", pair.ContentTopic.String()),

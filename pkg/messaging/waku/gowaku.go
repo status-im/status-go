@@ -775,55 +775,52 @@ func newReceivedMessage(e *common.ReceivedMessage) *types.ReceivedMessage {
 	}
 }
 
-// Subscribe registers a wire subscription for the given (pubsubTopic,
-// contentTopic) pair, declared by the transport when the first filter on that
-// pair appears. Decoding, matching and buffering of received messages all
-// happen in the transport (status-im/status-go#7464), so no key material is
-// involved: light clients register the pair with the filter protocol's
-// FilterManager under an internal subscription id remembered for the matching
-// Unsubscribe, while relay clients already receive everything on the pubsub
-// topics they subscribe to, making this pure bookkeeping. Subscribing an
-// already-subscribed pair is a no-op.
-func (w *Waku) Subscribe(ctx context.Context, sub types.TopicSubscription) error {
+// Subscribe registers a wire subscription for each given (pubsubTopic,
+// contentTopic) pair. Subscribing an already-subscribed pair is a no-op.
+func (w *Waku) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
 	w.subscriptionsMu.Lock()
 	defer w.subscriptionsMu.Unlock()
 
-	if _, ok := w.subscriptions[sub]; ok {
-		return nil
-	}
+	for _, contentTopic := range contentTopics {
+		sub := types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: contentTopic}
+		if _, ok := w.subscriptions[sub]; ok {
+			continue
+		}
 
-	id, err := common.GenerateRandomID()
-	if err != nil {
-		return err
+		id, err := common.GenerateRandomID()
+		if err != nil {
+			return err
+		}
+		if w.cfg.LightClient && w.filterManager != nil {
+			topics := [][]byte{types.TopicTypeToByteArray(contentTopic)}
+			cf := protocol.NewContentFilter(w.GetPubsubTopic(pubsubTopic), common.NewTopicSetFromBytes(topics).ContentTopics()...)
+			w.filterManager.SubscribeFilter(id, cf)
+		}
+		w.subscriptions[sub] = id
 	}
-	if w.cfg.LightClient && w.filterManager != nil {
-		pubsubTopic := w.GetPubsubTopic(sub.PubsubTopic)
-		contentTopics := [][]byte{types.TopicTypeToByteArray(sub.ContentTopic)}
-		cf := protocol.NewContentFilter(pubsubTopic, common.NewTopicSetFromBytes(contentTopics).ContentTopics()...)
-		w.filterManager.SubscribeFilter(id, cf)
-	}
-	w.subscriptions[sub] = id
 
 	return nil
 }
 
-// Unsubscribe removes the wire subscription for the given pair, declared by
-// the transport when the last filter on it is removed. Unsubscribing a pair
-// that is not subscribed is a no-op.
-func (w *Waku) Unsubscribe(ctx context.Context, sub types.TopicSubscription) error {
+// Unsubscribe removes the wire subscriptions for the given pairs.
+// Unsubscribing a pair that is not subscribed is a no-op.
+func (w *Waku) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
 	w.subscriptionsMu.Lock()
 	defer w.subscriptionsMu.Unlock()
 
-	id, ok := w.subscriptions[sub]
-	if !ok {
-		return nil
-	}
+	for _, contentTopic := range contentTopics {
+		sub := types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: contentTopic}
+		id, ok := w.subscriptions[sub]
+		if !ok {
+			continue
+		}
 
-	w.logger.Debug("cleaning up wire subscription", zap.String("id", id))
-	if w.cfg.LightClient && w.filterManager != nil {
-		w.filterManager.UnsubscribeFilter(id)
+		w.logger.Debug("cleaning up wire subscription", zap.String("id", id))
+		if w.cfg.LightClient && w.filterManager != nil {
+			w.filterManager.UnsubscribeFilter(id)
+		}
+		delete(w.subscriptions, sub)
 	}
-	delete(w.subscriptions, sub)
 
 	return nil
 }

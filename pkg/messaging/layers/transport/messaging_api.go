@@ -25,16 +25,22 @@ type MessagingAPI interface {
 	// tracks. This is the single, logos-delivery-shaped event seam.
 	SubscribeEnvelopeEvents(events chan<- types.EnvelopeEvent) types.Subscription
 
-	// Subscribe and Unsubscribe register and remove a wire subscription for a
-	// single (pubsubTopic, contentTopic) pair, keyed by the pair itself: the
-	// transport's FilterSubscriptions subscribes when the first filter on a
-	// pair is installed and unsubscribes when the last one is removed. How a
-	// subscription maps onto the wire — the Waku Filter protocol for light
-	// clients, nothing at all for relay clients — is the backend's concern,
-	// as is any subscription identifier it keeps for its own bookkeeping.
-	// Both are idempotent, mirroring the logos-delivery messaging API.
-	Subscribe(ctx context.Context, sub types.TopicSubscription) error
-	Unsubscribe(ctx context.Context, sub types.TopicSubscription) error
+	// Subscribe and Unsubscribe register and remove wire subscriptions for
+	// the given content topics on a pubsub topic, keyed by the (pubsubTopic,
+	// contentTopic) pairs themselves: the transport's FilterSubscriptions
+	// subscribes when the first filter on a pair is installed and
+	// unsubscribes when the last one is removed. Any subscription identifier
+	// the backend keeps for a pair is its own bookkeeping. Both are
+	// idempotent.
+	//
+	// NOTE: in the waku backend these currently take effect only in
+	// light-client mode (the Waku Filter protocol); relay clients receive
+	// everything on the pubsub topics they relay regardless of what is
+	// subscribed here, so the calls are pure bookkeeping for them. The
+	// semantics therefore do not exactly mirror the logos-delivery Messaging
+	// API yet — to be aligned in further PRs.
+	Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error
+	Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error
 }
 
 // Compile-time assertion: the waku adapter satisfies MessagingAPI.

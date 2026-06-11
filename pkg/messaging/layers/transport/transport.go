@@ -110,11 +110,6 @@ func NewTransport(
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Transport, error) {
-	var api MessagingAPI
-	if waku != nil {
-		api = waku
-	}
-
 	filtersManager, err := NewFiltersManager(keysPersistence, privateKey, logger)
 	if err != nil {
 		return nil, err
@@ -124,6 +119,11 @@ func NewTransport(
 	if envelopesMonitorConfig != nil {
 		envelopesMonitor = NewEnvelopesMonitor(waku, *envelopesMonitorConfig)
 		envelopesMonitor.Start()
+	}
+
+	var api MessagingAPI
+	if waku != nil {
+		api = waku
 	}
 	t := &Transport{
 		waku:             waku,
