@@ -169,3 +169,30 @@ func TestIsIgnorableForConnectivity(t *testing.T) {
 		t.Error("IsIgnorableForConnectivity should be false for unrelated errors")
 	}
 }
+
+func TestIsIgnorableForConnectivity_JoinedErrors(t *testing.T) {
+	connectionErr := &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+
+	// Joined errors are ignorable only when every component is ignorable.
+	mixed := fmt.Errorf("%w, provider2.error: %w", ErrDataUnavailable, connectionErr)
+	if IsIgnorableForConnectivity(mixed) {
+		t.Error("IsIgnorableForConnectivity should be false when a joined error contains a connectivity failure")
+	}
+
+	allIgnorable := fmt.Errorf("%w, provider2.error: %w", ErrDataUnavailable, context.Canceled)
+	if !IsIgnorableForConnectivity(allIgnorable) {
+		t.Error("IsIgnorableForConnectivity should be true when all joined errors are ignorable")
+	}
+
+	// Same shape as circuitbreaker.accumulateCommandError: leaves are single-wrapped.
+	nested := fmt.Errorf("%w, provider2.error: %w",
+		fmt.Errorf("provider1.error: %w", ErrDataUnavailable),
+		fmt.Errorf("call failed: %w", connectionErr))
+	if IsIgnorableForConnectivity(nested) {
+		t.Error("IsIgnorableForConnectivity should be false for nested joined errors with a connectivity failure")
+	}
+
+	if IsIgnorableForConnectivity(errors.Join()) {
+		t.Error("IsIgnorableForConnectivity should be false for nil joined error")
+	}
+}
