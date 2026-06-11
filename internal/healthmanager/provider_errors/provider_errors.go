@@ -26,6 +26,7 @@ const (
 	ProviderErrorTypeNone                    ProviderErrorType = "none"
 	ProviderErrorTypeContextCanceled         ProviderErrorType = "context_canceled"
 	ProviderErrorTypeContextDeadlineExceeded ProviderErrorType = "context_deadline"
+	ProviderErrorTypeDataUnavailable         ProviderErrorType = "data_unavailable"
 	ProviderErrorTypeConnection              ProviderErrorType = "connection"
 	ProviderErrorTypeNotAuthorized           ProviderErrorType = "not_authorized"
 	ProviderErrorTypeForbidden               ProviderErrorType = "forbidden"
@@ -37,6 +38,8 @@ const (
 	ProviderErrorTypeAuthRotating            ProviderErrorType = "auth_rotating"
 	ProviderErrorTypeOther                   ProviderErrorType = "other"
 )
+
+var ErrDataUnavailable = errors.New("requested data not available from provider")
 
 // IsConnectionError checks if the error is related to network issues.
 func IsConnectionError(err error) bool {
@@ -225,6 +228,9 @@ func determineProviderErrorType(err error) ProviderErrorType {
 	if errors.Is(err, puzzleauth.ErrAuthRotating) {
 		return ProviderErrorTypeAuthRotating
 	}
+	if errors.Is(err, ErrDataUnavailable) {
+		return ProviderErrorTypeDataUnavailable
+	}
 	if IsConnectionError(err) {
 		return ProviderErrorTypeConnection
 	}
@@ -258,9 +264,20 @@ func IsNonCriticalProviderError(err error) bool {
 	errorType := determineProviderErrorType(err)
 
 	switch errorType {
-	case ProviderErrorTypeNone, ProviderErrorTypeContextCanceled, ProviderErrorTypeContentTooLarge, ProviderErrorTypeRateLimit, ProviderErrorTypeAuthRotating:
+	case ProviderErrorTypeNone, ProviderErrorTypeContextCanceled, ProviderErrorTypeContentTooLarge, ProviderErrorTypeRateLimit, ProviderErrorTypeAuthRotating, ProviderErrorTypeDataUnavailable:
 		return true
 	default:
 		return false
 	}
+}
+
+// IsIgnorableForConnectivity reports whether the error should not flip
+// provider/chain connectivity status to "down".
+func IsIgnorableForConnectivity(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, context.Canceled) ||
+		IsNonCriticalRpcError(err) ||
+		IsNonCriticalProviderError(err)
 }

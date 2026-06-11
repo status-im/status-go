@@ -3,6 +3,7 @@ package coingecko
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,33 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestFetchHistoricalDailyPricesReturnsErrTokenNotMapped(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/coins/list", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	})
+
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	geckoClient := &Client{
+		httpClient: thirdparty.NewHTTPClient(),
+		baseURL:    srv.URL,
+	}
+
+	token := &tokentypes.Token{
+		Token: &types.Token{
+			ChainID: common.BaseMainnet,
+			Address: gethcommon.HexToAddress("0x662015ec830df08c0fc45896fab726542e8ac09e"),
+		},
+	}
+
+	_, err := geckoClient.FetchHistoricalDailyPrices(token, "usd", 30, false, 1)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, thirdparty.ErrTokenNotMapped))
+}
 
 func TestCoingeckoAPIKeyInQueryProOverDemo(t *testing.T) {
 	var sawQuery string

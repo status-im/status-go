@@ -139,3 +139,33 @@ func TestIsNonCriticalProviderError_PuzzleAuthRotating(t *testing.T) {
 		t.Error("IsNonCriticalProviderError should be false for unrelated errors")
 	}
 }
+
+func TestDetermineProviderErrorType_DataUnavailable(t *testing.T) {
+	if got := determineProviderErrorType(ErrDataUnavailable); got != ProviderErrorTypeDataUnavailable {
+		t.Errorf("determineProviderErrorType(ErrDataUnavailable) = %q, want %q", got, ProviderErrorTypeDataUnavailable)
+	}
+
+	wrapped := fmt.Errorf("wrapped: %w", ErrDataUnavailable)
+	if got := determineProviderErrorType(wrapped); got != ProviderErrorTypeDataUnavailable {
+		t.Errorf("determineProviderErrorType(wrapped ErrDataUnavailable) = %q, want %q", got, ProviderErrorTypeDataUnavailable)
+	}
+}
+
+func TestIsNonCriticalProviderError_DataUnavailable(t *testing.T) {
+	requireErr := fmt.Errorf("wrapped: %w", ErrDataUnavailable)
+	if !IsNonCriticalProviderError(requireErr) {
+		t.Error("IsNonCriticalProviderError should be true for wrapped ErrDataUnavailable")
+	}
+	if !IsNonCriticalProviderError(ErrDataUnavailable) {
+		t.Error("IsNonCriticalProviderError should be true for bare ErrDataUnavailable")
+	}
+}
+
+func TestIsIgnorableForConnectivity(t *testing.T) {
+	if !IsIgnorableForConnectivity(fmt.Errorf("wrapped: %w", ErrDataUnavailable)) {
+		t.Error("IsIgnorableForConnectivity should be true for wrapped ErrDataUnavailable")
+	}
+	if IsIgnorableForConnectivity(errors.New("fatal provider error")) {
+		t.Error("IsIgnorableForConnectivity should be false for unrelated errors")
+	}
+}

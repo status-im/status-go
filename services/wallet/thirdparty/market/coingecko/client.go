@@ -330,7 +330,7 @@ func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency st
 
 	coingeckoToken, ok := coingeckoTokensByTokenKey[token.Key()]
 	if !ok {
-		return nil, fmt.Errorf("coingecko id not found for token %s", token.Key())
+		return nil, fmt.Errorf("%w: coingecko id not found for token %s", thirdparty.ErrTokenNotMapped, token.Key())
 	}
 
 	var days string
