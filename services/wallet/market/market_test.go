@@ -3,6 +3,7 @@ package market
 import (
 	"errors"
 	"fmt"
+	"net"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	provider_errors "github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -266,6 +268,33 @@ func TestFetchHistoricalDailyPricesFallsBackToMainnetSibling(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []thirdparty.HistoricalPrice{{Timestamp: 1000, Value: 0.1}}, prices)
 	require.Equal(t, []string{baseToken.Key(), ethToken.Key()}, provider.requestedKeys)
+}
+
+func TestFetchHistoricalDailyPricesPropagatesJoinedUnmappedAndConnectivityError(t *testing.T) {
+	baseToken := &tokentypes.Token{Token: &types.Token{
+		ChainID:      walletcommon.BaseMainnet,
+		Address:      common.HexToAddress("0x662015ec830df08c0fc45896fab726542e8ac09e"),
+		CrossChainID: walletcommon.StatusMainnetTokenCrossChainID,
+	}}
+
+	unmappedProvider := &historicalPriceProvider{
+		id:         "unmapped-provider",
+		defaultErr: thirdparty.ErrTokenNotMapped,
+	}
+	failingProvider := &historicalPriceProvider{
+		id:         "failing-provider",
+		defaultErr: &net.OpError{Op: "dial", Err: errors.New("connection refused")},
+	}
+
+	manager := NewManager(
+		[]thirdparty.MarketDataProvider{unmappedProvider, failingProvider},
+		newStaticTokenManager(baseToken),
+		&event.Feed{},
+	)
+	prices, err := manager.FetchHistoricalDailyPrices(baseToken.Key(), "usd", 30, false, 1)
+	require.Error(t, err)
+	require.Nil(t, prices)
+	require.False(t, provider_errors.IsIgnorableForConnectivity(err))
 }
 
 func TestFetchHistoricalDailyPricesReturnsEmptyAndStaysConnectedForUnmappedToken(t *testing.T) {

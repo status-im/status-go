@@ -114,18 +114,18 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	}
 
 	result := pm.circuitbreaker.Execute(cmd)
-	isConnectivityError := result.Error() != nil && !provider_errors.IsIgnorableForConnectivity(result.Error())
-	pm.setIsConnected(!isConnectivityError)
-
-	if result.Error() != nil {
-		if provider_errors.IsIgnorableForConnectivity(result.Error()) {
-			logutils.ZapLogger().Warn("market data unavailable for token mapping", zap.Error(result.Error()))
+	if err := result.Error(); err != nil {
+		isIgnorableError := provider_errors.IsIgnorableForConnectivity(err)
+		pm.setIsConnected(isIgnorableError)
+		if isIgnorableError {
+			logutils.ZapLogger().Warn("market data unavailable for token mapping", zap.Error(err))
 		} else {
-			logutils.ZapLogger().Error("Error fetching prices", zap.Error(result.Error()))
+			logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
 		}
-		return nil, result.Error()
+		return nil, err
 	}
 
+	pm.setIsConnected(true)
 	return result.Result()[0], nil
 }
 
@@ -149,7 +149,7 @@ func (pm *Manager) fetchHistoricalPricesWithFallback(
 		if err == nil {
 			return result.([]thirdparty.HistoricalPrice), nil
 		}
-		if !errors.Is(err, thirdparty.ErrTokenNotMapped) {
+		if !(provider_errors.IsIgnorableForConnectivity(err) && errors.Is(err, thirdparty.ErrTokenNotMapped)) {
 			return nil, err
 		}
 	}
