@@ -179,7 +179,7 @@ ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	else \
 		cd $(LOGOS_STORAGE_SOURCE_DIR) && git fetch --tags; \
 	fi
-	cd $(LOGOS_STORAGE_SOURCE_DIR) && git checkout $(LOGOS_STORAGE_VERSION) && git submodule update --init --recursive
+	cd $(LOGOS_STORAGE_SOURCE_DIR) && git reset --hard && git checkout $(LOGOS_STORAGE_VERSION) && git submodule update --init --recursive
 endif
 
 $(LIBSTORAGE): clone-storage
@@ -322,7 +322,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	else \
 		cd $(NIM_SDS_SOURCE_DIR) && git fetch --tags; \
 	fi
-	cd $(NIM_SDS_SOURCE_DIR) && git checkout $(NIM_SDS_VERSION)
+	cd $(NIM_SDS_SOURCE_DIR) && git reset --hard && git checkout $(NIM_SDS_VERSION)
 endif
 
 $(LIBSDS): clone-nim-sds
