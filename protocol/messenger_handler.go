@@ -504,9 +504,17 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 }
 
 func (m *Messenger) HandleSyncInstallationContactV2(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncInstallationContactV2, statusMessage *common.StatusMessage) error {
-	// Ignore own contact installation
+	canonicalID, err := contacts.ContactIDFromPublicKeyString(message.Id)
+	if err != nil {
+		m.logger.Warn("HandleSyncInstallationContactV2: failed to canonicalize contact ID, continuing with original",
+			zap.String("contactID", message.Id),
+			zap.Error(err))
+		canonicalID = message.Id
+	}
+	message.Id = canonicalID
 
-	if message.Id == m.myHexIdentity() {
+	// Ignore own contact installation
+	if canonicalID == m.myHexIdentity() {
 		m.logger.Warn("HandleSyncInstallationContactV2: skipping own contact")
 		return nil
 	}

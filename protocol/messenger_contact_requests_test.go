@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -1753,4 +1754,36 @@ func (s *MessengerContactRequestSuite) TestAcceptContactWithoutRequest() { //nol
 
 	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.From)
 	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(outgoingMutualStateEventAcceptedDefaultText, contactRequestMsg.From))
+}
+
+func (s *MessengerContactRequestSuite) TestSyncInstallationContactV2_IgnoresNonCanonicalSelfID() {
+	state := s.m.buildMessageState()
+
+	canonicalSelfID := s.m.myHexIdentity()
+	nonCanonicalSelfID := "0X" + strings.ToUpper(canonicalSelfID[2:])
+
+	s.Require().NotEqual(canonicalSelfID, nonCanonicalSelfID)
+	s.Require().Equal(strings.ToLower(canonicalSelfID), strings.ToLower(nonCanonicalSelfID))
+
+	sync := &protobuf.SyncInstallationContactV2{
+		Id:                        nonCanonicalSelfID,
+		Added:                     true,
+		ContactRequestLocalState:  int64(contacts2.ContactRequestStateSent),
+		ContactRequestLocalClock:  1,
+		ContactRequestRemoteState: int64(contacts2.ContactRequestStateNone),
+		ContactRequestRemoteClock: 0,
+		LastUpdated:               1,
+		LastUpdatedLocally:        1,
+	}
+
+	err := s.m.HandleSyncInstallationContactV2(context.Background(), state, sync, nil)
+	s.Require().NoError(err)
+
+	// Regression: this sync payload represents ourselves and must be ignored.
+	s.Require().Len(state.Response.Messages(), 0)
+	s.Require().Len(state.Response.ActivityCenterNotifications(), 0)
+
+	pendingRequests, _, err := s.m.PendingContactRequests("", 10)
+	s.Require().NoError(err)
+	s.Require().Len(pendingRequests, 0)
 }

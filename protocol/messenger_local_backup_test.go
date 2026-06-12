@@ -4,8 +4,10 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -410,4 +412,42 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().NoError(err)
 	s.Require().Len(pinnedMessages, 1)
 	s.Require().Equal(bob2.selfContact.ID, pinnedMessages[0].PinnedBy)
+}
+
+func (s *MessengerLocalBackupSuite) TestExportBackup_ExcludesNonCanonicalSelfContact() {
+	canonicalSelfID := s.m.myHexIdentity()
+	nonCanonicalSelfID := "0X" + strings.ToUpper(canonicalSelfID[2:])
+
+	s.Require().NotEqual(canonicalSelfID, nonCanonicalSelfID)
+	s.Require().Equal(strings.ToLower(canonicalSelfID), strings.ToLower(nonCanonicalSelfID))
+
+	validContactKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	validContactID := types.EncodeHex(crypto.FromECDSAPub(&validContactKey.PublicKey))
+
+	s.m.allContacts.Store(nonCanonicalSelfID, &contacts.Contact{
+		ID:                       nonCanonicalSelfID,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
+		ContactRequestLocalClock: 1,
+		LastUpdated:              1,
+		LastUpdatedLocally:       1,
+	})
+	s.m.allContacts.Store(validContactID, &contacts.Contact{
+		ID:                       validContactID,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
+		ContactRequestLocalClock: 1,
+		LastUpdated:              1,
+		LastUpdatedLocally:       1,
+	})
+
+	marshalledBackup, err := s.m.ExportBackup()
+	s.Require().NoError(err)
+
+	var backup protobuf.MessengerLocalBackup
+	err = proto.Unmarshal(marshalledBackup, &backup)
+	s.Require().NoError(err)
+
+	s.Require().Len(backup.Contacts, 1)
+	s.Require().Equal(validContactID, backup.Contacts[0].Id)
+	s.Require().NotEqual(strings.ToLower(canonicalSelfID), strings.ToLower(backup.Contacts[0].Id))
 }
