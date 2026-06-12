@@ -57,3 +57,68 @@ vim.lsp.config("gopls", {
 		},
 	},
 })
+
+local function find_golangci_lint()
+	for dir in string.gmatch(vim.env.PATH or "", "[^:]+") do
+		local exe = dir .. "/golangci-lint"
+		if vim.fn.executable(exe) == 1 and not string.find(exe, "/mason/", 1, true) then
+			return exe
+		end
+	end
+end
+
+local function remove_golangci_lint(lint)
+	local go_linters = lint.linters_by_ft.go
+	if not go_linters then
+		return
+	end
+
+	local filtered = {}
+	for _, linter in ipairs(go_linters) do
+		if linter ~= "golangcilint" then
+			table.insert(filtered, linter)
+		end
+	end
+	lint.linters_by_ft.go = filtered
+end
+
+local function configure_golangci_lint()
+	local ok, lint = pcall(require, "lint")
+	if not ok or not lint.linters.golangcilint then
+		return
+	end
+
+	local golangci_lint = find_golangci_lint()
+	if not golangci_lint then
+		remove_golangci_lint(lint)
+		return
+	end
+
+	lint.linters.golangcilint.cmd = golangci_lint
+	lint.linters.golangcilint.cwd = status_go_root
+	lint.linters.golangcilint.args = {
+		"--build-tags",
+		"gowaku_no_rln lint",
+		"run",
+		"./...",
+		"--output.json.path=stdout",
+		"--output.text.path=",
+		"--output.tab.path=",
+		"--output.html.path=",
+		"--output.checkstyle.path=",
+		"--output.code-climate.path=",
+		"--output.junit-xml.path=",
+		"--output.teamcity.path=",
+		"--output.sarif.path=",
+		"--issues-exit-code=0",
+		"--show-stats=false",
+		"--path-mode=abs",
+	}
+end
+
+configure_golangci_lint()
+
+vim.api.nvim_create_autocmd("User", {
+	pattern = "VeryLazy",
+	callback = configure_golangci_lint,
+})
