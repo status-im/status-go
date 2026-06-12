@@ -35,11 +35,11 @@ import (
 
 type ArchiveManagerLogosStorageSuite struct {
 	suite.Suite
-	logosStorageClient logosstorage.LogosStorageClientInterface
-	archiveService     archive.ArchiveService
-	manager            *communities.Manager
-	identity           *ecdsa.PrivateKey
-	uploadedCIDs       []string
+	client         logosstorage.LogosStorageClientInterface
+	archiveService archive.ArchiveService
+	manager        *communities.Manager
+	identity       *ecdsa.PrivateKey
+	uploadedCIDs   []string
 }
 
 func buildLogosStorageConfig(t *testing.T) *params.LogosStorageConfig {
@@ -147,12 +147,12 @@ func (s *ArchiveManagerLogosStorageSuite) SetupTest() {
 	s.Require().NotNil(backend)
 	client := backend.GetClient()
 	s.Require().NotNil(client)
-	s.logosStorageClient = client
+	s.client = client
 }
 
 func (s *ArchiveManagerLogosStorageSuite) TearDownTest() {
 	for _, cid := range s.uploadedCIDs {
-		if err := s.logosStorageClient.RemoveCid(cid); err != nil {
+		if err := s.client.RemoveCid(cid); err != nil {
 			s.T().Logf("Warning: Failed to remove CID %s: %v", cid, err)
 		}
 	}
@@ -182,13 +182,13 @@ func (s *ArchiveManagerLogosStorageSuite) TestDownloadingArchivesFromLogosStorag
 	}
 
 	for _, archive := range archives {
-		cid, err := s.logosStorageClient.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
+		cid, err := s.client.Upload(bytes.NewReader(archive.data), archive.hash+".bin")
 		require.NoError(s.T(), err, "Failed to upload %s", archive.hash)
 
 		archiveCIDs[archive.hash] = cid
 		s.uploadedCIDs = append(s.uploadedCIDs, cid)
 
-		exists, err := s.logosStorageClient.HasCid(cid)
+		exists, err := s.client.HasCid(cid)
 		require.NoError(s.T(), err, "Failed to check CID existence for %s", archive.hash)
 		require.True(s.T(), exists, "CID %s should exist after upload", cid)
 	}
@@ -208,10 +208,10 @@ func (s *ArchiveManagerLogosStorageSuite) TestDownloadingArchivesFromLogosStorag
 		}
 	}
 
-	logosStorageIndexBytes, err := proto.Marshal(index)
+	indexBytes, err := proto.Marshal(index)
 	s.Require().NoError(err, "Failed to marshal index")
 
-	cid, err := s.logosStorageClient.UploadArchive(logosStorageIndexBytes)
+	cid, err := s.client.UploadArchive(indexBytes)
 	s.Require().NoError(err, "Failed to upload archive index to LogosStorage")
 	s.Require().NotEmpty(cid, "Uploaded index CID should not be empty")
 
@@ -346,7 +346,7 @@ func (s *ArchiveManagerLogosStorageSuite) TestCreateAndSeedHistoryArchiveKeepsCu
 	}
 
 	s.Require().Eventually(func() bool {
-		hasCid, err := s.logosStorageClient.HasCid(firstIndexCid)
+		hasCid, err := s.client.HasCid(firstIndexCid)
 		return err == nil && !hasCid
 	}, 2*time.Second, 100*time.Millisecond, "old index CID should be unseeded after new cumulative index is created")
 }

@@ -18,8 +18,10 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/archive"
+	archiveconsts "github.com/status-im/status-go/protocol/communities/archive/consts"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -51,9 +53,9 @@ func (s *ArchiveManagerLogosStorageMockSuite) buildManagers() (*communities.Mana
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	logosStorageConfig := &params.LogosStorageConfig{Enabled: true}
+	config := &params.LogosStorageConfig{Enabled: true}
 	amc := &archivetypes.ArchiveManagerConfig{
-		LogosStorageConfig: logosStorageConfig,
+		LogosStorageConfig: config,
 		Logger:             logger,
 		Persistence:        m.GetPersistence(),
 		Identity:           key,
@@ -299,7 +301,7 @@ func (s *ArchiveManagerLogosStorageMockSuite) TestMockDownloadCancellationDuring
 		}
 	}
 
-	logosStorageIndexBytes, err := proto.Marshal(index)
+	indexBytes, err := proto.Marshal(index)
 	s.Require().NoError(err)
 
 	communityID := types.HexBytes("mock-cancel-test-3")
@@ -308,7 +310,7 @@ func (s *ArchiveManagerLogosStorageMockSuite) TestMockDownloadCancellationDuring
 	s.mockLogosStorage.EXPECT().
 		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
 		DoAndReturn(func(ctx context.Context, cid string, output io.Writer) error {
-			_, _ = output.Write(logosStorageIndexBytes)
+			_, _ = output.Write(indexBytes)
 			return nil
 		}).
 		Times(1)
@@ -402,13 +404,13 @@ func (s *ArchiveManagerLogosStorageMockSuite) TestDownloadDoesNotAbortWhenExisti
 			},
 		},
 	}
-	logosStorageIndexBytes, err := proto.Marshal(index)
+	indexBytes, err := proto.Marshal(index)
 	s.Require().NoError(err)
 
 	s.mockLogosStorage.EXPECT().
 		DownloadWithContext(gomock.Any(), indexCid, gomock.Any()).
 		DoAndReturn(func(ctx context.Context, cid string, output io.Writer) error {
-			_, _ = output.Write(logosStorageIndexBytes)
+			_, _ = output.Write(indexBytes)
 			return nil
 		}).
 		Times(1)
@@ -433,6 +435,46 @@ func (s *ArchiveManagerLogosStorageMockSuite) TestDownloadDoesNotAbortWhenExisti
 	downloadedArchiveIDs, err := s.archiveService.GetDownloadedMessageArchiveIDs(communityID)
 	s.Require().NoError(err)
 	s.Require().ElementsMatch([]string{"archive-1", "archive-2"}, downloadedArchiveIDs)
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestChunkArchiveMessagesReturnsEmptyForNoMessages() {
+	backend, err := s.getArchiveManager().GetLogosStorageBackend()
+	s.Require().NoError(err, "Failed to get LogosStorage backend")
+
+	chunks := backend.ChunkArchiveMessages(nil)
+	s.Require().Empty(chunks)
+
+	chunks = backend.ChunkArchiveMessages([]messagingtypes.ReceivedMessage{})
+	s.Require().Empty(chunks)
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestChunkArchiveMessagesReturnsEmptyWhenAllMessagesOversized() {
+	backend, err := s.getArchiveManager().GetLogosStorageBackend()
+	s.Require().NoError(err, "Failed to get LogosStorage backend")
+
+	oversizedPayload := make([]byte, archiveconsts.MaxArchiveSizeInBytes+1)
+	msgs := []messagingtypes.ReceivedMessage{
+		{Payload: oversizedPayload, Sig: []byte("sig1")},
+		{Payload: oversizedPayload, Sig: []byte("sig2")},
+	}
+
+	chunks := backend.ChunkArchiveMessages(msgs)
+	s.Require().Empty(chunks)
+}
+
+func (s *ArchiveManagerLogosStorageMockSuite) TestChunkArchiveMessagesChunksNormalMessages() {
+	backend, err := s.getArchiveManager().GetLogosStorageBackend()
+	s.Require().NoError(err, "Failed to get LogosStorage backend")
+
+	msgs := []messagingtypes.ReceivedMessage{
+		{Payload: []byte("msg1"), Sig: []byte("sig1")},
+		{Payload: []byte("msg2"), Sig: []byte("sig2")},
+		{Payload: []byte("msg3"), Sig: []byte("sig3")},
+	}
+
+	chunks := backend.ChunkArchiveMessages(msgs)
+	s.Require().Len(chunks, 1)
+	s.Require().Len(chunks[0], 3)
 }
 
 func TestArchiveManagerLogosStorageMockSuite(t *testing.T) {
