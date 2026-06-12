@@ -29,7 +29,7 @@ func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []
 		ret[chainID] = make(map[AccountAddress]map[ContractAddress]*big.Int)
 		for _, account := range accountAddresses {
 			ret[chainID][account] = make(map[ContractAddress]*big.Int)
-			erc20balances, _, err := s.multistandardbalanceStorage.GetERC20Balances(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
+			erc20balances, erc20State, err := s.multistandardbalanceStorage.GetERC20Balances(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
 			if err != nil {
 				return nil, err
 			}
@@ -38,16 +38,20 @@ func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []
 				if token.IsNative() {
 					needsNative = true
 				}
-				if _, exists := erc20balances[token.Address]; exists {
-					ret[chainID][account][token.Address] = erc20balances[token.Address]
+				if balance, exists := erc20balances[token.Address]; exists {
+					ret[chainID][account][token.Address] = balance
+				} else if erc20State.FetchedAt != multistandardbalance.NeverFetched {
+					ret[chainID][account][token.Address] = big.NewInt(0)
 				}
 			}
 			if needsNative {
-				nativeBalance, _, err := s.multistandardbalanceStorage.GetNativeBalance(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
+				nativeBalance, nativeState, err := s.multistandardbalanceStorage.GetNativeBalance(ctx, multistandardbalance.BalancesKey{ChainID: chainID, Account: account})
 				if err != nil {
 					return nil, err
 				}
-				ret[chainID][account][NativeTokenAddress] = nativeBalance
+				if nativeState.FetchedAt != multistandardbalance.NeverFetched {
+					ret[chainID][account][NativeTokenAddress] = nativeBalance
+				}
 			}
 		}
 	}
