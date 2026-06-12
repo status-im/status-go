@@ -237,7 +237,13 @@ func (r *Reader) balancesToTokensByAddress(addresses []common.Address, allTokens
 		for _, token := range allTokens {
 			isMandatoryToken := slices.Contains(walletcommon.MandatoryTokens(), token.Key())
 			hasError := false
-			if _, ok := balances[token.ChainID][address][token.Address]; !ok {
+			if balances == nil {
+				hasError = true
+			} else if _, ok := balances[token.ChainID]; !ok {
+				hasError = true
+			} else if _, ok := balances[token.ChainID][address]; !ok {
+				hasError = true
+			} else if _, ok := balances[token.ChainID][address][token.Address]; !ok {
 				hasError = true
 			}
 
