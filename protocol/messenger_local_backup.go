@@ -26,11 +26,24 @@ type CommunitySet struct {
 
 func (m *Messenger) backupContacts() []*protobuf.Backup {
 	var contacts []*protobuf.SyncInstallationContactV2
+	myID := contacts2.ContactIDFromPublicKey(&m.identity.PublicKey)
 	m.allContacts.Range(func(contactID string, contact *contacts2.Contact) (shouldContinue bool) {
 		syncContact := m.buildSyncContactMessage(contact)
-		if syncContact != nil {
-			contacts = append(contacts, syncContact)
+		if syncContact == nil {
+			return true
 		}
+
+		// Only backup contacts that aren't ourselves
+		if contact.ID == myID {
+			return true
+		}
+		canonicalID, err := contacts2.ContactIDFromPublicKeyString(contact.ID)
+		if err == nil && canonicalID == myID {
+			return true
+		}
+
+		contacts = append(contacts, syncContact)
+
 		return true
 	})
 
