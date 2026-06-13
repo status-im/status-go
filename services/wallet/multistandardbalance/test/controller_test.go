@@ -3,6 +3,7 @@ package multistandardbalance_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -1021,4 +1022,96 @@ func TestController_FetchImmediatelyWithConfig_IgnoresNonSuccessStatus(t *testin
 		require.Empty(t, getFetchCallsCopy(fetchCalls, fetchMutex),
 			"status %q should NOT trigger an immediate fetch", status)
 	}
+}
+
+func TestController_CancelsInFlightFetchWhenStartingNewFetchForSameChain(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	storage := mock_multistandardbalance.NewMockStorage(ctrl)
+	fetcher := mock_multistandardbalance.NewMockBalanceFetcher(ctrl)
+	accountsProvider := mock_multistandardbalance.NewMockAccountsProvider(ctrl)
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_multistandardbalance.NewMockNetworksProvider(ctrl)
+	tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
+	collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
+	lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+	logger := zap.NewNop()
+
+	chainID := uint64(10)
+	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
+	key := multistandardbalance.BalancesKey{
+		Account: common.BytesToAddress(address1.Bytes()),
+		ChainID: chainID,
+	}
+	neverFetched := multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
+
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{{ChainID: chainID}}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(0), neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
+	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
+	tokenListProvider.EXPECT().GetTokenContractAddresses(chainID).Return([]common.Address{}, nil).AnyTimes()
+	collectibleListProvider.EXPECT().GetCollectiblesList(chainID, gomock.Any()).Return([]multistandardbalance.CollectibleID{}, []multistandardbalance.CollectibleID{}, nil).AnyTimes()
+
+	var firstCtx context.Context
+	var ctxMu sync.Mutex
+	firstFetchStarted := make(chan struct{})
+	fetchCount := 0
+	var fetchMu sync.Mutex
+
+	fetcher.EXPECT().FetchBalances(gomock.Any(), chainID, gomock.Any()).DoAndReturn(
+		func(ctx context.Context, cid uint64, cfg multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
+			fetchMu.Lock()
+			fetchCount++
+			callNumber := fetchCount
+			fetchMu.Unlock()
+
+			if callNumber == 1 {
+				ctxMu.Lock()
+				firstCtx = ctx
+				ctxMu.Unlock()
+				close(firstFetchStarted)
+				ch := make(chan multistandardfetcher.FetchResult)
+				return ch, nil
+			}
+
+			ch := make(chan multistandardfetcher.FetchResult)
+			close(ch)
+			return ch, nil
+		},
+	).Times(2)
+
+	controller := multistandardbalance.NewController(
+		multistandardbalance.ControllerConfig{
+			FetchDebounceTime: 0,
+			FetchPeriod:       time.Hour,
+		},
+		storage,
+		fetcher,
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		tokenListProvider,
+		collectibleListProvider,
+		lastBlockManager,
+		nil,
+		logger,
+	)
+
+	controller.Start()
+	defer controller.Stop()
+
+	<-firstFetchStarted
+	controller.TriggerFullFetch()
+
+	require.Eventually(t, func() bool {
+		ctxMu.Lock()
+		defer ctxMu.Unlock()
+		return firstCtx != nil && errors.Is(firstCtx.Err(), context.Canceled)
+	}, time.Second, 10*time.Millisecond, "expected in-flight fetch context to be canceled")
 }
