@@ -56,7 +56,7 @@ func setupReaderExported(t *testing.T) (*wallet.Reader, *mock_token.MockManagerI
 }
 
 func TestGetCachedBalances(t *testing.T) {
-	reader, tokenManager, _, mockCtrl := setupReaderExported(t)
+	reader, tokenManager, tokenBalancesStorage, mockCtrl := setupReaderExported(t)
 
 	defer mockCtrl.Finish()
 
@@ -132,6 +132,9 @@ func TestGetCachedBalances(t *testing.T) {
 
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
 	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	)
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
 
@@ -147,7 +150,7 @@ func TestGetCachedBalances(t *testing.T) {
 }
 
 func TestFetchBalances(t *testing.T) {
-	reader, tokenManager, _, mockCtrl := setupReaderExported(t)
+	reader, tokenManager, tokenBalancesStorage, mockCtrl := setupReaderExported(t)
 	defer mockCtrl.Finish()
 
 	addresses := []common.Address{
@@ -211,6 +214,9 @@ func TestFetchBalances(t *testing.T) {
 	// Test GetCachedBalances with cached data
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
 	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	)
 
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
