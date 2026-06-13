@@ -18,12 +18,16 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/pkg/pubsub"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock/storage"
 )
 
@@ -348,7 +352,7 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 }
 
 func TestGetCachedBalancesInternal(t *testing.T) {
-	reader, tokenManager, _, mockCtrl := setupReader(t)
+	reader, tokenManager, tokenBalancesStorage, mockCtrl := setupReader(t)
 	defer mockCtrl.Finish()
 
 	addresses := []common.Address{
@@ -422,6 +426,9 @@ func TestGetCachedBalancesInternal(t *testing.T) {
 
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
 	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	)
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
 
@@ -462,4 +469,124 @@ func TestGetLastTokenUpdateTimestampsInternal(t *testing.T) {
 	// Verify that the retrieved timestamps match the stored values.
 	assert.Equal(t, timestamp1, timestamps[address1], "Timestamp for address1 does not match")
 	assert.Equal(t, timestamp2, timestamps[address2], "Timestamp for address2 does not match")
+}
+
+func TestGetCachedBalances_UsesStorageForMandatoryTokenWhenNotInUICache(t *testing.T) {
+	reader, tokenManager, tokenBalancesStorage, mockCtrl := setupReader(t)
+	defer mockCtrl.Finish()
+
+	account := common.HexToAddress("0x2a811F1E11636C144a2A062d3D402245A43D4074")
+	chainIDs := []uint64{walletcommon.OptimismMainnet}
+	addresses := []common.Address{account}
+
+	nativeToken := &tokenTypes.Token{
+		Token: &wsdktypes.Token{
+			Address:  tokenbalances.NativeTokenAddress,
+			Symbol:   "ETH",
+			Decimals: 18,
+			ChainID:  walletcommon.OptimismMainnet,
+		},
+	}
+	allTokens := []*tokenTypes.Token{nativeToken}
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
+		account: {},
+	}
+	storageBalances := map[uint64]map[common.Address]map[common.Address]*big.Int{
+		walletcommon.OptimismMainnet: {
+			account: {
+				tokenbalances.NativeTokenAddress: big.NewInt(1_000_000_000_000_000_000),
+			},
+		},
+	}
+
+	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(
+		testutils.NewStringSliceElementsMatcher(walletcommon.MandatoryTokensByChainID(walletcommon.OptimismMainnet)),
+	).Return(allTokens, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(storageBalances, nil)
+
+	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
+	require.NoError(t, err)
+
+	var nativeMandatory *tokenTypes.StorageToken
+	for i := range tokens[account] {
+		token := tokens[account][i]
+		if token.TokenChainID == walletcommon.OptimismMainnet &&
+			token.TokenAddress == tokenbalances.NativeTokenAddress {
+			nativeMandatory = &tokens[account][i]
+			break
+		}
+	}
+	require.NotNil(t, nativeMandatory, "expected mandatory native token in response")
+	assert.False(t, nativeMandatory.HasError, "mandatory token should not be loading when storage has balance")
+	assert.Equal(t, "1000000000000000000", nativeMandatory.RawBalance)
+}
+
+func TestReader_RefreshesUICacheWhenFirstFetchCompletesWithoutBalanceChange(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	reader := NewReader(tokenManager, nil, &event.Feed{}, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+	key := multistandardbalance.BalancesKey{ChainID: chainID, Account: account}
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil)
+	tokenManager.EXPECT().GetTokensByChains([]uint64{chainID}).Return([]*tokenTypes.Token{}, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), []common.Address{account}).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	)
+	cacheSaved := make(chan struct{})
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).DoAndReturn(func(_ map[common.Address][]tokenTypes.StorageToken) error {
+		close(cacheSaved)
+		return nil
+	})
+
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            key,
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: false,
+		OldState:       multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case <-cacheSaved:
+	case <-time.After(time.Second):
+		t.Fatal("expected UI cache refresh after first fetch event")
+	}
+}
+
+func TestReader_SkipsUICacheRefreshWhenFetchUnchangedAndAlreadyFetched(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	reader := NewReader(tokenManager, nil, &event.Feed{}, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+	key := multistandardbalance.BalancesKey{ChainID: chainID, Account: account}
+
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            key,
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: false,
+		OldState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	time.Sleep(100 * time.Millisecond)
 }
