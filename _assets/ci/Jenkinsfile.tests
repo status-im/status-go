@@ -80,7 +80,6 @@ pipeline {
     GOPATH      = "${WORKSPACE_TMP}/go"
     GOCACHE     = "${WORKSPACE_TMP}/gocache"
     GOMODCACHE  = '/home/jenkins/gomodcache'
-    GOFLAGS     = '-modcacherw'
     PATH        = "${PATH}:${GOPATH}/bin"
     REPO_SRC    = "${GOPATH}/src/github.com/status-im/status-go"
     BASE_BRANCH = "${env.CHANGE_TARGET}"
