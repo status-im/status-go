@@ -13,8 +13,8 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
-	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/tokenbalances"
 )
 
 func TestGetBalances_ERC20NeverFetched_MissingTokenNotInMap(t *testing.T) {

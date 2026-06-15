@@ -154,7 +154,7 @@ func (c *Controller) Stop() {
 	c.stopWalletEventsWatcher()
 }
 
-func (c *Controller) startChainFetch(chainID uint64) context.Context {
+func (c *Controller) startChainFetch(chainID uint64) (context.Context, context.CancelFunc) {
 	c.chainFetchMu.Lock()
 	defer c.chainFetchMu.Unlock()
 	if cancel, ok := c.chainFetchCancels[chainID]; ok {
@@ -162,7 +162,7 @@ func (c *Controller) startChainFetch(chainID uint64) context.Context {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c.chainFetchCancels[chainID] = cancel
-	return ctx
+	return ctx, cancel
 }
 
 func (c *Controller) cancelAllChainFetches() {
@@ -494,10 +494,11 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			)
 		}
 
-		ctx := c.startChainFetch(chainID)
+		ctx, cancel := c.startChainFetch(chainID)
 
 		resultsCh, err := c.fetcher.FetchBalances(ctx, chainID, chainFetchConfig)
 		if err != nil {
+			cancel()
 			c.logger.Error("failed to fetch balances", zap.Uint64("chainID", chainID), zap.Error(err))
 			c.sendEventBalanceFetchFailedToStart(chainID, chainFetchConfig, err)
 			continue
@@ -506,8 +507,9 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 		c.logger.Debug("fetch started", zap.Uint64("chainID", chainID))
 		c.sendEventBalanceFetchStarted(chainID, chainFetchConfig)
 
-		go func(fetchChainID uint64) {
+		go func(fetchChainID uint64, ctx context.Context, cancel context.CancelFunc) {
 			defer gocommon.LogOnPanic()
+			defer cancel()
 			for {
 				select {
 				case <-c.stopCh:
@@ -519,7 +521,7 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 					c.handleFetchResult(ctx, fetchChainID, result)
 				}
 			}
-		}(chainID)
+		}(chainID, ctx, cancel)
 	}
 }
 
