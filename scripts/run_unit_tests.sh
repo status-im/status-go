@@ -73,7 +73,7 @@ run_test_for_packages() {
   rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   # Run tests
-  test_extra_flags="${GOTEST_EXTRAFLAGS}"
+  local test_extra_flags="${GOTEST_EXTRAFLAGS}"
   if [[ -n "${run_filter}" ]]; then
     test_extra_flags="${test_extra_flags} -run ${run_filter}"
   fi
@@ -117,8 +117,13 @@ resolve_protocol_shards() {
   if [[ -n "${UNIT_TEST_PROTOCOL_SHARDS}" ]]; then
     shards="${UNIT_TEST_PROTOCOL_SHARDS}"
   else
-    shards="$(nproc 2>/dev/null || echo "${DEFAULT_PROTOCOL_SHARDS}")"
-    echo -e "${GRN}Protocol shards:${RST} auto-detected ${shards} from nproc (override with UNIT_TEST_PROTOCOL_SHARDS)" >&2
+    if command -v nproc >/dev/null 2>&1; then
+      shards="$(nproc)"
+      echo -e "${GRN}Protocol shards:${RST} auto-detected ${shards} from nproc (override with UNIT_TEST_PROTOCOL_SHARDS)" >&2
+    else
+      shards="${DEFAULT_PROTOCOL_SHARDS}"
+      echo -e "${GRN}Protocol shards:${RST} nproc not found; defaulting to ${shards} (override with UNIT_TEST_PROTOCOL_SHARDS)" >&2
+    fi
   fi
 
   if ! [[ "${shards}" =~ ^[0-9]+$ ]]; then
