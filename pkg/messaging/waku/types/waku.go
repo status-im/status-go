@@ -77,6 +77,15 @@ func (u *ConnStatusSubscription) Send(s ConnStatus) bool {
 	return true
 }
 
+// TopicSubscription identifies a single (pubsub topic, content topic) pair the
+// transport wants to receive messages on. It is the unit of wire-subscription
+// bookkeeping, both in the transport's FilterSubscriptions and in the waku
+// adapter.
+type TopicSubscription struct {
+	PubsubTopic  string
+	ContentTopic TopicType
+}
+
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku interface {
@@ -122,14 +131,12 @@ type Waku interface {
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
-	MaxMessageSize() uint32
+	// Subscribe/Unsubscribe register and remove wire subscriptions for the
+	// given content topics on a pubsub topic. See transport.MessagingAPI.
+	Subscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
+	Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
 
-	// Subscribe registers a wire subscription for the given content topics on
-	// the given pubsub topic and returns its id. No key material is involved:
-	// decoding and matching of received messages happen in the transport.
-	Subscribe(pubsubTopic string, contentTopics [][]byte) (string, error)
-	Unsubscribe(ctx context.Context, id string) error
-	UnsubscribeMany(ids []string) error
+	MaxMessageSize() uint32
 
 	// ConnectionChanged is called whenever the client knows its connection status has changed
 	ConnectionChanged(connection.State)
