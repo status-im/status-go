@@ -310,39 +310,6 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 	return fn()
 }
 
-const missingMessageCheckPeriod = 30 * time.Second
-
-func (m *Messenger) checkForMissingMessagesLoop() {
-	defer gocommon.LogOnPanic()
-	defer m.shutdownWaitGroup.Done()
-
-	t := time.NewTicker(missingMessageCheckPeriod)
-	defer t.Stop()
-
-	mailserverAvailableSignal := m.messaging.OnStorenodeAvailable()
-
-	for {
-		select {
-		case <-m.quit:
-			return
-
-		// Wait for mailserver available, also triggered on mailserver change
-		case <-mailserverAvailableSignal:
-
-		case <-t.C:
-
-		}
-
-		if m.isPaused() {
-			continue
-		}
-
-		filters := m.messaging.ChatFilters()
-		peerInfo := m.messaging.GetActiveStorenode()
-		m.messaging.SetCriteriaForMissingMessageVerification(peerInfo, filters)
-	}
-}
-
 func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
