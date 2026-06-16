@@ -63,9 +63,17 @@ class TestChatCompatibility:
     def test_community_compatibility(self, vut, peer, third):
         community_id = messenger.create_community(vut)
 
+        # Pre-install the community's persistent filter on the joiner before joining.
+        # On light clients this avoids status-im/status-go#7547: otherwise the join's
+        # internal warm-up fetchCommunity is the one that creates (and later forgets)
+        # the bare community filter, collaterally tearing down the aggregated filter
+        # subscription so pushed community messages are rejected. Spectating first
+        # makes the filter already exist, so the warm-up fetches reuse it.
+        messenger.spectate_and_fetch_community(peer, community_id)
         chat_id = messenger.join_community(member=peer, admin=vut, community_id=community_id)
         messenger.community_messages(chat_id, 2, sender=vut, receiver=peer)
 
+        messenger.spectate_and_fetch_community(third, community_id)
         messenger.join_community(member=third, admin=vut, community_id=community_id)
         messenger.community_messages(chat_id, 2, sender=vut, receiver=third)
 
