@@ -181,7 +181,7 @@ func (m *EnvelopesMonitor) handleEvent(event types.EnvelopeEvent) {
 
 func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	// Mailserver confirmations for WakuV2 are disabled
-	if (m.w == nil || m.w.Version() < 2) && m.awaitOnlyMailServerConfirmations {
+	if m.w == nil && m.awaitOnlyMailServerConfirmations {
 		if !m.isMailserver(event.Peer) {
 			return
 		}

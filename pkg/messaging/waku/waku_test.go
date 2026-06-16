@@ -58,7 +58,7 @@ func TestDiscoveryV5(t *testing.T) {
 	require.NoError(t, w.Start())
 
 	err = testutils.RetryWithBackOff(func() error {
-		if w.PeerCount() == 0 {
+		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -66,7 +66,7 @@ func TestDiscoveryV5(t *testing.T) {
 
 	require.NoError(t, err)
 
-	require.NotEqual(t, 0, w.PeerCount())
+	require.NotEqual(t, 0, len(w.Peers()))
 	require.NoError(t, w.Stop())
 }
 
@@ -90,7 +90,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = testutils.RetryWithBackOff(func() error {
-		if w.PeerCount() == 0 {
+		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -105,7 +105,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	}
 
 	err = testutils.RetryWithBackOff(func() error {
-		if w.PeerCount() == 0 {
+		if len(w.Peers()) == 0 {
 			return errors.New("no peers discovered")
 		}
 		return nil
@@ -113,7 +113,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, w.seededBootnodesForDiscV5)
-	require.NotEqual(t, 0, w.PeerCount())
+	require.NotEqual(t, 0, len(w.Peers()))
 	require.NoError(t, w.Stop())
 }
 
