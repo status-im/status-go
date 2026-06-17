@@ -242,7 +242,7 @@ class TestCommunityArchives:
         # Wait for the archive import to complete for another member
         logging.info("Waiting for another member to finish importing history archive messages...")
         with another_member.expect_signal(
-            SignalType.COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED.value,
+            SignalType.COMMUNITY_HISTORY_ARCHIVES_DOWNLOAD_AND_IMPORT_FINISHED.value,
             timeout=archive_timeout,
             start="beginning",
             predicate=lambda signal: (signal.get("event", {}).get("communityId") == community_id),

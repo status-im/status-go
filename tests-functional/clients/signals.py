@@ -44,7 +44,8 @@ class SignalType(Enum):
     COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED = "community.indexDownloadCompleted"
     COMMUNITY_HISTORY_ARCHIVES_SEEDING = "community.historyArchivesSeeding"
     COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED = "community.importingHistoryArchiveMessages"
-    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_FINISHED = "community.downloadingHistoryArchivesFinished"
+    # Backend event name is historical; this is emitted after download and import complete.
+    COMMUNITY_HISTORY_ARCHIVES_DOWNLOAD_AND_IMPORT_FINISHED = "community.downloadingHistoryArchivesFinished"
 
 
 class CommunityMemberReevaluationStatus(IntEnum):
