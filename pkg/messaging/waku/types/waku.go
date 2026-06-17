@@ -104,12 +104,6 @@ type Waku interface {
 	// Resume re-arms goroutines suspended by Pause. Idempotent.
 	Resume() error
 
-	// Waku protocol version
-	Version() uint
-
-	// PeerCount
-	PeerCount() int
-
 	// Peers is retained only for the Python functional tests (see tests-functional);
 	// it is not used by status-app.
 	Peers() PeerStats
@@ -125,9 +119,6 @@ type Waku interface {
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
 	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
-
-	// GetCurrentTime returns current time.
-	GetCurrentTime() uint64
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 

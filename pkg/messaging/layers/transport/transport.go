@@ -672,11 +672,6 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 	}
 }
 
-// GetCurrentTime returns the current unix timestamp in milliseconds
-func (t *Transport) GetCurrentTime() uint64 {
-	return t.waku.GetCurrentTime()
-}
-
 func (t *Transport) MaxMessageSize() uint32 {
 	return t.waku.MaxMessageSize()
 }
@@ -724,7 +719,7 @@ func (t *Transport) cleanFiltersLoop() {
 }
 
 func (t *Transport) PeerCount() int {
-	return t.waku.PeerCount()
+	return len(t.waku.Peers())
 }
 
 // Peers is retained only for the Python functional tests (see tests-functional);

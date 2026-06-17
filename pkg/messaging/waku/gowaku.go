@@ -731,11 +731,6 @@ func (w *Waku) MaxMessageSize() uint32 {
 	return w.cfg.MaxMessageSize
 }
 
-// CurrentTime returns current time.
-func (w *Waku) CurrentTime() time.Time {
-	return w.timesource.Now()
-}
-
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 	return w.envelopeFeed.Send(event)
 }
@@ -1395,10 +1390,6 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-func (w *Waku) PeerCount() int {
-	return w.node.PeerCount()
-}
-
 // Peers is retained only for the Python functional tests (see tests-functional);
 // it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
@@ -1721,12 +1712,6 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	return p
 }
 
-// GetCurrentTime returns current time.
-// Implements protocol/common.TimeSource
-func (w *Waku) GetCurrentTime() uint64 {
-	return uint64(w.CurrentTime().UnixNano() / int64(time.Millisecond))
-}
-
 func (w *Waku) GetActiveStorenode() peer.AddrInfo {
 	return w.StorenodeCycle.GetActiveStorenodePeerInfo()
 }
@@ -1782,10 +1767,6 @@ func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, 
 	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
 
 	return nil
-}
-
-func (w *Waku) Version() uint {
-	return 2
 }
 
 func (w *Waku) Metrics() string {

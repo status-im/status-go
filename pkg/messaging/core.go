@@ -34,6 +34,7 @@ type Core struct {
 
 	identity   *ecdsa.PrivateKey
 	waku       wakutypes.Waku
+	timeSource timesource.Provider
 	stack      *common.MessagingStack
 	controller *controller.Controller
 
@@ -104,10 +105,16 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.tracer,
 	)
 
+	timeSource := params.TimeSource
+	if timeSource == nil {
+		timeSource = timesource.DefaultService()
+	}
+
 	return &Core{
 		config:     *config,
 		identity:   params.Identity,
 		waku:       waku,
+		timeSource: timeSource,
 		stack:      stack,
 		controller: controller,
 		publisher:  publisher,
