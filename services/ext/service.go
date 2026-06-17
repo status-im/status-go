@@ -56,6 +56,15 @@ import (
 const infinityString = "∞"
 const providerID = "community"
 
+func isPinnedBootstrapDisabledByEnv() bool {
+	switch os.Getenv("STATUS_GO_DISABLE_PINNED_BOOTSTRAP") {
+	case "1", "true", "TRUE", "True", "yes", "YES", "Yes":
+		return true
+	default:
+		return false
+	}
+}
+
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
@@ -323,8 +332,10 @@ func buildMessengerOptions(
 	networkManager communities.NetworkManager,
 ) ([]protocol.Option, error) {
 	personalService := personal.New()
+	enablePinnedBootstrap := !isPinnedBootstrapDisabledByEnv()
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
+		protocol.WithEnablePinnedBootstrap(enablePinnedBootstrap),
 		protocol.WithPushNotifications(),
 		protocol.WithDatabase(appDb),
 		protocol.WithWalletDatabase(walletDb),

@@ -671,6 +671,16 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	m.messaging.SetStorenodeConfigProvider(m)
 
+	if m.config.enablePinnedBootstrap {
+		go func() {
+			defer gocommon.LogOnPanic()
+
+			if err := m.bootstrapPinnedCommunities(); err != nil {
+				m.logger.Warn("failed to bootstrap pinned communities", zap.Error(err))
+			}
+		}()
+	}
+
 	m.shutdownWaitGroup.Add(1)
 	go m.checkForStorenodeCycleSignals()
 
