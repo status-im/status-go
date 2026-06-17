@@ -2181,10 +2181,6 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		m.incrementCommunityImageVersion(community.IDString())
 	}
 
-	if err = m.handleCommunityTokensMetadata(community); err != nil {
-		return nil, err
-	}
-
 	hasCommunityArchiveInfo, err := m.persistence.HasCommunityArchiveInfo(community.ID())
 	if err != nil {
 		return nil, err
@@ -2268,6 +2264,10 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(community.CommunityTokensMetadata()) > 0 {
+		m.handleCommunityTokensMetadataAsync(community.IDString())
 	}
 
 	// We mark our requests as completed, though maybe we should mark
@@ -4478,6 +4478,31 @@ func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 		}
 	}
 	return nil
+}
+
+func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
+	go func() {
+		defer utils.LogOnPanic()
+
+		select {
+		case <-m.quit:
+			return
+		default:
+		}
+
+		community, err := m.GetByIDString(communityID)
+		if err != nil {
+			return
+		}
+
+		err = m.handleCommunityTokensMetadata(community)
+		if err != nil {
+			return
+		}
+
+		m.publish(&Subscription{Community: community})
+
+	}()
 }
 
 func (m *Manager) HandleCommunityGrant(community *Community, grant []byte, clock uint64) (uint64, error) {

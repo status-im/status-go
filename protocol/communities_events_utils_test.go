@@ -1866,16 +1866,33 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 	waitOnMessengerResponse(s, checkTokenAdded, base.GetMember())
 	waitOnMessengerResponse(s, checkTokenAdded, base.GetEventSender())
 
-	// check CommunityToken was added to the DB
-	syncTokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
+	// Token metadata arrives via messenger response first; DB persistence can complete shortly after.
+	err = testutils.RetryWithBackOff(func() error {
+		syncTokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
+		if err != nil {
+			return err
+		}
+		if len(syncTokens) != 1 {
+			return errors.New("event sender tokens should be 1")
+		}
+		if syncTokens[0].PrivilegesLevel != privilegesLvl {
+			return errors.New("event sender token privileges level does not match")
+		}
+		return nil
+	})
 	s.Require().NoError(err)
-	s.Require().Len(syncTokens, 1)
-	s.Require().Equal(syncTokens[0].PrivilegesLevel, privilegesLvl)
 
-	// check CommunityToken was added to the DB
-	syncTokens, err = base.GetMember().communitiesManager.GetAllCommunityTokens()
+	err = testutils.RetryWithBackOff(func() error {
+		syncTokens, err := base.GetMember().communitiesManager.GetAllCommunityTokens()
+		if err != nil {
+			return err
+		}
+		if len(syncTokens) != 1 {
+			return errors.New("member tokens should be 1")
+		}
+		return nil
+	})
 	s.Require().NoError(err)
-	s.Require().Len(syncTokens, 1)
 }
 
 func testAddAndSyncOwnerTokenFromControlNode(base CommunityEventsTestsInterface, community *communities.Community,
