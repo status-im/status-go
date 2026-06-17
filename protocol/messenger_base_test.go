@@ -33,7 +33,9 @@ func (s *MessengerBaseTestSuite) newMessenger() *Messenger {
 }
 
 func (s *MessengerBaseTestSuite) anotherMessenger() *Messenger {
-	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{privateKey: s.privateKey})
+	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{
+		privateKey: s.privateKey,
+	})
 	s.Require().NoError(err)
 
 	return messenger

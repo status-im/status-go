@@ -111,6 +111,7 @@ type config struct {
 	onlineChecker func() bool
 
 	communitiesRekeyInterval time.Duration
+	enablePinnedBootstrap    bool
 }
 
 func messengerDefaultConfig() config {
@@ -247,6 +248,13 @@ func WithSignalsHandler(h MessengerSignalsHandler) Option {
 func WithClusterConfig(cc params.ClusterConfig) Option {
 	return func(c *config) error {
 		c.clusterConfig = cc
+		return nil
+	}
+}
+
+func WithEnablePinnedBootstrap(enabled bool) Option {
+	return func(c *config) error {
+		c.enablePinnedBootstrap = enabled
 		return nil
 	}
 }

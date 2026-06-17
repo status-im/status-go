@@ -260,6 +260,16 @@ func (p *Persistence) AllCommunities(memberIdentity *ecdsa.PublicKey) ([]*Commun
 	return p.queryCommunities(memberIdentity, communitiesBaseQuery)
 }
 
+func (p *Persistence) CommunitiesCount() (int, error) {
+	var count int
+	err := p.db.QueryRow(`SELECT COUNT(1) FROM communities_communities`).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (p *Persistence) JoinedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
 	query := communitiesBaseQuery + ` WHERE c.joined`
 	return p.queryCommunities(memberIdentity, query)

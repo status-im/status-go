@@ -17,6 +17,21 @@ The payloads are encoded using [protocol-buffers](https://developers.google.com/
 * `identity/` implements details related to creating a three-word name and identicon.
 * `migrations/` contains implementation specific migrations for the sqlite database which is used by `Messenger` as a persistent data store.
 
+## Pinned communities bootstrap
+
+`Messenger` can preload pinned communities at startup so a community is visible before any network fetch completes.
+
+Source precedence:
+
+1. If `STATUS_GO_PINNED_COMMUNITIES_DIR` is set, payloads are loaded from that directory (`*.rawpayload.hex`).
+2. Otherwise, payloads embedded in the binary from `pinned-communities/*.rawpayload.hex` are used.
+
+Runtime behavior:
+
+* Bootstrap runs only when the profile has no communities yet.
+* Bootstrap runs asynchronously during startup to avoid blocking app launch.
+* After import, each pinned community triggers a store-node refresh so pinned metadata is replaced by fresher network data.
+
 ## History
 
 Originally this package was a dedicated repo called `status-protocol-go` and [was migrated](https://github.com/status-im/status-go/pull/1684) into `status-go`. The new `status-go/protocol` package maintained its own dependencies until [sub modules were removed](https://github.com/status-im/status-go/pull/1835/files) and the root go.mod file managed all dependencies for the entire `status-go` repo.   
