@@ -17,6 +17,10 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${PEER_REFS:=}"
 : "${USE_TORRENT:=false}"
 
+if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
+  export WAKU_STORE_MESSAGE_RETENTION_SECONDS="${WAKU_STORE_MESSAGE_RETENTION_SECONDS:-60}"
+fi
+
 echo -e "${GRN}Running functional tests${RST}"
 
 root_path="${GIT_ROOT}/tests-functional"

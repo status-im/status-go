@@ -62,8 +62,8 @@ class TestCommunityArchives:
         }
 
     def test_community_archive_index_exists(self, creator, member, another_member, chat_payload):
-        # Set message archive interval to 80 seconds which is longer that the retention policy
-        # of the Waku node.
+        # Set message archive interval to 80 seconds which is longer than the
+        # Waku store retention used by LogosStorage functional runs.
         # So we are expecting to retrieve the archive from LogosStorage even after the Waku node
         # has already deleted the messages locally.
         message_archive_interval = 80
