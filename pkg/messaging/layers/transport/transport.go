@@ -150,6 +150,12 @@ func NewTransport(
 		go t.receiveLoop()
 	}
 
+	// Back-fill messages that live delivery missed by periodically reconciling the
+	// listening topics against the store.
+	if waku != nil {
+		go t.reconcileMissingMessagesLoop()
+	}
+
 	return t, nil
 }
 

@@ -57,7 +57,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
-	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -148,8 +147,6 @@ type Waku struct {
 	bandwidthCounter *metrics.BandwidthCounter
 
 	sendQueue *publish.MessageQueue
-
-	missingMsgVerifier *missing.MissingMessageVerifier
 
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
@@ -850,8 +847,7 @@ func (w *Waku) Start() error {
 	}
 
 	selector := newStoreSelector()
-	pager := newStorePager(wakuStoreRequestor{store: w.node.Store()}, NewHistoryProcessorWrapper(w), w.logger)
-	w.storeClient = NewStoreClient(selector, pager, w.GetPubsubTopic, w.logger)
+	w.storeClient = NewStoreClient(selector, wakuStoreRequestor{store: w.node.Store()}, NewHistoryProcessorWrapper(w), w.GetPubsubTopic, w.logger)
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
@@ -967,34 +963,6 @@ func (w *Waku) Start() error {
 
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
-
-	if w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
-			missing.NewDefaultStorenodeRequestor(w.node.Store()),
-			w,
-			w.node.Timesource(),
-			w.logger)
-
-		w.missingMsgVerifier.Start(w.ctx)
-		w.logger.Info("Started missing message verifier")
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case envelope := <-w.missingMsgVerifier.C:
-					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
-					if err != nil {
-						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
-					}
-				}
-			}
-		}()
-	}
 
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
@@ -1159,13 +1127,6 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
-}
-
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
-	if !w.cfg.EnableMissingMessageVerification {
-		return
-	}
-	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1456,12 +1417,6 @@ func (w *Waku) snapshotState() (connection.State, bool) {
 func (w *Waku) ConnectionChanged(state connection.State) {
 	if w.isGoingOnline(state) {
 		w.discoverAndConnectPeers()
-		if w.cfg.EnableMissingMessageVerification {
-			w.missingMsgVerifier.Start(w.ctx)
-		}
-	}
-	if w.isGoingOffline(state) && w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier.Stop()
 	}
 	isOnline := !state.Offline
 
@@ -1693,15 +1648,17 @@ func (w *Waku) StoreQuery(
 	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
-	var cTopics []string
-	for _, ct := range contentTopics {
-		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
+// FetchMissingMessages reconciles a window against the store for the batch's
+// topics via the StoreClient, fetching messages not already known locally and
+// feeding them into the receive pipeline tagged as missing messages. No-op when
+// missing-message verification is disabled.
+func (w *Waku) FetchMissingMessages(ctx context.Context, batch types.MailserverBatch) error {
+	if !w.cfg.EnableMissingMessageVerification {
+		return nil
 	}
-	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
-
-	return nil
+	return w.storeClient.FetchMissingMessages(ctx, batch, w.MessageExists, func(env *protocol.Envelope) error {
+		return w.OnNewEnvelopes(env, common.MissingMessageType, false)
+	})
 }
 
 func (w *Waku) Metrics() string {

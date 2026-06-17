@@ -12,35 +12,38 @@ import (
 	types "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-// maxStoreQueryAttempts bounds how many storenodes Query tries before giving up.
+// maxStoreQueryAttempts bounds how many storenodes an operation tries before giving up.
 const maxStoreQueryAttempts = 3
 
 // ErrNoStorenodesReachable is returned when no configured storenode could serve
 // the query (none configured, or all attempts failed).
 var ErrNoStorenodesReachable = errors.New("no store node could serve the query")
 
-// StoreClient is the single status-go seam for historic-message retrieval: one
-// Query method, no peer argument. It selects a storenode on demand — no health
-// checks, no background cycle, no pinning — and fails over to another node if a
-// query fails. Phase 2 will swap the pager's wire call for the Logos Delivery
-// store FFI without touching callers.
+// StoreClient is the single status-go seam for store access: explicit history
+// retrieval (Query) and background missing-message reconciliation
+// (FetchMissingMessages). It selects a storenode on demand — no health checks, no
+// background cycle, no pinning — pinning one node for the duration of a single
+// operation and failing over to another only between operations. Phase 2 will swap
+// the wire call for the Logos Delivery store FFI without touching callers.
 type StoreClient struct {
 	selector           *storeSelector
+	requestor          storeRequestor
 	pager              *storePager
 	resolvePubsubTopic func(string) string
 	logger             *zap.Logger
 }
 
-func NewStoreClient(selector *storeSelector, pager *storePager, resolvePubsubTopic func(string) string, logger *zap.Logger) *StoreClient {
+func NewStoreClient(selector *storeSelector, requestor storeRequestor, processor envelopeProcessor, resolvePubsubTopic func(string) string, logger *zap.Logger) *StoreClient {
 	return &StoreClient{
 		selector:           selector,
-		pager:              pager,
+		requestor:          requestor,
+		pager:              newStorePager(requestor, processor, logger),
 		resolvePubsubTopic: resolvePubsubTopic,
 		logger:             logger.Named("store-client"),
 	}
 }
 
-// SetStorenodes sets the storenodes Query may use. Called once at startup.
+// SetStorenodes sets the storenodes operations may use. Called once at startup.
 func (sc *StoreClient) SetStorenodes(nodes []peer.AddrInfo) {
 	sc.selector.setStorenodes(nodes)
 }
@@ -50,33 +53,24 @@ func (sc *StoreClient) HasStorenodes() bool {
 	return sc.selector.hasStorenodes()
 }
 
-// Query retrieves historic messages for a single batch (one pubsub topic and its
-// content topics over [batch.From, batch.To]). It tries storenodes in turn until
-// one serves the whole query; on a mid-query failure it restarts on the next node
-// (a store cursor is bound to the node that issued it). pageLimit is the first
-// page size; shouldProcessNextPage (may be nil) is the per-page early-stop;
-// processEnvelopes controls synchronous handling of fetched envelopes.
-func (sc *StoreClient) Query(
-	ctx context.Context,
-	batch types.MailserverBatch,
-	pageLimit uint64,
-	shouldProcessNextPage func(int) (bool, uint64),
-	processEnvelopes bool,
-) error {
+// withStorenode runs fn against configured storenodes in turn, marking each
+// success/failure on the selector and stopping at the first success. fn receives a
+// single storenode and must run its whole operation against it — a store cursor is
+// bound to the node that issued it, so a mid-operation failure restarts fn on the
+// next node. Returns ErrNoStorenodesReachable if none is configured or every
+// bounded attempt failed.
+func (sc *StoreClient) withStorenode(ctx context.Context, fn func(ctx context.Context, node peer.AddrInfo) error) error {
 	candidates := sc.selector.candidates()
 	if len(candidates) == 0 {
 		return ErrNoStorenodesReachable
 	}
-
-	pubsubTopic := sc.resolvePubsubTopic(batch.PubsubTopic)
-	contentTopics := sc.contentTopics(batch)
 
 	var lastErr error
 	for i, node := range candidates {
 		if i >= maxStoreQueryAttempts {
 			break
 		}
-		err := sc.pager.run(ctx, node, pubsubTopic, contentTopics, batch.From, batch.To, pageLimit, shouldProcessNextPage, processEnvelopes)
+		err := fn(ctx, node)
 		if err == nil {
 			sc.selector.markSuccess(node.ID)
 			return nil
@@ -86,7 +80,7 @@ func (sc *StoreClient) Query(
 		}
 		sc.selector.markFailure(node.ID)
 		lastErr = err
-		sc.logger.Debug("store query failed, trying next storenode",
+		sc.logger.Debug("store operation failed, trying next storenode",
 			zap.Stringer("peerID", node.ID), zap.Error(err))
 	}
 
@@ -94,6 +88,25 @@ func (sc *StoreClient) Query(
 		lastErr = ErrNoStorenodesReachable
 	}
 	return lastErr
+}
+
+// Query retrieves historic messages for a single batch (one pubsub topic and its
+// content topics over [batch.From, batch.To]). It pins one storenode for the whole
+// query and fails over to another only if that node fails. pageLimit is the first
+// page size; shouldProcessNextPage (may be nil) is the per-page early-stop;
+// processEnvelopes controls synchronous handling of fetched envelopes.
+func (sc *StoreClient) Query(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	pubsubTopic := sc.resolvePubsubTopic(batch.PubsubTopic)
+	contentTopics := sc.contentTopics(batch)
+	return sc.withStorenode(ctx, func(ctx context.Context, node peer.AddrInfo) error {
+		return sc.pager.run(ctx, node, pubsubTopic, contentTopics, batch.From, batch.To, pageLimit, shouldProcessNextPage, processEnvelopes)
+	})
 }
 
 func (sc *StoreClient) contentTopics(batch types.MailserverBatch) []string {

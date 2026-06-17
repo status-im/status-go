@@ -1,6 +1,7 @@
 package wakuv2
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -10,8 +11,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	pb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
 	types "github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -185,7 +188,7 @@ func newClient(r storeRequestor, nodes []peer.AddrInfo) *StoreClient {
 		}
 		return s
 	}
-	return NewStoreClient(sel, newStorePager(r, &recordingProcessor{}, zap.NewNop()), resolve, zap.NewNop())
+	return NewStoreClient(sel, r, &recordingProcessor{}, resolve, zap.NewNop())
 }
 
 func batch() types.MailserverBatch {
@@ -226,4 +229,52 @@ func TestStoreClientNoStorenodes(t *testing.T) {
 
 	require.ErrorIs(t, sc.Query(context.Background(), batch(), 10, nil, false), ErrNoStorenodesReachable)
 	require.Empty(t, r.calls())
+}
+
+// --- FetchMissingMessages ---
+
+func TestStoreClientFetchMissingMessages(t *testing.T) {
+	known := make([]byte, 32)
+	known[0] = 1
+	missingHash := make([]byte, 32)
+	missingHash[0] = 2
+
+	r := &fakeRequestor{respond: func(req *storepb.StoreQueryRequest, _ int) ([]*storepb.WakuMessageKeyValue, []byte, error) {
+		if !req.IncludeData {
+			// hash-listing phase: return both hashes, no bodies.
+			return []*storepb.WakuMessageKeyValue{{MessageHash: known}, {MessageHash: missingHash}}, nil, nil
+		}
+		// by-hash fetch phase: return the body for the requested (missing) hash.
+		return []*storepb.WakuMessageKeyValue{{
+			MessageHash: missingHash,
+			Message:     &pb.WakuMessage{Payload: []byte("x")},
+			PubsubTopic: proto.String("pubsub"),
+		}}, nil, nil
+	}}
+	sc := newClient(r, []peer.AddrInfo{{ID: "n1"}})
+
+	exists := func(h pb.MessageHash) (bool, error) { return bytes.Equal(h[:], known), nil }
+	var delivered int
+	process := func(*protocol.Envelope) error { delivered++; return nil }
+
+	require.NoError(t, sc.FetchMissingMessages(context.Background(), batch(), exists, process))
+
+	calls := r.calls()
+	require.Len(t, calls, 2)
+	require.False(t, calls[0].IncludeData)                          // phase 1 lists hashes only
+	require.True(t, calls[1].IncludeData)                           // phase 2 fetches bodies
+	require.Equal(t, [][]byte{missingHash}, calls[1].MessageHashes) // only the unknown hash is fetched
+	require.Equal(t, 1, delivered)                                  // the missing message is delivered
+}
+
+func TestStoreClientFetchMissingMessagesNoneMissing(t *testing.T) {
+	hash := make([]byte, 32)
+	r := &fakeRequestor{respond: func(_ *storepb.StoreQueryRequest, _ int) ([]*storepb.WakuMessageKeyValue, []byte, error) {
+		return []*storepb.WakuMessageKeyValue{{MessageHash: hash}}, nil, nil
+	}}
+	sc := newClient(r, []peer.AddrInfo{{ID: "n1"}})
+
+	allExist := func(pb.MessageHash) (bool, error) { return true, nil }
+	require.NoError(t, sc.FetchMissingMessages(context.Background(), batch(), allExist, func(*protocol.Envelope) error { return nil }))
+	require.Len(t, r.calls(), 1) // only the hash listing; nothing to fetch
 }

@@ -149,6 +149,11 @@ type Waku interface {
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
 	) error
+
+	// FetchMissingMessages reconciles a window against the store for the batch's
+	// topics, fetching messages not already known locally. No-op when
+	// missing-message verification is disabled. The storenode is selected internally.
+	FetchMissingMessages(ctx context.Context, batch MailserverBatch) error
 }
 
 type MailserverBatch struct {
