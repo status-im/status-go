@@ -99,10 +99,8 @@ func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	UPDATE wakuv2_config
-	SET enable_missing_message_verification = ?,
-		enable_store_confirmation_for_messages_sent = ?
+	SET enable_store_confirmation_for_messages_sent = ?
 	WHERE synthetic_id = 'id'`,
-		c.WakuV2Config.EnableMissingMessageVerification,
 		c.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 
@@ -281,12 +279,10 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 
 	err = tx.QueryRow(`
 	SELECT light_client,
-	       enable_missing_message_verification,
 	       enable_store_confirmation_for_messages_sent
 	FROM wakuv2_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.WakuV2Config.LightClient,
-		&nodecfg.WakuV2Config.EnableMissingMessageVerification,
 		&nodecfg.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 	if err != nil && err != sql.ErrNoRows {

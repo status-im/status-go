@@ -232,7 +232,6 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 		AutoUpdate:                             params.wakuConfig.AutoUpdate,
 		DefaultShardPubsubTopic:                wakuv3.DefaultShardPubsubTopic(),
 		ClusterID:                              params.clusterConfig.ClusterID,
-		EnableMissingMessageVerification:       params.wakuConfig.EnableMissingMessageVerification,
 		EnableStoreConfirmationForMessagesSent: params.wakuConfig.EnableStoreConfirmationForMessagesSent,
 		UseThrottledPublish:                    true,
 		MetricsEnabled:                         params.metricsEnabled,
