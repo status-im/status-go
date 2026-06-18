@@ -190,26 +190,26 @@ endif
 
 build-storage: $(LIBSTORAGE)
 
-STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
-	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
-	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)"
-STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
-
-TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-	CGO_CFLAGS="$(CGO_CFLAGS)"
-TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
-
 clean-storage: ##@other Remove built native libstorage artifacts
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@rm -f "$(LOGOS_STORAGE_LIB_DIR)"/libstorage.*
 endif
+
+STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)"
+STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
 test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
 	$(STORAGE_TEST_ENV) gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) gotestsum --packages="./protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
+
+TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+	CGO_CFLAGS="$(CGO_CFLAGS)"
+TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
 
 test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
 	$(TORRENT_TEST_ENV) gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
