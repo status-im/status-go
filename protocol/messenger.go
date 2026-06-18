@@ -668,6 +668,12 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	m.messaging.SetStorenodes(response.StoreNodes)
 
+	// Storenodes are now configured: request any history missed while offline.
+	// This is the cycle-free replacement for the storenode-availability signal
+	// (OnStorenodeAvailable) that previously triggered the sync, and it avoids
+	// racing SetStorenodes against the network-online trigger.
+	m.asyncRequestAllHistoricMessages()
+
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
 		return nil, err
