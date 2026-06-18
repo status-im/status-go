@@ -19,8 +19,11 @@ class TestDiscovery:
         full_ids: set[str] = set()
 
         known_nodes = {
-            # Boot nodes available in the fleet
+            # Boot node in the fleet: every client is expected to discover and stay
+            # connected to it.
             "16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb": "boot-1",
+            # Store node: queried on demand by the StoreClient, so it is NOT expected
+            # to be a persistent peer. Kept here only to label it in the peer dumps.
             "16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi": "store",
         }
 
@@ -72,7 +75,10 @@ class TestDiscovery:
 
         # Build sets for expectations
         all_node_ids = set(nodes.keys())
-        boot_ids = {k for k, v in known_nodes.items() if v in ("boot-1", "store")}
+        # Only the boot node is expected as a persistent peer. The store node is
+        # contacted on demand by the StoreClient (there is no storenode cycle keeping
+        # it connected), so it is intentionally excluded from the expectations.
+        boot_ids = {k for k, v in known_nodes.items() if v == "boot-1"}
 
         # Pre-build expected peers per node (static expectations)
         expected_by_node: dict[str, set[str]] = {}
