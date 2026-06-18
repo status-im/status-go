@@ -411,8 +411,34 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *contacts.C
 	}
 
 	if contactRequestID != "" {
-		m.logger.Warn("syncContactRequestForInstallationContact: skipping as contact request found", zap.String("contactRequestID", contactRequestID))
-		return nil
+		m.logger.Warn("syncContactRequestForInstallationContact: using existing contact request", zap.String("contactRequestID", contactRequestID))
+
+		existingContactRequest, err := m.persistence.MessageByID(contactRequestID)
+		if err != nil {
+			if err != common.ErrRecordNotFound {
+				return err
+			}
+
+			// The ID was returned by lookup but the message is missing. Fall back to
+			// synthesizing a default request to keep contact-request actions available.
+			m.logger.Warn("syncContactRequestForInstallationContact: contact request id found but message missing", zap.String("contactRequestID", contactRequestID))
+		} else {
+			if outgoing {
+				notification := m.generateOutgoingContactRequestNotification(contact, existingContactRequest)
+				notification.Timestamp = existingContactRequest.WhisperTimestamp
+				err = m.addActivityCenterNotification(state.Response, notification, nil)
+				if err != nil {
+					return err
+				}
+			} else {
+				err = m.createIncomingContactRequestNotification(contact, state, existingContactRequest, true)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}
 	}
 
 	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())

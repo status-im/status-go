@@ -34,6 +34,63 @@ func makeMutualContacts(lhs *Messenger, rhs *Messenger) error {
 	return makeMutualContact(rhs, &lhs.identity.PublicKey)
 }
 
+func (s *MessengerLocalBackupSuite) TestLocalBackupRestoresContactRequestText() {
+	bob1 := s.anotherMessenger()
+	bob2 := s.anotherMessenger()
+	alice := s.newMessenger()
+
+	err := bob1.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true)
+	s.Require().NoError(err)
+
+	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob1.identity.PublicKey))
+	contactRequestText := "hello from backup"
+
+	_, err = alice.SendContactRequest(context.Background(), &requests.SendContactRequest{
+		ID:      bobID,
+		Message: contactRequestText,
+	})
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(
+		bob1,
+		func(r *MessengerResponse) bool {
+			for _, msg := range r.Messages() {
+				if msg.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && msg.From == aliceID && msg.Text == contactRequestText {
+					return true
+				}
+			}
+			return false
+		},
+		"contact request not received",
+	)
+	s.Require().NoError(err)
+
+	marshalledBackup, err := bob1.ExportBackup()
+	s.Require().NoError(err)
+
+	err = bob2.ImportBackup(marshalledBackup)
+	s.Require().NoError(err)
+
+	restoredContactRequestID, err := bob2.persistence.LatestPendingContactRequestIDForContact(aliceID)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(restoredContactRequestID)
+	s.Require().NotEqual(defaultContactRequestID(aliceID), restoredContactRequestID)
+
+	restoredContactRequest, err := bob2.persistence.MessageByID(restoredContactRequestID)
+	s.Require().NoError(err)
+	s.Require().Equal(protobuf.ChatMessage_CONTACT_REQUEST, restoredContactRequest.ContentType)
+	s.Require().Equal(contactRequestText, restoredContactRequest.Text)
+	s.Require().NotEqual(defaultContactRequestText(), restoredContactRequest.Text)
+
+	notification, err := bob2.PendingNotificationContactRequest(aliceID)
+	s.Require().NoError(err)
+	s.Require().NotNil(notification)
+	s.Require().NotNil(notification.Message)
+	s.Require().Equal(restoredContactRequestID, notification.Message.ID)
+	s.Require().Equal(contactRequestText, notification.Message.Text)
+}
+
 func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Create bob1
 	bob1 := s.anotherMessenger()
@@ -353,7 +410,7 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Validate messages
 	messages, err := bob2.persistence.AllMessagesForBackup()
 	s.Require().NoError(err)
-	s.Require().Len(messages, 15)
+	s.Require().Len(messages, 13)
 
 	// Build a map for easier assertions
 	messageMap := make(map[string]*protobuf.BackedUpMessage)
