@@ -50,6 +50,27 @@ func (sc *StoreClient) HasStorenodes() bool {
 	return sc.selector.hasStorenodes()
 }
 
+// nextStorenode returns a currently-eligible storenode to query, or an empty
+// AddrInfo if none are configured. Selection is on demand (there is no
+// persistent active node); used by MessageSentCheck via storeClientPeerProvider.
+func (sc *StoreClient) nextStorenode() peer.AddrInfo {
+	candidates := sc.selector.candidates()
+	if len(candidates) == 0 {
+		return peer.AddrInfo{}
+	}
+	return candidates[0]
+}
+
+// storeClientPeerProvider adapts the StoreClient's on-demand storenode selection
+// to the single-peer GetActiveStorenodePeerInfo seam MessageSentCheck expects.
+// There is no persistent "active" storenode — each call returns a currently
+// eligible one (empty if none configured).
+type storeClientPeerProvider struct{ client *StoreClient }
+
+func (p storeClientPeerProvider) GetActiveStorenodePeerInfo() peer.AddrInfo {
+	return p.client.nextStorenode()
+}
+
 // Query retrieves historic messages for a single batch (one pubsub topic and its
 // content topics over [batch.From, batch.To]). It tries storenodes in turn until
 // one serves the whole query; on a mid-query failure it restarts on the next node

@@ -1106,10 +1106,43 @@ func (w *Waku) startMessageSender() error {
 		sender.WithMessageSentEmitter(w.node.Host())
 	}
 
-	// NOTE: store-based sent confirmation (EnableStoreConfirmationForMessagesSent /
-	// MessageSentCheck) was removed together with the go-waku storenode cycle it
-	// depended on. Sent/missed recovery moves to the Logos Delivery Messaging API
-	// (#7526 Phase 2).
+	if w.cfg.EnableStoreConfirmationForMessagesSent {
+		msgStoredChan := make(chan gethcommon.Hash, 1000)
+		msgExpiredChan := make(chan gethcommon.Hash, 1000)
+		// The store node is selected on demand by the StoreClient (the go-waku
+		// storenode cycle is gone); MessageSentCheck queries it by hash to confirm
+		// that published messages propagated.
+		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), storeClientPeerProvider{w.storeClient}, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
+		sender.WithMessageSentCheck(messageSentCheck)
+
+		w.wg.Add(1)
+		go func() {
+			defer gocommon.LogOnPanic()
+			defer w.wg.Done()
+			for {
+				select {
+				case <-w.ctx.Done():
+					return
+				case hash := <-msgStoredChan:
+					w.SendEnvelopeEvent(common.EnvelopeEvent{
+						Hash:  hash,
+						Event: common.EventEnvelopeSent,
+					})
+					if w.metricsHandler != nil {
+						w.metricsHandler.PushMessageCheckSuccess()
+					}
+				case hash := <-msgExpiredChan:
+					w.SendEnvelopeEvent(common.EnvelopeEvent{
+						Hash:  hash,
+						Event: common.EventEnvelopeExpired,
+					})
+					if w.metricsHandler != nil {
+						w.metricsHandler.PushMessageCheckFailure()
+					}
+				}
+			}
+		}()
+	}
 
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
 		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,

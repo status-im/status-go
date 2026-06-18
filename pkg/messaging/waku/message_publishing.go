@@ -97,13 +97,13 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		return
 	}
 
-	// Emit the envelope-sent event on successful publish. Store-confirmed sent
-	// (EnableStoreConfirmationForMessagesSent / MessageSentCheck) was removed with
-	// the go-waku storenode cycle it depended on, so the publish ack is now the
-	// only "sent" signal until the Logos Delivery Messaging API restores store
-	// confirmation (#7526 Phase 2).
-	w.SendEnvelopeEvent(common.EnvelopeEvent{
-		Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-		Event: common.EventEnvelopeSent,
-	})
+	// When store confirmation is enabled, MessageSentCheck emits EventEnvelopeSent
+	// once a store node confirms the message propagated; otherwise the publish ack
+	// is the only "sent" signal.
+	if !w.cfg.EnableStoreConfirmationForMessagesSent {
+		w.SendEnvelopeEvent(common.EnvelopeEvent{
+			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
+			Event: common.EventEnvelopeSent,
+		})
+	}
 }
