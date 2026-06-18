@@ -3,6 +3,9 @@ import pytest
 from steps import messenger
 from utils.config import Config
 
+# NOTE (investigation, do not merge): dummy change to trigger a tests-rpc-compat CI
+# run while looking into light-client compat flakiness (full-light / light-light cells).
+
 
 def pytest_generate_tests(metafunc):
     if "peer_image" in metafunc.fixturenames:
