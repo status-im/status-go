@@ -34,6 +34,16 @@ func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
 	}
 	reliabilityManager.RegisterCallbacks(callbacks)
 
+	// The pre-v0.4 nim-sds auto-started the periodic reliability loop inside the
+	// manager constructor (CREATE_RELIABILITY_MANAGER -> startPeriodicTasks). The
+	// nim-ffi v0.1.5 rewrite (nim-sds v0.4) dropped that auto-start, so the loop —
+	// which retransmits unacknowledged messages and requests missing ones — must
+	// now be kicked off explicitly. Without it, missed messages are never
+	// recovered and channels fail to reach eventual consistency.
+	if err := reliabilityManager.StartPeriodicTasks(); err != nil {
+		logger.Error("failed to start SDS periodic tasks", zap.Error(err))
+	}
+
 	return reliabilityManager
 }
 
