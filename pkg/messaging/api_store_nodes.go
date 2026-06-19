@@ -53,7 +53,3 @@ func (a *API) Query(
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	a.core.stack.Transport.SetStorenodeConfigProvider(c)
 }
-
-func (a *API) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters types.ChatFilters) {
-	a.core.stack.Transport.SetCriteriaForMissingMessageVerification(peerInfo, adapters.ToTransportFilters(filters))
-}

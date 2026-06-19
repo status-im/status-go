@@ -118,8 +118,6 @@ type Waku interface {
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
-	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
-
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
 	// Subscribe/Unsubscribe register and remove wire subscriptions for the

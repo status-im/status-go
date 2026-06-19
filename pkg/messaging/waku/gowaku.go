@@ -151,8 +151,6 @@ type Waku struct {
 
 	sendQueue *publish.MessageQueue
 
-	missingMsgVerifier *missing.MissingMessageVerifier
-
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
 	ctx    context.Context
@@ -974,34 +972,6 @@ func (w *Waku) Start() error {
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
 
-	if w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
-			missing.NewDefaultStorenodeRequestor(w.node.Store()),
-			w,
-			w.node.Timesource(),
-			w.logger)
-
-		w.missingMsgVerifier.Start(w.ctx)
-		w.logger.Info("Started missing message verifier")
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case envelope := <-w.missingMsgVerifier.C:
-					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
-					if err != nil {
-						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
-					}
-				}
-			}
-		}()
-	}
-
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
@@ -1195,13 +1165,6 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
-}
-
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
-	if !w.cfg.EnableMissingMessageVerification {
-		return
-	}
-	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1466,10 +1429,6 @@ func (w *Waku) isGoingOnline(state connection.State) bool {
 	return !state.Offline && !w.onlineChecker.IsOnline()
 }
 
-func (w *Waku) isGoingOffline(state connection.State) bool {
-	return state.Offline && w.onlineChecker.IsOnline()
-}
-
 // shouldFireConnectionChanged reports whether next represents a change in
 // connectivity. The first observation (no state recorded yet) always fires so
 // downstream consumers like the LightClient FilterManager get initialized.
@@ -1492,12 +1451,6 @@ func (w *Waku) snapshotState() (connection.State, bool) {
 func (w *Waku) ConnectionChanged(state connection.State) {
 	if w.isGoingOnline(state) {
 		w.discoverAndConnectPeers()
-		if w.cfg.EnableMissingMessageVerification {
-			w.missingMsgVerifier.Start(w.ctx)
-		}
-	}
-	if w.isGoingOffline(state) && w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier.Stop()
 	}
 	isOnline := !state.Offline
 
@@ -1756,17 +1709,6 @@ func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Durat
 	if shouldCycle {
 		w.StorenodeCycle.Cycle(ctx)
 	}
-}
-
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
-	var cTopics []string
-	for _, ct := range contentTopics {
-		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
-	}
-	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
-
-	return nil
 }
 
 func (w *Waku) Metrics() string {
