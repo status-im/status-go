@@ -135,14 +135,6 @@ LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 
-ifeq ($(detected_OS),Darwin)
-    NIM_SDS_NIMBLE_TASK := libsdsDynamicMac
-else ifeq ($(detected_OS),Windows)
-    NIM_SDS_NIMBLE_TASK := libsdsDynamicWindows
-else
-    NIM_SDS_NIMBLE_TASK := libsdsDynamicLinux
-endif
-
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
 LOGOS_STORAGE_VERSION ?= 3c09f008bb5266a669fd19f18368f9e8b861b664
@@ -325,7 +317,13 @@ ifeq ($(detected_OS),Windows)
 	git config --global core.autocrlf false
 endif
 	cd $(NIM_SDS_SOURCE_DIR) && nimble setup -l
-	cd $(NIM_SDS_SOURCE_DIR) && nimble $(NIM_SDS_NIMBLE_TASK)
+ifeq ($(detected_OS),Darwin)
+	cd $(NIM_SDS_SOURCE_DIR) && nimble libsdsDynamicMac
+else ifeq ($(detected_OS),Windows)
+	cd $(NIM_SDS_SOURCE_DIR) && nimble libsdsDynamicWindows
+else
+	cd $(NIM_SDS_SOURCE_DIR) && nimble libsdsDynamicLinux
+endif
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
 endif
