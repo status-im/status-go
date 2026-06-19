@@ -107,7 +107,8 @@ BUILD_TAGS ?= gowaku_no_rln
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
 NIM_SDS_VERSION ?= v0.2.4
 
-# Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
+# Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
+# to guarantee a clean checkout on every build.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
 ifeq ($(mkspecs),win32)
@@ -141,7 +142,8 @@ USE_TORRENT ?= false
 LOGOS_STORAGE_VERSION ?= 3c09f008bb5266a669fd19f18368f9e8b861b664
 LOGOS_STORAGE_SOURCE_DIR ?= $(GIT_ROOT)/../logos-storage-nim
 
-# Option 1: Provide LOGOS_STORAGE_SOURCE_DIR. Make clones it if missing.
+# Option 1: Provide LOGOS_STORAGE_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
+# to guarantee a clean checkout on every build.
 # Option 2: Provide LOGOS_STORAGE_LIB_DIR and LOGOS_STORAGE_INC_DIR.
 ifdef LOGOS_STORAGE_LIB_DIR
 ifdef LOGOS_STORAGE_INC_DIR
@@ -175,17 +177,23 @@ clone-storage: ##@build Clone or update logos-storage-nim
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@echo "Cloning or updating logos-storage-nim ..."
 	if [ ! -d "$(LOGOS_STORAGE_SOURCE_DIR)" ]; then \
-		git clone --recurse-submodules https://github.com/logos-storage/logos-storage-nim.git $(LOGOS_STORAGE_SOURCE_DIR); \
+		git clone --recurse-submodules https://github.com/logos-storage/logos-storage-nim.git "$(LOGOS_STORAGE_SOURCE_DIR)"; \
 	else \
-		cd $(LOGOS_STORAGE_SOURCE_DIR) && git fetch --tags; \
+		cd "$(LOGOS_STORAGE_SOURCE_DIR)" && git fetch --tags; \
 	fi
-	cd $(LOGOS_STORAGE_SOURCE_DIR) && git reset --hard && git checkout $(LOGOS_STORAGE_VERSION) && git submodule update --init --recursive
+	cd "$(LOGOS_STORAGE_SOURCE_DIR)" && \
+		git switch --force --detach "$(LOGOS_STORAGE_VERSION)" && \
+		git clean -fdx && \
+		git submodule update --init --recursive --force
 endif
 
 $(LIBSTORAGE): clone-storage
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@echo "Building logos-storage: $(LIBSTORAGE)"
 	$(MAKE) -C $(LOGOS_STORAGE_SOURCE_DIR) libstorage USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
+	@test -f $(LIBSTORAGE) || (echo "Error: libstorage not found at $(LIBSTORAGE) after build" && exit 1)
+else
+	@test -f $(LIBSTORAGE) || (echo "Error: libstorage not found at $(LIBSTORAGE)" && exit 1)
 endif
 
 build-storage: $(LIBSTORAGE)
@@ -318,11 +326,14 @@ clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
-		git clone https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR); \
+		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
 	else \
-		cd $(NIM_SDS_SOURCE_DIR) && git fetch --tags; \
+		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
 	fi
-	cd $(NIM_SDS_SOURCE_DIR) && git reset --hard && git checkout $(NIM_SDS_VERSION)
+	cd "$(NIM_SDS_SOURCE_DIR)" && \
+		git switch --force --detach "$(NIM_SDS_VERSION)" && \
+		git clean -fdx && \
+		git submodule update --init --recursive --force
 endif
 
 $(LIBSDS): clone-nim-sds
@@ -330,6 +341,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
+	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
 endif
