@@ -1634,7 +1634,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		}
 		derivedAddresses = generatedDerivedAddresses
 
-		walletXPub, err = generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletRoot)
+		walletXPub, err = generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletXPub)
 		if err != nil {
 			return nil, err
 		}
