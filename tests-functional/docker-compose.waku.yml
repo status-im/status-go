@@ -23,10 +23,12 @@ services:
       "--rest-admin",
       "--shard=32",
       "--shard=64",
+      "--shard=128",
+      "--shard=256",
       "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
       "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
       "--tcp-port=60001",
-      "--num-shards-in-network=65"
+      "--num-shards-in-network=257"
     ]
     depends_on:
       - store
@@ -62,12 +64,14 @@ services:
       "--rest-admin",
       "--shard=32",
       "--shard=64",
+      "--shard=128",
+      "--shard=256",
       "--staticnode=/dns4/boot-1/tcp/60001/p2p/16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb",
       "--store=true",
       "--store-message-db-url=sqlite:////tmp/waku-store.sqlite3",
       "--store-message-retention-policy=time:86400",
       "--tcp-port=60002",
-      "--num-shards-in-network=65"
+      "--num-shards-in-network=257"
     ]
     healthcheck:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
