@@ -105,7 +105,7 @@ BUILD_TAGS ?= gowaku_no_rln
 # `nim-sds` variables
 
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
-NIM_SDS_VERSION ?= v0.4.0-rc.4
+NIM_SDS_VERSION ?= v0.4.0-rc.5
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
