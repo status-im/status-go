@@ -103,7 +103,7 @@ require (
 	github.com/status-im/extkeys v1.4.0
 	github.com/status-im/go-wallet-sdk v0.0.0-20260428172609-d99313975e5c
 	github.com/waku-org/go-waku v0.10.2
-	github.com/waku-org/sds-go-bindings v0.0.0-20260619075528-a33b3ec5a971
+	github.com/waku-org/sds-go-bindings v0.0.0-20260619212938-903db205f23c
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.uber.org/atomic v1.11.0
 	go.uber.org/mock v0.6.0
@@ -222,6 +222,7 @@ require (
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
 	github.com/go-critic/go-critic v0.9.0 // indirect
@@ -462,6 +463,7 @@ require (
 	github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 // indirect
 	github.com/wk8/go-ordered-map v1.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xen0n/gosmopolitan v1.2.2 // indirect
