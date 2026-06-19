@@ -3,6 +3,8 @@ package circuitbreaker
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
@@ -53,9 +55,10 @@ func (cr *CommandResult) addCallStatus(providerName string, err error, startTime
 }
 
 type Command struct {
-	ctx      context.Context
-	functors []*Functor
-	cancel   bool
+	ctx                       context.Context
+	functors                  []*Functor
+	cancel                    atomic.Bool
+	nonFailureErrorClassifier func(error) bool
 }
 
 func NewCommand(ctx context.Context, functors []*Functor) *Command {
@@ -74,7 +77,15 @@ func (cmd *Command) IsEmpty() bool {
 }
 
 func (cmd *Command) Cancel() {
-	cmd.cancel = true
+	cmd.cancel.Store(true)
+}
+
+func (cmd *Command) SetNonFailureErrorClassifier(classifier func(error) bool) {
+	cmd.nonFailureErrorClassifier = classifier
+}
+
+func (cmd *Command) shouldIgnoreFailure(err error) bool {
+	return err != nil && cmd.nonFailureErrorClassifier != nil && cmd.nonFailureErrorClassifier(err)
 }
 
 type Config struct {
@@ -123,6 +134,45 @@ func accumulateCommandError(result CommandResult, circuitName string, err error)
 	return result
 }
 
+// sharedResult guards CommandResult against the hystrix goroutine that may
+// outlive DoC on timeout or cancellation.
+type sharedResult struct {
+	mu     sync.Mutex
+	result CommandResult
+}
+
+func (s *sharedResult) recordCall(providerName string, res []any, err error, startTime time.Time) FunctorCallStatus {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err == nil {
+		s.result.res = res
+		s.result.err = nil
+	}
+	s.result.addCallStatus(providerName, err, startTime)
+	return s.result.functorCallStatuses[len(s.result.functorCallStatuses)-1]
+}
+
+func (s *sharedResult) accumulateError(name string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.result = accumulateCommandError(s.result, name, err)
+}
+
+func (s *sharedResult) markCancelled() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.result.cancelled = true
+}
+
+func (s *sharedResult) snapshot() CommandResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cp := s.result
+	cp.res = append([]any(nil), s.result.res...)
+	cp.functorCallStatuses = append([]FunctorCallStatus(nil), s.result.functorCallStatuses...)
+	return cp
+}
+
 // Execute the command in its circuit if set.
 // If the command's circuit is not configured, the circuit of the CircuitBreaker is used.
 // This is a blocking function.
@@ -131,19 +181,20 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 		return CommandResult{err: fmt.Errorf("command is nil or empty")}
 	}
 
-	var result CommandResult
+	var shared sharedResult
 	ctx := cmd.ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	for i, f := range cmd.functors {
-		if cmd.cancel {
-			result.cancelled = true
+		if cmd.cancel.Load() {
+			shared.markCancelled()
 			break
 		}
 
 		var err error
+		var skippedErr error
 		circuitName := f.circuitName
 		providerName := f.providerName
 		if cb.circuitNameHandler != nil {
@@ -157,16 +208,10 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 		if i == len(cmd.functors)-1 || circuitName == "" {
 			res, execErr := f.exec()
 			err = execErr
-			if err == nil {
-				result.res = res
-				result.err = nil
-			}
-			result.addCallStatus(f.providerName, err, startTime)
+			status := shared.recordCall(f.providerName, res, err, startTime)
 
 			// Log error if present
 			if err != nil {
-				// Get the status that was just added
-				status := result.functorCallStatuses[len(result.functorCallStatuses)-1]
 				logutils.ZapLogger().Warn("direct execution error",
 					zap.String("provider", f.providerName),
 					zap.Error(err),
@@ -187,23 +232,20 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 				// We need to capture the execution time inside the hystrix function
 				execStartTime := time.Now()
 				res, err := f.exec()
-				// Write to result only if success
-				if err == nil {
-					result.res = res
-					result.err = nil
-				}
-				result.addCallStatus(f.providerName, err, execStartTime)
+				status := shared.recordCall(f.providerName, res, err, execStartTime)
 
 				// If the command has been cancelled, we don't count
 				// the error towards breaking the circuit, and then we break
-				if cmd.cancel {
-					result = accumulateCommandError(result, circuitName, err)
-					result.cancelled = true
+				if cmd.cancel.Load() {
+					shared.accumulateError(circuitName, err)
+					shared.markCancelled()
+					return nil
+				}
+				if cmd.shouldIgnoreFailure(err) {
+					skippedErr = err
 					return nil
 				}
 				if err != nil {
-					// Get the status that was just added
-					status := result.functorCallStatuses[len(result.functorCallStatuses)-1]
 					logutils.ZapLogger().Warn("hystrix error",
 						zap.String("provider", f.providerName),
 						zap.Error(err),
@@ -212,15 +254,18 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 				return err
 			}, nil)
 		}
+		if err == nil && skippedErr != nil {
+			err = skippedErr
+		}
 		if err == nil {
 			break
 		}
 
-		result = accumulateCommandError(result, providerName, err)
+		shared.accumulateError(providerName, err)
 		// Let's abuse every provider with the same amount of MaxConcurrentRequests,
 		// keep iterating even in case of ErrMaxConcurrency error
 	}
-	return result
+	return shared.snapshot()
 }
 
 func (cb *CircuitBreaker) SetOverrideCircuitNameHandler(f func(string) string) {

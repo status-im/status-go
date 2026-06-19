@@ -9,9 +9,9 @@ import (
 	"github.com/status-im/status-go/internal/contracts/ierc20"
 	"github.com/status-im/status-go/internal/contracts/namewrapper"
 	"github.com/status-im/status-go/internal/contracts/registrar"
-	"github.com/status-im/status-go/internal/contracts/resolver"
 	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/internal/contracts/stickers"
+	"github.com/status-im/status-go/internal/contracts/universalresolver"
 	"github.com/status-im/status-go/internal/rpc"
 
 	stickers2 "github.com/status-im/status-go/internal/contracts/stickers"
@@ -29,35 +29,6 @@ type ContractMaker struct {
 
 func NewContractMaker(client rpc.EthClientGetter) *ContractMaker {
 	return &ContractMaker{ethClientGetter: client}
-}
-
-func (c *ContractMaker) NewRegistryWithAddress(chainID uint64, address common.Address) (*resolver.ENSRegistryWithFallback, error) {
-	backend, err := c.ethClientGetter.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	return resolver.NewENSRegistryWithFallback(
-		address,
-		backend,
-	)
-}
-
-func (c *ContractMaker) NewRegistry(chainID uint64) (*resolver.ENSRegistryWithFallback, error) {
-	contractAddr, err := resolver.ContractAddress(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return c.NewRegistryWithAddress(chainID, contractAddr)
-}
-
-func (c *ContractMaker) NewPublicResolver(chainID uint64, resolverAddress *common.Address) (*resolver.PublicResolver, error) {
-	backend, err := c.ethClientGetter.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	return resolver.NewPublicResolver(*resolverAddress, backend)
 }
 
 func (c *ContractMaker) NewUsernameRegistrar(chainID uint64, contractAddr common.Address) (*registrar.UsernameRegistrar, error) {
@@ -172,6 +143,20 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 		contractAddr,
 		backend,
 	)
+}
+
+func (c *ContractMaker) NewUniversalResolver(chainID uint64) (*universalresolver.UniversalResolver, error) {
+	contractAddr, err := universalresolver.ContractAddress(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	backend, err := c.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return universalresolver.NewUniversalResolver(contractAddr, backend)
 }
 
 func (c *ContractMaker) NewNameWrapper(chainID uint64, address *common.Address) (*namewrapper.Namewrapper, error) {

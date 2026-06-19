@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy contracts that need to be pre-deployed
 RUN mkdir -p /app/contracts
 COPY contracts/Multicall3.sol /app/contracts/
+COPY contracts/UniversalResolver.sol /app/contracts/
 
 COPY --chmod=0755 *.sh /app
 

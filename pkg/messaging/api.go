@@ -1,6 +1,8 @@
 package messaging
 
 import (
+	"time"
+
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -28,7 +30,12 @@ func (a *API) Publisher() *pubsub.Publisher {
 
 // GetCurrentTime satisfies the common.TimeSource interface.
 func (a *API) GetCurrentTime() uint64 {
-	return a.core.stack.Transport.GetCurrentTime()
+	return uint64(a.core.timeSource.Now().UnixNano() / int64(time.Millisecond))
+}
+
+// Online reports whether the transport currently has at least one connected peer.
+func (a *API) Online() bool {
+	return a.core.stack.Transport.PeerCount() > 0
 }
 
 // SubscribeFilterMatched returns a channel that is notified whenever an incoming

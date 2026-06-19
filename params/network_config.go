@@ -22,7 +22,6 @@ const (
 type RpcProviderType string
 
 const (
-	EmbeddedProxyProviderType       RpcProviderType = "embedded-proxy"         // Proxy-based RPC provider
 	EmbeddedEthRpcProxyProviderType RpcProviderType = "embedded-eth-rpc-proxy" // EthRpcProxy-based RPC provider (smart proxy)
 	EmbeddedDirectProviderType      RpcProviderType = "embedded-direct"        // Direct RPC provider
 	UserProviderType                RpcProviderType = "user"                   // User-defined RPC provider
@@ -35,7 +34,7 @@ type RpcProvider struct {
 	Name             string                   `json:"name" validate:"required,min=1"`   // Provider name for identification
 	URL              security.SensitiveString `json:"url" validate:"required,url"`      // Current Provider URL
 	EnableRPSLimiter bool                     `json:"enableRpsLimiter"`                 // Enable RPC rate limiting for this provider
-	Type             RpcProviderType          `json:"type" validate:"required,oneof=embedded-proxy embedded-eth-rpc-proxy embedded-direct user"`
+	Type             RpcProviderType          `json:"type" validate:"required,oneof=embedded-eth-rpc-proxy embedded-direct user"`
 	Enabled          bool                     `json:"enabled"` // Whether the provider is enabled
 	// Authentication
 	AuthType     RpcProviderAuthType      `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth puzzle-auth"` // Type of authentication
@@ -68,9 +67,6 @@ type Network struct {
 
 	// Deprecated fields (kept for backward compatibility)
 	// FIXME: Removal of deprecated fields in integration PR https://github.com/status-im/status-go/pull/6178
-	DefaultRPCURL       string `json:"defaultRpcUrl" validate:"omitempty,url"`       // Deprecated: proxy rpc url
-	DefaultFallbackURL  string `json:"defaultFallbackURL" validate:"omitempty,url"`  // Deprecated: proxy fallback url
-	DefaultFallbackURL2 string `json:"defaultFallbackURL2" validate:"omitempty,url"` // Deprecated: second proxy fallback url
 	RPCURL              string `json:"rpcUrl" validate:"omitempty,url"`              // Deprecated: direct rpc url
 	OriginalRPCURL      string `json:"originalRpcUrl" validate:"omitempty,url"`      // Deprecated: direct rpc url if user overrides RPCURL
 	FallbackURL         string `json:"fallbackURL" validate:"omitempty,url"`         // Deprecated
@@ -120,10 +116,6 @@ func newRpcProvider(chainID uint64, name string, url security.SensitiveString, e
 
 func NewUserProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, UserProviderType)
-}
-
-func NewProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
-	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedProxyProviderType)
 }
 
 func NewEthRpcProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool, usePuzzleAuth bool) *RpcProvider {

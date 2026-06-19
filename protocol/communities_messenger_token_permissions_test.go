@@ -1109,6 +1109,31 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 	// confirm that member is a viewer and not a poster
 	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_POSTER, members[s.alice.IdentityPublicKeyString()].ChannelRole)
 
+	// bob must also apply the community changes that promote alice to poster
+	// before alice posts. Otherwise bob can process alice's message before he
+	// knows she is allowed to post, reject it ("user can't post in community")
+	// and never retry it — see status-im/status-go#3869. Reception ordering is
+	// not guaranteed, so the test must force bob to be up to date first.
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			if len(r.Communities()) == 0 {
+				return false
+			}
+			c := r.Communities()[0]
+			if c == nil {
+				return false
+			}
+			channel := c.Chats()[chat.CommunityChatID()]
+			if channel == nil || len(channel.Members) != 2 {
+				return false
+			}
+			return channel.Members[s.alice.IdentityPublicKeyString()].ChannelRole == protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+		},
+		"bob did not receive alice's poster permission",
+	)
+	s.Require().NoError(err)
+
 	// bob can't post
 	msg = &common.Message{
 		ChatMessage: &protobuf.ChatMessage{

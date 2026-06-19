@@ -23,7 +23,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -149,6 +148,9 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
+	historicSyncMu            sync.Mutex
+	historicSyncInFlight      bool
+	lastHistoricSyncRequestAt time.Time
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
@@ -547,24 +549,11 @@ func (m *Messenger) processSentMessage(id string) error {
 	return nil
 }
 
-func (m *Messenger) ToForeground() {
-	m.SetPaused(false)
-	if m.httpServer != nil {
-		m.httpServer.ToForeground()
-	}
-
-	m.asyncRequestAllHistoricMessages()
-}
-
-func (m *Messenger) ToBackground() {
-	m.SetPaused(true)
-	if m.httpServer != nil {
-		m.httpServer.ToBackground()
-	}
-}
-
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
+	if m.ensVerifier != nil {
+		m.ensVerifier.SetPaused(paused)
+	}
 	if m.pushNotificationClient != nil {
 		if paused {
 			m.pushNotificationClient.Offline()
@@ -581,6 +570,16 @@ func (m *Messenger) SetPaused(paused bool) {
 		if err := m.messaging.PauseDataSync(paused); err != nil {
 			m.logger.Warn("failed to pause data sync", zap.Error(err))
 		}
+	}
+	if !paused {
+		if m.httpServer != nil {
+			m.httpServer.ToForeground()
+		}
+		if m.started {
+			m.asyncRequestAllHistoricMessages()
+		}
+	} else if m.httpServer != nil {
+		m.httpServer.ToBackground()
 	}
 	// ToDo: the current ArchiveManager does not provide SetPaused method yet
 	// if m.archiveManager != nil {
@@ -668,9 +667,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	m.messaging.SetStorenodeConfigProvider(m)
-
-	m.shutdownWaitGroup.Add(1)
-	go m.checkForMissingMessagesLoop()
 
 	m.shutdownWaitGroup.Add(1)
 	go m.checkForStorenodeCycleSignals()
@@ -821,8 +817,9 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		m.shouldPublishContactCode = false
 	}
 
-	// Start fetching messages from store nodes
-	if online {
+	// Start fetching messages from store nodes.
+	// Skip when backgrounded: the sync will run when the app returns to foreground.
+	if online && !m.isPaused() {
 		m.asyncRequestAllHistoricMessages()
 	}
 
@@ -841,7 +838,7 @@ func (m *Messenger) Online() bool {
 		return m.config.onlineChecker()
 	}
 
-	return m.messaging.PeerCount() > 0
+	return m.messaging.Online()
 }
 
 func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
@@ -2850,10 +2847,6 @@ func (m *Messenger) contactRequestNotificationPreview() (show bool, preview int)
 	return true, preview
 }
 
-func (m *Messenger) GetStats() types2.TransportStats {
-	return m.messaging.GetStats()
-}
-
 type CurrentMessageState struct {
 	// Message is the protobuf message received
 	Message *protobuf.ChatMessage
@@ -3347,12 +3340,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilt
 			}
 
 			m.processCommunityChanges(messageState)
-
-			// NOTE: for now we confirm messages as processed regardless whether we
-			// actually processed them, this is because we need to differentiate
-			// from messages that we want to retry to process and messages that
-			// are never going to be processed
-			m.messaging.MarkP2PMessageAsProcessed(gethcommon.BytesToHash(shhMessage.Hash))
 
 			if allMessagesProcessed {
 				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))

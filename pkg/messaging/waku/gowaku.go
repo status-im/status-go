@@ -25,7 +25,6 @@ package wakuv2
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
@@ -43,15 +42,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
-	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 
-	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -74,8 +70,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/waku-org/go-waku/waku/v2/node"
@@ -137,13 +131,18 @@ type Waku struct {
 	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
 	dnsDiscAsyncRetrievedSignal chan struct{}
 
-	// Filter-related
-	filters       *common.Filters // Message filters installed with Subscribe function
+	// Light-client filter protocol; tracks the wire subscriptions declared via
+	// SyncSubscriptions.
 	filterManager *filterapi.FilterManager
 
-	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
-	symKeys     map[string][]byte            // Symmetric key storage
-	keyMu       sync.RWMutex                 // Mutex associated with key stores
+	// subscriptions maps each (pubsub, content) topic pair declared by the
+	// transport via Subscribe to the internal subscription id it is registered
+	// under in the filterManager — go-waku's filter API is id-based, so the
+	// adapter has to remember the id to honor Unsubscribe. The id never leaves
+	// the adapter; the logos-delivery backend is topic-keyed and needs no such
+	// table.
+	subscriptionsMu sync.Mutex
+	subscriptions   map[types.TopicSubscription]string
 
 	envelopeCache *ttlcache.Cache[gethcommon.Hash, bool] // [Hash of envelope -> Processed] cache
 	poolMu        sync.RWMutex                           // Mutex to sync the message and expiration pools
@@ -151,8 +150,6 @@ type Waku struct {
 	bandwidthCounter *metrics.BandwidthCounter
 
 	sendQueue *publish.MessageQueue
-
-	missingMsgVerifier *missing.MissingMessageVerifier
 
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
@@ -164,9 +161,6 @@ type Waku struct {
 	options []node.WakuNodeOption
 
 	envelopeFeed event.Feed
-
-	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
-	storeMsgIDsMu sync.RWMutex
 
 	messageSender *publish.MessageSender
 
@@ -187,6 +181,7 @@ type Waku struct {
 
 	StorenodeCycle   *history.StorenodeCycle
 	HistoryRetriever *history.HistoryRetriever
+	storeClient      *StoreClient
 
 	logger *zap.Logger
 
@@ -205,9 +200,6 @@ type Waku struct {
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
-
-	// getFilterMessagesMu serialises GetFilterMessages lookups.
-	getFilterMessagesMu sync.Mutex
 }
 
 var _ types.Waku = (*Waku)(nil)
@@ -250,8 +242,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 
 	waku := &Waku{
 		cfg:                             cfg,
-		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
-		symKeys:                         make(map[string][]byte),
+		subscriptions:                   make(map[types.TopicSubscription]string),
 		envelopeCache:                   newTTLCache(),
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
@@ -263,9 +254,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
-		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
 		timesource:                      ts,
-		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
@@ -273,7 +262,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
-	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	if nodeKey == nil {
@@ -626,14 +614,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
-func (w *Waku) GetStats() types.StatsSummary {
-	stats := w.bandwidthCounter.GetBandwidthTotals()
-	return types.StatsSummary{
-		UploadRate:   uint64(stats.RateOut),
-		DownloadRate: uint64(stats.RateIn),
-	}
-}
-
 func (w *Waku) runPeerExchangeLoop() {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
@@ -749,11 +729,6 @@ func (w *Waku) MaxMessageSize() uint32 {
 	return w.cfg.MaxMessageSize
 }
 
-// CurrentTime returns current time.
-func (w *Waku) CurrentTime() time.Time {
-	return w.timesource.Now()
-}
-
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 	return w.envelopeFeed.Send(event)
 }
@@ -776,234 +751,70 @@ func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) t
 	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
 }
 
-func (w *Waku) SubscribeFilterMatched() chan struct{} {
-	return w.filters.SubscribeFilterMatched()
+// newReceivedMessage builds the neutral, transport-agnostic view of a received
+// envelope that travels on the envelope feed (EventEnvelopeAvailable.Data) for
+// the transport to decode and route.
+func newReceivedMessage(e *common.ReceivedMessage) *types.ReceivedMessage {
+	msg := e.Envelope.Message()
+	return &types.ReceivedMessage{
+		Hash:         e.Hash().Bytes(),
+		ContentTopic: msg.ContentTopic,
+		Payload:      msg.Payload,
+		Ephemeral:    msg.GetEphemeral(),
+		Meta:         msg.Meta,
+		PubsubTopic:  e.PubsubTopic,
+		Version:      msg.GetVersion(),
+		Timestamp:    msg.GetTimestamp(),
+	}
 }
 
-func (w *Waku) UnsubscribeFilterMatched(ch chan struct{}) {
-	w.filters.UnsubscribeFilterMatched(ch)
-}
+// Subscribe registers a wire subscription for each given (pubsubTopic,
+// contentTopic) pair. Subscribing an already-subscribed pair is a no-op.
+func (w *Waku) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
+	w.subscriptionsMu.Lock()
+	defer w.subscriptionsMu.Unlock()
 
-// DeleteKeyPair deletes the specified key if it exists.
-func (w *Waku) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, common.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.privateKeys[deterministicID] != nil {
-		delete(w.privateKeys, deterministicID)
-		return true
-	}
-	return false
-}
-
-// AddKeyPair imports a asymmetric private key and returns it identifier.
-func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return "", err
-	}
-	if w.HasKeyPair(id) {
-		return id, nil // no need to re-inject
-	}
-
-	w.keyMu.Lock()
-	w.privateKeys[id] = key
-	w.keyMu.Unlock()
-
-	return id, nil
-}
-
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (w *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return err
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	w.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	w.privateKeys[id] = key
-
-	return nil
-}
-
-// DeleteKeyPairs removes all cryptographic identities known to the node
-func (w *Waku) DeleteKeyPairs() error {
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	w.privateKeys = make(map[string]*ecdsa.PrivateKey)
-
-	return nil
-}
-
-// HasKeyPair checks if the waku node is configured with the private key
-// of the specified public pair.
-func (w *Waku) HasKeyPair(id string) bool {
-	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	return w.privateKeys[deterministicID] != nil
-}
-
-// GetPrivateKey retrieves the private key of the specified identity.
-func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
-	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
-	if err != nil {
-		return nil, err
-	}
-
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	key := w.privateKeys[deterministicID]
-	if key == nil {
-		return nil, fmt.Errorf("invalid id")
-	}
-	return key, nil
-}
-
-// AddSymKeyDirect stores the key, and returns its id.
-func (w *Waku) AddSymKeyDirect(key []byte) (string, error) {
-	if len(key) != common.AESKeyLength {
-		return "", fmt.Errorf("wrong key size: %d", len(key))
-	}
-
-	id, err := common.GenerateRandomID()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate ID: %s", err)
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.symKeys[id] != nil {
-		return "", fmt.Errorf("failed to generate unique ID")
-	}
-	w.symKeys[id] = key
-	return id, nil
-}
-
-// AddSymKeyFromPassword generates the key from password, stores it, and returns its id.
-func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
-	id, err := common.GenerateRandomID()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate ID: %s", err)
-	}
-	if w.HasSymKey(id) {
-		return "", fmt.Errorf("failed to generate unique ID")
-	}
-
-	// kdf should run no less than 0.1 seconds on an average computer,
-	// because it's an once in a session experience
-	derived := pbkdf2.Key([]byte(password), nil, 65356, common.AESKeyLength, sha256.New)
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	// double check is necessary, because deriveKeyMaterial() is very slow
-	if w.symKeys[id] != nil {
-		return "", fmt.Errorf("critical error: failed to generate unique ID")
-	}
-	w.symKeys[id] = derived
-	return id, nil
-}
-
-// HasSymKey returns true if there is a key associated with the given id.
-// Otherwise returns false.
-func (w *Waku) HasSymKey(id string) bool {
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	return w.symKeys[id] != nil
-}
-
-// DeleteSymKey deletes the key associated with the name string if it exists.
-func (w *Waku) DeleteSymKey(id string) bool {
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-	if w.symKeys[id] != nil {
-		delete(w.symKeys, id)
-		return true
-	}
-	return false
-}
-
-// GetSymKey returns the symmetric key associated with the given id.
-func (w *Waku) GetSymKey(id string) ([]byte, error) {
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	if w.symKeys[id] != nil {
-		return w.symKeys[id], nil
-	}
-	return nil, fmt.Errorf("non-existent key ID")
-}
-
-// Subscribe installs a new message handler used for filtering, decrypting
-// and subsequent storing of incoming messages.
-func (w *Waku) subscribe(f *common.Filter) (string, error) {
-	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
-	id, err := w.filters.Install(f)
-	if err != nil {
-		return id, err
-	}
-
-	if w.cfg.LightClient {
-		if w.filterManager == nil {
-			return id, nil
+	for _, contentTopic := range contentTopics {
+		sub := types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: contentTopic}
+		if _, ok := w.subscriptions[sub]; ok {
+			continue
 		}
-		cf := protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...)
-		w.filterManager.SubscribeFilter(id, cf)
-	}
 
-	return id, nil
-}
-
-// Unsubscribe removes an installed message handler.
-func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
-	ok := w.filters.Uninstall(id)
-	if !ok {
-		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
-	}
-
-	if w.cfg.LightClient {
-		if w.filterManager == nil {
-			return nil
+		id, err := common.GenerateRandomID()
+		if err != nil {
+			return err
 		}
-		w.filterManager.UnsubscribeFilter(id)
+		if w.cfg.LightClient && w.filterManager != nil {
+			topics := [][]byte{types.TopicTypeToByteArray(contentTopic)}
+			cf := protocol.NewContentFilter(w.GetPubsubTopic(pubsubTopic), common.NewTopicSetFromBytes(topics).ContentTopics()...)
+			w.filterManager.SubscribeFilter(id, cf)
+		}
+		w.subscriptions[sub] = id
 	}
 
 	return nil
 }
 
-// GetFilter returns the filter by id.
-func (w *Waku) getFilter(id string) *common.Filter {
-	return w.filters.Get(id)
-}
+// Unsubscribe removes the wire subscriptions for the given pairs.
+// Unsubscribing a pair that is not subscribed is a no-op.
+func (w *Waku) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
+	w.subscriptionsMu.Lock()
+	defer w.subscriptionsMu.Unlock()
 
-func (w *Waku) GetFilter(id string) types.Filter {
-	return w.getFilter(id)
-}
-
-// Unsubscribe removes an installed message handler.
-func (w *Waku) UnsubscribeMany(ids []string) error {
-	for _, id := range ids {
-		w.logger.Debug("cleaning up filter", zap.String("id", id))
-		ok := w.filters.Uninstall(id)
+	for _, contentTopic := range contentTopics {
+		sub := types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: contentTopic}
+		id, ok := w.subscriptions[sub]
 		if !ok {
-			w.logger.Warn("could not remove filter with id", zap.String("id", id))
+			continue
 		}
+
+		w.logger.Debug("cleaning up wire subscription", zap.String("id", id))
+		if w.cfg.LightClient && w.filterManager != nil {
+			w.filterManager.UnsubscribeFilter(id)
+		}
+		delete(w.subscriptions, sub)
 	}
+
 	return nil
 }
 
@@ -1042,6 +853,7 @@ func (w *Waku) Start() error {
 
 	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, commonapi.NewDefaultPinger(w.node.Host()))
 	w.HistoryRetriever = history.NewHistoryRetriever(missing.NewDefaultStorenodeRequestor(w.node.Store()), NewHistoryProcessorWrapper(w), w.logger)
+	w.storeClient = NewStoreClient(w.StorenodeCycle, w.HistoryRetriever, w.GetPubsubTopic, w.logger)
 
 	w.StorenodeCycle.Start(w.ctx)
 
@@ -1160,41 +972,13 @@ func (w *Waku) Start() error {
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
 
-	if w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
-			missing.NewDefaultStorenodeRequestor(w.node.Store()),
-			w,
-			w.node.Timesource(),
-			w.logger)
-
-		w.missingMsgVerifier.Start(w.ctx)
-		w.logger.Info("Started missing message verifier")
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case envelope := <-w.missingMsgVerifier.C:
-					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
-					if err != nil {
-						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
-					}
-				}
-			}
-		}()
-	}
-
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
 		w.filterManager = filterapi.NewFilterManager(
 			w.ctx,
 			w.logger,
-			w.cfg.MinPeersForFilter,
+			w.cfg.MaxPeersForFilter,
 			w,
 			w.node.FilterLightnode(),
 			filterapi.WithBatchInterval(300*time.Millisecond))
@@ -1383,13 +1167,6 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
-	if !w.cfg.EnableMissingMessageVerification {
-		return
-	}
-	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
-}
-
 func (w *Waku) setupRelaySubscriptions() error {
 	if w.cfg.LightClient {
 		return nil
@@ -1538,41 +1315,17 @@ func (w *Waku) processQueueLoop() {
 }
 
 func (w *Waku) processMessage(e *common.ReceivedMessage) {
-	logger := w.logger.With(
-		zap.Stringer("envelopeHash", e.Envelope.Hash()),
-		zap.String("pubsubTopic", e.PubsubTopic),
-		zap.String("contentTopic", e.ContentTopic.ContentTopic()),
-		zap.Int64("timestamp", e.Envelope.Message().GetTimestamp()),
-	)
-
-	if e.MsgType == common.StoreMessageType {
-		// We need to insert it first, and then remove it if not matched,
-		// as messages are processed asynchronously
-		w.storeMsgIDsMu.Lock()
-		w.storeMsgIDs[e.Hash()] = true
-		w.storeMsgIDsMu.Unlock()
-	}
-
-	matched := w.filters.NotifyWatchers(e)
-
-	// If not matched we remove it
-	if !matched {
-		logger.Debug("filters did not match")
-		w.storeMsgIDsMu.Lock()
-		delete(w.storeMsgIDs, e.Hash())
-		w.storeMsgIDsMu.Unlock()
-	} else {
-		logger.Debug("filters did match")
-		if w.metricsHandler != nil && e.MsgType == common.MissingMessageType {
-			w.metricsHandler.PushMissedRelevantMessage(e)
-		}
-		w.envelopeCache.Set(e.Hash(), true, ttlcache.DefaultTTL)
-	}
-
+	// Decoding, content-topic routing and filter matching all happen in the
+	// transport now (status-im/status-go#7464). The adapter just forwards every
+	// received envelope on the envelope feed, carrying the neutral
+	// ReceivedMessage as the EventEnvelopeAvailable payload; the transport
+	// decodes and routes it. De-duplication is owned by the transport's
+	// persistent processed-message cache, so nothing is marked processed here.
 	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Topic: e.ContentTopic,
 		Hash:  e.Hash(),
 		Event: common.EventEnvelopeAvailable,
+		Data:  newReceivedMessage(e),
 	})
 }
 
@@ -1600,36 +1353,10 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-func (w *Waku) PeerCount() int {
-	return w.node.PeerCount()
-}
-
+// Peers is retained only for the Python functional tests (see tests-functional);
+// it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
-}
-
-func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
-	if w.cfg.LightClient {
-		return nil, errors.New("only available in relay mode")
-	}
-
-	return &types.PeerList{
-		FullMeshPeers: w.node.Relay().PubSub().MeshPeers(topic),
-		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
-	}, nil
-}
-
-func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return w.node.ListenAddresses(), nil
-}
-
-func (w *Waku) ENR() (*enode.Node, error) {
-	enr := w.node.ENR()
-	if enr == nil {
-		return nil, errors.New("enr not available")
-	}
-
-	return enr, nil
 }
 
 func (w *Waku) SubscribeToPubsubTopic(topic string) error {
@@ -1702,10 +1429,6 @@ func (w *Waku) isGoingOnline(state connection.State) bool {
 	return !state.Offline && !w.onlineChecker.IsOnline()
 }
 
-func (w *Waku) isGoingOffline(state connection.State) bool {
-	return state.Offline && w.onlineChecker.IsOnline()
-}
-
 // shouldFireConnectionChanged reports whether next represents a change in
 // connectivity. The first observation (no state recorded yet) always fires so
 // downstream consumers like the LightClient FilterManager get initialized.
@@ -1728,12 +1451,6 @@ func (w *Waku) snapshotState() (connection.State, bool) {
 func (w *Waku) ConnectionChanged(state connection.State) {
 	if w.isGoingOnline(state) {
 		w.discoverAndConnectPeers()
-		if w.cfg.EnableMissingMessageVerification {
-			w.missingMsgVerifier.Start(w.ctx)
-		}
-	}
-	if w.isGoingOffline(state) && w.cfg.EnableMissingMessageVerification {
-		w.missingMsgVerifier.Stop()
 	}
 	isOnline := !state.Offline
 
@@ -1912,43 +1629,8 @@ func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }
 
-func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer([]multiaddr.Multiaddr{address}, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
-	if err != nil {
-		return "", err
-	}
-	return peerID, nil
-}
-
-func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-	defer cancel()
-	return w.node.DialPeerWithMultiAddress(ctx, address)
-}
-
-func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-	defer cancel()
-	return w.node.DialPeerByID(ctx, peerID)
-}
-
-func (w *Waku) DropPeer(peerID peer.ID) error {
-	return w.node.ClosePeerById(peerID)
-}
-
-func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
-	w.storeMsgIDsMu.Lock()
-	defer w.storeMsgIDsMu.Unlock()
-	delete(w.storeMsgIDs, hash)
-}
-
 func (w *Waku) Clean() error {
 	w.msgQueue = make(chan *common.ReceivedMessage, messageQueueLimit)
-
-	for _, f := range w.filters.All() {
-		f.Messages = common.NewMemoryMessageStore()
-	}
-
 	return nil
 }
 
@@ -1958,41 +1640,6 @@ func (w *Waku) PeerID() peer.ID {
 
 func (w *Waku) Peerstore() peerstore.Peerstore {
 	return w.node.Host().Peerstore()
-}
-
-// validatePrivateKey checks the format of the given private key.
-func validatePrivateKey(k *ecdsa.PrivateKey) bool {
-	if k == nil || k.D == nil || k.D.Sign() == 0 {
-		return false
-	}
-	return common.ValidatePublicKey(&k.PublicKey)
-}
-
-// makeDeterministicID generates a deterministic ID, based on a given input
-func makeDeterministicID(input string, keyLen int) (id string, err error) {
-	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
-	if !common.ValidateDataIntegrity(buf, common.KeyIDSize) {
-		return "", fmt.Errorf("error in GenerateDeterministicID: failed to generate key")
-	}
-	id = gethcommon.Bytes2Hex(buf)
-	return id, err
-}
-
-// toDeterministicID reviews incoming id, and transforms it to format
-// expected internally be private key store. Originally, public keys
-// were used as keys, now random keys are being used. And in order to
-// make it easier to consume, we now allow both random IDs and public
-// keys to be passed.
-func toDeterministicID(id string, expectedLen int) (string, error) {
-	if len(id) != (expectedLen * 2) { // we received hex key, so number of chars in id is doubled
-		var err error
-		id, err = makeDeterministicID(id, expectedLen)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return id, nil
 }
 
 func FormatPeerStats(wakuNode *node.WakuNode) types.PeerStats {
@@ -2018,12 +1665,6 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	return p
 }
 
-// GetCurrentTime returns current time.
-// Implements protocol/common.TimeSource
-func (w *Waku) GetCurrentTime() uint64 {
-	return uint64(w.CurrentTime().UnixNano() / int64(time.Millisecond))
-}
-
 func (w *Waku) GetActiveStorenode() peer.AddrInfo {
 	return w.StorenodeCycle.GetActiveStorenodePeerInfo()
 }
@@ -2040,43 +1681,24 @@ func (w *Waku) OnStorenodeAvailable() <-chan peer.ID {
 	return w.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
 }
 
-func (w *Waku) WaitForAvailableStoreNode(ctx context.Context) bool {
-	return w.StorenodeCycle.WaitForAvailableStoreNode(ctx)
-}
-
 func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	w.StorenodeCycle.SetStorenodeConfigProvider(c)
 }
 
-func (w *Waku) ProcessMailserverBatch(
+// StoreQuery retrieves historic messages for a single batch via the StoreClient
+// facade, which selects the store node itself (no peer argument).
+func (w *Waku) StoreQuery(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	pubsubTopic := w.GetPubsubTopic(batch.PubsubTopic)
-	contentTopics := []string{}
-	for _, topic := range batch.Topics {
-		contentTopics = append(contentTopics, common.BytesToTopic(topic.Bytes()).ContentTopic())
-	}
-
-	criteria := store.FilterCriteria{
-		TimeStart:     proto.Int64(batch.From.UnixNano()),
-		TimeEnd:       proto.Int64(batch.To.UnixNano()),
-		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
-	}
-
-	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
 	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
-}
-
-func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
-	return w.StorenodeCycle.PerformStorenodeTask(fn, opts...)
 }
 
 func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
@@ -2087,52 +1709,6 @@ func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Durat
 	if shouldCycle {
 		w.StorenodeCycle.Cycle(ctx)
 	}
-}
-
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
-	var cTopics []string
-	for _, ct := range contentTopics {
-		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
-	}
-	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
-
-	return nil
-}
-
-func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
-	var (
-		err     error
-		keyAsym *ecdsa.PrivateKey
-		keySym  []byte
-	)
-
-	if opts.SymKeyID != "" {
-		keySym, err = w.GetSymKey(opts.SymKeyID)
-		if err != nil {
-			return "", err
-		}
-	}
-	if opts.PrivateKeyID != "" {
-		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	f := &common.Filter{
-		KeyAsym:       keyAsym,
-		KeySym:        keySym,
-		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
-		PubsubTopic:   opts.PubsubTopic,
-		Messages:      common.NewMemoryMessageStore(),
-	}
-
-	return w.subscribe(f)
-}
-
-func (w *Waku) Version() uint {
-	return 2
 }
 
 func (w *Waku) Metrics() string {

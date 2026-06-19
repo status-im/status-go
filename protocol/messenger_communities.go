@@ -2464,6 +2464,11 @@ func (m *Messenger) DefaultFilters(o *communities.Community) types2.ChatsToIniti
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultNonProtectedPubsubTopic()},
+		// Migration phase 1 (#7498): also listen for community control messages on
+		// the default shard (32), so that when publishing moves off the non-protected
+		// shard (64) to 32 (phase 2, separate PR) clients already receive them.
+		// Sending is unchanged here.
+		{ChatID: uncompressedPubKey, PubsubTopic: types2.DefaultShardPubsubTopic()},
 	}
 }
 
@@ -3569,8 +3574,6 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 	defer utils.LogOnPanic()
 	m.logger.Debug("initializing history archive tasks")
 
-	peerInfo := m.messaging.GetActiveStorenode()
-
 	for _, c := range communities {
 
 		if c.Joined() {
@@ -3637,7 +3640,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			_, err = m.syncFiltersFrom(peerInfo, filters, uint32(latestWakuMessageTimestamp))
+			_, err = m.syncFiltersFrom(filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.logger.Error("failed to request missing messages", zap.Error(err))
 				continue

@@ -27,16 +27,16 @@ func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {
 		*params.NewUserProvider(chainID, "UserProvider1", security.NewSensitiveString("https://userprovider1.example.com"), true),
 		*params.NewUserProvider(chainID, "UserProvider2", security.NewSensitiveString("https://userprovider2.example.com"), true),
 		*params.NewDirectProvider(chainID, "EmbeddedProvider1", security.NewSensitiveString("https://embeddedprovider1.example.com"), true),
-		*params.NewProxyProvider(chainID, "EmbeddedProvider2", security.NewSensitiveString("https://embeddedprovider2.example.com"), true),
+		*params.NewEthRpcProxyProvider(chainID, "EmbeddedProvider2", security.NewSensitiveString("https://embeddedprovider2.example.com"), true, false),
 	}
 	currentProviders[1].Enabled = false // UserProvider2 is disabled
 	currentProviders[2].Enabled = false // EmbeddedProvider1 is disabled
 
 	// New providers to merge
 	newProviders := []params.RpcProvider{
-		*params.NewDirectProvider(chainID, "EmbeddedProvider1", security.NewSensitiveString("https://embeddedprovider1-new.example.com"), true), // Should retain Enabled: false
-		*params.NewProxyProvider(chainID, "EmbeddedProvider3", security.NewSensitiveString("https://embeddedprovider3.example.com"), true),      // New embedded provider
-		*params.NewDirectProvider(chainID, "EmbeddedProvider4", security.NewSensitiveString("https://embeddedprovider4.example.com"), true),     // New embedded provider
+		*params.NewDirectProvider(chainID, "EmbeddedProvider1", security.NewSensitiveString("https://embeddedprovider1-new.example.com"), true),         // Should retain Enabled: false
+		*params.NewEthRpcProxyProvider(chainID, "EmbeddedProvider3", security.NewSensitiveString("https://embeddedprovider3.example.com"), true, false), // New embedded provider
+		*params.NewDirectProvider(chainID, "EmbeddedProvider4", security.NewSensitiveString("https://embeddedprovider4.example.com"), true),             // New embedded provider
 	}
 
 	// Call MergeProviders
@@ -62,12 +62,12 @@ func TestOverrideBasicAuth(t *testing.T) {
 	networks := []params.Network{
 		*testutil.CreateNetwork(walletcommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
 			*params.NewUserProvider(walletcommon.EthereumMainnet, "Provider1", security.NewSensitiveString("https://userprovider.example.com"), true),
-			*params.NewProxyProvider(walletcommon.EthereumMainnet, "Provider2", security.NewSensitiveString("https://proxyprovider.example.com"), true),
+			*params.NewEthRpcProxyProvider(walletcommon.EthereumMainnet, "Provider2", security.NewSensitiveString("https://ethrpcproxy.example.com"), true, false),
 			*params.NewEthRpcProxyProvider(walletcommon.EthereumMainnet, "Provider3", security.NewSensitiveString("https://ethrpcproxy.example.com"), true, false),
 		}),
 		*testutil.CreateNetwork(walletcommon.OptimismMainnet, "Optimism", []params.RpcProvider{
 			*params.NewDirectProvider(walletcommon.OptimismMainnet, "Provider4", security.NewSensitiveString("https://directprovider.example.com"), true),
-			*params.NewProxyProvider(walletcommon.OptimismMainnet, "Provider5", security.NewSensitiveString("https://proxyprovider2.example.com"), true),
+			*params.NewEthRpcProxyProvider(walletcommon.OptimismMainnet, "Provider5", security.NewSensitiveString("https://ethrpcproxy2.example.com"), true, false),
 			*params.NewEthRpcProxyProvider(walletcommon.OptimismMainnet, "Provider6", security.NewSensitiveString("https://ethrpcproxy2.example.com"), true, false),
 		}),
 	}
@@ -76,37 +76,10 @@ func TestOverrideBasicAuth(t *testing.T) {
 	networks[1].RpcProviders[1].Enabled = false
 	networks[1].RpcProviders[2].Enabled = false
 
-	user := security.NewSensitiveString(gofakeit.Username())
-	password := security.NewSensitiveString(gofakeit.LetterN(5))
-
-	// Test updating EmbeddedProxyProviderType providers
-	updatedNetworks := networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, user, password)
-
-	// Verify the networks
-	for i, network := range updatedNetworks {
-		networkCopy := network
-		expectedNetwork := &networks[i]
-		testutil.CompareNetworks(t, expectedNetwork, &networkCopy)
-
-		for j, provider := range networkCopy.RpcProviders {
-			expectedProvider := expectedNetwork.RpcProviders[j]
-			if provider.Type == params.EmbeddedProxyProviderType {
-				assert.True(t, provider.Enabled, "Provider Enabled state should be overridden")
-				assert.Equal(t, user, provider.AuthLogin, "Provider AuthLogin should be overridden")
-				assert.Equal(t, password, provider.AuthPassword, "Provider AuthPassword should be overridden")
-				assert.Equal(t, params.BasicAuth, provider.AuthType, "Provider AuthType should be set to BasicAuth")
-			} else {
-				assert.Equal(t, expectedProvider.Enabled, provider.Enabled, "Provider Enabled state should remain unchanged")
-				assert.Equal(t, expectedProvider.AuthLogin, provider.AuthLogin, "Provider AuthLogin should remain unchanged")
-				assert.Equal(t, expectedProvider.AuthPassword, provider.AuthPassword, "Provider AuthPassword should remain unchanged")
-			}
-		}
-	}
-
 	// Test updating EmbeddedEthRpcProxyProviderType providers
 	user2 := security.NewSensitiveString(gofakeit.Username())
 	password2 := security.NewSensitiveString(gofakeit.LetterN(5))
-	updatedNetworks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, user2, password2)
+	updatedNetworks := networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, user2, password2)
 
 	// Verify the networks
 	for i, network := range updatedNetworks {

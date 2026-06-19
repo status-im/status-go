@@ -5,12 +5,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
-
-	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
@@ -33,6 +30,8 @@ const (
 	oneMonthDuration = 31 * oneDayDuration
 
 	backoffByUserAction = 0 * time.Second
+
+	historicSyncMinInterval = 20 * time.Second
 )
 
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
@@ -66,52 +65,17 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		peerInfo := m.messaging.GetActiveStorenode()
-		_, err = m.performStorenodeTask(func() (*MessengerResponse, error) {
-			response, err := m.syncChatWithFilters(peerInfo, chat.ID)
-
-			if err != nil {
-				m.logger.Error("failed to sync chat", zap.Error(err))
-				return nil, err
-			}
-
-			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.MessengerResponse(response)
-			}
-			return response, nil
-		}, history.WithPeerID(peerInfo.ID))
+		response, err := m.syncChatWithFilters(chat.ID)
 		if err != nil {
-			m.logger.Error("failed to perform mailserver request", zap.Error(err))
+			m.logger.Error("failed to sync chat", zap.Error(err))
+			return
+		}
+
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.MessengerResponse(response)
 		}
 	}()
 	return true, nil
-}
-
-func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error), opts ...history.StorenodeTaskOption) (*MessengerResponse, error) {
-	responseCh := make(chan *MessengerResponse, 1)
-	err := m.messaging.PerformStorenodeTask(func() error {
-		r, err := task()
-		if err != nil {
-			return err
-		}
-
-		select {
-		case <-m.ctx.Done():
-			return m.ctx.Err()
-		case responseCh <- r:
-			return nil
-		}
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case r := <-responseCh:
-		return r, nil
-	case <-m.ctx.Done():
-		return nil, m.ctx.Err()
-	}
 }
 
 func (m *Messenger) scheduleSyncFilters(filters types2.ChatFilters) (bool, error) {
@@ -127,22 +91,14 @@ func (m *Messenger) scheduleSyncFilters(filters types2.ChatFilters) (bool, error
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		peerInfo := m.messaging.GetActiveStorenode()
-		_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-			response, err := m.syncFilters(peerInfo, filters)
-
-			if err != nil {
-				m.logger.Error("failed to sync filter", zap.Error(err))
-				return nil, err
-			}
-
-			if m.config.messengerSignalsHandler != nil {
-				m.config.messengerSignalsHandler.MessengerResponse(response)
-			}
-			return response, nil
-		}, history.WithPeerID(peerInfo.ID))
+		response, err := m.syncFilters(filters)
 		if err != nil {
-			m.logger.Error("failed to perform mailserver request", zap.Error(err))
+			m.logger.Error("failed to sync filter", zap.Error(err))
+			return
+		}
+
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.MessengerResponse(response)
 		}
 	}()
 	return true, nil
@@ -206,13 +162,13 @@ func (m *Messenger) topicsForChat(chatID string) (string, []types2.ContentTopic,
 	return filters[0].PubsubTopic(), contentTopics, nil
 }
 
-func (m *Messenger) syncChatWithFilters(peerInfo peer.AddrInfo, chatID string) (*MessengerResponse, error) {
+func (m *Messenger) syncChatWithFilters(chatID string) (*MessengerResponse, error) {
 	filters, err := m.filtersForChat(chatID)
 	if err != nil {
 		return nil, err
 	}
 
-	return m.syncFilters(peerInfo, filters)
+	return m.syncFilters(filters)
 }
 
 func (m *Messenger) defaultSyncPeriodFromNow() (uint32, error) {
@@ -261,8 +217,13 @@ func (m *Messenger) resetFiltersPriority(filters types2.ChatFilters) error {
 	return nil
 }
 
-// RequestAllHistoricMessages requests all the historic messages for any topic
+// RequestAllHistoricMessages requests all the historic messages for any topic.
+// It keeps aggregating all responses for callers that need the merged payload.
 func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResponse, error) {
+	return m.requestAllHistoricMessages(withRetries, true)
+}
+
+func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateResponses bool) (*MessengerResponse, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		return nil, err
@@ -276,85 +237,84 @@ func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResp
 		return nil, nil
 	}
 
-	allResponses := &MessengerResponse{}
-
-	filters := m.messaging.ChatFilters()
-	err = m.updateFiltersPriority(filters)
+	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
-		return nil, fmt.Errorf("failed to update filters priority: %w", err)
+		return nil, err
 	}
-	defer func() {
-		err := m.resetFiltersPriority(filters)
-		if err != nil {
-			m.logger.Error("failed to reset filters priority", zap.Error(err))
+	if !canSync {
+		return nil, nil
+	}
+
+	return m.withHistoricSyncInFlight(time.Now(), func() (*MessengerResponse, error) {
+		var allResponses *MessengerResponse
+		if aggregateResponses {
+			allResponses = &MessengerResponse{}
 		}
-	}()
 
-	peerInfo := m.messaging.GetActiveStorenode()
+		filters := m.messaging.ChatFilters()
+		err = m.updateFiltersPriority(filters)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update filters priority: %w", err)
+		}
+		defer func() {
+			err := m.resetFiltersPriority(filters)
+			if err != nil {
+				m.logger.Error("failed to reset filters priority", zap.Error(err))
+			}
+		}()
 
-	if withRetries {
-		response, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-			return m.syncFilters(peerInfo, filters)
-		}, history.WithPeerID(peerInfo.ID))
+		// Retry and failover are handled per query by the StoreClient (it pins a
+		// store node for the whole query and fails over only at query boundaries),
+		// so withRetries no longer selects a separate retry wrapper.
+		response, err := m.syncFilters(filters)
 		if err != nil {
 			return nil, err
 		}
-		if response != nil {
+		if aggregateResponses && response != nil {
 			allResponses.AddChats(response.Chats())
 			allResponses.AddMessages(response.Messages())
 		}
 		return allResponses, nil
-	}
-
-	response, err := m.syncFilters(peerInfo, filters)
-	if err != nil {
-		return nil, err
-	}
-	if response != nil {
-		allResponses.AddChats(response.Chats())
-		allResponses.AddMessages(response.Messages())
-	}
-	return allResponses, nil
+	})
 }
 
-const missingMessageCheckPeriod = 30 * time.Second
-
-func (m *Messenger) checkForMissingMessagesLoop() {
-	defer gocommon.LogOnPanic()
-	defer m.shutdownWaitGroup.Done()
-
-	t := time.NewTicker(missingMessageCheckPeriod)
-	defer t.Stop()
-
-	mailserverAvailableSignal := m.messaging.OnStorenodeAvailable()
-
-	for {
-		select {
-		case <-m.quit:
-			return
-
-		// Wait for mailserver available, also triggered on mailserver change
-		case <-mailserverAvailableSignal:
-
-		case <-t.C:
-
-		}
-
-		if m.isPaused() {
-			continue
-		}
-
-		filters := m.messaging.ChatFilters()
-		peerInfo := m.messaging.GetActiveStorenode()
-		m.messaging.SetCriteriaForMissingMessageVerification(peerInfo, filters)
+func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
+	m.historicSyncMu.Lock()
+	if m.historicSyncInFlight {
+		m.historicSyncMu.Unlock()
+		m.logger.Debug("skip historic sync request (already in progress)")
+		return nil, nil
 	}
+
+	if !m.lastHistoricSyncRequestAt.IsZero() {
+		elapsed := now.Sub(m.lastHistoricSyncRequestAt)
+		if elapsed < historicSyncMinInterval {
+			m.historicSyncMu.Unlock()
+			m.logger.Debug("skip historic sync request (throttled)",
+				zap.Duration("elapsed", elapsed),
+				zap.Duration("minInterval", historicSyncMinInterval),
+			)
+			return nil, nil
+		}
+	}
+
+	m.historicSyncInFlight = true
+	m.lastHistoricSyncRequestAt = now
+	m.historicSyncMu.Unlock()
+	defer func() {
+		m.historicSyncMu.Lock()
+		m.historicSyncInFlight = false
+		m.historicSyncMu.Unlock()
+	}()
+
+	return fn()
 }
 
 func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
 
-func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
+func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -369,7 +329,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		return nil, err
 	}
 
-	topicsData := make(map[string]mailservers.MailserverTopic)
+	topicsData := make(map[string]mailservers.MailserverTopic, len(topicInfo))
 	for _, topic := range topicInfo {
 		topicsData[fmt.Sprintf("%s-%s", topic.PubsubTopic, topic.ContentTopic)] = topic
 	}
@@ -377,7 +337,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 	batches := make(map[string]map[int]types2.StoreNodeBatch)
 
 	to := m.calculateMailserverTo()
-	var syncedTopics []mailservers.MailserverTopic
+	syncedTopics := make([]mailservers.MailserverTopic, 0, len(filters))
 
 	sort.Slice(filters[:], func(i, j int) bool {
 		p1 := filters[i].Priority()
@@ -396,7 +356,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		return nil, err
 	}
 
-	contentTopicsPerPubsubTopic := make(map[string]map[string]*types2.ChatFilter)
+	contentTopicsPerPubsubTopic := make(map[string]map[string]*types2.ChatFilter, len(filters))
 	for _, filter := range filters {
 		if !filter.IsListening() || filter.IsEphemeral() {
 			continue
@@ -493,7 +453,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		batchKeys := maps.Keys(batches[pubsubTopic])
 		sort.Ints(batchKeys)
 		for _, k := range batchKeys {
-			err := m.processMailserverBatch(peerInfo, batches[pubsubTopic][k])
+			err := m.processMailserverBatch(batches[pubsubTopic][k])
 			if err != nil {
 				m.logger.Error("error syncing topics", zap.Error(err))
 				return nil, err
@@ -511,7 +471,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		return nil, err
 	}
 
-	var messagesToBeSaved []*common.Message
+	messagesToBeSaved := make([]*common.Message, 0, len(syncedTopics))
 	for _, batches := range batches {
 		for _, batch := range batches {
 			for _, id := range batch.ChatIDs {
@@ -552,8 +512,8 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 	return response, nil
 }
 
-func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters types2.ChatFilters) (*MessengerResponse, error) {
-	return m.syncFiltersFrom(peerInfo, filters, 0)
+func (m *Messenger) syncFilters(filters types2.ChatFilters) (*MessengerResponse, error) {
+	return m.syncFiltersFrom(filters, 0)
 }
 
 func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Message, error) {
@@ -604,7 +564,10 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 	m.connectionState = state
 }
 
-func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch) error {
+// processMailserverBatch queries the store for a single batch, applying the
+// mobile-network gate. The store node is selected internally by the StoreClient
+// (no peer argument).
+func (m *Messenger) processMailserverBatch(batch types2.StoreNodeBatch) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -613,10 +576,10 @@ func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch types2.
 		return nil
 	}
 
-	return m.messaging.ProcessMailserverBatch(m.ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
+	return m.messaging.Query(m.ctx, batch, defaultStoreNodeRequestPageSize, nil, false)
 }
 
-func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
+func (m *Messenger) processMailserverBatchWithOptions(batch types2.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -625,7 +588,7 @@ func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, ba
 		return nil
 	}
 
-	return m.messaging.ProcessMailserverBatch(m.ctx, batch, peerInfo, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return m.messaging.Query(m.ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
@@ -634,61 +597,55 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		return 0, ErrChatNotFound
 	}
 
-	peerInfo := m.messaging.GetActiveStorenode()
-	var from uint32
-	_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-		canSync, err := m.canSyncWithStoreNodes()
-		if err != nil {
-			return nil, err
-		}
-		if !canSync {
-			return nil, nil
-		}
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return 0, err
+	}
+	if !canSync {
+		return 0, nil
+	}
 
-		pubsubTopic, topics, err := m.topicsForChat(chatID)
-		if err != nil {
-			return nil, nil
-		}
+	pubsubTopic, topics, err := m.topicsForChat(chatID)
+	if err != nil {
+		return 0, nil
+	}
 
-		defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
-		if err != nil {
-			return nil, err
-		}
-
-		batch := types2.StoreNodeBatch{
-			ChatIDs:     []string{chatID},
-			To:          time.Unix(int64(chat.SyncedFrom), 0),
-			From:        time.Unix(int64(chat.SyncedFrom-defaultSyncPeriod), 0),
-			PubsubTopic: pubsubTopic,
-			Topics:      topics,
-		}
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
-		}
-
-		err = m.processMailserverBatch(peerInfo, batch)
-		if err != nil {
-			return nil, err
-		}
-
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestCompleted()
-		}
-		if chat.SyncedFrom == 0 || chat.SyncedFrom > uint32(batch.From.Unix()) {
-			chat.SyncedFrom = uint32(batch.From.Unix())
-		}
-
-		m.logger.Debug("setting sync timestamps", zap.Int64("from", batch.From.Unix()), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
-
-		err = m.persistence.SetSyncTimestamps(uint32(batch.From.Unix()), chat.SyncedTo, chat.ID)
-		from = uint32(batch.From.Unix())
-		return nil, err
-	}, history.WithPeerID(peerInfo.ID))
+	defaultSyncPeriod, err := m.settings.GetDefaultSyncPeriod()
 	if err != nil {
 		return 0, err
 	}
 
-	return from, nil
+	batch := types2.StoreNodeBatch{
+		ChatIDs:     []string{chatID},
+		To:          time.Unix(int64(chat.SyncedFrom), 0),
+		From:        time.Unix(int64(chat.SyncedFrom-defaultSyncPeriod), 0),
+		PubsubTopic: pubsubTopic,
+		Topics:      topics,
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
+	}
+
+	err = m.processMailserverBatch(batch)
+	if err != nil {
+		return 0, err
+	}
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestCompleted()
+	}
+	if chat.SyncedFrom == 0 || chat.SyncedFrom > uint32(batch.From.Unix()) {
+		chat.SyncedFrom = uint32(batch.From.Unix())
+	}
+
+	m.logger.Debug("setting sync timestamps", zap.Int64("from", batch.From.Unix()), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+
+	err = m.persistence.SetSyncTimestamps(uint32(batch.From.Unix()), chat.SyncedTo, chat.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint32(batch.From.Unix()), nil
 }
 
 func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
@@ -735,8 +692,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 	}
 
-	peerID := m.messaging.GetActiveStorenode()
-	err = m.processMailserverBatch(peerID, batch)
+	err = m.processMailserverBatch(batch)
 	if err != nil {
 		return err
 	}
@@ -759,17 +715,6 @@ func (m *Messenger) ToggleUseMailservers(value bool) error {
 	return nil
 }
 
-func (m *Messenger) SetPinnedMailservers(mailservers map[string]string) error {
-	err := m.settings.SetPinnedMailservers(mailservers)
-	if err != nil {
-		return err
-	}
-
-	m.messaging.DisconnectActiveStorenode(m.ctx, backoffByUserAction, true)
-
-	return nil
-}
-
 func (m *Messenger) RemoveFilters(filters []*types2.ChatFilter) error {
 	return m.messaging.RemoveFilters(filters)
 }
@@ -782,51 +727,46 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 		return 0, ErrChatNotFound
 	}
 
-	peerInfo := m.messaging.GetActiveStorenode()
-	_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-		canSync, err := m.canSyncWithStoreNodes()
-		if err != nil {
-			return nil, err
-		}
-		if !canSync {
-			return nil, nil
-		}
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return 0, err
+	}
+	if !canSync {
+		return uint32(from.Unix()), nil
+	}
 
-		m.logger.Debug("fetching messages", zap.String("chatID", chatID), zap.Stringer("peerID", peerInfo.ID))
-		pubsubTopic, topics, err := m.topicsForChat(chatID)
-		if err != nil {
-			return nil, nil
-		}
+	m.logger.Debug("fetching messages", zap.String("chatID", chatID))
+	pubsubTopic, topics, err := m.topicsForChat(chatID)
+	if err != nil {
+		return uint32(from.Unix()), nil
+	}
 
-		batch := types2.StoreNodeBatch{
-			ChatIDs:     []string{chatID},
-			From:        from,
-			To:          to,
-			PubsubTopic: pubsubTopic,
-			Topics:      topics,
-		}
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
-		}
+	batch := types2.StoreNodeBatch{
+		ChatIDs:     []string{chatID},
+		From:        from,
+		To:          to,
+		PubsubTopic: pubsubTopic,
+		Topics:      topics,
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
+	}
 
-		err = m.processMailserverBatch(peerInfo, batch)
-		if err != nil {
-			return nil, err
-		}
+	err = m.processMailserverBatch(batch)
+	if err != nil {
+		return 0, err
+	}
 
-		if m.config.messengerSignalsHandler != nil {
-			m.config.messengerSignalsHandler.HistoryRequestCompleted()
-		}
-		if chat.SyncedFrom == 0 || chat.SyncedFrom > uint32(batch.From.Second()) {
-			chat.SyncedFrom = uint32(batch.From.Second())
-		}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestCompleted()
+	}
+	if chat.SyncedFrom == 0 || chat.SyncedFrom > uint32(batch.From.Second()) {
+		chat.SyncedFrom = uint32(batch.From.Second())
+	}
 
-		m.logger.Debug("setting sync timestamps", zap.Int64("from", batch.From.Unix()), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+	m.logger.Debug("setting sync timestamps", zap.Int64("from", batch.From.Unix()), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
 
-		err = m.persistence.SetSyncTimestamps(uint32(batch.From.Unix()), chat.SyncedTo, chat.ID)
-		from = batch.From
-		return nil, err
-	}, history.WithPeerID(peerInfo.ID))
+	err = m.persistence.SetSyncTimestamps(uint32(batch.From.Unix()), chat.SyncedTo, chat.ID)
 	if err != nil {
 		return 0, err
 	}

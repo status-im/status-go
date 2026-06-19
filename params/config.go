@@ -52,10 +52,7 @@ type WakuV2Config struct {
 	// AutoUpdate instructs the node to update their own ip address and port with the values seen by other nodes
 	AutoUpdate bool
 
-	// EnableMissingMessageVerification indicates whether the storenodes must be queried periodically to retrieve any missing message
-	EnableMissingMessageVerification bool
-
-	// EnableMissingMessageVerification indicates whether storenodes must be queried periodically to confirm if messages sent are actually propagated in the network
+	// EnableStoreConfirmationForMessagesSent indicates whether storenodes must be queried periodically to confirm if messages sent are actually propagated in the network
 	EnableStoreConfirmationForMessagesSent bool
 }
 
@@ -221,21 +218,16 @@ type NodeConfig struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled                   bool
-	RaribleMainnetAPIKey      security.SensitiveString `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey      security.SensitiveString `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKey             security.SensitiveString `json:"AlchemyAPIKey"`
-	InfuraAPIKey              security.SensitiveString `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret        security.SensitiveString `json:"InfuraAPIKeySecret"`
-	StatusProxyMarketUser     security.SensitiveString `json:"StatusProxyMarketUser"`
-	StatusProxyMarketPassword security.SensitiveString `json:"StatusProxyMarketPassword"`
-	CoingeckoAPIKey           security.SensitiveString `json:"CoingeckoAPIKey"`
-	CoingeckoDemoAPIKey       security.SensitiveString `json:"CoingeckoDemoAPIKey"`
-	MarketDataProxyConfig     MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
-	NftProxyConfig            NftProxyConfig           `json:"NftProxyConfig"`
-
-	StatusProxyUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
-	StatusProxyPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
+	Enabled               bool
+	RaribleMainnetAPIKey  security.SensitiveString `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey  security.SensitiveString `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKey         security.SensitiveString `json:"AlchemyAPIKey"`
+	InfuraAPIKey          security.SensitiveString `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret    security.SensitiveString `json:"InfuraAPIKeySecret"`
+	CoingeckoAPIKey       security.SensitiveString `json:"CoingeckoAPIKey"`
+	CoingeckoDemoAPIKey   security.SensitiveString `json:"CoingeckoDemoAPIKey"`
+	MarketDataProxyConfig MarketDataProxyConfig    `json:"MarketDataProxyConfig"`
+	NftProxyConfig        NftProxyConfig           `json:"NftProxyConfig"`
 
 	StatusProxyStageName     string                   `json:"StatusProxyStageName"`
 	EnableMercuryoProvider   bool                     `json:"EnableMercuryoProvider"`

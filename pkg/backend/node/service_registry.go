@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 )
 
@@ -34,6 +35,33 @@ func (p *PausableMediaServer) Pause() error {
 
 func (p *PausableMediaServer) Resume() error {
 	p.s.ToForeground()
+	p.MarkResumed()
+	return nil
+}
+
+// PausableMessenger wraps a protocol.Messenger to implement common.Pausable.
+// Pause() → SetPaused(true) and Resume() → SetPaused(false)
+type PausableMessenger struct {
+	common.PauseBroadcaster
+	m *protocol.Messenger
+}
+
+func newPausableMessenger(m *protocol.Messenger) *PausableMessenger {
+	p := &PausableMessenger{m: m}
+	p.MarkStarted()
+	return p
+}
+
+func (p *PausableMessenger) PausableName() string { return "messenger" }
+
+func (p *PausableMessenger) Pause() error {
+	p.m.SetPaused(true)
+	p.MarkPaused()
+	return nil
+}
+
+func (p *PausableMessenger) Resume() error {
+	p.m.SetPaused(false)
 	p.MarkResumed()
 	return nil
 }

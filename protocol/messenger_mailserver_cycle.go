@@ -51,7 +51,7 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		_, err := m.RequestAllHistoricMessages(true)
+		_, err := m.requestAllHistoricMessages(true, false)
 		if err != nil {
 			m.logger.Error("failed to request historic messages", zap.Error(err))
 		}
@@ -159,7 +159,11 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 				if ok {
 					signal.SendStoreNodeAvailable(&ms)
 				}
-				m.asyncRequestAllHistoricMessages()
+				// Skip history sync when backgrounded; SetPaused(false)
+				// will trigger it when the app returns to foreground.
+				if !m.isPaused() {
+					m.asyncRequestAllHistoricMessages()
+				}
 			}
 		}
 	}

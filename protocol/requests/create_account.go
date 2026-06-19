@@ -52,7 +52,6 @@ type CreateAccount struct {
 	WakuV2Nameserver                             *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
 	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
-	WakuV2EnableMissingMessageVerification       bool    `json:"wakuV2EnableMissingMessageVerification"`
 	WakuV2Fleet                                  string  `json:"wakuV2Fleet"`
 
 	LogLevel    *string `json:"logLevel"`
@@ -111,9 +110,7 @@ type WalletSecretsConfig struct {
 	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
 	AlchemyAPIKey        security.SensitiveString `json:"alchemyApiKey"`
 
-	StatusProxyStageName      string                   `json:"statusProxyStageName"`
-	StatusProxyMarketUser     security.SensitiveString `json:"statusProxyMarketUser"`
-	StatusProxyMarketPassword security.SensitiveString `json:"statusProxyMarketPassword"`
+	StatusProxyStageName string `json:"statusProxyStageName"`
 
 	MarketDataProxyUrl      security.SensitiveString `json:"marketDataProxyUrl"`
 	MarketDataProxyUser     security.SensitiveString `json:"marketDataProxyUser"`
@@ -121,9 +118,6 @@ type WalletSecretsConfig struct {
 
 	CoingeckoAPIKey     security.SensitiveString `json:"coingeckoApiKey"`
 	CoingeckoDemoAPIKey security.SensitiveString `json:"coingeckoDemoApiKey"`
-
-	StatusProxyUser     security.SensitiveString `json:"statusProxyBlockchainUser"`
-	StatusProxyPassword security.SensitiveString `json:"statusProxyBlockchainPassword"`
 
 	EthRpcProxyUrl           security.SensitiveString `json:"ethRpcProxyUrl"`
 	EthRpcProxyUser          security.SensitiveString `json:"ethRpcProxyUser"`

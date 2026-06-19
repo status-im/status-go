@@ -35,7 +35,6 @@ type ProviderID = string
 // Provider IDs
 const (
 	StatusSmartProxy  = "status-smart-proxy"
-	ProxyInfura       = "proxy-infura"
 	SmartProxyAlchemy = "smart-proxy-alchemy"
 	Nodefleet         = "nodefleet"
 	Infura            = "infura"
@@ -44,6 +43,9 @@ const (
 	DirectInfura      = "direct-infura"
 	DirectGrove       = "direct-grove"
 	DirectCustom      = "direct-custom"
+	DirectKatana      = "direct-katana"
+	DirectConduit     = "direct-conduit"
+	DirectTenderly    = "direct-tenderly"
 )
 
 type ChainID uint64

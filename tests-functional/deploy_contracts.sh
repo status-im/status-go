@@ -88,12 +88,23 @@ if [ -f "$ENS_BROADCAST_FILE" ]; then
     echo "Syncing deployed registry to well-known address..."
     /app/sync_ens_registry.sh $REGISTRY_ADDR $WELL_KNOWN_REGISTRY $ANVIL_URL
 
+    # status-go resolves ENS records through the Universal Resolver, which has no
+    # canonical deployment on Anvil. Deploy a minimal stand-in that reads from the
+    # well-known registry synced above. Deployed last so it doesn't shift the
+    # registrar's deterministic address (hardcoded in internal/contracts/registrar).
+    echo "Deploying test Universal Resolver..."
+    UNIVERSAL_RESOLVER_ADDR=$(forge create $CONTRACTS_PATH/UniversalResolver.sol:UniversalResolver \
+        --rpc-url $ANVIL_URL --private-key $DEPLOYER_PRIVATE_KEY --broadcast \
+        | grep "Deployed to:" | awk '{print $3}')
+    echo "Universal Resolver: $UNIVERSAL_RESOLVER_ADDR"
+
     cat > $CONTRACTS_PATH/ens_addresses.json << EOF
 {
   "registry": "$REGISTRY_ADDR",
   "resolver": "$RESOLVER_ADDR",
   "token": "$TOKEN_ADDR",
-  "registrar": "$REGISTRAR_ADDR"
+  "registrar": "$REGISTRAR_ADDR",
+  "universalResolver": "$UNIVERSAL_RESOLVER_ADDR"
 }
 EOF
 

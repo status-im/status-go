@@ -29,15 +29,12 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-var (
-	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
-)
-
 type Core struct {
 	config
 
 	identity   *ecdsa.PrivateKey
 	waku       wakutypes.Waku
+	timeSource timesource.Provider
 	stack      *common.MessagingStack
 	controller *controller.Controller
 
@@ -108,10 +105,16 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.tracer,
 	)
 
+	timeSource := params.TimeSource
+	if timeSource == nil {
+		timeSource = timesource.DefaultService()
+	}
+
 	return &Core{
 		config:     *config,
 		identity:   params.Identity,
 		waku:       waku,
+		timeSource: timeSource,
 		stack:      stack,
 		controller: controller,
 		publisher:  publisher,
@@ -229,7 +232,6 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 		AutoUpdate:                             params.wakuConfig.AutoUpdate,
 		DefaultShardPubsubTopic:                wakuv3.DefaultShardPubsubTopic(),
 		ClusterID:                              params.clusterConfig.ClusterID,
-		EnableMissingMessageVerification:       params.wakuConfig.EnableMissingMessageVerification,
 		EnableStoreConfirmationForMessagesSent: params.wakuConfig.EnableStoreConfirmationForMessagesSent,
 		UseThrottledPublish:                    true,
 		MetricsEnabled:                         params.metricsEnabled,
@@ -260,16 +262,6 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	// Inject the identity into Waku
-	err = waku.DeleteKeyPairs()
-	if err != nil {
-		return nil, err
-	}
-	_, err = waku.AddKeyPair(params.identity)
-	if err != nil {
-		return nil, ErrWakuIdentityInjectionFailure
 	}
 
 	return waku, nil

@@ -44,7 +44,6 @@ type DatabaseSettingsManager interface {
 
 	SetSettingsNotifier(n Notifier)
 	SetSettingLastSynced(setting SettingField, clock uint64) error
-	SetPinnedMailservers(mailservers map[string]string) error
 	SetUseMailservers(value bool) error
 	SetTokenGroupByCommunity(value bool) error
 	SetSyncingOnMobileNetwork(value bool) error

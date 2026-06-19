@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -19,8 +17,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
-
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -1079,48 +1075,16 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
-func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
-	maddr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return "", err
-	}
-	return api.service.messenger.AddRelayPeer(maddr)
-}
-
-func (api *PublicAPI) DialPeer(address string) error {
-	maddr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return err
-	}
-	return api.service.messenger.DialPeer(maddr)
-}
-
-func (api *PublicAPI) DialPeerByID(peerID string) error {
-	pID, err := peer.Decode(peerID)
-	if err != nil {
-		return err
-	}
-	return api.service.messenger.DialPeerByID(pID)
-}
-
-func (api *PublicAPI) DropPeer(peerID string) error {
-	pID, err := peer.Decode(peerID)
-	if err != nil {
-		return err
-	}
-	return api.service.messenger.DropPeer(pID)
-}
+// Peers and PeerID are retained only for the Python functional tests
+// (tests-functional): Peers backs the wait_for_online / test_discovery checks
+// and PeerID backs node identification. They are not used by status-app.
 
 func (api *PublicAPI) Peers() types2.PeerStats {
 	return api.service.messenger.Peers()
 }
 
-func (api *PublicAPI) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return api.service.messenger.ListenAddresses()
-}
-
-func (api *PublicAPI) Enr() (*enode.Node, error) {
-	return api.service.messenger.ENR()
+func (api *PublicAPI) PeerID() string {
+	return api.service.messaging.PeerID().String()
 }
 
 func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings2.ProfilePicturesShowToType) error {
@@ -1142,10 +1106,6 @@ func (api *PublicAPI) ToggleUseMailservers(value bool) error {
 
 func (api *PublicAPI) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobileNetwork) error {
 	return api.service.messenger.SetSyncingOnMobileNetwork(request)
-}
-
-func (api *PublicAPI) SetPinnedMailservers(pinnedMailservers map[string]string) error {
-	return api.service.messenger.SetPinnedMailservers(pinnedMailservers)
 }
 
 func (api *PublicAPI) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
@@ -1420,8 +1380,4 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
-}
-
-func (api *PublicAPI) PeerID() string {
-	return api.service.messaging.PeerID().String()
 }

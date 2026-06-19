@@ -139,3 +139,60 @@ func TestIsNonCriticalProviderError_PuzzleAuthRotating(t *testing.T) {
 		t.Error("IsNonCriticalProviderError should be false for unrelated errors")
 	}
 }
+
+func TestDetermineProviderErrorType_DataUnavailable(t *testing.T) {
+	if got := determineProviderErrorType(ErrDataUnavailable); got != ProviderErrorTypeDataUnavailable {
+		t.Errorf("determineProviderErrorType(ErrDataUnavailable) = %q, want %q", got, ProviderErrorTypeDataUnavailable)
+	}
+
+	wrapped := fmt.Errorf("wrapped: %w", ErrDataUnavailable)
+	if got := determineProviderErrorType(wrapped); got != ProviderErrorTypeDataUnavailable {
+		t.Errorf("determineProviderErrorType(wrapped ErrDataUnavailable) = %q, want %q", got, ProviderErrorTypeDataUnavailable)
+	}
+}
+
+func TestIsNonCriticalProviderError_DataUnavailable(t *testing.T) {
+	requireErr := fmt.Errorf("wrapped: %w", ErrDataUnavailable)
+	if !IsNonCriticalProviderError(requireErr) {
+		t.Error("IsNonCriticalProviderError should be true for wrapped ErrDataUnavailable")
+	}
+	if !IsNonCriticalProviderError(ErrDataUnavailable) {
+		t.Error("IsNonCriticalProviderError should be true for bare ErrDataUnavailable")
+	}
+}
+
+func TestIsIgnorableForConnectivity(t *testing.T) {
+	if !IsIgnorableForConnectivity(fmt.Errorf("wrapped: %w", ErrDataUnavailable)) {
+		t.Error("IsIgnorableForConnectivity should be true for wrapped ErrDataUnavailable")
+	}
+	if IsIgnorableForConnectivity(errors.New("fatal provider error")) {
+		t.Error("IsIgnorableForConnectivity should be false for unrelated errors")
+	}
+}
+
+func TestIsIgnorableForConnectivity_JoinedErrors(t *testing.T) {
+	connectionErr := &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+
+	// Joined errors are ignorable only when every component is ignorable.
+	mixed := fmt.Errorf("%w, provider2.error: %w", ErrDataUnavailable, connectionErr)
+	if IsIgnorableForConnectivity(mixed) {
+		t.Error("IsIgnorableForConnectivity should be false when a joined error contains a connectivity failure")
+	}
+
+	allIgnorable := fmt.Errorf("%w, provider2.error: %w", ErrDataUnavailable, context.Canceled)
+	if !IsIgnorableForConnectivity(allIgnorable) {
+		t.Error("IsIgnorableForConnectivity should be true when all joined errors are ignorable")
+	}
+
+	// Same shape as circuitbreaker.accumulateCommandError: leaves are single-wrapped.
+	nested := fmt.Errorf("%w, provider2.error: %w",
+		fmt.Errorf("provider1.error: %w", ErrDataUnavailable),
+		fmt.Errorf("call failed: %w", connectionErr))
+	if IsIgnorableForConnectivity(nested) {
+		t.Error("IsIgnorableForConnectivity should be false for nested joined errors with a connectivity failure")
+	}
+
+	if IsIgnorableForConnectivity(errors.Join()) {
+		t.Error("IsIgnorableForConnectivity should be false for nil joined error")
+	}
+}

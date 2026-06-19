@@ -58,6 +58,7 @@ func (s *BlockchainHealthSuite) setupClients(chainIDs []uint64) {
 		}).AnyTimes()
 
 		phm := healthmanager.NewProvidersHealthManager(chainID)
+		phm.SetDownDebounce(20 * time.Millisecond)
 		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
 
 		err := s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)
@@ -208,6 +209,11 @@ func (s *BlockchainHealthSuite) TestGetFullStatus() {
 
 	// Wait for status event to be triggered before getting full status
 	s.waitForStatus(statusCh, rpcstatus.StatusUp)
+
+	// Wait until all provider updates from both chains are aggregated.
+	require.Eventually(s.T(), func() bool {
+		return s.blockchainHealthManager.GetFullStatus().Status.TotalRequests == 4
+	}, 2*time.Second, 10*time.Millisecond)
 
 	// Get the full status from the BlockchainHealthManager
 	fullStatus := s.blockchainHealthManager.GetFullStatus()

@@ -60,12 +60,12 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 
 	networks := []params.Network{
 		*testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
-			*params.NewProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false),
+			*params.NewEthRpcProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false, false),
 		},
 		),
 	}
 
-	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
+	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
 	require.NotEmpty(t, networks)
 
 	config := rpc.ClientConfig{
@@ -90,7 +90,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	tokenManager, err := token.NewTokenManager(db, c, nil, mockNetworkManager, appDB, nil, nil, nil, accountsDb, 0, 0)
 	require.NoError(t, err)
 
-	service, err := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager, "")
+	service, err := NewService(db, accountsDb, appDB, c, accountsPublisher, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, tokenManager)
 	require.NoError(t, err)
 
 	tokenbalancesFetcher := mock_tokenbalances.NewMockFetcherIface(mockCtrl)

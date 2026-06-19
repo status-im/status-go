@@ -1,64 +1,22 @@
 package messaging
 
 import (
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
 	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
-// These utilities leak transport implementation details and should be eventually removed.
-// Client applications requiring peer information or statistics should utilize Prometheus
-// metrics for observability or communicate directly with the Waku node's RPC interface.
+// The helpers below leak transport implementation details and are retained ONLY
+// for the Python functional tests (tests-functional): Peers backs the
+// wait_for_online / test_discovery checks and PeerID backs node identification.
+// They are not used by status-app — clients needing peer information should use
+// Prometheus metrics or the Waku node's RPC interface instead.
 
-// Deprecated: shouldn't be exposed
-func (a *API) GetStats() types.TransportStats {
-	return adapters.FromWakuTransportStats(a.core.stack.Transport.GetStats())
-}
-
-// Deprecated: shouldn't be exposed
-func (a *API) PeerCount() int {
-	return a.core.stack.Transport.PeerCount()
-}
-
-// Deprecated: shouldn't be exposed
 func (a *API) Peers() types.PeerStats {
 	return adapters.FromWakuPeerStats(a.core.stack.Transport.Peers())
 }
 
-// Deprecated: shouldn't be exposed
 func (a *API) PeerID() peer.ID {
 	return a.core.waku.PeerID()
-}
-
-// Deprecated: shouldn't be exposed
-func (a *API) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return a.core.stack.Transport.ListenAddresses()
-}
-
-// Deprecated: shouldn't be exposed
-func (a *API) ENR() (*enode.Node, error) {
-	return a.core.stack.Transport.ENR()
-}
-
-// Deprecated: shouldn't be exposed
-func (a *API) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return a.core.stack.Transport.AddRelayPeer(address)
-}
-
-// Deprecated: shouldn't be exposed
-func (a *API) DialPeer(address multiaddr.Multiaddr) error {
-	return a.core.stack.Transport.DialPeer(address)
-}
-
-// Deprecated: shouldn't be exposed
-func (a *API) DialPeerByID(peerID peer.ID) error {
-	return a.core.stack.Transport.DialPeerByID(peerID)
-}
-
-// Deprecated: shouldn't be exposed
-func (a *API) DropPeer(peerID peer.ID) error {
-	return a.core.stack.Transport.DropPeer(peerID)
 }

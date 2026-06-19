@@ -11,7 +11,6 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/internal/contracts"
-	"github.com/status-im/status-go/internal/contracts/resolver"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/ens/ensresolver"
@@ -19,6 +18,10 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
+
+// setPubkeyABI is the single public-resolver method used to attach a chat key to
+// an ENS name: `setPubkey(bytes32 node, bytes32 x, bytes32 y)`.
+const setPubkeyABI = `[{"name":"setPubkey","inputs":[{"type":"bytes32"},{"type":"bytes32"},{"type":"bytes32"}],"outputs":[],"stateMutability":"nonpayable","type":"function"}]`
 
 type ENSPublicKeyProcessor struct {
 	contractMaker   *contracts.ContractMaker
@@ -53,7 +56,7 @@ func (s *ENSPublicKeyProcessor) CalculateFees(params ProcessorInputParams) (*big
 }
 
 func (s *ENSPublicKeyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	resolverABI, err := abi.JSON(strings.NewReader(resolver.PublicResolverABI))
+	resolverABI, err := abi.JSON(strings.NewReader(setPubkeyABI))
 	if err != nil {
 		return []byte{}, createENSPublicKeyErrorResponse(err)
 	}

@@ -62,6 +62,8 @@ type EthClientGetter interface {
 // Client manages RPC clients for multiple chains with
 // multiple providers for each chain.
 type Client struct {
+	appCommon.PauseBroadcaster
+
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
@@ -222,6 +224,9 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	}
 
 	phm := healthmanager.NewProvidersHealthManager(chainID)
+	if c.IsPaused() {
+		phm.Pause()
+	}
 	err := c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
 	if err != nil {
 		return nil, fmt.Errorf("register providers health manager: %s", err)
@@ -232,24 +237,42 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	return client, nil
 }
 
+// getProviderRPCLimiter returns the (optional) RPS limiter for the provider and the circuit
+// name to use for the circuit breaker.
+// The circuit name is always non-empty and isolated per chain+host, so the circuit breaker can
+// short-circuit a consistently failing endpoint without affecting other chains that share the
+// same host (e.g. the smart proxy). The RPS limiter, in contrast, is intentionally shared per
+// host so we throttle the whole host regardless of chain.
 func (c *Client) getProviderRPCLimiter(provider params.RpcProvider) (*rpclimiter.RPCRpsLimiter, string, error) {
+	circuitName := fmt.Sprintf("%s-%d", provider.GetHost(), provider.ChainID)
+
 	c.rpsLimiterMutex.Lock()
 	defer c.rpsLimiterMutex.Unlock()
 	if !provider.EnableRPSLimiter {
-		return nil, "", nil
+		return nil, circuitName, nil
 	}
-	// Generate a unique key for the provider based on its host
+	// Generate a unique key for the limiter based on its host (shared across chains)
 	limiterKey := provider.GetHost()
 
 	// Check if the limiter already exists
 	if limiter, ok := c.limiterPerProvider[limiterKey]; ok {
-		return limiter, limiterKey, nil
+		return limiter, circuitName, nil
 	}
 
-	// Create a new limiter and store it
-	limiter := rpclimiter.NewRPCRpsLimiter()
+	limiter := rpclimiter.NewRPCRpsLimiter(&c.PauseBroadcaster)
 	c.limiterPerProvider[limiterKey] = limiter
-	return limiter, limiterKey, nil
+	return limiter, circuitName, nil
+}
+
+// SetPaused stops/resumes the 1s tickers of every RPC rate limiter owned by this Client.
+func (c *Client) SetPaused(paused bool) {
+	if paused {
+		c.MarkPaused()
+		c.healthMgr.Pause()
+	} else {
+		c.MarkResumed()
+		c.healthMgr.Resume()
+	}
 }
 
 func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEthClientInterface {
@@ -272,14 +295,14 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 			continue
 		}
 
-		rpcLimiter, limiterKey, err := c.getProviderRPCLimiter(provider)
+		rpcLimiter, circuitName, err := c.getProviderRPCLimiter(provider)
 		if err != nil {
 			c.logger.Error("get RPC limiter failed", zap.String("provider", provider.Name), zap.Error(err))
 			continue
 		}
 
 		// Create ethclient with RPS limiter. If limiter is not enabled, it will be nil
-		ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, limiterKey, provider.Name)
+		ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitName, provider.Name)
 		ethClients = append(ethClients, ethClient)
 	}
 

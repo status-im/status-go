@@ -1,72 +1,110 @@
 import logging
-import time
-import pytest
 import threading
 
+import pytest
+from tenacity import retry, stop_after_delay, wait_fixed
+
 from clients.status_backend import StatusBackend
-
-DISCOVERY_TIMEOUT_SEC = 30
-
-
-def _all_nodes_discovered(nodes: dict[str, StatusBackend], known_peers: dict[str, str]) -> bool:
-    """Check if all nodes discovered each other"""
-    for peer_id, node in nodes.items():
-        if node is None:
-            return False
-        peers = node.wakuext_service.peers()
-
-        # Use shorter names for logging
-        peer_names = [known_peers.get(peer, peer[-5:]) for peer in peers]
-        logging.info(f"Node {known_peers[peer_id]} peers: {peer_names}")
-
-        for known_node in known_peers.keys():
-            if known_node == peer_id:
-                continue
-            if known_node not in peers:
-                return False
-    return True
 
 
 @pytest.mark.rpc
 class TestDiscovery:
-
     def test_discovery(self, backend_new_profile):
-        nodes_count = 3
+        # Desired topology: 3 full nodes, 2 light nodes
+        full_count = 3
+        light_count = 2
+        total_nodes = full_count + light_count
+
         nodes: dict[str, StatusBackend] = {}
+        full_ids: set[str] = set()
 
         known_nodes = {
+            # Boot nodes available in the fleet
             "16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb": "boot-1",
             "16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi": "store",
         }
 
-        def create_node(node_index: int):
-            """Function to run in each thread - waits for wakuv2.peerstats signal"""
-            backend = backend_new_profile(f"node_{node_index}")
+        def create_node(node_index: int, waku_light_client: bool):
+            backend = backend_new_profile(
+                f"node_{node_index}",
+                # We mix full and light clients in a single test.
+                # Light clients (edge nodes) will not discover each,
+                # but they must discover full clients.
+                waku_light_client=waku_light_client,
+                # Force the container to only have the docker compose network.
+                # Otherwise, advertised ENRs may contain the wrong IP address.
+                bridge_network=False,
+            )
             peer_id = backend.wakuext_service.peer_id()
             known_nodes[peer_id] = f"backend_{node_index}"
+            if not waku_light_client:
+                full_ids.add(peer_id)
             nodes[peer_id] = backend
-            logging.info(f"Backend {node_index} ready. Peer ID: {peer_id}")
+            info = f"Peer ID: {peer_id}"
+            info += f", URL: {backend.url}"
+            if backend.container:
+                info += f", Container: {backend.container.short_id()}"
+            info += f", Type: {'full' if not waku_light_client else 'light'}"
+            logging.info(f"Backend {node_index} ready. {info}")
 
-        # Run threads, each waiting for wakuv2.peerstats signal
-        logging.info("Starting threads to wait for wakuv2.peerstats signals...")
+        # Start threads to create nodes
+        logging.info("Starting threads to create full and light clients...")
         threads = []
 
-        for i in range(nodes_count):
-            thread = threading.Thread(target=create_node, args=(i,))
-            thread.daemon = True
-            thread.start()
-            threads.append(thread)
+        # First start full nodes
+        for i in range(full_count):
+            t = threading.Thread(target=create_node, args=(i, False))
+            t.daemon = True
+            t.start()
+            threads.append(t)
 
-        for thread in threads:
-            thread.join()
+        # Then start light nodes
+        for i in range(full_count, total_nodes):
+            t = threading.Thread(target=create_node, args=(i, True))
+            t.daemon = True
+            t.start()
+            threads.append(t)
 
-        assert len(nodes.keys()) == nodes_count, "Not all nodes created"
+        for t in threads:
+            t.join()
 
-        # Wait for all nodes to discover each other
-        start_time = time.time()
-        while time.time() - start_time < DISCOVERY_TIMEOUT_SEC:
-            if _all_nodes_discovered(nodes, known_nodes):
-                return
-            time.sleep(0.5)
+        assert len(nodes.keys()) == total_nodes, "Not all nodes created"
 
-        assert False, f"Nodes failed to discover each other within {DISCOVERY_TIMEOUT_SEC} seconds"
+        # Build sets for expectations
+        all_node_ids = set(nodes.keys())
+        boot_ids = {k for k, v in known_nodes.items() if v in ("boot-1", "store")}
+
+        # Pre-build expected peers per node (static expectations)
+        expected_by_node: dict[str, set[str]] = {}
+        for pid in nodes.keys():
+            if pid in full_ids:
+                # Full clients should discover all other clients and boot nodes
+                expected = (all_node_ids | boot_ids) - {pid}
+            else:
+                # Light clients should discover only full clients and boot nodes
+                expected = boot_ids | full_ids
+            expected_by_node[pid] = expected
+
+        # Check using tenacity.retry, logs peers on each iteration
+        @retry(stop=stop_after_delay(120), wait=wait_fixed(1), reraise=True)
+        def assert_discovery():
+            all_ok = True
+
+            for peer_id, node in nodes.items():
+                # Fetch peers once per node per attempt
+                peers = set(node.wakuext_service.peers())
+
+                # Log peer names
+                peer_names = [known_nodes.get(peer, peer[-5:]) for peer in peers]
+                logging.info(f"Checking node {known_nodes[peer_id]} peers: {peer_names}")
+
+                if peers >= expected_by_node[peer_id]:
+                    logging.info(f"Node {known_nodes[peer_id]} discovered peers as expected")
+                    nodes.pop(peer_id)
+                    continue
+
+                all_ok = False
+
+            assert all_ok, "Not all nodes discovered as expected"
+
+        assert_discovery()

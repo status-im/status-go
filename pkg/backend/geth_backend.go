@@ -2123,6 +2123,11 @@ func (b *StatusBackend) PauseServices(names []string) error {
 	if b.statusNode == nil {
 		return nil
 	}
+
+	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
+		rpcClient.SetPaused(true)
+	}
+
 	return b.statusNode.ServiceRegistry().PauseMultiple(names)
 }
 
@@ -2131,6 +2136,11 @@ func (b *StatusBackend) ResumeServices(names []string) error {
 	if b.statusNode == nil {
 		return nil
 	}
+
+	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
+		rpcClient.SetPaused(false)
+	}
+
 	return b.statusNode.ServiceRegistry().ResumeMultiple(names)
 }
 

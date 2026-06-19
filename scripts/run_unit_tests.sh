@@ -39,6 +39,7 @@ run_test_for_packages() {
   local count="$3"
   local single_timeout="$4"
   local log_message="$5"
+  local run_filter="${6:-}"
 
   local output_file="test_${iteration}.log"
   local coverage_file="test_${iteration}.coverage.out"
@@ -51,7 +52,8 @@ run_test_for_packages() {
     echo -e "${GRN}Dry run ${iteration}. message:${RST} ${log_message}\n"\
     "${YLW}Dry run ${iteration}. packages:${RST} ${packages}\n"\
     "${YLW}Dry run ${iteration}. count:${RST} ${count}\n"\
-    "${YLW}Dry run ${iteration}. timeout:${RST} ${timeout}"
+    "${YLW}Dry run ${iteration}. timeout:${RST} ${timeout}\n"\
+    "${YLW}Dry run ${iteration}. run_filter:${RST} ${run_filter:-<none>}"
     return 0
   fi
 
@@ -71,9 +73,14 @@ run_test_for_packages() {
   rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   # Run tests
+  local test_extra_flags="${GOTEST_EXTRAFLAGS}"
+  if [[ -n "${run_filter}" ]]; then
+    test_extra_flags="${test_extra_flags} -run ${run_filter}"
+  fi
+
   gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
     ./scripts/test_with_coverage.sh \
-    ${GOTEST_EXTRAFLAGS} \
+    ${test_extra_flags} \
     -timeout "${timeout}" \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
@@ -100,6 +107,40 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
 DEFAULT_TIMEOUT_MINUTES=5
 PROTOCOL_TIMEOUT_MINUTES=45
+DEFAULT_PROTOCOL_SHARDS=5
+MIN_PROTOCOL_SHARDS=1
+MAX_PROTOCOL_SHARDS=32
+
+resolve_protocol_shards() {
+  local shards
+
+  if [[ -n "${UNIT_TEST_PROTOCOL_SHARDS}" ]]; then
+    shards="${UNIT_TEST_PROTOCOL_SHARDS}"
+  else
+    if command -v nproc >/dev/null 2>&1; then
+      shards="$(nproc)"
+      echo -e "${GRN}Protocol shards:${RST} auto-detected ${shards} from nproc (override with UNIT_TEST_PROTOCOL_SHARDS)" >&2
+    else
+      shards="${DEFAULT_PROTOCOL_SHARDS}"
+      echo -e "${GRN}Protocol shards:${RST} nproc not found; defaulting to ${shards} (override with UNIT_TEST_PROTOCOL_SHARDS)" >&2
+    fi
+  fi
+
+  if ! [[ "${shards}" =~ ^[0-9]+$ ]]; then
+    echo -e "${YLW}Invalid UNIT_TEST_PROTOCOL_SHARDS='${shards}', using ${DEFAULT_PROTOCOL_SHARDS}${RST}" >&2
+    shards="${DEFAULT_PROTOCOL_SHARDS}"
+  fi
+  if [[ "${shards}" -lt "${MIN_PROTOCOL_SHARDS}" ]]; then
+    echo -e "${YLW}Protocol shards=${shards} is too low, clamping to ${MIN_PROTOCOL_SHARDS}${RST}" >&2
+    shards="${MIN_PROTOCOL_SHARDS}"
+  fi
+  if [[ "${shards}" -gt "${MAX_PROTOCOL_SHARDS}" ]]; then
+    echo -e "${YLW}Protocol shards=${shards} is too high, clamping to ${MAX_PROTOCOL_SHARDS}${RST}" >&2
+    shards="${MAX_PROTOCOL_SHARDS}"
+  fi
+
+  echo "${shards}"
+}
 
 HAS_PROTOCOL_PACKAGE=true
 if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; then
@@ -118,11 +159,54 @@ else
   run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
   bg_pids+=("$!")
 
-  # Spawn separate processes to run `protocol` package
-  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-    run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
-    bg_pids+=("$!")
-  done
+  if [[ $UNIT_TEST_COUNT -eq 1 ]]; then
+    protocol_shards="$(resolve_protocol_shards)"
+
+    protocol_list_cmd=(go test -list '^Test')
+    if [[ -n "${BUILD_TAGS}" ]]; then
+      protocol_list_cmd+=(-tags "${BUILD_TAGS}")
+    fi
+    protocol_list_cmd+=(github.com/status-im/status-go/protocol)
+
+    mapfile -t protocol_tests < <("${protocol_list_cmd[@]}" | awk '/^Test/ { print $0 }' | sort -u)
+    if [[ ${#protocol_tests[@]} -eq 0 ]]; then
+      echo -e "${YLW}No protocol tests discovered, running package without sharding${RST}"
+      run_test_for_packages github.com/status-im/status-go/protocol "1" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (fallback, no discovered tests)" &
+      bg_pids+=("$!")
+    else
+      echo -e "${GRN}Protocol sharding:${RST} ${#protocol_tests[@]} top-level tests across ${protocol_shards} shards"
+      declare -a protocol_shard_filters
+      for ((i=0; i<protocol_shards; i++)); do
+        protocol_shard_filters[i]=""
+      done
+
+      for ((i=0; i<${#protocol_tests[@]}; i++)); do
+        shard_idx=$((i % protocol_shards))
+        if [[ -z "${protocol_shard_filters[$shard_idx]}" ]]; then
+          protocol_shard_filters[$shard_idx]="${protocol_tests[$i]}"
+        else
+          protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_tests[$i]}"
+        fi
+      done
+
+      protocol_iteration=1
+      for ((i=0; i<protocol_shards; i++)); do
+        if [[ -z "${protocol_shard_filters[$i]}" ]]; then
+          continue
+        fi
+        protocol_filter="^(${protocol_shard_filters[$i]})$"
+        run_test_for_packages github.com/status-im/status-go/protocol "${protocol_iteration}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (shard $((i + 1))/${protocol_shards})" "${protocol_filter}" &
+        bg_pids+=("$!")
+        protocol_iteration=$((protocol_iteration + 1))
+      done
+    fi
+  else
+    # Spawn separate processes to run `protocol` package for each nightly iteration
+    for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+      run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+      bg_pids+=("$!")
+    done
+  fi
 fi
 
 # Wait for jobs and handle failfast
@@ -149,6 +233,11 @@ if [[ $UNIT_TEST_FAILFAST == 'true' ]]; then
   done
 else
   wait
+fi
+
+if [[ "${UNIT_TEST_DRY_RUN}" == 'true' ]]; then
+  echo -e "${GRN}Dry run finished${RST}"
+  exit 0
 fi
 
 # When running in PRs (count=1), early exit if any test failed.

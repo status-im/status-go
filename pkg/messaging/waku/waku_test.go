@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -27,6 +26,7 @@ import (
 	"github.com/status-im/status-go/internal/connection"
 	testutils "github.com/status-im/status-go/internal/testutils"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -115,28 +115,6 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	require.True(t, w.seededBootnodesForDiscV5)
 	require.NotEqual(t, 0, len(w.Peers()))
 	require.NoError(t, w.Stop())
-}
-
-func TestRelayPeers(t *testing.T) {
-	config := &Config{
-		EnableMissingMessageVerification: true,
-	}
-	setDefaultConfig(config, false)
-	w, err := New(nil, config, nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, w.Start())
-	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
-	require.NoError(t, err)
-
-	// Ensure function returns an error for lightclient
-	config = &Config{}
-	config.ClusterID = 16
-	config.LightClient = true
-	w, err = New(nil, config, nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, w.Start())
-	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
-	require.Error(t, err)
 }
 
 func parseNodes(rec []string) []*enode.Node {
@@ -256,7 +234,7 @@ func TestWakuV2Filter(t *testing.T) {
 	setDefaultConfig(config, true)
 	config.EnablePeerExchangeClient = false
 	config.Port = 0
-	config.MinPeersForFilter = 2
+	config.MaxPeersForFilter = 2
 
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
@@ -286,17 +264,32 @@ func TestWakuV2Filter(t *testing.T) {
 	contentTopicBytes := make([]byte, 4)
 	_, err = rand.Read(contentTopicBytes)
 	require.NoError(t, err)
-	filter := &common.Filter{
-		Messages:      common.NewMemoryMessageStore(),
-		PubsubTopic:   testPubsubTopic,
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
-	}
-
-	fID, err := w.subscribe(filter)
+	subContentTopics := []types.TopicType{types.BytesToTopic(contentTopicBytes)}
+	err = w.Subscribe(context.Background(), testPubsubTopic, subContentTopics)
 	require.NoError(t, err)
 
+	// Reception now flows on the envelope feed (decoding/matching live in the
+	// transport); wait for the EventEnvelopeAvailable carrying the message.
+	events := make(chan types.EnvelopeEvent, 100)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+	requireReceived := func() {
+		deadline := time.After(5 * time.Second)
+		for {
+			select {
+			case e := <-events:
+				if e.Event == types.EventEnvelopeAvailable {
+					require.NotNil(t, e.Data)
+					return
+				}
+			case <-deadline:
+				t.Fatal("expected a received message")
+			}
+		}
+	}
+
 	msgTimestamp := w.timestamp()
-	contentTopic := maps.Keys(filter.ContentTopics)[0]
+	contentTopic := common.BytesToTopic(contentTopicBytes)
 
 	_, err = w.sendEnvelope(testPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
@@ -311,8 +304,7 @@ func TestWakuV2Filter(t *testing.T) {
 	subscriptions := w.node.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
-	messages := filter.Retrieve()
-	require.Len(t, messages, 1)
+	requireReceived()
 
 	// Mock peers going down
 	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
@@ -334,9 +326,8 @@ func TestWakuV2Filter(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 
-	messages = filter.Retrieve()
-	require.Len(t, messages, 1)
-	err = w.Unsubscribe(context.Background(), fID)
+	requireReceived()
+	err = w.Unsubscribe(context.Background(), testPubsubTopic, subContentTopics)
 	require.NoError(t, err)
 	require.NoError(t, w.Stop())
 }
@@ -375,7 +366,6 @@ func TestOnlineChecker(t *testing.T) {
 	require.NoError(t, err)
 
 	require.False(t, lightNode.onlineChecker.IsOnline())
-	f := &common.Filter{}
-	lightNode.filterManager.SubscribeFilter("test", protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...))
+	lightNode.filterManager.SubscribeFilter("test", protocol.NewContentFilter(""))
 
 }

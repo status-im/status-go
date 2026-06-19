@@ -2,7 +2,6 @@ package types
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"sync"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/internal/connection"
 )
@@ -38,11 +36,6 @@ func (m PeerStats) MarshalJSON() ([]byte, error) {
 type WakuV2Peer struct {
 	Protocols []protocol.ID         `json:"protocols"`
 	Addresses []multiaddr.Multiaddr `json:"addresses"`
-}
-
-type PeerList struct {
-	FullMeshPeers peer.IDSlice `json:"fullMesh"`
-	AllPeers      peer.IDSlice `json:"all"`
 }
 
 type ConnStatusSubscription struct {
@@ -84,14 +77,13 @@ func (u *ConnStatusSubscription) Send(s ConnStatus) bool {
 	return true
 }
 
-type WakuKeyManager interface {
-	// GetPrivateKey retrieves the private key of the specified identity.
-	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
-	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
-	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	// DeleteKeyPairs deletes all the keys
-	DeleteKeyPairs() error
-	GetSymKey(id string) ([]byte, error)
+// TopicSubscription identifies a single (pubsub topic, content topic) pair the
+// transport wants to receive messages on. It is the unit of wire-subscription
+// bookkeeping, both in the transport's FilterSubscriptions and in the waku
+// adapter.
+type TopicSubscription struct {
+	PubsubTopic  string
+	ContentTopic TopicType
 }
 
 // Whisper represents a dark communication interface through the Ethereum
@@ -101,10 +93,6 @@ type Waku interface {
 	// payload is expected to be already encoded for WakuMessage version=1
 	// (see transport/rfc26.Encode). Returns the wire hash on success.
 	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
-
-	// GetFilterMessages returns the messages that match the filter criteria and
-	// are received between the last poll and now.
-	GetFilterMessages(id string) ([]*Message, error)
 
 	Start() error
 	Stop() error
@@ -116,18 +104,8 @@ type Waku interface {
 	// Resume re-arms goroutines suspended by Pause. Idempotent.
 	Resume() error
 
-	// Waku protocol version
-	Version() uint
-
-	// PeerCount
-	PeerCount() int
-
-	ListenAddresses() ([]multiaddr.Multiaddr, error)
-
-	RelayPeersByTopic(topic string) (*PeerList, error)
-
-	ENR() (*enode.Node, error)
-
+	// Peers is retained only for the Python functional tests (see tests-functional);
+	// it is not used by status-app.
 	Peers() PeerStats
 
 	StartDiscV5() error
@@ -138,59 +116,16 @@ type Waku interface {
 
 	UnsubscribeFromPubsubTopic(topic string) error
 
-	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
-
-	DialPeer(address multiaddr.Multiaddr) error
-
-	DialPeerByID(peerID peer.ID) error
-
-	DropPeer(peerID peer.ID) error
-
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
-
-	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
-
-	// MinPow returns the PoW value required by this node.
-	MinPow() float64
-	// BloomFilter returns the aggregated bloom filter for all the topics of interest.
-	// The nodes are required to send only messages that match the advertised bloom filter.
-	// If a message does not match the bloom, it will tantamount to spam, and the peer will
-	// be disconnected.
-	BloomFilter() []byte
-
-	// GetCurrentTime returns current time.
-	GetCurrentTime() uint64
-
-	// GetPrivateKey retrieves the private key of the specified identity.
-	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
-	// SubscribeFilterMatched returns a channel that is notified (non-blocking, coalescing)
-	// whenever an incoming envelope matches at least one installed filter.
-	// Callers must call UnsubscribeFilterMatched when done to avoid a channel leak.
-	SubscribeFilterMatched() chan struct{}
-	UnsubscribeFilterMatched(ch chan struct{})
+	// Subscribe/Unsubscribe register and remove wire subscriptions for the
+	// given content topics on a pubsub topic. See transport.MessagingAPI.
+	Subscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
+	Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
 
-	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
-	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	// DeleteKeyPair deletes the key with the specified ID if it exists.
-	DeleteKeyPair(keyID string) bool
-	AddSymKeyDirect(key []byte) (string, error)
-	AddSymKeyFromPassword(password string) (string, error)
-	DeleteSymKey(id string) bool
-	GetSymKey(id string) ([]byte, error)
 	MaxMessageSize() uint32
-
-	GetStats() StatsSummary
-
-	Subscribe(opts *SubscriptionOptions) (string, error)
-	GetFilter(id string) Filter
-	Unsubscribe(ctx context.Context, id string) error
-	UnsubscribeMany(ids []string) error
-
-	// MarkP2PMessageAsProcessed tells the waku layer that a P2P message has been processed
-	MarkP2PMessageAsProcessed(common.Hash)
 
 	// ConnectionChanged is called whenever the client knows its connection status has changed
 	ConnectionChanged(connection.State)
@@ -216,17 +151,14 @@ type Waku interface {
 	// OnStorenodeAvailable is triggered when there is a new active storenode selected
 	OnStorenodeAvailable() <-chan peer.ID
 
-	// WaitForAvailableStoreNode will wait for a storenode to be available depending on the context
-	WaitForAvailableStoreNode(ctx context.Context) bool
-
 	// SetStorenodeConfigProvider will set the configuration provider for the storenode cycle
 	SetStorenodeConfigProvider(c history.StorenodeConfigProvider)
 
-	// ProcessMailserverBatch will receive a criteria and storenode and execute a query
-	ProcessMailserverBatch(
+	// StoreQuery retrieves historic messages for a single batch, selecting the
+	// store node internally (no peer argument). See waku.StoreClient.
+	StoreQuery(
 		ctx context.Context,
 		batch MailserverBatch,
-		storenode peer.AddrInfo,
 		pageLimit uint64,
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
@@ -234,8 +166,6 @@ type Waku interface {
 
 	// IsStorenodeAvailable is used to determine whether a storenode is available or not
 	IsStorenodeAvailable(peerID peer.ID) bool
-
-	PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error
 
 	// DisconnectActiveStorenode will trigger a disconnection of the active storenode, and potentially execute a cycling so a new storenode is promoted
 	DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool)

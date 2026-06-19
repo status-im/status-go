@@ -50,7 +50,7 @@ func (s *BlockchainHealthManagerSuite) assertBlockChainStatus(expected rpcstatus
 
 // Test registering a provider health manager
 func (s *BlockchainHealthManagerSuite) TestRegisterProvidersHealthManager() {
-	phm := NewProvidersHealthManager(1) // Create a real ProvidersHealthManager
+	phm := newTestProvidersHealthManager(1) // Create a real ProvidersHealthManager
 	err := s.manager.RegisterProvidersHealthManager(context.Background(), phm)
 	s.Require().NoError(err)
 
@@ -60,7 +60,7 @@ func (s *BlockchainHealthManagerSuite) TestRegisterProvidersHealthManager() {
 
 // Test status updates and notifications
 func (s *BlockchainHealthManagerSuite) TestStatusUpdateNotification() {
-	phm := NewProvidersHealthManager(1)
+	phm := newTestProvidersHealthManager(1)
 	err := s.manager.RegisterProvidersHealthManager(context.Background(), phm)
 	s.Require().NoError(err)
 	ch := s.manager.Subscribe()
@@ -79,8 +79,8 @@ func (s *BlockchainHealthManagerSuite) TestGetFullStatus() {
 	s.manager.Stop()
 	s.manager = NewBlockchainHealthManager()
 
-	phm1 := NewProvidersHealthManager(1)
-	phm2 := NewProvidersHealthManager(2)
+	phm1 := newTestProvidersHealthManager(1)
+	phm2 := newTestProvidersHealthManager(2)
 	ctx := context.Background()
 	err := s.manager.RegisterProvidersHealthManager(ctx, phm1)
 	s.Require().NoError(err)
@@ -203,7 +203,7 @@ func (s *BlockchainHealthManagerSuite) TestConcurrency() {
 	ctx, cancel := context.WithCancel(s.ctx)
 	defer cancel()
 	for i := 1; i <= chainsCount; i++ {
-		phm := NewProvidersHealthManager(uint64(i))
+		phm := newTestProvidersHealthManager(uint64(i))
 		err := s.manager.RegisterProvidersHealthManager(ctx, phm)
 		s.Require().NoError(err)
 	}
@@ -250,7 +250,7 @@ func (s *BlockchainHealthManagerSuite) TestMultipleStartAndStop() {
 
 func (s *BlockchainHealthManagerSuite) TestUnsubscribeOneOfMultipleSubscribers() {
 	// Create an instance of BlockchainHealthManager and register a provider manager
-	phm := NewProvidersHealthManager(1)
+	phm := newTestProvidersHealthManager(1)
 	ctx, cancel := context.WithCancel(s.ctx)
 	err := s.manager.RegisterProvidersHealthManager(ctx, phm)
 	s.Require().NoError(err)
@@ -287,7 +287,7 @@ func (s *BlockchainHealthManagerSuite) TestUnsubscribeOneOfMultipleSubscribers()
 
 func (s *BlockchainHealthManagerSuite) TestMixedProviderStatusInSingleChain() {
 	// Register a provider for chain 1
-	phm := NewProvidersHealthManager(1)
+	phm := newTestProvidersHealthManager(1)
 	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm)
 	s.Require().NoError(err)
 
@@ -312,9 +312,9 @@ func (s *BlockchainHealthManagerSuite) TestMixedProviderStatusInSingleChain() {
 
 func (s *BlockchainHealthManagerSuite) TestInterleavedChainStatusChanges() {
 	// Register providers for chains 1, 2, and 3
-	phm1 := NewProvidersHealthManager(1)
-	phm2 := NewProvidersHealthManager(2)
-	phm3 := NewProvidersHealthManager(3)
+	phm1 := newTestProvidersHealthManager(1)
+	phm2 := newTestProvidersHealthManager(2)
+	phm3 := newTestProvidersHealthManager(3)
 	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
 	s.Require().NoError(err)
 	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
@@ -352,8 +352,8 @@ func (s *BlockchainHealthManagerSuite) TestInterleavedChainStatusChanges() {
 
 func (s *BlockchainHealthManagerSuite) TestDelayedChainUpdate() {
 	// Register providers for chains 1 and 2
-	phm1 := NewProvidersHealthManager(1)
-	phm2 := NewProvidersHealthManager(2)
+	phm1 := newTestProvidersHealthManager(1)
+	phm2 := newTestProvidersHealthManager(2)
 	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
 	s.Require().NoError(err)
 	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
@@ -382,6 +382,34 @@ func (s *BlockchainHealthManagerSuite) TestDelayedChainUpdate() {
 	s.Equal(rpcstatus.StatusDown, shortStatus.Status.Status)
 	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[1].Status) // Chain 1 is down
 	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[2].Status) // Chain 2 is down
+}
+
+func (s *BlockchainHealthManagerSuite) TestPauseResumeSuppressesAndCoalescesProviderUpdates() {
+	phm := newTestProvidersHealthManager(1)
+	phm.SetDownDebounce(50 * time.Millisecond)
+	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm)
+	s.Require().NoError(err)
+
+	ch := s.manager.Subscribe()
+	defer s.manager.Unsubscribe(ch)
+
+	phm.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{
+		{Name: "provider1", Timestamp: time.Now(), Err: nil},
+	})
+	s.waitForUpdate(ch, rpcstatus.StatusUp, time.Second)
+
+	s.manager.Pause()
+	phm.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{
+		{Name: "provider1", Timestamp: time.Now(), Err: errors.New("down")},
+	})
+	select {
+	case <-ch:
+		s.Fail("unexpected blockchain update while paused")
+	case <-time.After(120 * time.Millisecond):
+	}
+
+	s.manager.Resume()
+	s.waitForUpdate(ch, rpcstatus.StatusDown, 400*time.Millisecond)
 }
 
 func TestBlockchainHealthManagerSuite(t *testing.T) {

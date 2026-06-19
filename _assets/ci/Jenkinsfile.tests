@@ -2,13 +2,17 @@
 library 'status-jenkins-lib@v1.9.39'
 
 pipeline {
+  /* tests.Dockerfile pre-creates /home/jenkins/gomodcache owned by jenkins so the
+     otherwise go fails with "mkdir .../gomodcache/cache: permission denied" */
   agent {
-    docker {
+    dockerfile {
       label 'linuxcontainer'
-      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
+      filename 'tests.Dockerfile'
+      dir '_assets/ci'
       args '--volume=/nix:/nix ' +
            '--volume=/etc/nix:/etc/nix ' +
            '--volume=/var/run/docker.sock:/var/run/docker.sock ' +
+           '--volume=status-go-gomodcache:/home/jenkins/gomodcache ' +
            '--network=host ' +
            '--user jenkins'
     }
@@ -75,6 +79,7 @@ pipeline {
     TMPDIR      = "${WORKSPACE_TMP}"
     GOPATH      = "${WORKSPACE_TMP}/go"
     GOCACHE     = "${WORKSPACE_TMP}/gocache"
+    GOMODCACHE  = '/home/jenkins/gomodcache'
     PATH        = "${PATH}:${GOPATH}/bin"
     REPO_SRC    = "${GOPATH}/src/github.com/status-im/status-go"
     BASE_BRANCH = "${env.CHANGE_TARGET}"
