@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: wakuorg/nwaku:v0.38.1
+    image: quay.io/wakuorg/nwaku-pr:3939
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -37,7 +37,7 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: wakuorg/nwaku:v0.38.1
+    image: quay.io/wakuorg/nwaku-pr:3939
     # Publish the nwaku REST API (incl. Store API) on an ephemeral host port so
     # tests on the host can query it without colliding on shared CI hosts.
     # The actual host port is discovered at runtime via the Docker API
