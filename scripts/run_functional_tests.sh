@@ -119,7 +119,12 @@ if [[ "${FUNCTIONAL_TESTS_MARKER}" == "compatibility" ]]; then
    if [[ -z "${PEER_REFS}" ]]; then
       echo "${GRN}Fetching git tags to determine peer refs${RST}"
       git fetch --tags --quiet || true
-      PEER_REFS="$(git tag --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. '!seen[$1"."$2]++' | head -2 | paste -sd' ' -)"
+      # TEMP(#7574): test compat against the release branches with the filter
+      # full-node rate-limit fix cherry-picked in (tags compat-filterfix-10.3x.x),
+      # instead of the plain latest release tags. Revert this override (restore the
+      # commented `git tag --sort=-v:refname ...` line below) once the experiment ends.
+      PEER_REFS="compat-filterfix-10.34.x compat-filterfix-10.33.x"
+      # PEER_REFS="$(git tag --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. '!seen[$1"."$2]++' | head -2 | paste -sd' ' -)"
     fi
     if [[ -z "${PEER_REFS}" ]]; then
       echo -e "${RED}No peer refs available. Set PEER_REFS or PEER_IMAGES.${RST}"
