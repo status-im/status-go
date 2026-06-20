@@ -133,7 +133,7 @@ endif
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -Wl,-rpath,$(NIM_SDS_LIB_DIR)
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
