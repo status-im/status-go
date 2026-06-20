@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: quay.io/wakuorg/nwaku-pr:3939
+    image: wakuorg/nwaku:v0.38.1
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -24,20 +24,14 @@ services:
       "--shard=32",
       "--shard=64",
       # Lift the per-peer filter/lightpush rate limits well above nwaku's stock
-      # defaults (filter 30/min). Under `pytest -n 12` + reruns, many light
-      # clients subscribe against this single fleet node concurrently and hit the
-      # default, drawing a 429 that go-waku turns into a permanent subscription
-      # backoff for the whole run (dropped pushes / stuck joins).
+      # defaults. A light client joining a community fans out many per-content-topic
+      # filter subscribe requests at once; the stock filter limit (30/min) returns
+      # 429, which go-waku turns into a long subscription backoff.
       "--rate-limit=filter:10000/1s",
       "--rate-limit=lightpush:10000/1s",
       "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
       "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
       "--tcp-port=60001",
-      # nwaku runs AutoSharding, so each fleet node relay-subscribes to ALL
-      # `num-shards-in-network` shards. status-go uses static shards 32/64, so a
-      # large value (257) fragments the 2-node gossipsub mesh across 257 topics
-      # and leaves rs/16/32 with zero mesh peers — light-client lightpush then
-      # fails `not_published_to_any_peer`. Keep this minimal.
       "--num-shards-in-network=65"
     ]
     depends_on:
@@ -47,7 +41,7 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: quay.io/wakuorg/nwaku-pr:3939
+    image: wakuorg/nwaku:v0.38.1
     # Publish the nwaku REST API (incl. Store API) on an ephemeral host port so
     # tests on the host can query it without colliding on shared CI hosts.
     # The actual host port is discovered at runtime via the Docker API
@@ -82,7 +76,6 @@ services:
       "--store-message-db-url=sqlite:////tmp/waku-store.sqlite3",
       "--store-message-retention-policy=time:86400",
       "--tcp-port=60002",
-      # See boot-1: keep minimal so the relay mesh on rs/16/32 stays dense.
       "--num-shards-in-network=65"
     ]
     healthcheck:

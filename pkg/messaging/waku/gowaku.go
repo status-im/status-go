@@ -336,14 +336,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	}
 
 	if !cfg.LightClient {
-		// Match the logos-delivery (nwaku) fleet's filter rate limit of 30 requests/minute
-		// per peer (burst 30). Without an explicit limiter, go-waku's filter server defaults
-		// to 1 request/second with burst 1, which rejects (429) a light client's burst of
-		// per-content-topic subscribe requests (e.g. when joining a community).
-		opts = append(opts, node.WithWakuFilterFullNode(
-			filter.WithMaxSubscribers(20),
-			filter.WithFullNodeRateLimiter(rate.Every(time.Minute/30), 30),
-		))
+		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
 	}
 
