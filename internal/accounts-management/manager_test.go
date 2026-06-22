@@ -645,18 +645,7 @@ func (s *ManagerTestSuite) TestCleanKeystoreFiles() {
 			keypair.Removed = testCase.keypairRemoved
 
 			if testCase.keypairMigratedToKeycard {
-				keypair.Keycards = []*types.Keycard{
-					{
-						KeyUID:        keypair.KeyUID,
-						KeycardUID:    "keycard-uid",
-						KeycardName:   "keycard-name",
-						KeycardLocked: false,
-						AccountsAddresses: []types2.Address{
-							keypair.Accounts[0].Address,
-							keypair.Accounts[1].Address,
-						},
-					},
-				}
+				keypair.ColdWallet = types.ColdWalletTypeStatusKeycard
 			}
 
 			if testCase.oneAccountRemoved {

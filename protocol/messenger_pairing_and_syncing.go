@@ -192,13 +192,20 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	}
 
 	m.allContacts.Range(func(contactID string, contact *contacts.Contact) bool {
+		if contact.LocalNickname == "" && !contact.Added() && !contact.HasAddedUs() && !contact.Blocked {
+			return true
+		}
+
 		if contact.ID == myID {
 			return true
 		}
-		if contact.LocalNickname != "" || contact.Added() || contact.HasAddedUs() || contact.Blocked {
-			if err = m.syncContact(ctx, contact, rawMessageHandler); err != nil {
-				return false
-			}
+		canonicalID, err := contacts.ContactIDFromPublicKeyString(contact.ID)
+		if err == nil && canonicalID == myID {
+			return true
+		}
+
+		if err = m.syncContact(ctx, contact, rawMessageHandler); err != nil {
+			return false
 		}
 		return true
 	})

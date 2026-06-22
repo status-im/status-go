@@ -15,7 +15,6 @@ type AccountsManager interface {
 	DeleteKeypair(keyUID string, password string, clock uint64) (keypair *types.Keypair, err error)
 	MakeSeedPhraseKeypairFullyOperable(mnemonic string, password string, clock uint64) (string, error)
 	MakePrivateKeyKeypairFullyOperable(privateKey string, password string, clock uint64) (string, error)
-	SaveOrUpdateKeycard(keycard *types.Keycard, password string, clock uint64) error
 	AddAccounts(keyUID string, accounts []*types.Account, password string) error
 	CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string, coldWallet types.ColdWalletType,
 		walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error)
@@ -23,5 +22,6 @@ type AccountsManager interface {
 		coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error)
 	CreateKeypairFromPrivateKeyAndStore(privateKey string, password string, keypairName string,
 		walletAccount *types.AccountCreationDetails, clock uint64) (keypair *types.Keypair, err error)
-	MigrateNonProfileKeycardKeypairToApp(mnemonic string, password string, clock uint64) (string, error)
+	MigrateKeypairToColdWallet(keyUID string, password string, coldWallet types.ColdWalletType, clock uint64) error
+	MigrateColdWalletKeypairToApp(mnemonic string, password string, clock uint64) (string, error)
 }

@@ -41,12 +41,25 @@ func (m *Messenger) UpdateKeypairName(keyUID string, name string) error {
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
-func (m *Messenger) UpdateKeypairXPub(keyUID string, xpub string, coldWallet accsmanagementtypes.ColdWalletType) error {
+func (m *Messenger) MigrateKeypairToColdWallet(ctx context.Context, keyUID string, password string, coldWallet accsmanagementtypes.ColdWalletType) error {
 	clock, _ := m.getLastClockWithRelatedChat()
-	err := m.settings.UpdateKeypairXPub(keyUID, xpub, coldWallet, clock)
+
+	err := m.accountsManager.MigrateKeypairToColdWallet(keyUID, password, coldWallet, clock)
 	if err != nil {
 		return err
 	}
+
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
+}
+
+func (m *Messenger) MigrateColdWalletKeypairToApp(ctx context.Context, mnemonic string, password string) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	keyUID, err := m.accountsManager.MigrateColdWalletKeypairToApp(mnemonic, password, clock)
+	if err != nil {
+		return err
+	}
+
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
@@ -373,17 +386,12 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accsmanagementtypes.Keypair) (
 		message.Accounts = append(message.Accounts, sAcc)
 	}
 
-	syncKcMsgs, err := m.prepareSyncKeycardsMessage(kp.KeyUID)
-	if err != nil {
-		return nil, err
-	}
-	message.Keycards = syncKcMsgs
-
 	if m.walletAPI != nil {
-		message.KeycardPairings, err = m.walletAPI.GetPairingsJSONFileContent()
+		pairings, err := m.walletAPI.GetPairingsJSONFileContent()
 		if err != nil {
 			return nil, err
 		}
+		message.KeycardPairings = pairings
 	}
 
 	return message, nil

@@ -759,19 +759,15 @@ func TestConvertAccount(t *testing.T) {
 	db, err := accounts.NewDB(testContext.backend.appDB)
 	require.NoError(t, err)
 
-	// Check that there is no registered keycards
-	keycards, err := db.GetKeycardsWithSameKeyUID(testContext.profileKeypair.KeyUID)
+	// Check that the keypair is not yet marked as migrated to cold-wallet
+	keypair, err := db.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(keycards))
+	require.False(t, keypair.MigratedToColdWallet())
 
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
 
-	keycardSettings := settings.Settings{
-		KeycardInstanceUID: "0xdeadbeef",
-		KeycardPairedOn:    1,
-		KeycardPairing:     "pairing",
-	}
+	keycardSettings := settings.Settings{}
 
 	// Converting to a keycard account
 	const keycardPassword = "222222" // represents password for a keycard user
@@ -809,10 +805,10 @@ func TestConvertAccount(t *testing.T) {
 	db1, err := accounts.NewDB(testContext.backend.appDB)
 	require.NoError(t, err)
 
-	// Check that there is a registered keycard
-	keycards, err = db1.GetKeycardsWithSameKeyUID(testContext.profileKeypair.KeyUID)
+	// Check that the keypair is now marked as cold-wallet (keycard) migrated
+	keypair, err = db1.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(keycards))
+	require.True(t, keypair.MigratedToColdWallet())
 
 	// Converting to a regular account
 	err = testContext.backend.ConvertToRegularAccount(testContext.mnemonic, keycardPassword, testPassword)
@@ -838,10 +834,10 @@ func TestConvertAccount(t *testing.T) {
 	db2, err := accounts.NewDB(testContext.backend.appDB)
 	require.NoError(t, err)
 
-	// Check that there is no registered keycards
-	keycards, err = db2.GetKeycardsWithSameKeyUID(testContext.profileKeypair.KeyUID)
+	// Check that the keypair is no longer marked as cold-wallet migrated
+	keypair, err = db2.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(keycards))
+	require.False(t, keypair.MigratedToColdWallet())
 }
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {

@@ -93,6 +93,9 @@ type Controller struct {
 	pendingFullFetch   bool
 	pendingFetchConfig FetchConfig
 
+	chainFetchMu      sync.Mutex
+	chainFetchCancels map[uint64]context.CancelFunc
+
 	logger *zap.Logger
 }
 
@@ -122,6 +125,7 @@ func NewController(
 		publisher:               pubsub.NewPublisher(),
 		fetchDebounceFn:         debounce.New(config.FetchDebounceTime),
 		pendingFetchConfig:      make(FetchConfig),
+		chainFetchCancels:       make(map[uint64]context.CancelFunc),
 		walletFeed:              walletFeed,
 		logger:                  logger,
 	}
@@ -146,7 +150,28 @@ func (c *Controller) Stop() {
 		c.stopCh = nil
 	}
 
+	c.cancelAllChainFetches()
 	c.stopWalletEventsWatcher()
+}
+
+func (c *Controller) startChainFetch(chainID uint64) (context.Context, context.CancelFunc) {
+	c.chainFetchMu.Lock()
+	defer c.chainFetchMu.Unlock()
+	if cancel, ok := c.chainFetchCancels[chainID]; ok {
+		cancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c.chainFetchCancels[chainID] = cancel
+	return ctx, cancel
+}
+
+func (c *Controller) cancelAllChainFetches() {
+	c.chainFetchMu.Lock()
+	defer c.chainFetchMu.Unlock()
+	for chainID, cancel := range c.chainFetchCancels {
+		cancel()
+		delete(c.chainFetchCancels, chainID)
+	}
 }
 
 func (c *Controller) GetPublisher() *pubsub.Publisher {
@@ -469,23 +494,22 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			)
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := c.startChainFetch(chainID)
 
 		resultsCh, err := c.fetcher.FetchBalances(ctx, chainID, chainFetchConfig)
 		if err != nil {
+			cancel()
 			c.logger.Error("failed to fetch balances", zap.Uint64("chainID", chainID), zap.Error(err))
 			c.sendEventBalanceFetchFailedToStart(chainID, chainFetchConfig, err)
-			cancel()
 			continue
 		}
 
 		c.logger.Debug("fetch started", zap.Uint64("chainID", chainID))
 		c.sendEventBalanceFetchStarted(chainID, chainFetchConfig)
 
-		go func() {
+		go func(fetchChainID uint64, ctx context.Context, cancel context.CancelFunc) {
 			defer gocommon.LogOnPanic()
 			defer cancel()
-
 			for {
 				select {
 				case <-c.stopCh:
@@ -494,10 +518,10 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 					if !ok {
 						return
 					}
-					c.handleFetchResult(ctx, chainID, result)
+					c.handleFetchResult(ctx, fetchChainID, result)
 				}
 			}
-		}()
+		}(chainID, ctx, cancel)
 	}
 }
 

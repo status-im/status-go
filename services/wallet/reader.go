@@ -139,7 +139,7 @@ func (r *Reader) startBalanceChangeWatcher() {
 				}
 				switch event.ResultType {
 				case multistandardfetcher.ResultTypeNative, multistandardfetcher.ResultTypeERC20:
-					if !event.BalanceChanged {
+					if !event.BalanceChanged && event.OldState.FetchedAt != multistandardbalance.NeverFetched {
 						continue
 					}
 
@@ -236,19 +236,15 @@ func (r *Reader) balancesToTokensByAddress(addresses []common.Address, allTokens
 	for _, address := range addresses {
 		for _, token := range allTokens {
 			isMandatoryToken := slices.Contains(walletcommon.MandatoryTokens(), token.Key())
-			hasError := false
-			if _, ok := balances[token.ChainID][address][token.Address]; !ok {
-				hasError = true
-			}
+
+			_, ok := balances[token.ChainID][address][token.Address]
+			hasError := !ok
 
 			hexBalance := &big.Int{}
-			if balances != nil {
-				tokenBalance := balances[token.ChainID][address][token.Address]
+			if tokenBalance := balances[token.ChainID][address][token.Address]; tokenBalance != nil && len(tokenBalance.Bytes()) <= 32 {
 				// Balances should be represented by a uint256 (32 bytes). Some spam tokens return
 				// fake values larger than that, so we ignore them.
-				if tokenBalance != nil && len(tokenBalance.Bytes()) <= 32 {
-					hexBalance = tokenBalance
-				}
+				hexBalance = tokenBalance
 			}
 
 			balance := big.NewFloat(0.0)
@@ -389,5 +385,34 @@ func (r *Reader) GetCachedBalances(chainIDs []uint64, addresses []common.Address
 		return nil, err
 	}
 
+	if storageBalances, storageErr := r.tokenBalancesStorage.GetBalances(context.Background(), allTokens, addresses); storageErr != nil {
+		logutils.ZapLogger().Error("failed to get live storage balances", zap.Error(storageErr))
+	} else {
+		balances = mergeFetchedBalances(balances, storageBalances)
+	}
+
 	return r.balancesToTokensByAddress(addresses, allTokens, balances, cachedTokens), nil
+}
+
+func mergeFetchedBalances(cached, fetched map[uint64]map[common.Address]map[common.Address]*big.Int) map[uint64]map[common.Address]map[common.Address]*big.Int {
+	if fetched == nil {
+		return cached
+	}
+	if cached == nil {
+		return fetched
+	}
+	for chainID, accounts := range fetched {
+		if cached[chainID] == nil {
+			cached[chainID] = make(map[common.Address]map[common.Address]*big.Int)
+		}
+		for account, tokens := range accounts {
+			if cached[chainID][account] == nil {
+				cached[chainID][account] = make(map[common.Address]*big.Int)
+			}
+			for tokenAddress, balance := range tokens {
+				cached[chainID][account][tokenAddress] = balance
+			}
+		}
+	}
+	return cached
 }

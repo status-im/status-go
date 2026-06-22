@@ -376,7 +376,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
 		serverKp.Clock == clientKp.Clock &&
 		len(serverKp.Accounts) == len(clientKp.Accounts) &&
-		len(serverKp.Keycards) == len(clientKp.Keycards))
+		serverKp.ColdWallet == clientKp.ColdWallet)
 
 	// Check server - server should contain keystore files for imported seed phrase
 	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
@@ -395,12 +395,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	//////////////////////////////////////////////////////////////////////////////
 	// Convert it to a keycard keypair on server and sync it to client
 	//////////////////////////////////////////////////////////////////////////////
-	err = serverAccountsAPI.SaveOrUpdateKeycard(ctx, &accsmanagementtypes.Keycard{
-		KeycardUID:        "1234",
-		KeycardName:       "new-keycard",
-		KeyUID:            serverKp.KeyUID,
-		AccountsAddresses: []types.Address{serverKp.Accounts[0].Address, serverKp.Accounts[1].Address},
-	}, s.password)
+	err = serverAccountsAPI.MigrateNonProfileKeypairToColdWallet(ctx, serverKp.KeyUID, s.password, accsmanagementtypes.ColdWalletTypeStatusKeycard)
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client
@@ -432,8 +427,8 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
 		serverKp.Clock == clientKp.Clock &&
 		len(serverKp.Accounts) == len(clientKp.Accounts) &&
-		len(serverKp.Keycards) == len(clientKp.Keycards) &&
-		len(serverKp.Keycards) == 1)
+		serverKp.ColdWallet == clientKp.ColdWallet &&
+		serverKp.ColdWallet == accsmanagementtypes.ColdWalletTypeStatusKeycard)
 
 	// Check server - server should not contain keystore files for imported seed phrase
 	require.False(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
@@ -450,7 +445,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	//////////////////////////////////////////////////////////////////////////////
 	// Stop using keycard on server and sync it to client
 	//////////////////////////////////////////////////////////////////////////////
-	err = serverAccountsAPI.MigrateNonProfileKeycardKeypairToApp(ctx, seedKeypairMnemonic1, s.password)
+	err = serverAccountsAPI.MigrateNonProfileColdWalletKeypairToApp(ctx, seedKeypairMnemonic1, s.password)
 	s.Require().NoError(err)
 
 	// Wait for sync messages to be received on client
@@ -482,8 +477,8 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
 		serverKp.Clock == clientKp.Clock &&
 		len(serverKp.Accounts) == len(clientKp.Accounts) &&
-		len(serverKp.Keycards) == len(clientKp.Keycards) &&
-		len(serverKp.Keycards) == 0)
+		serverKp.ColdWallet == clientKp.ColdWallet &&
+		serverKp.ColdWallet == accsmanagementtypes.ColdWalletTypeNone)
 
 	// Check server - server should contain keystore files for imported seed phrase
 	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
