@@ -171,9 +171,15 @@ endif
 clone-storage: ##@build Clone or update logos-storage-nim
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@echo "Cloning or updating logos-storage-nim ..."
-	rm -rf "$(LOGOS_STORAGE_SOURCE_DIR)"
-	git clone https://github.com/logos-storage/logos-storage-nim.git $(LOGOS_STORAGE_SOURCE_DIR)
-	cd $(LOGOS_STORAGE_SOURCE_DIR) && git switch --force --detach $(LOGOS_STORAGE_VERSION) && git submodule update --init --recursive
+	if [ ! -d "$(LOGOS_STORAGE_SOURCE_DIR)" ]; then \
+		git clone --recurse-submodules https://github.com/logos-storage/logos-storage-nim.git "$(LOGOS_STORAGE_SOURCE_DIR)"; \
+	else \
+		cd "$(LOGOS_STORAGE_SOURCE_DIR)" && git fetch --tags; \
+	fi
+	cd "$(LOGOS_STORAGE_SOURCE_DIR)" && \
+		git switch --force --detach "$(LOGOS_STORAGE_VERSION)" && \
+		git clean -fdx && \
+		git submodule update --init --recursive --force
 endif
 
 $(LIBSTORAGE): clone-storage
@@ -299,9 +305,15 @@ USE_SYSTEM_NIM ?= 1
 clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Cloning or updating nim-sds ..."
-	rm -rf "$(NIM_SDS_SOURCE_DIR)"
-	git clone https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR)
-	cd $(NIM_SDS_SOURCE_DIR) && git switch --force --detach $(NIM_SDS_VERSION) && git submodule update --init --recursive
+	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
+		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
+	else \
+		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
+	fi
+	cd "$(NIM_SDS_SOURCE_DIR)" && \
+		git switch --force --detach "$(NIM_SDS_VERSION)" && \
+		git clean -fdx && \
+		git submodule update --init --recursive --force
 endif
 
 $(LIBSDS): clone-nim-sds
