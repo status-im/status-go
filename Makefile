@@ -105,7 +105,7 @@ BUILD_TAGS ?= gowaku_no_rln
 # `nim-sds` variables
 
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
-NIM_SDS_VERSION ?= v0.2.4
+NIM_SDS_VERSION ?= use-chronos-shutdown
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
@@ -300,7 +300,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
 		git clone https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR); \
 	else \
-		cd $(NIM_SDS_SOURCE_DIR) && git fetch --tags; \
+		cd $(NIM_SDS_SOURCE_DIR) && git fetch --all --tags; \
 	fi
 	cd $(NIM_SDS_SOURCE_DIR) && git checkout $(NIM_SDS_VERSION)
 endif
