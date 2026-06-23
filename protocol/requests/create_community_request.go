@@ -27,23 +27,24 @@ const (
 )
 
 type CreateCommunity struct {
-	Name                         string                               `json:"name"`
-	Description                  string                               `json:"description"`
-	IntroMessage                 string                               `json:"introMessage,omitempty"`
-	OutroMessage                 string                               `json:"outroMessage,omitempty"`
-	Color                        string                               `json:"color"`
-	Emoji                        string                               `json:"emoji"`
-	Membership                   protobuf.CommunityPermissions_Access `json:"membership"`
-	EnsOnly                      bool                                 `json:"ensOnly"`
-	Image                        string                               `json:"image"`
-	ImageAx                      int                                  `json:"imageAx"`
-	ImageAy                      int                                  `json:"imageAy"`
-	ImageBx                      int                                  `json:"imageBx"`
-	ImageBy                      int                                  `json:"imageBy"`
-	Banner                       images.CroppedImage                  `json:"banner"`
-	HistoryArchiveSupportEnabled bool                                 `json:"historyArchiveSupportEnabled,omitempty"`
-	PinMessageAllMembersEnabled  bool                                 `json:"pinMessageAllMembersEnabled,omitempty"`
-	Tags                         []string                             `json:"tags,omitempty"`
+	Name                          string                               `json:"name"`
+	Description                   string                               `json:"description"`
+	IntroMessage                  string                               `json:"introMessage,omitempty"`
+	OutroMessage                  string                               `json:"outroMessage,omitempty"`
+	Color                         string                               `json:"color"`
+	Emoji                         string                               `json:"emoji"`
+	Membership                    protobuf.CommunityPermissions_Access `json:"membership"`
+	EnsOnly                       bool                                 `json:"ensOnly"`
+	Image                         string                               `json:"image"`
+	ImageAx                       int                                  `json:"imageAx"`
+	ImageAy                       int                                  `json:"imageAy"`
+	ImageBx                       int                                  `json:"imageBx"`
+	ImageBy                       int                                  `json:"imageBy"`
+	Banner                        images.CroppedImage                  `json:"banner"`
+	HistoryArchiveSupportEnabled  bool                                 `json:"historyArchiveSupportEnabled,omitempty"`
+	PinMessageAllMembersEnabled   bool                                 `json:"pinMessageAllMembersEnabled,omitempty"`
+	CreateThreadAllMembersEnabled bool                                 `json:"createThreadAllMembersEnabled,omitempty"`
+	Tags                          []string                             `json:"tags,omitempty"`
 }
 
 func adaptIdentityImageToProtobuf(img images.IdentityImage) *protobuf.IdentityImage {
@@ -125,7 +126,8 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 			EnsOnly: c.EnsOnly,
 		},
 		AdminSettings: &protobuf.CommunityAdminSettings{
-			PinMessageAllMembersEnabled: c.PinMessageAllMembersEnabled,
+			PinMessageAllMembersEnabled:   c.PinMessageAllMembersEnabled,
+			CreateThreadAllMembersEnabled: c.CreateThreadAllMembersEnabled,
 		},
 		IntroMessage: c.IntroMessage,
 		OutroMessage: c.OutroMessage,

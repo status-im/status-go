@@ -91,10 +91,10 @@ func (s *MessengerSyncClearHistory) TestSyncClearHistory() {
 	s.Require().Equal(receivedPubChatMessage.ChatId, publicChatName)
 
 	var messages []*common.Message
-	messages, _, err = s.m.persistence.MessageByChatID(publicChatName, "", 10)
+	messages, _, err = s.m.persistence.MessageByChatID(publicChatName, "", "", 10, s.m.featureFlags.Threads)
 	s.Require().NoError(err)
 	s.Require().True(len(messages) == 1)
-	messages, _, err = theirMessenger.persistence.MessageByChatID(publicChatName, "", 10)
+	messages, _, err = theirMessenger.persistence.MessageByChatID(publicChatName, "", "", 10, theirMessenger.featureFlags.Threads)
 	s.Require().NoError(err)
 	s.Require().True(len(messages) == 1)
 
@@ -113,7 +113,7 @@ func (s *MessengerSyncClearHistory) TestSyncClearHistory() {
 		return errors.New("Not received all clearedHistories")
 	})
 	s.Require().NoError(err)
-	messages, _, err = theirMessenger.persistence.MessageByChatID(publicChatName, "", 10)
+	messages, _, err = theirMessenger.persistence.MessageByChatID(publicChatName, "", "", 10, theirMessenger.featureFlags.Threads)
 	s.Require().NoError(err)
 	s.Require().True(len(messages) == 0)
 }
