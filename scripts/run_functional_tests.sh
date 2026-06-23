@@ -12,6 +12,7 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${USE_LOGOS_STORAGE:=false}"
 : "${FUNCTIONAL_TESTS_MARKER:=rpc}"
 : "${FUNCTIONAL_TESTS_RERUNS:=2}"
+: "${FUNCTIONAL_TESTS_PARALLEL:=12}"
 : "${PEER_IMAGES:=}"
 : "${PEER_REFS:=}"
 
@@ -108,6 +109,12 @@ echo -e "${GRN}wakufleet-scanner completed successfully${RST}"
 # Resolve peer (old) backend images for cross-version compatibility tests.
 peer_image_args=()
 if [[ "${FUNCTIONAL_TESTS_MARKER}" == "compatibility" ]]; then
+  # Run compatibility tests serially. They share a single waku fleet, and under
+  # pytest-xdist parallelism the fleet's peer-exchange hands each light client the
+  # ENRs of other concurrent tests' (torn-down) backends, churning filter peer
+  # selection and intermittently dropping messages (see #7513). Serial execution
+  # removes the cross-test contamination.
+  FUNCTIONAL_TESTS_PARALLEL=0
   echo -e "${GRN}Preparing peer images for compatibility tests${RST}"
   resolved_peer_images=()
   if [[ -n "${PEER_IMAGES}" ]]; then
@@ -170,7 +177,7 @@ pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${FUNCTIONAL_TESTS_MARKER}" -c "${root_path}/pytest.ini" -n 12 \
+pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${FUNCTIONAL_TESTS_MARKER}" -c "${root_path}/pytest.ini" -n "${FUNCTIONAL_TESTS_PARALLEL}" \
   --dist load\
   --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
   --docker_project_name="${project_name}" \
