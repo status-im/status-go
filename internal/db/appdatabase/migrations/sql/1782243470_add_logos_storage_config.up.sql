@@ -1,4 +1,4 @@
-CREATE TABLE logos_storage_config (
+CREATE TABLE IF NOT EXISTS logos_storage_config (
   enabled BOOLEAN DEFAULT false,
   log_level TEXT DEFAULT 'info',
   log_format TEXT DEFAULT 'auto',
