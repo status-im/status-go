@@ -48,7 +48,7 @@ func TestSendSupportBotContactRequest(t *testing.T) {
 
 			chatID, err := requests.ConvertCompressedToLegacyKey(testPK)
 			require.NoError(t, err)
-			messages, _, err := m.persistence.MessageByChatID(chatID, "", 10)
+			messages, _, err := m.persistence.MessageByChatID(chatID, "", "", 10, false)
 			require.NoError(t, err)
 			contactRequest := FindFirstByContentType(messages, protobuf.ChatMessage_CONTACT_REQUEST)
 			if testCase.expectsContactRequest {
@@ -65,7 +65,7 @@ func TestSendSupportBotContactRequest(t *testing.T) {
 			require.NoError(t, m.settings.SaveSettingField(settings.SupportBotContactRequestState, testCase.state))
 			require.NoError(t, m.sendSupportBotContactRequest())
 
-			messagesAfterRetry, _, err := m.persistence.MessageByChatID(chatID, "", 10)
+			messagesAfterRetry, _, err := m.persistence.MessageByChatID(chatID, "", "", 10, false)
 			require.NoError(t, err)
 			require.Len(t, messagesAfterRetry, len(messages))
 
@@ -96,7 +96,7 @@ func TestMessengerStartSkipsExistingUserSupportBotContactRequest(t *testing.T) {
 
 	chatID, err := requests.ConvertCompressedToLegacyKey(testPK)
 	require.NoError(t, err)
-	messages, _, err := m.persistence.MessageByChatID(chatID, "", 10)
+	messages, _, err := m.persistence.MessageByChatID(chatID, "", "", 10, false)
 	require.NoError(t, err)
 	contactRequest := FindFirstByContentType(messages, protobuf.ChatMessage_CONTACT_REQUEST)
 	require.Nil(t, contactRequest)
