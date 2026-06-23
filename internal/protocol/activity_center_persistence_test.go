@@ -196,7 +196,7 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	err = p.SaveChat(*chat)
 	s.Require().NoError(err)
 
-	chatMessages, _, err := p.MessageByChatID(chat.ID, "", 2)
+	chatMessages, _, err := p.MessageByChatID(chat.ID, "", "", 2, false)
 	s.Require().NoError(err)
 	s.Require().Len(chatMessages, 2)
 
@@ -312,7 +312,7 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	err = p.SaveChat(*chat)
 	s.Require().NoError(err)
 
-	chatMessages, _, err := p.MessageByChatID(chat.ID, "", 2)
+	chatMessages, _, err := p.MessageByChatID(chat.ID, "", "", 2, false)
 	s.Require().NoError(err)
 	s.Require().Len(chatMessages, 2)
 

@@ -67,6 +67,7 @@ type MessengerResponse struct {
 	notifications                    map[string]*localnotifications.Notification
 	requestsToJoinCommunity          map[string]*communities.RequestToJoin
 	chats                            map[string]*Chat
+	threads                          map[string]*Thread
 	removedChats                     map[string]bool
 	removedMessages                  map[string]*RemovedMessage
 	deletedMessages                  map[string]string
@@ -94,6 +95,7 @@ type MessengerResponse struct {
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem := struct {
 		Chats                   []*Chat                             `json:"chats,omitempty"`
+		Threads                 []*Thread                           `json:"threads,omitempty"`
 		RemovedChats            []string                            `json:"removedChats,omitempty"`
 		RemovedMessages         []*RemovedMessage                   `json:"removedMessages,omitempty"`
 		DeletedMessages         map[string][]string                 `json:"deletedMessages,omitempty"`
@@ -159,6 +161,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SavedAddresses:                   r.SavedAddresses(),
 		Notifications:                    r.Notifications(),
 		Chats:                            r.Chats(),
+		Threads:                          r.Threads(),
 		Communities:                      r.Communities(),
 		CommunitiesSettings:              r.CommunitiesSettings(),
 		RemovedChats:                     r.RemovedChats(),
@@ -297,6 +300,7 @@ func (r *MessengerResponse) StatusUpdates() []UserStatus {
 
 func (r *MessengerResponse) IsEmpty() bool {
 	return len(r.chats)+
+		len(r.threads)+
 		len(r.messages)+
 		len(r.pinMessages)+
 		len(r.Contacts)+
@@ -345,6 +349,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	}
 
 	r.AddChats(response.Chats())
+	r.AddThreads(response.Threads())
 	r.AddRemovedChats(response.RemovedChats())
 	r.AddRemovedMessages(response.RemovedMessages())
 	r.MergeDeletedMessages(response.DeletedMessages())
@@ -484,6 +489,36 @@ func (r *MessengerResponse) AddChat(c *Chat) {
 	}
 
 	r.chats[c.ID] = c
+}
+
+func threadKey(chatID string, threadID string) string {
+	return chatID + ":" + threadID
+}
+
+func (r *MessengerResponse) Threads() []*Thread {
+	var threads []*Thread
+	for _, thread := range r.threads {
+		threads = append(threads, thread)
+	}
+	return threads
+}
+
+func (r *MessengerResponse) AddThread(thread *Thread) {
+	if thread == nil {
+		return
+	}
+
+	if r.threads == nil {
+		r.threads = make(map[string]*Thread)
+	}
+
+	r.threads[threadKey(thread.ChatID, thread.ThreadID)] = thread
+}
+
+func (r *MessengerResponse) AddThreads(threads []*Thread) {
+	for _, thread := range threads {
+		r.AddThread(thread)
+	}
 }
 
 func (r *MessengerResponse) AddChats(chats []*Chat) {

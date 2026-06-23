@@ -14,4 +14,7 @@ type FeatureFlags struct {
 
 	// EnableMercuryoProvider indicates whether we should enable the Mercuryo provider in the Wallet
 	EnableMercuryoProvider bool
+
+	// Threads indicates whether thread-specific behavior is enabled.
+	Threads bool
 }
