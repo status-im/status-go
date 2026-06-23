@@ -617,7 +617,7 @@ func (s *MessengerCommunitiesSuite) TestSDSMissingDependenciesFetchTriggeredWhen
 	s.joinCommunity(community, s.bob, aliceObserver)
 
 	// Alice joined after the first message, so old message should still be missing.
-	aliceMessages, _, err := aliceObserver.MessageByChatID(chat.ID, "", 20)
+	aliceMessages, _, err := aliceObserver.MessageByChatID(chat.ID, "", "", 20)
 	s.Require().NoError(err)
 	for _, msg := range aliceMessages {
 		s.Require().NotEqual(oldMessage.ID, msg.ID)

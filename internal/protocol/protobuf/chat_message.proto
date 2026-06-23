@@ -244,6 +244,9 @@ message ChatMessage {
 
   repeated PaymentRequest payment_requests = 20;
 
+  // Id of the parent message that identifies the thread.
+  optional string thread_id = 21;
+
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;

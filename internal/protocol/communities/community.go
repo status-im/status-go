@@ -141,7 +141,8 @@ func New(config Config, timesource common.TimeSource, encryptor DescriptionEncry
 }
 
 type CommunityAdminSettings struct {
-	PinMessageAllMembersEnabled bool `json:"pinMessageAllMembersEnabled"`
+	PinMessageAllMembersEnabled   bool `json:"pinMessageAllMembersEnabled"`
+	CreateThreadAllMembersEnabled bool `json:"createThreadAllMembersEnabled"`
 }
 
 type CommunityChat struct {
@@ -284,11 +285,13 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		}
 
 		communityItem.CommunityAdminSettings = CommunityAdminSettings{
-			PinMessageAllMembersEnabled: false,
+			PinMessageAllMembersEnabled:   false,
+			CreateThreadAllMembersEnabled: false,
 		}
 
 		if o.config.CommunityDescription.AdminSettings != nil {
 			communityItem.CommunityAdminSettings.PinMessageAllMembersEnabled = o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
+			communityItem.CommunityAdminSettings.CreateThreadAllMembersEnabled = o.config.CommunityDescription.AdminSettings.CreateThreadAllMembersEnabled
 		}
 	}
 	return json.Marshal(communityItem)
@@ -445,11 +448,13 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		}
 
 		communityItem.CommunityAdminSettings = CommunityAdminSettings{
-			PinMessageAllMembersEnabled: false,
+			PinMessageAllMembersEnabled:   false,
+			CreateThreadAllMembersEnabled: false,
 		}
 
 		if o.config.CommunityDescription.AdminSettings != nil {
 			communityItem.CommunityAdminSettings.PinMessageAllMembersEnabled = o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
+			communityItem.CommunityAdminSettings.CreateThreadAllMembersEnabled = o.config.CommunityDescription.AdminSettings.CreateThreadAllMembersEnabled
 		}
 	}
 	return json.Marshal(communityItem)
@@ -1165,6 +1170,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	}
 	o.config.CommunityDescription.Permissions = description.Permissions
 	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
+	o.config.CommunityDescription.AdminSettings.CreateThreadAllMembersEnabled = description.AdminSettings.CreateThreadAllMembersEnabled
 }
 
 func (o *Community) EditPermissionAccess(permissionAccess protobuf.CommunityPermissions_Access) {
@@ -2404,6 +2410,10 @@ func (o *Community) ChatIDs() (chatIDs []string) {
 
 func (o *Community) AllowsAllMembersToPinMessage() bool {
 	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
+}
+
+func (o *Community) AllowsAllMembersToCreateThread() bool {
+	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.CreateThreadAllMembersEnabled
 }
 
 func (o *Community) CreateDeepCopy() *Community {

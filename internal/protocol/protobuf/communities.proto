@@ -135,6 +135,7 @@ message CommunityBanInfo {
 
 message CommunityAdminSettings {
   bool pin_message_all_members_enabled = 1;
+  bool create_thread_all_members_enabled = 2;
 }
 
 message CommunityChat {
