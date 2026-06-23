@@ -2,6 +2,7 @@ package ext
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
@@ -31,6 +32,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
+	"github.com/status-im/status-go/services/logosstorage"
 )
 
 // PublicAPI extends whisper public API.
@@ -1071,6 +1073,10 @@ func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.EnableCommunityHistoryArchiveProtocol()
 }
 
+func (api *PublicAPI) EnableLogosStorageCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	return api.service.messenger.EnableLogosStorageCommunityHistoryArchiveProtocol(overrides)
+}
+
 func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
@@ -1380,4 +1386,37 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
+}
+
+func (api *PublicAPI) Connect(peerID string, addrs []string) error {
+	return api.service.messenger.Connect(peerID, addrs)
+}
+
+func (api *PublicAPI) Debug() (logosstorage.LogosStorageDebugInfo, error) {
+	return api.service.messenger.Debug()
+}
+
+func (api *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
+	return api.service.messenger.IsSeedingHistoryArchive(communityID)
+}
+
+func (api *PublicAPI) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+	return api.service.messenger.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (api *PublicAPI) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+	return api.service.messenger.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (api *PublicAPI) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	if duration <= 0 {
+		return 0, errors.New("duration must be greater than zero")
+	}
+
+	d := duration * time.Second
+	updatedInterval, err := api.service.messenger.UpdateMessageArchiveInterval(d)
+	if err != nil {
+		return 0, err
+	}
+	return updatedInterval / time.Second, nil
 }

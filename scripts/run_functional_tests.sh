@@ -15,6 +15,11 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${FUNCTIONAL_TESTS_PARALLEL:=12}"
 : "${PEER_IMAGES:=}"
 : "${PEER_REFS:=}"
+: "${USE_TORRENT:=false}"
+
+if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
+  export WAKU_STORE_MESSAGE_RETENTION_SECONDS="${WAKU_STORE_MESSAGE_RETENTION_SECONDS:-60}"
+fi
 
 echo -e "${GRN}Running functional tests${RST}"
 
@@ -62,16 +67,23 @@ docker ps -a --filter "name=${project_name}" --filter "status=exited" -q | xargs
 # Build statusgo image
 echo -e "${GRN}Building status-go${RST}"
 build_tags="${FUNCTIONAL_TESTS_BUILD_TAGS}"
+pytest_marker_expr="${FUNCTIONAL_TESTS_MARKER}"
 if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
   build_tags="${build_tags} use_logos_storage"
   if [[ -n "${LOGOS_STORAGE_LIB_DIR:-}" && ! -f "${LOGOS_STORAGE_LIB_DIR}/libstorage.so" ]]; then
     echo -e "${YEL}No libstorage.so at ${LOGOS_STORAGE_LIB_DIR}; build it first with make build-storage.${RST}"
   fi
+else
+  pytest_marker_expr="(${pytest_marker_expr}) and not logos_storage"
+fi
+if [[ "${USE_TORRENT}" == "true" ]]; then
+  build_tags="${build_tags} use_torrent"
 fi
 docker build . \
   --build-arg "build_flags=-cover" \
   --build-arg "build_tags=${build_tags}" \
   --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
+  --build-arg "use_torrent=${USE_TORRENT}" \
   --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 
@@ -177,7 +189,7 @@ pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${FUNCTIONAL_TESTS_MARKER}" -c "${root_path}/pytest.ini" -n "${FUNCTIONAL_TESTS_PARALLEL}" \
+pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${pytest_marker_expr}" -c "${root_path}/pytest.ini" -n "${FUNCTIONAL_TESTS_PARALLEL}"  \
   --dist load\
   --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
   --docker_project_name="${project_name}" \

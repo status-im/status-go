@@ -270,6 +270,7 @@ class WakuextService(Service):
         membership: CommunityPermissionsAccess = CommunityPermissionsAccess.AUTO_ACCEPT,
         image="",
         image_rect=ImageCropRect(),
+        history_archive_support_enabled=False,
     ):
         params = {
             "membership": membership.value,
@@ -281,6 +282,7 @@ class WakuextService(Service):
             "imageAy": image_rect.ay,
             "imageBx": image_rect.bx,
             "imageBy": image_rect.by,
+            "historyArchiveSupportEnabled": history_archive_support_enabled,
         }
         response = self.rpc_request("createCommunity", [params])
         return response
@@ -952,4 +954,43 @@ class WakuextService(Service):
     def create_community_token_deployment_signature(self, chain_id: int, address_from: str, community_id: str):
         params = [chain_id, address_from, community_id]
         response = self.rpc_request("createCommunityTokenDeploymentSignature", params)
+        return response
+
+    def has_community_archive(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("hasCommunityArchive", params)
+        return response
+
+    def connect(self, peerId: str, addrs: list = []):
+        params = [peerId, addrs]
+        response = self.rpc_request("connect", params)
+        return response
+
+    def debug(self):
+        params = []
+        response = self.rpc_request("debug", params)
+        return response
+
+    def get_downloaded_message_archive_ids(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getDownloadedMessageArchiveIDs", params)
+        return response
+
+    def get_message_archive_ids_to_import(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getMessageArchiveIDsToImport", params)
+        return response
+
+    def update_message_archive_interval(self, duration_seconds: int):
+        params = [duration_seconds]
+        response = self.rpc_request("updateMessageArchiveInterval", params)
+        return response
+
+    def enable_logos_storage_community_history_archive_protocol(self, overrides: dict | None = None):
+        if overrides:
+            string_overrides = {k: str(v) for k, v in overrides.items()}
+            params = [string_overrides]
+        else:
+            params = [{}]
+        response = self.rpc_request("enableLogosStorageCommunityHistoryArchiveProtocol", params)
         return response

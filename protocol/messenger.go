@@ -151,6 +151,7 @@ type Messenger struct {
 	historicSyncMu            sync.Mutex
 	historicSyncInFlight      bool
 	lastHistoricSyncRequestAt time.Time
+	ratchetNotFoundDelay      time.Duration
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
@@ -373,12 +374,13 @@ func NewMessenger(
 	}
 
 	amc := &archivetypes.ArchiveManagerConfig{
-		TorrentConfig: c.torrentConfig,
-		Logger:        logger,
-		Persistence:   communitiesManager.GetPersistence(),
-		Messaging:     messaging,
-		Identity:      identity,
-		Publisher:     communitiesManager,
+		TorrentConfig:      c.torrentConfig,
+		LogosStorageConfig: c.logosStorageConfig,
+		Logger:             logger,
+		Persistence:        communitiesManager.GetPersistence(),
+		Messaging:          messaging,
+		Identity:           identity,
+		Publisher:          communitiesManager,
 	}
 
 	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
@@ -441,8 +443,9 @@ func NewMessenger(
 			wait chan struct{}
 			once sync.Once
 		}{wait: make(chan struct{})},
-		browserDatabase: c.browserDatabase,
-		httpServer:      c.httpServer,
+		ratchetNotFoundDelay: 1 * time.Hour,
+		browserDatabase:      c.browserDatabase,
+		httpServer:           c.httpServer,
 		shutdownTasks: []func() error{
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
@@ -4856,4 +4859,17 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 
 func (m *Messenger) Messaging() *messaging2.API {
 	return m.messaging
+}
+
+func (m *Messenger) GetDownloadedMessageArchiveIDs(communityID cryptotypes.HexBytes) ([]string, error) {
+	return m.archiveManager.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (m *Messenger) GetMessageArchiveIDsToImport(communityID cryptotypes.HexBytes) ([]string, error) {
+	return m.archiveManager.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	messageArchiveInterval = duration
+	return duration, nil
 }

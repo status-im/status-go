@@ -1,3 +1,5 @@
+//go:build use_torrent
+
 package torrent_test
 
 import (

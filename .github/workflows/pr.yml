@@ -57,11 +57,11 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.1
-          args: --build-tags=gowaku_no_rln,lint,use_logos_storage
+          args: --build-tags=gowaku_no_rln,lint,use_logos_storage,use_torrent
 
       - name: lint-panics
         run: |
-          make lint-panics USE_LOGOS_STORAGE=true
+          make lint-panics USE_LOGOS_STORAGE=true USE_TORRENT=true
 
       - name: go mod tidy
         run: go mod tidy && git diff --exit-code
