@@ -312,7 +312,7 @@ func (s *MessengerSuite) TestSendPublic() {
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_PUBLIC_GROUP, outputMessage.MessageType)
 
-	savedMessages, _, err := s.m.MessageByChatID(chat.ID, "", 10)
+	savedMessages, _, err := s.m.MessageByChatID(chat.ID, "", "", 10)
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(savedMessages), "it saves the message")
 }
@@ -1347,11 +1347,11 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().Equal(3, len(actualChats))
 
 	// The messages have been deleted
-	chat2Messages, _, err := s.m.MessageByChatID(chat2.ID, "", 20)
+	chat2Messages, _, err := s.m.MessageByChatID(chat2.ID, "", "", 20)
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(chat2Messages))
 
-	chat3Messages, _, err := s.m.MessageByChatID(chat3.ID, "", 20)
+	chat3Messages, _, err := s.m.MessageByChatID(chat3.ID, "", "", 20)
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(chat3Messages))
 
@@ -1592,7 +1592,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	_, err = s.m.SendChatMessage(context.Background(), inputMsg)
 	s.NoError(err)
 
-	savedMsgs, _, err := s.m.MessageByChatID(chat.ID, "", 10)
+	savedMsgs, _, err := s.m.MessageByChatID(chat.ID, "", "", 10)
 	s.Require().NoError(err)
 	s.Require().Len(savedMsgs, 1)
 	savedMsg := savedMsgs[0]

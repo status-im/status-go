@@ -319,9 +319,14 @@ Send a text message to a chat/channel.
 [{
   "chatId": "<chatId>",
   "text": "Hello!",
-  "contentType": 1
+  "contentType": 1,
+  "threadId": "<parentMessageId-optional>"
 }]
 ```
+
+- `threadId` is optional.
+- Use `threadId` to send a message into an existing thread.
+- If `threadId` points to a parent that is not yet known locally, the backend still creates thread metadata and backfills the name when the parent arrives.
 
 **Chat ID formats:**
 
@@ -335,7 +340,7 @@ Send a text message to a chat/channel.
 
 ---
 
-### wakuext_chatMessages
+### wakuext_chatMessages (deprecated)
 
 Read message history for a chat.
 
@@ -343,6 +348,78 @@ Read message history for a chat.
 - `chatId`: string (communityId + chatUUID)
 - `cursor`: string (empty string for first page)
 - `limit`: number
+
+---
+
+### wakuext_chatMessagesV2
+
+Same as `wakuext_chatMessages`, but also can get thread history.
+
+**Params:** `[chatId, threadId cursor, limit]`
+- `chatId`: string (communityId + chatUUID)
+- `threadId`: string (leave empty to get the history of a chat)
+- `cursor`: string (empty string for first page)
+- `limit`: number
+
+---
+
+### wakuext_createThread
+
+Explicitly create a thread from an existing parent message. The parent message must already be stored locally (i.e. it was previously received or sent).
+
+For community chats, the caller must be a privileged member (admin/owner) unless the community has "create threads for all members" enabled.
+
+**Params:** `[chatId, parentMessageId]`
+- `chatId`: string — channel/chat identifier.
+- `parentMessageId`: string — ID of the message that becomes the thread root.
+
+**Result:**
+```json
+{
+  "threads": [
+    {
+      "threadId": "0x-parent-message-id",
+      "chatId": "0xcommunity...<chatUUID>",
+      "parentMessageId": "0x-parent-message-id",
+      "name": "First 40 chars of parent text (or empty)"
+    }
+  ]
+}
+```
+
+**Errors:**
+- `"threads feature is disabled"` — feature flag is off.
+- `"chatID and parentMessageID are required"` — missing params.
+- `"thread already exists for this message"` — thread already created for this parent.
+- `"parent message not found"` — parent message doesn't exist locally.
+- `"only admins can create threads in this community"` — permission denied.
+
+---
+
+### wakuext_chatThreads
+
+List threads for a chat.
+
+**Params:** `[chatId]`
+- `chatId`: string (communityId + chatUUID)
+
+**Result:**
+```json
+{
+  "threads": [
+    {
+      "threadId": "0x-parent-message-id",
+      "chatId": "0xcommunity...<chatUUID>",
+      "parentMessageId": "0x-parent-message-id",
+      "name": "Parent message text (or empty until known)"
+    }
+  ]
+}
+```
+
+Notes:
+- `name` may be empty when the parent message has not been persisted yet.
+- Unknown/placeholder names are intentionally client-defined; backend returns empty string until resolved.
 
 ---
 
