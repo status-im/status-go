@@ -365,10 +365,36 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	if request.TorrentConfigEnabled != nil {
 		nodeConfig.TorrentConfig.Enabled = *request.TorrentConfigEnabled
-
 	}
 	if request.TorrentConfigPort != nil {
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
+	}
+
+	if request.LogosStorageConfigEnabled != nil {
+		nodeConfig.LogosStorageConfig.Enabled = *request.LogosStorageConfigEnabled
+	}
+
+	if request.LogosStorageConfigBootstrapNode != nil {
+		nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes = []string{*request.LogosStorageConfigBootstrapNode}
+	}
+
+	nodeConfig.LogosStorageConfig = params.LogosStorageConfig{
+		Enabled: nodeConfig.LogosStorageConfig.Enabled,
+		NodeConfig: params.LogosStorageNodeConfig{
+			DataDir:        filepath.Join(nodeConfig.RootDataDir, "logos-storage", "data"),
+			BlockRetries:   params.DefaultLogosStorageBlockRetries,
+			MetricsEnabled: false,
+			LogFormat:      "nocolors",
+			BootstrapNodes: nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes,
+		},
+	}
+
+	if request.ImportInitialDelay != nil {
+		nodeConfig.ImportInitialDelay = *request.ImportInitialDelay
+	}
+
+	if request.MessageArchiveInterval != nil {
+		nodeConfig.MessageArchiveInterval = *request.MessageArchiveInterval
 	}
 
 	if request.APIConfig != nil {

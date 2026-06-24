@@ -1,6 +1,5 @@
 //go:build !disable_history_archives
 
-// // +build !disable_history_archives
 package archive
 
 import (
@@ -16,7 +15,6 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	archivetorrent "github.com/status-im/status-go/protocol/communities/archive/torrent"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	archiveutils "github.com/status-im/status-go/protocol/communities/archive/utils"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -28,6 +26,8 @@ type ArchiveManager struct {
 	downloadTasksMu              sync.RWMutex // protects historyArchiveDownloadTasks
 	historyArchiveTasksWaitGroup sync.WaitGroup
 	historyArchiveTasks          sync.Map // stores `chan struct{}`
+	online                       bool
+	onlineMu                     sync.RWMutex
 
 	logger      *zap.Logger
 	persistence archivetypes.PersistenceProvider
@@ -50,19 +50,13 @@ type ArchiveManager struct {
 func NewArchiveManager(amc *archivetypes.ArchiveManagerConfig) ArchiveService {
 	// Depending on which config is provided AND enabled, we instantiate the corresponding
 	// concrete ArchiveManager backend implementation.
-	var backend ArchiveServiceBackend
+	backend := newTorrentBackend(amc)
 
-	if amc.TorrentConfig != nil && amc.TorrentConfig.Enabled {
-		// Torrent-based archive backend
-		backend = archivetorrent.NewArchiveManagerTorrent(
-			amc.TorrentConfig,
-			amc.Logger,
-			amc.Persistence,
-			amc.Messaging,
-			amc.Identity,
-			amc.Publisher,
-		)
-	} else {
+	if backend == nil {
+		backend = newLogosStorageBackend(amc)
+	}
+
+	if backend == nil {
 		// No enabled configuration - return the NOP implementation
 		// This ensures we always return a valid instance that safely does nothing
 		return &ArchiveManagerNop{}
@@ -70,6 +64,7 @@ func NewArchiveManager(amc *archivetypes.ArchiveManagerConfig) ArchiveService {
 
 	return &ArchiveManager{
 		historyArchiveDownloadTasks: make(map[string]*archivetypes.HistoryArchiveDownloadTask),
+		online:                      true,
 
 		logger:      amc.Logger,
 		persistence: amc.Persistence,
@@ -84,7 +79,16 @@ func NewArchiveManager(amc *archivetypes.ArchiveManagerConfig) ArchiveService {
 // ArchiveServiceBackend interface implementation - delegates to backend
 
 func (m *ArchiveManager) SetOnline(online bool) {
+	m.onlineMu.Lock()
+	m.online = online
+	m.onlineMu.Unlock()
 	m.backend.SetOnline(online)
+}
+
+func (m *ArchiveManager) isOnline() bool {
+	m.onlineMu.RLock()
+	defer m.onlineMu.RUnlock()
+	return m.online
 }
 
 func (m *ArchiveManager) Start() error {
@@ -233,7 +237,6 @@ func (m *ArchiveManager) GetHistoryArchivePartitionStartTimestamp(communityID cr
 
 func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID cryptotypes.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
 	err := m.backend.CreateAndSeedHistoryArchive(communityID, topics, startDate, endDate, partition, encrypt)
-
 	if err != nil {
 		m.logger.Error("failed to create and seed history archive", zap.Error(err))
 		return err
@@ -269,6 +272,10 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(communityID cryptotype
 	for {
 		select {
 		case <-ticker.C:
+			if !m.isOnline() {
+				continue
+			}
+
 			m.logger.Debug("starting archive task...", zap.String("id", id))
 
 			lastArchiveEndDateTimestamp, err := m.GetHistoryArchivePartitionStartTimestamp(communityID)
@@ -375,7 +382,7 @@ func (m *ArchiveManager) SetMessageArchiveIDImported(communityID cryptotypes.Hex
 func (m *ArchiveManager) GetHistoryTasksCount() int {
 	// sync.Map doesn't have a Len function, so we need to count manually
 	count := 0
-	m.historyArchiveTasks.Range(func(_, _ interface{}) bool {
+	m.historyArchiveTasks.Range(func(_, _ any) bool {
 		count++
 		return true
 	})
@@ -384,7 +391,7 @@ func (m *ArchiveManager) GetHistoryTasksCount() int {
 
 // private methods
 func (m *ArchiveManager) stopHistoryArchiveTasksIntervals() {
-	m.historyArchiveTasks.Range(func(_, task interface{}) bool {
+	m.historyArchiveTasks.Range(func(_, task any) bool {
 		close(task.(chan struct{})) // Need to cast to the chan
 		return true
 	})
@@ -400,19 +407,6 @@ func (m *ArchiveManager) getOldestWakuMessageTimestamp(topics []messagingtypes.C
 
 func (m *ArchiveManager) getLastMessageArchiveEndDate(communityID cryptotypes.HexBytes) (uint64, error) {
 	return m.persistence.GetLastMessageArchiveEndDate(communityID)
-}
-
-// Special functions
-// These functions are not part of the ArchiveService interface.
-// Some legacy tests are accessing implementation details and for this reason
-// we need to expose these special accessors.
-
-// GetTorrentBackend returns the Torrent backend if available, for test purposes
-func (m *ArchiveManager) GetTorrentBackend() (*archivetorrent.ArchiveManagerTorrent, error) {
-	if torrentBackend, ok := m.backend.(*archivetorrent.ArchiveManagerTorrent); ok {
-		return torrentBackend, nil
-	}
-	return nil, errors.New("backend is not ArchiveManagerTorrent")
 }
 
 func (m *ArchiveManager) Wait() {

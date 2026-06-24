@@ -40,6 +40,12 @@ class SignalType(Enum):
     COMMUNITY_MEMBER_REEVALUATION_STATUS = "community.memberReevaluationStatus"
     COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED = "communityToken.communityTokenTransactionStatusChanged"
     COMMUNITY_TOKEN_ACTION = "communityToken.communityTokenAction"
+    COMMUNITY_HISTORY_ARCHIVES_CREATED = "community.historyArchivesCreated"
+    COMMUNITY_ARCHIVE_INDEX_DOWNLOAD_COMPLETED = "community.indexDownloadCompleted"
+    COMMUNITY_HISTORY_ARCHIVES_SEEDING = "community.historyArchivesSeeding"
+    COMMUNITY_IMPORTING_HISTORY_ARCHIVE_MESSAGES_STARTED = "community.importingHistoryArchiveMessages"
+    # Backend event name is historical; this is emitted after download and import complete.
+    COMMUNITY_HISTORY_ARCHIVES_DOWNLOAD_AND_IMPORT_FINISHED = "community.downloadingHistoryArchivesFinished"
 
 
 class CommunityMemberReevaluationStatus(IntEnum):
@@ -233,9 +239,15 @@ class SignalClient:
             return [signal.get("event") for signal in signals]
 
     def _on_error(self, ws, error):
+        if self._should_stop:
+            logging.debug(f"SignalClient [{self.url}]: websocket error during shutdown: {error}")
+            return
         logging.error(f"SignalClient [{self.url}]: websocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
+        if self._should_stop:
+            logging.debug(f"SignalClient [{self.url}]: websocket connection closed during shutdown")
+            return
         logging.error(f"SignalClient [{self.url}]: websocket connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
@@ -255,10 +267,12 @@ class SignalClient:
             self.wsapp.run_forever()
             if self._should_stop:
                 break
-            logging.warning(f"SignalClient [{self.url}]: websocket disconnected, reconnecting in {retry_delay}s")
+            if not self._should_stop:
+                logging.warning(f"SignalClient [{self.url}]: websocket disconnected, reconnecting in {retry_delay}s")
             time.sleep(retry_delay)
             retry_delay = min(retry_delay * 2, max_delay)
-        logging.debug(f"SignalClient [{self.url}]: connection loop stopped")
+        if not self._should_stop:
+            logging.debug(f"SignalClient [{self.url}]: connection loop stopped")
 
     def connect(self):
         self._should_stop = False

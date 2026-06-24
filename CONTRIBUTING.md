@@ -5,14 +5,15 @@ Thank you for considering contributing to our project! We appreciate your time a
 ## Table of Contents
 1. [Workflow](#workflow)
 2. [Code Style](#code-style)
-3. [Keep History Clean](#keep-history-clean)
-4. [Testing](#testing)
+3. [IDE Setup](#ide-setup)
+4. [Keep History Clean](#keep-history-clean)
+5. [Testing](#testing)
    - [Test Validation](#test-validation)
    - [Area of Impact](#area-of-impact)
-5. [Pull Request Description](#pull-request-description)
+6. [Pull Request Description](#pull-request-description)
    - [Feature Flags](#feature-flags)
    - [Removing Feature Flags](#removing-feature-flags)
-6. [Test Coverage](#test-coverage)
+7. [Test Coverage](#test-coverage)
    - [Maintaining Test Coverage](#maintaining-test-coverage)
    - [Metrics for Test Coverage](#metrics-for-test-coverage)
 
@@ -27,6 +28,18 @@ Thank you for considering contributing to our project! We appreciate your time a
 ## Code Style
 
 Please note that we follow [Effective Go](https://golang.org/doc/effective_go.html) and [CodeReviewComments](https://github.com/golang/go/wiki/CodeReviewComments) in our code.
+
+## IDE Setup
+
+### Neovim
+
+The repository includes a `.nvim.lua` at the root that auto-configures the Neovim environment for `status-go` development. When `status-go` is opened as a project in Neovim, this script:
+
+- Sets `CGO_CFLAGS`, `CGO_LDFLAGS`, and `LD_LIBRARY_PATH` for the native C dependencies (`libsds` and `libstorage`).
+- Configures `gopls` with the correct build tags (`gowaku_skip_migrations`, `gowaku_no_rln`, `use_logos_storage`, `use_torrent`).
+- Integrates `golangci-lint` with the project's lint settings.
+
+It supports both paths provided by the Nix development shell (via environment variables) and fallbacks to locally built native libraries. This is the recommended way to work with Neovim on this project, as direct `go test` or `gopls` may fail to resolve native symbols without these flags.
 
 ## Keep History Clean
 

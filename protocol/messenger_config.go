@@ -42,6 +42,7 @@ type MessengerSignalsHandler interface {
 	HistoryArchivesSeeding(communityID string)
 	HistoryArchivesUnseeded(communityID string)
 	HistoryArchiveDownloaded(communityID string, from int, to int)
+	IndexDownloadCompleted(communityID string, indexCid string)
 	DownloadingHistoryArchivesStarted(communityID string)
 	DownloadingHistoryArchivesFinished(communityID string)
 	ImportingHistoryArchiveMessages(communityID string)
@@ -76,6 +77,7 @@ type config struct {
 	clusterConfig          params.ClusterConfig
 	browserDatabase        *browsers.Database
 	torrentConfig          *params.TorrentConfig
+	logosStorageConfig     *params.LogosStorageConfig
 	walletService          *wallet.Service
 	communityTokensService communities.CommunityTokensServiceInterface
 	httpServer             *server.MediaServer
@@ -256,6 +258,13 @@ func WithTorrentConfig(tc *params.TorrentConfig) Option {
 	}
 }
 
+func WithLogosStorageConfig(logosStorageConfig *params.LogosStorageConfig) Option {
+	return func(c *config) error {
+		c.logosStorageConfig = logosStorageConfig
+		return nil
+	}
+}
+
 func WithHTTPServer(s *server.MediaServer) Option {
 	return func(c *config) error {
 		c.httpServer = s
@@ -357,6 +366,26 @@ func WithCommunitiesRekeyInterval(interval time.Duration) func(c *config) error 
 func WithCommunityManagerOptions(options []communities.ManagerOption) Option {
 	return func(c *config) error {
 		c.communityManagerOptions = options
+		return nil
+	}
+}
+
+func WithImportInitialDelay(delay int) Option {
+	return func(c *config) error {
+		if delay <= 0 {
+			return nil
+		}
+		importInitialDelay = time.Duration(delay) * time.Second
+		return nil
+	}
+}
+
+func WithMessageArchiveInterval(interval int) Option {
+	return func(c *config) error {
+		if interval <= 0 {
+			return nil
+		}
+		messageArchiveInterval = time.Duration(interval) * time.Second
 		return nil
 	}
 }

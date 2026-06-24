@@ -361,6 +361,12 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 "wsHost": "0.0.0.0",
                 "wsPort": constants.STATUS_CONNECTOR_WS_PORT,
             },
+            "logosStorageConfigEnabled": kwargs.get("logos_storage_config_enabled", False),
+            "logosStorageConfigBootstrapNode": kwargs.get("logos_storage_config_bootstrap_node", None),
+            "importInitialDelay": kwargs.get("import_initial_delay", None),
+            "messageArchiveInterval": kwargs.get("message_archive_interval", None),
+            "torrentConfigEnabled": False,
+            "torrentConfigPort": 9025,
             "thirdpartyServicesEnabled": True,
         }
         if not Config.disable_override_networks:

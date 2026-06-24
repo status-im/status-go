@@ -55,6 +55,33 @@ func randomNodeConfig() *params.NodeConfig {
 		WakuV2Config: params.WakuV2Config{
 			LightClient: randomBool(),
 		},
+		LogosStorageConfig: params.LogosStorageConfig{
+			Enabled: randomBool(),
+			NodeConfig: params.LogosStorageNodeConfig{
+				DataDir:                        randomString(),
+				DiscoveryPort:                  randomInt(65535),
+				BlockRetries:                   randomInt(10),
+				LogLevel:                       randomString(),
+				LogFormat:                      randomString(),
+				MetricsEnabled:                 randomBool(),
+				MetricsAddress:                 randomString(),
+				MetricsPort:                    randomInt(65535),
+				ListenAddrs:                    randomStringSlice(),
+				Nat:                            randomString(),
+				NetPrivKeyFile:                 randomString(),
+				BootstrapNodes:                 randomStringSlice(),
+				MaxPeers:                       randomInt(1000),
+				NumThreads:                     randomInt(64),
+				AgentString:                    randomString(),
+				RepoKind:                       randomString(),
+				StorageQuota:                   randomInt(math.MaxInt64),
+				BlockTtl:                       randomString(),
+				BlockMaintenanceInterval:       randomString(),
+				BlockMaintenanceNumberOfBlocks: randomInt(1000),
+				CacheSize:                      randomInt(math.MaxInt64),
+				LogFile:                        randomString(),
+			},
+		},
 	}
 }
 
