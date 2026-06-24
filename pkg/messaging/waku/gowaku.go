@@ -1116,7 +1116,7 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
 		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		messageSentCheck := publish.NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
+		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)

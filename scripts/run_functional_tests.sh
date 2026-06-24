@@ -12,8 +12,14 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${USE_LOGOS_STORAGE:=false}"
 : "${FUNCTIONAL_TESTS_MARKER:=rpc}"
 : "${FUNCTIONAL_TESTS_RERUNS:=2}"
+: "${FUNCTIONAL_TESTS_PARALLEL:=12}"
 : "${PEER_IMAGES:=}"
 : "${PEER_REFS:=}"
+: "${USE_TORRENT:=false}"
+
+if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
+  export WAKU_STORE_MESSAGE_RETENTION_SECONDS="${WAKU_STORE_MESSAGE_RETENTION_SECONDS:-60}"
+fi
 
 echo -e "${GRN}Running functional tests${RST}"
 
@@ -61,16 +67,23 @@ docker ps -a --filter "name=${project_name}" --filter "status=exited" -q | xargs
 # Build statusgo image
 echo -e "${GRN}Building status-go${RST}"
 build_tags="${FUNCTIONAL_TESTS_BUILD_TAGS}"
+pytest_marker_expr="${FUNCTIONAL_TESTS_MARKER}"
 if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
   build_tags="${build_tags} use_logos_storage"
   if [[ -n "${LOGOS_STORAGE_LIB_DIR:-}" && ! -f "${LOGOS_STORAGE_LIB_DIR}/libstorage.so" ]]; then
     echo -e "${YEL}No libstorage.so at ${LOGOS_STORAGE_LIB_DIR}; build it first with make build-storage.${RST}"
   fi
+else
+  pytest_marker_expr="(${pytest_marker_expr}) and not logos_storage"
+fi
+if [[ "${USE_TORRENT}" == "true" ]]; then
+  build_tags="${build_tags} use_torrent"
 fi
 docker build . \
   --build-arg "build_flags=-cover" \
   --build-arg "build_tags=${build_tags}" \
   --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
+  --build-arg "use_torrent=${USE_TORRENT}" \
   --build-arg "enable_go_cache=false" \
   --tag "${image_name}"
 
@@ -108,6 +121,12 @@ echo -e "${GRN}wakufleet-scanner completed successfully${RST}"
 # Resolve peer (old) backend images for cross-version compatibility tests.
 peer_image_args=()
 if [[ "${FUNCTIONAL_TESTS_MARKER}" == "compatibility" ]]; then
+  # Run compatibility tests serially. They share a single waku fleet, and under
+  # pytest-xdist parallelism the fleet's peer-exchange hands each light client the
+  # ENRs of other concurrent tests' (torn-down) backends, churning filter peer
+  # selection and intermittently dropping messages (see #7513). Serial execution
+  # removes the cross-test contamination.
+  FUNCTIONAL_TESTS_PARALLEL=0
   echo -e "${GRN}Preparing peer images for compatibility tests${RST}"
   resolved_peer_images=()
   if [[ -n "${PEER_IMAGES}" ]]; then
@@ -170,7 +189,7 @@ pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${FUNCTIONAL_TESTS_MARKER}" -c "${root_path}/pytest.ini" -n 12 \
+pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${pytest_marker_expr}" -c "${root_path}/pytest.ini" -n "${FUNCTIONAL_TESTS_PARALLEL}"  \
   --dist load\
   --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
   --docker_project_name="${project_name}" \

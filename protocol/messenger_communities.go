@@ -40,6 +40,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/logosstorage"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -58,13 +59,14 @@ var grantUpdateInterval = 24 * time.Hour
 // 4 hours interval
 var grantInvokesProfileDispatchInterval = 4 * time.Hour
 
+var importInitialDelay = time.Minute * 5
+
 const discordTimestampLayout = time.RFC3339
 
 const (
 	importSlowRate          = time.Second / 1
 	importFastRate          = time.Second / 100
 	importMessagesChunkSize = 10
-	importInitialDelay      = time.Minute * 5
 )
 
 const (
@@ -73,15 +75,15 @@ const (
 )
 
 const (
-	ErrOwnerTokenNeeded                     = "owner token is needed" // #nosec G101
-	ErrMissingCommunityID                   = "communityID has to be provided"
-	ErrForbiddenProfileOrWatchOnlyAccount   = "cannot join a community using profile chat or watch-only account"
-	ErrSigningJoinRequestForKeycardAccounts = "signing a joining community request for accounts migrated to keycard must be done with a keycard"
-	ErrNotPartOfCommunity                   = "not part of the community"
-	ErrNotAdminOrOwner                      = "not admin or owner"
-	ErrSignerIsNil                          = "signer can't be nil"
-	ErrSyncMessagesSentByNonControlNode     = "accepted/requested to join sync messages can be send only by the control node"
-	ErrReceiverIsNil                        = "receiver can't be nil"
+	ErrOwnerTokenNeeded                        = "owner token is needed" // #nosec G101
+	ErrMissingCommunityID                      = "communityID has to be provided"
+	ErrForbiddenProfileOrWatchOnlyAccount      = "cannot join a community using profile chat or watch-only account"
+	ErrSigningJoinRequestForColdWalletAccounts = "signing a joining community request for accounts migrated to a cold wallet must be done with the cold wallet"
+	ErrNotPartOfCommunity                      = "not part of the community"
+	ErrNotAdminOrOwner                         = "not admin or owner"
+	ErrSignerIsNil                             = "signer can't be nil"
+	ErrSyncMessagesSentByNonControlNode        = "accepted/requested to join sync messages can be send only by the control node"
+	ErrReceiverIsNil                           = "receiver can't be nil"
 )
 
 type FetchCommunityRequest struct {
@@ -284,6 +286,13 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 						sub.HistoryArchiveDownloadedSignal.CommunityID,
 						sub.HistoryArchiveDownloadedSignal.From,
 						sub.HistoryArchiveDownloadedSignal.To,
+					)
+				}
+
+				if sub.IndexDownloadCompletedSignal != nil {
+					m.config.messengerSignalsHandler.IndexDownloadCompleted(
+						sub.IndexDownloadCompletedSignal.CommunityID,
+						sub.IndexDownloadCompletedSignal.IndexCid,
 					)
 				}
 
@@ -1341,8 +1350,8 @@ func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string,
 }
 
 // Signs the provided messages with the provided accounts and password.
-// Provided accounts must not belong to a keypair that is migrated to a keycard.
-// Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
+// Provided accounts must not belong to a keypair that is migrated to a cold wallet.
+// Otherwise, the signing will fail, cause such accounts should be signed with the cold wallet device.
 func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error) {
 	signatures := make([]string, len(signParams))
 	for i, param := range signParams {
@@ -1364,8 +1373,8 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 			return nil, err
 		}
 
-		if keypair.MigratedToKeycard() {
-			return nil, errors.New(ErrSigningJoinRequestForKeycardAccounts)
+		if keypair.MigratedToColdWallet() {
+			return nil, errors.New(ErrSigningJoinRequestForColdWalletAccounts)
 		}
 
 		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(types3.HexToAddress(param.Address), param.Password)
@@ -3812,7 +3821,7 @@ importMessageArchivesLoop:
 			case <-ctx.Done():
 				m.logger.Debug("interrupted importing history archive messages")
 				return nil
-			case <-time.After(1 * time.Hour):
+			case <-time.After(m.ratchetNotFoundDelay):
 				delayImport = false
 			}
 		}
@@ -3912,7 +3921,7 @@ func (m *Messenger) dispatchArchiveLinkMessage(communityID string) error {
 		return err
 	}
 
-	chatID := community.MagnetlinkMessageChannelID()
+	chatID := community.UniversalChatID()
 	rawMessage := common.RawMessage{
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
@@ -3939,6 +3948,10 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	nodeConfig, err := m.settings.GetNodeConfig()
 	if err != nil {
 		return err
+	}
+
+	if nodeConfig.LogosStorageConfig.Enabled {
+		return fmt.Errorf("cannot enable Torrent archive distribution when LogosStorage archive distribution is already enabled")
 	}
 
 	if nodeConfig.TorrentConfig.Enabled {
@@ -3978,13 +3991,66 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 	return nil
 }
 
+func (m *Messenger) EnableLogosStorageCommunityHistoryArchiveProtocol(overrides map[string]string) error {
+	nodeConfig, err := m.settings.GetNodeConfig()
+	if err != nil {
+		return err
+	}
+
+	if nodeConfig.TorrentConfig.Enabled {
+		return fmt.Errorf("cannot enable LogosStorage archive distribution when Torrent archive distribution is already enabled")
+	}
+
+	if nodeConfig.LogosStorageConfig.Enabled {
+		return nil
+	}
+
+	if len(overrides) > 0 {
+		if err := logosstorage.ApplyLogosStorageConfigOverrides(&nodeConfig.LogosStorageConfig, overrides); err != nil {
+			return err
+		}
+	}
+
+	nodeConfig.LogosStorageConfig.Enabled = true
+	err = m.settings.SaveSetting("node-config", nodeConfig)
+	if err != nil {
+		return err
+	}
+
+	m.config.logosStorageConfig = &nodeConfig.LogosStorageConfig
+
+	amc := &archivetypes.ArchiveManagerConfig{
+		LogosStorageConfig: &nodeConfig.LogosStorageConfig,
+	}
+
+	m.SetupArchiveManager(amc)
+
+	err = m.archiveManager.Start()
+	if err != nil {
+		return err
+	}
+
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return err
+	}
+
+	if len(controlledCommunities) > 0 {
+		go m.InitHistoryArchiveTasks(controlledCommunities)
+	}
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
+	}
+	return nil
+}
+
 func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 
 	nodeConfig, err := m.settings.GetNodeConfig()
 	if err != nil {
 		return err
 	}
-	if !nodeConfig.TorrentConfig.Enabled {
+	if !nodeConfig.TorrentConfig.Enabled && !nodeConfig.LogosStorageConfig.Enabled {
 		return nil
 	}
 
@@ -3993,16 +4059,23 @@ func (m *Messenger) DisableCommunityHistoryArchiveProtocol() error {
 		m.logger.Error("failed to stop torrent manager", zap.Error(err))
 	}
 
+	wasTorrentEnabled := nodeConfig.TorrentConfig.Enabled
+	wasLogosStorageEnabled := nodeConfig.LogosStorageConfig.Enabled
 	nodeConfig.TorrentConfig.Enabled = false
+	nodeConfig.LogosStorageConfig.Enabled = false
 	err = m.settings.SaveSetting("node-config", nodeConfig)
 	if err != nil {
 		return err
 	}
 
-	m.config.torrentConfig = &nodeConfig.TorrentConfig
-
-	amc := &archivetypes.ArchiveManagerConfig{
-		TorrentConfig: &nodeConfig.TorrentConfig,
+	amc := &archivetypes.ArchiveManagerConfig{}
+	if wasTorrentEnabled {
+		m.config.torrentConfig = &nodeConfig.TorrentConfig
+		amc.TorrentConfig = &nodeConfig.TorrentConfig
+	}
+	if wasLogosStorageEnabled {
+		m.config.logosStorageConfig = &nodeConfig.LogosStorageConfig
+		amc.LogosStorageConfig = &nodeConfig.LogosStorageConfig
 	}
 
 	m.SetupArchiveManager(amc)
@@ -4867,4 +4940,12 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
+}
+
+func (m *Messenger) IsSeedingHistoryArchive(communityID types3.HexBytes) bool {
+	lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(communityID)
+	if err != nil {
+		return false
+	}
+	return m.archiveManager.IsSeedingHistoryArchive(communityID, lastSeenArchiveLink)
 }

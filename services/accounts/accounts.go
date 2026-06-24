@@ -2,12 +2,14 @@ package accounts
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
+	"github.com/status-im/status-go/internal/accounts-management/generator"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
@@ -144,11 +146,6 @@ func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name strin
 	return (*api.messenger).UpdateKeypairName(keyUID, name)
 }
 
-// If xpub is empty, only cold wallet will be updated.
-func (api *API) UpdateKeypairXPub(ctx context.Context, keyUID string, xpub string, coldWallet accsmanagementtypes.ColdWalletType) error {
-	return (*api.messenger).UpdateKeypairXPub(keyUID, xpub, coldWallet)
-}
-
 func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPosition int64) error {
 	return (*api.messenger).MoveWalletAccount(fromPosition, toPosition)
 }
@@ -277,56 +274,36 @@ func (api *API) VerifyPassword(password string) bool {
 	return api.VerifyKeystoreFileForAccount(address, password)
 }
 
-func (api *API) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemonic string, password string) error {
+func (api *API) MigrateNonProfileColdWalletKeypairToApp(ctx context.Context, mnemonic string, password string) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 
-	return (*api.messenger).MigrateNonProfileKeycardKeypairToApp(ctx, mnemonicNoExtraSpaces, password)
+	acc, err := generator.CreateAccountFromMnemonic(mnemonic, "")
+	if err != nil {
+		return err
+	}
+
+	keypair, err := api.db.GetKeypairByKeyUID(acc.KeyUID())
+	if err != nil {
+		return err
+	}
+
+	if keypair.Type == accsmanagementtypes.KeypairTypeProfile {
+		return errors.New("cannot migrate profile keypair to app this way, use ConvertToRegularAccount instead")
+	}
+
+	return (*api.messenger).MigrateColdWalletKeypairToApp(ctx, mnemonicNoExtraSpaces, password)
 }
 
-// If keycard is new `Position` will be determined and set by the backend and `KeycardLocked` will be set to false.
-// If keycard is already added, `Position` and `KeycardLocked` will be unchanged.
-func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accsmanagementtypes.Keycard, password string) error {
-	return (*api.messenger).SaveOrUpdateKeycard(ctx, keycard, password)
-}
+func (api *API) MigrateNonProfileKeypairToColdWallet(ctx context.Context, keyUID string, password string, coldWallet accsmanagementtypes.ColdWalletType) error {
+	keypair, err := api.db.GetKeypairByKeyUID(keyUID)
+	if err != nil {
+		return err
+	}
 
-func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*accsmanagementtypes.Keycard, error) {
-	return api.db.GetAllKnownKeycards()
-}
-
-func (api *API) GetKeycardsWithSameKeyUID(ctx context.Context, keyUID string) ([]*accsmanagementtypes.Keycard, error) {
-	return api.db.GetKeycardsWithSameKeyUID(keyUID)
-}
-
-func (api *API) GetKeycardByKeycardUID(ctx context.Context, keycardUID string) (*accsmanagementtypes.Keycard, error) {
-	return api.db.GetKeycardByKeycardUID(keycardUID)
-}
-
-func (api *API) SetKeycardName(ctx context.Context, keycardUID string, kpName string) error {
-	return (*api.messenger).SetKeycardName(ctx, keycardUID, kpName)
-}
-
-func (api *API) KeycardLocked(ctx context.Context, keycardUID string) error {
-	return (*api.messenger).KeycardLocked(ctx, keycardUID)
-}
-
-func (api *API) KeycardUnlocked(ctx context.Context, keycardUID string) error {
-	return (*api.messenger).KeycardUnlocked(ctx, keycardUID)
-}
-
-func (api *API) DeleteKeycardAccounts(ctx context.Context, keycardUID string, accountAddresses []types.Address) error {
-	return (*api.messenger).DeleteKeycardAccounts(ctx, keycardUID, accountAddresses)
-}
-
-func (api *API) DeleteKeycard(ctx context.Context, keycardUID string) error {
-	return (*api.messenger).DeleteKeycard(ctx, keycardUID)
-}
-
-func (api *API) DeleteAllKeycardsWithKeyUID(ctx context.Context, keyUID string) error {
-	return (*api.messenger).DeleteAllKeycardsWithKeyUID(ctx, keyUID)
-}
-
-func (api *API) UpdateKeycardUID(ctx context.Context, oldKeycardUID string, newKeycardUID string) error {
-	return (*api.messenger).UpdateKeycardUID(ctx, oldKeycardUID, newKeycardUID)
+	if keypair.Type == accsmanagementtypes.KeypairTypeProfile {
+		return errors.New("cannot migrate profile keypair to cold wallet this way, use ConvertToKeycardAccount instead")
+	}
+	return (*api.messenger).MigrateKeypairToColdWallet(ctx, keyUID, password, coldWallet)
 }
 
 func (api *API) AddressWasShown(address types.Address) error {

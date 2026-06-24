@@ -127,18 +127,6 @@ var (
 		dBColumnName:   "hide_home_tooltip",
 		valueHandler:   BoolHandler,
 	}
-	KeycardInstanceUID = SettingField{
-		reactFieldName: "keycard-instance_uid",
-		dBColumnName:   "keycard_instance_uid",
-	}
-	KeycardPairedOn = SettingField{
-		reactFieldName: "keycard-paired_on",
-		dBColumnName:   "keycard_paired_on",
-	}
-	KeycardPairing = SettingField{
-		reactFieldName: "keycard-pairing",
-		dBColumnName:   "keycard_pairing",
-	}
 	LastUpdated = SettingField{
 		reactFieldName: "last-updated",
 		dBColumnName:   "last_updated",
@@ -520,9 +508,6 @@ var (
 		GifFavourites,
 		GifRecents,
 		HideHomeTooltip,
-		KeycardInstanceUID,
-		KeycardPairedOn,
-		KeycardPairing,
 		LastUpdated,
 		LatestDerivedPath,
 		LinkPreviewRequestEnabled,

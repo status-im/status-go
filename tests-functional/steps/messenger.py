@@ -256,8 +256,10 @@ def leave_group(node, group_id, observers=()):
 # --- Community operations ---
 
 
-def create_community(node) -> str:
-    response = node.wakuext_service.create_community(fake.community_name(), fake.community_description())
+def create_community(node, history_archive_support_enabled=False) -> str:
+    response = node.wakuext_service.create_community(
+        fake.community_name(), fake.community_description(), history_archive_support_enabled=history_archive_support_enabled
+    )
     community_id = response.get("communities", [{}])[0].get("id")
     return community_id
 
@@ -339,7 +341,7 @@ def _pick_chat_id(chats: dict) -> str | None:
         return next(iter(chats.keys()), None)
 
 
-def join_community(member, admin, community_id):
+def join_community(member, admin, community_id, prejoin_warmup=True):
     def _is_accepted(state) -> bool:
         return state == 3 or str(state) == "3"
 
@@ -381,67 +383,84 @@ def join_community(member, admin, community_id):
     accepted_seen = False
     accepted_via = None
 
-    logger.info("join_community: Phase A — member visibility warm-up")
-    phase_a_deadline = min(deadline, time.monotonic() + 50.0)
     warmup_timed_out = False
-    while time.monotonic() < phase_a_deadline:
-        member_warmup_attempts += 1
-        member_fast_fetch_attempts += 1
+    if prejoin_warmup:
+        logger.info("join_community: Phase A — member visibility warm-up")
+        phase_a_deadline = min(deadline, time.monotonic() + 50.0)
+        while time.monotonic() < phase_a_deadline:
+            member_warmup_attempts += 1
+            member_fast_fetch_attempts += 1
+            try:
+                member_last_fetch = fetch_community(member, community_id, wait_for_response=False, try_database=False)
+            except ApiResponseError as e:
+                if not _is_community_not_found(e):
+                    raise
+                member_last_fetch_error = str(e)
+                member_last_fetch = None
+
+            if member_last_fetch:
+                logger.info("join_community: Phase A — community visible after %d fast-fetch attempts", member_warmup_attempts)
+                break
+
+            remaining_phase_a = phase_a_deadline - time.monotonic()
+            if member_warmup_attempts % 10 == 0 and remaining_phase_a > 20:
+                member_blocking_fetch_attempts += 1
+                try:
+                    member_last_fetch = fetch_community(
+                        member,
+                        community_id,
+                        wait_for_response=True,
+                        try_database=False,
+                        timeout=10,
+                    )
+                except ApiResponseError as e:
+                    if not _is_community_not_found(e):
+                        raise
+                    member_last_fetch_error = str(e)
+                    member_last_fetch = None
+                except Exception as e:
+                    member_last_fetch_error = str(e)
+                    member_last_fetch = None
+
+                if member_last_fetch:
+                    logger.info("join_community: Phase A — community visible after blocking fetch (attempt %d)", member_blocking_fetch_attempts)
+                    break
+
+            try:
+                member.wakuext_service.spectate_community(community_id)
+            except ApiResponseError as e:
+                if not _is_community_not_found(e):
+                    raise
+                member_last_spectate_error = str(e)
+
+            time.sleep(1)
+
+        if not member_last_fetch:
+            warmup_timed_out = True
+            logger.warning(
+                "join_community: Phase A — warm-up timed out after %d attempts (last_error=%s)", member_warmup_attempts, member_last_fetch_error
+            )
+    else:
+        logger.info("join_community: Phase A — member visibility warm-up skipped")
+
         try:
-            member_last_fetch = fetch_community(member, community_id, wait_for_response=False, try_database=False)
+            member_last_fetch = fetch_community(
+                member,
+                community_id,
+                wait_for_response=True,
+                try_database=False,
+                timeout=10,
+            )
         except ApiResponseError as e:
             if not _is_community_not_found(e):
                 raise
             member_last_fetch_error = str(e)
             member_last_fetch = None
 
-        if member_last_fetch:
-            logger.info("join_community: Phase A — community visible after %d fast-fetch attempts", member_warmup_attempts)
-            break
-
-        remaining_phase_a = phase_a_deadline - time.monotonic()
-        if member_warmup_attempts % 10 == 0 and remaining_phase_a > 20:
-            member_blocking_fetch_attempts += 1
-            try:
-                member_last_fetch = fetch_community(
-                    member,
-                    community_id,
-                    wait_for_response=True,
-                    try_database=False,
-                    timeout=10,
-                )
-            except ApiResponseError as e:
-                if not _is_community_not_found(e):
-                    raise
-                member_last_fetch_error = str(e)
-                member_last_fetch = None
-            except Exception as e:
-                member_last_fetch_error = str(e)
-                member_last_fetch = None
-
-            if member_last_fetch:
-                logger.info("join_community: Phase A — community visible after blocking fetch (attempt %d)", member_blocking_fetch_attempts)
-                break
-
-        try:
-            member.wakuext_service.spectate_community(community_id)
-        except ApiResponseError as e:
-            if not _is_community_not_found(e):
-                raise
-            member_last_spectate_error = str(e)
-
-        time.sleep(1)
-
-    if not member_last_fetch:
-        warmup_timed_out = True
-        logger.warning(
-            "join_community: Phase A — warm-up timed out after %d attempts (last_error=%s)", member_warmup_attempts, member_last_fetch_error
-        )
-
     fetch_community(admin, community_id)
 
     logger.info("join_community: Phase B — requesting to join")
-    request_retry_interval = 25.0
+    request_retry_interval = 25.0 if prejoin_warmup else 2.0
     next_request_at = time.monotonic()
     while time.monotonic() < deadline and not join_id:
         now = time.monotonic()
@@ -474,23 +493,24 @@ def join_community(member, admin, community_id):
             finally:
                 next_request_at = now + request_retry_interval
 
-        try:
-            member.wakuext_service.spectate_community(community_id)
-        except ApiResponseError as spectate_error:
-            if not _is_community_not_found(spectate_error):
-                raise
-            member_last_spectate_error = str(spectate_error)
+        if prejoin_warmup:
+            try:
+                member.wakuext_service.spectate_community(community_id)
+            except ApiResponseError as spectate_error:
+                if not _is_community_not_found(spectate_error):
+                    raise
+                member_last_spectate_error = str(spectate_error)
 
-        member_fast_fetch_attempts += 1
-        try:
-            member_last_fetch = fetch_community(member, community_id, wait_for_response=False, try_database=False)
-            if member_last_fetch:
-                warmup_timed_out = False
-        except ApiResponseError as e:
-            if not _is_community_not_found(e):
-                raise
-            member_last_fetch_error = str(e)
-            member_last_fetch = None
+            member_fast_fetch_attempts += 1
+            try:
+                member_last_fetch = fetch_community(member, community_id, wait_for_response=False, try_database=False)
+                if member_last_fetch:
+                    warmup_timed_out = False
+            except ApiResponseError as e:
+                if not _is_community_not_found(e):
+                    raise
+                member_last_fetch_error = str(e)
+                member_last_fetch = None
         time.sleep(1)
 
     if not join_id and not accepted_seen:

@@ -23,6 +23,7 @@ type HistoryArchiveSignals struct {
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
+	IndexDownloadCompletedSignal             *signal.IndexDownloadCompletedSignal
 }
 
 type HistoryArchiveDownloadTask struct {
@@ -72,10 +73,11 @@ type HistoryArchivePublisher interface {
 }
 
 type ArchiveManagerConfig struct {
-	TorrentConfig *params.TorrentConfig
-	Logger        *zap.Logger
-	Persistence   PersistenceProvider
-	Messaging     *messaging.API
-	Identity      *ecdsa.PrivateKey
-	Publisher     HistoryArchivePublisher
+	TorrentConfig      *params.TorrentConfig
+	LogosStorageConfig *params.LogosStorageConfig
+	Logger             *zap.Logger
+	Persistence        PersistenceProvider
+	Messaging          *messaging.API
+	Identity           *ecdsa.PrivateKey
+	Publisher          HistoryArchivePublisher
 }

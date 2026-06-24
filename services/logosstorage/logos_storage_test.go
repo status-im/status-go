@@ -1,5 +1,4 @@
 //go:build use_logos_storage && !lint
-// +build use_logos_storage,!lint
 
 package logosstorage_test
 

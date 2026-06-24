@@ -1,8 +1,8 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-ios-library statusgo-android-library
 .PHONY: build-libsds clean-libsds rebuild-libsds
-.PHONY: clone-storage build-storage clean-storage test-storage
-.PHONY: storage-help
+.PHONY: clone-storage build-storage clean-storage test-storage test-torrent
+.PHONY: history-archive-help
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -107,7 +107,8 @@ BUILD_TAGS ?= gowaku_no_rln
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
 NIM_SDS_VERSION ?= 5e272136aa3b4642753891054a77274b880df149
 
-# Option 1: Provide NIM_SDS_SOURCE_DIR. Make clones it if missing.
+# Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
+# to guarantee a clean checkout on every build.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
 ifeq ($(mkspecs),win32)
@@ -137,10 +138,12 @@ CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -Wl,-rpath,$(NIM_SDS_LIB_DIR)
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
+USE_TORRENT ?= false
 LOGOS_STORAGE_VERSION ?= 3c09f008bb5266a669fd19f18368f9e8b861b664
 LOGOS_STORAGE_SOURCE_DIR ?= $(GIT_ROOT)/../logos-storage-nim
 
-# Option 1: Provide LOGOS_STORAGE_SOURCE_DIR. Make clones it if missing.
+# Option 1: Provide LOGOS_STORAGE_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
+# to guarantee a clean checkout on every build.
 # Option 2: Provide LOGOS_STORAGE_LIB_DIR and LOGOS_STORAGE_INC_DIR.
 ifdef LOGOS_STORAGE_LIB_DIR
 ifdef LOGOS_STORAGE_INC_DIR
@@ -159,28 +162,38 @@ LIBSTORAGE ?= $(LOGOS_STORAGE_LIB_DIR)/libstorage.$(LIB_EXT)
 RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
-	BUILD_TAGS += use_logos_storage
+	override BUILD_TAGS += use_logos_storage
 	CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
 	CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
 	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
 	LOGOS_STORAGE_BUILD_DEPS += $(LIBSTORAGE)
 endif
 
+ifeq ($(USE_TORRENT),true)
+	override BUILD_TAGS += use_torrent
+endif
+
 clone-storage: ##@build Clone or update logos-storage-nim
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@echo "Cloning or updating logos-storage-nim ..."
 	if [ ! -d "$(LOGOS_STORAGE_SOURCE_DIR)" ]; then \
-		git clone --recurse-submodules https://github.com/logos-storage/logos-storage-nim.git $(LOGOS_STORAGE_SOURCE_DIR); \
+		git clone --recurse-submodules https://github.com/logos-storage/logos-storage-nim.git "$(LOGOS_STORAGE_SOURCE_DIR)"; \
 	else \
-		cd $(LOGOS_STORAGE_SOURCE_DIR) && git fetch --tags; \
+		cd "$(LOGOS_STORAGE_SOURCE_DIR)" && git fetch --tags; \
 	fi
-	cd $(LOGOS_STORAGE_SOURCE_DIR) && git checkout $(LOGOS_STORAGE_VERSION) && git submodule update --init --recursive
+	cd "$(LOGOS_STORAGE_SOURCE_DIR)" && \
+		git switch --force --detach "$(LOGOS_STORAGE_VERSION)" && \
+		git clean -fdx && \
+		git submodule update --init --recursive --force
 endif
 
 $(LIBSTORAGE): clone-storage
 ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@echo "Building logos-storage: $(LIBSTORAGE)"
-	$(MAKE) -C $(LOGOS_STORAGE_SOURCE_DIR) libstorage
+	$(MAKE) -C $(LOGOS_STORAGE_SOURCE_DIR) libstorage USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
+	@test -f $(LIBSTORAGE) || (echo "Error: libstorage not found at $(LIBSTORAGE) after build" && exit 1)
+else
+	@test -f $(LIBSTORAGE) || (echo "Error: libstorage not found at $(LIBSTORAGE)" && exit 1)
 endif
 
 build-storage: $(LIBSTORAGE)
@@ -190,14 +203,29 @@ ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 	@rm -f "$(LOGOS_STORAGE_LIB_DIR)"/libstorage.*
 endif
 
-test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
-	LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
+STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)" \
 	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)" \
-	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)" \
-	gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations"
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)"
+STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
-storage-help: ##@build Show logos-storage build/test toggles and env vars
-	@cat services/logosstorage/README.md
+test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
+	$(STORAGE_TEST_ENV) gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) gotestsum --packages="./protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
+	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
+
+TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+	CGO_CFLAGS="$(CGO_CFLAGS)"
+TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
+
+test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
+	$(TORRENT_TEST_ENV) gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
+	$(TORRENT_TEST_ENV) gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
+	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
+
+history-archive-help: ##@build Show history archive build/test toggles and env vars
+	@cat protocol/communities/archive/README.md
 
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
@@ -298,11 +326,14 @@ clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
-		git clone https://github.com/waku-org/nim-sds.git $(NIM_SDS_SOURCE_DIR); \
+		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
 	else \
-		cd $(NIM_SDS_SOURCE_DIR) && git fetch --tags; \
+		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
 	fi
-	cd $(NIM_SDS_SOURCE_DIR) && git checkout $(NIM_SDS_VERSION)
+	cd "$(NIM_SDS_SOURCE_DIR)" && \
+		git switch --force --detach "$(NIM_SDS_VERSION)" && \
+		git clean -fdx && \
+		git submodule update --init --recursive --force
 endif
 
 $(LIBSDS): clone-nim-sds
@@ -535,7 +566,7 @@ test-unit: ##@tests Run unit and integration tests
 
 test-single: test-unit-prep
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go test -v $(PKG) -testify.m $(TEST)
+	go test -v -tags '$(BUILD_TAGS)' $(PKG) -run '$(TEST)' $(if $(TESTIFY_M),-testify.m '$(TESTIFY_M)')
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
@@ -550,6 +581,7 @@ test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
+test-functional: export USE_TORRENT := $(USE_TORRENT)
 test-functional:
 	@./scripts/run_functional_tests.sh
 
@@ -558,7 +590,7 @@ test-functional-compatibility: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, 
 test-functional-compatibility: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional-compatibility: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
 test-functional-compatibility: export FUNCTIONAL_TESTS_MARKER := compatibility
-test-functional-compatibility: export FUNCTIONAL_TESTS_RERUNS := 1
+test-functional-compatibility: export FUNCTIONAL_TESTS_RERUNS := 6
 test-functional-compatibility: ##@tests Cross-version chat compatibility smoke tests (set PEER_IMAGES or PEER_REFS)
 	@./scripts/run_functional_tests.sh
 

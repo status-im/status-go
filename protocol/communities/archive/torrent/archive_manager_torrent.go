@@ -1,5 +1,4 @@
 //go:build !disable_history_archives
-// +build !disable_history_archives
 
 package torrent
 
@@ -11,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -135,7 +135,7 @@ func (m *ArchiveManagerTorrent) Start() error {
 	config.DataDir = m.torrentConfig.DataDir
 
 	if _, err := os.Stat(m.torrentConfig.DataDir); os.IsNotExist(err) {
-		err := os.MkdirAll(m.torrentConfig.DataDir, 0700)
+		err := os.MkdirAll(m.torrentConfig.DataDir, 0o700)
 		if err != nil {
 			return err
 		}
@@ -168,9 +168,7 @@ func (m *ArchiveManagerTorrent) Stop() error {
 }
 
 func (m *ArchiveManagerTorrent) IsStarted() bool {
-	m.torrentMu.RLock()
-	defer m.torrentMu.RUnlock()
-	return m.torrentClient != nil
+	return m.torrentClientStarted()
 }
 
 func (m *ArchiveManagerTorrent) SeedHistoryArchive(communityID cryptotypes.HexBytes, archiveLink string) error {
@@ -193,10 +191,6 @@ func (m *ArchiveManagerTorrent) SeedHistoryArchive(communityID cryptotypes.HexBy
 
 	hash := metaInfo.HashInfoBytes()
 	m.setTorrentTask(id, hash)
-
-	if err != nil {
-		return err
-	}
 
 	client := m.getTorrentClient()
 	if client == nil {
@@ -363,15 +357,7 @@ func (m *ArchiveManagerTorrent) DownloadHistoryArchives(communityID cryptotypes.
 					for _, hd := range archiveHashes {
 
 						hash := hd.hash
-						hasArchive := false
-
-						for _, existingHash := range existingArchiveIDs {
-							if existingHash == hash {
-								hasArchive = true
-								break
-							}
-						}
-						if hasArchive {
+						if slices.Contains(existingArchiveIDs, hash) {
 							continue
 						}
 
@@ -450,7 +436,6 @@ func (m *ArchiveManagerTorrent) CreateHistoryArchiveFromDB(communityID cryptotyp
 }
 
 func (m *ArchiveManagerTorrent) CreateAndSeedHistoryArchive(communityID cryptotypes.HexBytes, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error {
-
 	archiveCreatedSuccessfully := true
 	m.UnseedHistoryArchive(communityID, "")
 	_, err := m.CreateHistoryArchiveFromDB(communityID, topics, startDate, endDate, partition, encrypt)
@@ -584,7 +569,7 @@ func (m *ArchiveManagerTorrent) getTCPandUDPport(portNumber int) (int, error) {
 	}
 
 	// Find free port
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		port := func() int {
 			tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
 			if err != nil {
@@ -666,7 +651,6 @@ func (m *ArchiveManagerTorrent) archiveIndexFile(communityID string) string {
 }
 
 func (m *ArchiveManagerTorrent) createHistoryArchiveTorrent(communityID cryptotypes.HexBytes, msgs []*messagingtypes.ReceivedMessage, topics []messagingtypes.ContentTopic, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error) {
-
 	loadFromDB := len(msgs) == 0
 
 	from := startDate
@@ -685,13 +669,13 @@ func (m *ArchiveManagerTorrent) createHistoryArchiveTorrent(communityID cryptoty
 	archiveIDs := make([]string, 0)
 
 	if _, err := os.Stat(archiveDir); os.IsNotExist(err) {
-		err := os.MkdirAll(archiveDir, 0700)
+		err := os.MkdirAll(archiveDir, 0o700)
 		if err != nil {
 			return archiveIDs, err
 		}
 	}
 	if _, err := os.Stat(torrentDir); os.IsNotExist(err) {
-		err := os.MkdirAll(torrentDir, 0700)
+		err := os.MkdirAll(torrentDir, 0o700)
 		if err != nil {
 			return archiveIDs, err
 		}
@@ -719,16 +703,15 @@ func (m *ArchiveManagerTorrent) createHistoryArchiveTorrent(communityID cryptoty
 		CommunityID: communityID.String(),
 	}})
 
-	m.logger.Debug("creating archives",
+	m.logger.Debug(
+		"creating archives",
 		zap.Any("startDate", startDate),
 		zap.Any("endDate", endDate),
 		zap.Duration("partition", partition),
 	)
-	for {
-		if from.Equal(endDate) || from.After(endDate) {
-			break
-		}
-		m.logger.Debug("creating message archive",
+	for from.Before(endDate) {
+		m.logger.Debug(
+			"creating message archive",
 			zap.Any("from", from),
 			zap.Any("to", to),
 		)
@@ -858,12 +841,12 @@ func (m *ArchiveManagerTorrent) createHistoryArchiveTorrent(communityID cryptoty
 			}
 		}
 
-		err = os.WriteFile(indexPath, indexBytes, 0644) // nolint: gosec
+		err = os.WriteFile(indexPath, indexBytes, 0o644) // nolint: gosec
 		if err != nil {
 			return archiveIDs, err
 		}
 
-		file, err := os.OpenFile(dataPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		file, err := os.OpenFile(dataPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 		if err != nil {
 			return archiveIDs, err
 		}
@@ -899,7 +882,7 @@ func (m *ArchiveManagerTorrent) createHistoryArchiveTorrent(communityID cryptoty
 			return archiveIDs, err
 		}
 
-		err = os.WriteFile(torrentFile(m.torrentConfig.TorrentDir, communityID.String()), metaInfoBytes, 0644) // nolint: gosec
+		err = os.WriteFile(torrentFile(m.torrentConfig.TorrentDir, communityID.String()), metaInfoBytes, 0o644) // nolint: gosec
 		if err != nil {
 			return archiveIDs, err
 		}
@@ -987,6 +970,7 @@ func findIndexFile(files []*torrent.File) (index int, ok bool) {
 // These functions are not part of the ArchiveServiceBackend interface.
 // Some legacy tests are accessing implementation details and for this reason
 // we need to expose these special accessors.
+
 func (m *ArchiveManagerTorrent) LoadHistoryArchiveIndexFromFile(myKey *ecdsa.PrivateKey, communityID cryptotypes.HexBytes) (*protobuf.WakuMessageArchiveIndex, error) {
 	return m.loadHistoryArchiveIndexFromFile(myKey, communityID)
 }

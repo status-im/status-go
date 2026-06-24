@@ -303,7 +303,8 @@ message SyncKeypair {
   uint64 last_used_derivation_index = 6;
   string synced_from = 7;
   repeated SyncAccount accounts = 8;
-  repeated SyncKeycard keycards = 9;
+  reserved 9;
+  reserved "keycards";
   bool removed = 10;
   bytes keycard_pairings = 11;
   string xpub = 12;
@@ -412,15 +413,6 @@ message SyncRawMessage {
   // we need these to be able to login
   bytes subAccountsJsonBytes = 2;
   bytes settingsJsonBytes = 3;
-}
-
-message SyncKeycard {
-  string uid = 1;
-  string name = 2;
-  bool locked = 3;
-  string key_uid = 4;
-  repeated bytes addresses = 5;
-  uint64 position = 6;
 }
 
 message SyncSocialLinks {

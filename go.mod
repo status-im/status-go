@@ -101,7 +101,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.4.0
-	github.com/status-im/go-wallet-sdk v0.0.0-20260428172609-d99313975e5c
+	github.com/status-im/go-wallet-sdk v0.0.0-20260612221124-9c7a9c043068
 	github.com/waku-org/go-waku v0.10.2
 	github.com/waku-org/sds-go-bindings v0.0.0-20260619212938-903db205f23c
 	github.com/wk8/go-ordered-map/v2 v2.1.7

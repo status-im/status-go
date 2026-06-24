@@ -7,8 +7,10 @@ import (
 	"image/png"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -17,7 +19,9 @@ import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -345,6 +349,53 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NotNil(removedChat)
 	s.Require().False(removedChat.Active)
 
+}
+
+func (s *MessengerInstallationSuite) TestSyncDevices_DoesNotSyncSelfAsContact() {
+	s.m.SetLocalPairing(true)
+	defer s.m.SetLocalPairing(false)
+
+	canonicalSelfID := s.m.myHexIdentity()
+	nonCanonicalSelfID := "0X" + strings.ToUpper(canonicalSelfID[2:])
+
+	selfContact, err := contacts.BuildContactFromPublicKey(&s.m.identity.PublicKey)
+	s.Require().NoError(err)
+	selfContact.ContactRequestSent(1)
+
+	nonCanonicalSelfContact, err := contacts.BuildContact(nonCanonicalSelfID, &s.m.identity.PublicKey)
+	s.Require().NoError(err)
+	nonCanonicalSelfContact.ContactRequestSent(1)
+
+	otherContactKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	otherContact, err := contacts.BuildContactFromPublicKey(&otherContactKey.PublicKey)
+	s.Require().NoError(err)
+	otherContact.ContactRequestSent(1)
+
+	s.m.allContacts.Store(selfContact.ID, selfContact)
+	s.m.allContacts.Store(nonCanonicalSelfContact.ID, nonCanonicalSelfContact)
+	s.m.allContacts.Store(otherContact.ID, otherContact)
+
+	syncedContactIDs := map[string]int{}
+	rawMessageHandler := func(_ context.Context, rawMessage common.RawMessage) (common.RawMessage, error) {
+		if rawMessage.MessageType != protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT_V2 {
+			return rawMessage, nil
+		}
+
+		syncContact := &protobuf.SyncInstallationContactV2{}
+		err := proto.Unmarshal(rawMessage.Payload, syncContact)
+		s.Require().NoError(err)
+		syncedContactIDs[syncContact.Id]++
+
+		return rawMessage, nil
+	}
+
+	err = s.m.SyncDevices(context.Background(), "", "", false, rawMessageHandler)
+	s.Require().NoError(err)
+
+	s.Require().Zero(syncedContactIDs[canonicalSelfID])
+	s.Require().Zero(syncedContactIDs[nonCanonicalSelfID])
+	s.Require().Equal(1, syncedContactIDs[otherContact.ID])
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {

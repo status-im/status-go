@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"gopkg.in/go-playground/validator.v9"
@@ -30,6 +31,13 @@ func TestNewConfigFromJSON(t *testing.T) {
 			"DataDir": "` + tmpDir + `/archivedata",
 			"TorrentDir": "` + tmpDir + `/torrents"
 		},
+		"LogosStorageConfig": {
+			"Enabled": false,
+			"NodeConfig": {
+				"DataDir": "` + tmpDir + `/logos-storage/data",
+				"BlockRetries": 5
+			}
+		},
 		"RuntimeLogLevel": "DEBUG"
 	}`
 	c, err := params.NewConfigFromJSON(json)
@@ -41,6 +49,21 @@ func TestNewConfigFromJSON(t *testing.T) {
 	require.Equal(t, tmpDir+"/archivedata", c.TorrentConfig.DataDir)
 	require.Equal(t, tmpDir+"/torrents", c.TorrentConfig.TorrentDir)
 	require.Equal(t, "DEBUG", c.RuntimeLogLevel)
+	require.Equal(t, filepath.Join(tmpDir, "logos-storage", "data"), c.LogosStorageConfig.NodeConfig.DataDir)
+	require.Equal(t, 5, c.LogosStorageConfig.NodeConfig.BlockRetries)
+}
+
+func TestNodeConfigUpdateWithDefaultsSetsLogosStorageDataDirWhenEnabled(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := &params.NodeConfig{
+		RootDataDir: tmpDir,
+		LogosStorageConfig: params.LogosStorageConfig{
+			Enabled: true,
+		},
+	}
+
+	require.NoError(t, config.UpdateWithDefaults())
+	require.Equal(t, filepath.Join(tmpDir, "logos-storage", "data"), config.LogosStorageConfig.NodeConfig.DataDir)
 }
 
 // TestNodeConfigValidate checks validation of individual fields.
