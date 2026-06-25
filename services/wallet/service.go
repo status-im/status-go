@@ -377,8 +377,12 @@ func buildPathProcessors(
 	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.GetNetworkManager())
 	ret = append(ret, hop)
 
-	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
-	ret = append(ret, paraswap)
+	// disable paraswap, todo: put it back after testing
+	// paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
+	// ret = append(ret, paraswap)
+
+	lifi := pathprocessor.NewSwapLiFiProcessor(rpcClient, transactor, tokenManager)
+	ret = append(ret, lifi)
 
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)
 	ret = append(ret, ensRegister)

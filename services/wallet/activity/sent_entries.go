@@ -254,7 +254,7 @@ func getSentActivityType(processorName string, isApproval bool) ac.Type {
 		return ac.SendAT
 	case pathProcessorCommon.ProcessorBridgeHopName:
 		return ac.BridgeAT
-	case pathProcessorCommon.ProcessorSwapParaswapName:
+	case pathProcessorCommon.ProcessorSwapParaswapName, pathProcessorCommon.ProcessorSwapLiFiName:
 		return ac.SwapAT
 	}
 	return ac.UnknownAT

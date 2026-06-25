@@ -20,7 +20,8 @@ func IsProcessorBridge(name string) bool {
 }
 
 func IsProcessorSwap(name string) bool {
-	return name == pathProcessorCommon.ProcessorSwapParaswapName
+	return name == pathProcessorCommon.ProcessorSwapParaswapName ||
+		name == pathProcessorCommon.ProcessorSwapLiFiName
 }
 
 func PackApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Address) ([]byte, error) {
