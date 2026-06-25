@@ -54,6 +54,7 @@ var (
 	ErrCommunityTokenType       = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-041"), Details: "invalid community token type"}
 	ErrIncorrectSignatureFormat = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-042"), Details: "incorrect signature length: got %d, want %d"}
 	ErrTransactionNotFound      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-043"), Details: "transaction not found"}
+	ErrSwapLiFiCustomError      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-044"), Details: "LiFi custom error"}
 )
 
 func createErrorResponse(processorName string, err error) error {
@@ -86,6 +87,8 @@ func createErrorResponse(processorName string, err error) error {
 		customErrResp = ErrBridgeHopCustomError
 	case pathProcessorCommon.ProcessorSwapParaswapName:
 		customErrResp = ErrSwapParaswapCustomError
+	case pathProcessorCommon.ProcessorSwapLiFiName:
+		customErrResp = ErrSwapLiFiCustomError
 	case pathProcessorCommon.ProcessorENSRegisterName:
 		customErrResp = ErrENSRegisterCustomError
 	case pathProcessorCommon.ProcessorENSReleaseName:
@@ -118,6 +121,7 @@ func IsCustomError(err error) bool {
 		ErrERC1155TransferCustomError,
 		ErrBridgeHopCustomError,
 		ErrSwapParaswapCustomError,
+		ErrSwapLiFiCustomError,
 		ErrENSRegisterCustomError,
 		ErrENSReleaseCustomError,
 		ErrENSPublicKeyCustomError,

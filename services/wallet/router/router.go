@@ -30,6 +30,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
@@ -81,6 +82,7 @@ type Router struct {
 	scheduler            *async.Scheduler
 
 	paraswapClientFactory func(chainID uint64) paraswap.ClientInterface
+	lifiClientFactory     func(chainID uint64) lifi.ClientInterface
 
 	activeBalanceMap sync.Map // map[string]*big.Int
 
@@ -121,6 +123,9 @@ func NewRouter(
 		scheduler:            async.NewScheduler(),
 		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
 			return paraswap.NewClientV5(chainID, pathprocessor.ParaswapPartnerID, walletCommon.ZeroAddress(), 0)
+		},
+		lifiClientFactory: func(chainID uint64) lifi.ClientInterface {
+			return lifi.NewClient(chainID, lifi.Integrator, "")
 		},
 		logger: logger,
 	}
