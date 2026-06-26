@@ -24,7 +24,13 @@ report_to_codecov() {
   # and doesn't report coverage to Github. More details here: https://github.com/status-im/status-go/issues/5963
   #  codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${report_files_args}
 
-  codecov upload-process --token "${CODECOV_TOKEN}" -f ${coverage_report} -F "${flag}"
+  # Pass PR/commit/branch explicitly; codecov-cli auto-detection fails to associate PR uploads.
+  local context_args=()
+  [[ -n "${CODECOV_SHA:-}"    && "${CODECOV_SHA:-}"    != "null" ]] && context_args+=(-C "${CODECOV_SHA}")
+  [[ -n "${CODECOV_BRANCH:-}" && "${CODECOV_BRANCH:-}" != "null" ]] && context_args+=(-B "${CODECOV_BRANCH}")
+  [[ -n "${CODECOV_PR:-}"     && "${CODECOV_PR:-}"     != "null" ]] && context_args+=(--pr "${CODECOV_PR}")
+
+  codecov upload-process --token "${CODECOV_TOKEN}" -f ${coverage_report} -F "${flag}" ${context_args[@]+"${context_args[@]}"}
 }
 
 convert_coverage_to_html() {
