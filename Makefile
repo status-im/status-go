@@ -77,7 +77,9 @@ ifeq ($(MAKECMDGOALS),statusgo-ios-library)
         MOBILE_GOARCH := $(ARCH)
     endif
     IOS_BUILD_FLAGS := CGO_ENABLED=1 GOOS=ios GOARCH=$(MOBILE_GOARCH)
-    CGO_CFLAGS+=-Os -flto -arch $(ARCH) -isysroot $$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode
+    IOS_SDK_PATH := $$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path)
+    CGO_CFLAGS+=-Os -flto -arch $(ARCH) -isysroot $(IOS_SDK_PATH) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode
+    CGO_CXXFLAGS+=-Os -flto -arch $(ARCH) -isysroot $(IOS_SDK_PATH) -miphoneos-version-min=$(IOS_TARGET) -fembed-bitcode
     CGO_LDFLAGS+=-Os -flto
 endif
 
@@ -458,7 +460,8 @@ statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-com
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
-	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	CXX="$$(xcrun --sdk $(IPHONE_SDK) --find clang++)" \
+	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" \
 	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
