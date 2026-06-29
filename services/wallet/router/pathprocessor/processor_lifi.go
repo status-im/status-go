@@ -21,7 +21,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
-type SwapLiFiProcessor struct {
+// LiFiProcessor handles both same-chain swaps and cross-chain bridges through the
+// LI.FI aggregator: same /quote flow for both, the from/to chain (derived from the
+// tokens) is the only difference.
+type LiFiProcessor struct {
 	ethClientGetter rpc.EthClientGetter
 	lifiClient      lifi.ClientInterface
 	tokenManager    *walletToken.Manager
@@ -29,8 +32,8 @@ type SwapLiFiProcessor struct {
 	quotes          sync.Map // [fromTokenKey-toTokenKey-amountIn, *lifi.Quote]
 }
 
-func NewSwapLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *SwapLiFiProcessor {
-	return &SwapLiFiProcessor{
+func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *LiFiProcessor {
+	return &LiFiProcessor{
 		ethClientGetter: ethClientGetter,
 		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, lifi.Integrator, ""),
 		tokenManager:    tokenManager,
@@ -49,24 +52,26 @@ func createSwapLiFiErrorResponse(err error) error {
 	return createErrorResponse(pathProcessorCommon.ProcessorSwapLiFiName, err)
 }
 
-func (s *SwapLiFiProcessor) Name() string {
+func (s *LiFiProcessor) Name() string {
 	return pathProcessorCommon.ProcessorSwapLiFiName
 }
 
-func (s *SwapLiFiProcessor) Clear() {
+func (s *LiFiProcessor) Clear() {
 	s.quotes = sync.Map{}
 }
 
-func (s *SwapLiFiProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
+// isLiFiBridge reports whether the operation crosses chains (bridge vs swap).
+func isLiFiBridge(params ProcessorInputParams) bool {
+	return params.FromToken.ChainID != params.ToToken.ChainID
+}
+
+func (s *LiFiProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
 	if params.FromToken == nil || params.ToToken == nil {
 		return false, ErrToAndFromTokensMustBeSet
 	}
 
-	if params.FromToken.ChainID != params.ToToken.ChainID {
-		return false, ErrFromAndToChainsMustBeSame
-	}
-
-	if strings.EqualFold(params.FromToken.Address.Hex(), params.ToToken.Address.Hex()) {
+	// For a same-chain swap the two tokens must differ; across chains it's a bridge.
+	if !isLiFiBridge(params) && strings.EqualFold(params.FromToken.Address.Hex(), params.ToToken.Address.Hex()) {
 		return false, ErrFromAndToTokensMustBeDifferent
 	}
 
@@ -79,7 +84,7 @@ func (s *SwapLiFiProcessor) AvailableFor(params ProcessorInputParams) (bool, err
 	return true, nil
 }
 
-func (s *SwapLiFiProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
+func (s *LiFiProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
 	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
@@ -95,11 +100,12 @@ func getLiFiFromAndToTokenAddresses(params ProcessorInputParams) (common.Address
 	return fromTokenAddress, toTokenAddress
 }
 
-func (s *SwapLiFiProcessor) fetchAndStoreQuote(params ProcessorInputParams) (*lifi.Quote, error) {
+func (s *LiFiProcessor) fetchAndStoreQuote(params ProcessorInputParams) (*lifi.Quote, error) {
 	fromTokenAddress, toTokenAddress := getLiFiFromAndToTokenAddresses(params)
 
 	quote, err := s.lifiClient.FetchQuote(context.Background(), lifi.QuoteParams{
-		ChainID:            params.FromToken.ChainID,
+		FromChainID:        params.FromToken.ChainID,
+		ToChainID:          params.ToToken.ChainID,
 		FromToken:          fromTokenAddress,
 		ToToken:            toTokenAddress,
 		FromAddress:        params.FromAddr,
@@ -116,7 +122,7 @@ func (s *SwapLiFiProcessor) fetchAndStoreQuote(params ProcessorInputParams) (*li
 	return &quote, nil
 }
 
-func (s *SwapLiFiProcessor) getQuote(key string) (*lifi.Quote, error) {
+func (s *LiFiProcessor) getQuote(key string) (*lifi.Quote, error) {
 	quoteIns, ok := s.quotes.Load(key)
 	if !ok {
 		return nil, ErrPriceRouteNotFound
@@ -128,7 +134,7 @@ func (s *SwapLiFiProcessor) getQuote(key string) (*lifi.Quote, error) {
 	return quote, nil
 }
 
-func (s *SwapLiFiProcessor) getOrFetchQuote(params ProcessorInputParams) (*lifi.Quote, error) {
+func (s *LiFiProcessor) getOrFetchQuote(params ProcessorInputParams) (*lifi.Quote, error) {
 	key := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
 	if quote, err := s.getQuote(key); err == nil {
 		return quote, nil
@@ -136,7 +142,7 @@ func (s *SwapLiFiProcessor) getOrFetchQuote(params ProcessorInputParams) (*lifi.
 	return s.fetchAndStoreQuote(params)
 }
 
-func (s *SwapLiFiProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
+func (s *LiFiProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	quote, err := s.fetchAndStoreQuote(params)
 	if err != nil {
 		return common.Address{}, err
@@ -144,7 +150,7 @@ func (s *SwapLiFiProcessor) GetContractAddress(params ProcessorInputParams) (com
 	return quote.Estimate.ApprovalAddress, nil
 }
 
-func (s *SwapLiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
+func (s *LiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	key := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
 	quote, err := s.getQuote(key)
 	if err != nil {
@@ -156,7 +162,7 @@ func (s *SwapLiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*bi
 	return quote.Estimate.ToAmount.Int, nil
 }
 
-func (s *SwapLiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+func (s *LiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	if params.TestsMode {
 		return []byte{}, nil
 	}
@@ -168,7 +174,7 @@ func (s *SwapLiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte
 	return types2.Hex2Bytes(quote.TransactionRequest.Data), nil
 }
 
-func (s *SwapLiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
+func (s *LiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -178,8 +184,9 @@ func (s *SwapLiFiProcessor) EstimateGas(params ProcessorInputParams, input []byt
 		return 0, ErrNoEstimationFound
 	}
 
+	isNative := params.FromToken.IsNative()
 	value := big.NewInt(0)
-	if params.FromToken.IsNative() {
+	if isNative {
 		value = params.AmountIn
 	}
 
@@ -203,15 +210,28 @@ func (s *SwapLiFiProcessor) EstimateGas(params ProcessorInputParams, input []byt
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, createSwapLiFiErrorResponse(err)
+		// ERC20 estimation reverts before approval; fall back to the quote's gas limit.
+		if isNative {
+			return 0, createSwapLiFiErrorResponse(err)
+		}
+		quotedGas, decErr := hexutil.DecodeUint64(quote.TransactionRequest.GasLimit)
+		if decErr != nil || quotedGas == 0 {
+			return 0, createSwapLiFiErrorResponse(err)
+		}
+		estimation = quotedGas
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
+	gasFactor := pathProcessorCommon.IncreaseEstimatedGasFactor
+	if isLiFiBridge(params) {
+		gasFactor = pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
+	}
+
+	increasedEstimation := float64(estimation) * gasFactor
 
 	return uint64(increasedEstimation), nil
 }
 
-func (s *SwapLiFiProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*lifi.Quote, error) {
+func (s *LiFiProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*lifi.Quote, error) {
 	return s.fetchAndStoreQuote(ProcessorInputParams{
 		FromToken:          sendArgs.FromToken,
 		ToToken:            sendArgs.ToToken,
@@ -222,7 +242,7 @@ func (s *SwapLiFiProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettyp
 	})
 }
 
-func (s *SwapLiFiProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (s *LiFiProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	key := pathProcessorCommon.MakeKey(sendArgs.FromToken.Key(), sendArgs.ToToken.Key(), sendArgs.ValueIn.ToInt())
 	quote, err := s.getQuote(key)
 	if err != nil {

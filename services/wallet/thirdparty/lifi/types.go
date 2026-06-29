@@ -12,7 +12,8 @@ import (
 var NativeTokenAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
 
 type QuoteParams struct {
-	ChainID            uint64
+	FromChainID        uint64
+	ToChainID          uint64
 	FromToken          common.Address
 	ToToken            common.Address
 	FromAddress        common.Address

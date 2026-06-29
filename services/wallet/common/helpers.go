@@ -16,7 +16,9 @@ import (
 )
 
 func IsProcessorBridge(name string) bool {
-	return name == pathProcessorCommon.ProcessorBridgeHopName
+	// LI.FI does both swaps and bridges through a single processor.
+	return name == pathProcessorCommon.ProcessorBridgeHopName ||
+		name == pathProcessorCommon.ProcessorSwapLiFiName
 }
 
 func IsProcessorSwap(name string) bool {

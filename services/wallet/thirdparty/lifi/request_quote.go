@@ -38,9 +38,14 @@ type Quote struct {
 }
 
 func (c *Client) FetchQuote(ctx context.Context, p QuoteParams) (Quote, error) {
+	toChainID := p.ToChainID
+	if toChainID == 0 {
+		toChainID = p.FromChainID
+	}
+
 	params := netUrl.Values{}
-	params.Add("fromChain", strconv.FormatUint(p.ChainID, 10))
-	params.Add("toChain", strconv.FormatUint(p.ChainID, 10))
+	params.Add("fromChain", strconv.FormatUint(p.FromChainID, 10))
+	params.Add("toChain", strconv.FormatUint(toChainID, 10))
 	params.Add("fromToken", p.FromToken.Hex())
 	params.Add("toToken", p.ToToken.Hex())
 	params.Add("fromAddress", p.FromAddress.Hex())
