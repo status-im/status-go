@@ -20,7 +20,7 @@ func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
 		OnMessageSent: func(messageId sds.MessageID, channelId string) {
 			logger.Debug("message sent with sds", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
 		},
-		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.MessageID, channelId string) {
+		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string) {
 			logger.Debug("missing dependencies",
 				zap.String("messageId", string(messageId)),
 				zap.String("channelId", channelId),
@@ -33,6 +33,12 @@ func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
 		},
 	}
 	reliabilityManager.RegisterCallbacks(callbacks)
+
+	// Start explicitly. Without it, missed messages are never
+	// recovered and channels fail to reach eventual consistency.
+	if err := reliabilityManager.StartPeriodicTasks(); err != nil {
+		logger.Error("failed to start SDS periodic tasks", zap.Error(err))
+	}
 
 	return reliabilityManager
 }

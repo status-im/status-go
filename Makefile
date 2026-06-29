@@ -105,7 +105,7 @@ BUILD_TAGS ?= gowaku_no_rln
 # `nim-sds` variables
 
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
-NIM_SDS_VERSION ?= v0.2.4
+NIM_SDS_VERSION ?= d9d70cc2fe7d82bd981b745dbc986353dfc626b9
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
 # to guarantee a clean checkout on every build.
@@ -134,7 +134,7 @@ endif
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -Wl,-rpath,$(NIM_SDS_LIB_DIR)
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -339,9 +339,22 @@ endif
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
-	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
+ifeq ($(detected_OS),Windows)
+	# nimble vendors deep deps (lsquic -> boringssl) under nimbledeps/pkgs2; on
+	# Windows that overruns MAX_PATH unless git uses long paths, and autocrlf
+	# would change the locked nim package checksum. Mirrors what makes the
+	# logos-delivery Windows build pass.
+	git config --global core.longpaths true
+	git config --global core.autocrlf false
+endif
+	cd $(NIM_SDS_SOURCE_DIR) && nimble setup -l
+ifeq ($(detected_OS),Darwin)
+	cd $(NIM_SDS_SOURCE_DIR) && nimble libsdsDynamicMac
+else ifeq ($(detected_OS),Windows)
+	cd $(NIM_SDS_SOURCE_DIR) && nimble libsdsDynamicWindows
+else
+	cd $(NIM_SDS_SOURCE_DIR) && nimble libsdsDynamicLinux
+endif
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
 endif
