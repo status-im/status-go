@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -3099,7 +3102,33 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		}
 	}
 
+	if communityResponse.Community != nil {
+		err = m.dumpCommunityRawPayloadToFile(communityResponse.Community.IDString(), rawPayload)
+		if err != nil {
+			m.logger.Warn("failed to dump community raw payload", zap.Error(err))
+		}
+	}
+
 	return m.handleCommunityResponse(state, communityResponse)
+}
+
+func (m *Messenger) dumpCommunityRawPayloadToFile(communityID string, rawPayload []byte) error {
+	if len(rawPayload) == 0 || communityID == "" {
+		return nil
+	}
+
+	dumpDir := os.Getenv("STATUS_GO_COMMUNITY_PAYLOAD_DUMP_DIR")
+	if dumpDir == "" {
+		return nil
+	}
+
+	if err := os.MkdirAll(dumpDir, 0o755); err != nil {
+		return err
+	}
+
+	filePath := filepath.Join(dumpDir, communityID+".rawpayload.hex")
+	hexPayload := hex.EncodeToString(rawPayload) + "\n"
+	return os.WriteFile(filePath, []byte(hexPayload), 0o600)
 }
 
 func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communityResponse *communities.CommunityResponse) error {
