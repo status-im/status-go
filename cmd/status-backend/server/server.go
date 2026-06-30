@@ -27,6 +27,9 @@ func init() {
 		threadsCount, _ := runtime.ThreadCreateProfile([]runtime.StackRecord{})
 		return threadsCount
 	}))
+	expvar.Publish("numGoroutine", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
 }
 
 type Server struct {
