@@ -956,11 +956,6 @@ class WakuextService(Service):
         response = self.rpc_request("registerReceivedOwnershipNotification", params)
         return response
 
-    def register_lost_ownership_notification(self, community_id: str):
-        params = [community_id]
-        response = self.rpc_request("registerLostOwnershipNotification", params)
-        return response
-
     def sign_data(self, sign_params: list[dict]):
         params = [sign_params]
         response = self.rpc_request("signData", params)

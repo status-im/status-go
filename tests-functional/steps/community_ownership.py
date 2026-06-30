@@ -6,6 +6,7 @@ import uuid
 from typing import Optional
 
 from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput, ContractLogicError
 
 from clients.api import ApiResponseError
 from clients.services.wakuext import (
@@ -69,8 +70,8 @@ def resolve_owner_token_id(anvil_client, owner_token_address: str, holder_addres
     contract = anvil_client.eth.contract(address=Web3.to_checksum_address(owner_token_address), abi=ERC721_OWNERSHIP_ABI)
     try:
         return contract.functions.tokenOfOwnerByIndex(Web3.to_checksum_address(holder_address), 0).call()
-    except Exception as exc:
-        logger.debug(f"tokenOfOwnerByIndex unavailable for {owner_token_address}: {exc}; defaulting to 0")
+    except (ContractLogicError, BadFunctionCallOutput) as exc:
+        logger.warning(f"tokenOfOwnerByIndex unavailable for {owner_token_address}: {exc}; defaulting to token_id 0")
         return 0
 
 
@@ -273,11 +274,31 @@ def assert_new_owner_receives_owner_permission(
     )
 
 
-def promote_to_control_node(new_owner_backend: StatusBackend, community_id: str) -> dict:
-    response = new_owner_backend.wakuext_service.promote_self_to_control_node(community_id)
-    assert response is not None, "promote_self_to_control_node returned no response"
-    new_owner_backend.wakuext_service.register_received_ownership_notification(community_id)
-    return response
+def promote_to_control_node(
+    new_owner_backend: StatusBackend,
+    community_id: str,
+    attempts: int = 30,
+    delay: int = 2,
+) -> dict:
+    """Promote self to control node, retrying until the on-chain signer change is indexed.
+
+    Promote fails the authorization check until the new owner's wallet has indexed the
+    signer change, so we poll the real operation instead of guessing the indexing latency
+    with a fixed sleep."""
+    last_exc: Optional[ApiResponseError] = None
+    for attempt in range(attempts):
+        try:
+            response = new_owner_backend.wakuext_service.promote_self_to_control_node(community_id)
+        except ApiResponseError as exc:
+            last_exc = exc
+            logger.debug(f"promote_self_to_control_node not ready (attempt {attempt + 1}/{attempts}): {exc}")
+            time.sleep(delay)
+            continue
+        assert response is not None, "promote_self_to_control_node returned no response"
+        new_owner_backend.wakuext_service.register_received_ownership_notification(community_id)
+        return response
+
+    raise AssertionError(f"promote_self_to_control_node never succeeded after {attempts} attempts; last error={last_exc}")
 
 
 def wait_until_member_is_owner(
@@ -388,6 +409,6 @@ def transfer_community_ownership(
     transfer_owner_token_to_new_owner(anvil_client, owner_token_address, owner_wallet, new_owner_wallet)
     register_owner_token_on_backend(new_owner_backend, community_id, owner_token_address)
     set_signer_pubkey(new_owner_backend, community_id, owner_token_address)
-    time.sleep(2)  # let the new owner's wallet index the signer change
 
+    # promote_to_control_node polls until the new owner's wallet has indexed the signer change.
     return promote_to_control_node(new_owner_backend, community_id)
