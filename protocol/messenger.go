@@ -551,6 +551,7 @@ func (m *Messenger) processSentMessage(id string) error {
 }
 
 func (m *Messenger) SetPaused(paused bool) {
+	fmt.Println("--------Messenger.SetPaused", paused)
 	m.paused.Store(paused)
 	if m.ensVerifier != nil {
 		m.ensVerifier.SetPaused(paused)
@@ -577,7 +578,8 @@ func (m *Messenger) SetPaused(paused bool) {
 			m.httpServer.ToForeground()
 		}
 		if m.started {
-			m.asyncRequestAllHistoricMessages()
+			fmt.Println("--------Messenger.SetPaused requestHistoricMessagesAfterResume")
+			m.requestHistoricMessagesAfterResume()
 		}
 	} else if m.httpServer != nil {
 		m.httpServer.ToBackground()
@@ -823,6 +825,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 
 	// Start fetching messages from store nodes.
 	// Skip when backgrounded: the sync will run when the app returns to foreground.
+	fmt.Println("--------Messenger.handleConnectionChange", online, m.isPaused())
 	if online && !m.isPaused() {
 		m.asyncRequestAllHistoricMessages()
 	}

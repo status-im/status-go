@@ -35,6 +35,11 @@ const (
 	backoffByUserAction = 0 * time.Second
 
 	historicSyncMinInterval = 20 * time.Second
+
+	// resumeStorenodeWaitTimeout bounds how long we wait for an available
+	// storenode when the app returns to the foreground before requesting
+	// historic messages.
+	resumeStorenodeWaitTimeout = 30 * time.Second
 )
 
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")

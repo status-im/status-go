@@ -1,6 +1,9 @@
 package protocol
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
@@ -54,6 +57,47 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 		_, err := m.requestAllHistoricMessages(true, false)
 		if err != nil {
 			m.logger.Error("failed to request historic messages", zap.Error(err))
+		}
+	}()
+}
+
+// requestHistoricMessagesAfterResume triggers a historic message sync when the
+// app returns to the foreground (SetPaused(false)).
+//
+// While backgrounded, the history sync is deferred (see handleConnectionChange
+// and checkForStorenodeCycleSignals, both gated on !isPaused()). The connection
+// and storenode signals are edge-triggered, so when the device wakes from sleep
+// nothing necessarily "changes" from the node's point of view and those signals
+// may not fire again. Firing a one-shot request on resume can then silently
+// no-op in shouldSync() because the storenode/connection isn't ready yet at that
+// exact instant, and there is nothing left to retry it.
+//
+// To make resume reliable, we wait (bounded) for an available storenode before
+// requesting. WaitForAvailableStoreNode returns immediately if a storenode is
+// already available (covering the "nothing changed after wake" case) and
+// otherwise blocks until the cycle re-establishes one. The underlying request is
+// throttled/deduplicated via withHistoricSyncInFlight, so this is safe even if a
+// storenode-available signal also fires.
+func (m *Messenger) requestHistoricMessagesAfterResume() {
+	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
+		return
+	}
+
+	m.shutdownWaitGroup.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
+
+		ctx, cancel := context.WithTimeout(m.ctx, resumeStorenodeWaitTimeout)
+		defer cancel()
+
+		if !m.messaging.WaitForAvailableStoreNode(ctx) {
+			m.logger.Debug("no storenode available after resume, skipping historic sync")
+			return
+		}
+
+		if _, err := m.requestAllHistoricMessages(true, false); err != nil {
+			m.logger.Error("failed to request historic messages after resume", zap.Error(err))
 		}
 	}()
 }
@@ -161,6 +205,7 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 				}
 				// Skip history sync when backgrounded; SetPaused(false)
 				// will trigger it when the app returns to foreground.
+				fmt.Println("--------Messenger.checkForStorenodeCycleSignals", activeMailserver, m.isPaused())
 				if !m.isPaused() {
 					m.asyncRequestAllHistoricMessages()
 				}
