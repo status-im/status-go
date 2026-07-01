@@ -48,13 +48,33 @@ type Core struct {
 	wakumetrics *wakumetrics2.Client
 }
 
+// Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
+// from the waku layer so callers configure the messaging API without importing
+// the transport package directly.
+type Mode = wakuv3.Mode
+
+const (
+	ModeCore = wakuv3.ModeCore
+	ModeEdge = wakuv3.ModeEdge
+)
+
+// ModeFromLightClient maps the legacy WakuV2Config.LightClient boolean onto a Mode.
+func ModeFromLightClient(lightClient bool) Mode {
+	return wakuv3.ModeFromLightClient(lightClient)
+}
+
 type CoreParams struct {
 	Identity       *ecdsa.PrivateKey
 	InstallationID string
 
-	NodeKey       *ecdsa.PrivateKey
-	WakuConfig    params.WakuV2Config
-	ClusterConfig params.ClusterConfig
+	NodeKey    *ecdsa.PrivateKey
+	WakuConfig params.WakuV2Config
+
+	// Fleet is the network preset the waku node resolves its peers from; Mode
+	// selects Core (full/relay) vs Edge (light). Together they give the
+	// messaging API its Start(fleet, mode)-shaped configuration.
+	Fleet string
+	Mode  Mode
 
 	TimeSource timesource.Provider
 }
@@ -133,7 +153,8 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 		identity:                        params.Identity,
 		nodeKey:                         params.NodeKey,
 		wakuConfig:                      params.WakuConfig,
-		clusterConfig:                   params.ClusterConfig,
+		fleet:                           params.Fleet,
+		mode:                            params.Mode,
 		metricsEnabled:                  config.metricsEnabled,
 		onHistoricMessagesRequestFailed: config.onHistoricMessagesRequestFailed,
 		onPeerStats: func(status wakutypes.ConnStatus) {
@@ -207,7 +228,8 @@ type wakuParams struct {
 	nodeKey  *ecdsa.PrivateKey
 
 	wakuConfig     params.WakuV2Config
-	clusterConfig  params.ClusterConfig
+	fleet          string
+	mode           wakuv3.Mode
 	metricsEnabled bool
 
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
@@ -220,32 +242,21 @@ type wakuParams struct {
 
 func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 	cfg := &wakuv3.Config{
-		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
-		Host:                                   params.wakuConfig.Host,
-		Port:                                   params.wakuConfig.Port,
-		LightClient:                            params.wakuConfig.LightClient,
-		WakuNodes:                              params.clusterConfig.WakuNodes,
+		MaxMessageSize: wakuv2common.DefaultMaxMessageSize,
+		Host:           params.wakuConfig.Host,
+		Port:           params.wakuConfig.Port,
+		// Fleet + Mode drive peer resolution and the peer-exchange/discv5/
+		// light-client policy inside the waku node (see wakuv2.setDefaults).
+		Fleet:                                  params.fleet,
+		Mode:                                   params.mode,
 		DiscoveryLimit:                         params.wakuConfig.DiscoveryLimit,
-		DiscV5BootstrapNodes:                   params.clusterConfig.DiscV5BootstrapNodes,
 		Nameserver:                             params.wakuConfig.Nameserver,
 		UDPPort:                                params.wakuConfig.UDPPort,
 		AutoUpdate:                             params.wakuConfig.AutoUpdate,
 		DefaultShardPubsubTopic:                wakuv3.DefaultShardPubsubTopic(),
-		ClusterID:                              params.clusterConfig.ClusterID,
 		EnableStoreConfirmationForMessagesSent: params.wakuConfig.EnableStoreConfirmationForMessagesSent,
 		UseThrottledPublish:                    true,
 		MetricsEnabled:                         params.metricsEnabled,
-	}
-
-	// Configure peer exchange and discv5 settings based on node type
-	if cfg.LightClient {
-		cfg.EnablePeerExchangeServer = false
-		cfg.EnablePeerExchangeClient = true
-		cfg.EnableDiscV5 = false
-	} else {
-		cfg.EnablePeerExchangeServer = true
-		cfg.EnablePeerExchangeClient = false
-		cfg.EnableDiscV5 = true
 	}
 
 	if params.wakuConfig.MaxMessageSize > 0 {
