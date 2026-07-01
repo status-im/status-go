@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"go.uber.org/zap"
 
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
 	types "github.com/status-im/status-go/pkg/messaging/types"
@@ -31,9 +32,15 @@ func (a *API) SetStorenodes(nodes []types.StoreNode) {
 	for _, node := range nodes {
 		info, err := node.PeerInfo()
 		if err != nil {
+			a.core.logger.Warn("skipping storenode with unresolvable peer info",
+				zap.String("id", node.ID), zap.String("name", node.Name), zap.Error(err))
 			continue
 		}
 		addrInfos = append(addrInfos, info)
+	}
+	if len(addrInfos) == 0 && len(nodes) > 0 {
+		a.core.logger.Warn("no usable storenodes after resolving peer info; history queries will fail until reconfigured",
+			zap.Int("configured", len(nodes)))
 	}
 	a.core.stack.Transport.SetStorenodes(addrInfos)
 }
