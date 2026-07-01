@@ -3,6 +3,9 @@ package gif
 import (
 	"database/sql"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -39,7 +42,7 @@ func setupTestDB(t *testing.T, db *sql.DB) (*accounts.Database, func()) {
 	}
 }
 
-func TestSetTenorAPIKey(t *testing.T) {
+func TestSetKlipyAPIKey(t *testing.T) {
 	appDB, appStop := setupSQLTestDb(t)
 	defer appStop()
 
@@ -48,8 +51,8 @@ func TestSetTenorAPIKey(t *testing.T) {
 
 	gifAPI := NewGifAPI(db)
 
-	require.NoError(t, gifAPI.SetTenorAPIKey("DU7DWZ27STB2"))
-	require.Equal(t, "DU7DWZ27STB2", tenorAPIKey)
+	require.NoError(t, gifAPI.SetKlipyAPIKey("test-key"))
+	require.Equal(t, "test-key", klipyAPIKey)
 }
 
 func TestGetContentWithRetry(t *testing.T) {
@@ -61,19 +64,52 @@ func TestGetContentWithRetry(t *testing.T) {
 
 	gifAPI := NewGifAPI(db)
 
-	require.NoError(t, gifAPI.SetTenorAPIKey(""))
-	require.Equal(t, "", tenorAPIKey)
+	const responseBody = `{"result":true,"data":{"data":[],"current_page":1,"per_page":50,"has_next":false}}`
+	var lastPath, lastQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lastPath = r.URL.Path
+		lastQuery = r.URL.RawQuery
+		if strings.Contains(r.URL.Path, "//") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(responseBody))
+	}))
+	defer server.Close()
+
+	originalBaseURL := baseURL
+	baseURL = server.URL + "/api/v1/"
+	defer func() { baseURL = originalBaseURL }()
+
+	// No api key set
+	require.NoError(t, gifAPI.SetKlipyAPIKey(""))
+	require.Equal(t, "", klipyAPIKey)
 
 	gifs, err := gifAPI.GetContentWithRetry("trending?")
 	require.Error(t, err)
 	require.Equal(t, "", gifs)
 
-	require.NoError(t, gifAPI.SetTenorAPIKey("DU7DWZ27STB2"))
-	require.Equal(t, "DU7DWZ27STB2", tenorAPIKey)
+	// Valid api key set
+	require.NoError(t, gifAPI.SetKlipyAPIKey("test-key"))
+	require.Equal(t, "test-key", klipyAPIKey)
 
 	gifs, err = gifAPI.GetContentWithRetry("trending?")
 	require.NoError(t, err)
-	require.NotEqual(t, "", gifs)
+	require.Equal(t, responseBody, gifs)
+
+	// Verify the KLIPY URL format
+	require.Equal(t, "/api/v1/test-key/gifs/trending", lastPath)
+	require.Contains(t, lastQuery, "per_page=50")
+	require.Contains(t, lastQuery, "content_filter=low")
+	require.Contains(t, lastQuery, "customer_id=status-app")
+
+	// A search query is properly forwarded
+	gifs, err = gifAPI.GetContentWithRetry("search?q=cat&")
+	require.NoError(t, err)
+	require.Equal(t, responseBody, gifs)
+	require.Equal(t, "/api/v1/test-key/gifs/search", lastPath)
+	require.Contains(t, lastQuery, "q=cat")
 }
 
 func TestFavoriteGifs(t *testing.T) {
@@ -85,31 +121,26 @@ func TestFavoriteGifs(t *testing.T) {
 
 	gifAPI := NewGifAPI(db)
 
-	require.NoError(t, gifAPI.SetTenorAPIKey("DU7DWZ27STB2"))
-	require.Equal(t, "DU7DWZ27STB2", tenorAPIKey)
+	require.NoError(t, gifAPI.SetKlipyAPIKey("test-key"))
+	require.Equal(t, "test-key", klipyAPIKey)
 
-	recent := map[string]interface{}{
-		"id":         "23833142",
-		"title":      "",
-		"url":        "https://media.tenor.com/images/b845ae14f43883e5cd6283e705f09efb/tenor.gif",
-		"tinyUrl":    "https://media.tenor.com/images/2067bdc0375f9606dfb9fb4d2bfaafde/tenor.gif",
-		"height":     498,
-		"isFavorite": true,
+	favorite := Gif{
+		ID:         "23833142",
+		Title:      "",
+		URL:        "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/8GCrVAB7.gif",
+		TinyURL:    "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/y6iepZM7.gif",
+		Height:     498,
+		IsFavorite: true,
 	}
 
-	newRecents := map[string]interface{}{
-		"items": recent,
-	}
-	inputJSON := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"method":  "gif_setTenorAPIKey",
-		"params":  newRecents,
-	}
-	like, _ := json.Marshal(inputJSON)
-
-	source := (json.RawMessage)(like)
+	source, err := json.Marshal(Container{Items: []Gif{favorite}})
+	require.NoError(t, err)
 
 	require.NoError(t, gifAPI.UpdateFavoriteGifs(source))
+
+	storedFavorites, err := gifAPI.GetFavoriteGifs()
+	require.NoError(t, err)
+	require.Equal(t, []Gif{favorite}, storedFavorites)
 }
 
 func TestRecentGifs(t *testing.T) {
@@ -121,29 +152,24 @@ func TestRecentGifs(t *testing.T) {
 
 	gifAPI := NewGifAPI(db)
 
-	require.NoError(t, gifAPI.SetTenorAPIKey("DU7DWZ27STB2"))
-	require.Equal(t, "DU7DWZ27STB2", tenorAPIKey)
+	require.NoError(t, gifAPI.SetKlipyAPIKey("test-key"))
+	require.Equal(t, "test-key", klipyAPIKey)
 
-	recent := map[string]interface{}{
-		"id":         "23833142",
-		"title":      "",
-		"url":        "https://media.tenor.com/images/b845ae14f43883e5cd6283e705f09efb/tenor.gif",
-		"tinyUrl":    "https://media.tenor.com/images/2067bdc0375f9606dfb9fb4d2bfaafde/tenor.gif",
-		"height":     498,
-		"isFavorite": true,
+	recent := Gif{
+		ID:         "23833142",
+		Title:      "",
+		URL:        "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/8GCrVAB7.gif",
+		TinyURL:    "https://static.klipy.com/ii/935d7ab9d8c6202580a668421940ec81/14/af/y6iepZM7.gif",
+		Height:     498,
+		IsFavorite: true,
 	}
 
-	newRecents := map[string]interface{}{
-		"items": recent,
-	}
-	inputJSON := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"method":  "gif_setTenorAPIKey",
-		"params":  newRecents,
-	}
-	like, _ := json.Marshal(inputJSON)
-
-	source := (json.RawMessage)(like)
+	source, err := json.Marshal(Container{Items: []Gif{recent}})
+	require.NoError(t, err)
 
 	require.NoError(t, gifAPI.UpdateRecentGifs(source))
+
+	storedRecents, err := gifAPI.GetRecentGifs()
+	require.NoError(t, err)
+	require.Equal(t, []Gif{recent}, storedRecents)
 }
