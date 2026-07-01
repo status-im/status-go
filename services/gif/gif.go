@@ -27,11 +27,17 @@ type Container struct {
 	Items []Gif `json:"items"`
 }
 
-var tenorAPIKey = ""
-var defaultParams = "&media_filter=minimal&limit=50&key="
+const (
+	maxRetry = 3
+)
 
-const maxRetry = 3
-const baseURL = "https://g.tenor.com/v1/"
+var (
+	klipyAPIKey = ""
+
+	defaultParams = "page=1&per_page=50&content_filter=low&customer_id=status-app"
+
+	baseURL = "https://api.klipy.com/api/v1/"
+)
 
 func NewGifAPI(db *accounts.Database) *API {
 	return &API{db}
@@ -42,13 +48,13 @@ type API struct {
 	db *accounts.Database
 }
 
-func (api *API) SetTenorAPIKey(key string) (err error) {
-	logutils.ZapLogger().Info("[GifAPI::SetTenorAPIKey]")
+func (api *API) SetKlipyAPIKey(key string) (err error) {
+	logutils.ZapLogger().Info("[GifAPI::SetKlipyAPIKey]")
 	err = api.db.SaveSettingField(settings.GifAPIKey, key)
 	if err != nil {
 		return err
 	}
-	tenorAPIKey = key
+	klipyAPIKey = key
 	return nil
 }
 
@@ -62,11 +68,14 @@ func (api *API) GetContentWithRetry(path string) (value string, err error) {
 		}
 
 		client := http.Client{
-			Timeout:   1 * time.Second,
+			Timeout:   5 * time.Second,
 			Transport: transport,
 		}
 
-		response, err = client.Get(baseURL + path + defaultParams + tenorAPIKey)
+		// KLIPY URL format: {baseURL}{app_key}/gifs/{endpoint}?{query}
+		// `path` contains the endpoint plus any endpoint-specific query (e.g. "trending?" or "search?q=cat&")
+		// and defaultParams appends the remaining fixed parameters.
+		response, err = client.Get(baseURL + klipyAPIKey + "/gifs/" + path + defaultParams)
 
 		if err != nil {
 			logutils.ZapLogger().Error("can't get content", zap.String("path", path), zap.Error(err))
@@ -78,7 +87,7 @@ func (api *API) GetContentWithRetry(path string) (value string, err error) {
 	}
 
 	if response == nil {
-		return "", fmt.Errorf("Could not reach Tenor API")
+		return "", fmt.Errorf("Could not reach KLIPY API")
 	}
 	defer response.Body.Close()
 
