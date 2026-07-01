@@ -97,6 +97,9 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		return
 	}
 
+	// When store confirmation is enabled, MessageSentCheck emits EventEnvelopeSent
+	// once a store node confirms the message propagated; otherwise the publish ack
+	// is the only "sent" signal.
 	if !w.cfg.EnableStoreConfirmationForMessagesSent {
 		w.SendEnvelopeEvent(common.EnvelopeEvent{
 			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),

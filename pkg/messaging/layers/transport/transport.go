@@ -10,8 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/api/history"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -782,14 +780,6 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	t.waku.ConfirmMessageDelivered(commHashes)
 }
 
-func (t *Transport) GetActiveStorenode() peer.AddrInfo {
-	return t.waku.GetActiveStorenode()
-}
-
-func (t *Transport) DisconnectActiveStorenode(ctx context.Context, backoffReason time.Duration, shouldCycle bool) {
-	t.waku.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
-}
-
 // SubscribeFilterMatched returns a channel notified (non-blocking, coalescing) whenever
 // an incoming envelope matches at least one installed filter. Callers must call
 // UnsubscribeFilterMatched with the returned channel when done.
@@ -804,22 +794,6 @@ func (t *Transport) UnsubscribeFilterMatched(ch chan struct{}) {
 	t.matchedPublisher.Unsubscribe(ch)
 }
 
-func (t *Transport) OnStorenodeChanged() <-chan peer.ID {
-	return t.waku.OnStorenodeChanged()
-}
-
-func (t *Transport) OnStorenodeNotWorking() <-chan struct{} {
-	return t.waku.OnStorenodeNotWorking()
-}
-
-func (t *Transport) OnStorenodeAvailable() <-chan peer.ID {
-	return t.waku.OnStorenodeAvailable()
-}
-
-func (t *Transport) IsStorenodeAvailable(peerID peer.ID) bool {
-	return t.waku.IsStorenodeAvailable(peerID)
-}
-
 // Query retrieves historic messages for a single batch, selecting the store node
 // internally (no peer argument). See waku.StoreClient.
 func (t *Transport) Query(
@@ -832,6 +806,7 @@ func (t *Transport) Query(
 	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
-func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
-	t.waku.SetStorenodeConfigProvider(c)
+// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
+func (t *Transport) SetStorenodes(nodes []peer.AddrInfo) {
+	t.waku.SetStorenodes(nodes)
 }

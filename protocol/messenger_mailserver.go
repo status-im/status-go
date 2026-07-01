@@ -29,17 +29,21 @@ const (
 	oneDayDuration   = 24 * time.Hour
 	oneMonthDuration = 31 * oneDayDuration
 
-	backoffByUserAction = 0 * time.Second
-
 	historicSyncMinInterval = 20 * time.Second
+
+	// historicSyncRetryInterval and historicSyncRetryTimeout bound the login
+	// history-fetch retry. On login the libp2p host is freshly recreated and no
+	// storenode is connected yet, so the first attempt can fail before a
+	// storenode is dialable; with the go-waku storenode cycle gone nothing else
+	// retriggers the fetch, so asyncRequestAllHistoricMessages retries here.
+	historicSyncRetryInterval = 5 * time.Second
+	historicSyncRetryTimeout  = 3 * time.Minute
 )
 
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
-	if !m.started ||
-		m.messaging.GetActiveStorenode().ID == "" ||
-		!m.Online() {
+	if !m.started || !m.Online() {
 		return false, nil
 	}
 
@@ -48,8 +52,15 @@ func (m *Messenger) shouldSync() (bool, error) {
 		m.logger.Error("failed to get use mailservers", zap.Error(err))
 		return false, err
 	}
+	if !useMailserver {
+		return false, nil
+	}
 
-	return useMailserver, nil
+	mailservers, err := m.AllMailservers()
+	if err != nil {
+		return false, err
+	}
+	return len(mailservers) > 0, nil
 }
 
 func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
@@ -299,7 +310,6 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 	}
 
 	m.historicSyncInFlight = true
-	m.lastHistoricSyncRequestAt = now
 	m.historicSyncMu.Unlock()
 	defer func() {
 		m.historicSyncMu.Lock()
@@ -307,7 +317,17 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 		m.historicSyncMu.Unlock()
 	}()
 
-	return fn()
+	resp, err := fn()
+	if err == nil {
+		// Only a completed sync arms the throttle. A failed attempt (e.g. no
+		// storenode reachable in the instant right after login, before
+		// SetStorenodes/peer dialing) must not block the retry that succeeds
+		// once a storenode is dialable.
+		m.historicSyncMu.Lock()
+		m.lastHistoricSyncRequestAt = now
+		m.historicSyncMu.Unlock()
+	}
+	return resp, err
 }
 
 func getPrioritizedBatches() []int {
@@ -709,8 +729,6 @@ func (m *Messenger) ToggleUseMailservers(value bool) error {
 	if err != nil {
 		return err
 	}
-
-	m.messaging.DisconnectActiveStorenode(m.ctx, backoffByUserAction, value)
 
 	return nil
 }
