@@ -358,7 +358,6 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 	}
 
 	m.historicSyncInFlight = true
-	m.lastHistoricSyncRequestAt = now
 	m.historicSyncMu.Unlock()
 	defer func() {
 		m.historicSyncMu.Lock()
@@ -366,7 +365,21 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 		m.historicSyncMu.Unlock()
 	}()
 
-	return fn()
+	response, err := fn()
+	if err != nil {
+		// Only successful syncs consume the throttle window. If the request
+		// fails (e.g. the storenode task errored), leave lastHistoricSyncRequestAt
+		// untouched so a subsequent trigger (storenode-available/connection change,
+		// resume) can retry immediately instead of being throttled.
+		m.logger.Debug("historic sync request failed, not throttling next attempt", zap.Error(err))
+		return response, err
+	}
+
+	m.historicSyncMu.Lock()
+	m.lastHistoricSyncRequestAt = now
+	m.historicSyncMu.Unlock()
+
+	return response, nil
 }
 
 const missingMessageCheckPeriod = 30 * time.Second
