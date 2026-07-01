@@ -1173,6 +1173,14 @@ func (w *Waku) setupRelaySubscriptions() error {
 		return err
 	}
 
+	// Community control messages arrive on the non-protected pubsub topic.
+	// TODO remove once fully migrated to Global Community Control and Content Topic
+	// https://github.com/status-im/status-go/issues/6384
+	err = w.subscribeToPubsubTopicWithWakuRelay(DefaultNonProtectedPubsubTopic())
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1353,47 +1361,6 @@ func (w *Waku) ClearEnvelopesCache() {
 // it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
-}
-
-func (w *Waku) SubscribeToPubsubTopic(topic string) error {
-	topic = w.GetPubsubTopic(topic)
-
-	if !w.cfg.LightClient {
-		err := w.subscribeToPubsubTopicWithWakuRelay(topic)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
-	topic = w.GetPubsubTopic(topic)
-
-	if !w.cfg.LightClient {
-		err := w.unsubscribeFromPubsubTopicWithWakuRelay(topic)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (w *Waku) StartDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	return w.node.DiscV5().Start(w.ctx)
-}
-
-func (w *Waku) StopDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	w.node.DiscV5().Stop()
-	return nil
 }
 
 // isNetworkSwitchEvent reports whether next represents a genuine wifi <-> cellular

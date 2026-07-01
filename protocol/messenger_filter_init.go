@@ -21,11 +21,8 @@ func (m *Messenger) InitFilters() error {
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
 
-	// Community requests will arrive in this pubsub topic
-	// TODO remove once fully migrated to Global Community Control and Content Topic https://github.com/status-im/status-go/issues/6384
-	if err := m.messaging.SubscribeToPubsubTopic(types.DefaultNonProtectedPubsubTopic()); err != nil {
-		return err
-	}
+	// Subscription to the non-protected pubsub topic (community control
+	// messages) is now handled internally by the messaging backend on start.
 	filters, publicKeys, err := m.collectFiltersAndKeys()
 	if err != nil {
 		return err
