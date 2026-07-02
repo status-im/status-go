@@ -143,7 +143,7 @@ func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 		TotalErrorCount:   totalErrorCount,
 	}
 	if len(a.providerStatuses) == 0 {
-		aggregatedStatus.Status = rpcstatus.StatusDown
+		aggregatedStatus.Status = rpcstatus.StatusUnknown
 	} else if anyUp {
 		aggregatedStatus.Status = rpcstatus.StatusUp
 	} else if anyUnknown {

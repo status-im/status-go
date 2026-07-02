@@ -125,9 +125,6 @@ INSERT INTO settings (
   eip1581_address,
   installation_id,
   key_uid,
-  keycard_instance_uid,
-  keycard_paired_on,
-  keycard_pairing,
   latest_derived_path,
   mnemonic,
   name,
@@ -151,7 +148,7 @@ INSERT INTO settings (
   auto_refresh_tokens_enabled,
   thirdparty_services_enabled
 ) VALUES (
-?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+?,?,?,?,?,?,?,?,?,?,?,
 ?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
@@ -164,9 +161,6 @@ INSERT INTO settings (
 		s.EIP1581Address,
 		s.InstallationID,
 		s.KeyUID,
-		s.KeycardInstanceUID,
-		s.KeycardPairedOn,
-		s.KeycardPairing,
 		s.LatestDerivedPath,
 		s.Mnemonic,
 		s.Name,
@@ -392,7 +386,7 @@ func (db *Database) GetSettings() (Settings, error) {
 	SELECT
 		address, chaos_mode, currency, current_network,
 		custom_bootnodes, custom_bootnodes_enabled, dapps_address, display_name, bio, eip1581_address, fleet,
-		hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing,
+		hide_home_tooltip, installation_id, key_uid,
 		last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level,
 		mnemonic, mnemonic_removed, name, networks,
 		push_notifications_from_contacts_only, remote_push_notifications_enabled, messenger_notifications_enabled,
@@ -425,9 +419,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.HideHomeTooltip,
 		&s.InstallationID,
 		&s.KeyUID,
-		&s.KeycardInstanceUID,
-		&s.KeycardPairedOn,
-		&s.KeycardPairing,
 		&s.LastUpdated,
 		&s.LatestDerivedPath,
 		&s.LinkPreviewRequestEnabled,
@@ -684,10 +675,6 @@ func (db *Database) GetPendingStickerPacks() (rst *json.RawMessage, err error) {
 func (db *Database) GetRecentStickers() (rst *json.RawMessage, err error) {
 	err = db.makeSelectRow(StickersRecentStickers).Scan(&rst)
 	return
-}
-
-func (db *Database) SetPinnedMailservers(mailservers map[string]string) error {
-	return db.SaveSettingField(PinnedMailservers, mailservers)
 }
 
 func (db *Database) SetUseMailservers(value bool) error {

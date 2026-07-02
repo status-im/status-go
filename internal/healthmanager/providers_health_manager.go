@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
+	status_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/healthmanager/aggregator"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
 )
+
+// DefaultDownDebounce delays Down emission to suppress short provider blips.
+const DefaultDownDebounce = 30 * time.Second
 
 type ProvidersHealthManager struct {
 	mu                  sync.RWMutex
@@ -15,6 +20,10 @@ type ProvidersHealthManager struct {
 	aggregator          *aggregator.Aggregator
 	subscriptionManager *SubscriptionManager
 	lastStatus          *rpcstatus.ProviderStatus
+
+	downDebounce time.Duration
+	downTimer    *time.Timer
+	paused       bool
 }
 
 // NewProvidersHealthManager creates a new instance of ProvidersHealthManager with the given chain ID.
@@ -25,6 +34,7 @@ func NewProvidersHealthManager(chainID uint64) *ProvidersHealthManager {
 		chainID:             chainID,
 		aggregator:          agg,
 		subscriptionManager: NewSubscriptionManager(),
+		downDebounce:        DefaultDownDebounce,
 	}
 }
 
@@ -52,15 +62,89 @@ func (p *ProvidersHealthManager) doUpdate(callStatuses []rpcstatus.RpcProviderCa
 // Update processes a batch of provider call statuses, updates the aggregated status, and emits chain status changes if necessary.
 func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcstatus.RpcProviderCallStatus) {
 	shouldEmit, newStatus := p.doUpdate(callStatuses)
-	if !shouldEmit {
+
+	p.mu.RLock()
+	paused := p.paused
+	p.mu.RUnlock()
+	if paused {
+		if newStatus.Status != rpcstatus.StatusDown {
+			p.stopDownTimer()
+		}
 		return
 	}
 
+	// Defer Down emission until it persists; emit recovery to Up/Unknown immediately.
+	if newStatus.Status == rpcstatus.StatusDown {
+		if shouldEmit {
+			p.armDownTimer()
+		}
+		return
+	}
+
+	p.stopDownTimer()
+	if !shouldEmit {
+		return
+	}
 	p.emitChainStatus(ctx)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.lastStatus = &newStatus
+}
+
+func (p *ProvidersHealthManager) armDownTimer() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.downTimer != nil {
+		return
+	}
+	debounce := p.downDebounce
+	if debounce <= 0 {
+		debounce = DefaultDownDebounce
+	}
+	p.downTimer = time.AfterFunc(debounce, p.emitDownIfStillDown)
+}
+
+func (p *ProvidersHealthManager) stopDownTimer() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.downTimer != nil {
+		p.downTimer.Stop()
+		p.downTimer = nil
+	}
+}
+
+// Uses background context because the request ctx is usually cancelled by the time the timer fires.
+func (p *ProvidersHealthManager) emitDownIfStillDown() {
+	defer status_common.LogOnPanic()
+
+	p.mu.Lock()
+	p.downTimer = nil
+
+	if p.aggregator == nil {
+		p.mu.Unlock()
+		return
+	}
+
+	current := p.aggregator.GetAggregatedStatus()
+	if p.paused {
+		p.mu.Unlock()
+		return
+	}
+	if current.Status != rpcstatus.StatusDown {
+		p.mu.Unlock()
+		return
+	}
+	if p.lastStatus != nil && p.lastStatus.Status == rpcstatus.StatusDown {
+		p.mu.Unlock()
+		return
+	}
+
+	statusCopy := current
+	p.lastStatus = &statusCopy
+	p.mu.Unlock()
+
+	p.emitChainStatus(context.Background())
 }
 
 // GetStatuses returns a copy of the current provider statuses.
@@ -84,6 +168,10 @@ func (p *ProvidersHealthManager) Unsubscribe(ch chan struct{}) {
 func (p *ProvidersHealthManager) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.downTimer != nil {
+		p.downTimer.Stop()
+		p.downTimer = nil
+	}
 	newAgg := aggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
 	p.aggregator = newAgg
 	p.lastStatus = nil
@@ -99,6 +187,54 @@ func (p *ProvidersHealthManager) Status() rpcstatus.ProviderStatus {
 // ChainID returns the ID of the chain.
 func (p *ProvidersHealthManager) ChainID() uint64 {
 	return p.chainID
+}
+
+// SetDownDebounce overrides the Down emission debounce window.
+func (p *ProvidersHealthManager) SetDownDebounce(d time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.downDebounce = d
+}
+
+// Pause prevents emissions and clears any pending Down debounce timer.
+func (p *ProvidersHealthManager) Pause() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.paused = true
+	if p.downTimer != nil {
+		p.downTimer.Stop()
+		p.downTimer = nil
+	}
+}
+
+// Resume reenables emissions and coalesces status updates to a single notification.
+func (p *ProvidersHealthManager) Resume() {
+	p.mu.Lock()
+	p.paused = false
+	if p.aggregator == nil {
+		p.mu.Unlock()
+		return
+	}
+
+	current := p.aggregator.GetAggregatedStatus()
+	shouldEmit := p.lastStatus == nil || p.lastStatus.Status != current.Status
+	p.mu.Unlock()
+
+	if !shouldEmit {
+		return
+	}
+
+	if current.Status == rpcstatus.StatusDown {
+		p.armDownTimer()
+		return
+	}
+
+	p.emitChainStatus(context.Background())
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	statusCopy := current
+	p.lastStatus = &statusCopy
 }
 
 // emitChainStatus sends a notification to all subscribers.

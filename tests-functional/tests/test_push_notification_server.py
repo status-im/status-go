@@ -10,7 +10,8 @@ from steps import messenger
 from utils import keys
 
 APN_TOPIC = "im.status.ethereum"
-DEFAULT_PUSH_MESSAGE = "You have a new message"
+DEFAULT_PUSH_MESSAGE = "New message in Messenger"
+CONTACT_REQUEST_PUSH_MESSAGE = "Someone sent you a contact request"
 
 
 @pytest.fixture
@@ -37,14 +38,14 @@ def push_notification_server(gorush_stub):
     server.shutdown()
 
 
-def expect_push_notification(gorush, sender, receiver):
+def expect_push_notification(gorush, sender, receiver, expected_message=DEFAULT_PUSH_MESSAGE):
     requests = gorush.wait_for_requests()
     assert len(requests) == 1, "Expected 1 push notification to be received"
 
     push = requests[0]
     assert len(push["tokens"]) == 1 and push["tokens"][0] == receiver.device_id, "Expected only Bob device_id in push notification tokens"
     assert push["platform"] == receiver.device_platform.value
-    assert push["message"] == DEFAULT_PUSH_MESSAGE
+    assert push["message"] == expected_message
     assert push["data"]["publicKey"] == keys.shake256(bytes.fromhex(receiver.compressed_public_key()[2:]))
     assert push["data"]["chatId"] == keys.shake256(sender.public_key.encode("utf-8"))
 
@@ -77,7 +78,7 @@ class TestPushNotificationServer:
 
         # Make contacts, this should force delivery of a push notification
         messenger.make_contacts(sender, receiver)
-        expect_push_notification(gorush, sender, receiver)
+        expect_push_notification(gorush, sender, receiver, CONTACT_REQUEST_PUSH_MESSAGE)
 
         # Send a message from Alice to Bob
         sender.wakuext_service.send_one_to_one_message(receiver.public_key, f"Message {uuid.uuid4()}")

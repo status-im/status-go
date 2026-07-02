@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/internal/circuitbreaker"
+	provider_errors "github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -100,6 +102,7 @@ func (pm *Manager) setIsConnected(value bool) {
 
 func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(provider thirdparty.MarketDataProvider) (interface{}, error)) (interface{}, error) {
 	cmd := circuitbreaker.NewCommand(context.Background(), nil)
+	cmd.SetNonFailureErrorClassifier(provider_errors.IsIgnorableForConnectivity)
 	for _, provider := range providers {
 		provider := provider
 		// FIXME: we might want a different circuitName. See other uses of NewFunctor
@@ -111,14 +114,50 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	}
 
 	result := pm.circuitbreaker.Execute(cmd)
-	pm.setIsConnected(result.Error() == nil)
-
-	if result.Error() != nil {
-		logutils.ZapLogger().Error("Error fetching prices", zap.Error(result.Error()))
-		return nil, result.Error()
+	if err := result.Error(); err != nil {
+		isIgnorableError := provider_errors.IsIgnorableForConnectivity(err)
+		pm.setIsConnected(isIgnorableError)
+		if isIgnorableError {
+			logutils.ZapLogger().Warn("market data unavailable for token mapping", zap.Error(err))
+		} else {
+			logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
+		}
+		return nil, err
 	}
 
+	pm.setIsConnected(true)
 	return result.Result()[0], nil
+}
+
+func (pm *Manager) fetchHistoricalPricesWithFallback(
+	token *tokentypes.Token,
+	call func(provider thirdparty.MarketDataProvider, token *tokentypes.Token) ([]thirdparty.HistoricalPrice, error),
+) ([]thirdparty.HistoricalPrice, error) {
+	var sibling *tokentypes.Token
+	if allTokens, err := pm.tokenManager.GetTokensForFetchingMarketData(); err == nil {
+		sibling = tokentypes.EthereumMainnetSibling(token, allTokens)
+	}
+
+	for _, t := range []*tokentypes.Token{token, sibling} {
+		if t == nil {
+			continue
+		}
+
+		result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
+			return call(provider, t)
+		})
+		if err == nil {
+			return result.([]thirdparty.HistoricalPrice), nil
+		}
+		if !(provider_errors.IsIgnorableForConnectivity(err) && errors.Is(err, thirdparty.ErrTokenNotMapped)) {
+			return nil, err
+		}
+	}
+
+	logutils.ZapLogger().Warn("no mapped market history token found",
+		zap.String("tokenKey", token.Key()),
+		zap.String("crossChainID", token.CrossChainID))
+	return []thirdparty.HistoricalPrice{}, nil
 }
 
 func (pm *Manager) getTokensByKeys(tokensKeys []string) (tokens []*tokentypes.Token, err error) {
@@ -136,17 +175,9 @@ func (pm *Manager) FetchHistoricalDailyPrices(tokenKey string, currency string, 
 		return nil, err
 	}
 
-	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchHistoricalDailyPrices(token, currency, limit, allData, aggregate)
+	return pm.fetchHistoricalPricesWithFallback(token, func(provider thirdparty.MarketDataProvider, t *tokentypes.Token) ([]thirdparty.HistoricalPrice, error) {
+		return provider.FetchHistoricalDailyPrices(t, currency, limit, allData, aggregate)
 	})
-
-	if err != nil {
-		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
-		return nil, err
-	}
-
-	prices := result.([]thirdparty.HistoricalPrice)
-	return prices, nil
 }
 
 func (pm *Manager) FetchHistoricalHourlyPrices(tokenKey string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
@@ -155,17 +186,9 @@ func (pm *Manager) FetchHistoricalHourlyPrices(tokenKey string, currency string,
 		return nil, err
 	}
 
-	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchHistoricalHourlyPrices(token, currency, limit, aggregate)
+	return pm.fetchHistoricalPricesWithFallback(token, func(provider thirdparty.MarketDataProvider, t *tokentypes.Token) ([]thirdparty.HistoricalPrice, error) {
+		return provider.FetchHistoricalHourlyPrices(t, currency, limit, aggregate)
 	})
-
-	if err != nil {
-		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
-		return nil, err
-	}
-
-	prices := result.([]thirdparty.HistoricalPrice)
-	return prices, nil
 }
 
 // FetchTokenMarketValues fetches market values for a given token keys and currency. If no tokens are provided, all tokens are fetched.

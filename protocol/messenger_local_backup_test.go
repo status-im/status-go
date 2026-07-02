@@ -4,8 +4,10 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -30,6 +32,63 @@ func makeMutualContacts(lhs *Messenger, rhs *Messenger) error {
 		return err
 	}
 	return makeMutualContact(rhs, &lhs.identity.PublicKey)
+}
+
+func (s *MessengerLocalBackupSuite) TestLocalBackupRestoresContactRequestText() {
+	bob1 := s.anotherMessenger()
+	bob2 := s.anotherMessenger()
+	alice := s.newMessenger()
+
+	err := bob1.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true)
+	s.Require().NoError(err)
+
+	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob1.identity.PublicKey))
+	contactRequestText := "hello from backup"
+
+	_, err = alice.SendContactRequest(context.Background(), &requests.SendContactRequest{
+		ID:      bobID,
+		Message: contactRequestText,
+	})
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(
+		bob1,
+		func(r *MessengerResponse) bool {
+			for _, msg := range r.Messages() {
+				if msg.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && msg.From == aliceID && msg.Text == contactRequestText {
+					return true
+				}
+			}
+			return false
+		},
+		"contact request not received",
+	)
+	s.Require().NoError(err)
+
+	marshalledBackup, err := bob1.ExportBackup()
+	s.Require().NoError(err)
+
+	err = bob2.ImportBackup(marshalledBackup)
+	s.Require().NoError(err)
+
+	restoredContactRequestID, err := bob2.persistence.LatestPendingContactRequestIDForContact(aliceID)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(restoredContactRequestID)
+	s.Require().NotEqual(defaultContactRequestID(aliceID), restoredContactRequestID)
+
+	restoredContactRequest, err := bob2.persistence.MessageByID(restoredContactRequestID)
+	s.Require().NoError(err)
+	s.Require().Equal(protobuf.ChatMessage_CONTACT_REQUEST, restoredContactRequest.ContentType)
+	s.Require().Equal(contactRequestText, restoredContactRequest.Text)
+	s.Require().NotEqual(defaultContactRequestText(), restoredContactRequest.Text)
+
+	notification, err := bob2.PendingNotificationContactRequest(aliceID)
+	s.Require().NoError(err)
+	s.Require().NotNil(notification)
+	s.Require().NotNil(notification.Message)
+	s.Require().Equal(restoredContactRequestID, notification.Message.ID)
+	s.Require().Equal(contactRequestText, notification.Message.Text)
 }
 
 func (s *MessengerLocalBackupSuite) TestLocalBackup() {
@@ -351,7 +410,7 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	// Validate messages
 	messages, err := bob2.persistence.AllMessagesForBackup()
 	s.Require().NoError(err)
-	s.Require().Len(messages, 15)
+	s.Require().Len(messages, 13)
 
 	// Build a map for easier assertions
 	messageMap := make(map[string]*protobuf.BackedUpMessage)
@@ -410,4 +469,42 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().NoError(err)
 	s.Require().Len(pinnedMessages, 1)
 	s.Require().Equal(bob2.selfContact.ID, pinnedMessages[0].PinnedBy)
+}
+
+func (s *MessengerLocalBackupSuite) TestExportBackup_ExcludesNonCanonicalSelfContact() {
+	canonicalSelfID := s.m.myHexIdentity()
+	nonCanonicalSelfID := "0X" + strings.ToUpper(canonicalSelfID[2:])
+
+	s.Require().NotEqual(canonicalSelfID, nonCanonicalSelfID)
+	s.Require().Equal(strings.ToLower(canonicalSelfID), strings.ToLower(nonCanonicalSelfID))
+
+	validContactKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	validContactID := types.EncodeHex(crypto.FromECDSAPub(&validContactKey.PublicKey))
+
+	s.m.allContacts.Store(nonCanonicalSelfID, &contacts.Contact{
+		ID:                       nonCanonicalSelfID,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
+		ContactRequestLocalClock: 1,
+		LastUpdated:              1,
+		LastUpdatedLocally:       1,
+	})
+	s.m.allContacts.Store(validContactID, &contacts.Contact{
+		ID:                       validContactID,
+		ContactRequestLocalState: contacts.ContactRequestStateSent,
+		ContactRequestLocalClock: 1,
+		LastUpdated:              1,
+		LastUpdatedLocally:       1,
+	})
+
+	marshalledBackup, err := s.m.ExportBackup()
+	s.Require().NoError(err)
+
+	var backup protobuf.MessengerLocalBackup
+	err = proto.Unmarshal(marshalledBackup, &backup)
+	s.Require().NoError(err)
+
+	s.Require().Len(backup.Contacts, 1)
+	s.Require().Equal(validContactID, backup.Contacts[0].Id)
+	s.Require().NotEqual(strings.ToLower(canonicalSelfID), strings.ToLower(backup.Contacts[0].Id))
 }

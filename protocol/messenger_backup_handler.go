@@ -37,6 +37,15 @@ func (m *Messenger) handleLocalBackup(ctx context.Context, state *ReceivedMessag
 		errors = append(errors, err)
 	}
 
+	if len(backup.Messages) > 0 {
+		err := m.persistence.SaveBackedUpMessages(backup.Messages)
+		if err != nil {
+			errors = append(errors, err)
+		}
+
+		signal.LocalMessageBackupDone()
+	}
+
 	for _, contact := range backup.Contacts {
 		err = m.HandleSyncInstallationContactV2(ctx, state, contact, nil)
 		if err != nil {
@@ -52,15 +61,6 @@ func (m *Messenger) handleLocalBackup(ctx context.Context, state *ReceivedMessag
 	communityErrors := m.handleLocalBackupCommunities(state, backup.Communities)
 	if len(communityErrors) > 0 {
 		errors = append(errors, communityErrors...)
-	}
-
-	if len(backup.Messages) > 0 {
-		err := m.persistence.SaveBackedUpMessages(backup.Messages)
-		if err != nil {
-			errors = append(errors, err)
-		}
-
-		signal.LocalMessageBackupDone()
 	}
 
 	return errors

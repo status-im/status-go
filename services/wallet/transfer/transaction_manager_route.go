@@ -227,7 +227,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 		Address:       accFrom.Address,
 		AddressPath:   accFrom.Path,
 		KeyUid:        accFrom.KeyUID,
-		SignOnKeycard: keypair.MigratedToKeycard(),
+		SignOnKeycard: keypair.MigratedToColdWallet(),
 	}
 
 	usedNonces := make(map[uint64]int64)

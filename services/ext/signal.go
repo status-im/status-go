@@ -2,7 +2,6 @@ package ext
 
 import (
 	"github.com/status-im/status-go/internal/crypto/types"
-	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/communities"
@@ -46,10 +45,6 @@ func (h PublisherSignalHandler) BundleAdded(identity string, installationID stri
 
 func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse) {
 	signal.SendNewMessages(response)
-}
-
-func (h PublisherSignalHandler) Stats(stats messagingtypes.TransportStats) {
-	signal.SendStats(stats)
 }
 
 // MessengerSignalsHandler sends signals on messenger events
@@ -107,6 +102,10 @@ func (m *MessengerSignalsHandler) HistoryArchivesUnseeded(communityID string) {
 
 func (m *MessengerSignalsHandler) HistoryArchiveDownloaded(communityID string, from int, to int) {
 	signal.SendHistoryArchiveDownloaded(communityID, from, to)
+}
+
+func (m *MessengerSignalsHandler) IndexDownloadCompleted(communityID string, indexCid string) {
+	signal.SendIndexDownloadCompleted(communityID, indexCid)
 }
 
 func (m *MessengerSignalsHandler) DownloadingHistoryArchivesStarted(communityID string) {

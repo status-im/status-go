@@ -289,63 +289,6 @@ func GetPrivKeyImportedKeypairForTest() *accsmanagementtypes.Keypair {
 	return kp
 }
 
-func GetProfileKeycardForTest() *accsmanagementtypes.Keycard {
-	profileKp, _, _, err := GetProfileKeypairForTest(true, true, true)
-	if err != nil {
-		panic(err)
-	}
-	keycard1Addresses := []types.Address{}
-	for _, acc := range profileKp.Accounts {
-		keycard1Addresses = append(keycard1Addresses, acc.Address)
-	}
-	return &accsmanagementtypes.Keycard{
-		KeycardUID:        "00000000000000000000000000000001",
-		KeycardName:       "Card01",
-		KeycardLocked:     false,
-		AccountsAddresses: keycard1Addresses,
-		KeyUID:            profileKp.KeyUID,
-		Position:          0,
-	}
-}
-
-func GetKeycardForSeedImportedKeypair1ForTest() *accsmanagementtypes.Keycard {
-	seed1Kp, _, _, err := GetSeedImportedKeypair1ForTest()
-	if err != nil {
-		panic(err)
-	}
-	keycard2Addresses := []types.Address{}
-	for _, acc := range seed1Kp.Accounts {
-		keycard2Addresses = append(keycard2Addresses, acc.Address)
-	}
-	return &accsmanagementtypes.Keycard{
-		KeycardUID:        "00000000000000000000000000000002",
-		KeycardName:       "Card02",
-		KeycardLocked:     false,
-		AccountsAddresses: keycard2Addresses,
-		KeyUID:            seed1Kp.KeyUID,
-		Position:          1,
-	}
-}
-
-func GetKeycardForSeedImportedKeypair2ForTest() *accsmanagementtypes.Keycard {
-	seed2Kp, _, _, err := GetSeedImportedKeypair2ForTest()
-	if err != nil {
-		panic(err)
-	}
-	keycard4Addresses := []types.Address{}
-	for _, acc := range seed2Kp.Accounts {
-		keycard4Addresses = append(keycard4Addresses, acc.Address)
-	}
-	return &accsmanagementtypes.Keycard{
-		KeycardUID:        "00000000000000000000000000000003",
-		KeycardName:       "Card03",
-		KeycardLocked:     false,
-		AccountsAddresses: keycard4Addresses,
-		KeyUID:            seed2Kp.KeyUID,
-		Position:          2,
-	}
-}
-
 func Contains[T comparable](container []T, element T, isEqual func(T, T) bool) bool {
 	for _, e := range container {
 		if isEqual(e, element) {
@@ -441,33 +384,6 @@ func SameKeypairsWithDifferentSyncedFrom(expected, real *accsmanagementtypes.Key
 			found := false
 			for j := range real.Accounts {
 				if SameAccountsWithDifferentOperable(expected.Accounts[i], real.Accounts[j], expectedOperableValue) {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				return false
-			}
-		}
-	}
-
-	return same
-}
-
-func SameKeycards(expected, real *accsmanagementtypes.Keycard) bool {
-	same := expected.KeycardUID == real.KeycardUID &&
-		expected.KeyUID == real.KeyUID &&
-		expected.KeycardName == real.KeycardName &&
-		expected.KeycardLocked == real.KeycardLocked &&
-		expected.Position == real.Position &&
-		len(expected.AccountsAddresses) == len(real.AccountsAddresses)
-
-	if same {
-		for i := range expected.AccountsAddresses {
-			found := false
-			for j := range real.AccountsAddresses {
-				if expected.AccountsAddresses[i] == real.AccountsAddresses[j] {
 					found = true
 					break
 				}

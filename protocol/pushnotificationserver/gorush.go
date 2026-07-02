@@ -12,22 +12,32 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-const defaultNewMessageNotificationText = "You have a new message"
-const defaultMentionNotificationText = "Someone mentioned you"
+const defaultNewMessageNotificationText = "New message in Messenger"
+const defaultMentionNotificationText = "New mention or reply in Communities"
 const defaultRequestToJoinCommunityNotificationText = "Someone requested to join a community you are an admin of"
+const defaultContactRequestNotificationText = "Someone sent you a contact request"
+
+const deepLinkChats = "status-app://chats"                      // plain messages -> messenger
+const deepLinkActivityCenter = "status-app://ac"                // mentions, community requests, etc. -> activity center
+const deepLinkContactRequests = "status-app://contact-requests" // contact requests -> activity center contact requests
 
 type GoRushRequestData struct {
 	EncryptedMessage string `json:"encryptedMessage"`
 	ChatID           string `json:"chatId"`
 	PublicKey        string `json:"publicKey"`
+	DeepLink         string `json:"deepLink,omitempty"`
 }
 
 type GoRushRequestNotification struct {
-	Tokens   []string           `json:"tokens"`
-	Platform uint               `json:"platform"`
-	Message  string             `json:"message"`
-	Topic    string             `json:"topic"`
-	Data     *GoRushRequestData `json:"data"`
+	Tokens           []string           `json:"tokens"`
+	Platform         uint               `json:"platform"`
+	Message          string             `json:"message"`
+	Topic            string             `json:"topic"`
+	ContentAvailable bool               `json:"content_available,omitempty"`
+	Sound            string             `json:"sound,omitempty"`
+	Priority         string             `json:"priority,omitempty"`
+	PushType         string             `json:"push_type,omitempty"`
+	Data             *GoRushRequestData `json:"data"`
 }
 
 type GoRushRequest struct {
@@ -59,19 +69,40 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 			text = defaultNewMessageNotificationText
 		} else if request.Type == protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY {
 			text = defaultRequestToJoinCommunityNotificationText
+		} else if request.Type == protobuf.PushNotification_CONTACT_REQUEST {
+			text = defaultContactRequestNotificationText
 		} else {
 			text = defaultMentionNotificationText
 		}
+		isAPN := registration.TokenType == protobuf.PushNotificationRegistration_APN_TOKEN
+		var sound, priority, pushType, deepLink string
+		if isAPN {
+			sound = "default"
+			priority = "high"
+			pushType = "alert"
+			if request.Type == protobuf.PushNotification_MESSAGE {
+				deepLink = deepLinkChats
+			} else if request.Type == protobuf.PushNotification_CONTACT_REQUEST {
+				deepLink = deepLinkContactRequests
+			} else {
+				deepLink = deepLinkActivityCenter
+			}
+		}
 		goRushRequests.Notifications = append(goRushRequests.Notifications,
 			&GoRushRequestNotification{
-				Tokens:   []string{registration.DeviceToken},
-				Platform: tokenTypeToGoRushPlatform(registration.TokenType),
-				Message:  text,
-				Topic:    registration.ApnTopic,
+				Tokens:           []string{registration.DeviceToken},
+				Platform:         tokenTypeToGoRushPlatform(registration.TokenType),
+				Message:          text,
+				Topic:            registration.ApnTopic,
+				ContentAvailable: isAPN,
+				Sound:            sound,
+				Priority:         priority,
+				PushType:         pushType,
 				Data: &GoRushRequestData{
 					EncryptedMessage: types.EncodeHex(request.Message),
 					ChatID:           types.EncodeHex(request.ChatId),
 					PublicKey:        types.EncodeHex(request.PublicKey),
+					DeepLink:         deepLink,
 				},
 			})
 	}

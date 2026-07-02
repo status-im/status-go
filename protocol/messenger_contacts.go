@@ -315,6 +315,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		return nil, err
 	}
 
+	previouslyAccepted := contactRequest.ContactRequestState == common.ContactRequestStateAccepted
 	contactRequest.ContactRequestState = common.ContactRequestStateAccepted
 
 	err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
@@ -388,22 +389,24 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	response.AddMessage(contactRequest)
 	response.AddContact(contact)
 
-	// Add mutual state update message for incoming contact request
-	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, contacts.MutualStateUpdateTypeAdded, clock, timestamp, true)
-	if err != nil {
-		return nil, err
-	}
+	// Add mutual state update message only on first acceptance.
+	if !previouslyAccepted {
+		clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
+		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, contacts.MutualStateUpdateTypeAdded, clock, timestamp, true)
+		if err != nil {
+			return nil, err
+		}
 
-	err = m.prepareMessage(updateMessage, m.httpServer)
-	if err != nil {
-		return nil, err
+		err = m.prepareMessage(updateMessage, m.httpServer)
+		if err != nil {
+			return nil, err
+		}
+		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+		if err != nil {
+			return nil, err
+		}
+		response.AddMessage(updateMessage)
 	}
-	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-	if err != nil {
-		return nil, err
-	}
-	response.AddMessage(updateMessage)
 	response.AddChat(chat)
 
 	return response, nil
@@ -1193,9 +1196,10 @@ func (m *Messenger) retrieveLatestContactRequestIDForContact(contactID string) (
 	}
 
 	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contactID)
-	if err == common.ErrRecordNotFound {
+	if err == common.ErrRecordNotFound || (err == nil && contactRequestID == "") {
 		// No pending request found, use a default one
 		contactRequestID = defaultContactRequestID(contactID)
+		err = nil
 	}
 	return contactRequestID, err
 }

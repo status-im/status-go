@@ -6,6 +6,7 @@ from clients.api import ApiResponseError
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps import async_messenger
+from waku_params import parametrize_waku_light_client, parametrize_waku_light_client_non_lc
 
 
 @pytest.mark.rpc
@@ -20,14 +21,14 @@ class TestMessageReactions:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
-    @pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+    @parametrize_waku_light_client
     async def test_one_to_one_message_reactions(self, sender, receiver, waku_light_client):
         """Test message reactions with different wakuV2LightClient configurations"""
         await async_messenger.make_contacts(sender, receiver)
         response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, "test_message")
         message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
-        receiver_chat_id = receiver.wakuext_service.chats()[0]["id"]
+        receiver_chat_id = sender.public_key
 
         # Send emoji reaction
         response = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, message_id, "2764")
@@ -89,14 +90,14 @@ class TestMessageReactions:
                 )
             )
 
-    @pytest.mark.parametrize("waku_light_client", [False], indirect=True, ids=["wakuV2LightClient_False"])
+    @parametrize_waku_light_client_non_lc
     async def test_limit_of_20_reactions(self, sender, receiver, waku_light_client):
         """Test that you cannot send more than 20 message reactions on a single message"""
         await async_messenger.make_contacts(sender, receiver)
         response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, "test_message")
         message = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
-        receiver_chat_id = receiver.wakuext_service.chats()[0]["id"]
+        receiver_chat_id = sender.public_key
 
         # Send 20 emojis
         emojis = [

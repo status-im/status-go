@@ -10,8 +10,6 @@ type Filter struct {
 	ChatID string `json:"chatId"`
 	// FilterID the whisper filter id generated
 	FilterID string `json:"filterId"`
-	// SymKeyID is the symmetric key id used for symmetric filters
-	SymKeyID string `json:"symKeyId"`
 	// OneToOne tells us if we need to use asymmetric encryption for this chat
 	OneToOne bool `json:"oneToOne"`
 	// Identity is the public key of the other recipient for non-public filters.

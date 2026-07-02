@@ -215,6 +215,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
+	// Each paired device advertises only its own installation's push info on the
+	// shared contact-code topic, and processing one such advertisement stamps a
+	// query timestamp that suppresses the authoritative server query for
+	// staleQueryTimeInSeconds. alice only subscribes to that topic when she starts
+	// the chat above, so a device that advertised earlier is missed. Re-advertise
+	// from both devices now that she is listening so she receives both.
+	s.Require().NoError(bob1.PublishIdentityImage())
+	s.Require().NoError(bob2.PublishIdentityImage())
+
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
 	err = testutils2.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
@@ -692,6 +701,74 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 
 }
 
+// TestContactCodeAdvertisementStoresPushInfoViaHandler is a regression test for the bug
+// where Messenger.HandleContactCodeAdvertisement stopped forwarding the advertisement to
+// the push notification client (the forwarding was dropped in the "generate handlers"
+// refactor). The push info carried in a contact code is the channel light clients rely on
+// to learn a contact's push registration — the live query response is ephemeral and is
+// routinely missed by light clients — so the handler MUST forward it. Unlike TestContactCode
+// (which calls the push client method directly and so never exercised this wiring), this
+// test drives the messenger handler and asserts the recipient's push info is stored.
+func (s *MessengerPushNotificationSuite) TestContactCodeAdvertisementStoresPushInfoViaHandler() {
+	bob1 := s.m
+	messenger, _ := s.newPushNotificationServer()
+	alice := s.newMessenger()
+
+	s.Require().NoError(alice.EnableSendingPushNotifications())
+
+	// Register bob1 with the push notification server so its contact code carries push info.
+	err := bob1.AddPushNotificationsServer(context.Background(), &messenger.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	s.Require().NoError(err)
+
+	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
+	s.Require().NoError(err)
+
+	err = testutils2.RetryWithBackOff(func() error {
+		if _, err := messenger.RetrieveAll(); err != nil {
+			return err
+		}
+		if _, err := bob1.RetrieveAll(); err != nil {
+			return err
+		}
+		registered, err := bob1.RegisteredForPushNotifications()
+		if err != nil {
+			return err
+		}
+		if !registered {
+			return errors.New("not registered")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	contactCodeAdvertisement, err := bob1.buildContactCodeAdvertisement()
+	s.Require().NoError(err)
+	s.Require().NotNil(contactCodeAdvertisement)
+	s.Require().NotEmpty(contactCodeAdvertisement.PushNotificationInfo)
+	// The common case for periodic push-info re-advertisements has no chat identity attached;
+	// this is precisely the shape the buggy handler dropped (it bailed when ChatIdentity == nil).
+	s.Require().Nil(contactCodeAdvertisement.ChatIdentity)
+
+	// alice has never interacted with bob1, so it must not yet have bob1's push info.
+	infoBefore, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, nil)
+	s.Require().NoError(err)
+	s.Require().Empty(infoBefore)
+
+	// Drive the messenger handler (the wiring under test) rather than the push client directly.
+	state := &ReceivedMessageState{
+		CurrentMessageState: &CurrentMessageState{
+			PublicKey: &bob1.identity.PublicKey,
+		},
+	}
+	s.Require().NoError(alice.HandleContactCodeAdvertisement(context.Background(), state, contactCodeAdvertisement, nil))
+
+	// The handler must have forwarded the advertisement to the push client, which stores
+	// bob1's push registration so a subsequent send can dispatch a notification.
+	infoAfter, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, nil)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(infoAfter, "messenger handler must forward contact-code push info to the push notification client")
+}
+
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	bob := s.m
 	messenger, _ := s.newPushNotificationServer()
@@ -1049,6 +1126,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	messageIDString := response.Messages()[0].ID
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
+
+	// Each paired device advertises only its own installation's push info on the
+	// shared contact-code topic, and processing one such advertisement stamps a
+	// query timestamp that suppresses the authoritative server query for
+	// staleQueryTimeInSeconds. alice only subscribes to that topic when she starts
+	// the chat above, so a device that advertised earlier is missed. Re-advertise
+	// from both devices now that she is listening so she receives both.
+	s.Require().NoError(bob1.PublishIdentityImage())
+	s.Require().NoError(bob2.PublishIdentityImage())
 
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
 	err = testutils2.RetryWithBackOff(func() error {

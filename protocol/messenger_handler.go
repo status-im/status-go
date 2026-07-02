@@ -411,8 +411,34 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *contacts.C
 	}
 
 	if contactRequestID != "" {
-		m.logger.Warn("syncContactRequestForInstallationContact: skipping as contact request found", zap.String("contactRequestID", contactRequestID))
-		return nil
+		m.logger.Warn("syncContactRequestForInstallationContact: using existing contact request", zap.String("contactRequestID", contactRequestID))
+
+		existingContactRequest, err := m.persistence.MessageByID(contactRequestID)
+		if err != nil {
+			if err != common.ErrRecordNotFound {
+				return err
+			}
+
+			// The ID was returned by lookup but the message is missing. Fall back to
+			// synthesizing a default request to keep contact-request actions available.
+			m.logger.Warn("syncContactRequestForInstallationContact: contact request id found but message missing", zap.String("contactRequestID", contactRequestID))
+		} else {
+			if outgoing {
+				notification := m.generateOutgoingContactRequestNotification(contact, existingContactRequest)
+				notification.Timestamp = existingContactRequest.WhisperTimestamp
+				err = m.addActivityCenterNotification(state.Response, notification, nil)
+				if err != nil {
+					return err
+				}
+			} else {
+				err = m.createIncomingContactRequestNotification(contact, state, existingContactRequest, true)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}
 	}
 
 	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
@@ -504,9 +530,17 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 }
 
 func (m *Messenger) HandleSyncInstallationContactV2(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncInstallationContactV2, statusMessage *common.StatusMessage) error {
-	// Ignore own contact installation
+	canonicalID, err := contacts.ContactIDFromPublicKeyString(message.Id)
+	if err != nil {
+		m.logger.Warn("HandleSyncInstallationContactV2: failed to canonicalize contact ID, continuing with original",
+			zap.String("contactID", message.Id),
+			zap.Error(err))
+		canonicalID = message.Id
+	}
+	message.Id = canonicalID
 
-	if message.Id == m.myHexIdentity() {
+	// Ignore own contact installation
+	if canonicalID == m.myHexIdentity() {
 		m.logger.Warn("HandleSyncInstallationContactV2: skipping own contact")
 		return nil
 	}
@@ -912,6 +946,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 	previouslyAccepted := request != nil && request.ContactRequestState == common.ContactRequestStateAccepted
 
 	contact := state.CurrentMessageState.Contact
+	wasMutual := contact.Mutual()
 
 	// The request message will be added to the response here
 	processingResponse, err := m.handleAcceptContactRequest(state.Response, contact, request, clock)
@@ -941,8 +976,8 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 			chat.Active = true
 		}
 
-		// Add mutual state update message for incoming contact request
-		if !previouslyAccepted {
+		// Add mutual state update message only when transitioning to mutual.
+		if !wasMutual && contact.Mutual() && !previouslyAccepted {
 			clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 
 			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, contacts.MutualStateUpdateTypeAdded, clock, timestamp, false)
@@ -2701,6 +2736,14 @@ func (m *Messenger) HandleGroupChatInvitation(ctx context.Context, state *Receiv
 }
 
 func (m *Messenger) HandleContactCodeAdvertisement(ctx context.Context, state *ReceivedMessageState, cca *protobuf.ContactCodeAdvertisement, statusMessage *common.StatusMessage) error {
+	publicKey := state.CurrentMessageState.PublicKey
+
+	if m.pushNotificationClient != nil {
+		if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, cca); err != nil {
+			m.logger.Warn("failed to handle ContactCodeAdvertisement push notification info", zap.Error(err))
+		}
+	}
+
 	if cca.ChatIdentity == nil {
 		return nil
 	}
@@ -3012,19 +3055,10 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount,
 		return dbAccount.Operable, nil
 	}
 
-	if !syncKpMigratedToKeycard {
-		// We're here when we receive a keypair from the paired device which is either:
-		// 1. regular keypair or
-		// 2. was just converted from keycard to a regular keypair.
-		dbKeycardsForKeyUID, err := m.settings.GetKeycardsWithSameKeyUID(syncAcc.KeyUid)
-		if err != nil {
-			return accsmanagementtypes.AccountNonOperable, err
-		}
-
-		if len(dbKeycardsForKeyUID) > 0 {
-			// We're here in case 2. from above and in this case we need to mark all accounts for this keypair non operable
-			return accsmanagementtypes.AccountNonOperable, nil
-		}
+	if !syncKpMigratedToKeycard && dbKpMigratedToKeycard {
+		// We're here when we receive a keypair from the paired device which was just converted from a cold wallet
+		// to a regular keypair so we need to mark all accounts for this keypair non operable
+		return accsmanagementtypes.AccountNonOperable, nil
 	}
 
 	if syncAcc.Chat || syncAcc.Wallet {
@@ -3185,8 +3219,8 @@ func (m *Messenger) handleProfileKeypairMigration(state *ReceivedMessageState, f
 		return false, nil
 	}
 
-	migrationNeeded := dbKeypair.MigratedToKeycard() && len(message.Keycards) == 0 || // `true` if profile keypair was migrated to the app on one of paired devices
-		!dbKeypair.MigratedToKeycard() && len(message.Keycards) > 0 // `true` if profile keypair was migrated to a Keycard on one of paired devices
+	migrationNeeded := dbKeypair.MigratedToColdWallet() && message.ColdWallet == "" || // `true` if profile keypair cold wallet was removed on one of paired devices
+		!dbKeypair.MigratedToColdWallet() && message.ColdWallet != "" // `true` if profile keypair was migrated to a cold wallet on one of paired devices
 	err = m.settings.SaveSettingField(settings2.ProfileMigrationNeeded, migrationNeeded)
 	if err != nil {
 		return false, err
@@ -3235,12 +3269,12 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		}
 	}
 
-	syncKpMigratedToKeycard := len(message.Keycards) > 0
+	syncKpMigratedToKeycard := message.ColdWallet != ""
 
 	for _, sAcc := range message.Accounts {
 		accountOperability, err := m.resolveAccountOperability(sAcc,
 			syncKpMigratedToKeycard,
-			dbKeypair != nil && dbKeypair.MigratedToKeycard(),
+			dbKeypair != nil && dbKeypair.MigratedToColdWallet(),
 			fromLocalPairing)
 		if err != nil {
 			return nil, err
@@ -3252,7 +3286,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 
 	if !fromLocalPairing &&
 		dbKeypair != nil &&
-		!dbKeypair.MigratedToKeycard() &&
+		!dbKeypair.MigratedToColdWallet() &&
 		syncKpMigratedToKeycard {
 		err = m.settings.MarkKeypairFullyOperable(dbKeypair.KeyUID, 0, false)
 		if err != nil {
@@ -3293,16 +3327,6 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		defer func() {
 			err = acNofificationCallback()
 		}()
-	}
-
-	for _, sKc := range message.Keycards {
-		kc := accsmanagementtypes.Keycard{}
-		kc.FromSyncKeycard(sKc)
-		err = m.settings.SaveOrUpdateKeycard(kc, message.Clock, false)
-		if err != nil {
-			return nil, err
-		}
-		kp.Keycards = append(kp.Keycards, &kc)
 	}
 
 	// getting keypair form the db, cause keypair related accounts positions might be changed

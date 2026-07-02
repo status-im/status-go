@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -21,7 +20,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
-	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/services/wallet/transferdetector"
 
@@ -131,7 +129,6 @@ func NewService(
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
 	tokenManager *token.Manager,
-	statusProxyStageName string,
 ) (*Service, error) {
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
@@ -159,20 +156,13 @@ func NewService(
 			onramp.NewMoonPayProvider(),
 		}
 
-		cryptoCompare := cryptocompare.NewClient()
 		coingeckoClient := coingecko.NewClientWithParams(coingecko.Params{
 			CoingeckoAPIKey:     config.WalletConfig.CoingeckoAPIKey,
 			CoingeckoDemoAPIKey: config.WalletConfig.CoingeckoDemoAPIKey,
 		})
 		coingeckoProxy := createCoingeckoProxyClient(config.WalletConfig.MarketDataProxyConfig)
-		cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
-			ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
-			URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
-			User:     config.WalletConfig.StatusProxyMarketUser,
-			Password: config.WalletConfig.StatusProxyMarketPassword,
-		})
 		marketProviders = []thirdparty.MarketDataProvider{
-			coingeckoProxy, coingeckoClient, cryptoCompare, cryptoCompareProxy,
+			coingeckoProxy, coingeckoClient,
 		}
 
 		raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)

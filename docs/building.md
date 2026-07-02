@@ -106,11 +106,16 @@ Or use `make test-single`:
 make test-single PKG=./messaging/controller/processor TEST=^TestSDSWrappedMessages$
 ```
 
-Note -testify.m as [testify/suite](https://godoc.org/github.com/stretchr/testify/suite) is used to group individual tests.
+Note `-testify.m` as [testify/suite](https://godoc.org/github.com/stretchr/testify/suite) is used to group individual tests.
 
 To run a single test in a test suite (e.g. `TestTransferringKeystoreFiles`, which is part of `SyncDeviceSuite`):
 ```shell
 go test -v ./server/pairing -test.run TestSyncDeviceSuite -testify.m ^TestTransferringKeystoreFiles$
+```
+
+Or with `make test-single`:
+```shell
+make test-single PKG=./server/pairing TEST=TestSyncDeviceSuite TESTIFY_M=^TestTransferringKeystoreFiles$
 ```
 
 Note: `TestSyncDeviceSuite` is not the name of the test suite, but the name of the test function that runs the `SyncDeviceSuite` suite.

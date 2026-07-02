@@ -139,7 +139,6 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		// mobile may need to override the following options
 		LightClient:                            specifiedWakuV2Config.LightClient,
 		EnableStoreConfirmationForMessagesSent: specifiedWakuV2Config.EnableStoreConfirmationForMessagesSent,
-		EnableMissingMessageVerification:       specifiedWakuV2Config.EnableMissingMessageVerification,
 		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
@@ -185,12 +184,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.AlchemyAPIKey = request.AlchemyAPIKey
 	}
 
-	if !request.StatusProxyMarketUser.Empty() {
-		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
-	}
-	if !request.StatusProxyMarketPassword.Empty() {
-		walletConfig.StatusProxyMarketPassword = request.StatusProxyMarketPassword
-	}
 	if !request.MarketDataProxyUser.Empty() {
 		walletConfig.MarketDataProxyConfig.User = request.MarketDataProxyUser
 	}
@@ -223,13 +216,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	}
 	if len(walletRequest.CustomTokens) > 0 {
 		walletConfig.CustomTokens = walletRequest.CustomTokens
-	}
-
-	if !request.StatusProxyUser.Empty() {
-		walletConfig.StatusProxyUser = request.StatusProxyUser
-	}
-	if !request.StatusProxyPassword.Empty() {
-		walletConfig.StatusProxyPassword = request.StatusProxyPassword
 	}
 
 	if !request.EthRpcProxyUrl.Empty() {
@@ -343,10 +329,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.WakuV2Config.LightClient = true
 	}
 
-	if request.WakuV2EnableMissingMessageVerification {
-		nodeConfig.WakuV2Config.EnableMissingMessageVerification = true
-	}
-
 	if request.WakuV2EnableStoreConfirmationForMessagesSent {
 		nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent = true
 	}
@@ -383,10 +365,36 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	if request.TorrentConfigEnabled != nil {
 		nodeConfig.TorrentConfig.Enabled = *request.TorrentConfigEnabled
-
 	}
 	if request.TorrentConfigPort != nil {
 		nodeConfig.TorrentConfig.Port = *request.TorrentConfigPort
+	}
+
+	if request.LogosStorageConfigEnabled != nil {
+		nodeConfig.LogosStorageConfig.Enabled = *request.LogosStorageConfigEnabled
+	}
+
+	if request.LogosStorageConfigBootstrapNode != nil {
+		nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes = []string{*request.LogosStorageConfigBootstrapNode}
+	}
+
+	nodeConfig.LogosStorageConfig = params.LogosStorageConfig{
+		Enabled: nodeConfig.LogosStorageConfig.Enabled,
+		NodeConfig: params.LogosStorageNodeConfig{
+			DataDir:        filepath.Join(nodeConfig.RootDataDir, "logos-storage", "data"),
+			BlockRetries:   params.DefaultLogosStorageBlockRetries,
+			MetricsEnabled: false,
+			LogFormat:      "nocolors",
+			BootstrapNodes: nodeConfig.LogosStorageConfig.NodeConfig.BootstrapNodes,
+		},
+	}
+
+	if request.ImportInitialDelay != nil {
+		nodeConfig.ImportInitialDelay = *request.ImportInitialDelay
+	}
+
+	if request.MessageArchiveInterval != nil {
+		nodeConfig.MessageArchiveInterval = *request.MessageArchiveInterval
 	}
 
 	if request.APIConfig != nil {

@@ -9,10 +9,6 @@ import (
 	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
-func (a *API) SubscribeToPubsubTopic(topic string) error {
-	return a.core.stack.Transport.SubscribeToPubsubTopic(topic)
-}
-
 func (a *API) GetKeysForGroup(groupID []byte) ([]*encryption.HashRatchetKeyCompatibility, error) {
 	return a.core.stack.Encryption.GetKeysForGroup(groupID)
 }

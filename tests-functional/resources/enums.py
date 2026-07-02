@@ -61,3 +61,14 @@ class ContactVerificationState(Enum):
     Accepted = 2
     Declined = 3
     Canceled = 4
+
+
+class StatusType(Enum):
+    # protobuf.StatusUpdate StatusType values (see protocol/protobuf/status_update.proto).
+    # Only AUTOMATIC status updates are published as ephemeral Waku messages, so they
+    # are never persisted by the store node.
+    UNKNOWN_STATUS_TYPE = 0
+    AUTOMATIC = 1  # ephemeral
+    DO_NOT_DISTURB = 2  # persisted
+    ALWAYS_ONLINE = 3
+    INACTIVE = 4

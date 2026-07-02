@@ -34,6 +34,14 @@ def pytest_addoption(parser):
         default="",
     )
     parser.addoption(
+        "--peer-docker-image",
+        action="append",
+        help="status-go image for the OTHER (peer) chat participant in cross-version "
+        "compatibility tests. Repeatable; each value adds one peer version to run against. "
+        "Empty => use --docker-image (vut<->vut).",
+        default=None,
+    )
+    parser.addoption(
         "--codecov_dir",
         action="store",
         help="",
@@ -88,43 +96,6 @@ def _status_backend_url_generator(urls) -> Iterator[str]:
         yield url
 
 
-def _calculate_port_range():
-    executor_number = int(os.getenv("EXECUTOR_NUMBER", "5"))
-    Config.executor_number = executor_number
-    base_port = 7000
-    range_size = 2000
-    max_port = 65535
-    min_port = 1024
-
-    start_port = base_port + (executor_number * range_size)
-    end_port = start_port + range_size
-
-    # Validate executor-level range BEFORE xdist partitioning.
-    # xdist only narrows the range, so if the full range is valid, all sub-ranges are too.
-    if start_port < min_port or end_port > max_port:
-        raise ValueError(
-            f"Generated port range ({start_port}-{end_port}) is outside the allowed range "
-            f"({min_port}-{max_port}). executor_number={executor_number}, range_size={range_size}"
-        )
-
-    # Sub-partition for pytest-xdist workers to avoid intra-executor collisions.
-    # Each xdist worker is a separate process (spawned via execnet, not fork),
-    # so each gets its own copy of the port pool — threading.Lock does not help across processes.
-    worker_id = os.getenv("PYTEST_XDIST_WORKER")  # "gw0", "gw1", etc.
-    if worker_id:
-        worker_num = int(worker_id.replace("gw", ""))
-        num_workers = int(os.getenv("PYTEST_XDIST_WORKER_COUNT", 12))
-        if num_workers <= 0:
-            raise ValueError(f"PYTEST_XDIST_WORKER_COUNT must be positive, got {num_workers}")
-        worker_range = range_size // num_workers
-        if worker_range == 0:
-            raise ValueError(f"range_size={range_size} is too small for {num_workers} xdist workers " f"(worker_range would be 0)")
-        start_port = start_port + (worker_num * worker_range)
-        end_port = start_port + worker_range
-
-    return list(range(start_port, end_port))
-
-
 def pytest_configure(config):
     status_backend_urls = config.getoption("--status_backend_url")
     Config.status_backend_urls = _status_backend_url_generator(status_backend_urls) if status_backend_urls else None
@@ -132,6 +103,7 @@ def pytest_configure(config):
     Config.password = config.getoption("--password")
     Config.docker_project_name = config.getoption("--docker_project_name")
     Config.docker_image = config.getoption("--docker-image")
+    Config.peer_docker_images = config.getoption("--peer-docker-image") or []
     Config.codecov_dir = config.getoption("--codecov_dir")
     Config.logs_dir = config.getoption("--logs-dir")
     Config.benchmark_results_dir = config.getoption("--benchmark-results-dir")
@@ -140,21 +112,17 @@ def pytest_configure(config):
     Config.waku_fleet = config.getoption("--waku-fleet")
     Config.push_fleets_config = config.getoption("--push-fleets-config")
     Config.disable_override_networks = config.getoption("--disable-override-networks")
-    Config.status_backend_port_range = _calculate_port_range()
     Config.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
 
 
 def pytest_report_header(config):
-    port_range = Config.status_backend_port_range
-    port_range_info = f"port range: {port_range[0]}-{port_range[-1]} ({len(port_range)} ports)" if port_range else "port range: empty"
     return [
         f"docker image: {Config.docker_image}",
+        f"peer docker images: {Config.peer_docker_images or '(same as docker image)'}",
         f"waku fleets config file: {config.option.waku_fleets_config}",
         f"waku fleet: {config.option.waku_fleet}",
         f"push fleets config file: {config.option.push_fleets_config}",
         f"disable override networks: {config.option.disable_override_networks}",
-        f"executor number: {Config.executor_number}",
-        f"{port_range_info}",
     ]
 
 
@@ -182,20 +150,12 @@ class SecretRedactingFilter(logging.Filter):
         return message
 
     def filter(self, record):
-        # Redact secrets in the log message
         if isinstance(record.msg, str):
-            message = record.getMessage()
-            record.msg = self.redact(message)
-
-        # Also redact secrets in args (if used with parameterized logging)
-        if record.args:
-            new_args = []
-            for arg in record.args:
-                redacted_arg = arg
-                if isinstance(arg, str):
-                    redacted_arg = self.redact(arg)
-                new_args.append(redacted_arg)
-            record.args = tuple(new_args)
+            if record.args:
+                record.msg = self.redact(record.getMessage())
+                record.args = ()
+            else:
+                record.msg = self.redact(record.msg)
 
         return True
 

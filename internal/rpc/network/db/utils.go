@@ -9,11 +9,10 @@ import (
 )
 
 // Deprecated: fillDeprecatedURLs populates the `original_rpc_url`, `original_fallback_url`, `rpc_url`,
-// `fallback_url`, `defaultRpcUrl`, `defaultFallbackURL`, and `defaultFallbackURL2` fields.
+// and `fallback_url` fields.
 // Keep for backwrad compatibility until it's fully integrated
 func FillDeprecatedURLs(network *params.Network, providers []params.RpcProvider) {
 	var embeddedDirect []params.RpcProvider
-	var embeddedProxy []params.RpcProvider
 	var userProviders []params.RpcProvider
 
 	// Categorize providers
@@ -21,8 +20,6 @@ func FillDeprecatedURLs(network *params.Network, providers []params.RpcProvider)
 		switch provider.Type {
 		case params.EmbeddedDirectProviderType:
 			embeddedDirect = append(embeddedDirect, provider)
-		case params.EmbeddedProxyProviderType:
-			embeddedProxy = append(embeddedProxy, provider)
 		case params.UserProviderType:
 			userProviders = append(userProviders, provider)
 		}
@@ -46,17 +43,6 @@ func FillDeprecatedURLs(network *params.Network, providers []params.RpcProvider)
 		// Default to EmbeddedDirectProviderType providers if no User providers exist
 		network.RPCURL = network.OriginalRPCURL
 		network.FallbackURL = network.OriginalFallbackURL
-	}
-
-	// Set default_*_url fields based on EmbeddedProxyProviderType providers
-	if len(embeddedProxy) > 0 {
-		network.DefaultRPCURL = embeddedProxy[0].GetFullURL().Reveal()
-		if len(embeddedProxy) > 1 {
-			network.DefaultFallbackURL = embeddedProxy[1].GetFullURL().Reveal()
-		}
-		if len(embeddedProxy) > 2 {
-			network.DefaultFallbackURL2 = embeddedProxy[2].GetFullURL().Reveal()
-		}
 	}
 }
 

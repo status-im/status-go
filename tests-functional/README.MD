@@ -191,7 +191,7 @@ For more specific use cases, you can use these specialized fixtures:
   ```
 
 - **`waku_light_client`** (function-scoped):  
-  A simple parametrization fixture for enabling/disabling Waku light client mode.
+  A parametrization fixture for enabling/disabling Waku light client mode. Use `@parametrize_waku_light_client` from `waku_params.py` to run tests with both `wakuV2LightClient_False` and `wakuV2LightClient_True`. Example: `pytest -m rpc -k 'wakuV2LightClient_True' -v`.
 
 #### 3. Manual/Custom Backend Setup
 
@@ -287,6 +287,32 @@ If you see some import issues, make sure that you have all requirements installe
 Make sure that you made `test-functional` source folder (Right click > Mark directory as > Source folder)
 
 
+## Apple Silicon (macOS): Waku fleet connection failures — disable Rosetta
+
+The `wakuorg/nwaku` fleet image is `amd64`-only, so on Apple Silicon it runs under emulation.
+With Docker Desktop's **Rosetta** emulation enabled, the libp2p Noise handshake between the
+`status-go` nodes (go-libp2p) and the nwaku fleet nodes (nim-libp2p) fails, so the app nodes
+never connect to `boot-1`/`store`. Symptoms:
+
+- status-go logs: `failed to negotiate security protocol: ... chacha20poly1305: message authentication failed`
+- nwaku (boot-1/store) logs: `decryptWithAd failed tag authentication.`
+- Tests that depend on the fleet (store/history sync, communities, anything store-backed) hang
+  or fail, and the store node never receives messages.
+
+The handshake only fails across go-libp2p ↔ nim-libp2p (go↔go and nim↔nim connections work),
+which points at Rosetta's emulation of the crypto path.
+
+**Fix:** Docker Desktop → Settings → General → uncheck
+**"Use Rosetta for x86_64/amd64 emulation on Apple Silicon"**, then restart Docker Desktop and
+recreate the fleet:
+
+```sh
+docker compose -f tests-functional/docker-compose.anvil.yml -f tests-functional/docker-compose.waku.yml up --build --remove-orphans -d
+```
+
+With the default (QEMU) emulation the go↔nim handshake succeeds.
+
+
 ## Reliability tests
 
 This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/tests-functional/tests/reliability/README.MD)
@@ -318,3 +344,12 @@ If that is so, force Python to use the same Docker socket (from `docker context 
 export DOCKER_HOST=unix:///var/run/docker.sock
 ```
 Add this before launching your test runner
+
+## `/usr/status-user/wakufleetconfig.json: no such file or directory"`
+
+When running tests against `status-backend` Docker containers, you might see this error:
+```
+DEBUG:root:Got response: b'{"error":"failed to open fleets json file: open /usr/status-user/wakufleetconfig.json: no such file or directory"}'
+```
+
+If running with default arguments, this most likely means that you're not running local Waku fleet as described in [Prerequisites](#prerequisites).

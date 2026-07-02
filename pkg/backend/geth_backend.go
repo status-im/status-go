@@ -1170,29 +1170,6 @@ func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s
 		return err
 	}
 
-	keypair, err := accountDB.GetKeypairByKeyUID(account.KeyUID)
-	if err != nil {
-		if err == accsmanagementtypes.ErrDbKeypairNotFound {
-			return errors.New("cannot convert an unknown keypair")
-		}
-		return err
-	}
-
-	err = accountDB.SaveSettingField(settings.KeycardInstanceUID, s.KeycardInstanceUID)
-	if err != nil {
-		return err
-	}
-
-	err = accountDB.SaveSettingField(settings.KeycardPairedOn, s.KeycardPairedOn)
-	if err != nil {
-		return err
-	}
-
-	err = accountDB.SaveSettingField(settings.KeycardPairing, s.KeycardPairing)
-	if err != nil {
-		return err
-	}
-
 	err = accountDB.SaveSettingField(settings.Mnemonic, nil)
 	if err != nil {
 		return err
@@ -1203,22 +1180,7 @@ func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s
 		return err
 	}
 
-	displayName, err := accountDB.DisplayName()
-	if err != nil {
-		return err
-	}
-
-	kc := accsmanagementtypes.Keycard{
-		KeycardUID:    keycardUID,
-		KeycardName:   displayName,
-		KeycardLocked: false,
-		KeyUID:        account.KeyUID,
-	}
-
-	for _, acc := range keypair.Accounts {
-		kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
-	}
-	err = messenger.SaveOrUpdateKeycard(context.Background(), &kc, oldPassword)
+	err = messenger.MigrateKeypairToColdWallet(context.Background(), account.KeyUID, oldPassword, accsmanagementtypes.ColdWalletTypeStatusKeycard)
 	if err != nil {
 		return err
 	}
@@ -1463,14 +1425,13 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 }
 
 func (b *StatusBackend) prepareForKeycard(request *requests.CreateAccount, multiAccount *multiaccounts.Account,
-	settings *settings.Settings, nodeConfig *params.NodeConfig) error {
+	nodeConfig *params.NodeConfig) error {
 	if request.KeycardInstanceUID == "" {
 		return nil
 	}
 
 	if request.KeycardPairingKey != "" {
 		// KeycardPairingKey is used only on mobile
-		settings.KeycardPairing = request.KeycardPairingKey
 		multiAccount.KeycardPairing = request.KeycardPairingKey
 	} else {
 		// KeycardPairingDataFile is used only on desktop
@@ -1486,12 +1447,8 @@ func (b *StatusBackend) prepareForKeycard(request *requests.CreateAccount, multi
 			return errors.New("keycard not found in pairings file")
 		}
 
-		settings.KeycardPairing = keycard.Key
 		multiAccount.KeycardPairing = keycard.Key
 	}
-
-	settings.KeycardInstanceUID = request.KeycardInstanceUID
-	settings.KeycardPairedOn = time.Now().Unix()
 
 	return nil
 }
@@ -1523,46 +1480,12 @@ func (b *StatusBackend) ConvertToRegularAccount(mnemonic string, currPassword st
 		return err
 	}
 
-	knownAccounts, err := db.GetActiveAccounts()
-	if err != nil {
-		return err
-	}
-
-	// We add these two paths, cause others will be added via `StoreAccount` function call
-	var paths []string
-	paths = append(paths, common.PathWalletRoot, common.PathEIP1581Root)
-	for _, acc := range knownAccounts {
-		if generatedAccountInfo.KeyUID == acc.KeyUID {
-			paths = append(paths, acc.Path)
-		}
-	}
-
-	_, _, err = b.accountsManager.StoreKeystoreFilesForMnemonic(mnemonicNoExtraSpaces, currPassword, paths)
-	if err != nil {
-		return err
-	}
-
 	err = b.multiaccountsDB.UpdateAccountKeycardPairing(generatedAccountInfo.KeyUID, "")
 	if err != nil {
 		return err
 	}
 
-	err = messenger.DeleteAllKeycardsWithKeyUID(context.Background(), generatedAccountInfo.KeyUID)
-	if err != nil {
-		return err
-	}
-
-	err = db.SaveSettingField(settings.KeycardInstanceUID, "")
-	if err != nil {
-		return err
-	}
-
-	err = db.SaveSettingField(settings.KeycardPairedOn, 0)
-	if err != nil {
-		return err
-	}
-
-	err = db.SaveSettingField(settings.KeycardPairing, "")
+	err = messenger.MigrateColdWalletKeypairToApp(context.Background(), mnemonicNoExtraSpaces, currPassword)
 	if err != nil {
 		return err
 	}
@@ -1711,7 +1634,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		}
 		derivedAddresses = generatedDerivedAddresses
 
-		walletXPub, err = generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletRoot)
+		walletXPub, err = generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletXPub)
 		if err != nil {
 			return nil, err
 		}
@@ -1762,7 +1685,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	}
 
 	if isKeycard {
-		err = b.prepareForKeycard(request, multiAccount, settings, nodeConfig)
+		err = b.prepareForKeycard(request, multiAccount, nodeConfig)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to prepare for keycard")
 		}
@@ -2123,6 +2046,11 @@ func (b *StatusBackend) PauseServices(names []string) error {
 	if b.statusNode == nil {
 		return nil
 	}
+
+	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
+		rpcClient.SetPaused(true)
+	}
+
 	return b.statusNode.ServiceRegistry().PauseMultiple(names)
 }
 
@@ -2131,6 +2059,11 @@ func (b *StatusBackend) ResumeServices(names []string) error {
 	if b.statusNode == nil {
 		return nil
 	}
+
+	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
+		rpcClient.SetPaused(false)
+	}
+
 	return b.statusNode.ServiceRegistry().ResumeMultiple(names)
 }
 

@@ -53,8 +53,9 @@ ARG enable_go_cache=true
 RUN if [ "$enable_go_cache" = "true" ]; then \
     go env -w GOCACHE=/root/.cache/go-build; \
     fi
+ARG use_torrent=false
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
-    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage"
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent"
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \

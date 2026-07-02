@@ -41,7 +41,7 @@ type Config struct {
 	EnablePeerExchangeServer               bool             `toml:",omitempty"` // PeerExchange server makes sense only when discv5 is running locally as it will have a cache of peers that it can respond to in case a PeerExchange request comes from the PeerExchangeClient
 	EnablePeerExchangeClient               bool             `toml:",omitempty"`
 	MinPeersForRelay                       int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Relay Protocol
-	MinPeersForFilter                      int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
+	MaxPeersForFilter                      int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
 	LightClient                            bool             `toml:",omitempty"` // Indicates if the node is a light client
 	WakuNodes                              []string         `toml:",omitempty"`
 	DiscV5BootstrapNodes                   []string         `toml:",omitempty"`
@@ -57,7 +57,6 @@ type Config struct {
 	ClusterID                              uint16           `toml:",omitempty"`
 	EnableConfirmations                    bool             `toml:",omitempty"` // Enable sending message confirmations
 	SkipPublishToTopic                     bool             `toml:",omitempty"` // Used in testing
-	EnableMissingMessageVerification       bool             `toml:",omitempty"`
 	EnableStoreConfirmationForMessagesSent bool             `toml:",omitempty"` //Flag that enables checking with store node for sent message confimration
 	UseThrottledPublish                    bool             `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
 }
@@ -80,7 +79,7 @@ var DefaultConfig = Config{
 	Port:              0,
 	DiscoveryLimit:    20,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
-	MinPeersForFilter: 2, // TODO: determine correct value with Vac team and via testing
+	MaxPeersForFilter: 3, // TODO: determine correct value with Vac team and via testing
 	AutoUpdate:        false,
 }
 
@@ -105,8 +104,8 @@ func setDefaults(cfg *Config) *Config {
 		cfg.MinPeersForRelay = DefaultConfig.MinPeersForRelay
 	}
 
-	if cfg.MinPeersForFilter == 0 {
-		cfg.MinPeersForFilter = DefaultConfig.MinPeersForFilter
+	if cfg.MaxPeersForFilter == 0 {
+		cfg.MaxPeersForFilter = DefaultConfig.MaxPeersForFilter
 	}
 
 	if cfg.DefaultShardPubsubTopic == "" {

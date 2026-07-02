@@ -69,18 +69,36 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				TokenType:   protobuf.PushNotificationRegistration_FIREBASE_TOKEN,
 			},
 		},
+		{
+			Request: &protobuf.PushNotification{
+				ChatId:         chatID,
+				Type:           protobuf.PushNotification_CONTACT_REQUEST,
+				PublicKey:      publicKey2,
+				InstallationId: installationID3,
+				Message:        message3,
+			},
+			Registration: &protobuf.PushNotificationRegistration{
+				DeviceToken: token3,
+				TokenType:   protobuf.PushNotificationRegistration_APN_TOKEN,
+			},
+		},
 	}
 
 	expectedRequests := &GoRushRequest{
 		Notifications: []*GoRushRequestNotification{
 			{
-				Tokens:   []string{token1},
-				Platform: platform1,
-				Message:  defaultNewMessageNotificationText,
+				Tokens:           []string{token1},
+				Platform:         platform1,
+				Message:          defaultNewMessageNotificationText,
+				ContentAvailable: true,
+				Sound:            "default",
+				Priority:         "high",
+				PushType:         "alert",
 				Data: &GoRushRequestData{
 					EncryptedMessage: hexMessage1,
 					ChatID:           types.EncodeHex(chatID),
 					PublicKey:        types.EncodeHex(publicKey1),
+					DeepLink:         deepLinkChats,
 				},
 			},
 			{
@@ -103,8 +121,79 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 					PublicKey:        types.EncodeHex(publicKey2),
 				},
 			},
+			{
+				Tokens:           []string{token3},
+				Platform:         platform1,
+				Message:          defaultContactRequestNotificationText,
+				ContentAvailable: true,
+				Sound:            "default",
+				Priority:         "high",
+				PushType:         "alert",
+				Data: &GoRushRequestData{
+					EncryptedMessage: hexMessage3,
+					ChatID:           types.EncodeHex(chatID),
+					PublicKey:        types.EncodeHex(publicKey2),
+					DeepLink:         deepLinkContactRequests,
+				},
+			},
 		},
 	}
 	actualRequests := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
 	require.Equal(t, expectedRequests, actualRequests)
+}
+
+func TestGoRushRequestMakesAPNAlertWithSound(t *testing.T) {
+	req := PushNotificationRegistrationToGoRushRequest([]*RequestAndRegistration{{
+		Request: &protobuf.PushNotification{Type: protobuf.PushNotification_MESSAGE},
+		Registration: &protobuf.PushNotificationRegistration{
+			TokenType:   protobuf.PushNotificationRegistration_APN_TOKEN,
+			DeviceToken: "tok",
+			ApnTopic:    "im.status.ethereum",
+		},
+	}})
+	n := req.Notifications[0]
+	require.Equal(t, "default", n.Sound)
+	require.Equal(t, "high", n.Priority)
+	require.Equal(t, "alert", n.PushType)
+	require.True(t, n.ContentAvailable)
+}
+
+func TestGoRushRequestFirebaseUnaffected(t *testing.T) {
+	req := PushNotificationRegistrationToGoRushRequest([]*RequestAndRegistration{{
+		Request: &protobuf.PushNotification{Type: protobuf.PushNotification_MESSAGE},
+		Registration: &protobuf.PushNotificationRegistration{
+			TokenType:   protobuf.PushNotificationRegistration_FIREBASE_TOKEN,
+			DeviceToken: "tok",
+		},
+	}})
+	n := req.Notifications[0]
+	require.Empty(t, n.Sound)
+	require.Empty(t, n.PushType)
+	require.Empty(t, n.Data.DeepLink)
+}
+
+func TestGoRushRequestDeepLinkByType(t *testing.T) {
+	cases := []struct {
+		name     string
+		pushType protobuf.PushNotification_PushNotificationType
+		expected string
+	}{
+		{"message", protobuf.PushNotification_MESSAGE, deepLinkChats},
+		{"mention", protobuf.PushNotification_MENTION, deepLinkActivityCenter},
+		{"community request", protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY, deepLinkActivityCenter},
+		{"contact request", protobuf.PushNotification_CONTACT_REQUEST, deepLinkContactRequests},
+		{"unknown", protobuf.PushNotification_UNKNOWN_PUSH_NOTIFICATION_TYPE, deepLinkActivityCenter},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := PushNotificationRegistrationToGoRushRequest([]*RequestAndRegistration{{
+				Request: &protobuf.PushNotification{Type: tc.pushType},
+				Registration: &protobuf.PushNotificationRegistration{
+					TokenType:   protobuf.PushNotificationRegistration_APN_TOKEN,
+					DeviceToken: "tok",
+				},
+			}})
+			require.Equal(t, tc.expected, req.Notifications[0].Data.DeepLink)
+		})
+	}
 }

@@ -128,7 +128,7 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs walletty
 		KeyUID:        account.KeyUID,
 		Address:       account.Address,
 		AddressPath:   account.Path,
-		SignOnKeycard: kp.MigratedToKeycard(),
+		SignOnKeycard: kp.MigratedToColdWallet(),
 		ChainID:       chainID,
 		MessageToSign: signer.Hash(txBeingSigned),
 		TxArgs:        sendArgs,

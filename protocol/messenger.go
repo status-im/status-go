@@ -23,7 +23,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	gocommon "github.com/status-im/status-go/common"
@@ -149,6 +148,10 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
+	historicSyncMu            sync.Mutex
+	historicSyncInFlight      bool
+	lastHistoricSyncRequestAt time.Time
+	ratchetNotFoundDelay      time.Duration
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
@@ -371,12 +374,13 @@ func NewMessenger(
 	}
 
 	amc := &archivetypes.ArchiveManagerConfig{
-		TorrentConfig: c.torrentConfig,
-		Logger:        logger,
-		Persistence:   communitiesManager.GetPersistence(),
-		Messaging:     messaging,
-		Identity:      identity,
-		Publisher:     communitiesManager,
+		TorrentConfig:      c.torrentConfig,
+		LogosStorageConfig: c.logosStorageConfig,
+		Logger:             logger,
+		Persistence:        communitiesManager.GetPersistence(),
+		Messaging:          messaging,
+		Identity:           identity,
+		Publisher:          communitiesManager,
 	}
 
 	// Depending on the OS go will choose whether to use the "communities/manager_archive_nop.go" or
@@ -439,8 +443,9 @@ func NewMessenger(
 			wait chan struct{}
 			once sync.Once
 		}{wait: make(chan struct{})},
-		browserDatabase: c.browserDatabase,
-		httpServer:      c.httpServer,
+		ratchetNotFoundDelay: 1 * time.Hour,
+		browserDatabase:      c.browserDatabase,
+		httpServer:           c.httpServer,
 		shutdownTasks: []func() error{
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
@@ -547,24 +552,11 @@ func (m *Messenger) processSentMessage(id string) error {
 	return nil
 }
 
-func (m *Messenger) ToForeground() {
-	m.SetPaused(false)
-	if m.httpServer != nil {
-		m.httpServer.ToForeground()
-	}
-
-	m.asyncRequestAllHistoricMessages()
-}
-
-func (m *Messenger) ToBackground() {
-	m.SetPaused(true)
-	if m.httpServer != nil {
-		m.httpServer.ToBackground()
-	}
-}
-
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
+	if m.ensVerifier != nil {
+		m.ensVerifier.SetPaused(paused)
+	}
 	if m.pushNotificationClient != nil {
 		if paused {
 			m.pushNotificationClient.Offline()
@@ -581,6 +573,16 @@ func (m *Messenger) SetPaused(paused bool) {
 		if err := m.messaging.PauseDataSync(paused); err != nil {
 			m.logger.Warn("failed to pause data sync", zap.Error(err))
 		}
+	}
+	if !paused {
+		if m.httpServer != nil {
+			m.httpServer.ToForeground()
+		}
+		if m.started {
+			m.asyncRequestAllHistoricMessages()
+		}
+	} else if m.httpServer != nil {
+		m.httpServer.ToBackground()
 	}
 	// ToDo: the current ArchiveManager does not provide SetPaused method yet
 	// if m.archiveManager != nil {
@@ -667,13 +669,23 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.messaging.SetStorenodeConfigProvider(m)
+	m.messaging.SetStorenodes(response.StoreNodes)
 
-	m.shutdownWaitGroup.Add(1)
-	go m.checkForMissingMessagesLoop()
+	if m.config.enablePinnedBootstrap {
+		go func() {
+			defer gocommon.LogOnPanic()
 
-	m.shutdownWaitGroup.Add(1)
-	go m.checkForStorenodeCycleSignals()
+			if err := m.bootstrapPinnedCommunities(); err != nil {
+				m.logger.Warn("failed to bootstrap pinned communities", zap.Error(err))
+			}
+		}()
+	}
+
+	// Storenodes are now configured: request any history missed while offline.
+	// This is the cycle-free replacement for the storenode-availability signal
+	// (OnStorenodeAvailable) that previously triggered the sync, and it avoids
+	// racing SetStorenodes against the network-online trigger.
+	m.asyncRequestAllHistoricMessages()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
@@ -685,15 +697,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		go func() {
 			defer gocommon.LogOnPanic()
 			defer m.shutdownWaitGroup.Done()
-
-			select {
-			case <-m.quit:
-				return
-			case <-m.ctx.Done():
-				return
-			case <-m.messaging.OnStorenodeAvailable():
-			}
-
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
 	}
@@ -821,8 +824,9 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		m.shouldPublishContactCode = false
 	}
 
-	// Start fetching messages from store nodes
-	if online {
+	// Start fetching messages from store nodes.
+	// Skip when backgrounded: the sync will run when the app returns to foreground.
+	if online && !m.isPaused() {
 		m.asyncRequestAllHistoricMessages()
 	}
 
@@ -841,7 +845,7 @@ func (m *Messenger) Online() bool {
 		return m.config.onlineChecker()
 	}
 
-	return m.messaging.PeerCount() > 0
+	return m.messaging.Online()
 }
 
 func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
@@ -2850,10 +2854,6 @@ func (m *Messenger) contactRequestNotificationPreview() (show bool, preview int)
 	return true, preview
 }
 
-func (m *Messenger) GetStats() types2.TransportStats {
-	return m.messaging.GetStats()
-}
-
 type CurrentMessageState struct {
 	// Message is the protobuf message received
 	Message *protobuf.ChatMessage
@@ -3347,12 +3347,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilt
 			}
 
 			m.processCommunityChanges(messageState)
-
-			// NOTE: for now we confirm messages as processed regardless whether we
-			// actually processed them, this is because we need to differentiate
-			// from messages that we want to retry to process and messages that
-			// are never going to be processed
-			m.messaging.MarkP2PMessageAsProcessed(gethcommon.BytesToHash(shhMessage.Hash))
 
 			if allMessagesProcessed {
 				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))
@@ -4869,4 +4863,17 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 
 func (m *Messenger) Messaging() *messaging2.API {
 	return m.messaging
+}
+
+func (m *Messenger) GetDownloadedMessageArchiveIDs(communityID cryptotypes.HexBytes) ([]string, error) {
+	return m.archiveManager.GetDownloadedMessageArchiveIDs(communityID)
+}
+
+func (m *Messenger) GetMessageArchiveIDsToImport(communityID cryptotypes.HexBytes) ([]string, error) {
+	return m.archiveManager.GetMessageArchiveIDsToImport(communityID)
+}
+
+func (m *Messenger) UpdateMessageArchiveInterval(duration time.Duration) (time.Duration, error) {
+	messageArchiveInterval = duration
+	return duration, nil
 }

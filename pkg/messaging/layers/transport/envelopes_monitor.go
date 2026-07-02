@@ -1,11 +1,8 @@
 package transport
 
 import (
-	"context"
 	"errors"
-	"math"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -28,7 +25,6 @@ const (
 
 type EnvelopesMonitorConfig struct {
 	EnvelopeEventsHandler            EnvelopeEventsHandler
-	MaxAttempts                      int
 	AwaitOnlyMailServerConfirmations bool
 	IsMailserver                     func(types.EnodeID) bool
 	Logger                           *zap.Logger
@@ -50,17 +46,10 @@ func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *Envelopes
 		logger = zap.NewNop()
 	}
 
-	var api types.PublicWakuAPI
-	if w != nil {
-		api = w.PublicWakuAPI()
-	}
-
 	return &EnvelopesMonitor{
 		w:                                w,
-		api:                              api,
 		handler:                          config.EnvelopeEventsHandler,
 		awaitOnlyMailServerConfirmations: config.AwaitOnlyMailServerConfirmations,
-		maxAttempts:                      config.MaxAttempts,
 		isMailserver:                     config.IsMailserver,
 		logger:                           logger.With(zap.Namespace("EnvelopesMonitor")),
 
@@ -76,27 +65,21 @@ func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *Envelopes
 }
 
 type monitoredEnvelope struct {
-	envelopeHashID  types2.Hash
-	state           EnvelopeState
-	attempts        int
-	message         *types.NewMessage
-	messageIDs      [][]byte
-	lastAttemptTime time.Time
+	envelopeHashID types2.Hash
+	state          EnvelopeState
+	messageIDs     [][]byte
 }
 
 // EnvelopesMonitor is responsible for monitoring waku envelopes state.
 type EnvelopesMonitor struct {
 	gocommon.PauseBroadcaster
 
-	w           types.Waku
-	api         types.PublicWakuAPI
-	handler     EnvelopeEventsHandler
-	maxAttempts int
+	w       types.Waku
+	handler EnvelopeEventsHandler
 
 	mu sync.Mutex
 
 	envelopes             map[types2.Hash]*monitoredEnvelope
-	retryQueue            []*monitoredEnvelope
 	batches               map[types2.Hash]map[types2.Hash]struct{}
 	messageEnvelopeHashes map[string][]types2.Hash
 
@@ -112,16 +95,11 @@ type EnvelopesMonitor struct {
 // Start processing events.
 func (m *EnvelopesMonitor) Start() {
 	m.quit = make(chan struct{})
-	m.wg.Add(2)
-	go func() {
-		defer gocommon.LogOnPanic()
-		m.handleEnvelopeEvents()
-		m.wg.Done()
-	}()
+	m.wg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer m.wg.Done()
-		m.retryLoop()
+		m.handleEnvelopeEvents()
 	}()
 }
 
@@ -145,15 +123,12 @@ func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []types2.Hash
 		m.messageEnvelopeHashes[types2.HexBytes(messageID).String()] = envelopeHashes
 	}
 
-	for i, envelopeHash := range envelopeHashes {
+	for _, envelopeHash := range envelopeHashes {
 		if _, ok := m.envelopes[envelopeHash]; !ok {
 			m.envelopes[envelopeHash] = &monitoredEnvelope{
-				envelopeHashID:  envelopeHash,
-				state:           EnvelopePosted,
-				attempts:        1,
-				lastAttemptTime: time.Now(),
-				message:         messages[i],
-				messageIDs:      messageIDs,
+				envelopeHashID: envelopeHash,
+				state:          EnvelopePosted,
+				messageIDs:     messageIDs,
 			}
 		}
 	}
@@ -206,7 +181,7 @@ func (m *EnvelopesMonitor) handleEvent(event types.EnvelopeEvent) {
 
 func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	// Mailserver confirmations for WakuV2 are disabled
-	if (m.w == nil || m.w.Version() < 2) && m.awaitOnlyMailServerConfirmations {
+	if m.w == nil && m.awaitOnlyMailServerConfirmations {
 		if !m.isMailserver(event.Peer) {
 			return
 		}
@@ -300,85 +275,22 @@ func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event types.EnvelopeEvent)
 
 // handleEnvelopeFailure is a common code path for processing envelopes failures. not thread safe, lock
 // must be used on a higher level.
+//
+// Transport-level retry was removed (logos-messaging/pm#380): logos-delivery
+// performs retransmission internally. A failed envelope is now reported as
+// expired immediately; the message stays unconfirmed and the app layer (raw
+// message resend) remains the backstop until the Messaging API is integrated.
 func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types2.Hash, err error) {
 	if envelope, ok := m.envelopes[hash]; ok {
 		m.clearMessageState(hash)
 		if envelope.state == EnvelopeSent {
 			return
 		}
-		if envelope.attempts < m.maxAttempts {
-			m.retryQueue = append(m.retryQueue, envelope)
-		} else {
-			m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
-			m.removeFromRetryQueue(hash)
-			if m.handler != nil {
-				m.handler.EnvelopeExpired(envelope.messageIDs, err)
-			}
+		m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
+		if m.handler != nil {
+			m.handler.EnvelopeExpired(envelope.messageIDs, err)
 		}
 	}
-}
-
-func backoffDuration(attempts int) time.Duration {
-	baseDelay := 1 * time.Second
-	maxDelay := 30 * time.Second
-	backoff := baseDelay * time.Duration(math.Pow(2, float64(attempts)))
-	if backoff > maxDelay {
-		backoff = maxDelay
-	}
-	return backoff
-}
-
-// retryLoop handles the retry logic to send envelope in a loop
-func (m *EnvelopesMonitor) retryLoop() {
-	sub := m.Subscribe()
-	defer sub.Unsubscribe()
-	pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
-		Interval: 500 * time.Millisecond,
-		OnTick:   m.retryOnce,
-	}, sub.C())
-	pt.Run(m.quit)
-}
-
-// retryOnce retries once
-func (m *EnvelopesMonitor) retryOnce() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, envelope := range m.retryQueue {
-		if envelope.attempts < m.maxAttempts {
-			elapsed := time.Since(envelope.lastAttemptTime)
-			if elapsed < backoffDuration(envelope.attempts) {
-				continue
-			}
-
-			m.logger.Debug("retrying to send a message", zap.String("hash", envelope.envelopeHashID.String()), zap.Int("attempt", envelope.attempts+1))
-			hex, err := m.api.Post(context.TODO(), *envelope.message)
-			if err != nil {
-				m.logger.Error("failed to retry sending message", zap.String("hash", envelope.envelopeHashID.String()), zap.Int("attempt", envelope.attempts+1), zap.Error(err))
-				if m.handler != nil {
-					m.handler.EnvelopeExpired(envelope.messageIDs, err)
-				}
-			} else {
-				m.removeFromRetryQueue(envelope.envelopeHashID)
-				envelope.envelopeHashID = types2.BytesToHash(hex)
-			}
-			envelope.state = EnvelopePosted
-			envelope.attempts++
-			envelope.lastAttemptTime = time.Now()
-			m.envelopes[envelope.envelopeHashID] = envelope
-		}
-	}
-}
-
-// removeFromRetryQueue removes the specified envelope from the retry queue
-func (m *EnvelopesMonitor) removeFromRetryQueue(envelopeID types2.Hash) {
-	var newRetryQueue []*monitoredEnvelope
-	for _, envelope := range m.retryQueue {
-		if envelope.envelopeHashID != envelopeID {
-			newRetryQueue = append(newRetryQueue, envelope)
-		}
-	}
-	m.retryQueue = newRetryQueue
 }
 
 func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event types.EnvelopeEvent) {

@@ -12,32 +12,40 @@ type RPCUsageStats struct {
 
 var stats *RPCUsageStats
 var mu sync.Mutex
+var statsOnce sync.Once
 
 func getInstance() *RPCUsageStats {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if stats == nil {
-		stats = &RPCUsageStats{}
-		stats.counterPerMethod = &sync.Map{}
-		stats.counterPerMethodPerTag = &sync.Map{}
-	}
+	statsOnce.Do(func() {
+		stats = &RPCUsageStats{
+			counterPerMethod:       &sync.Map{},
+			counterPerMethodPerTag: &sync.Map{},
+		}
+	})
 	return stats
 }
 
 func getStats() (uint, *sync.Map, *sync.Map) {
-	stats := getInstance()
-	return stats.total, stats.counterPerMethod, stats.counterPerMethodPerTag
+	mu.Lock()
+	defer mu.Unlock()
+
+	s := getInstance()
+	return s.total, s.counterPerMethod, s.counterPerMethodPerTag
 }
 
 func resetStats() {
-	stats := getInstance()
-	stats.total = 0
-	stats.counterPerMethod = &sync.Map{}
-	stats.counterPerMethodPerTag = &sync.Map{}
+	mu.Lock()
+	defer mu.Unlock()
+
+	s := getInstance()
+	s.total = 0
+	s.counterPerMethod = &sync.Map{}
+	s.counterPerMethodPerTag = &sync.Map{}
 }
 
 func CountCall(method string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	stats := getInstance()
 	stats.total++
 	value, _ := stats.counterPerMethod.LoadOrStore(method, uint(0))
@@ -49,6 +57,9 @@ func CountCallWithTag(method string, tag string) {
 		CountCall(method)
 		return
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	stats := getInstance()
 	value, _ := stats.counterPerMethodPerTag.LoadOrStore(tag, &sync.Map{})

@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
-
-	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"go.uber.org/zap"
 
@@ -17,10 +14,6 @@ import (
 	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/protocol/communities"
-)
-
-const (
-	storeNodeAvailableTimeout = 30 * time.Second
 )
 
 // StoreNodeRequestStats is used in tests
@@ -447,13 +440,6 @@ func (r *storeNodeRequest) routine() {
 
 	communityID := r.requestID.getCommunityID()
 
-	ctx, cancel := context.WithTimeout(r.ctx, storeNodeAvailableTimeout)
-	defer cancel()
-	if !r.manager.messenger.messaging.WaitForAvailableStoreNode(ctx) {
-		r.result.err = fmt.Errorf("store node is not available")
-		return
-	}
-
 	// Check if community already exists locally and get Clock.
 	if r.requestID.RequestType == storeNodeCommunityRequest {
 		localCommunity, _ := r.manager.messenger.communitiesManager.GetByIDString(communityID)
@@ -465,23 +451,22 @@ func (r *storeNodeRequest) routine() {
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
-	storeNode := r.manager.messenger.messaging.GetActiveStorenode()
-	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {
-		batch := types2.StoreNodeBatch{
-			From:        from,
-			To:          to,
-			PubsubTopic: r.pubsubTopic,
-			Topics:      []types2.ContentTopic{r.contentTopic},
-		}
-		r.manager.logger.Info("perform store node request", zap.Any("batch", batch))
-		if r.manager.onPerformingBatch != nil {
-			r.manager.onPerformingBatch(batch)
-		}
+	batch := types2.StoreNodeBatch{
+		From:        from,
+		To:          to,
+		PubsubTopic: r.pubsubTopic,
+		Topics:      []types2.ContentTopic{r.contentTopic},
+	}
+	r.manager.logger.Info("perform store node request", zap.Any("batch", batch))
+	if r.manager.onPerformingBatch != nil {
+		r.manager.onPerformingBatch(batch)
+	}
 
-		return nil, r.manager.messenger.processMailserverBatchWithOptions(storeNode, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
-	}, history.WithPeerID(storeNode.ID))
-
-	r.result.err = err
+	// processMailserverBatchWithOptions applies the mobile-network gate and then
+	// queries: the StoreClient selects and pins the store node itself (waiting up
+	// to storenodeAvailableTimeout for one), paginating with shouldFetchNextPage
+	// as the early-stop. It returns ErrStorenodeNotAvailable if none is reachable.
+	r.result.err = r.manager.messenger.processMailserverBatchWithOptions(batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
 }
 
 func (r *storeNodeRequest) start() {

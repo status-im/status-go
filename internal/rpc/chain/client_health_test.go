@@ -18,7 +18,7 @@ import (
 
 	healthManager "github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
-	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
+	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	mockEthclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 )
@@ -167,7 +167,7 @@ func (s *ClientWithFallbackSuite) TestVMErrorDoesNotMarkChainDown() {
 	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
 }
 
-func (s *ClientWithFallbackSuite) TestNoClientsChainDown() {
+func (s *ClientWithFallbackSuite) TestNoClientsChainUnknown() {
 	s.setupClients(0)
 
 	ctx := context.Background()
@@ -179,7 +179,7 @@ func (s *ClientWithFallbackSuite) TestNoClientsChainDown() {
 
 	// THEN
 	chainStatus := s.providersHealthManager.Status()
-	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
+	require.Equal(s.T(), rpcstatus.StatusUnknown, chainStatus.Status)
 }
 
 func (s *ClientWithFallbackSuite) TestAllClientsDifferentErrors() {
@@ -233,11 +233,13 @@ func (s *ClientWithFallbackSuite) TestAllClientsNetworkErrors() {
 	require.Equal(s.T(), providerStatuses["test2_provider"].Status, rpcstatus.StatusDown)
 }
 
-func (s *ClientWithFallbackSuite) TestChainStatusDownWhenInitial() {
+func (s *ClientWithFallbackSuite) TestChainStatusUnknownWhenInitial() {
 	s.setupClients(2)
 
+	// Before any call the chain has no health data, so it is Unknown (not Down).
+	// This prevents a false "networks down" banner while the first request is in flight.
 	chainStatus := s.providersHealthManager.Status()
-	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
+	require.Equal(s.T(), rpcstatus.StatusUnknown, chainStatus.Status)
 }
 
 func TestClientWithFallbackSuite(t *testing.T) {

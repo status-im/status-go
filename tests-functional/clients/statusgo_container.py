@@ -5,10 +5,12 @@ import random
 import tarfile
 import tempfile
 import threading
+import uuid
 
 import docker
 import docker.errors
 from docker.errors import APIError
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 import resources.constants as constants
 from clients.metrics import ContainerStats
@@ -22,11 +24,9 @@ def _localhost(ipv6: bool):
 
 
 class StatusGoContainer:
-    all_containers = []
     container = None
-    _port_lock = threading.Lock()  # Thread-safe port allocation for parallel backend creation
 
-    def __init__(self, cmd, ports=None, privileged=False, container_name_suffix=""):
+    def __init__(self, cmd, ports=None, privileged=False, container_name_suffix="", image=None):
         if ports is None:
             ports = {}
 
@@ -46,7 +46,7 @@ class StatusGoContainer:
         self.network_name = f"{docker_project_name}_default"
         git_commit = os.popen("git rev-parse --short HEAD").read().strip()
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
-        image_name = Config.docker_image or f"statusgo-{identifier}:latest"
+        image_name = image or Config.docker_image or f"statusgo-{identifier}:latest"
         self.container_name = f"{docker_project_name}-{identifier}{container_name_suffix}"
         coverage_path = Config.codecov_dir if Config.codecov_dir else os.path.abspath("./coverage/binary")
 
@@ -62,6 +62,7 @@ class StatusGoContainer:
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
                 "STATUS_ALLOW_FORCE_REEVAL": "1",
+                "STATUS_GO_DISABLE_PINNED_BOOTSTRAP": "1",
             },
             "volumes": {
                 coverage_path: {
@@ -94,7 +95,6 @@ class StatusGoContainer:
             raise RuntimeError(f"Docker image '{image_name}' not found")
 
         self.container = self.docker_client.containers.run(**container_args)
-        StatusGoContainer.all_containers.append(self)
 
         logging.debug(f"Container {self.container.name} created. ID = {self.container.id}")
 
@@ -317,16 +317,6 @@ class StatusGoContainer:
             logs = self.container.logs()
             f.write(logs)
 
-    @classmethod
-    def acquire_port(cls):
-        with cls._port_lock:
-            if not Config.status_backend_port_range:
-                raise RuntimeError("Port pool exhausted: no more ports available. " "Consider increasing range_size in _calculate_port_range().")
-            host_port = random.choice(Config.status_backend_port_range)
-            Config.status_backend_port_range.remove(host_port)
-            logging.debug(f"Acquired port {host_port} ({len(Config.status_backend_port_range)} remaining)")
-            return host_port
-
     def connect_to_bridge_network(self):
         if not self.container:
             return
@@ -350,12 +340,7 @@ class StatusGoContainer:
 class PortsMapping:
     def __init__(self, container_port: int):
         self.container_port = container_port
-        self.host_port = StatusGoContainer.acquire_port()
-
-    def host_url(self, ipv6: bool):
-        if ipv6:
-            return f"http://[::1]:{self.host_port}"
-        return f"http://127.0.0.1:{self.host_port}"
+        self.host_port: int | None = None  # Assigned by the Docker daemon, resolved after the container starts.
 
 
 class StatusPortsMappings:
@@ -364,26 +349,30 @@ class StatusPortsMappings:
         self.media_server = PortsMapping(media_server_port)
         self.connector = PortsMapping(connector_port) if connector_port else None
 
-    def ipv6_ports(self):
-        ports = {
-            f"{self.backend.container_port}/tcp": [{"HostIp": "::", "HostPort": str(self.backend.host_port)}],
-            f"{self.media_server.container_port}/tcp": [{"HostIp": "::", "HostPort": str(self.media_server.host_port)}],
-        }
+    def _published(self):
+        mappings = [self.backend, self.media_server]
         if self.connector:
-            ports[f"{self.connector.container_port}/tcp"] = [{"HostIp": "::", "HostPort": str(self.connector.host_port)}]
-        return ports
+            mappings.append(self.connector)
+        return mappings
+
+    def ipv6_ports(self):
+        return {f"{m.container_port}/tcp": ("::", None) for m in self._published()}
 
     def ipv4_ports(self):
-        ports = {
-            f"{self.backend.container_port}/tcp": str(self.backend.host_port),
-            f"{self.media_server.container_port}/tcp": str(self.media_server.host_port),
-        }
-        if self.connector:
-            ports[f"{self.connector.container_port}/tcp"] = str(self.connector.host_port)
-        return ports
+        return {f"{m.container_port}/tcp": None for m in self._published()}
 
     def ports(self, ipv6: bool):
         return self.ipv6_ports() if ipv6 else self.ipv4_ports()
+
+    @retry(stop=stop_after_attempt(15), wait=wait_fixed(0.2), reraise=True)
+    def resolve_host_ports(self, container):
+        container.reload()
+        for m in self._published():
+            bindings = container.ports.get(f"{m.container_port}/tcp") or []
+            host_port = bindings[0].get("HostPort") if bindings else None
+            if not host_port:
+                raise RuntimeError(f"Host port for {m.container_port}/tcp not assigned yet")
+            m.host_port = int(host_port)
 
 
 class PushNotificationServerContainer(StatusGoContainer):
@@ -409,6 +398,7 @@ class PushNotificationServerContainer(StatusGoContainer):
 class StatusBackendContainer(StatusGoContainer):
     def __init__(self, privileged=False, ipv6=False, **kwargs):
         connector_enabled = kwargs.get("connector_enabled", False)
+        image = kwargs.get("image")
 
         self.ipv6 = ipv6
         self.ports = StatusPortsMappings(
@@ -425,10 +415,22 @@ class StatusBackendContainer(StatusGoContainer):
             "true" if kwargs.get("pprof_enabled", False) else "false",
         ]
 
+        super().__init__(entrypoint, self.ports.ports(ipv6), privileged, container_name_suffix=f"-status-backend-{uuid.uuid4().hex[:8]}", image=image)
+
+        try:
+            self.ports.resolve_host_ports(self.container)
+        except Exception:
+            try:
+                if self.container is not None:
+                    self.container.remove(force=True)
+            except Exception:
+                logging.warning("Failed to remove container after port resolution failure", exc_info=True)
+            finally:
+                self.container = None
+            raise
+
         self.url = f"http://{_localhost(ipv6)}:{self.ports.backend.host_port}"
         self.connector_ws_url = f"ws://{_localhost(ipv6)}:{self.ports.connector.host_port}" if self.ports.connector else ""
-
-        super().__init__(entrypoint, self.ports.ports(ipv6), privileged, container_name_suffix=f"-status-backend-{self.ports.backend.host_port}")
 
         if kwargs.get("bridge_network", False):
             self.connect_to_bridge_network()

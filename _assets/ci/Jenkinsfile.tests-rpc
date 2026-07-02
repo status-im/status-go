@@ -51,6 +51,11 @@ pipeline {
     PLATFORM = 'tests-rpc'
     PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
+    /* Pass PR/commit/branch to codecov so uploads are associated with the PR. */
+    CODECOV_SHA    = "${env.GIT_COMMIT}"
+    CODECOV_BRANCH = "${params.BRANCH}"
+    CODECOV_PR     = "${utils.changeId() ?: ''}"
+
     /* Hack-fix for params not being set in env on first job run. */
     BRANCH =                          "${params.BRANCH}"
     FUNCTIONAL_TESTS_REPORT_CODECOV = "${params.FUNCTIONAL_TESTS_REPORT_CODECOV}"
@@ -72,7 +77,7 @@ pipeline {
             passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
     ),
         ]) {
-          nix.develop('make test-functional', pure: false)
+          nix.develop('make test-functional USE_LOGOS_STORAGE=true', pure: false)
         }
       } }
     }

@@ -55,25 +55,44 @@ func (f *TestMessagingEnvironment) SubscribePostEvents() chan *PostMessageSubscr
 }
 
 func (f *TestMessagingEnvironment) SimulateOffline() func() {
-	f.waku.Waku.(*wakuv3.Waku).SkipPublishToTopic(true)
+	f.waku.Waku.SkipPublishToTopic(true)
 	return func() {
-		f.waku.Waku.(*wakuv3.Waku).SkipPublishToTopic(false)
+		f.waku.Waku.SkipPublishToTopic(false)
 	}
 }
 
-// Wraps waku to provide ability to subscribe to post events.
+// Wraps waku to provide ability to subscribe to post events. It embeds the
+// concrete *wakuv3.Waku (not the types.Waku interface) so that the messaging
+// API methods that live on the backend — Send / Subscribe / Unsubscribe /
+// envelope events, i.e. transport.MessagingAPI — are promoted too.
 type testWakuWrapper struct {
-	types.Waku
-	api *testPublicWakuAPI
+	*wakuv3.Waku
+	postSubscriptions []chan *PostMessageSubscription
 }
 
-func (tw *testWakuWrapper) PublicWakuAPI() types.PublicWakuAPI {
-	return tw.api
+// Send overrides the embedded Waku's Send to fan out post events to any
+// subscribers registered via SubscribePostEvents. Primary sends go through
+// Send (the transport encodes payloads via rfc26.Encode before publishing).
+// Msg is nil because Send takes raw bytes, not a NewMessage; the only
+// consumer (MessagesOrderController) reads ID.
+func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
+	id, err := tw.Waku.Send(ctx, pubsubTopic, contentTopic, payload, ephemeral, priority)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range tw.postSubscriptions {
+		select {
+		case s <- &PostMessageSubscription{ID: id}:
+		default:
+			// subscription channel full
+		}
+	}
+	return id, nil
 }
 
 func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {
 	subscription := make(chan *PostMessageSubscription, 100)
-	tw.api.postSubscriptions = append(tw.api.postSubscriptions, subscription)
+	tw.postSubscriptions = append(tw.postSubscriptions, subscription)
 	return subscription
 }
 
@@ -92,27 +111,6 @@ func (tw *testWakuWrapper) Stop() error {
 type PostMessageSubscription struct {
 	ID  []byte
 	Msg *types.NewMessage
-}
-
-type testPublicWakuAPI struct {
-	*wakuv3.PublicWakuAPI
-
-	postSubscriptions []chan *PostMessageSubscription
-}
-
-func (tp *testPublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
-	id, err := tp.PublicWakuAPI.Post(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	for _, s := range tp.postSubscriptions {
-		select {
-		case s <- &PostMessageSubscription{ID: id, Msg: &req}:
-		default:
-			// subscription channel full
-		}
-	}
-	return id, err
 }
 
 type testTimeSource struct {
@@ -135,12 +133,7 @@ func newTestWakuWrapper() (*testWakuWrapper, error) {
 		return nil, err
 	}
 
-	return &testWakuWrapper{
-		Waku: w,
-		api: &testPublicWakuAPI{
-			PublicWakuAPI: wakuv3.NewPublicWakuAPI(w),
-		},
-	}, nil
+	return &testWakuWrapper{Waku: w}, nil
 }
 
 type TestUtils struct {

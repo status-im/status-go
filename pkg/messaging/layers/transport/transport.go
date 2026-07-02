@@ -7,22 +7,19 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
-
-	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
+	"github.com/status-im/status-go/pkg/pubsub"
 )
 
 var (
@@ -30,59 +27,40 @@ var (
 	ErrNoMailservers = errors.New("no configured mailservers")
 )
 
-type transportKeysManager struct {
-	waku types.Waku
-
-	// Identity of the current user.
-	privateKey *ecdsa.PrivateKey
-
-	passToSymKeyMutex sync.RWMutex
-	passToSymKeyCache map[string]string
-}
-
-func (m *transportKeysManager) AddOrGetKeyPair(priv *ecdsa.PrivateKey) (string, error) {
-	// caching is handled in waku
-	return m.waku.AddKeyPair(priv)
-}
-
-func (m *transportKeysManager) AddOrGetSymKeyFromPassword(password string) (string, error) {
-	m.passToSymKeyMutex.Lock()
-	defer m.passToSymKeyMutex.Unlock()
-
-	if val, ok := m.passToSymKeyCache[password]; ok {
-		return val, nil
-	}
-
-	id, err := m.waku.AddSymKeyFromPassword(password)
-	if err != nil {
-		return id, err
-	}
-
-	m.passToSymKeyCache[password] = id
-
-	return id, nil
-}
-
-func (m *transportKeysManager) RawSymKey(id string) ([]byte, error) {
-	return m.waku.GetSymKey(id)
-}
-
 type Option func(*Transport) error
 
 // Transport is a transport based on Whisper service.
 type Transport struct {
 	gocommon.PauseBroadcaster
 
-	waku        types.Waku
-	api         types.PublicWakuAPI // only PublicWakuAPI implements logic to send messages
-	keysManager *transportKeysManager
-	filters     *FiltersManager
-	logger      *zap.Logger
-	cache       ProcessedMessageIDsCachePersistence
+	waku       types.Waku
+	api        MessagingAPI      // backend used to send messages and read received envelopes
+	privateKey *ecdsa.PrivateKey // identity of the current user
+	filters    *FiltersManager
+	logger     *zap.Logger
+	cache      ProcessedMessageIDsCachePersistence
 
 	envelopesMonitor *EnvelopesMonitor
 	cleanFiltersFn   func() error
 	quit             chan struct{}
+
+	// received buffers decoded messages pushed from the waku adapter until
+	// RetrieveRawAll drains them. It is keyed by FilterID and then by message
+	// hash so that the same envelope pushed more than once before a drain is
+	// stored only once — mirroring the hash-keyed per-filter store the waku
+	// adapter used to keep (the persistent cache only dedups across drains).
+	receivedMu sync.Mutex
+	received   map[string]map[string]*types.Message
+
+	// matchedPublisher notifies subscribers (the messenger's retrieve loop)
+	// whenever a received message matched at least one listening filter.
+	// Non-blocking, coalescing — the buffer above holds the actual data.
+	matchedPublisher *pubsub.TypePublisher[struct{}]
+
+	// subs owns the backend's wire subscriptions: every filter returned by a
+	// FiltersManager mutation is acquired here, and every removed filter
+	// released.
+	subs *FilterSubscriptions
 }
 
 // Pause signals Transport's internal goroutines to idle and cascades to
@@ -129,7 +107,7 @@ func NewTransport(
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Transport, error) {
-	filtersManager, err := NewFiltersManager(keysPersistence, waku, privateKey, logger)
+	filtersManager, err := NewFiltersManager(keysPersistence, privateKey, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +118,13 @@ func NewTransport(
 		envelopesMonitor.Start()
 	}
 
-	var api types.PublicWakuAPI
+	// The waku backend also satisfies MessagingAPI (Send / Subscribe /
+	// Unsubscribe / envelope events); those methods live on the concrete
+	// backend, not on the types.Waku lifecycle interface. Offline transports
+	// (tests) pass a nil waku and leave api nil.
+	var api MessagingAPI
 	if waku != nil {
-		api = waku.PublicWakuAPI()
+		api, _ = waku.(MessagingAPI)
 	}
 	t := &Transport{
 		waku:             waku,
@@ -150,13 +132,12 @@ func NewTransport(
 		cache:            messageIDsCachePersistence,
 		envelopesMonitor: envelopesMonitor,
 		quit:             make(chan struct{}),
-		keysManager: &transportKeysManager{
-			waku:              waku,
-			privateKey:        privateKey,
-			passToSymKeyCache: make(map[string]string),
-		},
-		filters: filtersManager,
-		logger:  logger.With(zap.Namespace("Transport")),
+		privateKey:       privateKey,
+		filters:          filtersManager,
+		logger:           logger.With(zap.Namespace("Transport")),
+		received:         make(map[string]map[string]*types.Message),
+		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
+		subs:             newFilterSubscriptions(api, logger),
 	}
 
 	for _, opt := range opts {
@@ -167,15 +148,211 @@ func NewTransport(
 
 	t.cleanFiltersLoop()
 
+	// Consume the adapter's push stream of received messages: decode, route by
+	// content topic, match against our filters, and buffer for RetrieveRawAll.
+	if t.api != nil {
+		go t.receiveLoop()
+	}
+
 	return t, nil
 }
 
+// receiveLoop consumes the backend's envelope-event stream and turns every
+// EventEnvelopeAvailable into the decode/route step. The feed is a broadcast, so
+// multiple transports sharing one backend (as in tests) each see every event and
+// route it against their own filters. The events channel is amply buffered so
+// the backend's producer is never blocked.
+func (t *Transport) receiveLoop() {
+	defer gocommon.LogOnPanic()
+
+	events := make(chan types.EnvelopeEvent, 100)
+	sub := t.api.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		case <-t.quit:
+			return
+		case event := <-events:
+			if event.Event != types.EventEnvelopeAvailable {
+				continue
+			}
+			msg, ok := event.Data.(*types.ReceivedMessage)
+			if !ok {
+				continue
+			}
+			t.handleReceivedMessage(msg)
+		}
+	}
+}
+
+// handleReceivedMessage routes a received message to the listening filters on
+// its (pubsub, content) topic and buffers the decoded result. A content topic
+// is only a 4-byte hash of the chat id, so distinct chats can collide on it;
+// a successful authenticated decrypt is what confirms which key — and hence
+// which filters — the message belongs to (replacing the old per-filter
+// key-hash match). Since a message decrypts with exactly one key, candidates
+// are grouped by key: decoding is attempted at most once per distinct key,
+// stops at the first key that succeeds, and the decoded message is fanned out
+// to every filter sharing that key.
+func (t *Transport) handleReceivedMessage(msg *types.ReceivedMessage) {
+	if msg == nil {
+		return
+	}
+
+	candidates := t.filters.WatchersByTopic(msg.PubsubTopic, msg.ContentTopic)
+	if len(candidates) == 0 {
+		return
+	}
+
+	type keyGroup struct {
+		symKey  []byte
+		privKey *ecdsa.PrivateKey
+		filters []*Filter
+	}
+	var order []string // group iteration order, deterministic over candidates
+	groups := make(map[string]*keyGroup)
+	for _, filter := range candidates {
+		// Filters that exist only so we can publish never receive.
+		if !filter.Listen {
+			continue
+		}
+
+		symKey, privKey, err := t.filterKeys(filter)
+		if err != nil {
+			continue
+		}
+
+		var fingerprint string
+		if symKey != nil {
+			fingerprint = "s:" + string(symKey)
+		} else {
+			fingerprint = "a:" + string(crypto.FromECDSAPub(&privKey.PublicKey))
+		}
+
+		group := groups[fingerprint]
+		if group == nil {
+			group = &keyGroup{symKey: symKey, privKey: privKey}
+			groups[fingerprint] = group
+			order = append(order, fingerprint)
+		}
+		group.filters = append(group.filters, filter)
+	}
+
+	var matched bool
+	for _, fingerprint := range order {
+		group := groups[fingerprint]
+
+		decoded, err := t.decode(msg, group.symKey, group.privKey)
+		if err != nil {
+			// Wrong key (e.g. a colliding chat's message); try the next one.
+			continue
+		}
+
+		for _, filter := range group.filters {
+			t.bufferMessage(filter.FilterID, toMessage(decoded, filter, msg, group.privKey))
+		}
+		matched = true
+		break // only one key can authenticate a given message
+	}
+
+	if matched {
+		t.matchedPublisher.Publish(struct{}{})
+	}
+}
+
+// bufferMessage stores a decoded message in the per-filter receive buffer,
+// keyed by envelope hash, until RetrieveRawAll drains it.
+func (t *Transport) bufferMessage(filterID string, message *types.Message) {
+	t.receivedMu.Lock()
+	defer t.receivedMu.Unlock()
+	byHash := t.received[filterID]
+	if byHash == nil {
+		byHash = make(map[string]*types.Message)
+		t.received[filterID] = byHash
+	}
+	byHash[types2.EncodeHex(message.Hash)] = message
+}
+
+// filterKeys resolves the key material used to decode messages received on a
+// filter. Both symmetric and asymmetric keys come from the FiltersManager's
+// runtime maps, keyed by FilterID (the same path the send side uses). Exactly
+// one of the returned keys is non-nil.
+func (t *Transport) filterKeys(filter *Filter) (symKey []byte, privKey *ecdsa.PrivateKey, err error) {
+	if symKey, ok := t.filters.SymKey(filter.FilterID); ok {
+		return symKey, nil, nil
+	}
+	if privKey, ok := t.filters.AsymKey(filter.FilterID); ok {
+		return nil, privKey, nil
+	}
+	return nil, nil, errors.New("no decode key for filter")
+}
+
+// decode reverses the rfc26 payload codec using the filter's key material.
+//
+// The WakuMessage `version` field is deliberately ignored here, as part of the
+// migration to retire it (status-im/status-go#7499): the rfc26 codec is
+// independent of `version`, and the caller only reaches this point with a
+// decryption key (keyless filters are skipped in handleReceivedMessage), so we
+// always decrypt. status-go only ever emitted version==1, so a keyed version==0
+// envelope is never genuine plaintext; once senders start advertising version==0
+// (a later migration step) those messages must still decrypt here. Previously
+// version==0 was passed through unencrypted — that phase-0 behaviour is removed.
+func (t *Transport) decode(msg *types.ReceivedMessage, symKey []byte, privKey *ecdsa.PrivateKey) (*rfc26.DecodedPayload, error) {
+	keyInfo := &rfc26.KeyInfo{}
+	switch {
+	case privKey != nil:
+		keyInfo.Kind = rfc26.Asymmetric
+		keyInfo.PrivKey = privKey
+	case symKey != nil:
+		keyInfo.Kind = rfc26.Symmetric
+		keyInfo.SymKey = symKey
+	default:
+		return nil, errors.New("no decode key for filter")
+	}
+
+	return rfc26.Decode(msg.Payload, keyInfo)
+}
+
+// toMessage assembles the transport's *types.Message from a decoded payload,
+// the matched filter and the raw received message.
+func toMessage(decoded *rfc26.DecodedPayload, filter *Filter, raw *types.ReceivedMessage, privKey *ecdsa.PrivateKey) *types.Message {
+	m := &types.Message{
+		Payload:   decoded.Data,
+		Padding:   decoded.Padding,
+		Timestamp: uint32(raw.Timestamp / int64(time.Second)),
+		Hash:      raw.Hash,
+		Topic:     filter.ContentTopic,
+	}
+	if privKey != nil {
+		m.Dst = crypto.FromECDSAPub(&privKey.PublicKey)
+	}
+	if decoded.PubKey != nil {
+		m.Sig = crypto.FromECDSAPub(decoded.PubKey)
+	}
+	return m
+}
+
 func (t *Transport) InitFilters(chatIDs []FiltersToInitialize, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
-	return t.filters.Init(chatIDs, publicKeys)
+	filters, err := t.filters.Init(chatIDs, publicKeys)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.subs.Acquire(filters...); err != nil {
+		return nil, err
+	}
+	return filters, nil
 }
 
 func (t *Transport) InitPublicFilters(filtersToInit []FiltersToInitialize) ([]*Filter, error) {
-	return t.filters.InitPublicFilters(filtersToInit)
+	filters, err := t.filters.InitPublicFilters(filtersToInit)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.subs.Acquire(filters...); err != nil {
+		return nil, err
+	}
+	return filters, nil
 }
 
 func (t *Transport) Filters() []*Filter {
@@ -195,19 +372,42 @@ func (t *Transport) FiltersByIdentities(identities []string) []*Filter {
 }
 
 func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
-	return t.filters.InitCommunityFilters(communityFiltersToInitialize)
+	filters, err := t.filters.InitCommunityFilters(communityFiltersToInitialize)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.subs.Acquire(filters...); err != nil {
+		return nil, err
+	}
+	return filters, nil
 }
 
 func (t *Transport) RemoveFilters(filters []*Filter) error {
-	return t.filters.Remove(context.Background(), filters...)
+	if err := t.filters.Remove(filters...); err != nil {
+		return err
+	}
+	t.subs.Release(filters...)
+	return nil
 }
 
 func (t *Transport) RemoveFilterByChatID(chatID string) (*Filter, error) {
-	return t.filters.RemoveFilterByChatID(chatID)
+	filter, err := t.filters.RemoveFilterByChatID(chatID)
+	if err != nil {
+		return nil, err
+	}
+	if filter != nil {
+		t.subs.Release(filter)
+	}
+	return filter, nil
 }
 
 func (t *Transport) ResetFilters(ctx context.Context) error {
-	return t.filters.Reset(ctx)
+	removed, err := t.filters.Reset()
+	if err != nil {
+		return err
+	}
+	t.subs.Release(removed...)
+	return nil
 }
 
 func (t *Transport) ProcessNegotiatedSecret(secret messagingtypes.NegotiatedSecret) (*Filter, error) {
@@ -215,15 +415,32 @@ func (t *Transport) ProcessNegotiatedSecret(secret messagingtypes.NegotiatedSecr
 	if err != nil {
 		return nil, err
 	}
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
 	return filter, nil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, "")
+	filter, err := t.filters.LoadPublic(chatID, "")
+	if err != nil {
+		return nil, err
+	}
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
+	return filter, nil
 }
 
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
-	return t.filters.LoadContactCode(publicKey)
+	filter, err := t.filters.LoadContactCode(publicKey)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
+	return filter, nil
 }
 
 func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
@@ -236,39 +453,38 @@ func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) 
 		filters = append(filters, f)
 
 	}
+	if err := t.subs.Acquire(filters...); err != nil {
+		return nil, err
+	}
 	return filters, nil
 }
 
-func (t *Transport) GetStats() types.StatsSummary {
-	return t.waku.GetStats()
-}
-
+// RetrieveRawAll drains the messages pushed in by the waku adapter and decoded
+// by receiveLoop, dropping any the persistent processed-message cache has
+// already seen, and returns them grouped by filter.
 func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 	result := make(map[Filter][]*types.Message)
 	logger := t.logger.With(zap.String("site", "retrieveRawAll"))
 
-	for _, filter := range t.filters.Filters() {
-		msgs, err := t.api.GetFilterMessages(filter.FilterID)
-		if err != nil {
-			logger.Warn("failed to fetch messages", zap.Error(err))
-			continue
-		}
-		// Don't pull from filters we don't listen to
-		if !filter.Listen {
-			for _, msg := range msgs {
-				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msg.Hash))
-			}
+	t.receivedMu.Lock()
+	drained := t.received
+	t.received = make(map[string]map[string]*types.Message)
+	t.receivedMu.Unlock()
+
+	for filterID, byHash := range drained {
+		if len(byHash) == 0 {
 			continue
 		}
 
-		if len(msgs) == 0 {
+		filter := t.filters.FilterByFilterID(filterID)
+		if filter == nil {
+			// Filter was removed between receipt and drain; drop its messages.
 			continue
 		}
 
-		ids := make([]string, len(msgs))
-		for i := range msgs {
-			id := types2.EncodeHex(msgs[i].Hash)
-			ids[i] = id
+		ids := make([]string, 0, len(byHash))
+		for id := range byHash {
+			ids = append(ids, id)
 		}
 
 		hits, err := t.cache.Hits(ids)
@@ -277,17 +493,15 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 			return nil, err
 		}
 
-		for i := range msgs {
-			// Exclude anything that is a cache hit
-			if !hits[types2.EncodeHex(msgs[i].Hash)] {
-				result[*filter] = append(result[*filter], msgs[i])
-				logger.Debug("message not cached", zap.String("hash", types2.EncodeHex(msgs[i].Hash)))
+		for _, id := range ids {
+			// Exclude anything the processed-message cache has already seen.
+			if !hits[id] {
+				result[*filter] = append(result[*filter], byHash[id])
+				logger.Debug("message not cached", zap.String("hash", id))
 			} else {
-				logger.Debug("message cached", zap.String("hash", types2.EncodeHex(msgs[i].Hash)))
-				t.waku.MarkP2PMessageAsProcessed(common.BytesToHash(msgs[i].Hash))
+				logger.Debug("message cached", zap.String("hash", id))
 			}
 		}
-
 	}
 
 	return result, nil
@@ -297,27 +511,29 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 // For public filters, chat name is used as an ID as well as
 // a topic.
 func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
-		return nil, err
-	}
-
 	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.SymKeyID = filter.SymKeyID
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PubsubTopic = filter.PubsubTopic
-
-	return t.api.Post(ctx, *newMessage)
-}
-
-func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
+	if err := t.subs.Acquire(filter); err != nil {
 		return nil, err
 	}
 
+	symKey, ok := t.filters.SymKey(filter.FilterID)
+	if !ok {
+		return nil, errors.New("no sym key found for filter")
+	}
+
+	encoded, err := t.encode(newMessage.Payload, symKey, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
+}
+
+func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
 	filter, err := t.filters.LoadNegotiated(messagingtypes.NegotiatedSecret{
 		PublicKey: publicKey,
 		Key:       secret,
@@ -326,46 +542,57 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 		return nil, err
 	}
 
-	newMessage.SymKeyID = filter.SymKeyID
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.PublicKey = nil
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
 
-	return t.api.Post(ctx, *newMessage)
+	symKey, ok := t.filters.SymKey(filter.FilterID)
+	if !ok {
+		return nil, errors.New("no sym key found for filter")
+	}
+
+	encoded, err := t.encode(newMessage.Payload, symKey, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
 func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
-		return nil, err
-	}
-
-	filter, err := t.filters.LoadPartitioned(publicKey, t.keysManager.privateKey, false)
+	filter, err := t.filters.LoadPartitioned(publicKey, t.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
 
-	return t.api.Post(ctx, *newMessage)
+	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
 func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
-		return nil, err
-	}
-
-	filter, err := t.filters.LoadPersonal(publicKey, t.keysManager.privateKey, false)
+	filter, err := t.filters.LoadPersonal(publicKey, t.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
 
-	return t.api.Post(ctx, *newMessage)
+	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
 func (t *Transport) PersonalTopicFilter() *Filter {
@@ -373,25 +600,33 @@ func (t *Transport) PersonalTopicFilter() *Filter {
 }
 
 func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
-	return t.filters.LoadEphemeral(&key.PublicKey, key, true)
+	filter, err := t.filters.LoadEphemeral(&key.PublicKey, key, true)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
+	return filter, nil
 }
 
 func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
-	if err := t.addSig(newMessage); err != nil {
-		return nil, err
-	}
-
 	// We load the filter to make sure we can post on it
 	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.PubsubTopic = filter.PubsubTopic
-	newMessage.Topic = filter.ContentTopic
-	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+	if err := t.subs.Acquire(filter); err != nil {
+		return nil, err
+	}
 
-	return t.api.Post(ctx, *newMessage)
+	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
 func (t *Transport) cleanFilters() error {
@@ -401,18 +636,23 @@ func (t *Transport) cleanFilters() error {
 	if t.filters == nil {
 		return nil
 	}
-	return t.filters.RemoveNoListenFilters()
-}
-
-func (t *Transport) addSig(newMessage *types.NewMessage) error {
-	sigID, err := t.keysManager.AddOrGetKeyPair(t.keysManager.privateKey)
+	removed, err := t.filters.RemoveNoListenFilters()
 	if err != nil {
 		return err
 	}
-	newMessage.SigID = sigID
+	t.subs.Release(removed...)
 	return nil
 }
 
+// encode produces the WakuMessage version=1 payload for the given plaintext.
+// Exactly one of symKey or recipient must be non-nil. The message is always
+// signed with the local identity key.
+func (t *Transport) encode(payload []byte, symKey []byte, recipient *ecdsa.PublicKey) ([]byte, error) {
+	return rfc26.Encode(payload, symKey, recipient, t.privateKey)
+}
+
+// Track records sent envelopes for delivery monitoring. It is the
+// single-identifier convenience wrapper around TrackMany.
 func (t *Transport) Track(identifier []byte, hashes [][]byte, newMessages []*types.NewMessage) {
 	t.TrackMany([][]byte{identifier}, hashes, newMessages)
 }
@@ -431,11 +671,6 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 	if err != nil {
 		t.logger.Error("failed to track messages", zap.Error(err))
 	}
-}
-
-// GetCurrentTime returns the current unix timestamp in milliseconds
-func (t *Transport) GetCurrentTime() uint64 {
-	return t.waku.GetCurrentTime()
 }
 
 func (t *Transport) MaxMessageSize() uint32 {
@@ -485,9 +720,11 @@ func (t *Transport) cleanFiltersLoop() {
 }
 
 func (t *Transport) PeerCount() int {
-	return t.waku.PeerCount()
+	return len(t.waku.Peers())
 }
 
+// Peers is retained only for the Python functional tests (see tests-functional);
+// it is not used by status-app.
 func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
@@ -522,42 +759,8 @@ func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types2.EncodeHex(crypto.FromECDSAPub(key))
 }
 
-func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return t.waku.ListenAddresses()
-}
-
-func (t *Transport) ENR() (*enode.Node, error) {
-	return t.waku.ENR()
-}
-
-func (t *Transport) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return t.waku.AddRelayPeer(address)
-}
-
-func (t *Transport) DialPeer(address multiaddr.Multiaddr) error {
-	return t.waku.DialPeer(address)
-}
-
-func (t *Transport) DialPeerByID(peerID peer.ID) error {
-	return t.waku.DialPeerByID(peerID)
-}
-
-func (t *Transport) DropPeer(peerID peer.ID) error {
-	return t.waku.DropPeer(peerID)
-}
-
-func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
-	t.waku.MarkP2PMessageAsProcessed(hash)
-}
-
 func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
-}
-
-// Subscribe to a pubsub topic
-func (t *Transport) SubscribeToPubsubTopic(topic string) error {
-	t.logger.Debug("subscribing to pubsub topic", zap.String("pubsubtopic", topic))
-	return t.waku.SubscribeToPubsubTopic(topic)
 }
 
 func (t *Transport) ConfirmMessageDelivered(messageID string) {
@@ -575,95 +778,33 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	t.waku.ConfirmMessageDelivered(commHashes)
 }
 
-func (t *Transport) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters []*Filter) {
-	topicMap := make(map[string]map[types.TopicType]struct{})
-	for _, f := range filters {
-		if !f.Listen || f.Ephemeral {
-			continue
-		}
-
-		_, ok := topicMap[f.PubsubTopic]
-		if !ok {
-			topicMap[f.PubsubTopic] = make(map[types.TopicType]struct{})
-		}
-
-		topicMap[f.PubsubTopic][f.ContentTopic] = struct{}{}
-	}
-
-	for pubsubTopic, contentTopics := range topicMap {
-		ctList := maps.Keys(contentTopics)
-		err := t.waku.SetCriteriaForMissingMessageVerification(peerInfo, pubsubTopic, ctList)
-		if err != nil {
-			t.logger.Error("could not check for missing messages",
-				zap.Error(err),
-				zap.Stringer("peerID", peerInfo.ID),
-				zap.String("pubsubTopic", pubsubTopic),
-				zap.Stringers("contentTopics", ctList))
-			return
-		}
-	}
-}
-
-func (t *Transport) GetActiveStorenode() peer.AddrInfo {
-	return t.waku.GetActiveStorenode()
-}
-
-func (t *Transport) DisconnectActiveStorenode(ctx context.Context, backoffReason time.Duration, shouldCycle bool) {
-	t.waku.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
-}
-
 // SubscribeFilterMatched returns a channel notified (non-blocking, coalescing) whenever
 // an incoming envelope matches at least one installed filter. Callers must call
 // UnsubscribeFilterMatched with the returned channel when done.
 func (t *Transport) SubscribeFilterMatched() chan struct{} {
-	if t.waku == nil {
-		return nil
-	}
-	return t.waku.SubscribeFilterMatched()
+	return t.matchedPublisher.Subscribe(1)
 }
 
 func (t *Transport) UnsubscribeFilterMatched(ch chan struct{}) {
-	if t.waku == nil || ch == nil {
+	if ch == nil {
 		return
 	}
-	t.waku.UnsubscribeFilterMatched(ch)
+	t.matchedPublisher.Unsubscribe(ch)
 }
 
-func (t *Transport) OnStorenodeChanged() <-chan peer.ID {
-	return t.waku.OnStorenodeChanged()
-}
-
-func (t *Transport) OnStorenodeNotWorking() <-chan struct{} {
-	return t.waku.OnStorenodeNotWorking()
-}
-
-func (t *Transport) OnStorenodeAvailable() <-chan peer.ID {
-	return t.waku.OnStorenodeAvailable()
-}
-
-func (t *Transport) WaitForAvailableStoreNode(ctx context.Context) bool {
-	return t.waku.WaitForAvailableStoreNode(ctx)
-}
-
-func (t *Transport) IsStorenodeAvailable(peerID peer.ID) bool {
-	return t.waku.IsStorenodeAvailable(peerID)
-}
-
-func (t *Transport) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
-	return t.waku.PerformStorenodeTask(fn, opts...)
-}
-
-func (t *Transport) ProcessMailserverBatch(
+// Query retrieves historic messages for a single batch, selecting the store node
+// internally (no peer argument). See waku.StoreClient.
+func (t *Transport) Query(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return t.waku.ProcessMailserverBatch(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
-func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
-	t.waku.SetStorenodeConfigProvider(c)
+// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
+func (t *Transport) SetStorenodes(nodes []peer.AddrInfo) {
+	t.waku.SetStorenodes(nodes)
 }

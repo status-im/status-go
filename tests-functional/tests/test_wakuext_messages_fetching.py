@@ -1,10 +1,12 @@
 import pytest
 
 from steps import messenger
+from utils.rpc_helpers import messages_list
+from waku_params import parametrize_waku_light_client
 
 
 @pytest.mark.rpc
-@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
+@parametrize_waku_light_client
 class TestFetchingChatMessages:
 
     @pytest.fixture()
@@ -102,7 +104,7 @@ class TestFetchingChatMessages:
         )
         # TODO: Add more assertions on response
 
-        messages = response.get("messages", [])
+        messages = messages_list(response)
         actual_texts = [message.get("text", "") for message in messages]
         assert sent_texts_one_to_one[0] in actual_texts
         assert text_group in actual_texts

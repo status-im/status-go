@@ -35,10 +35,8 @@ const (
 	ErrCodeCannotAddDefaultChatAccount
 	ErrCodeCannotRemoveDefaultChatAccount
 	ErrCodeCannotMigrateProfileKeypair
-	ErrCodeKeypairIsNotKeycard
+	ErrCodeKeypairIsNotColdWallet
 	ErrCodeWrongPasswordProvided
-	ErrCodeKeycardDoesNotHaveAnyAccounts
-	ErrCodeKeycardDoesNotRelateToAnyKeypair
 	ErrCodeCannotRemoveProfileKeypair
 	ErrCodeNoPasswordProvided
 )
@@ -65,8 +63,7 @@ var (
 	ErrCannotAddDefaultChatAccount                     = errors.NewError(ErrCodeCannotAddDefaultChatAccount, "cannot add default chat account", getErrorCategory)
 	ErrCannotRemoveDefaultChatAccount                  = errors.NewError(ErrCodeCannotRemoveDefaultChatAccount, "cannot remove default chat account", getErrorCategory)
 	ErrCannotMigrateProfileKeypair                     = errors.NewError(ErrCodeCannotMigrateProfileKeypair, "cannot migrate profile keypair", getErrorCategory)
-	ErrKeypairIsNotKeycard                             = errors.NewError(ErrCodeKeypairIsNotKeycard, "keypair is not a keycard keypair", getErrorCategory)
-	ErrKeycardDoesNotHaveAnyAccounts                   = errors.NewError(ErrCodeKeycardDoesNotHaveAnyAccounts, "keycard does not have any accounts", getErrorCategory)
+	ErrKeypairIsNotColdWallet                          = errors.NewError(ErrCodeKeypairIsNotColdWallet, "keypair is not a cold wallet keypair", getErrorCategory)
 	ErrCannotRemoveProfileKeypair                      = errors.NewError(ErrCodeCannotRemoveProfileKeypair, "cannot remove profile keypair", getErrorCategory)
 	ErrNoPasswordProvided                              = errors.NewError(ErrCodeNoPasswordProvided, "no password provided", getErrorCategory)
 )
@@ -77,10 +74,6 @@ func ErrKeystoreDirectoryError(err error) *errors.AccountsError {
 
 func ErrWrongPasswordProvided(err error) *errors.AccountsError {
 	return errors.WrapError(ErrCodeWrongPasswordProvided, "wrong password provided", err, getErrorCategory)
-}
-
-func ErrKeycardDoesNotRelateToAnyKeypair(err error) *errors.AccountsError {
-	return errors.WrapError(ErrCodeKeycardDoesNotRelateToAnyKeypair, "keycard does not relate to any keypair", err, getErrorCategory)
 }
 
 func getErrorCategory(code errors.ErrorCode) errors.ErrorCategory {
@@ -94,8 +87,8 @@ func getErrorCategory(code errors.ErrorCode) errors.ErrorCategory {
 	case ErrCodeAddressAndPasswordOrPrivateKeyRequired, ErrCodeKeypairDoesNotHaveWalletAccount, ErrCodeUnsupportedWalletAccountPath,
 		ErrCodeKeypairAlreadyAdded, ErrCodeAccountAlreadyAdded, ErrCodeChatAccountNotFoundInDerivedAccounts,
 		ErrCodeKeypairMustHaveAtLeastOneWalletAccount, ErrCodeCannotAddAccountsToKeypairImportedViaPrivateKey,
-		ErrCodeCannotMigrateProfileKeypair, ErrCodeKeypairIsNotKeycard, ErrCodeWrongPasswordProvided, ErrCodeKeycardDoesNotHaveAnyAccounts,
-		ErrCodeKeycardDoesNotRelateToAnyKeypair, ErrCodeNoPasswordProvided:
+		ErrCodeCannotMigrateProfileKeypair, ErrCodeKeypairIsNotColdWallet, ErrCodeWrongPasswordProvided,
+		ErrCodeNoPasswordProvided:
 		return ErrorCategoryValidation
 	case ErrCodeCannotAddDefaultWalletAccount, ErrCodeCannotAddDefaultChatAccount, ErrCodeCannotRemoveDefaultWalletAccount,
 		ErrCodeCannotRemoveDefaultChatAccount, ErrCodeCannotRemoveProfileKeypair:

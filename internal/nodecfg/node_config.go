@@ -3,6 +3,7 @@ package nodecfg
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/params"
@@ -81,6 +82,51 @@ func insertTorrentConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
+func insertLogosStorageConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	listenAddrsJSON, err := json.Marshal(c.LogosStorageConfig.NodeConfig.ListenAddrs)
+	if err != nil {
+		return err
+	}
+
+	bootstrapNodesJSON, err := json.Marshal(c.LogosStorageConfig.NodeConfig.BootstrapNodes)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		INSERT OR REPLACE INTO logos_storage_config (
+			enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+			listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
+			repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
+			block_retries, cache_size, log_file, synthetic_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.LogosStorageConfig.Enabled,
+		c.LogosStorageConfig.NodeConfig.LogLevel,
+		c.LogosStorageConfig.NodeConfig.LogFormat,
+		c.LogosStorageConfig.NodeConfig.MetricsEnabled,
+		c.LogosStorageConfig.NodeConfig.MetricsAddress,
+		c.LogosStorageConfig.NodeConfig.MetricsPort,
+		c.LogosStorageConfig.NodeConfig.DataDir,
+		string(listenAddrsJSON),
+		c.LogosStorageConfig.NodeConfig.Nat,
+		c.LogosStorageConfig.NodeConfig.DiscoveryPort,
+		c.LogosStorageConfig.NodeConfig.NetPrivKeyFile,
+		string(bootstrapNodesJSON),
+		c.LogosStorageConfig.NodeConfig.MaxPeers,
+		c.LogosStorageConfig.NodeConfig.NumThreads,
+		c.LogosStorageConfig.NodeConfig.AgentString,
+		c.LogosStorageConfig.NodeConfig.RepoKind,
+		c.LogosStorageConfig.NodeConfig.StorageQuota,
+		c.LogosStorageConfig.NodeConfig.BlockTtl,
+		c.LogosStorageConfig.NodeConfig.BlockMaintenanceInterval,
+		c.LogosStorageConfig.NodeConfig.BlockMaintenanceNumberOfBlocks,
+		c.LogosStorageConfig.NodeConfig.BlockRetries,
+		c.LogosStorageConfig.NodeConfig.CacheSize,
+		c.LogosStorageConfig.NodeConfig.LogFile,
+	)
+	return err
+}
+
 func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO wakuv2_config (
@@ -99,10 +145,8 @@ func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	UPDATE wakuv2_config
-	SET enable_missing_message_verification = ?,
-		enable_store_confirmation_for_messages_sent = ?
+	SET enable_store_confirmation_for_messages_sent = ?
 	WHERE synthetic_id = 'id'`,
-		c.WakuV2Config.EnableMissingMessageVerification,
 		c.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 
@@ -144,6 +188,7 @@ func nodeConfigNormalInserts() []insertFn {
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
+		insertLogosStorageConfig,
 		insertWakuV2ConfigPostMigration,
 	}
 }
@@ -279,14 +324,58 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
+	var listenAddrsStr, bootstrapNodesStr string
+	err = tx.QueryRow(`
+	SELECT enabled, log_level, log_format, metrics_enabled, metrics_address, metrics_port, data_dir,
+		listen_addrs, nat, disc_port, net_privkey, bootstrap_nodes, max_peers, num_threads, agent_string,
+		repo_kind, storage_quota, block_ttl, block_maintenance_interval, block_maintenance_number_of_blocks,
+		block_retries, cache_size, log_file
+	FROM logos_storage_config WHERE synthetic_id = 'id'
+	`).Scan(
+		&nodecfg.LogosStorageConfig.Enabled,
+		&nodecfg.LogosStorageConfig.NodeConfig.LogLevel,
+		&nodecfg.LogosStorageConfig.NodeConfig.LogFormat,
+		&nodecfg.LogosStorageConfig.NodeConfig.MetricsEnabled,
+		&nodecfg.LogosStorageConfig.NodeConfig.MetricsAddress,
+		&nodecfg.LogosStorageConfig.NodeConfig.MetricsPort,
+		&nodecfg.LogosStorageConfig.NodeConfig.DataDir,
+		&listenAddrsStr,
+		&nodecfg.LogosStorageConfig.NodeConfig.Nat,
+		&nodecfg.LogosStorageConfig.NodeConfig.DiscoveryPort,
+		&nodecfg.LogosStorageConfig.NodeConfig.NetPrivKeyFile,
+		&bootstrapNodesStr,
+		&nodecfg.LogosStorageConfig.NodeConfig.MaxPeers,
+		&nodecfg.LogosStorageConfig.NodeConfig.NumThreads,
+		&nodecfg.LogosStorageConfig.NodeConfig.AgentString,
+		&nodecfg.LogosStorageConfig.NodeConfig.RepoKind,
+		&nodecfg.LogosStorageConfig.NodeConfig.StorageQuota,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockTtl,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockMaintenanceInterval,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockMaintenanceNumberOfBlocks,
+		&nodecfg.LogosStorageConfig.NodeConfig.BlockRetries,
+		&nodecfg.LogosStorageConfig.NodeConfig.CacheSize,
+		&nodecfg.LogosStorageConfig.NodeConfig.LogFile,
+	)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	if listenAddrsStr != "" {
+		if err := json.Unmarshal([]byte(listenAddrsStr), &nodecfg.LogosStorageConfig.NodeConfig.ListenAddrs); err != nil {
+			return nil, err
+		}
+	}
+	if bootstrapNodesStr != "" {
+		if err := json.Unmarshal([]byte(bootstrapNodesStr), &nodecfg.LogosStorageConfig.NodeConfig.BootstrapNodes); err != nil {
+			return nil, err
+		}
+	}
+
 	err = tx.QueryRow(`
 	SELECT light_client,
-	       enable_missing_message_verification,
 	       enable_store_confirmation_for_messages_sent
 	FROM wakuv2_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.WakuV2Config.LightClient,
-		&nodecfg.WakuV2Config.EnableMissingMessageVerification,
 		&nodecfg.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 	if err != nil && err != sql.ErrNoRows {

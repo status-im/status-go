@@ -392,7 +392,7 @@ func (s *Server) buildPushNotificationReport(pn *protobuf.PushNotification, regi
 	} else if registration.AccessToken != pn.AccessToken {
 		s.config.Logger.Debug("invalid token")
 		report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
-	} else if (s.isMessageNotification(pn) && !s.isValidMessageNotification(pn, registration)) || (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration)) || (s.isRequestToJoinCommunityNotification(pn) && !s.isValidRequestToJoinCommunityNotification(pn, registration)) {
+	} else if (s.isMessageNotification(pn) && !s.isValidMessageNotification(pn, registration)) || (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration)) || (s.isRequestToJoinCommunityNotification(pn) && !s.isValidRequestToJoinCommunityNotification(pn, registration)) || (s.isContactRequestNotification(pn) && !s.isValidContactRequestNotification(pn, registration)) {
 		s.config.Logger.Debug("filtered notification")
 		// We report as successful but don't send the notification
 		// for privacy reasons, as otherwise we would disclose that
@@ -564,4 +564,15 @@ func (s *Server) isRequestToJoinCommunityNotification(pn *protobuf.PushNotificat
 // the author is not blocked
 func (s *Server) isValidRequestToJoinCommunityNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
 	return s.isRequestToJoinCommunityNotification(pn) && !s.contains(registration.BlockedChatList, pn.Author)
+}
+
+func (s *Server) isContactRequestNotification(pn *protobuf.PushNotification) bool {
+	return pn.Type == protobuf.PushNotification_CONTACT_REQUEST
+}
+
+// isValidContactRequestNotification checks:
+// this is a contact request
+// the author is not blocked
+func (s *Server) isValidContactRequestNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
+	return s.isContactRequestNotification(pn) && !s.contains(registration.BlockedChatList, pn.Author)
 }

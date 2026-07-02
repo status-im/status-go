@@ -117,7 +117,7 @@ func (s *NetworkManagerTestSuite) TestInitNetworksKeepsUserProviders() {
 	// Re-initialize networks
 	initNetworks := []params.Network{
 		*testutil.CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
+			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
 		}),
 	}
 	err = s.manager.InitEmbeddedNetworks(initNetworks)
@@ -137,7 +137,7 @@ func (s *NetworkManagerTestSuite) TestInitNetworksDoesNotSaveEmbeddedProviders()
 	// Re-initialize networks
 	initNetworks := []params.Network{
 		*testutil.CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
+			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
 		}),
 	}
 	err := s.manager.InitEmbeddedNetworks(initNetworks)
@@ -154,7 +154,7 @@ func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
 	// Re-initialize networks
 	initNetworks := []params.Network{
 		*testutil.CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
+			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
 		}),
 	}
 	expectedProviders := networkhelper.GetEmbeddedProviders(initNetworks[0].RpcProviders)
@@ -211,9 +211,9 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulation() {
 		*testutil.CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
 			testutil.CreateProvider(common.EthereumMainnet, "DirectProvider1", params.EmbeddedDirectProviderType, true, security.NewSensitiveString("https://direct1.ethereum.io")),
 			testutil.CreateProvider(common.EthereumMainnet, "DirectProvider2", params.EmbeddedDirectProviderType, true, security.NewSensitiveString("https://direct2.ethereum.io")),
-			testutil.CreateProvider(common.EthereumMainnet, "ProxyProvider1", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://proxy1.ethereum.io")),
-			testutil.CreateProvider(common.EthereumMainnet, "ProxyProvider2", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://proxy2.ethereum.io")),
-			testutil.CreateProvider(common.EthereumMainnet, "ProxyProvider3", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://proxy3.ethereum.io")),
+			testutil.CreateProvider(common.EthereumMainnet, "ProxyProvider1", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://proxy1.ethereum.io")),
+			testutil.CreateProvider(common.EthereumMainnet, "ProxyProvider2", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://proxy2.ethereum.io")),
+			testutil.CreateProvider(common.EthereumMainnet, "ProxyProvider3", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://proxy3.ethereum.io")),
 			testutil.CreateProvider(common.EthereumMainnet, "UserProvider1", params.UserProviderType, true, security.NewSensitiveString("https://user1.ethereum.io")),
 			testutil.CreateProvider(common.EthereumMainnet, "UserProvider2", params.UserProviderType, true, security.NewSensitiveString("https://user2.ethereum.io")),
 		}),
@@ -236,9 +236,6 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulation() {
 	s.Equal("https://direct2.ethereum.io", network.OriginalFallbackURL)
 	s.Equal("https://user1.ethereum.io", network.RPCURL)
 	s.Equal("https://user2.ethereum.io", network.FallbackURL)
-	s.Equal("https://proxy1.ethereum.io", network.DefaultRPCURL)
-	s.Equal("https://proxy2.ethereum.io", network.DefaultFallbackURL)
-	s.Equal("https://proxy3.ethereum.io", network.DefaultFallbackURL2)
 }
 
 func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders() {
@@ -246,8 +243,8 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders(
 	initNetworks := []params.Network{
 		*testutil.CreateNetwork(common.EthereumSepolia, "Sepolia Testnet", []params.RpcProvider{
 			testutil.CreateProvider(common.EthereumSepolia, "DirectProvider1", params.EmbeddedDirectProviderType, true, security.NewSensitiveString("https://direct1.sepolia.io")),
-			testutil.CreateProvider(common.EthereumSepolia, "ProxyProvider1", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://proxy1.sepolia.io")),
-			testutil.CreateProvider(common.EthereumSepolia, "ProxyProvider2", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://proxy2.sepolia.io")),
+			testutil.CreateProvider(common.EthereumSepolia, "ProxyProvider1", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://proxy1.sepolia.io")),
+			testutil.CreateProvider(common.EthereumSepolia, "ProxyProvider2", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://proxy2.sepolia.io")),
 		}),
 	}
 
@@ -268,9 +265,6 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders(
 	s.Empty(network.OriginalFallbackURL)                  // No second EmbeddedDirect provider
 	s.Equal("https://direct1.sepolia.io", network.RPCURL) // Defaults to OriginalRPCURL
 	s.Empty(network.FallbackURL)                          // Defaults to OriginalFallbackURL, which is empty
-	s.Equal("https://proxy1.sepolia.io", network.DefaultRPCURL)
-	s.Equal("https://proxy2.sepolia.io", network.DefaultFallbackURL)
-	s.Empty(network.DefaultFallbackURL2) // No third Proxy provider
 }
 
 func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
@@ -278,7 +272,7 @@ func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
 
 	// Create a new network
 	newNetwork := testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
-		testutil.CreateProvider(chainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
+		testutil.CreateProvider(chainID, "Infura Mainnet", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
 	})
 	// Check that these values are overiden for upserted networks
 	newNetwork.IsActive = true

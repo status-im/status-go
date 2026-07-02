@@ -174,7 +174,7 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptot
 			return err
 		}
 
-		if !kp.MigratedToKeycard() {
+		if !kp.MigratedToColdWallet() {
 			err = m.deleteAccountFromKeystoreIfExists(address, password)
 			if err != nil {
 				return err
@@ -207,7 +207,7 @@ func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types
 		return ErrKeypairIsNil
 	}
 
-	if keypair.MigratedToKeycard() {
+	if keypair.MigratedToColdWallet() {
 		return nil
 	}
 
@@ -264,7 +264,7 @@ func (m *AccountsManager) CleanKeystoreFiles(password string) error {
 	}
 
 	for _, kp := range keypairs {
-		if kp.MigratedToKeycard() || kp.Removed {
+		if kp.MigratedToColdWallet() || kp.Removed {
 			for _, acc := range kp.Accounts {
 				err = m.deleteAccountFromKeystoreIfExists(acc.Address, password)
 				if err != nil {

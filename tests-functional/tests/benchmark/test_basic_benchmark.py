@@ -6,10 +6,11 @@ from clients.status_backend import StatusBackend
 from steps import messenger
 from utils import fake
 from utils.config import Config
+from waku_params import parametrize_waku_light_client
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("waku_light_client", [False, True], indirect=True, ids=["waku_light_client_False", "waku_light_client_True"])
+@parametrize_waku_light_client
 class TestBasicBenchmark:
     """Test StatusBackend performance.
 

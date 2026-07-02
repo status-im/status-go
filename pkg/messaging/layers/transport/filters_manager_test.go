@@ -8,15 +8,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/testutils"
-	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
 )
 
 type testKeysPersistence struct {
@@ -90,17 +87,7 @@ func (s *FiltersManagerSuite) SetupTest() {
 
 	keysPersistence := newTestKeysPersistence()
 
-	waku, err := wakuv3.New(
-		nil,
-		&wakuv3.DefaultConfig,
-		s.logger,
-		nil,
-		func([]byte, peer.AddrInfo, error) {},
-		nil,
-	)
-	s.Require().NoError(err)
-
-	s.chats, err = NewFiltersManager(keysPersistence, waku, s.manager[0].privateKey, s.logger)
+	s.chats, err = NewFiltersManager(keysPersistence, s.manager[0].privateKey, s.logger)
 	s.Require().NoError(err)
 }
 
