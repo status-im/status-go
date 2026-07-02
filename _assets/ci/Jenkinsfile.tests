@@ -84,6 +84,11 @@ pipeline {
     REPO_SRC    = "${GOPATH}/src/github.com/status-im/status-go"
     BASE_BRANCH = "${env.CHANGE_TARGET}"
 
+    /* Pass PR/commit/branch to codecov so uploads are associated with the PR. */
+    CODECOV_SHA    = "${env.GIT_COMMIT}"
+    CODECOV_BRANCH = "${params.BRANCH}"
+    CODECOV_PR     = "${utils.changeId() ?: ''}"
+
     /* Hack-fix for params not being set in env on first job run. */
     UNIT_TEST_FAILFAST =               "${params.UNIT_TEST_FAILFAST}"
     UNIT_TEST_RERUN_FAILS =            "${params.UNIT_TEST_RERUN_FAILS}"

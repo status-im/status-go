@@ -396,11 +396,14 @@ status-go-deps:
 	go clean -modcache || true
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
+# GOOS and GOARCH are essential to generate cbindings when cross compiling on macos
+GO_HOST_ENV = GOOS=$(shell go env GOHOSTOS) GOARCH=$(shell go env GOHOSTARCH)
+
 statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-c-bindings:
 	@## tools/generate-cbindings/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
-	go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
+	$(GO_HOST_ENV) go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
 statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= build/bin
 statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= build/bin/libstatus.h
@@ -504,8 +507,8 @@ generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
-	@go generate -tags "use_logos_storage $(BUILD_TAGS)" ./services/logosstorage
+	@GOROOT=$$(go env GOROOT) $(GO_HOST_ENV) $(GO_GENERATE_CMD) $(PACKAGES)
+	@$(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./services/logosstorage
 
 generate-contracts:
 	go generate ./contracts

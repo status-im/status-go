@@ -1,13 +1,13 @@
 package protocol
 
 import (
-	"github.com/libp2p/go-libp2p/core/peer"
+	"time"
+
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/signal"
 )
 
 func (m *Messenger) AllMailservers() ([]messagingtypes.StoreNode, error) {
@@ -51,120 +51,28 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		_, err := m.requestAllHistoricMessages(true, false)
-		if err != nil {
-			m.logger.Error("failed to request historic messages", zap.Error(err))
+		// On login the libp2p host is freshly (re)created and no storenode is
+		// connected yet, so the first attempt can fail with "no store node
+		// reachable" before a storenode is dialable. The go-waku storenode cycle
+		// that used to retrigger the fetch is gone, so retry with backoff until a
+		// storenode serves the query (or we give up). Once one attempt succeeds
+		// it arms the throttle, so concurrent/later triggers no-op.
+		deadline := time.Now().Add(historicSyncRetryTimeout)
+		for {
+			_, err := m.requestAllHistoricMessages(true, false)
+			if err == nil {
+				return
+			}
+			if time.Now().After(deadline) {
+				m.logger.Error("failed to request historic messages after retries", zap.Error(err))
+				return
+			}
+			m.logger.Warn("failed to request historic messages, retrying", zap.Error(err))
+			select {
+			case <-m.quit:
+				return
+			case <-time.After(historicSyncRetryInterval):
+			}
 		}
 	}()
-}
-
-func (m *Messenger) GetPinnedStorenode() (peer.AddrInfo, error) {
-	fleet, err := m.getFleet()
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-
-	pinnedMailservers, err := m.settings.GetPinnedMailservers()
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-
-	pinnedMailserver, ok := pinnedMailservers[fleet]
-	if !ok {
-		return peer.AddrInfo{}, nil
-	}
-
-	allMailservers, err := m.allMailserversByFleet(fleet)
-	if err != nil {
-		return peer.AddrInfo{}, err
-	}
-
-	for _, c := range allMailservers {
-		if c.ID == pinnedMailserver {
-			return c.PeerInfo()
-		}
-	}
-
-	return peer.AddrInfo{}, nil
-}
-
-func (m *Messenger) UseStorenodes() (bool, error) {
-	return m.settings.CanUseMailservers()
-}
-
-func (m *Messenger) Storenodes() ([]peer.AddrInfo, error) {
-	mailservers, err := m.AllMailservers()
-	if err != nil {
-		return nil, err
-	}
-
-	var result []peer.AddrInfo
-	for _, m := range mailservers {
-
-		peerInfo, err := m.PeerInfo()
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, peerInfo)
-	}
-
-	return result, nil
-}
-
-func (m *Messenger) checkForStorenodeCycleSignals() {
-	defer gocommon.LogOnPanic()
-	defer m.shutdownWaitGroup.Done()
-
-	changed := m.messaging.OnStorenodeChanged()
-	notWorking := m.messaging.OnStorenodeNotWorking()
-	available := m.messaging.OnStorenodeAvailable()
-
-	allMailservers, err := m.AllMailservers()
-	if err != nil {
-		m.logger.Error("Could not retrieve mailserver list", zap.Error(err))
-		return
-	}
-
-	mailserverMap := make(map[peer.ID]messagingtypes.StoreNode)
-	for _, ms := range allMailservers {
-		peerID, err := ms.PeerID()
-		if err != nil {
-			m.logger.Error("could not retrieve peerID", zap.Error(err))
-			return
-		}
-		mailserverMap[peerID] = ms
-	}
-
-	for {
-		select {
-		case <-m.quit:
-			return
-		case <-m.ctx.Done():
-			return
-		case <-notWorking:
-			signal.SendStoreNodeNotWorking()
-
-		case activeMailserver := <-changed:
-			if activeMailserver != "" {
-				ms, ok := mailserverMap[activeMailserver]
-				if ok {
-					signal.SendStoreNodeChanged(&ms)
-				}
-			} else {
-				signal.SendStoreNodeChanged(nil)
-			}
-		case activeMailserver := <-available:
-			if activeMailserver != "" {
-				ms, ok := mailserverMap[activeMailserver]
-				if ok {
-					signal.SendStoreNodeAvailable(&ms)
-				}
-				// Skip history sync when backgrounded; SetPaused(false)
-				// will trigger it when the app returns to foreground.
-				if !m.isPaused() {
-					m.asyncRequestAllHistoricMessages()
-				}
-			}
-		}
-	}
 }

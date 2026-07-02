@@ -11,8 +11,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pborman/uuid"
 
-	"github.com/waku-org/go-waku/waku/v2/api/history"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/connection"
@@ -108,22 +106,9 @@ type Waku interface {
 	// it is not used by status-app.
 	Peers() PeerStats
 
-	StartDiscV5() error
-
-	StopDiscV5() error
-
-	SubscribeToPubsubTopic(topic string) error
-
-	UnsubscribeFromPubsubTopic(topic string) error
-
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
-
-	// Subscribe/Unsubscribe register and remove wire subscriptions for the
-	// given content topics on a pubsub topic. See transport.MessagingAPI.
-	Subscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
-	Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
 
 	MaxMessageSize() uint32
 
@@ -139,20 +124,8 @@ type Waku interface {
 	// PeerID returns node's PeerID
 	PeerID() peer.ID
 
-	// GetActiveStorenode returns the peer AddrInfo of the currently active storenode. It will be empty if no storenode is active
-	GetActiveStorenode() peer.AddrInfo
-
-	// OnStorenodeChanged is triggered when a new storenode is promoted to become the active storenode or when the active storenode is removed
-	OnStorenodeChanged() <-chan peer.ID
-
-	// OnStorenodeNotWorking is triggered when the last active storenode fails to return results consistently
-	OnStorenodeNotWorking() <-chan struct{}
-
-	// OnStorenodeAvailable is triggered when there is a new active storenode selected
-	OnStorenodeAvailable() <-chan peer.ID
-
-	// SetStorenodeConfigProvider will set the configuration provider for the storenode cycle
-	SetStorenodeConfigProvider(c history.StorenodeConfigProvider)
+	// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
+	SetStorenodes(nodes []peer.AddrInfo)
 
 	// StoreQuery retrieves historic messages for a single batch, selecting the
 	// store node internally (no peer argument). See waku.StoreClient.
@@ -163,12 +136,6 @@ type Waku interface {
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
 	) error
-
-	// IsStorenodeAvailable is used to determine whether a storenode is available or not
-	IsStorenodeAvailable(peerID peer.ID) bool
-
-	// DisconnectActiveStorenode will trigger a disconnection of the active storenode, and potentially execute a cycling so a new storenode is promoted
-	DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool)
 }
 
 type MailserverBatch struct {

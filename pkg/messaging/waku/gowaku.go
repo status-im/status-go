@@ -56,10 +56,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
-	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
-	"github.com/waku-org/go-waku/waku/v2/api/history"
-	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -179,9 +176,7 @@ type Waku struct {
 	// "ConnectionChange received with Offline=false"
 	stateInitialized bool
 
-	StorenodeCycle   *history.StorenodeCycle
-	HistoryRetriever *history.HistoryRetriever
-	storeClient      *StoreClient
+	storeClient *StoreClient
 
 	logger *zap.Logger
 
@@ -851,11 +846,9 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
 
-	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, commonapi.NewDefaultPinger(w.node.Host()))
-	w.HistoryRetriever = history.NewHistoryRetriever(missing.NewDefaultStorenodeRequestor(w.node.Store()), NewHistoryProcessorWrapper(w), w.logger)
-	w.storeClient = NewStoreClient(w.StorenodeCycle, w.HistoryRetriever, w.GetPubsubTopic, w.logger)
-
-	w.StorenodeCycle.Start(w.ctx)
+	selector := newStoreSelector()
+	pager := newStorePager(wakuStoreRequestor{store: w.node.Store()}, NewHistoryProcessorWrapper(w), w.logger)
+	w.storeClient = NewStoreClient(selector, pager, w.GetPubsubTopic, w.logger)
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
@@ -1116,7 +1109,10 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
 		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
+		// The store node is selected on demand by the StoreClient (the go-waku
+		// storenode cycle is gone); MessageSentCheck queries it by hash to confirm
+		// that published messages propagated.
+		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), storeClientPeerProvider{w.storeClient}, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)
@@ -1173,6 +1169,14 @@ func (w *Waku) setupRelaySubscriptions() error {
 	}
 
 	err := w.subscribeToPubsubTopicWithWakuRelay(w.cfg.DefaultShardPubsubTopic)
+	if err != nil {
+		return err
+	}
+
+	// Community control messages arrive on the non-protected pubsub topic.
+	// TODO remove once fully migrated to Global Community Control and Content Topic
+	// https://github.com/status-im/status-go/issues/6384
+	err = w.subscribeToPubsubTopicWithWakuRelay(DefaultNonProtectedPubsubTopic())
 	if err != nil {
 		return err
 	}
@@ -1357,47 +1361,6 @@ func (w *Waku) ClearEnvelopesCache() {
 // it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
-}
-
-func (w *Waku) SubscribeToPubsubTopic(topic string) error {
-	topic = w.GetPubsubTopic(topic)
-
-	if !w.cfg.LightClient {
-		err := w.subscribeToPubsubTopicWithWakuRelay(topic)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
-	topic = w.GetPubsubTopic(topic)
-
-	if !w.cfg.LightClient {
-		err := w.unsubscribeFromPubsubTopicWithWakuRelay(topic)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (w *Waku) StartDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	return w.node.DiscV5().Start(w.ctx)
-}
-
-func (w *Waku) StopDiscV5() error {
-	if w.node.DiscV5() == nil {
-		return errors.New("discv5 is not setup")
-	}
-
-	w.node.DiscV5().Stop()
-	return nil
 }
 
 // isNetworkSwitchEvent reports whether next represents a genuine wifi <-> cellular
@@ -1665,24 +1628,9 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	return p
 }
 
-func (w *Waku) GetActiveStorenode() peer.AddrInfo {
-	return w.StorenodeCycle.GetActiveStorenodePeerInfo()
-}
-
-func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
-	return w.StorenodeCycle.StorenodeChangedEmitter.Subscribe()
-}
-
-func (w *Waku) OnStorenodeNotWorking() <-chan struct{} {
-	return w.StorenodeCycle.StorenodeNotWorkingEmitter.Subscribe()
-}
-
-func (w *Waku) OnStorenodeAvailable() <-chan peer.ID {
-	return w.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
-}
-
-func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
-	w.StorenodeCycle.SetStorenodeConfigProvider(c)
+// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
+func (w *Waku) SetStorenodes(nodes []peer.AddrInfo) {
+	w.storeClient.SetStorenodes(nodes)
 }
 
 // StoreQuery retrieves historic messages for a single batch via the StoreClient
@@ -1695,20 +1643,6 @@ func (w *Waku) StoreQuery(
 	processEnvelopes bool,
 ) error {
 	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
-}
-
-func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
-	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
-}
-
-func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
-	w.StorenodeCycle.Lock()
-	defer w.StorenodeCycle.Unlock()
-
-	w.StorenodeCycle.DisconnectActiveStorenode(backoff)
-	if shouldCycle {
-		w.StorenodeCycle.Cycle(ctx)
-	}
 }
 
 func (w *Waku) Metrics() string {

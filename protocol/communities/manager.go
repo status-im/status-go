@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"reflect"
 	"strconv"
@@ -675,6 +676,10 @@ func (m *Manager) Publish(subscription *archivetypes.HistoryArchiveSignals) {
 
 func (m *Manager) All() ([]*Community, error) {
 	return m.persistence.AllCommunities(&m.identity.PublicKey)
+}
+
+func (m *Manager) Count() (int, error) {
+	return m.persistence.CommunitiesCount()
 }
 
 type CuratedCommunities struct {
@@ -2176,10 +2181,6 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		m.incrementCommunityImageVersion(community.IDString())
 	}
 
-	if err = m.handleCommunityTokensMetadata(community); err != nil {
-		return nil, err
-	}
-
 	hasCommunityArchiveInfo, err := m.persistence.HasCommunityArchiveInfo(community.ID())
 	if err != nil {
 		return nil, err
@@ -2263,6 +2264,10 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(community.CommunityTokensMetadata()) > 0 {
+		m.handleCommunityTokensMetadataAsync(community.IDString())
 	}
 
 	// We mark our requests as completed, though maybe we should mark
@@ -4475,6 +4480,31 @@ func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 	return nil
 }
 
+func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
+	go func() {
+		defer utils.LogOnPanic()
+
+		select {
+		case <-m.quit:
+			return
+		default:
+		}
+
+		community, err := m.GetByIDString(communityID)
+		if err != nil {
+			return
+		}
+
+		err = m.handleCommunityTokensMetadata(community)
+		if err != nil {
+			return
+		}
+
+		m.publish(&Subscription{Community: community})
+
+	}()
+}
+
 func (m *Manager) HandleCommunityGrant(community *Community, grant []byte, clock uint64) (uint64, error) {
 	_, oldClock, err := m.GetCommunityGrant(community.IDString())
 	if err != nil {
@@ -4507,6 +4537,7 @@ func (m *Manager) FetchCommunityToken(community *Community, tokenMetadata *proto
 		Name:               tokenMetadata.Name,
 		Symbol:             tokenMetadata.Symbol,
 		Description:        tokenMetadata.Description,
+		Supply:             &bigint.BigInt{Int: big.NewInt(0)},
 		Transferable:       true,
 		RemoteSelfDestruct: false,
 		ChainID:            int(chainID),
@@ -4518,24 +4549,36 @@ func (m *Manager) FetchCommunityToken(community *Community, tokenMetadata *proto
 
 	switch tokenMetadata.TokenType {
 	case protobuf.CommunityTokenType_ERC721:
+		if m.communityTokensService == nil {
+			break
+		}
 		contractData, err := m.communityTokensService.GetCollectibleContractData(chainID, contractAddress)
 		if err != nil {
 			return nil, err
 		}
-
-		communityToken.Supply = contractData.TotalSupply
-		communityToken.Transferable = contractData.Transferable
-		communityToken.RemoteSelfDestruct = contractData.RemoteBurnable
-		communityToken.InfiniteSupply = contractData.InfiniteSupply
+		if contractData != nil {
+			if contractData.TotalSupply != nil {
+				communityToken.Supply = contractData.TotalSupply
+			}
+			communityToken.Transferable = contractData.Transferable
+			communityToken.RemoteSelfDestruct = contractData.RemoteBurnable
+			communityToken.InfiniteSupply = contractData.InfiniteSupply
+		}
 
 	case protobuf.CommunityTokenType_ERC20:
+		if m.communityTokensService == nil {
+			break
+		}
 		contractData, err := m.communityTokensService.GetAssetContractData(chainID, contractAddress)
 		if err != nil {
 			return nil, err
 		}
-
-		communityToken.Supply = contractData.TotalSupply
-		communityToken.InfiniteSupply = contractData.InfiniteSupply
+		if contractData != nil {
+			if contractData.TotalSupply != nil {
+				communityToken.Supply = contractData.TotalSupply
+			}
+			communityToken.InfiniteSupply = contractData.InfiniteSupply
+		}
 	}
 
 	communityToken.PrivilegesLevel = getPrivilegesLevel(chainID, contractAddress, community.TokenPermissions())

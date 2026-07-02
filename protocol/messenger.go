@@ -669,10 +669,23 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.messaging.SetStorenodeConfigProvider(m)
+	m.messaging.SetStorenodes(response.StoreNodes)
 
-	m.shutdownWaitGroup.Add(1)
-	go m.checkForStorenodeCycleSignals()
+	if m.config.enablePinnedBootstrap {
+		go func() {
+			defer gocommon.LogOnPanic()
+
+			if err := m.bootstrapPinnedCommunities(); err != nil {
+				m.logger.Warn("failed to bootstrap pinned communities", zap.Error(err))
+			}
+		}()
+	}
+
+	// Storenodes are now configured: request any history missed while offline.
+	// This is the cycle-free replacement for the storenode-availability signal
+	// (OnStorenodeAvailable) that previously triggered the sync, and it avoids
+	// racing SetStorenodes against the network-online trigger.
+	m.asyncRequestAllHistoricMessages()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
@@ -684,15 +697,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		go func() {
 			defer gocommon.LogOnPanic()
 			defer m.shutdownWaitGroup.Done()
-
-			select {
-			case <-m.quit:
-				return
-			case <-m.ctx.Done():
-				return
-			case <-m.messaging.OnStorenodeAvailable():
-			}
-
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
 	}
