@@ -78,6 +78,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -844,6 +845,9 @@ func (w *Waku) Start() error {
 	selector := newStoreSelector()
 	pager := newStorePager(wakuStoreRequestor{store: w.node.Store()}, NewHistoryProcessorWrapper(w), w.logger)
 	w.storeClient = NewStoreClient(selector, pager, w.GetPubsubTopic, w.logger)
+	// The store nodes belong to the fleet, so the waku node resolves them itself
+	// instead of having a higher layer push them in.
+	w.storeClient.SetStorenodes(w.fleetStorenodes())
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
@@ -1616,9 +1620,25 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	return p
 }
 
-// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
-func (w *Waku) SetStorenodes(nodes []peer.AddrInfo) {
-	w.storeClient.SetStorenodes(nodes)
+// fleetStorenodes resolves the configured fleet's store nodes into dialable peer
+// addresses. Nodes whose addressing info can't be resolved are skipped.
+func (w *Waku) fleetStorenodes() []peer.AddrInfo {
+	storeNodes := fleets.StoreNodes(w.cfg.Fleet)
+	addrInfos := make([]peer.AddrInfo, 0, len(storeNodes))
+	for _, node := range storeNodes {
+		info, err := node.PeerInfo()
+		if err != nil {
+			w.logger.Warn("skipping storenode with unresolvable peer info",
+				zap.String("id", node.ID), zap.String("name", node.Name), zap.Error(err))
+			continue
+		}
+		addrInfos = append(addrInfos, info)
+	}
+	if len(addrInfos) == 0 && len(storeNodes) > 0 {
+		w.logger.Warn("no usable storenodes after resolving peer info; history queries will fail",
+			zap.Int("configured", len(storeNodes)))
+	}
+	return addrInfos
 }
 
 // StoreQuery retrieves historic messages for a single batch via the StoreClient

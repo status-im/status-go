@@ -8,7 +8,6 @@ import (
 	pkgerrors "github.com/pkg/errors"
 
 	"github.com/status-im/status-go/internal/crypto"
-	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
 
@@ -88,10 +87,6 @@ func IsFleetSupported(fleet string) bool {
 
 func GetSupportedFleets() FleetsMap {
 	return fleets.Supported()
-}
-
-func DefaultStoreNodes(fleet string) []messagingtypes.StoreNode {
-	return fleets.StoreNodes(fleet)
 }
 
 func DefaultPushNotificationServers() []*ecdsa.PublicKey {

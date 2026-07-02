@@ -123,9 +123,6 @@ type Waku interface {
 	// PeerID returns node's PeerID
 	PeerID() peer.ID
 
-	// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
-	SetStorenodes(nodes []peer.AddrInfo)
-
 	// StoreQuery retrieves historic messages for a single batch, selecting the
 	// store node internally (no peer argument). See waku.StoreClient.
 	StoreQuery(

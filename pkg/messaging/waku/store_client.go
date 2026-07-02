@@ -45,11 +45,6 @@ func (sc *StoreClient) SetStorenodes(nodes []peer.AddrInfo) {
 	sc.selector.setStorenodes(nodes)
 }
 
-// HasStorenodes reports whether any storenode is configured (used to gate sync).
-func (sc *StoreClient) HasStorenodes() bool {
-	return sc.selector.hasStorenodes()
-}
-
 // nextStorenode returns a currently-eligible storenode to query, or an empty
 // AddrInfo if none are configured. Selection is on demand (there is no
 // persistent active node); used by MessageSentCheck via storeClientPeerProvider.
