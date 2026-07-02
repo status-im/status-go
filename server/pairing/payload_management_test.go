@@ -368,10 +368,10 @@ func (pms *PayloadMarshallerSuite) TestKeycardPairingPasswordAdjustments_Unmarsh
 		require.Equal(t, "0xABC", ppm.password)
 	})
 
-	// 2) KeycardPairing != "", IsMobilePlatform() == true => TrimPrefix("0x")
-	pms.T().Run("IsMobilePlatform => trim prefix 0x", func(t *testing.T) {
+	// 2) KeycardPairing != "", IsMobilePlatform() == true => keep/add "0x" (platform no longer matters, previously the prefix was trimmed on mobile).
+	pms.T().Run("IsMobilePlatform => add prefix 0x", func(t *testing.T) {
 		ap := &AccountPayload{
-			password:     "0xDEF",
+			password:     "DEF",
 			multiaccount: &multiaccounts.Account{},
 			keys:         make(map[string][]byte),
 		}
@@ -385,7 +385,7 @@ func (pms *PayloadMarshallerSuite) TestKeycardPairingPasswordAdjustments_Unmarsh
 		err = ppm.UnmarshalProtobuf(pb)
 		require.NoError(t, err)
 
-		require.Equal(t, "DEF", ppm.password)
+		require.Equal(t, "0xDEF", ppm.password)
 	})
 
 	// 3) KeycardPairing != "", IsMobilePlatform() == false, without "0x" => add "0x"
