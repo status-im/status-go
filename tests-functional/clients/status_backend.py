@@ -88,29 +88,34 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.version = "unknown"
         self.network_id = 1
         self._boot_api_config = None
-        RpcClient.__init__(self)
-        ApiClient.__init__(self, self.api_url)
-        SignalClient.__init__(self, self.ws_url)
+        try:
+            RpcClient.__init__(self)
+            ApiClient.__init__(self, self.api_url)
+            SignalClient.__init__(self, self.ws_url)
 
-        self.wait_for_healthy()
+            self.wait_for_healthy()
 
-        # Skip sync signal client if we'll use async wrapper
-        if not kwargs.get("skip_signal_client", False):
-            SignalClient.connect(self)
+            # Skip sync signal client if we'll use async wrapper
+            if not kwargs.get("skip_signal_client", False):
+                SignalClient.connect(self)
 
-        self.wallet_service = WalletService(self)
-        self.wakuext_service = WakuextService(self)
-        self.accounts_service = AccountService(self)
-        self.newsfeed_service = NewsFeedService(self)
-        self.multiaccounts_service = MultiAccountsService(self)
-        self.settings_service = SettingsService(self)
-        self.sharedurls_service = SharedURLsService(self)
-        self.connector_service = ConnectorService(self)
-        self.appgeneral_service = AppgeneralService(self)
-        self.ens_service = EnsService(self)
-        self.eth_service = EthService(self)
-        self.linkpreview_service = LinkPreviewService(self)
-        self.expvar_client = ExpvarClient(self.base_url)
+            self.wallet_service = WalletService(self)
+            self.wakuext_service = WakuextService(self)
+            self.accounts_service = AccountService(self)
+            self.newsfeed_service = NewsFeedService(self)
+            self.multiaccounts_service = MultiAccountsService(self)
+            self.settings_service = SettingsService(self)
+            self.sharedurls_service = SharedURLsService(self)
+            self.connector_service = ConnectorService(self)
+            self.appgeneral_service = AppgeneralService(self)
+            self.ens_service = EnsService(self)
+            self.eth_service = EthService(self)
+            self.linkpreview_service = LinkPreviewService(self)
+            self.expvar_client = ExpvarClient(self.base_url)
+        except Exception:
+            if self.container:
+                self.container.shutdown()
+            raise
 
     def __del__(self):
         self.shutdown()
@@ -187,7 +192,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "wakuFleetsConfigFilePath": Config.waku_fleets_config,
             "pushFleetsConfigFilePath": Config.push_fleets_config,
             "mediaServerAddress": (
-                f"0.0.0.0:{self.container.ports.media_server.container_port}" if self.container else f"127.0.0.1:{self.media_server_port}"
+                f"{'[::]' if self.ipv6 else '0.0.0.0'}:{self.container.ports.media_server.container_port}"
+                if self.container
+                else f"127.0.0.1:{self.media_server_port}"
             ),
             "mediaServerAdvertizeHost": "localhost",
             "mediaServerAdvertizePort": self.media_server_port,
