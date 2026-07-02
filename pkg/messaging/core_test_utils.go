@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
@@ -126,8 +125,6 @@ func newTestWakuWrapper() (*testWakuWrapper, error) {
 		&wakuv3.DefaultConfig,
 		zap.NewNop(),
 		&testTimeSource{},
-		func([]byte, peer.AddrInfo, error) {},
-		nil,
 	)
 	if err != nil {
 		return nil, err

@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -14,14 +13,12 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/messaging/adapters"
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
 	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
-	"github.com/status-im/status-go/pkg/messaging/types"
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	wakumetrics2 "github.com/status-im/status-go/pkg/messaging/wakumetrics"
@@ -149,22 +146,15 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	}
 
 	waku, err := newWaku(wakuParams{
-		nodeKey:                         params.NodeKey,
-		fleet:                           params.Fleet,
-		mode:                            params.Mode,
-		port:                            params.WakuConfig.Port,
-		udpPort:                         params.WakuConfig.UDPPort,
-		nameserver:                      params.WakuConfig.Nameserver,
-		metricsEnabled:                  config.metricsEnabled,
-		onHistoricMessagesRequestFailed: config.onHistoricMessagesRequestFailed,
-		onPeerStats: func(status wakutypes.ConnStatus) {
-			config.onPeerStats(types.ConnStatus{
-				IsOnline: status.IsOnline,
-				Peers:    adapters.FromWakuPeerStats(status.Peers),
-			})
-		},
-		timeSource: params.TimeSource,
-		logger:     config.logger,
+		nodeKey:        params.NodeKey,
+		fleet:          params.Fleet,
+		mode:           params.Mode,
+		port:           params.WakuConfig.Port,
+		udpPort:        params.WakuConfig.UDPPort,
+		nameserver:     params.WakuConfig.Nameserver,
+		metricsEnabled: config.metricsEnabled,
+		timeSource:     params.TimeSource,
+		logger:         config.logger,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create waku instance")
@@ -241,9 +231,6 @@ type wakuParams struct {
 
 	metricsEnabled bool
 
-	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
-	onPeerStats                     func(wakutypes.ConnStatus)
-
 	timeSource timesource.Provider
 
 	logger *zap.Logger
@@ -271,8 +258,6 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 		cfg,
 		params.logger,
 		params.timeSource,
-		params.onHistoricMessagesRequestFailed,
-		params.onPeerStats,
 	)
 	if err != nil {
 		return nil, err

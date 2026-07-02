@@ -8,11 +8,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-type ConnStatus struct {
-	IsOnline bool      `json:"isOnline"`
-	Peers    PeerStats `json:"peers"`
-}
-
 type PeerStats map[peer.ID]Peer
 
 func (m PeerStats) MarshalJSON() ([]byte, error) {

@@ -29,7 +29,7 @@ func TestWakuLifecycleState(t *testing.T) {
 	// New() alone is safe to call with nil params; Start()/Stop() are not used
 	// here because they initialise the SDS library (requires a full node
 	// environment). The PauseBroadcaster state machine is validated directly.
-	w, err := New(nil, nil, nil, nil, nil, nil)
+	w, err := New(nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, gocommon.ServiceStateStopped, w.PausableState())

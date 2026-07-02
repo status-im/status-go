@@ -4,8 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/internal/crypto/types"
@@ -46,9 +44,6 @@ const (
 
 	// EventHistoryRequestCompleted is triggered after processing all storenode requests
 	EventHistoryRequestCompleted = "history.request.completed"
-
-	// EventHistoryRequestFailed is triggered when requesting history messages fails
-	EventHistoryRequestFailed = "history.request.failed"
 
 	// EventBackupPerformed is triggered when a backup has been performed
 	EventBackupPerformed = "backup.performed"
@@ -140,10 +135,6 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 
 func SendHistoricMessagesRequestStarted(numBatches int) {
 	send(EventHistoryRequestStarted, HistoryMessagesSignal{NumBatches: numBatches})
-}
-
-func SendHistoricMessagesRequestFailed(requestID []byte, peerInfo peer.AddrInfo, err error) {
-	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: hex.EncodeToString(requestID), PeerID: peerInfo.ID.String(), ErrorMsg: err.Error()})
 }
 
 func SendHistoricMessagesRequestCompleted() {
