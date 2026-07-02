@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
-	wakuv2common "github.com/status-im/status-go/pkg/messaging/waku/common"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	wakumetrics2 "github.com/status-im/status-go/pkg/messaging/wakumetrics"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -150,11 +149,12 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	}
 
 	waku, err := newWaku(wakuParams{
-		identity:                        params.Identity,
 		nodeKey:                         params.NodeKey,
-		wakuConfig:                      params.WakuConfig,
 		fleet:                           params.Fleet,
 		mode:                            params.Mode,
+		port:                            params.WakuConfig.Port,
+		udpPort:                         params.WakuConfig.UDPPort,
+		nameserver:                      params.WakuConfig.Nameserver,
 		metricsEnabled:                  config.metricsEnabled,
 		onHistoricMessagesRequestFailed: config.onHistoricMessagesRequestFailed,
 		onPeerStats: func(status wakutypes.ConnStatus) {
@@ -224,12 +224,21 @@ func (c *Core) stop() error {
 }
 
 type wakuParams struct {
-	identity *ecdsa.PrivateKey
-	nodeKey  *ecdsa.PrivateKey
+	nodeKey *ecdsa.PrivateKey
 
-	wakuConfig     params.WakuV2Config
-	fleet          string
-	mode           wakuv3.Mode
+	// fleet + mode fully determine the peer configuration and the Core/Edge
+	// policy; the waku node builds the rest of its config from them.
+	fleet string
+	mode  wakuv3.Mode
+
+	// port / udpPort / nameserver are the only node settings a caller configures
+	// (zero/empty falls back to the waku defaults). Everything else — host,
+	// discovery limit, max message size, store-confirmation, etc. — is defaulted
+	// by the waku layer or derived from the mode.
+	port       int
+	udpPort    int
+	nameserver string
+
 	metricsEnabled bool
 
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
@@ -242,25 +251,19 @@ type wakuParams struct {
 
 func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 	cfg := &wakuv3.Config{
-		MaxMessageSize: wakuv2common.DefaultMaxMessageSize,
-		Host:           params.wakuConfig.Host,
-		Port:           params.wakuConfig.Port,
 		// Fleet + Mode drive peer resolution and the peer-exchange/discv5/
-		// light-client policy inside the waku node (see wakuv2.setDefaults).
-		Fleet:                                  params.fleet,
-		Mode:                                   params.mode,
-		DiscoveryLimit:                         params.wakuConfig.DiscoveryLimit,
-		Nameserver:                             params.wakuConfig.Nameserver,
-		UDPPort:                                params.wakuConfig.UDPPort,
-		AutoUpdate:                             params.wakuConfig.AutoUpdate,
-		DefaultShardPubsubTopic:                wakuv3.DefaultShardPubsubTopic(),
-		EnableStoreConfirmationForMessagesSent: params.wakuConfig.EnableStoreConfirmationForMessagesSent,
-		UseThrottledPublish:                    true,
-		MetricsEnabled:                         params.metricsEnabled,
-	}
-
-	if params.wakuConfig.MaxMessageSize > 0 {
-		cfg.MaxMessageSize = params.wakuConfig.MaxMessageSize
+		// light-client policy inside the waku node (see wakuv2.setDefaults). The
+		// host, discovery limit, max message size and default shard topic are
+		// filled by the waku layer's setDefaults.
+		Fleet:      params.fleet,
+		Mode:       params.mode,
+		Port:       params.port,
+		UDPPort:    params.udpPort,
+		Nameserver: params.nameserver,
+		// Status nodes advertise the ip/port observed by their peers.
+		AutoUpdate:          true,
+		UseThrottledPublish: true,
+		MetricsEnabled:      params.metricsEnabled,
 	}
 
 	waku, err := wakuv3.New(
