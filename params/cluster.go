@@ -78,14 +78,6 @@ func LoadPushFleetsFromFile(filepath string) error {
 	return nil
 }
 
-func DefaultWakuNodes(fleet string) []string {
-	return fleets.WakuNodes(fleet)
-}
-
-func DefaultDiscV5Nodes(fleet string) []string {
-	return fleets.DiscV5Nodes(fleet)
-}
-
 func DefaultClusterID(fleet string) uint16 {
 	return fleets.ClusterID(fleet)
 }
@@ -110,10 +102,8 @@ func DefaultPushNotificationServers() []*ecdsa.PublicKey {
 
 func DefaultClusterConfig(fleet string) ClusterConfig {
 	return ClusterConfig{
-		Enabled:              true,
-		Fleet:                fleet,
-		WakuNodes:            DefaultWakuNodes(fleet),
-		DiscV5BootstrapNodes: DefaultDiscV5Nodes(fleet),
-		ClusterID:            DefaultClusterID(fleet),
+		Enabled:   true,
+		Fleet:     fleet,
+		ClusterID: DefaultClusterID(fleet),
 	}
 }

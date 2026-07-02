@@ -71,13 +71,10 @@ type ClusterConfig struct {
 	// An according fleet configuration is loaded from hard-coded lists.
 	Fleet string
 
-	// WakuNodes is a list of waku2 multiaddresses
-	WakuNodes []string
-
-	// DiscV5Nodes is a list of enr to be used for ambient discovery
-	DiscV5BootstrapNodes []string
-
-	//Waku network identifier
+	// ClusterID is the Waku network identifier. It is persisted for the selected
+	// fleet; the peer configuration (waku nodes, discv5 bootstrap nodes) is now
+	// resolved from the fleet name inside the messaging layer, so it is no longer
+	// carried here.
 	ClusterID uint16
 }
 
