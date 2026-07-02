@@ -55,15 +55,18 @@ func (f *TestMessagingEnvironment) SubscribePostEvents() chan *PostMessageSubscr
 }
 
 func (f *TestMessagingEnvironment) SimulateOffline() func() {
-	f.waku.Waku.(*wakuv3.Waku).SkipPublishToTopic(true)
+	f.waku.Waku.SkipPublishToTopic(true)
 	return func() {
-		f.waku.Waku.(*wakuv3.Waku).SkipPublishToTopic(false)
+		f.waku.Waku.SkipPublishToTopic(false)
 	}
 }
 
-// Wraps waku to provide ability to subscribe to post events.
+// Wraps waku to provide ability to subscribe to post events. It embeds the
+// concrete *wakuv3.Waku (not the types.Waku interface) so that the messaging
+// API methods that live on the backend — Send / Subscribe / Unsubscribe /
+// envelope events, i.e. transport.MessagingAPI — are promoted too.
 type testWakuWrapper struct {
-	types.Waku
+	*wakuv3.Waku
 	postSubscriptions []chan *PostMessageSubscription
 }
 

@@ -118,9 +118,13 @@ func NewTransport(
 		envelopesMonitor.Start()
 	}
 
+	// The waku backend also satisfies MessagingAPI (Send / Subscribe /
+	// Unsubscribe / envelope events); those methods live on the concrete
+	// backend, not on the types.Waku lifecycle interface. Offline transports
+	// (tests) pass a nil waku and leave api nil.
 	var api MessagingAPI
 	if waku != nil {
-		api = waku
+		api, _ = waku.(MessagingAPI)
 	}
 	t := &Transport{
 		waku:             waku,
@@ -757,12 +761,6 @@ func PubkeyToHex(key *ecdsa.PublicKey) string {
 
 func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
-}
-
-// Subscribe to a pubsub topic
-func (t *Transport) SubscribeToPubsubTopic(topic string) error {
-	t.logger.Debug("subscribing to pubsub topic", zap.String("pubsubtopic", topic))
-	return t.waku.SubscribeToPubsubTopic(topic)
 }
 
 func (t *Transport) ConfirmMessageDelivered(messageID string) {

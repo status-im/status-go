@@ -106,22 +106,9 @@ type Waku interface {
 	// it is not used by status-app.
 	Peers() PeerStats
 
-	StartDiscV5() error
-
-	StopDiscV5() error
-
-	SubscribeToPubsubTopic(topic string) error
-
-	UnsubscribeFromPubsubTopic(topic string) error
-
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
-
-	// Subscribe/Unsubscribe register and remove wire subscriptions for the
-	// given content topics on a pubsub topic. See transport.MessagingAPI.
-	Subscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
-	Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []TopicType) error
 
 	MaxMessageSize() uint32
 
