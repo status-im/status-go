@@ -67,18 +67,11 @@ type ClusterConfig struct {
 	// Enabled flag specifies that nodes in this configuration are taken into account.
 	Enabled bool
 
-	// Fleet is a name of a selected fleet.
-	// An according fleet configuration is loaded from hard-coded lists.
+	// Fleet is a name of a selected fleet. The rest of the fleet configuration
+	// (waku nodes, discv5 bootstrap nodes, cluster id) is resolved from this name
+	// inside the messaging layer, so it is no longer carried on this struct. The
+	// cluster_id DB column is still maintained from the fleet (see internal/nodecfg).
 	Fleet string
-
-	// WakuNodes is a list of waku2 multiaddresses
-	WakuNodes []string
-
-	// DiscV5Nodes is a list of enr to be used for ambient discovery
-	DiscV5BootstrapNodes []string
-
-	//Waku network identifier
-	ClusterID uint16
 }
 
 // String dumps config object as nicely indented JSON
