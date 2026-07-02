@@ -1,4 +1,4 @@
-package params
+package fleets
 
 import (
 	"encoding/json"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestLoadPushFleetsFromFile tests the loadPushFleetsFromFile function.
-func TestLoadPushFleetsFromFile(t *testing.T) {
+// TestLoadFromFile tests the loadFromFile function.
+func TestLoadFromFile(t *testing.T) {
 	t.Run("valid file", func(t *testing.T) {
 		// Arrange: Create a temporary valid JSON file.
 		tempFile, err := os.CreateTemp("", "fleets*.json")
@@ -20,11 +20,12 @@ func TestLoadPushFleetsFromFile(t *testing.T) {
 		defer os.Remove(tempFile.Name())
 
 		// Write valid JSON data into the temp file.
-		validFleets := []string{
-			// There's no public key validation at this stage, so we can use any string.
-			gofakeit.LetterN(5),
-			gofakeit.LetterN(5),
-			gofakeit.LetterN(5),
+		fleetName := gofakeit.LetterN(10)
+		validFleets := Map{
+			fleetName: {
+				ClusterID: 123,
+				WakuNodes: []string{"test.node"},
+			},
 		}
 		err = json.NewEncoder(tempFile).Encode(validFleets)
 		require.NoError(t, err)
@@ -32,7 +33,7 @@ func TestLoadPushFleetsFromFile(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act: Call the function.
-		result, err := loadPushFleetsFromFile(tempFile.Name())
+		result, err := loadFromFile(tempFile.Name())
 
 		// Assert: Check the error.
 		require.NoError(t, err)
@@ -44,7 +45,7 @@ func TestLoadPushFleetsFromFile(t *testing.T) {
 		nonExistentFile := filepath.Join(os.TempDir(), "non_existent_file.json")
 
 		// Act: Call the function.
-		_, err := loadPushFleetsFromFile(nonExistentFile)
+		_, err := loadFromFile(nonExistentFile)
 
 		// Assert: Check the error.
 		require.Error(t, err)
@@ -62,7 +63,7 @@ func TestLoadPushFleetsFromFile(t *testing.T) {
 		tempFile.Close()
 
 		// Act: Call the function.
-		_, err = loadPushFleetsFromFile(tempFile.Name())
+		_, err = loadFromFile(tempFile.Name())
 
 		// Assert: Check the error.
 		require.Error(t, err)
