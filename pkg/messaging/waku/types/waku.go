@@ -114,9 +114,6 @@ type Waku interface {
 	// ConnectionChanged is called whenever the client knows its connection status has changed
 	ConnectionChanged(connection.State)
 
-	// ClearEnvelopesCache clears waku envelopes cache
-	ClearEnvelopesCache()
-
 	// ConfirmMessageDelivered updates a message has been delivered in waku
 	ConfirmMessageDelivered(hash []common.Hash)
 
