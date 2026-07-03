@@ -17,6 +17,7 @@ func NewConnectionStatusSubscription(s *wakutypes.ConnStatusSubscription) *Conne
 		c: utils.BridgeChannels(s.C, func(status wakutypes.ConnStatus) types.ConnectionStatus {
 			return types.ConnectionStatus{
 				IsOnline: status.IsOnline,
+				State:    status.State,
 			}
 		}),
 	}

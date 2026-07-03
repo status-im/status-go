@@ -17,7 +17,8 @@ import (
 )
 
 type ConnStatus struct {
-	IsOnline bool `json:"isOnline"`
+	IsOnline bool            `json:"isOnline"`
+	State    ConnectionState `json:"state"`
 }
 
 type PeerStats map[peer.ID]WakuV2Peer
@@ -106,6 +107,11 @@ type Waku interface {
 	Peers() PeerStats
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
+
+	// ConnectionState returns the node's current three-state connection status
+	// (Disconnected / PartiallyConnected / Connected). Online detection derives
+	// from it via ConnectionState.IsOnline().
+	ConnectionState() ConnectionState
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 

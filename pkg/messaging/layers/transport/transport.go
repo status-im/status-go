@@ -722,6 +722,11 @@ func (t *Transport) PeerCount() int {
 	return len(t.waku.Peers())
 }
 
+// ConnectionState returns the waku node's current three-state connection status.
+func (t *Transport) ConnectionState() types.ConnectionState {
+	return t.waku.ConnectionState()
+}
+
 // Peers is retained only for the Python functional tests (see tests-functional);
 // it is not used by status-app.
 func (t *Transport) Peers() types.PeerStats {
