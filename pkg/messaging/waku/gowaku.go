@@ -166,7 +166,15 @@ type Waku struct {
 	connectionNotifChan     chan node.PeerConnection
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
-	onlineChecker           *onlinechecker.DefaultOnlineChecker
+	// connState is the latest derived three-state connection status, guarded by
+	// connStatusMu. ConnectionState() reads it; checkForConnectionChanges writes it.
+	connState types.ConnectionState
+	// topicHealth caches the most recent per-pubsub-topic mesh health reported by
+	// go-waku on topicHealthStatusChan. Accessed only from the connection poller
+	// goroutine (the topicHealthStatusChan/ticker/connectionNotifChan select loop),
+	// so it needs no lock of its own.
+	topicHealth   map[string]peermanager.TopicHealth
+	onlineChecker *onlinechecker.DefaultOnlineChecker
 	// stateMu guards state and stateInitialized. ConnectionChanged is invoked
 	// from the OS/mobile path while checkForConnectionChanges and
 	// handleNetworkChangeFromApp run on the internal poller goroutine, so all
@@ -241,6 +249,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		topicHealthStatusChan:       make(chan peermanager.TopicHealthStatus, 100),
 		connectionNotifChan:         make(chan node.PeerConnection, 20),
 		connStatusSubscriptions:     make(map[string]*types.ConnStatusSubscription),
+		topicHealth:                 make(map[string]peermanager.TopicHealth),
 		ctx:                         ctx,
 		cancel:                      cancel,
 		wg:                          sync.WaitGroup{},
@@ -889,8 +898,15 @@ func (w *Waku) Start() error {
 				}
 			case <-tickerC:
 				w.checkForConnectionChanges()
-			case <-w.topicHealthStatusChan:
-				// TODO: https://github.com/status-im/status-go/issues/4628
+			case topicHealth := <-w.topicHealthStatusChan:
+				// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
+				// / SufficientlyHealthy); cache it so checkForConnectionChanges can
+				// tell PartiallyConnected from Connected. Supersedes the old no-op
+				// (status-im/status-go#4628).
+				w.topicHealth[topicHealth.Topic] = topicHealth.Health
+				if !paused {
+					w.checkForConnectionChanges()
+				}
 			case <-w.connectionNotifChan:
 				if !paused {
 					w.checkForConnectionChanges()
@@ -1008,17 +1024,54 @@ func (w *Waku) Start() error {
 	return nil
 }
 
+// deriveConnectionState maps the node's current connectivity onto the three-state
+// ConnectionState, mirroring logos-delivery's health monitor
+// (node_health_monitor.nim calculateConnectionState):
+//
+//   - no peers                     -> Disconnected
+//   - relay mesh SufficientlyHealthy on every default shard -> Connected
+//   - peers, but a degraded mesh   -> PartiallyConnected
+//
+// Light (Edge) nodes have no relay mesh, so per-shard mesh health is not
+// meaningful for them; any connectivity is reported as Connected until
+// per-protocol (filter/lightpush/store) health is exposed. Runs on the
+// connection poller goroutine, so topicHealth is read without a lock.
+func (w *Waku) deriveConnectionState() types.ConnectionState {
+	if len(w.node.Host().Network().Peers()) == 0 {
+		return types.ConnectionStateDisconnected
+	}
+	if w.cfg.IsLightClient() {
+		return types.ConnectionStateConnected
+	}
+	for _, topic := range w.cfg.DefaultShardedPubsubTopics {
+		if w.topicHealth[topic] < peermanager.SufficientlyHealthy {
+			return types.ConnectionStatePartiallyConnected
+		}
+	}
+	return types.ConnectionStateConnected
+}
+
+// ConnectionState returns the latest derived three-state connection status.
+func (w *Waku) ConnectionState() types.ConnectionState {
+	w.connStatusMu.Lock()
+	defer w.connStatusMu.Unlock()
+	return w.connState
+}
+
 func (w *Waku) checkForConnectionChanges() {
 
-	isOnline := len(w.node.Host().Network().Peers()) > 0
+	state := w.deriveConnectionState()
+	isOnline := state.IsOnline()
 
 	w.connStatusMu.Lock()
 
+	w.connState = state
 	latestConnStatus := types.ConnStatus{
 		IsOnline: isOnline,
+		State:    state,
 	}
 
-	w.logger.Debug("connection status", zap.Bool("isOnline", isOnline))
+	w.logger.Debug("connection status", zap.Bool("isOnline", isOnline), zap.Stringer("state", state))
 	for k, subs := range w.connStatusSubscriptions {
 		if !subs.Send(latestConnStatus) {
 			delete(w.connStatusSubscriptions, k)
@@ -1034,7 +1087,7 @@ func (w *Waku) checkForConnectionChanges() {
 	prevState, _ := w.snapshotState()
 	next := connection.State{
 		Type:    prevState.Type, //setting state type as previous one since there won't be a change here
-		Offline: !latestConnStatus.IsOnline,
+		Offline: !isOnline,
 	}
 	if w.shouldFireConnectionChanged(next) {
 		w.ConnectionChanged(next)

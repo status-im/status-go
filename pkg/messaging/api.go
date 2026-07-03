@@ -3,6 +3,7 @@ package messaging
 import (
 	"time"
 
+	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -33,9 +34,21 @@ func (a *API) GetCurrentTime() uint64 {
 	return uint64(a.core.timeSource.Now().UnixNano() / int64(time.Millisecond))
 }
 
-// Online reports whether the transport currently has at least one connected peer.
+// Online reports whether the transport currently has connectivity. It derives
+// from the three-state ConnectionStatus (online == status != Disconnected),
+// matching the logos-delivery Messaging API's online semantics.
 func (a *API) Online() bool {
-	return a.core.stack.Transport.PeerCount() > 0
+	return a.core.stack.Transport.ConnectionState().IsOnline()
+}
+
+// ConnectionStatus returns the transport's current three-state connection status
+// (Disconnected / PartiallyConnected / Connected).
+func (a *API) ConnectionStatus() types.ConnectionStatus {
+	state := a.core.stack.Transport.ConnectionState()
+	return types.ConnectionStatus{
+		IsOnline: state.IsOnline(),
+		State:    state,
+	}
 }
 
 // SubscribeFilterMatched returns a channel that is notified whenever an incoming

@@ -1353,9 +1353,15 @@ func (m *Messenger) watchConnectionChange() {
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
+		// Sentinel outside the valid enum range so the first event always emits.
+		lastConnState := types2.ConnectionState(-1)
 		for {
 			select {
 			case status := <-subscription.C():
+				if status.State != lastConnState {
+					lastConnState = status.State
+					signal.SendConnectionStatusChange(status)
+				}
 				processNewState(status.IsOnline)
 			case <-ticker.C:
 				if m.isPaused() {
