@@ -154,11 +154,13 @@ func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 		return err
 	}
 
+	// cluster_id is no longer carried on ClusterConfig; keep the column populated
+	// from the selected fleet so the DB schema is unchanged (no migration).
 	_, err = tx.Exec(`
 	UPDATE cluster_config
 	SET cluster_id = ?
 	WHERE synthetic_id = 'id'`,
-		c.ClusterConfig.ClusterID,
+		params.DefaultClusterID(c.ClusterConfig.Fleet),
 	)
 
 	return err
@@ -296,7 +298,9 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		nodecfg.Networks = append(nodecfg.Networks, n)
 	}
 
-	err = tx.QueryRow("SELECT enabled, fleet, cluster_id FROM cluster_config WHERE synthetic_id = 'id'").Scan(&nodecfg.ClusterConfig.Enabled, &nodecfg.ClusterConfig.Fleet, &nodecfg.ClusterConfig.ClusterID)
+	// cluster_id is intentionally not loaded: it is no longer on ClusterConfig
+	// (the column is kept for schema stability, written from the fleet on save).
+	err = tx.QueryRow("SELECT enabled, fleet FROM cluster_config WHERE synthetic_id = 'id'").Scan(&nodecfg.ClusterConfig.Enabled, &nodecfg.ClusterConfig.Fleet)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}

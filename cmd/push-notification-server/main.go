@@ -134,11 +134,9 @@ func main() {
 				DiscoveryLimit: 20,
 				AutoUpdate:     true,
 			},
-			ClusterConfig: params.ClusterConfig{
-				WakuNodes:            params.DefaultWakuNodes(*wakuFleet),
-				DiscV5BootstrapNodes: params.DefaultDiscV5Nodes(*wakuFleet),
-				ClusterID:            16,
-			},
+			// The waku node resolves its peers from the fleet name; Core = full node.
+			Fleet:          *wakuFleet,
+			Mode:           messaging.ModeCore,
 			InstallationID: installationID,
 			TimeSource:     timesource.DefaultService(),
 		},

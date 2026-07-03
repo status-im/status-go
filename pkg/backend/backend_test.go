@@ -1095,7 +1095,7 @@ func TestSetFleet(t *testing.T) {
 		t.FailNow()
 	}
 	// Check is using the right fleet
-	require.Equal(t, testContext.backend.config.ClusterConfig.WakuNodes, params.DefaultWakuNodes(params.FleetStatusProd))
+	require.Equal(t, params.FleetStatusProd, testContext.backend.config.ClusterConfig.Fleet)
 
 	require.NoError(t, testContext.backend.Logout())
 }

@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
-	wakuv2common "github.com/status-im/status-go/pkg/messaging/waku/common"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	wakumetrics2 "github.com/status-im/status-go/pkg/messaging/wakumetrics"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -48,13 +47,33 @@ type Core struct {
 	wakumetrics *wakumetrics2.Client
 }
 
+// Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
+// from the waku layer so callers configure the messaging API without importing
+// the transport package directly.
+type Mode = wakuv3.Mode
+
+const (
+	ModeCore = wakuv3.ModeCore
+	ModeEdge = wakuv3.ModeEdge
+)
+
+// ModeFromLightClient maps the legacy WakuV2Config.LightClient boolean onto a Mode.
+func ModeFromLightClient(lightClient bool) Mode {
+	return wakuv3.ModeFromLightClient(lightClient)
+}
+
 type CoreParams struct {
 	Identity       *ecdsa.PrivateKey
 	InstallationID string
 
-	NodeKey       *ecdsa.PrivateKey
-	WakuConfig    params.WakuV2Config
-	ClusterConfig params.ClusterConfig
+	NodeKey    *ecdsa.PrivateKey
+	WakuConfig params.WakuV2Config
+
+	// Fleet is the network preset the waku node resolves its peers from; Mode
+	// selects Core (full/relay) vs Edge (light). Together they give the
+	// messaging API its Start(fleet, mode)-shaped configuration.
+	Fleet string
+	Mode  Mode
 
 	TimeSource timesource.Provider
 }
@@ -130,10 +149,12 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	}
 
 	waku, err := newWaku(wakuParams{
-		identity:                        params.Identity,
 		nodeKey:                         params.NodeKey,
-		wakuConfig:                      params.WakuConfig,
-		clusterConfig:                   params.ClusterConfig,
+		fleet:                           params.Fleet,
+		mode:                            params.Mode,
+		port:                            params.WakuConfig.Port,
+		udpPort:                         params.WakuConfig.UDPPort,
+		nameserver:                      params.WakuConfig.Nameserver,
 		metricsEnabled:                  config.metricsEnabled,
 		onHistoricMessagesRequestFailed: config.onHistoricMessagesRequestFailed,
 		onPeerStats: func(status wakutypes.ConnStatus) {
@@ -203,11 +224,21 @@ func (c *Core) stop() error {
 }
 
 type wakuParams struct {
-	identity *ecdsa.PrivateKey
-	nodeKey  *ecdsa.PrivateKey
+	nodeKey *ecdsa.PrivateKey
 
-	wakuConfig     params.WakuV2Config
-	clusterConfig  params.ClusterConfig
+	// fleet + mode fully determine the peer configuration and the Core/Edge
+	// policy; the waku node builds the rest of its config from them.
+	fleet string
+	mode  wakuv3.Mode
+
+	// port / udpPort / nameserver are the only node settings a caller configures
+	// (zero/empty falls back to the waku defaults). Everything else — host,
+	// discovery limit, max message size, store-confirmation, etc. — is defaulted
+	// by the waku layer or derived from the mode.
+	port       int
+	udpPort    int
+	nameserver string
+
 	metricsEnabled bool
 
 	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
@@ -220,36 +251,19 @@ type wakuParams struct {
 
 func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 	cfg := &wakuv3.Config{
-		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
-		Host:                                   params.wakuConfig.Host,
-		Port:                                   params.wakuConfig.Port,
-		LightClient:                            params.wakuConfig.LightClient,
-		WakuNodes:                              params.clusterConfig.WakuNodes,
-		DiscoveryLimit:                         params.wakuConfig.DiscoveryLimit,
-		DiscV5BootstrapNodes:                   params.clusterConfig.DiscV5BootstrapNodes,
-		Nameserver:                             params.wakuConfig.Nameserver,
-		UDPPort:                                params.wakuConfig.UDPPort,
-		AutoUpdate:                             params.wakuConfig.AutoUpdate,
-		DefaultShardPubsubTopic:                wakuv3.DefaultShardPubsubTopic(),
-		ClusterID:                              params.clusterConfig.ClusterID,
-		EnableStoreConfirmationForMessagesSent: params.wakuConfig.EnableStoreConfirmationForMessagesSent,
-		UseThrottledPublish:                    true,
-		MetricsEnabled:                         params.metricsEnabled,
-	}
-
-	// Configure peer exchange and discv5 settings based on node type
-	if cfg.LightClient {
-		cfg.EnablePeerExchangeServer = false
-		cfg.EnablePeerExchangeClient = true
-		cfg.EnableDiscV5 = false
-	} else {
-		cfg.EnablePeerExchangeServer = true
-		cfg.EnablePeerExchangeClient = false
-		cfg.EnableDiscV5 = true
-	}
-
-	if params.wakuConfig.MaxMessageSize > 0 {
-		cfg.MaxMessageSize = params.wakuConfig.MaxMessageSize
+		// Fleet + Mode drive peer resolution and the peer-exchange/discv5/
+		// light-client policy inside the waku node (see wakuv2.setDefaults). The
+		// host, discovery limit, max message size and default shard topic are
+		// filled by the waku layer's setDefaults.
+		Fleet:      params.fleet,
+		Mode:       params.mode,
+		Port:       params.port,
+		UDPPort:    params.udpPort,
+		Nameserver: params.nameserver,
+		// Status nodes advertise the ip/port observed by their peers.
+		AutoUpdate:          true,
+		UseThrottledPublish: true,
+		MetricsEnabled:      params.metricsEnabled,
 	}
 
 	waku, err := wakuv3.New(

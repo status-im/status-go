@@ -37,12 +37,12 @@ func setDefaultConfig(config *Config, lightMode bool) {
 
 	if lightMode {
 		config.EnablePeerExchangeClient = true
-		config.LightClient = true
+		config.Mode = ModeEdge
 		config.EnableDiscV5 = false
 	} else {
 		config.EnableDiscV5 = true
 		config.EnablePeerExchangeServer = true
-		config.LightClient = false
+		config.Mode = ModeCore
 		config.EnablePeerExchangeClient = false
 	}
 }
@@ -188,7 +188,7 @@ func TestPeerExchange(t *testing.T) {
 	config.ClusterID = 16
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = true
-	config.LightClient = true
+	config.Mode = ModeEdge
 	config.Resolver = resolver
 
 	config.WakuNodes = []string{url}
@@ -358,7 +358,7 @@ func TestOnlineChecker(t *testing.T) {
 	// Test lightnode online checker
 	config := &Config{}
 	config.ClusterID = 16
-	config.LightClient = true
+	config.Mode = ModeEdge
 	lightNode, err := New(nil, config, nil, nil, nil, nil)
 	require.NoError(t, err)
 

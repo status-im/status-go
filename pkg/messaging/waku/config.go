@@ -19,30 +19,32 @@
 package wakuv2
 
 import (
-	"errors"
-
 	"go.uber.org/zap"
 
 	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
-)
-
-var (
-	ErrBadLightClientConfig = errors.New("either peer exchange server or discv5 must be disabled, and the peer exchange client must be enabled")
-	ErrBadFullNodeConfig    = errors.New("peer exchange server and discv5 must be enabled, and the peer exchange client must be disabled")
+	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
 
 // Config represents the configuration state of a waku node.
 type Config struct {
-	MaxMessageSize                         uint32           `toml:",omitempty"` // Maximal message length allowed by the waku node
-	Host                                   string           `toml:",omitempty"`
-	Port                                   int              `toml:",omitempty"`
-	EnablePeerExchangeServer               bool             `toml:",omitempty"` // PeerExchange server makes sense only when discv5 is running locally as it will have a cache of peers that it can respond to in case a PeerExchange request comes from the PeerExchangeClient
-	EnablePeerExchangeClient               bool             `toml:",omitempty"`
-	MinPeersForRelay                       int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Relay Protocol
-	MaxPeersForFilter                      int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
-	LightClient                            bool             `toml:",omitempty"` // Indicates if the node is a light client
+	MaxMessageSize           uint32 `toml:",omitempty"` // Maximal message length allowed by the waku node
+	Host                     string `toml:",omitempty"`
+	Port                     int    `toml:",omitempty"`
+	EnablePeerExchangeServer bool   `toml:",omitempty"` // PeerExchange server makes sense only when discv5 is running locally as it will have a cache of peers that it can respond to in case a PeerExchange request comes from the PeerExchangeClient
+	EnablePeerExchangeClient bool   `toml:",omitempty"`
+	MinPeersForRelay         int    `toml:",omitempty"` // Indicates the minimum number of peers required for using Relay Protocol
+	MaxPeersForFilter        int    `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
+	// Fleet, when set, is the source of truth for the peer configuration: the
+	// waku node resolves WakuNodes / DiscV5BootstrapNodes / ClusterID from the
+	// fleet registry (see setDefaults). Leave empty to configure those fields
+	// directly (used by tests pointing at ephemeral nodes).
+	Fleet string `toml:",omitempty"`
+	// Mode selects Core (full/relay, the default) vs Edge (light). It derives the
+	// peer-exchange / discv5 flags below and is the single source of truth for
+	// the light-vs-full distinction (see IsLightClient).
+	Mode                                   Mode             `toml:",omitempty"`
 	WakuNodes                              []string         `toml:",omitempty"`
 	DiscV5BootstrapNodes                   []string         `toml:",omitempty"`
 	Nameserver                             string           `toml:",omitempty"` // Optional nameserver to use for dns discovery
@@ -61,16 +63,16 @@ type Config struct {
 	UseThrottledPublish                    bool             `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
 }
 
+// IsLightClient reports whether the node is a light (Edge) node. Mode is the
+// single source of truth; there is no separate LightClient flag.
+func (c *Config) IsLightClient() bool {
+	return c.Mode.IsLightClient()
+}
+
 func (c *Config) Validate(logger *zap.Logger) error {
-	if c.LightClient && (c.EnablePeerExchangeServer || c.EnableDiscV5 || !c.EnablePeerExchangeClient) {
-		logger.Warn("bad configuration for a light client", zap.Error(ErrBadLightClientConfig))
-		return nil
-	}
-	if !c.LightClient && (!c.EnablePeerExchangeServer || !c.EnableDiscV5 || c.EnablePeerExchangeClient) {
-		logger.Warn("bad configuration for a full node", zap.Error(ErrBadFullNodeConfig))
-		return nil
-	}
-	return nil
+	// The peer-exchange / discv5 flags are derived from Mode in setDefaults, so
+	// the only thing to reject here is an unknown mode value.
+	return c.Mode.Validate()
 }
 
 var DefaultConfig = Config{
@@ -113,6 +115,19 @@ func setDefaults(cfg *Config) *Config {
 		//For now populating with both used shards, but this can be populated from user subscribed communities etc once community sharding is implemented
 		cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, DefaultShardPubsubTopic())
 		cfg.DefaultShardedPubsubTopics = append(cfg.DefaultShardedPubsubTopics, DefaultNonProtectedPubsubTopic())
+	}
+
+	// Derive the peer-exchange / discv5 flags from the mode (Core is the default).
+	cfg.Mode.applyTo(cfg)
+
+	// Resolve the peer configuration from the fleet registry. When a fleet is
+	// given it is the source of truth, so the waku node owns fleet resolution
+	// and callers pass only a fleet name. An empty fleet leaves WakuNodes /
+	// DiscV5BootstrapNodes / ClusterID as set directly on the config.
+	if cfg.Fleet != "" {
+		cfg.WakuNodes = fleets.WakuNodes(cfg.Fleet)
+		cfg.DiscV5BootstrapNodes = fleets.DiscV5Nodes(cfg.Fleet)
+		cfg.ClusterID = fleets.ClusterID(cfg.Fleet)
 	}
 
 	return cfg

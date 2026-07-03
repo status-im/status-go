@@ -308,7 +308,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		shards = append(shards, shardInfo)
 	}
 	waku.defaultShardInfo = shards[0]
-	if cfg.LightClient {
+	if cfg.IsLightClient() {
 		opts = append(opts, node.WithWakuFilterLightNode())
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
@@ -330,7 +330,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
-	if !cfg.LightClient {
+	if !cfg.IsLightClient() {
 		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
 	}
@@ -678,7 +678,7 @@ func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
 }
 
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string) error {
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		return errors.New("only available for full nodes")
 	}
 
@@ -779,7 +779,7 @@ func (w *Waku) Subscribe(ctx context.Context, pubsubTopic string, contentTopics 
 		if err != nil {
 			return err
 		}
-		if w.cfg.LightClient && w.filterManager != nil {
+		if w.cfg.IsLightClient() && w.filterManager != nil {
 			topics := [][]byte{types.TopicTypeToByteArray(contentTopic)}
 			cf := protocol.NewContentFilter(w.GetPubsubTopic(pubsubTopic), common.NewTopicSetFromBytes(topics).ContentTopics()...)
 			w.filterManager.SubscribeFilter(id, cf)
@@ -804,7 +804,7 @@ func (w *Waku) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopic
 		}
 
 		w.logger.Debug("cleaning up wire subscription", zap.String("id", id))
-		if w.cfg.LightClient && w.filterManager != nil {
+		if w.cfg.IsLightClient() && w.filterManager != nil {
 			w.filterManager.UnsubscribeFilter(id)
 		}
 		delete(w.subscriptions, sub)
@@ -930,7 +930,7 @@ func (w *Waku) Start() error {
 			}
 
 			publishMethod := "relay"
-			if w.cfg.LightClient {
+			if w.cfg.IsLightClient() {
 				publishMethod = "lightpush"
 			}
 
@@ -965,7 +965,7 @@ func (w *Waku) Start() error {
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
 
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
 		w.filterManager = filterapi.NewFilterManager(
@@ -1092,7 +1092,7 @@ func (w *Waku) reportPeerMetrics() {
 
 func (w *Waku) startMessageSender() error {
 	publishMethod := publish.Relay
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		publishMethod = publish.LightPush
 	}
 
@@ -1164,7 +1164,7 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		return nil
 	}
 
@@ -1382,7 +1382,7 @@ func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 		isNetworkSwitchEvent(prevState, state, prevInitialized) {
 		w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
 		w.node.DisconnectAllPeers()
-		if w.cfg.LightClient {
+		if w.cfg.IsLightClient() {
 			w.filterManager.NetworkChange()
 		}
 	}
@@ -1417,7 +1417,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	}
 	isOnline := !state.Offline
 
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
 		go func() {
 			defer gocommon.LogOnPanic()
