@@ -750,7 +750,6 @@ func (t *Transport) SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) erro
 
 func (t *Transport) ClearProcessedMessageIDsCache() error {
 	t.logger.Debug("clearing processed messages cache")
-	t.waku.ClearEnvelopesCache()
 	return t.cache.Clear()
 }
 

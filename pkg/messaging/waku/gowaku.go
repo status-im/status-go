@@ -74,7 +74,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
-	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
@@ -142,8 +141,8 @@ type Waku struct {
 	subscriptionsMu sync.Mutex
 	subscriptions   map[types.TopicSubscription]string
 
-	envelopeCache *ttlcache.Cache[gethcommon.Hash, bool] // [Hash of envelope -> Processed] cache
-	poolMu        sync.RWMutex                           // Mutex to sync the message and expiration pools
+	envelopeCache *ttlcache.Cache[gethcommon.Hash, struct{}] // short-lived set of seen envelope hashes; feeds hit/miss metrics and self-send suppression only. De-duplication is owned by the transport's persistent processed-message cache (status-im/status-go#7464).
+	poolMu        sync.RWMutex                               // Mutex to sync the message and expiration pools
 
 	bandwidthCounter *metrics.BandwidthCounter
 
@@ -201,8 +200,8 @@ func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
 	w.metricsHandler = client
 }
 
-func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
-	cache := ttlcache.New(ttlcache.WithTTL[gethcommon.Hash, bool](cacheTTL))
+func newTTLCache() *ttlcache.Cache[gethcommon.Hash, struct{}] {
+	cache := ttlcache.New(ttlcache.WithTTL[gethcommon.Hash, struct{}](cacheTTL))
 	go func() {
 		defer gocommon.LogOnPanic()
 		cache.Start()
@@ -1248,8 +1247,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 // addEnvelope adds an envelope to the envelope map, used for sending
 func (w *Waku) addEnvelope(envelope *common.ReceivedMessage) {
 	w.poolMu.Lock()
-	// Add the envelope to the cache with Processed set to false
-	w.envelopeCache.Set(envelope.Hash(), false, ttlcache.DefaultTTL)
+	w.envelopeCache.Set(envelope.Hash(), struct{}{}, ttlcache.DefaultTTL)
 	w.poolMu.Unlock()
 }
 
@@ -1258,14 +1256,7 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 
 	w.poolMu.Lock()
 	alreadyCached := w.envelopeCache.Has(recvMessage.Hash())
-	envelopeProcessed := false
 	w.poolMu.Unlock()
-
-	if !alreadyCached {
-		w.addEnvelope(recvMessage)
-	} else {
-		envelopeProcessed = w.envelopeCache.Get(recvMessage.Hash()).Value()
-	}
 
 	logger := w.logger.With(zap.String("envelopeHash", recvMessage.Hash().Hex()))
 
@@ -1273,19 +1264,21 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 		logger.Debug("w envelope already cached")
 		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
+		w.addEnvelope(recvMessage)
 		logger.Debug("cached w envelope")
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
 		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
 	}
 
-	if !envelopeProcessed {
-		if processImmediately {
-			logger.Debug("immediately processing envelope")
-			w.processMessage(recvMessage)
-		} else {
-			logger.Debug("posting event")
-			w.postEvent(recvMessage) // notify the local node about the new message
-		}
+	// De-duplication is owned by the transport's persistent processed-message
+	// cache (status-im/status-go#7464), so every received envelope is forwarded
+	// regardless of the in-memory cache above.
+	if processImmediately {
+		logger.Debug("immediately processing envelope")
+		w.processMessage(recvMessage)
+	} else {
+		logger.Debug("posting event")
+		w.postEvent(recvMessage) // notify the local node about the new message
 	}
 
 	return true, nil
@@ -1323,30 +1316,6 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		Event: common.EventEnvelopeAvailable,
 		Data:  newReceivedMessage(e),
 	})
-}
-
-// HasEnvelope returns true if the envelope with the given hash is present in the cache.
-func (w *Waku) HasEnvelope(hash cryptotypes.Hash) bool {
-	w.poolMu.RLock()
-	defer w.poolMu.RUnlock()
-
-	return w.envelopeCache.Has(gethcommon.Hash(hash))
-}
-
-// isEnvelopeCached checks if envelope with specific hash has already been received and cached.
-func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
-	w.poolMu.Lock()
-	defer w.poolMu.Unlock()
-
-	return w.envelopeCache.Has(hash)
-}
-
-func (w *Waku) ClearEnvelopesCache() {
-	w.poolMu.Lock()
-	defer w.poolMu.Unlock()
-
-	w.envelopeCache.Stop()
-	w.envelopeCache = newTTLCache()
 }
 
 // Peers is retained only for the Python functional tests (see tests-functional);
