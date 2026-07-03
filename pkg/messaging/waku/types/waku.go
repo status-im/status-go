@@ -17,8 +17,7 @@ import (
 )
 
 type ConnStatus struct {
-	IsOnline bool      `json:"isOnline"`
-	Peers    PeerStats `json:"peers"`
+	IsOnline bool `json:"isOnline"`
 }
 
 type PeerStats map[peer.ID]WakuV2Peer

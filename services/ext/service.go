@@ -50,7 +50,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/signal"
 )
 
 const infinityString = "∞"
@@ -194,8 +193,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		messaging2.WithSQLitePersistence(params.AppDB),
 		messaging2.WithLogger(s.logger),
 		messaging2.WithEnvelopeEventsConfig(envelopeEventsConfig),
-		messaging2.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),
-		messaging2.WithPeerStatsHandler(signal.SendPeerStats),
 		messaging2.WithMetrics(params.MetricsEnabled),
 		messaging2.WithTracer(tracer),
 	)

@@ -8,7 +8,6 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang/protobuf/proto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
@@ -85,8 +84,6 @@ func (s *ProcessorSuite) SetupTest() {
 		nil,
 		&wakuConfig,
 		s.logger,
-		nil,
-		func([]byte, peer.AddrInfo, error) {},
 		nil,
 	)
 	s.Require().NoError(err)

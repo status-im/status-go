@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/stretchr/testify/require"
 
@@ -49,7 +48,7 @@ func TestReceivePushPath(t *testing.T) {
 	logger := testutils.MustCreateTestLogger()
 	defer func() { _ = logger.Sync() }()
 
-	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil, func([]byte, peer.AddrInfo, error) {}, nil)
+	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil)
 	require.NoError(t, err)
 
 	identity, err := crypto.GenerateKey()
@@ -144,7 +143,7 @@ func TestReceiveVersionZeroDecodesAsV1(t *testing.T) {
 	logger := testutils.MustCreateTestLogger()
 	defer func() { _ = logger.Sync() }()
 
-	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil, func([]byte, peer.AddrInfo, error) {}, nil)
+	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil)
 	require.NoError(t, err)
 
 	identity, err := crypto.GenerateKey()
@@ -198,7 +197,7 @@ func TestReceiveSharedKeyFanOut(t *testing.T) {
 	logger := testutils.MustCreateTestLogger()
 	defer func() { _ = logger.Sync() }()
 
-	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil, func([]byte, peer.AddrInfo, error) {}, nil)
+	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil)
 	require.NoError(t, err)
 
 	identity, err := crypto.GenerateKey()

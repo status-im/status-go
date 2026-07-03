@@ -189,9 +189,6 @@ type Waku struct {
 	// goingOnline is channel that notifies when connectivity has changed from offline to online
 	goingOnline chan struct{}
 
-	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
-	onPeerStats                     func(types.ConnStatus)
-
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
@@ -213,7 +210,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesource.Provider) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -236,25 +233,23 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	ctx, cancel := context.WithCancel(context.Background())
 
 	waku := &Waku{
-		cfg:                             cfg,
-		subscriptions:                   make(map[types.TopicSubscription]string),
-		envelopeCache:                   newTTLCache(),
-		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
-		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
-		connectionNotifChan:             make(chan node.PeerConnection, 20),
-		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
-		ctx:                             ctx,
-		cancel:                          cancel,
-		wg:                              sync.WaitGroup{},
-		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
-		dnsAddressCacheLock:             &sync.RWMutex{},
-		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
-		timesource:                      ts,
-		logger:                          logger,
-		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
-		onPeerStats:                     onPeerStats,
-		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
-		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+		cfg:                         cfg,
+		subscriptions:               make(map[types.TopicSubscription]string),
+		envelopeCache:               newTTLCache(),
+		msgQueue:                    make(chan *common.ReceivedMessage, messageQueueLimit),
+		topicHealthStatusChan:       make(chan peermanager.TopicHealthStatus, 100),
+		connectionNotifChan:         make(chan node.PeerConnection, 20),
+		connStatusSubscriptions:     make(map[string]*types.ConnStatusSubscription),
+		ctx:                         ctx,
+		cancel:                      cancel,
+		wg:                          sync.WaitGroup{},
+		dnsAddressCache:             make(map[string][]dnsdisc.DiscoveredNode),
+		dnsAddressCacheLock:         &sync.RWMutex{},
+		dnsDiscAsyncRetrievedSignal: make(chan struct{}),
+		timesource:                  ts,
+		logger:                      logger,
+		onlineChecker:               onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
+		sendQueue:                   publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
@@ -1017,12 +1012,9 @@ func (w *Waku) checkForConnectionChanges() {
 
 	latestConnStatus := types.ConnStatus{
 		IsOnline: isOnline,
-		Peers:    FormatPeerStats(w.node),
 	}
 
-	w.logger.Debug("peer stats",
-		zap.Int("peersCount", len(latestConnStatus.Peers)),
-		zap.Any("stats", latestConnStatus))
+	w.logger.Debug("connection status", zap.Bool("isOnline", isOnline))
 	for k, subs := range w.connStatusSubscriptions {
 		if !subs.Send(latestConnStatus) {
 			delete(w.connStatusSubscriptions, k)
@@ -1030,10 +1022,6 @@ func (w *Waku) checkForConnectionChanges() {
 	}
 
 	w.connStatusMu.Unlock()
-
-	if w.onPeerStats != nil {
-		w.onPeerStats(latestConnStatus)
-	}
 
 	// Build the proposed next state. checkForConnectionChanges never originates
 	// a Type change (the comment below acknowledges this), and it has no OS

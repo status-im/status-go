@@ -31,7 +31,6 @@ const (
 // envelopeProcessor consumes messages fetched from a storenode.
 type envelopeProcessor interface {
 	OnEnvelope(env *protocol.Envelope, processEnvelopes bool) error
-	OnRequestFailed(requestID []byte, peerInfo peer.AddrInfo, err error)
 }
 
 // storePager reads a time range of historic messages from a single storenode. It
@@ -181,7 +180,6 @@ func (p *storePager) fetchChunk(
 			messages, nextCursor, err := p.requestor.query(reqCtx, peerInfo, request)
 			reqCancel()
 			if err != nil {
-				p.processor.OnRequestFailed(requestID, peerInfo, err)
 				return err
 			}
 

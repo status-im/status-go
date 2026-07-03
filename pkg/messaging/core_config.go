@@ -5,8 +5,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
@@ -14,13 +12,11 @@ import (
 )
 
 type config struct {
-	logger                          *zap.Logger
-	tracer                          trace.Tracer
-	envelopesMonitorConfig          *transport.EnvelopesMonitorConfig
-	metricsEnabled                  bool
-	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
-	onPeerStats                     func(types2.ConnStatus)
-	persistence                     Persistence
+	logger                 *zap.Logger
+	tracer                 trace.Tracer
+	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
+	metricsEnabled         bool
+	persistence            Persistence
 }
 
 func newConfig(options ...Options) *config {
@@ -32,9 +28,7 @@ func newConfig(options ...Options) *config {
 				return false
 			},
 		},
-		metricsEnabled:                  false,
-		onHistoricMessagesRequestFailed: func([]byte, peer.AddrInfo, error) {},
-		onPeerStats:                     func(types2.ConnStatus) {},
+		metricsEnabled: false,
 	}
 
 	for _, option := range options {
@@ -71,18 +65,6 @@ func WithEnvelopeEventsConfig(econf *types2.EnvelopeEventsConfig) Options {
 func WithMetrics(enabled bool) Options {
 	return func(c *config) {
 		c.metricsEnabled = enabled
-	}
-}
-
-func WithHistoricMessagesRequestFailedHandler(onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)) Options {
-	return func(c *config) {
-		c.onHistoricMessagesRequestFailed = onHistoricMessagesRequestFailed
-	}
-}
-
-func WithPeerStatsHandler(onPeerStats func(types2.ConnStatus)) Options {
-	return func(c *config) {
-		c.onPeerStats = onPeerStats
 	}
 }
 
