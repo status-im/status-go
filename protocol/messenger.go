@@ -664,13 +664,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	response.StoreNodes, err = m.AllMailservers()
-	if err != nil {
-		return nil, err
-	}
-
-	m.messaging.SetStorenodes(response.StoreNodes)
-
 	if m.config.enablePinnedBootstrap {
 		go func() {
 			defer gocommon.LogOnPanic()
@@ -681,10 +674,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}()
 	}
 
-	// Storenodes are now configured: request any history missed while offline.
-	// This is the cycle-free replacement for the storenode-availability signal
-	// (OnStorenodeAvailable) that previously triggered the sync, and it avoids
-	// racing SetStorenodes against the network-online trigger.
+	// Request any history missed while offline. The storenodes are resolved from
+	// the fleet inside the waku node at startup, so they are already configured
+	// by now. This is the cycle-free replacement for the storenode-availability
+	// signal (OnStorenodeAvailable) that previously triggered the sync.
 	m.asyncRequestAllHistoricMessages()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()

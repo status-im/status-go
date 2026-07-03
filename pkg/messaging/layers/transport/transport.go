@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -802,9 +801,4 @@ func (t *Transport) Query(
 	processEnvelopes bool,
 ) error {
 	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
-}
-
-// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
-func (t *Transport) SetStorenodes(nodes []peer.AddrInfo) {
-	t.waku.SetStorenodes(nodes)
 }

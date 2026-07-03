@@ -56,11 +56,9 @@ func (m *Messenger) shouldSync() (bool, error) {
 		return false, nil
 	}
 
-	mailservers, err := m.AllMailservers()
-	if err != nil {
-		return false, err
-	}
-	return len(mailservers) > 0, nil
+	// The waku node always has the fleet's store nodes configured, so a
+	// mailserver is available whenever mailservers are enabled.
+	return true, nil
 }
 
 func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
@@ -320,9 +318,9 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 	resp, err := fn()
 	if err == nil {
 		// Only a completed sync arms the throttle. A failed attempt (e.g. no
-		// storenode reachable in the instant right after login, before
-		// SetStorenodes/peer dialing) must not block the retry that succeeds
-		// once a storenode is dialable.
+		// storenode reachable in the instant right after login, before the
+		// storenodes are dialed) must not block the retry that succeeds once a
+		// storenode is dialable.
 		m.historicSyncMu.Lock()
 		m.lastHistoricSyncRequestAt = now
 		m.historicSyncMu.Unlock()
