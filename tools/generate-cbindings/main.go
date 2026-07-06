@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -26,10 +27,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, a := range parsedAST {
-		for _, file := range a.Files {
+	// Iterate maps in sorted order: the emitted binding order must be stable
+	// so the built library is byte-reproducible (dependents rebuild via a
+	// compare-before-copy contract — see status-desktop ADR 0003).
+	for _, pkgName := range sortedKeys(parsedAST) {
+		a := parsedAST[pkgName]
+		for _, fileName := range sortedKeys(a.Files) {
 			// handle each file and append the output
-			output += handleFile(file)
+			output += handleFile(a.Files[fileName])
 		}
 	}
 
@@ -38,6 +43,9 @@ func main() {
 	output += "func Free (param unsafe.Pointer){\n"
 	output += "C.free(param);\n"
 	output += "}\n"
+
+	// Run the status-backend HTTP server from library consumers
+	output += statusBackendRunServer
 
 	fmt.Println(output)
 }
@@ -134,7 +142,8 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 
 func handleFile(parsedAST *ast.File) string {
 	output := ""
-	for name, obj := range parsedAST.Scope.Objects {
+	for _, name := range sortedKeys(parsedAST.Scope.Objects) {
+		obj := parsedAST.Scope.Objects[name]
 		// Ignore non-functions or non exported fields
 		if obj.Kind != ast.Fun || !unicode.IsUpper(rune(name[0])) {
 			continue
@@ -143,4 +152,13 @@ func handleFile(parsedAST *ast.File) string {
 	}
 
 	return output
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

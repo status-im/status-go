@@ -126,3 +126,8 @@ libs
 
 # CODEX (ChatGPT plugin)
 .codex
+nimble.develop
+nimble.paths
+nimbledeps
+# scratch copy of the resolved nim-sds store package (see statusgo.nims)
+.sds-build

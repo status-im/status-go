@@ -104,8 +104,8 @@ BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
 
-# Pin nim-sds revision here. Can be a tag (default) or commit hash.
-NIM_SDS_VERSION ?= v0.2.4
+# Pin lives in statusgo.nimble (single source of truth, also read by consumers).
+NIM_SDS_VERSION ?= $(shell sed -n 's|^requires "https://github.com/logos-messaging/nim-sds.git\#\([^"]*\)".*|\1|p' $(GIT_ROOT)/statusgo.nimble)
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
 # to guarantee a clean checkout on every build.
@@ -133,8 +133,9 @@ else
 endif
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+# override: these must survive CGO_* passed as make command-line args (else -lsds is silently dropped).
+override CGO_CFLAGS += -I$(NIM_SDS_INC_DIR)
+override CGO_LDFLAGS += -L$(NIM_SDS_LIB_DIR) -lsds
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -163,8 +164,8 @@ RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage
-	CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
-	CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
+	override CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
+	override CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
 	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
 	LOGOS_STORAGE_BUILD_DEPS += $(LIBSTORAGE)
 endif
@@ -230,7 +231,7 @@ history-archive-help: ##@build Show history archive build/test toggles and env v
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
  # On Windows, use portable C implementations and add -Werror=implicit-function-declaration workaround
- CGO_CFLAGS+=-Wno-implicit-function-declaration
+ override CGO_CFLAGS += -Wno-implicit-function-declaration
 endif
 
 # Common flags
@@ -324,6 +325,7 @@ USE_SYSTEM_NIM ?= 1
 .PHONY: clone-nim-sds
 clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@test -n "$(NIM_SDS_VERSION)" || { echo "ERROR: NIM_SDS_VERSION is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
 		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
@@ -356,13 +358,23 @@ build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
 	$(if $(filter amd64,$(ARCH)),amd64,\
 	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
+# LIBSDS uses the host LIB_EXT; mobile targets need the target platform's extension.
 build-libsds-android: clone-nim-sds
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for Android" $(LIBSDS)
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=$(MAKE_SHELL)
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.so || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.so" && exit 1)
+endif
 
+# LIBSDS uses the host LIB_EXT; mobile targets need the target platform's extension.
 build-libsds-ios: clone-nim-sds
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for iOS" $(LIBSDS)
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.a || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.a" && exit 1)
+endif
 
 clean-libsds:
 	@echo "Removing libsds"
@@ -445,11 +457,15 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
+# The mobile library targets must be byte-reproducible for unchanged sources:
+# consumers rebuild dependents through a compare-before-copy contract
+# (status-desktop ADR 0003), and Go's link-time build ID varies run-to-run.
+# -buildid= strips it; the ID is unused in c-archive/c-shared artifacts.
 statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
+		-ldflags="-buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
 	@file build/bin/libstatus.so
@@ -460,8 +476,14 @@ statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-com
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
+		-ldflags="-buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
+	@# Go's archive writer stamps real mtimes in the ar member headers; repack
+	@# with zeroed dates so unchanged sources yield a byte-identical archive
+	@# (the compare-before-copy contract above).
+	ZERO_AR_DATE=1 xcrun libtool -static -no_warning_for_no_symbols \
+		-o "build/bin/libstatus.a.tmp" "build/bin/libstatus.a" && \
+		mv "build/bin/libstatus.a.tmp" "build/bin/libstatus.a"
 	@echo "iOS library built"
 	@file build/bin/libstatus.a
 
