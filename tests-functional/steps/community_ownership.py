@@ -369,11 +369,11 @@ def wait_until_owner_and_members_present(
 def wait_until_kicked_from_community(
     backend: StatusBackend,
     community_id: str,
+    new_owner_public_key: Optional[str] = None,
     attempts: int = 45,
     delay: int = 2,
 ) -> dict:
-    """Poll until *backend* observes it has been kicked (no longer joined) after an ownership change.
-    The ex-owner must wait for this before re-requesting to join, else it gets 'already joined'."""
+    """Poll until *backend* observes it has been kicked (no longer joined) after an ownership change."""
     community: Optional[dict] = None
     for _ in range(attempts):
         try:
@@ -385,11 +385,16 @@ def wait_until_kicked_from_community(
             None,
         )
         if community is not None and not community.get("joined", False):
-            return community
+            if new_owner_public_key is None:
+                return community
+            owner_roles = community.get("members", {}).get(new_owner_public_key, {}).get("roles", [])
+            if CommunityRoles.ROLE_OWNER.value in owner_roles:
+                return community
         time.sleep(delay)
 
     raise AssertionError(
-        f"Backend was never kicked from community after {attempts} attempts; " f"joined={community.get('joined') if community else None}"
+        f"Backend was never kicked from community (with new owner ingested) after {attempts} attempts; "
+        f"joined={community.get('joined') if community else None}"
     )
 
 
