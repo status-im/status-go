@@ -105,7 +105,10 @@ BUILD_TAGS ?= gowaku_no_rln
 # `nim-sds` variables
 
 # Pin lives in statusgo.nimble (single source of truth, also read by consumers).
-NIM_SDS_VERSION ?= $(shell sed -n 's|^requires "https://github.com/logos-messaging/nim-sds.git\#\([^"]*\)".*|\1|p' $(GIT_ROOT)/statusgo.nimble)
+# Both the repo URL and the revision come from the requires line, so a pin
+# flip (e.g. to a fork while a PR is in flight) needs no Makefile change.
+NIM_SDS_VERSION ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\3|p' $(GIT_ROOT)/statusgo.nimble)
+NIM_SDS_REPO ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\1|p' $(GIT_ROOT)/statusgo.nimble)
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
 # to guarantee a clean checkout on every build.
@@ -328,9 +331,9 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@test -n "$(NIM_SDS_VERSION)" || { echo "ERROR: NIM_SDS_VERSION is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
-		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
+		git clone --recurse-submodules "$(NIM_SDS_REPO).git" "$(NIM_SDS_SOURCE_DIR)"; \
 	else \
-		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
+		cd "$(NIM_SDS_SOURCE_DIR)" && git remote set-url origin "$(NIM_SDS_REPO).git" && git fetch --tags origin; \
 	fi
 	cd "$(NIM_SDS_SOURCE_DIR)" && \
 		git switch --force --detach "$(NIM_SDS_VERSION)" && \
