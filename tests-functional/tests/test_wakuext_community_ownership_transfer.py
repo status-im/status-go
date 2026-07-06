@@ -139,8 +139,11 @@ class TestCommunityOwnershipTransfer:
         # The ex-owner created the community and has no revealed accounts, so it can't auto-rejoin; it
         # must manually re-join once it has observed the kick.
         community_ownership.wait_until_kicked_from_community(owner_backend, community_id, member_a_backend.public_key)
-        community_tokens.join_community_with_signatures_and_accept(
-            member_a_backend, owner_backend, community_id, messenger.wallet_address(owner_backend)
+        community_ownership.rejoin_ex_owner_and_accept(
+            ex_owner_backend=owner_backend,
+            new_owner_backend=member_a_backend,
+            community_id=community_id,
+            ex_owner_wallet_address=messenger.wallet_address(owner_backend),
         )
 
         # Then the members list contains Owner, Member A, and Member B
