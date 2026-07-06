@@ -5,8 +5,13 @@ import (
 
 	"github.com/status-im/status-go/internal/connection"
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	types "github.com/status-im/status-go/pkg/messaging/types"
 )
+
+// MessageEventsHandler is the consumer of the transport's message-level
+// delivery events, re-exported as part of the messaging API surface.
+type MessageEventsHandler = transport.MessageEventsHandler
 
 func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, error) {
 	filters, err := a.core.stack.Transport.RetrieveRawAll()
@@ -36,8 +41,8 @@ func (a *API) ClearProcessedMessageIDsCache() error {
 	return a.core.stack.Transport.ClearProcessedMessageIDsCache()
 }
 
-func (a *API) SetEnvelopeEventsHandler(handler types.EnvelopeEventsHandler) error {
-	return a.core.stack.Transport.SetEnvelopeEventsHandler(handler)
+func (a *API) SetMessageEventsHandler(handler MessageEventsHandler) error {
+	return a.core.stack.Transport.SetMessageEventsHandler(handler)
 }
 
 func (a *API) ReportUserOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {

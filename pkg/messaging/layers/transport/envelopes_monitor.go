@@ -24,18 +24,18 @@ const (
 )
 
 type EnvelopesMonitorConfig struct {
-	EnvelopeEventsHandler            EnvelopeEventsHandler
-	AwaitOnlyMailServerConfirmations bool
-	IsMailserver                     func(types.EnodeID) bool
-	Logger                           *zap.Logger
+	Logger *zap.Logger
 }
 
-// EnvelopeEventsHandler used for two different event types.
-type EnvelopeEventsHandler interface {
-	EnvelopeSent([][]byte)
-	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(types2.Hash, types2.Hash, []byte, error)
-	MailServerRequestExpired(types2.Hash)
+// MessageEventsHandler receives message-level delivery events produced by the
+// transport. This is the transport's outbound event contract: waku envelope
+// events stay inside the transport, which aggregates them per message and
+// reports message IDs to the layer above.
+type MessageEventsHandler interface {
+	// MessagesSent reports messages whose envelopes were all confirmed as sent.
+	MessagesSent(messageIDs [][]byte)
+	// MessagesExpired reports messages that failed to be sent.
+	MessagesExpired(messageIDs [][]byte, err error)
 }
 
 // NewEnvelopesMonitor returns a pointer to an instance of the EnvelopesMonitor.
@@ -47,17 +47,11 @@ func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *Envelopes
 	}
 
 	return &EnvelopesMonitor{
-		w:                                w,
-		handler:                          config.EnvelopeEventsHandler,
-		awaitOnlyMailServerConfirmations: config.AwaitOnlyMailServerConfirmations,
-		isMailserver:                     config.IsMailserver,
-		logger:                           logger.With(zap.Namespace("EnvelopesMonitor")),
+		w:      w,
+		logger: logger.With(zap.Namespace("EnvelopesMonitor")),
 
 		// key is envelope hash (event.Hash)
 		envelopes: map[types2.Hash]*monitoredEnvelope{},
-
-		// key is hash of the batch (event.Batch)
-		batches: map[types2.Hash]map[types2.Hash]struct{}{},
 
 		// key is stringified message identifier
 		messageEnvelopeHashes: make(map[string][]types2.Hash),
@@ -75,19 +69,15 @@ type EnvelopesMonitor struct {
 	gocommon.PauseBroadcaster
 
 	w       types.Waku
-	handler EnvelopeEventsHandler
+	handler MessageEventsHandler
 
 	mu sync.Mutex
 
 	envelopes             map[types2.Hash]*monitoredEnvelope
-	batches               map[types2.Hash]map[types2.Hash]struct{}
 	messageEnvelopeHashes map[string][]types2.Hash
 
-	awaitOnlyMailServerConfirmations bool
-
-	wg           sync.WaitGroup
-	quit         chan struct{}
-	isMailserver func(peer types.EnodeID) bool
+	wg   sync.WaitGroup
+	quit chan struct{}
 
 	logger *zap.Logger
 }
@@ -168,35 +158,23 @@ func (m *EnvelopesMonitor) handleEnvelopeEvents() {
 // handleEvent based on type of the event either triggers
 // confirmation handler or removes hash from tracker
 func (m *EnvelopesMonitor) handleEvent(event types.EnvelopeEvent) {
-	handlers := map[types.EventType]func(types.EnvelopeEvent){
-		types.EventEnvelopeSent:      m.handleEventEnvelopeSent,
-		types.EventEnvelopeExpired:   m.handleEventEnvelopeExpired,
-		types.EventBatchAcknowledged: m.handleAcknowledgedBatch,
-		types.EventEnvelopeReceived:  m.handleEventEnvelopeReceived,
-	}
-	if handler, ok := handlers[event.Event]; ok {
-		handler(event)
+	switch event.Event {
+	case types.EventEnvelopeSent:
+		m.handleEventEnvelopeSent(event)
+	case types.EventEnvelopeExpired:
+		m.handleEventEnvelopeExpired(event)
 	}
 }
 
 func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
-	// Mailserver confirmations for WakuV2 are disabled
-	if m.w == nil && m.awaitOnlyMailServerConfirmations {
-		if !m.isMailserver(event.Peer) {
-			return
-		}
-	}
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	confirmationExpected := event.Batch != (types2.Hash{})
-
 	envelope, ok := m.envelopes[event.Hash]
 
-	// If confirmations are not expected, we keep track of the envelope
-	// being sent
-	if !ok && !confirmationExpected {
+	// If we don't track this envelope, keep track of it as already sent, so a
+	// later Add for the same envelope resolves immediately.
+	if !ok {
 		m.envelopes[event.Hash] = &monitoredEnvelope{envelopeHashID: event.Hash, state: EnvelopeSent}
 		return
 	}
@@ -205,66 +183,9 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	if envelope.state == EnvelopeSent {
 		return
 	}
-	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
-	if confirmationExpected {
-		if _, ok := m.batches[event.Batch]; !ok {
-			m.batches[event.Batch] = map[types2.Hash]struct{}{}
-		}
-		m.batches[event.Batch][event.Hash] = struct{}{}
-		m.logger.Debug("waiting for a confirmation", zap.String("batch", event.Batch.String()))
-	} else {
-		m.logger.Debug("confirmation not expected, marking as sent")
-		envelope.state = EnvelopeSent
-		m.processMessageIDs(envelope.messageIDs)
-	}
-}
-
-func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
-
-	if m.awaitOnlyMailServerConfirmations && !m.isMailserver(event.Peer) {
-		return
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	envelopes, ok := m.batches[event.Batch]
-	if !ok {
-		m.logger.Debug("batch is not found", zap.String("batch", event.Batch.String()))
-	}
-	m.logger.Debug("received a confirmation", zap.String("batch", event.Batch.String()), zap.String("peer", event.Peer.String()))
-	envelopeErrors, ok := event.Data.([]types.EnvelopeError)
-	if event.Data != nil && !ok {
-		m.logger.Error("received unexpected data in the the confirmation event", zap.Any("data", event.Data))
-	}
-	failedEnvelopes := map[types2.Hash]struct{}{}
-	for i := range envelopeErrors {
-		envelopeError := envelopeErrors[i]
-		_, exist := m.envelopes[envelopeError.Hash]
-		if exist {
-			m.logger.Warn("envelope that was posted by us is discarded", zap.String("hash", envelopeError.Hash.String()), zap.String("peer", event.Peer.String()), zap.String("error", envelopeError.Description))
-			var err error
-			switch envelopeError.Code {
-			case types.EnvelopeTimeNotSynced:
-				err = errors.New("envelope wasn't delivered due to time sync issues")
-			}
-			m.handleEnvelopeFailure(envelopeError.Hash, err)
-		}
-		failedEnvelopes[envelopeError.Hash] = struct{}{}
-	}
-
-	for hash := range envelopes {
-		if _, exist := failedEnvelopes[hash]; exist {
-			continue
-		}
-		envelope, ok := m.envelopes[hash]
-		if !ok || envelope.state == EnvelopeSent {
-			continue
-		}
-		envelope.state = EnvelopeSent
-		m.processMessageIDs(envelope.messageIDs)
-	}
-	delete(m.batches, event.Batch)
+	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()))
+	envelope.state = EnvelopeSent
+	m.processMessageIDs(envelope.messageIDs)
 }
 
 func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event types.EnvelopeEvent) {
@@ -288,24 +209,9 @@ func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types2.Hash, err error) {
 		}
 		m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
 		if m.handler != nil {
-			m.handler.EnvelopeExpired(envelope.messageIDs, err)
+			m.handler.MessagesExpired(envelope.messageIDs, err)
 		}
 	}
-}
-
-func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event types.EnvelopeEvent) {
-	if m.awaitOnlyMailServerConfirmations && !m.isMailserver(event.Peer) {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	envelope, ok := m.envelopes[event.Hash]
-	if !ok || envelope.state != EnvelopePosted {
-		return
-	}
-	m.logger.Debug("expected envelope received", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
-	envelope.state = EnvelopeSent
-	m.processMessageIDs(envelope.messageIDs)
 }
 
 func (m *EnvelopesMonitor) processMessageIDs(messageIDs [][]byte) {
@@ -332,7 +238,7 @@ func (m *EnvelopesMonitor) processMessageIDs(messageIDs [][]byte) {
 	}
 
 	if len(sentMessageIDs) > 0 && m.handler != nil {
-		m.handler.EnvelopeSent(sentMessageIDs)
+		m.handler.MessagesSent(sentMessageIDs)
 	}
 }
 

@@ -76,6 +76,10 @@ func (m *MessengerSignalsHandlerMock) MessengerResponse(response *MessengerRespo
 
 func (m *MessengerSignalsHandlerMock) MessageDelivered(chatID string, messageID string) {}
 
+func (m *MessengerSignalsHandlerMock) MessagesSent(messageIDs [][]byte) {}
+
+func (m *MessengerSignalsHandlerMock) MessagesExpired(messageIDs [][]byte, err error) {}
+
 func (m *MessengerSignalsHandlerMock) CommunityInfoFound(community *communities.Community) {
 	select {
 	case m.communityFoundChan <- community:

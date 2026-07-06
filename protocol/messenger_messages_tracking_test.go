@@ -10,63 +10,38 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
-	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/signal"
 )
 
 func TestMessengerMessagesTrackingSuite(t *testing.T) {
 	suite.Run(t, new(MessengerMessagesTrackingSuite))
 }
 
-type EnvelopeSignalHandlerMock struct{}
-
-// EnvelopeSent triggered when envelope delivered atleast to 1 peer.
-func (h EnvelopeSignalHandlerMock) EnvelopeSent(identifiers [][]byte) {
-	signal.SendEnvelopeSent(identifiers)
-}
-
-// EnvelopeExpired triggered when envelope is expired but wasn't delivered to any peer.
-func (h EnvelopeSignalHandlerMock) EnvelopeExpired(identifiers [][]byte, err error) {
-	signal.SendEnvelopeExpired(identifiers, err)
-}
-
-// MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (h EnvelopeSignalHandlerMock) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
-	signal.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
-}
-
-// MailServerRequestExpired triggered when the mailserver request expires
-func (h EnvelopeSignalHandlerMock) MailServerRequestExpired(hash types.Hash) {
-	signal.SendMailServerRequestExpired(hash)
-}
-
-type EnvelopeEventsInterceptorMock struct {
-	EnvelopeEventsInterceptor
+type MessageEventsInterceptorMock struct {
+	MessageEventsInterceptor
 
 	enabled          bool
 	lock             sync.Mutex
 	identifiersQueue [][][]byte
 }
 
-func (i *EnvelopeEventsInterceptorMock) EnvelopeSent(identifiers [][]byte) {
+func (i *MessageEventsInterceptorMock) MessagesSent(identifiers [][]byte) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	if i.enabled {
-		i.EnvelopeEventsInterceptor.EnvelopeSent(identifiers)
+		i.MessageEventsInterceptor.MessagesSent(identifiers)
 	} else {
 		i.identifiersQueue = append(i.identifiersQueue, identifiers)
 	}
 }
 
-func (i *EnvelopeEventsInterceptorMock) Enable() {
+func (i *MessageEventsInterceptorMock) Enable() {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	for _, identifiers := range i.identifiersQueue {
-		i.EnvelopeEventsInterceptor.EnvelopeSent(identifiers)
+		i.MessageEventsInterceptor.MessagesSent(identifiers)
 	}
 	i.enabled = true
 }
@@ -74,10 +49,10 @@ func (i *EnvelopeEventsInterceptorMock) Enable() {
 type MessengerMessagesTrackingSuite struct {
 	MessengerBaseTestSuite
 
-	bobInterceptor *EnvelopeEventsInterceptorMock
+	bobInterceptor *MessageEventsInterceptorMock
 	bob            *Messenger
 
-	aliceInterceptor *EnvelopeEventsInterceptorMock
+	aliceInterceptor *MessageEventsInterceptorMock
 	alice            *Messenger
 }
 
@@ -87,24 +62,17 @@ func (s *MessengerMessagesTrackingSuite) SetupTest() {
 	s.alice, s.aliceInterceptor = s.newMessenger()
 }
 
-func (s *MessengerMessagesTrackingSuite) newMessenger() (*Messenger, *EnvelopeEventsInterceptorMock) {
-	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
-		EnvelopeEventsHandler:      EnvelopeSignalHandlerMock{},
-		MaxMessageDeliveryAttempts: 1,
-		MailServerConfirmations:    false,
-	}
-
-	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{extraOptions: []Option{WithEnvelopeEventsConfig(envelopeEventsConfig)}})
+func (s *MessengerMessagesTrackingSuite) newMessenger() (*Messenger, *MessageEventsInterceptorMock) {
+	messenger, err := newRunningTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{})
 	s.Require().NoError(err)
 
-	interceptor := &EnvelopeEventsInterceptorMock{
-		EnvelopeEventsInterceptor: EnvelopeEventsInterceptor{
-			EnvelopeEventsHandler: envelopeEventsConfig.EnvelopeEventsHandler,
-			Messenger:             messenger,
+	interceptor := &MessageEventsInterceptorMock{
+		MessageEventsInterceptor: MessageEventsInterceptor{
+			Messenger: messenger,
 		},
 	}
 
-	err = messenger.messaging.SetEnvelopeEventsHandler(interceptor)
+	err = messenger.messaging.SetMessageEventsHandler(interceptor)
 	s.Require().NoError(err)
 
 	return messenger, interceptor
@@ -125,7 +93,7 @@ func (s *MessengerMessagesTrackingSuite) testMessageMarkedAsSent(textSize int) {
 	s.Require().NoError(err)
 	s.Require().False(rawMessage.Sent)
 
-	// enables "EnvelopeSent" callback processing
+	// enables "MessagesSent" callback processing
 	s.bobInterceptor.Enable()
 
 	options := func(b *backoff.ExponentialBackOff) {

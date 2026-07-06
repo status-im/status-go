@@ -18,59 +18,28 @@ type Envelope interface {
 	Size() int
 }
 
-// EventType used to define known envelope events.
+// EventType identifies envelope events emitted by the waku backend.
+//
+// These events are internal to the messaging stack: they are consumed by the
+// transport layer only and never leave the process. Client-facing signals are
+// a separate contract owned by the signal package.
 type EventType string
 
-// NOTE: This list of event names is extracted from Geth. It must be kept in sync, or otherwise a mapping layer needs to be created
 const (
-	// EventEnvelopeSent fires when envelope was sent to a peer.
+	// EventEnvelopeSent fires when an envelope is confirmed as sent into the network.
 	EventEnvelopeSent EventType = "envelope.sent"
-	// EventEnvelopeExpired fires when envelop expired
+	// EventEnvelopeExpired fires when an envelope failed to be sent and won't be retried.
 	EventEnvelopeExpired EventType = "envelope.expired"
-	// EventEnvelopeReceived is sent once envelope was received from a peer.
-	// EventEnvelopeReceived must be sent to the feed even if envelope was previously in the cache.
-	// And event, ideally, should contain information about peer that sent envelope to us.
-	EventEnvelopeReceived EventType = "envelope.received"
-	// EventBatchAcknowledged is sent when batch of envelopes was acknowledged by a peer.
-	EventBatchAcknowledged EventType = "batch.acknowledged"
-	// EventEnvelopeAvailable fires when envelop is available for filters
+	// EventEnvelopeAvailable fires when a received envelope is available for the
+	// transport to decode and route. Data carries a *ReceivedMessage.
 	EventEnvelopeAvailable EventType = "envelope.available"
-	// EventMailServerRequestSent fires when such request is sent.
-	EventMailServerRequestSent EventType = "mailserver.request.sent"
-	// EventMailServerRequestCompleted fires after mailserver sends all the requested messages
-	EventMailServerRequestCompleted EventType = "mailserver.request.completed"
-	// EventMailServerRequestExpired fires after mailserver the request TTL ends.
-	// This event is independent and concurrent to EventMailServerRequestCompleted.
-	// Request should be considered as expired only if expiry event was received first.
-	EventMailServerRequestExpired EventType = "mailserver.request.expired"
-	// EventMailServerEnvelopeArchived fires after an envelope has been archived
-	EventMailServerEnvelopeArchived EventType = "mailserver.envelope.archived"
-	// EventMailServerSyncFinished fires when the sync of messages is finished.
-	EventMailServerSyncFinished EventType = "mailserver.sync.finished"
-)
-
-const (
-	// EnvelopeTimeNotSynced represents the code passed to notify of a clock skew situation
-	EnvelopeTimeNotSynced uint = 1000
-	// EnvelopeOtherError represents the code passed to notify of a generic error situation
-	EnvelopeOtherError
 )
 
 // EnvelopeEvent used for envelopes events.
 type EnvelopeEvent struct {
 	Event EventType
-	Topic TopicType
 	Hash  cryptotypes.Hash
-	Batch cryptotypes.Hash
-	Peer  EnodeID
 	Data  interface{}
-}
-
-// EnvelopeError code and optional description of the error.
-type EnvelopeError struct {
-	Hash        cryptotypes.Hash
-	Code        uint
-	Description string
 }
 
 // Subscription represents a stream of events. The carrier of the events is typically a

@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/params"
-	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
@@ -29,6 +28,10 @@ type MessageDeliveredHandler func(string, string)
 
 type MessengerSignalsHandler interface {
 	MessageDelivered(chatID string, messageID string)
+	// MessagesSent reports messages confirmed as sent into the network.
+	MessagesSent(messageIDs [][]byte)
+	// MessagesExpired reports messages that failed to be sent.
+	MessagesExpired(messageIDs [][]byte, err error)
 	CommunityInfoFound(community *communities.Community)
 	MessengerResponse(response *MessengerResponse)
 	HistoryRequestStarted(numBatches int)
@@ -63,7 +66,6 @@ type MessengerSignalsHandler interface {
 type config struct {
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations *systemMessageTranslationsMap
-	envelopeEventsConfig       *messagingtypes.EnvelopeEventsConfig
 
 	featureFlags     common.FeatureFlags
 	codeControlFlags common.CodeControlFlags
@@ -227,13 +229,6 @@ func WithPushNotifications() func(c *config) error {
 func WithPushNotificationServer(server PushNotificationServer) func(c *config) error {
 	return func(c *config) error {
 		c.pushNotificationServer = server
-		return nil
-	}
-}
-
-func WithEnvelopeEventsConfig(emc *messagingtypes.EnvelopeEventsConfig) Option {
-	return func(c *config) error {
-		c.envelopeEventsConfig = emc
 		return nil
 	}
 }

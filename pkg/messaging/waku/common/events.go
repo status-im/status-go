@@ -20,37 +20,26 @@ package common
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 // EventType used to define known waku events.
 type EventType string
 
 const (
-	// EventEnvelopeSent fires when envelope was sent to a peer.
+	// EventEnvelopeSent fires when an envelope is confirmed as sent into the network.
 	EventEnvelopeSent EventType = "envelope.sent"
 
-	// EventEnvelopeExpired fires when envelop expired
+	// EventEnvelopeExpired fires when an envelope failed to be sent and won't be retried.
 	EventEnvelopeExpired EventType = "envelope.expired"
 
-	// EventEnvelopeReceived is sent once envelope was received from a peer.
-	// EventEnvelopeReceived must be sent to the feed even if envelope was previously in the cache.
-	// And event, ideally, should contain information about peer that sent envelope to us.
-	EventEnvelopeReceived EventType = "envelope.received"
-
-	// EventBatchAcknowledged is sent when batch of envelopes was acknowledged by a peer.
-	EventBatchAcknowledged EventType = "batch.acknowledged"
-
-	// EventEnvelopeAvailable fires when envelop is available for filters
+	// EventEnvelopeAvailable fires when a received envelope is available for the
+	// transport to decode and route.
 	EventEnvelopeAvailable EventType = "envelope.available"
 )
 
 // EnvelopeEvent represents an envelope event.
 type EnvelopeEvent struct {
 	Event EventType
-	Topic TopicType
 	Hash  common.Hash
-	Batch common.Hash
-	Peer  enode.ID
 	Data  interface{}
 }
