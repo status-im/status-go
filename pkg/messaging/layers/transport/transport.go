@@ -727,6 +727,13 @@ func (t *Transport) ConnectionState() types.ConnectionState {
 	return t.waku.ConnectionState()
 }
 
+// OnHistoryReconcileNeeded returns the waku node's history-reconcile signal
+// (#7568): fired periodically while connectivity is not reliable and once when
+// it recovers.
+func (t *Transport) OnHistoryReconcileNeeded() <-chan struct{} {
+	return t.waku.OnHistoryReconcileNeeded()
+}
+
 // Peers is retained only for the Python functional tests (see tests-functional);
 // it is not used by status-app.
 func (t *Transport) Peers() types.PeerStats {
