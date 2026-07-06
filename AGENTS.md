@@ -115,12 +115,14 @@ char ~32/33 of an ar line it's the header mtime, otherwise extract members
 ## status-desktop single-graph consumption (issue 0003)
 
 - status-desktop requires this package in its ONE dependency graph
-  (`nim_status_client.nimble`): interim via an ABSOLUTE `file://` requires
-  (nimble rejects a develop-linked package whose manifest contains `file://`
-  requires — see the wall below — and statusgo.nimble carries the interim
-  file:// nim-sds pin). Final form once the sds pin flips back to a URL:
-  `requires "statusgo"` + `nimble develop --add:vendor/status-go`
-  (name-form requires DO accept develop links).
+  (`nim_status_client.nimble`): interim via an ABSOLUTE `file://` requires.
+  Since issue 0007 statusgo.nimble pins nim-sds by `URL#hash`
+  (alexjba/nim-sds = PR logos-messaging/nim-sds#85 head, the whole 6-patch
+  queue; moves to the upstream merge SHA when the PR lands), sds resolves
+  into the shared store and builds via the `.sds-build/` scratch engine —
+  `vendor/nim-sds` is no longer needed by the default flow (it remains only
+  as a develop-mode artifact, issue 0009). The app-side statusgo pin
+  (file:// → `URL#hash`) is issue 0010's job.
 - The app's store lives OUT of tree (`~/.cache/status-desktop-nimbledeps`,
   `APP_NIMBLE_DIR` in the desktop Makefile): `nimble setup` builds dependency
   package binaries (dnsclient, via libp2p), and Nim's parent-dir config walk
@@ -141,15 +143,43 @@ char ~32/33 of an ar line it's the header mtime, otherwise extract members
   packages (statusgo, sds) are omitted, their transitive-only picks (libp2p,
   lsquic, boringssl, protobuf_serialization, npeg) are omitted too, and some
   shared entries are recorded at versions the resolution did not pick
-  (websock 0.3.0 in the lock vs 0.4.0 resolved). With a WARM store the lock
-  works anyway, but on a CLEAN store `solveLockFileDeps` takes the divergent
-  entry as a hard constraint and the graph goes unsatisfiable — hand-fix the
-  entry to the resolved version (version + vcsRevision + checksums.sha1,
-  copied from the materialized store dir `pkgs2/<name>-<ver>-<sha1>`), the
-  established lock-hand-fix pattern. Always verify a fresh lock by wiping the
-  store and re-running `make nimble-deps`.
+  (websock 0.3.0 in the lock vs 0.4.0 resolved). REVISED UNDERSTANDING
+  (issue 0007, instrumented-nimble evidence): the divergence is HARMLESS,
+  because the app never takes the lock's install-exactly fast path at all —
+  see the "lock coverage" wall below. The earlier belief that clean-store
+  `solveLockFileDeps` hard-fails on a divergent entry (and the websock
+  hand-fix that "cured" it) was a misattribution of the INI-manifest wall
+  below. A clean-store `make nimble-deps` with a websock-divergent lock
+  passes. Still verify a fresh lock by wiping the store and re-running
+  `make nimble-deps`.
 
 ## nimble 0.22.3 resolution walls (verified in source + experiments)
+
+- **INI-style dependency manifests break clean-store solves** (issue 0007;
+  minimal 2-package repro + instrumented nimble): vNext's dependency
+  validation extracts an EMPTY version from an old INI-format (`[Package]`)
+  manifest on a FRESH pkgcache clone. A version-range require on such a
+  package (uuids' `isaac >= 0.1.3`) then fails ("wanted >= 0.1.3 got .") and
+  nimble silently drops the REQUIRER from the candidate table ("Skipping
+  package uuids@ due to invalid dependency: isaac"); when a lock file is
+  present the reachability check then kills the ENTIRE solve ("Dependency X
+  not found in the graph" → "Couldn't find a solution"). A warm pkgcache
+  (cached clone) heals it — which is why "setup once fails, setup twice
+  works", and why the wall hides on any non-pristine machine. Fix shape:
+  fork + modernize the manifest + pin by `#hash` — the app pins
+  alexjba/uuids (upstream 0.1.12 + modern manifest + isaac pinned by
+  revision to alexjba/isaac = upstream v0.1.3 + modern manifest). Long-term:
+  drop uuids/isaac (unmaintained since ~2018).
+- **The lock's install-exactly fast path is unreachable for URL-pinned
+  manifests**: `solveLockFileDeps`' coverage check compares each root
+  require's NAME string against name-keyed lock entries — a `URL#hash`
+  require (and any `file://` require) never matches, one uncovered require
+  forces a FULL fresh solve, and this app's manifest is all URL pins, so
+  EVERY `nimble setup` re-solves (~1 min warm) and the lock does NOT
+  constrain that solve (verified: a lock recording websock 0.3.0 while the
+  resolution picks 0.4.0 passes a clean-store setup). The lock still gates
+  nothing per-entry — treat it as documentation + upstream contract, and
+  treat resolution changes as manifest-driven only.
 
 - **`file://` requires are legal only at top level or inside packages reached
   via `file://`** (`developfile.nim` refuses to LOAD a develop-linked package

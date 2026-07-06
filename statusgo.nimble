@@ -49,17 +49,10 @@ before build:
         "found on PATH. Install make (Xcode CLT / build-essential / msys2) or " &
         "set STATUS_GO_SKIP_GO_BUILD=1 for a source-only install without the binary."
     exec "nim libstatus statusgo.nims"
-# Interim (until the nim-sds patch queue merges upstream and the pin bumps):
-# build against the workspace-patched checkout (ABSOLUTE file:// path: nimble
-# silently drops relative or bare-URL local requires). Machine-local working-
-# tree state only. Restore the exact-revision pin
-# when flipping back:
-# requires "https://github.com/logos-messaging/nim-sds.git#884ce6f02b5a49c625683ef6e2a2dd5e67fd6c00"
-requires "file:///Users/alexjbanca/Repos/status-desktop/.claude/worktrees/nimble-migration/vendor/nim-sds"
-# nim-ffi pinned to the revision nim-sds's CI certifies (its own lock): the
-# 0.1.x range still floats and newer 0.1.x tags are untested against this sds.
-# INTERIM: pin disabled while sds is a local file:// checkout — nimble 0.22.3
-# silently drops BOTH a file:// dependency and a sibling URL#hash requires
-# when they coexist (verified); the patched sds's capped ffi range
-# (>= 0.1.3 & < 0.2.0) owns ffi meanwhile. Restore with the sds pin:
-# requires "https://github.com/logos-messaging/nim-ffi#fb25f069d2dfae2b543d79d2c1a81f197de22a2b"
+# Interim fork pin: PR logos-messaging/nim-sds#85 head (the whole 6-patch
+# queue: ffi pin, NIMFLAGS forwarding, libsdsStaticMac localization,
+# installDirs whitelist, ZERO_AR_DATE, -fno-common). Moves to the
+# logos-messaging merge SHA when PR #85 lands. No explicit nim-ffi pin
+# needed: this sds revision pins ffi itself (#fb25f069, the CI-certified
+# 0.1.4).
+requires "https://github.com/alexjba/nim-sds.git#5c89d61f897b44b75f2f28978f9928960181cf95"
