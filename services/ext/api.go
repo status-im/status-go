@@ -1045,11 +1045,13 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages(false)
+	return api.service.messenger.RequestAllHistoricMessages()
 }
 
+// RequestAllHistoricMessagesWithRetries is kept as an API-compatible alias:
+// retry and failover happen inside the store client on every request.
 func (api *PublicAPI) RequestAllHistoricMessagesWithRetries() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages(true)
+	return api.service.messenger.RequestAllHistoricMessages()
 }
 
 // Echo is a method for testing purposes.

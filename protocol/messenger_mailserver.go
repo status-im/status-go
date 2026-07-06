@@ -29,13 +29,15 @@ const (
 	oneDayDuration   = 24 * time.Hour
 	oneMonthDuration = 31 * oneDayDuration
 
+	// historicSyncMinInterval is the minimum spacing between two historic
+	// syncs. The historic-sync worker enforces it by delaying the pending sync,
+	// never by dropping triggers (see startHistoricSyncWorker).
 	historicSyncMinInterval = 20 * time.Second
 
-	// historicSyncRetryInterval and historicSyncRetryTimeout bound the login
-	// history-fetch retry. On login the libp2p host is freshly recreated and no
-	// storenode is connected yet, so the first attempt can fail before a
-	// storenode is dialable; with the go-waku storenode cycle gone nothing else
-	// retriggers the fetch, so asyncRequestAllHistoricMessages retries here.
+	// historicSyncRetryInterval and historicSyncRetryTimeout bound the
+	// historic-sync worker's per-sync retry. On login the libp2p host is
+	// freshly recreated — and right after a connectivity change the store node
+	// may not be dialable yet — so first attempts can fail.
 	historicSyncRetryInterval = 5 * time.Second
 	historicSyncRetryTimeout  = 3 * time.Minute
 )
@@ -228,11 +230,11 @@ func (m *Messenger) resetFiltersPriority(filters types2.ChatFilters) error {
 
 // RequestAllHistoricMessages requests all the historic messages for any topic.
 // It keeps aggregating all responses for callers that need the merged payload.
-func (m *Messenger) RequestAllHistoricMessages(withRetries bool) (*MessengerResponse, error) {
-	return m.requestAllHistoricMessages(withRetries, true)
+func (m *Messenger) RequestAllHistoricMessages() (*MessengerResponse, error) {
+	return m.requestAllHistoricMessages(true)
 }
 
-func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateResponses bool) (*MessengerResponse, error) {
+func (m *Messenger) requestAllHistoricMessages(aggregateResponses bool) (*MessengerResponse, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		return nil, err
@@ -254,7 +256,7 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 		return nil, nil
 	}
 
-	return m.withHistoricSyncInFlight(time.Now(), func() (*MessengerResponse, error) {
+	return m.withHistoricSyncInFlight(func() (*MessengerResponse, error) {
 		var allResponses *MessengerResponse
 		if aggregateResponses {
 			allResponses = &MessengerResponse{}
@@ -273,8 +275,7 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 		}()
 
 		// Retry and failover are handled per query by the StoreClient (it pins a
-		// store node for the whole query and fails over only at query boundaries),
-		// so withRetries no longer selects a separate retry wrapper.
+		// store node for the whole query and fails over only at query boundaries).
 		response, err := m.syncFilters(filters)
 		if err != nil {
 			return nil, err
@@ -287,26 +288,17 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 	})
 }
 
-func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
+// withHistoricSyncInFlight runs fn unless another historic sync is already in
+// progress. Automatic syncs are serialized and spaced by the historic-sync
+// worker (startHistoricSyncWorker); this gate protects against a manual
+// RequestAllHistoricMessages (RPC) racing the worker.
+func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
 	m.historicSyncMu.Lock()
 	if m.historicSyncInFlight {
 		m.historicSyncMu.Unlock()
 		m.logger.Debug("skip historic sync request (already in progress)")
 		return nil, nil
 	}
-
-	if !m.lastHistoricSyncRequestAt.IsZero() {
-		elapsed := now.Sub(m.lastHistoricSyncRequestAt)
-		if elapsed < historicSyncMinInterval {
-			m.historicSyncMu.Unlock()
-			m.logger.Debug("skip historic sync request (throttled)",
-				zap.Duration("elapsed", elapsed),
-				zap.Duration("minInterval", historicSyncMinInterval),
-			)
-			return nil, nil
-		}
-	}
-
 	m.historicSyncInFlight = true
 	m.historicSyncMu.Unlock()
 	defer func() {
@@ -315,17 +307,7 @@ func (m *Messenger) withHistoricSyncInFlight(now time.Time, fn func() (*Messenge
 		m.historicSyncMu.Unlock()
 	}()
 
-	resp, err := fn()
-	if err == nil {
-		// Only a completed sync arms the throttle. A failed attempt (e.g. no
-		// storenode reachable in the instant right after login, before the
-		// storenodes are dialed) must not block the retry that succeeds once a
-		// storenode is dialable.
-		m.historicSyncMu.Lock()
-		m.lastHistoricSyncRequestAt = now
-		m.historicSyncMu.Unlock()
-	}
-	return resp, err
+	return fn()
 }
 
 func getPrioritizedBatches() []int {

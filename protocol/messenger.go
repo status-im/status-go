@@ -148,10 +148,12 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
-	historicSyncMu            sync.Mutex
-	historicSyncInFlight      bool
-	lastHistoricSyncRequestAt time.Time
-	ratchetNotFoundDelay      time.Duration
+	historicSyncMu       sync.Mutex
+	historicSyncInFlight bool
+	// historicSyncTrigger feeds the historic-sync worker; buffered (1) so
+	// triggers coalesce (see asyncRequestAllHistoricMessages).
+	historicSyncTrigger  chan struct{}
+	ratchetNotFoundDelay time.Duration
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
@@ -434,6 +436,7 @@ func NewMessenger(
 		mailserversDatabase:   c.mailserversDatabase,
 		account:               c.account,
 		quit:                  make(chan struct{}),
+		historicSyncTrigger:   make(chan struct{}, 1),
 		ctx:                   ctx,
 		cancel:                cancel,
 		importingCommunities:  make(map[string]bool),
@@ -644,6 +647,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.schedulePublishGrantsForControlledCommunities()
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
+	m.startHistoricSyncWorker()
 	m.startHistoryReconciliationLoop()
 	m.watchChatsToUnmute()
 	m.watchCommunitiesToUnmute()

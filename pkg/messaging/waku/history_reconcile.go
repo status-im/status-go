@@ -45,44 +45,27 @@ func (w *Waku) OnHistoryReconcileNeeded() <-chan struct{} {
 // reconciliation. The fetch itself lives with the consumer (the protocol
 // layer), which owns the topics and per-chat watermarks; this loop only owns
 // connectivity confidence and cadence. Suspended while the node is paused
-// (app backgrounded): SetPaused(false) triggers its own fetch on foreground.
+// (app backgrounded, no ticker armed): SetPaused(false) triggers its own
+// fetch on foreground.
 func (w *Waku) startHistoryReconcileLoop() {
 	w.wg.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer w.wg.Done()
-		ticker := time.NewTicker(historyReconcileCheckInterval)
-		defer ticker.Stop()
+
 		sub := w.PauseBroadcaster.Subscribe()
 		defer sub.Unsubscribe()
-		paused := <-sub.C()
-		var tickerC <-chan time.Time
-		if !paused {
-			tickerC = ticker.C
-		}
 
 		reliable := w.reliablyConnected()
 		var lastReconcile time.Time
 
-		for {
-			select {
-			case <-w.ctx.Done():
-				return
-			case pausedState, ok := <-sub.C():
-				if !ok {
-					return
-				}
-				paused = pausedState
-				if paused {
-					tickerC = nil
-				} else {
-					tickerC = ticker.C
-				}
-			case <-tickerC:
+		pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+			Interval: historyReconcileCheckInterval,
+			OnTick: func() {
 				wasReliable := reliable
 				reliable = w.reliablyConnected()
 				if !shouldReconcileHistory(reliable, wasReliable, lastReconcile, time.Now(), historyReconcileMinInterval) {
-					continue
+					return
 				}
 				lastReconcile = time.Now()
 				w.logger.Debug("history reconciliation needed", zap.Bool("reliable", reliable))
@@ -90,8 +73,9 @@ func (w *Waku) startHistoryReconcileLoop() {
 				case w.historyReconcileNeeded <- struct{}{}:
 				default: // a signal is already pending; coalesce
 				}
-			}
-		}
+			},
+		}, sub.C())
+		pt.Run(w.ctx.Done())
 	}()
 }
 
