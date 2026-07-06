@@ -405,48 +405,32 @@ def rejoin_ex_owner_and_accept(
     ex_owner_wallet_address: str,
     attempts: int = 90,
     delay: int = 2,
-    resend_every: int = 15,
 ) -> str:
     """Ex-owner re-requests to join after the transfer and the new control node accepts.
 
-    The request-to-join is delivered to the control node over Waku, which can be slow or dropped in
-    CI. Rather than catch a one-shot MESSAGES_NEW signal within a fixed window, poll the control
-    node's persisted pending requests and periodically re-send until the request lands, then accept
-    it (request ids are deterministic, so the stored id matches what the ex-owner generated)."""
-    my_req_ids: set = set()
+    The ex-owner can only request once (a resend returns 'already joined'), and its request
+    reconciles into a non-pending state on the control node (which auto-generated an approved
+    request on promotion), so it never appears in pendingRequestsToJoinForCommunity. Accepting by
+    id does work once the control node has received the request. The request travels over Waku,
+    which can be slow in CI, so retry the accept (the real operation) until it succeeds rather than
+    catch a one-shot MESSAGES_NEW signal within a fixed window."""
+    resp = community_tokens.request_to_join_with_signatures(ex_owner_backend, community_id, [ex_owner_wallet_address])
+    requests = resp.get("requestsToJoinCommunity", [])
+    assert requests, "No requests to join community"
+    req_id = requests[0].get("id")
 
-    def _send():
-        try:
-            resp = community_tokens.request_to_join_with_signatures(ex_owner_backend, community_id, [ex_owner_wallet_address])
-            for req in resp.get("requestsToJoinCommunity", []) or []:
-                if req.get("id"):
-                    my_req_ids.add(req.get("id"))
-        except ApiResponseError as exc:
-            logger.debug(f"ex-owner request_to_join failed: {exc}")
-
-    _send()
+    last_exc: Optional[ApiResponseError] = None
     for attempt in range(attempts):
         try:
-            pending = new_owner_backend.wakuext_service.pending_requests_to_join_for_community(community_id) or []
+            accept_resp = new_owner_backend.wakuext_service.accept_request_to_join_community(req_id)
+            if accept_resp is not None:
+                return req_id
         except ApiResponseError as exc:
-            pending = []
-            logger.debug(f"pending_requests fetch failed: {exc}")
-
-        match = next(
-            (r for r in pending if r.get("id") in my_req_ids or r.get("publicKey") == ex_owner_backend.public_key),
-            None,
-        )
-        if match is not None:
-            accept_resp = new_owner_backend.wakuext_service.accept_request_to_join_community(match.get("id"))
-            assert accept_resp is not None, f"Failed to accept ex-owner request: {accept_resp}"
-            return match.get("id")
-
-        if attempt and attempt % resend_every == 0:
-            logger.info(f"ex-owner rejoin: control node has not observed the request, re-sending (attempt {attempt}/{attempts})")
-            _send()
+            last_exc = exc
+            logger.debug(f"accept ex-owner request not ready (attempt {attempt + 1}/{attempts}): {exc}")
         time.sleep(delay)
 
-    raise AssertionError(f"Control node never observed the ex-owner rejoin request after {attempts} attempts; ids tried={my_req_ids}")
+    raise AssertionError(f"Control node never accepted the ex-owner rejoin request {req_id} after {attempts} attempts; last error={last_exc}")
 
 
 def transfer_community_ownership(
