@@ -1005,8 +1005,9 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 			continue
 		}
 
-		// if we're doing a single chain operation, we can skip bridge processors
-		if walletCommon.IsSingleChainOperation(input.FromChainID, input.ToChainID) && walletCommon.IsProcessorBridge(pProcessor.Name()) {
+		// on a single-chain operation, skip bridge-only processors (LI.FI is also a swap)
+		if walletCommon.IsSingleChainOperation(input.FromChainID, input.ToChainID) &&
+			walletCommon.IsProcessorBridge(pProcessor.Name()) && !walletCommon.IsProcessorSwap(pProcessor.Name()) {
 			r.logger.Debug("resolveRoute: skipping bridge processor for single-chain op",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pProcessor.Name()),

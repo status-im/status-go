@@ -381,7 +381,7 @@ func buildPathProcessors(
 	// paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
 	// ret = append(ret, paraswap)
 
-	lifi := pathprocessor.NewSwapLiFiProcessor(rpcClient, transactor, tokenManager)
+	lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager)
 	ret = append(ret, lifi)
 
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)

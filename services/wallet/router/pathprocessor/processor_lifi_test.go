@@ -62,7 +62,7 @@ func TestLiFiQuote(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewSwapLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil)
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -101,12 +101,45 @@ func TestLiFiQuote(t *testing.T) {
 	assert.Equal(t, testQuote.TransactionRequest.Data, hexutil.Encode(inputData))
 }
 
+func TestLiFiBridgeAvailable(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := mock_lifi.NewMockClientInterface(ctrl)
+	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
+
+	processor := NewLiFiProcessor(nil, nil, nil)
+	processor.lifiClient = client
+
+	// Bridge the same asset (USDC) across two different chains.
+	fromToken := tokentypes.Token{Token: &types.Token{
+		Symbol:  walletCommon.UsdcSymbol,
+		Address: common.HexToAddress("0x465"),
+		ChainID: walletCommon.EthereumMainnet,
+	}}
+	toToken := tokentypes.Token{Token: &types.Token{
+		Symbol:  walletCommon.UsdcSymbol,
+		Address: common.HexToAddress("0x999"),
+		ChainID: walletCommon.OptimismMainnet,
+	}}
+
+	available, err := processor.AvailableFor(ProcessorInputParams{
+		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
+		ToChain:   &params.Network{ChainID: walletCommon.OptimismMainnet},
+		FromToken: &fromToken,
+		ToToken:   &toToken,
+		AmountIn:  big.NewInt(1000),
+	})
+	require.NoError(t, err)
+	require.True(t, available)
+}
+
 func TestLiFiBuySideUnsupported(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	client := mock_lifi.NewMockClientInterface(ctrl)
-	processor := NewSwapLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil)
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -129,7 +162,7 @@ func TestLiFiErrors(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewSwapLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil)
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()

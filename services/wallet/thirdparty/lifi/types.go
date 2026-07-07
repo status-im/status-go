@@ -7,12 +7,15 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
-var NativeTokenAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
+var NativeTokenAddress = walletcommon.ZeroAddress()
 
 type QuoteParams struct {
-	ChainID            uint64
+	FromChainID        uint64
+	ToChainID          uint64
 	FromToken          common.Address
 	ToToken            common.Address
 	FromAddress        common.Address
