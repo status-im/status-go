@@ -12,7 +12,9 @@ import std/[os, strutils]
 #   nim libsdsAndroid statusgo.nims           # ARCH + ANDROID_NDK_ROOT env
 # Artifact locations follow the copy being built:
 #   develop-linked checkout → built in place, artifacts in <checkout>/build,
-#     header contract <checkout>/library/libsds.h (unchanged for embedders).
+#     header contract <checkout>/library/libsds.h (unchanged for embedders);
+#     the artifact files are also cmp-mirrored into .sds-build/ so embedders
+#     read ONE fixed layout in every mode (copies only on content change).
 #   store copy (…/pkgs2/sds-…) → copied to .sds-build/ at the package root
 #     (scratch dir, never installed) and built there, so the shared store
 #     stays pristine. This is the `nimble install` case.
@@ -113,6 +115,22 @@ proc prepareSdsSource(sdsRoot: string): string =
       paths &= e & "\n"
   writeFile(result / "nimble.paths", paths)
 
+proc mirrorInPlaceArtifacts(srcRoot: string) =
+  ## In-place builds leave artifacts in <checkout>/build + <checkout>/library,
+  ## but embedders (status-desktop's Makefiles) read the fixed .sds-build/
+  ## layout in every mode. Mirror the artifact files there with cmp-gated
+  ## copies — ADR-0003 compare-before-copy: the build runs every time in
+  ## develop mode, dependents relink only when bytes actually changed.
+  let dest = thisDir() / ".sds-build"
+  for sub in ["build", "library"]:
+    if not dirExists(srcRoot / sub):
+      continue
+    mkDir dest / sub
+    for f in listFiles(srcRoot / sub):
+      let d = dest / sub / extractFilename(f)
+      exec "cmp -s " & quoteShell(f) & " " & quoteShell(d) &
+        " || cp " & quoteShell(f) & " " & quoteShell(d)
+
 proc runSdsTask(taskName: string, extraEnvFlags = ""): string =
   ## Runs a nim-sds build task in the resolved copy; returns the directory
   ## that was built (artifacts in <dir>/build, header in <dir>/library).
@@ -129,6 +147,8 @@ proc runSdsTask(taskName: string, extraEnvFlags = ""): string =
     " " & getEnv("NIMFLAGS"))
   exec "cd " & quoteShell(result) & " && ln -sf sds.nimble sds.nims && nim " &
     taskName & " sds.nims"
+  if result != thisDir() / ".sds-build":
+    mirrorInPlaceArtifacts(result)
 
 task libstatus, "Build static libstatus + libsds for the host into build/bin (the auto-link layout)":
   # Produces the artifacts the status_go wrapper's auto-link flags reference:
