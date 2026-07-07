@@ -296,6 +296,30 @@ char ~32/33 of an ar line it's the header mtime, otherwise extract members
   repo tree — same `name-version-checksum` directory either way. Non-srcDir
   files a consumer needs (libsds.h, the FFI wrapper) survive only via an
   `installDirs` whitelist in the dependency's own manifest.
+- **`bin` in a dependency manifest forces a binary build inside every store
+  materialization** (issue 0010; nimble source + loopback-pin experiment):
+  vnext's install pipeline gates on `bin.len > 0` alone — the package is
+  staged in `<nimbleDir>/buildtemp`, the `before build` hook runs (for this
+  package: `nim libstatus statusgo.nims`, a full host Go+libsds build), and
+  the binary is compiled, ALL during the consumer's `nimble setup`. There is
+  no skip mechanism: a hook returning false aborts the whole setup ("Pre-hook
+  prevented further execution"), `--depsOnly` only skips the ROOT package,
+  `--noRebuild` runs the hook first and needs a pre-existing binary, and
+  nimble's "hybrid" support (`installExt = @["nim"]`) only affects which
+  files install, not whether the bin builds. Consequence: statusgo.nimble is
+  SOURCE-ONLY on the pin branch (no bin/installDirs/installFiles/hook);
+  status_backend builds from checkouts via statusgo.nims. Upstream ask:
+  dependency materialization should be able to skip binary builds.
+- **Every install whitelist strips the store copy, independent of `bin`**:
+  `whitelistMode = installDirs or installFiles or installExt` (nimble
+  packageinfo.nim iterInstallFiles) — one entry and ONLY whitelisted files
+  reach the store (extension-less files like `Makefile` cannot be
+  ext-whitelisted at all). With no whitelist and no bin, setup-driven
+  materialization copies the FULL repo tree (verified: 58 MB statusgo store
+  entry with go.mod, Makefile, scripts/, tools/ — no `.git`, so `git
+  describe` version stamping is impossible from a store copy; consumers
+  derive the version from the pin SHA instead, and the store entry's
+  `nimblemeta.json` records it as `vcsRevision`).
 - **Hooks staged in buildtemp cannot run nested nimble project actions**:
   `thereIsNimbleFile` deliberately returns false under `<nimbleDir>/buildtemp`,
   so a `before build` hook cannot `nimble setup` in place during installs.
