@@ -8,8 +8,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 )
 
-// startHistoryReconciliationLoop fetches history from the store nodes whenever
-// the transport signals that reconciliation is needed — periodically while
+// startHistoryReconciliationLoop schedules a historic sync whenever the
+// transport signals that reconciliation is needed — periodically while
 // connectivity is not reliable, and once more when it recovers. This is the
 // "unreliable" leg of the history-reconciliation policy (#7568), which the
 // offline→online and app-foreground triggers do not cover: without it, a
@@ -30,53 +30,88 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 		defer gocommon.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 
-		// No isPaused check needed: the waku-side loop producing the signal is
-		// itself suspended while the transport is paused.
 		needed := m.messaging.OnHistoryReconcileNeeded()
 		for {
 			select {
 			case <-m.quit:
 				return
 			case <-needed:
-				m.logger.Debug("reconciling history with store nodes")
-				if _, err := m.requestAllHistoricMessages(true, false); err != nil {
-					m.logger.Warn("history reconciliation fetch failed", zap.Error(err))
-				}
+				m.asyncRequestAllHistoricMessages()
 			}
 		}
 	}()
 }
 
+// asyncRequestAllHistoricMessages schedules a historic-message sync on the
+// historic-sync worker (startHistoricSyncWorker). Non-blocking; concurrent
+// triggers coalesce into a single pending sync and are never silently
+// dropped — the worker spaces, serializes and retries them.
 func (m *Messenger) asyncRequestAllHistoricMessages() {
+	m.logger.Debug("asyncRequestAllHistoricMessages")
+	select {
+	case m.historicSyncTrigger <- struct{}{}:
+	default: // a sync is already pending; it will cover this trigger too
+	}
+}
+
+// startHistoricSyncWorker owns the execution of automatic historic-message
+// syncs: it serializes them, enforces historicSyncMinInterval by waiting
+// (never by dropping — triggers arriving meanwhile coalesce into the pending
+// slot and are served by the next run), and retries failed syncs with backoff.
+// The retry here is temporal, complementing the StoreClient's spatial
+// failover: the StoreClient tries the candidate storenodes within one attempt
+// and fails fast when none is reachable — which is the normal state right
+// after login (freshly recreated libp2p host) or a connectivity change — while
+// this loop decides when to try again.
+func (m *Messenger) startHistoricSyncWorker() {
 	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
 		return
 	}
 
-	m.logger.Debug("asyncRequestAllHistoricMessages")
-
+	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
-		// On login the libp2p host is freshly (re)created and no storenode is
-		// connected yet, so the first attempt can fail with "no store node
-		// reachable" before a storenode is dialable. The go-waku storenode cycle
-		// that used to retrigger the fetch is gone, so retry with backoff until a
-		// storenode serves the query (or we give up). Once one attempt succeeds
-		// it arms the throttle, so concurrent/later triggers no-op.
-		deadline := time.Now().Add(historicSyncRetryTimeout)
+		defer m.shutdownWaitGroup.Done()
+
+		var lastAttempt time.Time
 		for {
-			_, err := m.requestAllHistoricMessages(true, false)
-			if err == nil {
-				return
-			}
-			if time.Now().After(deadline) {
-				m.logger.Error("failed to request historic messages after retries", zap.Error(err))
-				return
-			}
-			m.logger.Warn("failed to request historic messages, retrying", zap.Error(err))
 			select {
 			case <-m.quit:
 				return
-			case <-time.After(historicSyncRetryInterval):
+			case <-m.historicSyncTrigger:
+			}
+
+			if m.isPaused() {
+				// Dropped, not deferred: returning to foreground schedules its own
+				// sync (SetPaused(false) → asyncRequestAllHistoricMessages).
+				continue
+			}
+
+			if wait := historicSyncMinInterval - time.Since(lastAttempt); wait > 0 {
+				select {
+				case <-m.quit:
+					return
+				case <-time.After(wait):
+				}
+			}
+
+			deadline := time.Now().Add(historicSyncRetryTimeout)
+			for {
+				lastAttempt = time.Now()
+				_, err := m.requestAllHistoricMessages(false)
+				if err == nil {
+					break
+				}
+				if time.Now().After(deadline) {
+					m.logger.Error("historic sync failed after retries", zap.Error(err))
+					break
+				}
+				m.logger.Warn("historic sync failed, retrying", zap.Error(err))
+				select {
+				case <-m.quit:
+					return
+				case <-time.After(historicSyncRetryInterval):
+				}
 			}
 		}
 	}()
