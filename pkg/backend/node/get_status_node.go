@@ -319,10 +319,32 @@ func (n *StatusNode) LoadLocalBackup(filePath string) error {
 }
 
 func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, advertizeHost string, advertizePort int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
 	n.mediaServerAddress = address
 	n.mediaServerEnableTLS = enableTLS
 	n.mediaServerAdvertizeHost = advertizeHost
 	n.mediaServerAdvertizePort = advertizePort
+
+	if n.mediaServer != nil {
+		if err := n.startMediaServer(); err != nil {
+			n.logger.Error("failed to restart media server with updated options", zap.Error(err))
+		}
+	}
+}
+
+func (n *StatusNode) StopMediaServer() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.mediaServer == nil {
+		return nil
+	}
+
+	err := n.mediaServer.Stop()
+	n.mediaServer = nil
+	return err
 }
 
 func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
@@ -500,7 +522,9 @@ func (n *StatusNode) Stop() error {
 	n.rpcClient = nil
 	n.config = nil
 
-	n.mediaServer.SetDataProviders(nil, nil, nil)
+	if n.mediaServer != nil {
+		n.mediaServer.SetDataProviders(nil, nil, nil)
+	}
 
 	n.downloader.Stop()
 	n.downloader = nil

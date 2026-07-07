@@ -2093,7 +2093,12 @@ func (b *StatusBackend) Logout() error {
 	b.account = nil
 
 	if b.statusNode != nil {
-		if err := b.statusNode.Stop(); err != nil {
+		if b.statusNode.IsRunning() {
+			if err := b.statusNode.Stop(); err != nil {
+				return err
+			}
+		}
+		if err := b.statusNode.StopMediaServer(); err != nil {
 			return err
 		}
 		b.statusNode = nil
