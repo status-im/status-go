@@ -12,43 +12,20 @@ license       = "MPL-2.0"
 # `nim libstatus statusgo.nims` (host auto-link artifacts) or
 # `nim libsds statusgo.nims` (shared libsds only).
 
-# Executable delivery: `nimble install` puts the status-backend RPC server on
-# PATH as `status_backend`, built from source for the host. The before-build
-# hook produces the Go artifacts (build/bin/libstatus.a + libsds.a) that the
-# bin links through the wrapper's auto-link — the same path library consumers
-# use — and installDirs carries them into the package store so installed
-# copies keep linking.
-bin         = @["status_backend"]
-# A package with `bin` is treated as binary-only: nimble installs nothing but
-# the binary plus these whitelists. The wrapper module and the hook-produced
-# build/ artifacts must be listed explicitly or consumers cannot
-# `import status_go` from the installed copy (hybrid behavior).
-installDirs  = @["build", "status_go"]
-installFiles = @["status_go.nim", "statusgo.nims"]
+# SOURCE-ONLY on this interim branch (issue 0010): no `bin`, no install
+# whitelists, no build hook. On nimble 0.22.3 a dependency manifest with `bin`
+# forces every store materialization through buildtemp + the before-build hook
+# + a binary build (vnext.nim gates on `bin.len > 0` alone, hook-cancel aborts
+# the whole setup), i.e. consumers would pay a full host Go build inside every
+# clean-store `nimble setup` for artifacts they never link. Any whitelist
+# entry (installDirs/installFiles/installExt) additionally strips the store
+# copy to the whitelisted files — dropping go.mod/Makefile/*.go — so all of
+# them must stay absent for the full source tree to materialize (see
+# AGENTS.md, "nimble 0.22.3 resolution walls"). The status_backend RPC server
+# remains buildable from a checkout via `nim libstatus statusgo.nims` +
+# `nim c status_backend.nim`; the former `nimble install` bin contract returns
+# when nimble can materialize dependencies without building their binaries.
 
-before build:
-  # Building the status_backend bin needs the Go artifacts at link time.
-  # STATUS_GO_SKIP_GO_BUILD=1 skips the Go build for source-only workflows:
-  # existing build/bin artifacts are reused when present, otherwise the
-  # binary step is cancelled.
-  if getEnv("STATUS_GO_SKIP_GO_BUILD").len > 0:
-    if fileExists("build/bin/libstatus.a"):
-      echo "STATUS_GO_SKIP_GO_BUILD set: skipping the Go build, " &
-        "linking status_backend against the existing build/bin artifacts"
-    else:
-      echo "STATUS_GO_SKIP_GO_BUILD set and no prebuilt build/bin/libstatus.a: " &
-        "skipping the status_backend binary step (source-only, no Go build)"
-      return false
-  else:
-    if findExe("go").len == 0:
-      quit "status-go builds libstatus from source and needs the Go toolchain, " &
-        "but `go` was not found on PATH. Install Go (https://go.dev/dl/) or set " &
-        "STATUS_GO_SKIP_GO_BUILD=1 for a source-only install without the binary."
-    if findExe("make").len == 0:
-      quit "status-go builds libstatus via its Makefile, but `make` was not " &
-        "found on PATH. Install make (Xcode CLT / build-essential / msys2) or " &
-        "set STATUS_GO_SKIP_GO_BUILD=1 for a source-only install without the binary."
-    exec "nim libstatus statusgo.nims"
 # Interim fork pin: PR logos-messaging/nim-sds#85 head (the whole 6-patch
 # queue: ffi pin, NIMFLAGS forwarding, libsdsStaticMac localization,
 # installDirs whitelist, ZERO_AR_DATE, -fno-common). Moves to the
