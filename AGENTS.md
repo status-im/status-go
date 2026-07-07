@@ -181,6 +181,20 @@ char ~32/33 of an ar line it's the header mtime, otherwise extract members
   nothing per-entry — treat it as documentation + upstream contract, and
   treat resolution changes as manifest-driven only.
 
+- **Warm re-setups emit dangling srcDir entries for srcDir-hoisted store
+  copies** (issue 0009, verified by wiping a single store entry): the setup
+  run that MATERIALIZES a store copy installs it srcDir-hoisted (module files
+  at the entry root — alexjba/isaac declares `srcDir = "src"` but the store
+  copy has `isaac.nim` at the root, `files` in nimblemeta.json confirms) and
+  writes a root path entry into nimble.paths, which works. Every LATER
+  `nimble setup` re-derives that entry from the manifest as `<root>/src` — a
+  directory that does not exist in the hoisted copy — so `import isaac` dies
+  ("cannot open file: isaac") on the first app recompile after any warm
+  re-setup (fresh setup → root entry → works; immediate second setup → /src
+  entry → dangles; same store). Hits any dependency whose manifest declares a
+  srcDir that hoisting collapses. status-desktop counter-measure: the isaac
+  path hack in config.nims points at whichever of `<entry>` /
+  `<entry minus /src>` actually exists.
 - **`file://` requires are legal only at top level or inside packages reached
   via `file://`** (`developfile.nim` refuses to LOAD a develop-linked package
   whose manifest has one: "'file://' requires are only allowed in top level
