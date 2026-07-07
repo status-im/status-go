@@ -644,6 +644,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.schedulePublishGrantsForControlledCommunities()
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
+	m.startHistoryReconciliationLoop()
 	m.watchChatsToUnmute()
 	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
