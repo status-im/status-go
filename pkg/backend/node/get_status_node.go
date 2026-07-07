@@ -319,6 +319,9 @@ func (n *StatusNode) LoadLocalBackup(filePath string) error {
 }
 
 func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, advertizeHost string, advertizePort int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
 	n.mediaServerAddress = address
 	n.mediaServerEnableTLS = enableTLS
 	n.mediaServerAdvertizeHost = advertizeHost
@@ -332,6 +335,9 @@ func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, adv
 }
 
 func (n *StatusNode) StopMediaServer() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
 	if n.mediaServer == nil {
 		return nil
 	}
