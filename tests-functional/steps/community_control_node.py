@@ -97,29 +97,21 @@ def promote_to_control_node(
     raise AssertionError(f"promote_self_to_control_node never succeeded after {attempts} attempts; last error={last_exc}")
 
 
-def wait_until_is_control_node(
+def wait_until_local_control_node_state(
     backend: StatusBackend,
     community_id: str,
     expected: bool = True,
     attempts: int = 30,
     delay: int = 2,
-    try_database: bool = True,
-    pull_sync_every: int = 5,
 ) -> dict:
-    """Poll until *backend* sees its own control-node status equal to *expected*.
+    """Poll the backend's local control-node state until isControlNode equals *expected*.
 
-    isControlNode flips only after the paired-device control-node sync is received, so periodically
-    pull historic messages from the store to fetch it instead of waiting for passive delivery."""
+    isControlNode is a local per-device flag, so this reads from the local database only."""
     community: Optional[dict] = None
     observed: Optional[bool] = None
     for attempt in range(attempts):
-        if pull_sync_every and attempt % pull_sync_every == 0:
-            try:
-                backend.wakuext_service.request_all_historic_messages()
-            except ApiResponseError as exc:
-                logger.warning(f"request_all_historic_messages failed (attempt {attempt + 1}): {exc}")
         try:
-            community = messenger.fetch_community(backend, community_id, wait_for_response=True, try_database=try_database)
+            community = messenger.fetch_community(backend, community_id, wait_for_response=True, try_database=True)
         except ApiResponseError as exc:
             logger.debug(f"fetch_community failed (attempt {attempt + 1}): {exc}")
             community = None

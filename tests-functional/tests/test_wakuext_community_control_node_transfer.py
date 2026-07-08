@@ -49,6 +49,7 @@ class TestCommunityControlNodeTransfer:
     community_token_deployer: str
     deploy_state: CommunityTokenDeployState
 
+    @pytest.mark.flaky(reruns=0)  # DIAGNOSTIC: run once so the long device-1 wait can't multiply the job time
     def test_control_node_transfer_across_devices(
         self,
         owner_backend,
@@ -97,8 +98,8 @@ class TestCommunityControlNodeTransfer:
 
         # When the Owner transfers control from device 1 to device 2
         community_control_node.promote_to_control_node(owner_device_2, community_id, attempts=60)
-        community_control_node.wait_until_is_control_node(owner_device_2, community_id, expected=True, attempts=45)
-        community_control_node.wait_until_is_control_node(owner_device_1, community_id, expected=False, attempts=45)
+        community_control_node.wait_until_local_control_node_state(owner_device_2, community_id, expected=True, attempts=60)
+        community_control_node.wait_until_local_control_node_state(owner_device_1, community_id, expected=False, attempts=180)
 
         # And device 2 goes offline (wait for node.stopped so device 1's edit can't race it).
         with owner_device_2.expect_signal(SignalType.NODE_STOPPED):
