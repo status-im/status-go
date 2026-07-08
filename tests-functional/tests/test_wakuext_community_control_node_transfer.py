@@ -108,22 +108,22 @@ class TestCommunityControlNodeTransfer:
         # When the Owner on device 1 edits the community
         # Then the member sees the updated community
         name_from_device_1, description_from_device_1 = community_tokens.edit_community_and_wait_until_observer_sees_update(
-            owner_device_1, member, community_id, attempts=180, wait_for_message_signal=False
+            owner_device_1, member, community_id, attempts=60, wait_for_message_signal=False
         )
 
         # When device 2 comes online
-        _login_device(owner_device_2, owner_key_uid, owner_password)
+        _login_device(owner_device_2, owner_key_uid, owner_password, online_timeout=120)
 
         # Then the Owner on device 2 sees the updated community
         community_tokens.wait_until_member_sees_community_update(
-            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=180, spectate=True
+            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=120, spectate=True
         )
 
         # When the Owner on device 2 edits the community
         # Then the member and the Owner on device 1 see the updated community
         name_from_device_2, description_from_device_2 = community_tokens.edit_community_and_wait_until_observer_sees_update(
-            owner_device_2, member, community_id, attempts=180, wait_for_message_signal=False
+            owner_device_2, member, community_id, attempts=60, wait_for_message_signal=False
         )
         community_tokens.wait_until_member_sees_community_update(
-            owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=180, spectate=True
+            owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=60, spectate=True
         )
