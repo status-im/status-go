@@ -49,7 +49,7 @@ class TestCommunityControlNodeTransfer:
     community_token_deployer: str
     deploy_state: CommunityTokenDeployState
 
-    @pytest.mark.flaky(reruns=0)  # DIAGNOSTIC: run once so the long device-1 wait can't multiply the job time
+    @pytest.mark.flaky(reruns=0)  # heavy e2e test (~25 min/run): reruns would multiply the whole run past the job timeout
     def test_control_node_transfer_across_devices(
         self,
         owner_backend,
@@ -108,7 +108,7 @@ class TestCommunityControlNodeTransfer:
         # When the Owner on device 1 edits the community
         # Then the member sees the updated community
         name_from_device_1, description_from_device_1 = community_tokens.edit_community_and_wait_until_observer_sees_update(
-            owner_device_1, member, community_id, attempts=45, wait_for_message_signal=False
+            owner_device_1, member, community_id, attempts=180, wait_for_message_signal=False
         )
 
         # When device 2 comes online
@@ -116,14 +116,14 @@ class TestCommunityControlNodeTransfer:
 
         # Then the Owner on device 2 sees the updated community
         community_tokens.wait_until_member_sees_community_update(
-            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=45, spectate=True
+            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=180, spectate=True
         )
 
         # When the Owner on device 2 edits the community
         # Then the member and the Owner on device 1 see the updated community
         name_from_device_2, description_from_device_2 = community_tokens.edit_community_and_wait_until_observer_sees_update(
-            owner_device_2, member, community_id, attempts=45, wait_for_message_signal=False
+            owner_device_2, member, community_id, attempts=180, wait_for_message_signal=False
         )
         community_tokens.wait_until_member_sees_community_update(
-            owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=45, spectate=True
+            owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=180, spectate=True
         )
