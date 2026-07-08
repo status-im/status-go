@@ -91,14 +91,15 @@ def wait_until_member_sees_community_update(
     spectate: bool = False,
 ):
     """Poll until backend sees the expected community name and description."""
-    if spectate:
-        try:
-            backend.wakuext_service.spectate_community(community_id)
-        except Exception as exc:
-            logger.debug(f"spectate_community failed for {community_id}: {exc}")
-
     last_community = None
     for _ in range(attempts):
+        # Re-spectate each iteration to survive a subscription that raced a device reconnect.
+        if spectate:
+            try:
+                backend.wakuext_service.spectate_community(community_id)
+            except Exception as exc:
+                logger.debug(f"spectate_community failed for {community_id}: {exc}")
+
         if check_member_community_updated(backend, community_id, expected_name, expected_description):
             return
         member_communities = backend.wakuext_service.communities()
