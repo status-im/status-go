@@ -114,6 +114,10 @@ class TestCommunityControlNodeTransfer:
         # When device 2 comes online
         _login_device(owner_device_2, owner_key_uid, owner_password, online_timeout=120)
 
+        # Device 2 was offline during the edit, so force-pull the missed messages from the store
+        # before checking — passive delivery of the missed edit event is unreliable under CI load.
+        community_tokens.catch_up_community_after_reconnect(owner_device_2, community_id)
+
         # Then the Owner on device 2 sees the updated community
         community_tokens.wait_until_member_sees_community_update(
             owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=120, spectate=True

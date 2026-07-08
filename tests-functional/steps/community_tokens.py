@@ -8,6 +8,7 @@ from clients.services.wakuext import (
     CommunityTokenPermissionType,
     CommunityTokenType,
 )
+from clients.api import ApiResponseError
 from clients.signals import CommunityMemberReevaluationStatus, SignalType
 from clients.status_backend import StatusBackend
 from resources.constants import user_1
@@ -115,6 +116,21 @@ def wait_until_member_sees_community_update(
         f"last observed name={(last_community or {}).get('name')!r} "
         f"description={(last_community or {}).get('description')!r}"
     )
+
+
+def catch_up_community_after_reconnect(backend: StatusBackend, community_id: str, attempts: int = 3, delay: int = 2):
+    """After a device reconnects, force-pull missed messages from the store so it processes community
+    updates that arrived while it was offline, instead of waiting for unreliable passive delivery."""
+    for _ in range(attempts):
+        try:
+            backend.wakuext_service.request_all_historic_messages()
+        except ApiResponseError as exc:
+            logger.warning(f"request_all_historic_messages failed: {exc}")
+        try:
+            backend.wakuext_service.spectate_community(community_id)
+        except ApiResponseError as exc:
+            logger.debug(f"spectate_community failed for {community_id}: {exc}")
+        time.sleep(delay)
 
 
 def edit_community_and_wait_until_observer_sees_update(
