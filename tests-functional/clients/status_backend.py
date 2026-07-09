@@ -42,6 +42,7 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
 class StatusBackend(RpcClient, SignalClient, ApiClient):
+    name: str = ""
     container: StatusBackendContainer | None = None
     _media_server_port_gen = itertools.count(constants.STATUS_MEDIA_SERVER_PORT, 1)
     _connector_ws_port_gen = itertools.count(constants.STATUS_CONNECTOR_WS_PORT, 1)
