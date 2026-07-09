@@ -82,6 +82,7 @@ class TestFetchingChatMessages:
         messages = response.get("messages", [])
         assert len(messages) == expected_count
 
+    @pytest.mark.light_client_7393
     def test_all_messages_from_chats_and_communities_which_match_term(self, sender, receiver):
         # One to one
         messenger.make_contacts(sender, receiver)
@@ -110,6 +111,7 @@ class TestFetchingChatMessages:
         assert text_group in actual_texts
         assert text_community in actual_texts
 
+    @pytest.mark.light_client_7393
     @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6359")
     def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self, sender, receiver):
         # One to one

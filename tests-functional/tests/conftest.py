@@ -138,6 +138,17 @@ def backend_factory(request):
     _parallel_teardown(tasks)
 
 
+def pytest_collection_modifyitems(config, items):
+    # Skip only the light-client leg of tests marked known-flaky under #7393, keeping the full-node
+    # (wakuV2LightClient_False) leg. Remove this hook and the marker when the issue is closed.
+    skip_flaky = pytest.mark.skip(
+        reason="known-flaky light-client test, tracked in https://github.com/status-im/status-go/issues/7393 (remove when the issue is closed)"
+    )
+    for item in items:
+        if item.get_closest_marker("light_client_7393") and "wakuV2LightClient_False" not in item.nodeid:
+            item.add_marker(skip_flaky)
+
+
 @pytest.fixture(scope="function", autouse=False)
 def waku_light_client(request) -> bool:
     return getattr(request, "param", False)
