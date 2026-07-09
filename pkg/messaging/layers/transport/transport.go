@@ -771,6 +771,10 @@ func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) err
 	return t.cache.Add(ids, timestamp)
 }
 
+func (t *Transport) AlreadyProcessed(ids []string) (map[string]bool, error) {
+	return t.cache.Hits(ids)
+}
+
 // CleanMessagesProcessed clears the messages that are older than timestamp
 func (t *Transport) CleanMessagesProcessed(timestamp uint64) error {
 	return t.cache.Clean(timestamp)

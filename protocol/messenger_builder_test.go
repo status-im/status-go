@@ -43,9 +43,9 @@ type testMessengerConfig struct {
 	unhandledMessagesTracker *unhandledMessagesTracker
 	messagesOrderController  *MessagesOrderController
 
-	appSettings  *settings2.Settings
-	nodeConfig   *params.NodeConfig
-	extraOptions []Option
+	appSettings      *settings2.Settings
+	nodeConfig       *params.NodeConfig
+	extraOptions     []Option
 	messagingOptions []messaging2.Options
 }
 

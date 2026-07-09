@@ -2,7 +2,6 @@ package reliability
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -113,15 +112,15 @@ func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missing
 	if handler == nil || len(missingDeps) == 0 {
 		return
 	}
-	fmt.Println("Handling missing dependencies for message", string(messageID), "with deps", missingDeps)
 
-	missingDepsAsString := make([]string, len(missingDeps))
-	for i, dep := range missingDeps {
+	missingDepsAsString := make([]string, 0, len(missingDeps))
+	for _, dep := range missingDeps {
 		if len(dep.RetrievalHint) > 0 {
-			missingDepsAsString[i] = string(dep.RetrievalHint)
-			continue
+			missingDepsAsString = append(missingDepsAsString, string(dep.RetrievalHint))
 		}
-		missingDepsAsString[i] = string(dep.MessageID)
+	}
+	if len(missingDepsAsString) == 0 {
+		return
 	}
 
 	if err := handler(string(messageID), missingDepsAsString, channelID); err != nil {

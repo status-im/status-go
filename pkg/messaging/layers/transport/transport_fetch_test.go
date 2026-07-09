@@ -29,6 +29,29 @@ type fakeWakuWithHashFetcher struct {
 	fetchInvocations  int
 }
 
+type fakeProcessedMessageIDsCache struct {
+	receivedIDs []string
+	hits        map[string]bool
+	err         error
+}
+
+func (f *fakeProcessedMessageIDsCache) Clear() error {
+	return nil
+}
+
+func (f *fakeProcessedMessageIDsCache) Hits(ids []string) (map[string]bool, error) {
+	f.receivedIDs = append([]string(nil), ids...)
+	return f.hits, f.err
+}
+
+func (f *fakeProcessedMessageIDsCache) Add(ids []string, timestamp uint64) error {
+	return nil
+}
+
+func (f *fakeProcessedMessageIDsCache) Clean(timestamp uint64) error {
+	return nil
+}
+
 func (f *fakeWakuWithHashFetcher) GetActiveStorenode() peer.AddrInfo {
 	return f.active
 }
@@ -47,6 +70,18 @@ func TestFetchMessagesByHashes_EmptyHashesNoop(t *testing.T) {
 	err := tr.FetchMessagesByHashes(context.Background(), nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, waku.fetchInvocations)
+}
+
+func TestAlreadyProcessed_ForwardsToCache(t *testing.T) {
+	hashes := []string{"0x01", "0x02"}
+	expectedHits := map[string]bool{"0x02": true}
+	cache := &fakeProcessedMessageIDsCache{hits: expectedHits}
+	tr := &Transport{cache: cache}
+
+	hits, err := tr.AlreadyProcessed(hashes)
+	require.NoError(t, err)
+	require.Equal(t, hashes, cache.receivedIDs)
+	require.Equal(t, expectedHits, hits)
 }
 
 func TestFetchMessagesByHashes_NoActiveStorenode(t *testing.T) {

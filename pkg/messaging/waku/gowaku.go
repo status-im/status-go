@@ -57,8 +57,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
-	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
 	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
+	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
 	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
@@ -1697,7 +1697,6 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 	if len(messageHashes) == 0 {
 		return nil
 	}
-	fmt.Println("Fetching messages by hash from storenode:", storenode.ID, "hashes:", messageHashes)
 
 	parsedHashes := make([]pb.MessageHash, 0, len(messageHashes))
 	for _, messageHash := range messageHashes {
@@ -1708,7 +1707,6 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 		}
 		parsedHashes = append(parsedHashes, pb.ToMessageHash(decodedHash))
 	}
-	fmt.Println("Parsed message hashes for storenode fetch:", parsedHashes)
 
 	if len(parsedHashes) == 0 {
 		return nil
@@ -1719,7 +1717,6 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 	// Encapsulate the peer ID into the multiaddresses as expected by the missing API
 	encapsulatedAddrs := utils.EncapsulatePeerID(storenodeInfo.ID, storenodeInfo.Addrs...)
 	storenodeInfo.Addrs = encapsulatedAddrs
-	fmt.Println("Enriched storenode with encapsulated addresses:", storenodeInfo.Addrs)
 
 	type hashRequestor interface {
 		GetMessagesByHash(ctx context.Context, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error)
@@ -1732,24 +1729,19 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 
 	result, err := requestor.GetMessagesByHash(ctx, storenodeInfo, uint64(len(parsedHashes)), parsedHashes)
 	if err != nil {
-		fmt.Println("Error fetching messages by hash from storenode:", storenodeInfo.ID, "error:", err)
 		return err
 	}
 
 	if result == nil {
-		fmt.Println("No messages found for the requested hashes from storenode:", storenodeInfo.ID)
 		return nil
 	}
 
 	for {
 		messages := result.Messages()
-		fmt.Println("Processing batch of messages from storenode fetch by hash, batch size:", len(messages))
 
 		for _, mkv := range messages {
 			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
-			fmt.Println("Received message from storenode fetch by hash:", envelope.Hash().String())
 			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, true); err != nil {
-				fmt.Println("Error processing messages from storenode fetch by hash:", err)
 				return err
 			}
 		}
@@ -1759,15 +1751,8 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 		}
 
 		if err := result.Next(ctx); err != nil {
-			fmt.Println("Error fetching next batch of messages from storenode:", err)
 			return err
 		}
-	}
-
-	if processedCount == 0 {
-		fmt.Println("Storenode fetch by hash completed without returning any messages for the requested hashes")
-	} else {
-		fmt.Println("Storenode fetch by hash completed, processed messages:", processedCount)
 	}
 
 	return nil

@@ -3,7 +3,6 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
@@ -266,22 +266,41 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 	default:
 	}
 
-	fmt.Println("Scheduling missing dependency fetch for message", messageID, "with deps", missingDeps)
-
 	c.wg.Add(1)
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer c.wg.Done()
 
 		fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
 		defer cancel()
 
-		err := c.stack.Transport.FetchMessagesByHashes(fetchCtx, missingDeps)
+		alreadyProcessed, err := c.stack.Transport.AlreadyProcessed(missingDeps)
 		if err != nil {
-			fmt.Println("failed to fetch missing dependencies from storenode", "messageID", messageID, "channelID", channelID, "missingDeps", missingDeps, "error", err)
-			c.logger.Debug("failed to fetch missing dependencies from storenode",
+			c.logger.Debug("failed to check missing dependencies cache",
 				zap.String("messageID", messageID),
 				zap.String("channelID", channelID),
 				zap.Strings("missingDeps", missingDeps),
+				zap.Error(err),
+			)
+			return
+		}
+
+		missingDepsToFetch := make([]string, 0, len(missingDeps))
+		for _, missingDep := range missingDeps {
+			if !alreadyProcessed[missingDep] {
+				missingDepsToFetch = append(missingDepsToFetch, missingDep)
+			}
+		}
+		if len(missingDepsToFetch) == 0 {
+			return
+		}
+
+		err = c.stack.Transport.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
+		if err != nil {
+			c.logger.Debug("failed to fetch missing dependencies from storenode",
+				zap.String("messageID", messageID),
+				zap.String("channelID", channelID),
+				zap.Strings("missingDeps", missingDepsToFetch),
 				zap.Error(err),
 			)
 		}
