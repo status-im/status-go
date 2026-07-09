@@ -20,6 +20,7 @@ class TestChatActions:
     def receiver(self, backend_new_profile, waku_light_client):
         return backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.light_client_7393
     def test_all_chats(self, sender, receiver):
         messenger.make_contacts(sender, receiver)
         private_group_id = messenger.join_private_group(admin=sender, member=receiver)
@@ -45,6 +46,7 @@ class TestChatActions:
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
 
+    @pytest.mark.light_client_7393
     def test_chats_preview(self, sender, receiver):
         # One to one
         messenger.make_contacts(sender, receiver)
@@ -68,6 +70,7 @@ class TestChatActions:
         assert len(chats_previews) == 2
         assert {chat.get("id", "") for chat in chats_previews} == {one_to_one_chat_id, private_group_chat_id}
 
+    @pytest.mark.light_client_7393
     def test_active_chats(self, sender, receiver):
         messenger.make_contacts(sender, receiver)
         messenger.send_multiple_one_to_one_messages(1, sender=sender, receiver=receiver)
