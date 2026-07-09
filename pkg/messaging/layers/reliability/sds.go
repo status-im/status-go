@@ -1,8 +1,6 @@
 package reliability
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
@@ -10,9 +8,6 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
-
-// Hashes
-// 0xb0bf45126fdcae4c3cb4d0fc8bca3e089f8113b85a56ae89e1ee751499488dd8
 
 func newSdsReliabilityManager(
 	logger *zap.Logger,
@@ -30,11 +25,6 @@ func newSdsReliabilityManager(
 			logger.Debug("message sent with sds", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
 		},
 		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string) {
-			fmt.Println("OnMissingDependencies: Message has missing dependencies", missingDeps)
-			for _, dep := range missingDeps {
-				fmt.Printf("Missing dependency: MessageID=%s, RetrievalHintLen=%d, RetrievalHintHex=%x\n", dep.MessageID, len(dep.RetrievalHint), dep.RetrievalHint)
-			}
-
 			logger.Debug("missing dependencies",
 				zap.String("messageId", string(messageId)),
 				zap.String("channelId", channelId),
