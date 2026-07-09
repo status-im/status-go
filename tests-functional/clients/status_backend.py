@@ -203,7 +203,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         return self.api_request_json(method, data)
 
-    def _build_anvil_network(self, **kwargs):
+    def _build_anvil_network(self, provider_type="embedded-direct", **kwargs):
         network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
         anvil_network = {
             "chainID": network_id,
@@ -214,7 +214,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                     "name": "Anvil Direct",
                     "url": Config.anvil_url,
                     "enableRpsLimiter": False,
-                    "type": "embedded-direct",
+                    "type": provider_type,
                     "enabled": True,
                     "authType": "no-auth",
                 }
@@ -250,11 +250,12 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             data["networksOverride"] = [anvil_network, *extra_networks_override]
 
     def add_anvil_network(self, **kwargs):
-        # LoginAccount rebuilds the network list from defaults (status-im/status-go#6010, #5597),
-        # so a paired device that signs in via login() never gets the Anvil chain and drops
-        # token-gated community messages ("could not find network: 31337"). Re-add it against the
-        # live network manager after every login.
-        network = self._build_anvil_network(**kwargs)
+        # LoginAccount rebuilds the network list from defaults (status-im/status-go#6010, #5597), so a
+        # paired device that signs in via login() never gets the Anvil chain and drops token-gated
+        # community messages. wallet_addEthereumChain (Upsert) keeps only USER providers, so add the
+        # chain with a user provider — an embedded one is stripped, leaving the chain with no usable
+        # provider, which fails as "could not find any enabled RPC providers for chain: 31337".
+        network = self._build_anvil_network(provider_type="user", **kwargs)
         return self.wallet_service.add_ethereum_chain(network)
 
     def _set_proxy_credentials(self, data):
