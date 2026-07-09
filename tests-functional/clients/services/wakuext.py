@@ -893,9 +893,6 @@ class WakuextService(Service):
         response = self.rpc_request("handleLocalBackupCommunities", params)
         return response
 
-    def request_all_historic_messages(self):
-        return self.rpc_request("requestAllHistoricMessages", [])
-
     def generate_hash_ratchet_key(self, group_id: str):
         params = [group_id]
         response = self.rpc_request("generateHashRatchetKey", params)

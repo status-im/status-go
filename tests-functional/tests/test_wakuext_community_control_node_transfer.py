@@ -38,6 +38,10 @@ def _login_device(backend, key_uid, password, online_timeout=60):
     backend.login(key_uid, password)
     backend.wait_for_login()
     backend.wait_for_wakuext_ready(timeout=30)
+    # LoginAccount resets networks to defaults (status-im/status-go#6010, #5597), so the paired
+    # device has no Anvil chain and would drop token-gated community events with
+    # "could not find network: 31337". Re-add it after each sign-in.
+    backend.add_anvil_network()
     backend.wait_for_online(timeout=online_timeout)
 
 
@@ -101,24 +105,20 @@ class TestCommunityControlNodeTransfer:
         community_control_node.wait_until_local_control_node_state(owner_device_2, community_id, expected=True, attempts=60)
         community_control_node.wait_until_local_control_node_state(owner_device_1, community_id, expected=False, attempts=180)
 
-        # And device 2 goes offline (wait for node.stopped so device 1's edit can't race it).
+        # And Device B goes offline (wait for node.stopped so device 1's edit can't race it)
         with owner_device_2.expect_signal(SignalType.NODE_STOPPED):
             owner_device_2.logout()
 
-        # When the Owner on device 1 edits the community
-        # Then the member sees the updated community
+        # When the Owner on Device A edits the community
+        # Then Member A sees the updated community
         name_from_device_1, description_from_device_1 = community_tokens.edit_community_and_wait_until_observer_sees_update(
             owner_device_1, member, community_id, attempts=60, wait_for_message_signal=False
         )
 
-        # When device 2 comes online
+        # When Device B comes online
         _login_device(owner_device_2, owner_key_uid, owner_password, online_timeout=120)
 
-        # Device 2 was offline during the edit, so force-pull the missed messages from the store
-        # before checking — passive delivery of the missed edit event is unreliable under CI load.
-        community_tokens.catch_up_community_after_reconnect(owner_device_2, community_id)
-
-        # Then the Owner on device 2 sees the updated community
+        # Then the Owner on Device B sees the updated community
         community_tokens.wait_until_member_sees_community_update(
             owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=120, spectate=True
         )
