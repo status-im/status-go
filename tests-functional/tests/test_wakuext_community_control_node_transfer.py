@@ -103,7 +103,7 @@ class TestCommunityControlNodeTransfer:
         # When the Owner transfers control from device 1 to device 2
         community_control_node.promote_to_control_node(owner_device_2, community_id, attempts=60)
         community_control_node.wait_until_local_control_node_state(owner_device_2, community_id, expected=True, attempts=60)
-        community_control_node.wait_until_local_control_node_state(owner_device_1, community_id, expected=False, attempts=180)
+        community_control_node.wait_until_local_control_node_state(owner_device_1, community_id, expected=False, attempts=90)
 
         # And Device B goes offline (wait for node.stopped so device 1's edit can't race it)
         with owner_device_2.expect_signal(SignalType.NODE_STOPPED):
@@ -120,7 +120,7 @@ class TestCommunityControlNodeTransfer:
 
         # Then the Owner on Device B sees the updated community
         community_tokens.wait_until_member_sees_community_update(
-            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=120, spectate=True
+            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, spectate=True
         )
 
         # When the Owner on device 2 edits the community
