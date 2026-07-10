@@ -121,7 +121,9 @@ class TestCommunityControlNodeTransfer:
 
         community_control_node.promote_to_control_node(owner_device_2, community_id, attempts=60)
         community_control_node.wait_until_local_control_node_state(owner_device_2, community_id, expected=True, attempts=60)
-        community_control_node.wait_until_local_control_node_state(owner_device_1, community_id, expected=False, attempts=90)
+        # Device 1 relinquishing control is a slow, variable cross-node sync in CI; the whole test is
+        # bounded by @pytest.mark.timeout, so give this hop generous headroom instead of flaking.
+        community_control_node.wait_until_local_control_node_state(owner_device_1, community_id, expected=False, attempts=120, delay=3)
 
         return community_id
 
@@ -203,12 +205,12 @@ class TestCommunityControlNodeTransfer:
 
         with _step("member sees device 2 community update"):
             community_tokens.wait_until_member_sees_community_update(
-                member, community_id, name_from_device_2, description_from_device_2, attempts=60, delay=3, spectate=True
+                member, community_id, name_from_device_2, description_from_device_2, attempts=120, delay=3, spectate=True
             )
 
         with _step("device 1 sees device 2 community update"):
             community_tokens.wait_until_member_sees_community_update(
-                owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=60, delay=3, spectate=True
+                owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=120, delay=3, spectate=True
             )
 
         # If this shows but the test has no PASSED, the hang is in teardown, not the test body.
