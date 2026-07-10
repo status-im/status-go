@@ -94,6 +94,11 @@ func (c *Client) PushMessageCheckFailure() {
 	metrics.StoreQueryFailures.Inc()
 }
 
+func (c *Client) PushBandwidthStats(downloadRate uint64, uploadRate uint64) {
+	metrics.BandwidthDownloadBytesRate.Set(float64(downloadRate))
+	metrics.BandwidthUploadBytesRate.Set(float64(uploadRate))
+}
+
 func (c *Client) PushPeerCountByShard(peerCountByShard map[uint16]uint) {
 	for shard, count := range peerCountByShard {
 		metrics.PeersByShard.WithLabelValues(strconv.FormatUint(uint64(shard), 10)).Set(float64(count))

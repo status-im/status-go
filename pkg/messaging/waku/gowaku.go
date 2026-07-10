@@ -101,12 +101,18 @@ type ErrorSendingEnvelope struct {
 	SentEnvelope SentEnvelope
 }
 
+type StatsSummary struct {
+	DownloadRate uint64
+	UploadRate   uint64
+}
+
 type IMetricsHandler interface {
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerConnFailures(peerConnFailures map[string]int)
 	PushMessageCheckSuccess()
 	PushMessageCheckFailure()
+	PushBandwidthStats(downloadRate uint64, uploadRate uint64)
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
@@ -1140,6 +1146,20 @@ func (w *Waku) reportPeerMetrics() {
 		}
 		w.metricsHandler.PushPeerCountByShard(peerCountByShard)
 		w.metricsHandler.PushPeerCountByOrigin(peerCountByOrigin)
+		stats := w.GetStats()
+		w.metricsHandler.PushBandwidthStats(stats.DownloadRate, stats.UploadRate)
+	}
+}
+
+func (w *Waku) GetStats() StatsSummary {
+	if w.bandwidthCounter == nil {
+		return StatsSummary{}
+	}
+
+	totals := w.bandwidthCounter.GetBandwidthTotals()
+	return StatsSummary{
+		DownloadRate: uint64(math.Max(0, totals.RateIn)),
+		UploadRate:   uint64(math.Max(0, totals.RateOut)),
 	}
 }
 
