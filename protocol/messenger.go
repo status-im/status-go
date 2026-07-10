@@ -153,6 +153,7 @@ type Messenger struct {
 	historicSyncInFlight      bool
 	lastHistoricSyncRequestAt time.Time
 
+	connectionStateMutex  sync.RWMutex
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
