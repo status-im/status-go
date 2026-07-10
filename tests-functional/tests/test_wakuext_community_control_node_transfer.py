@@ -188,8 +188,10 @@ class TestCommunityControlNodeTransfer:
             owner_device_2.wait_for_online(timeout=120)
 
         with _step("device 2 sees device 1 community update after unpause"):
+            # fetch_live=False: poll device 2's local DB (updated when it processes the event) instead of a
+            # live fetch, which blocks indefinitely under store contention.
             community_tokens.wait_until_member_sees_community_update(
-                owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, delay=3, spectate=True
+                owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, delay=3, spectate=True, fetch_live=False
             )
 
         with _step("device 2 is still local control node after unpause"):
@@ -200,17 +202,17 @@ class TestCommunityControlNodeTransfer:
         with _step("device 2 edit RPC returns and local state updates"):
             name_from_device_2, description_from_device_2 = messenger.edit_community(owner_device_2, community_id)
             assert community_tokens.check_member_community_updated(
-                owner_device_2, community_id, name_from_device_2, description_from_device_2
+                owner_device_2, community_id, name_from_device_2, description_from_device_2, include_live_fetch=False
             ), "device 2 did not apply its own edit locally"
 
         with _step("member sees device 2 community update"):
             community_tokens.wait_until_member_sees_community_update(
-                member, community_id, name_from_device_2, description_from_device_2, attempts=120, delay=3, spectate=True
+                member, community_id, name_from_device_2, description_from_device_2, attempts=120, delay=3, spectate=True, fetch_live=False
             )
 
         with _step("device 1 sees device 2 community update"):
             community_tokens.wait_until_member_sees_community_update(
-                owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=120, delay=3, spectate=True
+                owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=120, delay=3, spectate=True, fetch_live=False
             )
 
         # If this shows but the test has no PASSED, the hang is in teardown, not the test body.
