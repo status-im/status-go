@@ -116,6 +116,7 @@ type IMetricsHandler interface {
 	PushPeerConnFailures(peerConnFailures map[string]int)
 	PushMessageCheckSuccess()
 	PushMessageCheckFailure()
+	PushBandwidthStats(downloadRate uint64, uploadRate uint64)
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
@@ -1378,6 +1379,8 @@ func (w *Waku) reportPeerMetrics() {
 		}
 		w.metricsHandler.PushPeerCountByShard(peerCountByShard)
 		w.metricsHandler.PushPeerCountByOrigin(peerCountByOrigin)
+		stats := w.GetStats()
+		w.metricsHandler.PushBandwidthStats(stats.DownloadRate, stats.UploadRate)
 	}
 }
 

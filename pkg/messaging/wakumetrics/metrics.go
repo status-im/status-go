@@ -9,6 +9,8 @@ type MetricsCollection struct {
 	EnvelopeSentTotal            *prometheus.CounterVec
 	MessagesReceivedTotal        *prometheus.CounterVec
 	WakuMessagesSizeBytes        *prometheus.CounterVec
+	BandwidthDownloadBytesRate   prometheus.Gauge
+	BandwidthUploadBytesRate     prometheus.Gauge
 	EnvelopeSentErrors           *prometheus.CounterVec
 	PeerDialFailures             *prometheus.CounterVec
 	MissedMessages               *prometheus.CounterVec
@@ -54,6 +56,20 @@ var metrics = MetricsCollection{
 			Help: "Size of each Waku message in bytes sent by this node",
 		},
 		[]string{"publish_method"},
+	),
+
+	BandwidthDownloadBytesRate: prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "waku_bandwidth_download_bytes_per_second",
+			Help: "Current Waku/libp2p download bandwidth in bytes per second",
+		},
+	),
+
+	BandwidthUploadBytesRate: prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "waku_bandwidth_upload_bytes_per_second",
+			Help: "Current Waku/libp2p upload bandwidth in bytes per second",
+		},
 	),
 
 	EnvelopeSentErrors: prometheus.NewCounterVec(
@@ -153,6 +169,8 @@ var collectors = []prometheus.Collector{
 	metrics.MessagesSentTotal,
 	metrics.MessagesReceivedTotal,
 	metrics.WakuMessagesSizeBytes,
+	metrics.BandwidthDownloadBytesRate,
+	metrics.BandwidthUploadBytesRate,
 	metrics.EnvelopeSentErrors,
 	metrics.MessageDeliveryConfirmations,
 	metrics.PeersByOrigin,

@@ -61,6 +61,15 @@ func getGaugeVecValue(metric *prometheus.GaugeVec, labels ...string) float64 {
 	return pb.Gauge.GetValue()
 }
 
+func getGaugeValue(metric prometheus.Gauge) float64 {
+	pb := &dto.Metric{}
+	err := metric.Write(pb)
+	if err != nil {
+		return 0
+	}
+	return pb.Gauge.GetValue()
+}
+
 func TestClient_DoubleRegister(t *testing.T) {
 	client := createTestClient(t)
 	require.Error(t, client.RegisterWithRegistry())
@@ -134,6 +143,15 @@ func TestClient_PushPeerCountByShard(t *testing.T) {
 		value := getGaugeVecValue(metrics.PeersByShard, strconv.FormatUint(uint64(shard), 10))
 		require.Equal(t, float64(expectedCount), value)
 	}
+}
+
+func TestClient_PushBandwidthStats(t *testing.T) {
+	client := createTestClient(t)
+
+	client.PushBandwidthStats(2048, 1024)
+
+	require.Equal(t, float64(2048), getGaugeValue(metrics.BandwidthDownloadBytesRate))
+	require.Equal(t, float64(1024), getGaugeValue(metrics.BandwidthUploadBytesRate))
 }
 
 func TestClient_PushErrorSendingEnvelope(t *testing.T) {
