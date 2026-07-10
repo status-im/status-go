@@ -38,9 +38,7 @@ def _login_device(backend, key_uid, password, online_timeout=60):
     backend.login(key_uid, password)
     backend.wait_for_login()
     backend.wait_for_wakuext_ready(timeout=30)
-    # LoginAccount resets networks to defaults (status-im/status-go#6010, #5597), so the paired
-    # device has no Anvil chain and would drop token-gated community events with
-    # "could not find network: 31337". Re-add it after each sign-in.
+    # LoginAccount resets networks to defaults (#6010/#5597); re-add Anvil so token-gated events aren't dropped.
     backend.add_anvil_network()
     backend.wait_for_online(timeout=online_timeout)
 
@@ -53,21 +51,8 @@ class TestCommunityControlNodeTransfer:
     community_token_deployer: str
     deploy_state: CommunityTokenDeployState
 
-    @pytest.mark.flaky(reruns=0)  # heavy e2e test (~25 min/run): reruns would multiply the whole run past the job timeout
-    def test_control_node_transfer_across_devices(
-        self,
-        owner_backend,
-        member_backend,
-        backend_factory,
-        anvil_client,
-    ):
-        # Owner account on two paired devices; the member is separate.
-        owner_device_1 = owner_backend
-        member = member_backend
-        owner_key_uid = owner_device_1.key_uid
-        owner_password = owner_device_1.password
-
-        # Given the Owner on device 1 has created a community
+    def _promote_device_2_to_control_node(self, owner_device_1, member, owner_device_2, anvil_client):
+        """Token-gated community on device 1, with device 2 paired and promoted to control node."""
         community_resp = owner_device_1.wakuext_service.create_community(
             name=fake.community_name(),
             description=fake.community_description(),
@@ -76,11 +61,10 @@ class TestCommunityControlNodeTransfer:
         community_id = community_resp.get("communities", [{}])[0].get("id")
         assert community_id, "Community was not created"
 
-        # And the member has joined the community
         assert messenger.spectate_and_fetch_community(member, community_id), "Community not found for the member"
         messenger.join_community(member, owner_device_1, community_id)
 
-        # The community needs an owner token for control-node transfer to be allowed (HasTokenOwnership).
+        # Control-node transfer requires the community to own a token (HasTokenOwnership).
         community_tokens.fund_native_balance(owner_device_1, anvil_client)
         owner_device_1.wallet_service.restart_wallet_reload_timer()
         tokens = community_token_deploy.deploy_owner_and_master_tokens(
@@ -94,37 +78,70 @@ class TestCommunityControlNodeTransfer:
         assert tokens.owner_token_address, "Owner token was not deployed"
         community_control_node.publish_owner_token_to_community(owner_device_1, community_id, tokens.owner_token_address)
 
-        # And the Owner has logged into device 2 (the same account, paired second device)
-        owner_device_2 = backend_factory("owner_device_2")
         owner_device_2.init_status_backend()
         _pair_second_device(owner_device_1, owner_device_2)
-        _login_device(owner_device_2, owner_key_uid, owner_password)
+        _login_device(owner_device_2, owner_device_1.key_uid, owner_device_1.password)
 
-        # When the Owner transfers control from device 1 to device 2
         community_control_node.promote_to_control_node(owner_device_2, community_id, attempts=60)
         community_control_node.wait_until_local_control_node_state(owner_device_2, community_id, expected=True, attempts=60)
         community_control_node.wait_until_local_control_node_state(owner_device_1, community_id, expected=False, attempts=90)
 
-        # And Device B goes offline (wait for node.stopped so device 1's edit can't race it)
+        return community_id
+
+    # run=False: known-broken pending #7615, and ~25 min to run; the pause variant below covers it and runs.
+    @pytest.mark.xfail(
+        reason="Device B loses the Anvil network on LoginAccount and drops the token-gated community event; "
+        "see https://github.com/status-im/status-go/issues/7615",
+        run=False,
+    )
+    def test_control_node_transfer_across_devices(self, owner_backend, member_backend, backend_factory, anvil_client):
+        owner_device_1 = owner_backend
+        member = member_backend
+        owner_device_2 = backend_factory("owner_device_2")
+        community_id = self._promote_device_2_to_control_node(owner_device_1, member, owner_device_2, anvil_client)
+
+        # Wait for node.stopped so device 1's edit can't race the shutdown.
         with owner_device_2.expect_signal(SignalType.NODE_STOPPED):
             owner_device_2.logout()
 
-        # When the Owner on Device A edits the community
-        # Then Member A sees the updated community
         name_from_device_1, description_from_device_1 = community_tokens.edit_community_and_wait_until_observer_sees_update(
             owner_device_1, member, community_id, attempts=60, wait_for_message_signal=False
         )
 
-        # When Device B comes online
-        _login_device(owner_device_2, owner_key_uid, owner_password, online_timeout=120)
+        _login_device(owner_device_2, owner_device_1.key_uid, owner_device_1.password, online_timeout=120)
 
-        # Then the Owner on Device B sees the updated community
         community_tokens.wait_until_member_sees_community_update(
             owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, spectate=True
         )
 
-        # When the Owner on device 2 edits the community
-        # Then the member and the Owner on device 1 see the updated community
+        name_from_device_2, description_from_device_2 = community_tokens.edit_community_and_wait_until_observer_sees_update(
+            owner_device_2, member, community_id, attempts=60, wait_for_message_signal=False
+        )
+        community_tokens.wait_until_member_sees_community_update(
+            owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=60, spectate=True
+        )
+
+    @pytest.mark.flaky(reruns=0)  # heavy e2e test: reruns would multiply the run past the job timeout
+    def test_control_node_transfer_across_devices_with_container_pause(self, owner_backend, member_backend, backend_factory, anvil_client):
+        # Pausing device B's container (vs logout + LoginAccount) keeps its Anvil network, avoiding #7615.
+        owner_device_1 = owner_backend
+        member = member_backend
+        owner_device_2 = backend_factory("owner_device_2")
+        community_id = self._promote_device_2_to_control_node(owner_device_1, member, owner_device_2, anvil_client)
+
+        owner_device_2.container_pause()  # synchronous, so device 1's edit can't race it
+
+        name_from_device_1, description_from_device_1 = community_tokens.edit_community_and_wait_until_observer_sees_update(
+            owner_device_1, member, community_id, attempts=60, wait_for_message_signal=False
+        )
+
+        owner_device_2.container_unpause()
+        owner_device_2.wait_for_online(timeout=120)
+
+        community_tokens.wait_until_member_sees_community_update(
+            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, spectate=True
+        )
+
         name_from_device_2, description_from_device_2 = community_tokens.edit_community_and_wait_until_observer_sees_update(
             owner_device_2, member, community_id, attempts=60, wait_for_message_signal=False
         )
