@@ -1,7 +1,7 @@
 """Community control-node transfer across an owner's paired devices — github.com/status-im/status-go/issues/7132."""
 
 import logging
-import signal
+import os
 import time
 from contextlib import contextmanager
 
@@ -12,37 +12,42 @@ from clients.signals import LocalPairingEventAction, LocalPairingEventType, Sign
 from steps import community_control_node, community_token_deploy, community_tokens, messenger
 from steps.community_token_deploy import CommunityTokenDeployState
 from utils import fake
+from utils.config import Config
 
 logger = logging.getLogger(__name__)
 
 
-class _StepTimeoutError(TimeoutError):
-    pass
+def _ci_marker(message):
+    """Emit a progress marker that survives xdist log buffering and a CI wall-clock kill.
+
+    pytest/xdist only forward a worker's captured output when the test ends, so a hung test shows
+    nothing. This appends+flushes to an archived log file (tests-functional/logs/*.log) — so the last
+    marker pinpoints the stuck step even if the build is killed mid-run — and also writes to stderr.
+    """
+    line = f"[CONTROL_NODE_TRANSFER] {time.strftime('%H:%M:%S')} {message}\n"
+    try:
+        os.write(2, line.encode())
+    except OSError:
+        pass
+    if Config.logs_dir:
+        try:
+            with open(os.path.join(Config.logs_dir, "control_node_transfer_markers.log"), "a", encoding="utf-8") as marker_file:
+                marker_file.write(line)
+                marker_file.flush()
+        except OSError:
+            pass
 
 
 @contextmanager
-def _fail_after(seconds, step):
-    """Fail *step* via pytest if it runs longer than *seconds*, logging its start/end and elapsed so
-    the Jenkins console shows how long each step took. SIGALRM interrupts a blocked RPC too, letting
-    the test fail fast (with logs, at the stuck step) instead of stalling to the CI wall-clock.
-    """
-
-    def _handler(signum, frame):
-        where = f" at {frame.f_code.co_filename.rsplit('/', 1)[-1]}:{frame.f_lineno}" if frame else ""
-        raise _StepTimeoutError(f"timed out after {seconds}s during step: {step}{where}")
-
-    previous = signal.signal(signal.SIGALRM, _handler)
-    signal.setitimer(signal.ITIMER_REAL, seconds)
+def _step(name):
+    """Record a durable start/end marker (with elapsed) so the last marker pinpoints where a hang
+    stopped. The whole test is bounded by @pytest.mark.timeout, which also dumps a stack trace."""
     start = time.monotonic()
-    logger.info("STEP START: %s (timeout=%ss)", step, seconds)
+    _ci_marker(f"STEP START: {name}")
     try:
         yield
-    except _StepTimeoutError as exc:
-        pytest.fail(str(exc))
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
-        signal.signal(signal.SIGALRM, previous)
-        logger.info("STEP END: %s (elapsed=%.1fs)", step, time.monotonic() - start)
+        _ci_marker(f"STEP END: {name} (elapsed={time.monotonic() - start:.1f}s)")
 
 
 def _pairing_predicate(action_value, type_value):
@@ -154,53 +159,57 @@ class TestCommunityControlNodeTransfer:
         )
 
     @pytest.mark.flaky(reruns=0)  # heavy e2e test: reruns would multiply the run past the job timeout
+    @pytest.mark.timeout(1500)  # whole-test bound (incl. fixtures); fires before the CI wall-clock and dumps a stack trace
     def test_control_node_transfer_across_devices_with_container_pause(self, owner_backend, member_backend, backend_factory, anvil_client):
         # Pausing device B's container (vs logout + LoginAccount) keeps its Anvil network, avoiding #7615.
+        # If this marker is absent from the log, the hang was in fixture setup, before the body.
+        _ci_marker("pause test: body entered (fixtures complete)")
         owner_device_1 = owner_backend
         member = member_backend
         owner_device_2 = backend_factory("owner_device_2")
 
-        # Each step is bounded on its own so a stall fails fast at the exact step (with logs), instead
-        # of hanging to the CI wall-clock. Setup is guarded too — the hang has been seen ~6 min in.
-        with _fail_after(600, "setup: token-gated community + promote device 2 to control node"):
+        with _step("setup: token-gated community + promote device 2 to control node"):
             community_id = self._promote_device_2_to_control_node(owner_device_1, member, owner_device_2, anvil_client)
 
-        with _fail_after(30, "pause device 2 container"):
+        with _step("pause device 2 container"):
             owner_device_2.container_pause()  # synchronous, so device 1's edit can't race it
 
-        with _fail_after(180, "device 1 edits community and member sees update"):
+        with _step("device 1 edits community and member sees update"):
             name_from_device_1, description_from_device_1 = community_tokens.edit_community_and_wait_until_observer_sees_update(
                 owner_device_1, member, community_id, attempts=60, wait_for_message_signal=False
             )
 
-        with _fail_after(30, "unpause device 2 container"):
+        with _step("unpause device 2 container"):
             owner_device_2.container_unpause()
 
-        with _fail_after(150, "device 2 becomes online after unpause"):
+        with _step("device 2 becomes online after unpause"):
             owner_device_2.wait_for_online(timeout=120)
 
-        with _fail_after(210, "device 2 sees device 1 community update after unpause"):
+        with _step("device 2 sees device 1 community update after unpause"):
             community_tokens.wait_until_member_sees_community_update(
                 owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, delay=3, spectate=True
             )
 
-        with _fail_after(90, "device 2 is still local control node after unpause"):
+        with _step("device 2 is still local control node after unpause"):
             community_control_node.wait_until_local_control_node_state(owner_device_2, community_id, expected=True, attempts=30, delay=2)
 
         # Split device 2's edit: a local-apply failure means it isn't really control node after unpause;
         # a member-propagation failure means the send path didn't resume after pause.
-        with _fail_after(60, "device 2 edit RPC returns and local state updates"):
+        with _step("device 2 edit RPC returns and local state updates"):
             name_from_device_2, description_from_device_2 = messenger.edit_community(owner_device_2, community_id)
             assert community_tokens.check_member_community_updated(
                 owner_device_2, community_id, name_from_device_2, description_from_device_2
             ), "device 2 did not apply its own edit locally"
 
-        with _fail_after(210, "member sees device 2 community update"):
+        with _step("member sees device 2 community update"):
             community_tokens.wait_until_member_sees_community_update(
                 member, community_id, name_from_device_2, description_from_device_2, attempts=60, delay=3, spectate=True
             )
 
-        with _fail_after(210, "device 1 sees device 2 community update"):
+        with _step("device 1 sees device 2 community update"):
             community_tokens.wait_until_member_sees_community_update(
                 owner_device_1, community_id, name_from_device_2, description_from_device_2, attempts=60, delay=3, spectate=True
             )
+
+        # If this shows but the test has no PASSED, the hang is in teardown, not the test body.
+        _ci_marker("pause test: body complete")
