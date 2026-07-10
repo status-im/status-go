@@ -1,6 +1,8 @@
 """Community control-node transfer across an owner's paired devices — github.com/status-im/status-go/issues/7132."""
 
 import logging
+import signal
+from contextlib import contextmanager
 
 import pytest
 
@@ -11,6 +13,26 @@ from steps.community_token_deploy import CommunityTokenDeployState
 from utils import fake
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _fail_if_slower_than(seconds, step):
+    """Fail *step* with an AssertionError if it runs longer than *seconds*.
+
+    Uses SIGALRM so it interrupts a blocked RPC too (a plain deadline can't), letting the test finish
+    and its container logs get captured instead of hanging to the CI wall-clock.
+    """
+
+    def _handler(signum, frame):
+        raise AssertionError(f"{step} exceeded {seconds}s (suspected CI store catch-up latency / blocked RPC)")
+
+    previous = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def _pairing_predicate(action_value, type_value):
@@ -136,11 +158,13 @@ class TestCommunityControlNodeTransfer:
         )
 
         owner_device_2.container_unpause()
-        owner_device_2.wait_for_online(timeout=120)
 
-        community_tokens.wait_until_member_sees_community_update(
-            owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, spectate=True
-        )
+        # The offline catch-up is the step that hangs in CI; bound it so a stall fails fast (with logs).
+        with _fail_if_slower_than(300, "device B catch-up after unpause"):
+            owner_device_2.wait_for_online(timeout=120)
+            community_tokens.wait_until_member_sees_community_update(
+                owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, spectate=True
+            )
 
         name_from_device_2, description_from_device_2 = community_tokens.edit_community_and_wait_until_observer_sees_update(
             owner_device_2, member, community_id, attempts=60, wait_for_message_signal=False
