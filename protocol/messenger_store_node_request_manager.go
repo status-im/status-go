@@ -334,6 +334,10 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 		zap.Any("requestID", r.requestID),
 		zap.Int("envelopesCount", envelopesCount))
 
+	if r.manager.messenger.isPaused() && r.config.Pausable {
+		return false, 0
+	}
+
 	r.result.stats.FetchedEnvelopesCount += envelopesCount
 	r.result.stats.FetchedPagesCount++
 
@@ -427,11 +431,9 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 func (r *storeNodeRequest) routine() {
 	defer gocommon.LogOnPanic()
 
-	r.manager.logger.Info("starting store node request",
-		zap.Any("requestID", r.requestID),
-		zap.String("pubsubTopic", r.pubsubTopic),
-		zap.Any("contentTopic", r.contentTopic),
-	)
+	if r.manager.messenger.isPaused() && r.config.Pausable {
+		return
+	}
 
 	// Return a nil community and no error when request was
 	// performed successfully, but no community/contact found.
@@ -464,6 +466,12 @@ func (r *storeNodeRequest) routine() {
 
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
+
+	if r.manager.messenger.isPaused() {
+		if r.config.Pausable {
+			return
+		}
+	}
 
 	storeNode := r.manager.messenger.messaging.GetActiveStorenode()
 	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {

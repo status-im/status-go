@@ -149,7 +149,11 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 		m.logger.Debug("fetching unknown curated communities")
 
 		for _, communityID := range response.UnknownCommunities {
-			_, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityID, nil)
+			if m.isPaused() {
+				break
+			}
+
+			_, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityID, []StoreNodeRequestOption{WithPausableOption(true)})
 			if err != nil {
 				m.logger.Error("failed to fetch curated community",
 					zap.String("communityID", communityID),

@@ -3,6 +3,7 @@ package protocol
 type StoreNodeRequestConfig struct {
 	WaitForResponse   bool
 	StopWhenDataFound bool
+	Pausable         bool
 	InitialPageSize   uint64
 	FurtherPageSize   uint64
 }
@@ -13,6 +14,7 @@ func defaultStoreNodeRequestConfig() StoreNodeRequestConfig {
 	return StoreNodeRequestConfig{
 		WaitForResponse:   true,
 		StopWhenDataFound: true,
+		Pausable:         false,
 		InitialPageSize:   initialStoreNodeRequestPageSize,
 		FurtherPageSize:   defaultStoreNodeRequestPageSize,
 	}
@@ -37,6 +39,12 @@ func WithWaitForResponseOption(waitForResponse bool) StoreNodeRequestOption {
 func WithStopWhenDataFound(stopWhenDataFound bool) StoreNodeRequestOption {
 	return func(c *StoreNodeRequestConfig) {
 		c.StopWhenDataFound = stopWhenDataFound
+	}
+}
+
+func WithPausableOption(pausable bool) StoreNodeRequestOption {
+	return func(c *StoreNodeRequestConfig) {
+		c.Pausable = pausable
 	}
 }
 
