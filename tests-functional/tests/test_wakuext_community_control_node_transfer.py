@@ -184,9 +184,20 @@ class TestCommunityControlNodeTransfer:
                 owner_device_2, community_id, name_from_device_1, description_from_device_1, attempts=60, delay=3, spectate=True
             )
 
-        with _fail_after(180, "device 2 edits community and member sees update"):
-            name_from_device_2, description_from_device_2 = community_tokens.edit_community_and_wait_until_observer_sees_update(
-                owner_device_2, member, community_id, attempts=60, wait_for_message_signal=False
+        with _fail_after(90, "device 2 is still local control node after unpause"):
+            community_control_node.wait_until_local_control_node_state(owner_device_2, community_id, expected=True, attempts=30, delay=2)
+
+        # Split device 2's edit: a local-apply failure means it isn't really control node after unpause;
+        # a member-propagation failure means the send path didn't resume after pause.
+        with _fail_after(60, "device 2 edit RPC returns and local state updates"):
+            name_from_device_2, description_from_device_2 = messenger.edit_community(owner_device_2, community_id)
+            assert community_tokens.check_member_community_updated(
+                owner_device_2, community_id, name_from_device_2, description_from_device_2
+            ), "device 2 did not apply its own edit locally"
+
+        with _fail_after(210, "member sees device 2 community update"):
+            community_tokens.wait_until_member_sees_community_update(
+                member, community_id, name_from_device_2, description_from_device_2, attempts=60, delay=3, spectate=True
             )
 
         with _fail_after(210, "device 1 sees device 2 community update"):
