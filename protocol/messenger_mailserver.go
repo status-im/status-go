@@ -553,15 +553,29 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 }
 
 func (m *Messenger) canSyncWithStoreNodes() (bool, error) {
-	if m.connectionState.IsExpensive() {
+	if m.getConnectionState().IsExpensive() {
 		return m.settings.CanSyncOnMobileNetwork()
 	}
 	return true, nil
 }
 
+func (m *Messenger) getConnectionState() connection.State {
+	m.connectionStateMutex.RLock()
+	defer m.connectionStateMutex.RUnlock()
+
+	return m.connectionState
+}
+
+func (m *Messenger) setConnectionState(state connection.State) {
+	m.connectionStateMutex.Lock()
+	defer m.connectionStateMutex.Unlock()
+
+	m.connectionState = state
+}
+
 func (m *Messenger) ConnectionChanged(state connection.State) {
 	m.messaging.ConnectionChanged(state)
-	m.connectionState = state
+	m.setConnectionState(state)
 }
 
 // processMailserverBatch queries the store for a single batch, applying the

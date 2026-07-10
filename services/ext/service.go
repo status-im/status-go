@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -83,6 +84,10 @@ type Service struct {
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
+
+	connectionStateMu      sync.Mutex
+	lastConnectionState    connection.State
+	hasLastConnectionState bool
 
 	logger *zap.Logger
 }
@@ -247,6 +252,17 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Android can report connectivity before login; apply the latest known state
+	// now that messenger exists so expensive/offline gates are correct from start.
+	s.connectionStateMu.Lock()
+	hasLastState := s.hasLastConnectionState
+	lastState := s.lastConnectionState
+	s.connectionStateMu.Unlock()
+	if hasLastState {
+		s.messenger.ConnectionChanged(lastState)
+	}
+
 	s.MarkStarted()
 	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
 
@@ -783,7 +799,13 @@ func obtainNodeKey(nodeConfig *params.NodeConfig) (*ecdsa.PrivateKey, error) {
 }
 
 func (s *Service) ConnectionChanged(state connection.State) {
-	if s.messenger != nil {
-		s.messenger.ConnectionChanged(state)
+	s.connectionStateMu.Lock()
+	s.lastConnectionState = state
+	s.hasLastConnectionState = true
+	messenger := s.messenger
+	s.connectionStateMu.Unlock()
+
+	if messenger != nil {
+		messenger.ConnectionChanged(state)
 	}
 }

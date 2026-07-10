@@ -155,6 +155,7 @@ type Messenger struct {
 	historicSyncTrigger  chan struct{}
 	ratchetNotFoundDelay time.Duration
 
+	connectionStateMutex  sync.RWMutex
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
