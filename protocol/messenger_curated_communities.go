@@ -44,7 +44,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 		for {
 			select {
 			case <-time.After(interval):
-				if m.isPaused() {
+				if m.shouldPauseCuratedCommunitiesUpdateLoop() {
 					interval = curatedCommunitiesUpdateInterval
 					continue
 				}
@@ -86,6 +86,13 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 			}
 		}
 	}()
+}
+
+func (m *Messenger) shouldPauseCuratedCommunitiesUpdateLoop() bool {
+	// TODO when we implement back the setting for the user to select if they want to
+	// fetch on expensive networks, use canSyncWithStoreNodes()
+	// https://github.com/status-im/status-app/issues/18388
+	return m.isPaused() || m.getConnectionState().IsExpensive()
 }
 
 func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCommunities, error) {
