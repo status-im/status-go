@@ -23,6 +23,12 @@ type ContactURLData struct {
 	PublicKey   string `json:"publicKey"`
 }
 
+type MessageURLData struct {
+	ChatID      string `json:"chatId"`
+	MessageID   string `json:"messageId"`
+	CommunityID string `json:"communityId"`
+}
+
 type URLDataResponse struct {
 	Community *CommunityURLData        `json:"community"`
 	Channel   *CommunityChannelURLData `json:"channel"`

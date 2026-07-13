@@ -39,3 +39,11 @@ func (api *PublicAPI) ShareUserURLWithData(pubKey string) (string, error) {
 func (api *PublicAPI) ParseSharedURL(url string) (*URLDataResponse, error) {
 	return ParseSharedURL(url)
 }
+
+func (api *PublicAPI) ShareMessageURL(chatID string, messageID string) (string, error) {
+	return ShareMessageURL(chatID, messageID)
+}
+
+func (api *PublicAPI) ParseMessageURL(url string) (*MessageURLData, error) {
+	return ParseMessageURL(url)
+}
