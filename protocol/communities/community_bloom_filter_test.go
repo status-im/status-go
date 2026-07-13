@@ -65,3 +65,37 @@ func (s *CommunityBloomFilterSuite) TestBasic() {
 	s.Require().True(verifyMembershipWithBloomFilter(filter, memberIdentity, &ownerIdentity.PublicKey, encryptedChannelID, description.Clock))
 	s.Require().False(verifyMembershipWithBloomFilter(filter, nonMemberIdentity, &ownerIdentity.PublicKey, encryptedChannelID, description.Clock))
 }
+
+func (s *CommunityBloomFilterSuite) TestNilPrivateKey() {
+	memberIdentity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	communityID := "cid"
+	encryptedChannelID := "enc"
+
+	description := &protobuf.CommunityDescription{
+		ID:    communityID,
+		Clock: 1,
+		Chats: map[string]*protobuf.CommunityChat{
+			encryptedChannelID: {
+				Members: map[string]*protobuf.CommunityMember{
+					crypto.PubkeyToHex(&memberIdentity.PublicKey): {},
+				},
+			},
+		},
+		TokenPermissions: map[string]*protobuf.CommunityTokenPermission{
+			"permissionID": {
+				Id:            "permissionID",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: []*protobuf.TokenCriteria{{}},
+				ChatIds:       []string{ChatID(communityID, encryptedChannelID)},
+			},
+		},
+	}
+
+	// Without the community private key we can't derive the shared secret, so
+	// bloom filter generation must be skipped instead of panicking.
+	err = generateBloomFiltersForChannels(description, nil)
+	s.Require().NoError(err)
+	s.Require().Nil(description.Chats[encryptedChannelID].MembersList)
+}
