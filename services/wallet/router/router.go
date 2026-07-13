@@ -30,6 +30,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
@@ -81,6 +82,7 @@ type Router struct {
 	scheduler            *async.Scheduler
 
 	paraswapClientFactory func(chainID uint64) paraswap.ClientInterface
+	lifiClientFactory     func(chainID uint64) lifi.ClientInterface
 
 	activeBalanceMap sync.Map // map[string]*big.Int
 
@@ -121,6 +123,9 @@ func NewRouter(
 		scheduler:            async.NewScheduler(),
 		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
 			return paraswap.NewClientV5(chainID, pathprocessor.ParaswapPartnerID, walletCommon.ZeroAddress(), 0)
+		},
+		lifiClientFactory: func(chainID uint64) lifi.ClientInterface {
+			return lifi.NewClient(chainID, lifi.Integrator, "")
 		},
 		logger: logger,
 	}
@@ -1000,8 +1005,9 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 			continue
 		}
 
-		// if we're doing a single chain operation, we can skip bridge processors
-		if walletCommon.IsSingleChainOperation(input.FromChainID, input.ToChainID) && walletCommon.IsProcessorBridge(pProcessor.Name()) {
+		// on a single-chain operation, skip bridge-only processors (LI.FI is also a swap)
+		if walletCommon.IsSingleChainOperation(input.FromChainID, input.ToChainID) &&
+			walletCommon.IsProcessorBridge(pProcessor.Name()) && !walletCommon.IsProcessorSwap(pProcessor.Name()) {
 			r.logger.Debug("resolveRoute: skipping bridge processor for single-chain op",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pProcessor.Name()),
