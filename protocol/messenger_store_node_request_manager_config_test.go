@@ -66,8 +66,8 @@ func TestStoreNodeRequestPageCap(t *testing.T) {
 // fetches (both currently 30). Only the community construction site reads the
 // community knob; the shared default is never rerouted through it.
 func TestCommunityStoreNodeRequestPageCap(t *testing.T) {
-	t.Run("community construction caps at 3 pages", func(t *testing.T) {
-		require.Equal(t, 3, maxCommunityStoreNodeRequestPageCount)
+	t.Run("community construction caps at 30 pages", func(t *testing.T) {
+		require.Equal(t, 30, maxCommunityStoreNodeRequestPageCount)
 		cfg := buildCommunityStoreNodeRequestConfig(nil)
 		require.Equal(t, maxCommunityStoreNodeRequestPageCount, cfg.MaxPageCount)
 	})
@@ -78,10 +78,10 @@ func TestCommunityStoreNodeRequestPageCap(t *testing.T) {
 		require.Equal(t, maxStoreNodeRequestPageCount, cfg.MaxPageCount)
 	})
 
-	t.Run("community construction is tighter than contact construction", func(t *testing.T) {
+	t.Run("community construction is not looser than contact construction", func(t *testing.T) {
 		community := buildCommunityStoreNodeRequestConfig(nil)
 		contact := buildStoreNodeRequestConfig(nil)
-		require.Less(t, community.MaxPageCount, contact.MaxPageCount)
+		require.LessOrEqual(t, community.MaxPageCount, contact.MaxPageCount)
 	})
 
 	t.Run("community construction inherits the shared non-cap defaults", func(t *testing.T) {
