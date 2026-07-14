@@ -153,6 +153,10 @@ type Messenger struct {
 	historicSyncInFlight      bool
 	lastHistoricSyncRequestAt time.Time
 
+	// communityHistoryFetches tracks cancellable, per-community spectate backfills
+	// so they can be aborted on leave / app-background (issue #21470-hf).
+	communityHistoryFetches *communityHistoryFetchRegistry
+
 	connectionStateMutex  sync.RWMutex
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
@@ -424,21 +428,22 @@ func NewMessenger(
 			logger: logger,
 			me:     selfContact,
 		},
-		allInstallations:      new(installationMap),
-		installationID:        installationID,
-		modifiedInstallations: new(stringBoolMap),
-		database:              database,
-		multiAccounts:         c.multiAccount,
-		settings:              settings,
-		verificationDatabase:  verification.NewPersistence(database),
-		mailserversDatabase:   c.mailserversDatabase,
-		account:               c.account,
-		quit:                  make(chan struct{}),
-		ctx:                   ctx,
-		cancel:                cancel,
-		importingCommunities:  make(map[string]bool),
-		importingChannels:     make(map[string]bool),
-		importRateLimiter:     rate.NewLimiter(rate.Every(importSlowRate), 1),
+		allInstallations:        new(installationMap),
+		installationID:          installationID,
+		modifiedInstallations:   new(stringBoolMap),
+		database:                database,
+		multiAccounts:           c.multiAccount,
+		settings:                settings,
+		verificationDatabase:    verification.NewPersistence(database),
+		mailserversDatabase:     c.mailserversDatabase,
+		account:                 c.account,
+		quit:                    make(chan struct{}),
+		ctx:                     ctx,
+		cancel:                  cancel,
+		importingCommunities:    make(map[string]bool),
+		importingChannels:       make(map[string]bool),
+		communityHistoryFetches: newCommunityHistoryFetchRegistry(),
+		importRateLimiter:       rate.NewLimiter(rate.Every(importSlowRate), 1),
 		importDelayer: struct {
 			wait chan struct{}
 			once sync.Once
@@ -553,6 +558,11 @@ func (m *Messenger) processSentMessage(id string) error {
 
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
+	if paused {
+		// Backgrounding stops any in-flight scoped community history backfills, which
+		// on device were measured continuing headless after the UI died (#21470-hf).
+		m.communityHistoryFetches.cancelAll()
+	}
 	if m.ensVerifier != nil {
 		m.ensVerifier.SetPaused(paused)
 	}

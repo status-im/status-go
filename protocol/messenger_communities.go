@@ -958,7 +958,14 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Spectated()
 }
 
-func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Chat, error) {
+// initCommunityChats initialises a community's chats and filters. When spectated is
+// true the broad, full-period history sync is NOT scheduled here — the caller
+// (SpectateCommunity) drives a scoped 24h backfill instead (issue #21470-hf). A
+// keyless spectator's full-period backfill of the community's single universal
+// content topic ingests gigabytes of undecryptable payloads; the broad sync scheduled
+// here would race the scoped one for the topic watermark and defeat the scoping.
+// Joining keeps today's behavior (the broad sync runs).
+func (m *Messenger) initCommunityChats(community *communities.Community, spectated bool) ([]*Chat, error) {
 	logger := m.logger.Named("initCommunityChats")
 
 	chats := CreateCommunityChats(community, m.getTimesource())
@@ -983,10 +990,13 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		filters = append(filters, communityFilters...)
 	}
 
-	willSync, err := m.scheduleSyncFilters(filters)
-	if err != nil {
-		logger.Debug("m.scheduleSyncFilters error", zap.Error(err))
-		return nil, err
+	willSync := false
+	if scoped, _ := communityInitialHistorySync(spectated); !scoped {
+		willSync, err = m.scheduleSyncFilters(filters)
+		if err != nil {
+			logger.Debug("m.scheduleSyncFilters error", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	if !willSync {
@@ -1062,7 +1072,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types3.HexByt
 
 	// chats and settings are already initialized for spectated communities
 	if !community.Spectated() {
-		chats, err := m.initCommunityChats(community)
+		chats, err := m.initCommunityChats(community, false)
 		if err != nil {
 			return nil, err
 		}
@@ -1147,7 +1157,7 @@ func (m *Messenger) SpectateCommunity(communityID types3.HexBytes) (*MessengerRe
 		return nil, err
 	}
 
-	chats, err := m.initCommunityChats(community)
+	chats, err := m.initCommunityChats(community, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1161,8 +1171,12 @@ func (m *Messenger) SpectateCommunity(communityID types3.HexBytes) (*MessengerRe
 
 	response.AddCommunity(community)
 
-	// sync community
-	m.asyncRequestAllHistoricMessages()
+	// #21470-hf: a spectator holds no community keys, so the previous global
+	// full-period backfill of every filter pulled the community's single universal
+	// content topic as gigabytes of undecryptable payloads (measured ~2-3GB/11min at
+	// ~330% service CPU). Backfill ONLY this community's filters over a scoped 24h
+	// window, cancellable on leave / app-background.
+	m.asyncSyncSpectatedCommunity(community)
 
 	return response, nil
 }
@@ -2245,6 +2259,10 @@ func (m *Messenger) LeaveCommunity(communityID types3.HexBytes) (*MessengerRespo
 
 func (m *Messenger) leaveCommunity(communityID types3.HexBytes) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
+
+	// Leaving (or unspectating) a community stops any in-flight scoped history
+	// backfill for it (issue #21470-hf).
+	m.communityHistoryFetches.cancel(communityID.String())
 
 	community, err := m.communitiesManager.LeaveCommunity(communityID)
 	if err != nil {
@@ -3633,7 +3651,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			_, err = m.syncFiltersFrom(peerInfo, filters, uint32(latestWakuMessageTimestamp))
+			_, err = m.syncFiltersFrom(m.ctx, peerInfo, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.logger.Error("failed to request missing messages", zap.Error(err))
 				continue
