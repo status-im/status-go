@@ -115,6 +115,21 @@ func TestFilterUnknownHashes_ExistsError(t *testing.T) {
 	require.ErrorIs(t, err, boom)
 }
 
+// TestBuildMetadataQuery covers the two behavioral contracts of the hash-walk query
+// (issue #21470-hf): it must request NO bodies (the whole point — metadata only) and it
+// must page NEWEST-FIRST so bodies are fetched most-recent-first.
+func TestBuildMetadataQuery(t *testing.T) {
+	q := buildMetadataQuery("req-1", "pub-a", []string{"0x01", "0x02"}, 1000, 2000)
+
+	require.False(t, q.IncludeData, "metadata walk must NOT fetch bodies")
+	require.False(t, q.PaginationForward, "must page newest-first so bodies are fetched most-recent-first")
+	require.Equal(t, uint64(hashFirstMetadataPageSize), q.GetPaginationLimit())
+	require.Equal(t, "pub-a", q.GetPubsubTopic())
+	require.Equal(t, []string{"0x01", "0x02"}, q.ContentTopics)
+	require.Equal(t, int64(1000), q.GetTimeStart())
+	require.Equal(t, int64(2000), q.GetTimeEnd())
+}
+
 // TestPlanBodyFetch covers the keyless body-skip decision (issue #21470-hf
 // enhancement): a keyless spectator whose community description is already resolved must
 // fetch NO bodies (every body on the shared community topic is an undecryptable channel

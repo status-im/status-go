@@ -91,6 +91,24 @@ func filterUnknownHashes(hashes []wpb.MessageHash, exists func(wpb.MessageHash) 
 	return unknown, known, nil
 }
 
+// buildMetadataQuery builds the metadata-only (hash) store query that walks the window.
+// It requests NO bodies (IncludeData:false) and NEWEST-FIRST pagination
+// (PaginationForward:false) so bodies are later fetched most-recent-first — for a keyed
+// fetch that means a cancellation (leave/background) keeps the most useful (newest)
+// history rather than the oldest (issue #21470-hf enhancement).
+func buildMetadataQuery(requestID string, pubsubTopic string, contentTopics []string, fromNano, toNano int64) *storepb.StoreQueryRequest {
+	return &storepb.StoreQueryRequest{
+		RequestId:         requestID,
+		IncludeData:       false,
+		PubsubTopic:       &pubsubTopic,
+		ContentTopics:     contentTopics,
+		TimeStart:         proto.Int64(fromNano),
+		TimeEnd:           proto.Int64(toNano),
+		PaginationForward: false,
+		PaginationLimit:   proto.Uint64(hashFirstMetadataPageSize),
+	}
+}
+
 // planBodyFetch decides which unknown-hash bodies to actually fetch. When skipBodies is
 // set (keyless spectator with a resolved description — every body here is undecryptable),
 // nothing is fetched and all unknowns are counted as skipped; the hashes were still
@@ -130,18 +148,12 @@ func (w *Waku) ProcessMailserverBatchHashFirst(
 
 	requestor := missing.NewDefaultStorenodeRequestor(w.node.Store())
 
-	// Phase 1 — metadata-only page walk: collect every hash in the window, skipping those
-	// already held locally.
+	// Phase 1 — metadata-only page walk (newest-first): collect every hash in the window,
+	// skipping those already held locally.
 	var unknownHashes []wpb.MessageHash
-	metadataQuery := &storepb.StoreQueryRequest{
-		RequestId:       hex.EncodeToString(protocol.GenerateRequestID()),
-		IncludeData:     false,
-		PubsubTopic:     &pubsubTopic,
-		ContentTopics:   contentTopics,
-		TimeStart:       proto.Int64(batch.From.UnixNano()),
-		TimeEnd:         proto.Int64(batch.To.UnixNano()),
-		PaginationLimit: proto.Uint64(hashFirstMetadataPageSize),
-	}
+	metadataQuery := buildMetadataQuery(
+		hex.EncodeToString(protocol.GenerateRequestID()),
+		pubsubTopic, contentTopics, batch.From.UnixNano(), batch.To.UnixNano())
 
 	result, err := requestor.Query(ctx, storenode, metadataQuery)
 	if err != nil {
