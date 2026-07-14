@@ -129,18 +129,18 @@ func (c *communityFetchBackoff) suppress(communityID string, now time.Time) (boo
 // full 31-day store-node window and burns CPU/battery on the device.
 const maxStoreNodeRequestPageCount = 30
 
-// maxCommunityStoreNodeRequestPageCount caps community fetches far more tightly
-// than the generic contact cap (issue #21470-hf). Store queries page newest-first
-// (verified in go-waku history.go: PaginationForward unset => proto3 default false
-// => backward) and community descriptions are republished periodically, so a live
-// community's description lands within the first pages; the description-seen gate
-// (6cd6ced1a) then stops the request on that hit. Deeper paging can therefore only
-// ever chew empty/irrelevant history — exactly the device failure mode: dead
-// curated ids each cost a ~minutes-long 30-page run finalizing with
-// fetchedEnvelopesCount=0. 3 pages keeps a healthy fetch (1-2 pages) untouched
-// while collapsing a dead-id run to a fraction of its former cost. Applied only at
-// the community construction site; the contact/default cap stays at 30.
-const maxCommunityStoreNodeRequestPageCount = 3
+// maxCommunityStoreNodeRequestPageCount caps community fetches (issue #21470-hf).
+// Store queries page newest-first, but on a HIGH-TRAFFIC community the universal
+// content topic carries all channels' messages, so the periodically-republished
+// description can sit well below the newest pages: on-device (Samsung S21FE, dev
+// fleet) a 3-page cap made the Status community's 1.4MB description UNREACHABLE —
+// 62 capped fetch attempts, zero resolves, community permanently absent from
+// Discover — while low-traffic communities resolved in 1-2 pages. 30 pages
+// (~1500 envelopes) reliably reached it in every measured run. Deep pages are
+// affordable now that undecryptable envelopes drop early (keyless gate,
+// 36dd3cf7f) and empty pages skip processing; the description-seen gate
+// (6cd6ced1a) still stops a request the moment the description appears.
+const maxCommunityStoreNodeRequestPageCount = 30
 
 type StoreNodeRequestConfig struct {
 	WaitForResponse   bool
