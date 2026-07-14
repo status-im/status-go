@@ -43,6 +43,30 @@ type Processor struct {
 	logger    *zap.Logger
 
 	tracer trace.Tracer
+
+	// dropUndecryptableWithoutKeys enables the keyless early-drop of undecryptable
+	// hash-ratchet messages (issue #21470, gate #2). Default off pending on-device
+	// validation of this shared processing path; toggle via
+	// SetDropUndecryptableWithoutKeys.
+	dropUndecryptableWithoutKeys bool
+}
+
+// SetDropUndecryptableWithoutKeys toggles gate #2 (#21470): when enabled, an
+// incoming hash-ratchet message the node cannot decrypt AND holds no key material
+// for is dropped instead of parked in the DB for retroactive replay. Default off.
+func (r *Processor) SetDropUndecryptableWithoutKeys(enabled bool) {
+	r.dropUndecryptableWithoutKeys = enabled
+}
+
+// holdsKeysForGroup reports whether the node holds any hash-ratchet key material
+// for groupID. Fails open (true) on lookup error so a transient DB issue never
+// causes a message to be dropped.
+func (r *Processor) holdsKeysForGroup(groupID []byte) bool {
+	keys, err := r.stack.Encryption.GetKeysForGroup(groupID)
+	if err != nil {
+		return true
+	}
+	return len(keys) > 0
 }
 
 func NewProcessor(
@@ -157,6 +181,15 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 			span.AddEvent("hash ratchet with group id not found yet", oteltrace.WithAttributes(
 				otelattribute.String("groupID", types.ToHex(info.GroupID)),
 			))
+			// #21470 gate #2: a keyless spectator receiving a community channel's
+			// encrypted data plane will never obtain this group's key, so parking
+			// the message for replay only grows the DB. Drop it; the store node
+			// retains it for post-join backfill/MMV recovery.
+			if r.dropUndecryptableWithoutKeys &&
+				shouldDropUndecryptableHashRatchetMessage(true, r.holdsKeysForGroup(info.GroupID)) {
+				span.AddEvent("dropping undecryptable hash ratchet message (no keys held)")
+				return nil, nil
+			}
 			return nil, r.hashRatchetStorage.SaveMessage(info.GroupID, info.KeyID, m)
 		} else {
 			span.AddEvent("encryption layer not processed", oteltrace.WithAttributes(
