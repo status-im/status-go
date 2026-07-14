@@ -29,6 +29,11 @@ const (
 	oneDayDuration   = 24 * time.Hour
 	oneMonthDuration = 31 * oneDayDuration
 
+	// Reduce historic backfill window on expensive networks (e.g. mobile data)
+	// to avoid excessive bandwidth/CPU usage.
+	// TODO remove or change this when implementing https://github.com/status-im/status-app/issues/18388
+	expensiveNetworkMaxSyncDuration = 1 * oneDayDuration
+
 	// historicSyncMinInterval is the minimum spacing between two historic
 	// syncs. The historic-sync worker enforces it by delaying the pending sync,
 	// never by dropping triggers (see startHistoricSyncWorker).
@@ -187,7 +192,31 @@ func (m *Messenger) defaultSyncPeriodFromNow() (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return uint32(m.getTimesource().GetCurrentTime()/1000) - defaultSyncPeriod, nil
+
+	syncPeriod := m.capSyncPeriodForNetwork(defaultSyncPeriod)
+	return syncPeriodFromNow(m.getTimesource().GetCurrentTime(), syncPeriod), nil
+}
+
+func syncPeriodFromNow(currentTimeMillis uint64, syncPeriod uint32) uint32 {
+	fromUnix := int64(currentTimeMillis/1000) - int64(syncPeriod)
+	if fromUnix < 0 {
+		return 0
+	}
+
+	return uint32(fromUnix)
+}
+
+func (m *Messenger) capSyncPeriodForNetwork(defaultSyncPeriod uint32) uint32 {
+	if !m.connectionState.IsExpensive() {
+		return defaultSyncPeriod
+	}
+
+	expensiveSeconds := uint32(expensiveNetworkMaxSyncDuration / time.Second)
+	if defaultSyncPeriod > expensiveSeconds {
+		return expensiveSeconds
+	}
+
+	return defaultSyncPeriod
 }
 
 // capToDefaultSyncPeriod caps the sync period to the default
@@ -615,10 +644,17 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		return 0, err
 	}
 
+	syncPeriod := m.capSyncPeriodForNetwork(defaultSyncPeriod)
+
+	fromUnix := int64(chat.SyncedFrom) - int64(syncPeriod)
+	if fromUnix < 0 {
+		fromUnix = 0
+	}
+
 	batch := types2.StoreNodeBatch{
 		ChatIDs:     []string{chatID},
 		To:          time.Unix(int64(chat.SyncedFrom), 0),
-		From:        time.Unix(int64(chat.SyncedFrom-defaultSyncPeriod), 0),
+		From:        time.Unix(fromUnix, 0),
 		PubsubTopic: pubsubTopic,
 		Topics:      topics,
 	}
