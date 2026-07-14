@@ -75,7 +75,7 @@ func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 // Automatically waits for an available store node.
 // When a `nil` community and `nil` error is returned, that means the community wasn't found at the store node.
 func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityID string, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
-	cfg := buildStoreNodeRequestConfig(opts)
+	cfg := buildCommunityStoreNodeRequestConfig(opts)
 
 	m.logger.Info("requesting community from store node",
 		zap.String("community", communityID),
@@ -381,7 +381,21 @@ func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool
 	// Force all received envelopes to be processed. We keep the resulting
 	// response so a community request can tell whether this page actually
 	// carried a description for the target community (issue #21470-hf).
-	response := r.manager.messenger.ProcessAllMessages()
+	//
+	// Skip the walk entirely for an empty page: ProcessAllMessages traverses the
+	// messenger's whole pending backlog, but its only job here is to flush THIS
+	// page's envelopes into the DB before the GetByID check. With zero envelopes
+	// there is nothing of ours to flush, and during a channel backfill re-walking
+	// that fat queue on every empty page — to the cap, per dead id — is the CPU/GC
+	// storm behind the device overheat (issue #21470-hf). The DB check below still
+	// runs, so a description delivered by a parallel channel-sync page is not
+	// missed; only the redundant processing is dropped.
+	var response *MessengerResponse
+	if shouldProcessStoreNodePage(envelopesCount) {
+		response = r.manager.messenger.ProcessAllMessages()
+	} else {
+		logger.Debug("skipping ProcessAllMessages for empty store node page")
+	}
 
 	// Try to get community from database
 	switch r.requestID.RequestType {

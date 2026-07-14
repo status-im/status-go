@@ -64,6 +64,67 @@ func TestStoreNodeRequestPageCap(t *testing.T) {
 	})
 }
 
+// TestCommunityStoreNodeRequestPageCap verifies that community fetches get a much
+// tighter page cap than contact fetches (issue #21470-hf). Store queries page
+// newest-first (go-waku history.go: PaginationForward unset = backward) and
+// community descriptions are republished periodically, so a live community's
+// description appears within the first few pages; with the description-seen gate
+// (6cd6ced1a) a hit stops the request anyway, so deep paging can only ever chew
+// empty/irrelevant history. The device evidence: dead curated ids each cost a
+// ~minutes-long 30-page run with fetchedEnvelopesCount=0 at cap-trip. Contact
+// fetches keep the generous 30-page cap; only the community construction site is
+// tightened, never the shared default.
+func TestCommunityStoreNodeRequestPageCap(t *testing.T) {
+	t.Run("community construction caps at 3 pages", func(t *testing.T) {
+		require.Equal(t, 3, maxCommunityStoreNodeRequestPageCount)
+		cfg := buildCommunityStoreNodeRequestConfig(nil)
+		require.Equal(t, maxCommunityStoreNodeRequestPageCount, cfg.MaxPageCount)
+	})
+
+	t.Run("contact construction keeps the generous 30-page cap", func(t *testing.T) {
+		require.Equal(t, 30, maxStoreNodeRequestPageCount)
+		cfg := buildStoreNodeRequestConfig(nil)
+		require.Equal(t, maxStoreNodeRequestPageCount, cfg.MaxPageCount)
+	})
+
+	t.Run("community construction is tighter than contact construction", func(t *testing.T) {
+		community := buildCommunityStoreNodeRequestConfig(nil)
+		contact := buildStoreNodeRequestConfig(nil)
+		require.Less(t, community.MaxPageCount, contact.MaxPageCount)
+	})
+
+	t.Run("community construction inherits the shared non-cap defaults", func(t *testing.T) {
+		cfg := buildCommunityStoreNodeRequestConfig(nil)
+		base := defaultStoreNodeRequestConfig()
+		require.Equal(t, base.WaitForResponse, cfg.WaitForResponse)
+		require.Equal(t, base.StopWhenDataFound, cfg.StopWhenDataFound)
+		require.Equal(t, base.InitialPageSize, cfg.InitialPageSize)
+		require.Equal(t, base.FurtherPageSize, cfg.FurtherPageSize)
+	})
+
+	t.Run("caller options still override the community cap", func(t *testing.T) {
+		cfg := buildCommunityStoreNodeRequestConfig([]StoreNodeRequestOption{WithMaxPageCount(7)})
+		require.Equal(t, 7, cfg.MaxPageCount)
+	})
+}
+
+// TestShouldProcessStoreNodePage verifies the decision that skips the forced
+// per-page Messenger.ProcessAllMessages when the just-fetched page carried zero
+// envelopes (issue #21470-hf). That call exists solely to flush THIS request's
+// envelopes into the DB before the GetByID check; with zero envelopes there is
+// nothing of ours to flush, yet ProcessAllMessages still walks the messenger's
+// whole pending backlog. During the legitimate channel backfill that means
+// re-walking a fat queue on every empty page — up to the page cap, continuously,
+// for each dead curated id — the CPU/GC storm seen on device (GC 67%, service
+// 320-370%). Skipping the walk on empty pages removes that amplification; the DB
+// check still runs (a parallel channel-sync page may have delivered the
+// description).
+func TestShouldProcessStoreNodePage(t *testing.T) {
+	require.False(t, shouldProcessStoreNodePage(0), "empty page has nothing of ours to flush")
+	require.True(t, shouldProcessStoreNodePage(1), "a page with envelopes must be processed")
+	require.True(t, shouldProcessStoreNodePage(50), "a full page must be processed")
+}
+
 // TestGateNextPageByValidationQueue verifies the decision that stops store-node
 // pagination for a community request once the community's description is already
 // in hand and only blocked on owner validation (issue #21470-hf). For a
