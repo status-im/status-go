@@ -3,6 +3,7 @@ package wakuv2
 import (
 	"context"
 	"encoding/hex"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
@@ -42,7 +43,77 @@ const (
 	// may carry. Mirrors the verifier's maxMsgHashesPerRequest — the store node caps the
 	// number of message_hashes keys per request.
 	hashFirstMaxHashesPerRequest = 50
+
+	// hashFirstMaxContentTopicsPerRequest bounds how many content topics a single metadata
+	// store query may carry. Mirrors the classic HistoryRetriever's maxTopicsPerRequest and
+	// the verifier's maxContentTopicsPerRequest — the store node caps the number of content
+	// topics per request. The general (all-filters) history sync batches many more topics
+	// than the spectate path, so the metadata walk must chunk them (issue #21470-hf).
+	hashFirstMaxContentTopicsPerRequest = 10
 )
+
+// hashFirstMaxWindow caps the duration of a single metadata store query. The classic
+// HistoryRetriever caps each query to 24h and walks a longer range backward (see
+// history.go's exceeds24h handling); the general history sync can span the ~9-day default
+// sync period, so the metadata walk is split into <=24h sub-windows to match (issue
+// #21470-hf).
+const hashFirstMaxWindow = 24 * time.Hour
+
+// hashFirstTimeWindow is one <=24h sub-window of the metadata walk, in unix nanoseconds.
+type hashFirstTimeWindow struct {
+	fromNano int64
+	toNano   int64
+}
+
+// partitionContentTopics splits content topics into chunks of at most maxPerRequest, so
+// each metadata store query stays within the store node's per-request content-topic limit.
+// A non-positive maxPerRequest yields a single chunk (defensive: never emit an unbounded
+// or infinite split). Order is preserved.
+func partitionContentTopics(topics []string, maxPerRequest int) [][]string {
+	if len(topics) == 0 {
+		return nil
+	}
+	if maxPerRequest <= 0 {
+		return [][]string{topics}
+	}
+	var chunks [][]string
+	for i := 0; i < len(topics); i += maxPerRequest {
+		j := i + maxPerRequest
+		if j > len(topics) {
+			j = len(topics)
+		}
+		chunks = append(chunks, topics[i:j])
+	}
+	return chunks
+}
+
+// splitWindowNewestFirst splits [fromNano, toNano) into consecutive sub-windows of at most
+// maxWindowNano, ordered NEWEST-FIRST (the first window ends at toNano). This mirrors the
+// classic HistoryRetriever, which caps each store query to 24h and walks a longer range
+// backward: a single metadata query over a multi-day range would silently cover only the
+// newest window while the watermark still advances to `to`, losing the older days.
+// Newest-first ordering keeps bodies fetched most-recent-first (matching aa9fa29b5). An
+// empty or inverted range yields no windows; a non-positive maxWindowNano yields a single
+// window spanning the range (defensive: never loop forever).
+func splitWindowNewestFirst(fromNano, toNano, maxWindowNano int64) []hashFirstTimeWindow {
+	if toNano <= fromNano {
+		return nil
+	}
+	if maxWindowNano <= 0 {
+		return []hashFirstTimeWindow{{fromNano: fromNano, toNano: toNano}}
+	}
+	var windows []hashFirstTimeWindow
+	end := toNano
+	for end > fromNano {
+		start := end - maxWindowNano
+		if start < fromNano {
+			start = fromNano
+		}
+		windows = append(windows, hashFirstTimeWindow{fromNano: start, toNano: end})
+		end = start
+	}
+	return windows
+}
 
 // partitionMessageHashes splits hashes into batches of at most maxPerRequest, so each
 // body-fetch store query stays within the store node's per-request hash-key limit. A
@@ -127,9 +198,15 @@ func planBodyFetch(unknown []wpb.MessageHash, skipBodies bool) (toFetch []wpb.Me
 // normal ingest path (OnNewEnvelopes), exactly as the classic full-body path does. It
 // returns per-batch stats for the once-per-backfill INFO log.
 //
+// The metadata walk generalizes to the general (all-filters) history sync's batch shapes
+// (issue #21470-hf): content topics are chunked to at most hashFirstMaxContentTopicsPerRequest
+// per store query, and a multi-day window is split into <=24h sub-windows walked
+// newest-first, both mirroring the classic HistoryRetriever so coverage is identical and no
+// day is silently dropped from a range wider than 24h.
+//
 // Cancellation: the caller's ctx is threaded into every store query and checked between
-// pages and between body-fetch partitions, so leave/background aborts promptly. As with
-// the classic path, watermark bookkeeping lives in the caller and advances only after
+// chunks, windows, pages and body-fetch partitions, so leave/background aborts promptly. As
+// with the classic path, watermark bookkeeping lives in the caller and advances only after
 // this returns without error, so a cancelled batch marks nothing fetched.
 func (w *Waku) ProcessMailserverBatchHashFirst(
 	ctx context.Context,
@@ -149,43 +226,27 @@ func (w *Waku) ProcessMailserverBatchHashFirst(
 	requestor := missing.NewDefaultStorenodeRequestor(w.node.Store())
 
 	// Phase 1 — metadata-only page walk (newest-first): collect every hash in the window,
-	// skipping those already held locally.
+	// skipping those already held locally. The general sync batches many topics over a
+	// multi-day window, so the walk is chunked by content topic (store per-request cap) and
+	// by <=24h sub-window (query duration cap), exactly as the classic HistoryRetriever does.
+	windows := splitWindowNewestFirst(batch.From.UnixNano(), batch.To.UnixNano(), hashFirstMaxWindow.Nanoseconds())
 	var unknownHashes []wpb.MessageHash
-	metadataQuery := buildMetadataQuery(
-		hex.EncodeToString(protocol.GenerateRequestID()),
-		pubsubTopic, contentTopics, batch.From.UnixNano(), batch.To.UnixNano())
-
-	result, err := requestor.Query(ctx, storenode, metadataQuery)
-	if err != nil {
-		return stats, err
-	}
-	for {
-		pageHashes := make([]wpb.MessageHash, 0, len(result.Messages()))
-		for _, mkv := range result.Messages() {
-			stats.HashesSeen++
-			pageHashes = append(pageHashes, wpb.ToMessageHash(mkv.MessageHash))
-		}
-		pageUnknown, known, err := filterUnknownHashes(pageHashes, w.MessageExists)
-		if err != nil {
-			return stats, err
-		}
-		stats.HashesKnown += known
-		unknownHashes = append(unknownHashes, pageUnknown...)
-
-		if result.IsComplete() {
-			break
-		}
-		if err := ctx.Err(); err != nil {
-			return stats, err
-		}
-		if err := result.Next(ctx); err != nil {
-			return stats, err
+	for _, topicChunk := range partitionContentTopics(contentTopics, hashFirstMaxContentTopicsPerRequest) {
+		for _, window := range windows {
+			if err := ctx.Err(); err != nil {
+				return stats, err
+			}
+			chunkUnknown, err := w.walkMetadataWindow(ctx, requestor, storenode, pubsubTopic, topicChunk, window, &stats)
+			if err != nil {
+				return stats, err
+			}
+			unknownHashes = append(unknownHashes, chunkUnknown...)
 		}
 	}
 
-	// De-duplicate across pages as well: a hash unknown on one page must not be fetched
-	// twice if the store repeats it.
-	unknownHashes, _, err = filterUnknownHashes(unknownHashes, func(wpb.MessageHash) (bool, error) { return false, nil })
+	// De-duplicate across chunks, windows and pages: a hash unknown in one place must not be
+	// fetched twice if the store repeats it.
+	unknownHashes, _, err := filterUnknownHashes(unknownHashes, func(wpb.MessageHash) (bool, error) { return false, nil })
 	if err != nil {
 		return stats, err
 	}
@@ -235,6 +296,56 @@ func (w *Waku) ProcessMailserverBatchHashFirst(
 	}
 
 	return stats, nil
+}
+
+// walkMetadataWindow runs the metadata-only page walk for one content-topic chunk over one
+// <=24h sub-window: it pages newest-first pulling only hashes, accumulates HashesSeen /
+// HashesKnown into stats, and returns the hashes not already held locally (per-page
+// de-duplicated; the caller de-duplicates across chunks/windows). The ctx is checked
+// between pages so a cancel aborts promptly.
+func (w *Waku) walkMetadataWindow(
+	ctx context.Context,
+	requestor commonapi.StorenodeRequestor,
+	storenode peer.AddrInfo,
+	pubsubTopic string,
+	contentTopics []string,
+	window hashFirstTimeWindow,
+	stats *types.HashFirstStats,
+) ([]wpb.MessageHash, error) {
+	metadataQuery := buildMetadataQuery(
+		hex.EncodeToString(protocol.GenerateRequestID()),
+		pubsubTopic, contentTopics, window.fromNano, window.toNano)
+
+	result, err := requestor.Query(ctx, storenode, metadataQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	var unknownHashes []wpb.MessageHash
+	for {
+		pageHashes := make([]wpb.MessageHash, 0, len(result.Messages()))
+		for _, mkv := range result.Messages() {
+			stats.HashesSeen++
+			pageHashes = append(pageHashes, wpb.ToMessageHash(mkv.MessageHash))
+		}
+		pageUnknown, known, err := filterUnknownHashes(pageHashes, w.MessageExists)
+		if err != nil {
+			return nil, err
+		}
+		stats.HashesKnown += known
+		unknownHashes = append(unknownHashes, pageUnknown...)
+
+		if result.IsComplete() {
+			break
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if err := result.Next(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return unknownHashes, nil
 }
 
 // ingestBodyPage feeds one page of fetched full-body envelopes into the normal ingest

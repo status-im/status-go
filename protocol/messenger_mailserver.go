@@ -312,9 +312,26 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 
 		peerInfo := m.messaging.GetActiveStorenode()
 
+		// The general all-filters history sync runs hash-first: each batch fetches only the
+		// window's hashes and then bodies for the hashes not already held locally, so the
+		// classic path no longer re-downloads (full-body) community/personal history we
+		// already have (issue #21470-hf). skipEncryptedBodies stays false — this is the
+		// all-filters sync and personal/1-1/contact bodies are always wanted; the keyless
+		// body-skip is exclusive to the spectate call site.
+		hf := &hashFirstBackfill{}
+		defer func() {
+			// One INFO line per requestAllHistoricMessages run (not per batch): the on-device
+			// evidence of the byte cut — hashes walked vs. bodies actually fetched.
+			m.logger.Info("history sync hash-first",
+				zap.Int("hashesSeen", hf.stats.HashesSeen),
+				zap.Int("hashesKnown", hf.stats.HashesKnown),
+				zap.Int("bodiesFetched", hf.stats.BodiesFetched),
+				zap.Int64("bytesEstimate", hf.stats.BytesEstimate))
+		}()
+
 		if withRetries {
 			response, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-				return m.syncFilters(peerInfo, filters)
+				return m.syncFiltersFrom(m.ctx, peerInfo, filters, 0, hf)
 			}, history.WithPeerID(peerInfo.ID))
 			if err != nil {
 				return nil, err
@@ -326,7 +343,7 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 			return allResponses, nil
 		}
 
-		response, err := m.syncFilters(peerInfo, filters)
+		response, err := m.syncFiltersFrom(m.ctx, peerInfo, filters, 0, hf)
 		if err != nil {
 			return nil, err
 		}
@@ -630,7 +647,11 @@ func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo,
 }
 
 func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters types2.ChatFilters) (*MessengerResponse, error) {
-	return m.syncFiltersFrom(m.ctx, peerInfo, filters, 0, nil)
+	// General (non-spectate) filter sync runs hash-first, fetching bodies only for hashes
+	// not already held locally (issue #21470-hf). skipEncryptedBodies stays false — these
+	// are the scheduled/per-chat syncs where personal/1-1/contact bodies are always wanted;
+	// the keyless body-skip is exclusive to the spectate call site.
+	return m.syncFiltersFrom(m.ctx, peerInfo, filters, 0, &hashFirstBackfill{})
 }
 
 func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Message, error) {
@@ -697,6 +718,16 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 
 func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch) error {
 	return m.processMailserverBatchWithContext(m.ctx, peerInfo, batch)
+}
+
+// processMailserverBatchPersonal runs a single-batch backfill hash-first on the messenger
+// context, always fetching bodies for unknown hashes (skipEncryptedBodies=false — the
+// on-demand single-chat paths want personal/1-1/contact bodies). Like the general sync it
+// only stops re-downloading bodies already held locally (issue #21470-hf). The metadata
+// walk chunks topics and splits a multi-day window into <=24h sub-windows, so it covers the
+// same range as the classic processMailserverBatch it replaces on these paths.
+func (m *Messenger) processMailserverBatchPersonal(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch) error {
+	return m.processMailserverBatchHashFirst(m.ctx, peerInfo, batch, &hashFirstBackfill{})
 }
 
 // processMailserverBatchWithContext is processMailserverBatch with a caller-supplied
@@ -792,7 +823,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 		}
 
-		err = m.processMailserverBatch(peerInfo, batch)
+		err = m.processMailserverBatchPersonal(peerInfo, batch)
 		if err != nil {
 			return nil, err
 		}
@@ -935,7 +966,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 		}
 
-		err = m.processMailserverBatch(peerInfo, batch)
+		err = m.processMailserverBatchPersonal(peerInfo, batch)
 		if err != nil {
 			return nil, err
 		}

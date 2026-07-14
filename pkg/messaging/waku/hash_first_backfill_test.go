@@ -3,6 +3,7 @@ package wakuv2
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -63,6 +64,102 @@ func TestPartitionMessageHashes(t *testing.T) {
 	// defensive: a non-positive cap must not divide-by-zero or loop forever; one batch
 	require.Len(t, partitionMessageHashes(hashesN(1, 2), 0), 1)
 	require.Len(t, partitionMessageHashes(hashesN(1, 2), -1), 1)
+}
+
+// TestPartitionContentTopics covers the metadata-query topic chunking that generalizes
+// the hash-first walk to the general (all-filters) history sync (issue #21470-hf): the
+// global sync batches MANY content topics, and a single store query may carry at most
+// maxContentTopicsPerRequest (mirrors the classic HistoryRetriever's maxTopicsPerRequest
+// and the verifier's maxContentTopicsPerRequest). Chunking wrong would have the store node
+// reject or silently truncate the query, dropping whole topics from the walk.
+func TestPartitionContentTopics(t *testing.T) {
+	require.Equal(t, 10, hashFirstMaxContentTopicsPerRequest,
+		"must mirror the classic HistoryRetriever maxTopicsPerRequest / verifier maxContentTopicsPerRequest")
+
+	// empty -> no chunks
+	require.Empty(t, partitionContentTopics(nil, 10))
+	require.Empty(t, partitionContentTopics([]string{}, 10))
+
+	// fewer than the cap -> a single chunk, order preserved
+	got := partitionContentTopics([]string{"a", "b", "c"}, 10)
+	require.Len(t, got, 1)
+	require.Equal(t, []string{"a", "b", "c"}, got[0])
+
+	// exactly the cap -> a single full chunk
+	got = partitionContentTopics([]string{"a", "b", "c", "d"}, 4)
+	require.Len(t, got, 1)
+	require.Len(t, got[0], 4)
+
+	// one over the cap -> two chunks, remainder in the second
+	got = partitionContentTopics([]string{"a", "b", "c", "d", "e"}, 4)
+	require.Len(t, got, 2)
+	require.Equal(t, []string{"a", "b", "c", "d"}, got[0])
+	require.Equal(t, []string{"e"}, got[1])
+
+	// several full chunks plus a remainder
+	got = partitionContentTopics([]string{"a", "b", "c", "d", "e", "f", "g"}, 3)
+	require.Len(t, got, 3)
+	require.Equal(t, []string{"a", "b", "c"}, got[0])
+	require.Equal(t, []string{"d", "e", "f"}, got[1])
+	require.Equal(t, []string{"g"}, got[2])
+
+	// defensive: a non-positive cap must not divide-by-zero or loop forever; one chunk
+	require.Len(t, partitionContentTopics([]string{"a", "b"}, 0), 1)
+	require.Len(t, partitionContentTopics([]string{"a", "b"}, -1), 1)
+}
+
+// TestSplitWindowNewestFirst covers the multi-day window walk that generalizes the
+// hash-first backfill to the general history sync (issue #21470-hf). The general path can
+// span up to the ~9-day default sync period, but the classic HistoryRetriever caps each
+// store query to 24h and walks the range backward (see history.go's exceeds24h handling);
+// a single metadata query over a multi-day range would silently cover only the newest 24h
+// while the watermark still advances to `to`, losing the older days. So the metadata walk
+// must be split into consecutive <=24h sub-windows, ordered NEWEST-FIRST so bodies are
+// fetched most-recent-first (matching aa9fa29b5).
+func TestSplitWindowNewestFirst(t *testing.T) {
+	const day = int64(24 * time.Hour)
+
+	// empty / inverted range -> no windows
+	require.Empty(t, splitWindowNewestFirst(1000, 1000, day))
+	require.Empty(t, splitWindowNewestFirst(2000, 1000, day))
+
+	// range <= maxWindow -> a single window equal to the input
+	got := splitWindowNewestFirst(0, day, day)
+	require.Equal(t, []hashFirstTimeWindow{{fromNano: 0, toNano: day}}, got)
+
+	// sub-window range -> a single window equal to the input
+	got = splitWindowNewestFirst(100, 500, day)
+	require.Equal(t, []hashFirstTimeWindow{{fromNano: 100, toNano: 500}}, got)
+
+	// exactly two days -> two full 24h windows, newest first, contiguous, no gaps/overlap
+	got = splitWindowNewestFirst(0, 2*day, day)
+	require.Equal(t, []hashFirstTimeWindow{
+		{fromNano: day, toNano: 2 * day},
+		{fromNano: 0, toNano: day},
+	}, got)
+
+	// nine-day default -> nine contiguous windows, newest-first, covering the whole range
+	got = splitWindowNewestFirst(0, 9*day, day)
+	require.Len(t, got, 9)
+	require.Equal(t, 9*day, got[0].toNano, "first window ends at `to` (newest)")
+	require.Equal(t, int64(0), got[len(got)-1].fromNano, "last window starts at `from` (oldest)")
+	for i := 0; i < len(got); i++ {
+		require.LessOrEqual(t, got[i].toNano-got[i].fromNano, day, "no window exceeds 24h")
+		if i > 0 {
+			require.Equal(t, got[i-1].fromNano, got[i].toNano, "windows are contiguous, no gap/overlap")
+		}
+	}
+
+	// partial trailing window -> oldest window is clamped to `from`, never before it
+	got = splitWindowNewestFirst(0, day+500, day)
+	require.Equal(t, []hashFirstTimeWindow{
+		{fromNano: 500, toNano: day + 500},
+		{fromNano: 0, toNano: 500},
+	}, got)
+
+	// defensive: a non-positive maxWindow must not loop forever; one window spanning the range
+	require.Equal(t, []hashFirstTimeWindow{{fromNano: 0, toNano: 2 * day}}, splitWindowNewestFirst(0, 2*day, 0))
+	require.Equal(t, []hashFirstTimeWindow{{fromNano: 0, toNano: 2 * day}}, splitWindowNewestFirst(0, 2*day, -1))
 }
 
 // TestFilterUnknownHashes covers known-hash filtering: bodies are fetched ONLY for
