@@ -1210,10 +1210,18 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 type testOwnerVerifier struct {
 	called    int
 	ownersMap map[string]string
+	// err simulates a transport-class failure of the on-chain owner lookup
+	// (RPC timeout, dead proxy, rate limit). When set, SafeGetSignerPubKey
+	// fails the way a broken wallet RPC stack does, without rejecting the
+	// community as invalid.
+	err error
 }
 
 func (t *testOwnerVerifier) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
 	t.called++
+	if t.err != nil {
+		return "", t.err
+	}
 	return t.ownersMap[communityID], nil
 }
 
@@ -1296,6 +1304,139 @@ func (s *ManagerSuite) TestCommunityQueue() {
 	communitiesToValidate, err := m.persistence.getCommunitiesToValidate()
 	s.Require().NoError(err)
 	s.Require().Empty(communitiesToValidate)
+}
+
+// TestHighestQueuedValidationClock verifies the queue read the store-node pager
+// uses to decide it may stop paging (issue #21470-hf): once a community's
+// description is queued for owner validation, HighestQueuedValidationClock
+// reports the greatest queued clock so the pager can compare it against the
+// clock it already holds. With nothing queued (or for an unrelated community) it
+// reports 0, so the pager keeps paging as before.
+func (s *ManagerSuite) TestHighestQueuedValidationClock() {
+	verifier := &testOwnerVerifier{}
+	m, _ := s.buildManagers(verifier)
+
+	communityID := []byte{0x01, 0x02, 0x03}
+
+	clock, err := m.HighestQueuedValidationClock(communityID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(0), clock, "nothing queued yet")
+
+	// Queue two descriptions with different clocks, both already due for
+	// validation (validate_at in the past).
+	s.Require().NoError(m.persistence.SaveCommunityToValidate(communityToValidate{
+		id: communityID, clock: 5, payload: []byte("a"), validateAt: 1, signer: []byte("s")}))
+	s.Require().NoError(m.persistence.SaveCommunityToValidate(communityToValidate{
+		id: communityID, clock: 9, payload: []byte("b"), validateAt: 1, signer: []byte("s")}))
+
+	clock, err = m.HighestQueuedValidationClock(communityID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(9), clock, "highest queued clock")
+
+	clock, err = m.HighestQueuedValidationClock([]byte{0xaa, 0xbb})
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(0), clock, "unrelated community is unaffected")
+}
+
+// TestCommunityQueueRetriesTransportError verifies the core correctness fix
+// (issue #21470-hf): a transport-class failure of owner verification (RPC
+// timeout / dead proxy / rate limit) must NOT reject the community and must NOT
+// clear the queue — the description stays queued so verification is retried
+// out-of-band, and succeeds once the RPC recovers, publishing
+// TokenCommunityValidated. This decouples verification retries from store-node
+// paging: the pager stops once the description is queued, and recovery happens
+// here rather than by fetching more pages.
+func (s *ManagerSuite) TestCommunityQueueRetriesTransportError() {
+	owner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	verifier := &testOwnerVerifier{}
+	m, _ := s.buildManagers(verifier)
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+	community, err := s.manager.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	verifier.ownersMap = make(map[string]string)
+	verifier.ownersMap[community.IDString()] = crypto.PubkeyToHex(&owner.PublicKey)
+
+	description := community.config.CommunityDescription
+	description.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	description.TokenPermissions["some-id"] = &protobuf.CommunityTokenPermission{
+		Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER,
+		Id:   "some-token-id",
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{2: "some-address"},
+			},
+		}}
+	s.Require().Equal(uint64(2), CommunityDescriptionTokenOwnerChainID(description))
+
+	payload, err := community.MarshaledDescription()
+	s.Require().NoError(err)
+	payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, owner)
+	s.Require().NoError(err)
+
+	notTheOwner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// The description arrives from a non-owner signer, so it is queued for
+	// on-chain owner verification instead of being applied immediately.
+	response, err := m.HandleCommunityDescriptionMessage(&notTheOwner.PublicKey, description, payload, nil)
+	s.Require().NoError(err)
+	s.Require().Nil(response, "must be queued, not applied")
+
+	// The queued description is now in hand: the pager can see it and stop.
+	queuedClock, err := m.HighestQueuedValidationClock(community.ID())
+	s.Require().NoError(err)
+	s.Require().Greater(queuedClock, uint64(0))
+
+	// Transport failure during verification: the community must stay queued and
+	// nothing may be published.
+	subscription := m.Subscribe()
+	verifier.err = errors.New("proxy dead: connection refused")
+
+	resp, err := m.ValidateCommunityByID(community.ID())
+	s.Require().NoError(err, "transport failure must not surface as a validation error")
+	s.Require().Nil(resp)
+
+	queued, err := m.persistence.getCommunityToValidateByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEmpty(queued, "transport-failed validation must remain queued for retry")
+
+	select {
+	case event := <-subscription:
+		s.Require().Nil(event.TokenCommunityValidated, "must not publish on transport failure")
+	default:
+	}
+
+	// Recovery: the RPC works on the next attempt → validated, published, queue
+	// cleared.
+	verifier.err = nil
+	resp, err = m.ValidateCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(resp, "validation must succeed once the RPC recovers")
+
+	published := false
+	for !published {
+		select {
+		case event := <-subscription:
+			if event.TokenCommunityValidated == nil {
+				continue
+			}
+			published = true
+		case <-time.After(2 * time.Second):
+			s.FailNow("TokenCommunityValidated not published after recovery")
+		}
+	}
+
+	queued, err = m.persistence.getCommunityToValidateByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Empty(queued, "successful validation must clear the queue")
 }
 
 // 1) We create a community

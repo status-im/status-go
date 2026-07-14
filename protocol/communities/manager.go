@@ -589,6 +589,27 @@ func (m *Manager) ValidateCommunityByID(communityID types3.HexBytes) (*Community
 
 }
 
+// HighestQueuedValidationClock returns the greatest clock among the community
+// descriptions currently queued for owner validation for the given community, or
+// 0 if none are queued. The store-node pager uses this to stop requesting more
+// history once we already hold the description and only on-chain owner
+// verification remains: fetching further pages cannot make verification succeed,
+// and verification is retried out-of-band on the owner-verification loop
+// (issue #21470-hf).
+func (m *Manager) HighestQueuedValidationClock(communityID types3.HexBytes) (uint64, error) {
+	queued, err := m.persistence.getCommunityToValidateByID(communityID)
+	if err != nil {
+		return 0, err
+	}
+	var highest uint64
+	for _, c := range queued {
+		if c.clock > highest {
+			highest = c.clock
+		}
+	}
+	return highest, nil
+}
+
 func (m *Manager) validateCommunity(communityToValidateData []communityToValidate) (*CommunityResponse, error) {
 	for _, community := range communityToValidateData {
 		signer, description, err := UnwrapCommunityDescriptionMessage(community.payload)
@@ -611,7 +632,17 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 
 		owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, types3.EncodeHex(community.id))
 		if err != nil {
-			m.logger.Error("failed to get owner", zap.Error(err))
+			// Transport-class failure of the on-chain owner lookup (RPC timeout,
+			// dead proxy, rate limit, connection refused). This is NOT a verdict
+			// on the community: we deliberately keep it queued so the
+			// owner-verification loop retries it once the RPC recovers, instead
+			// of the store-node pager reacting to it by fetching more history
+			// (issue #21470-hf). Logged distinctly from an invalid/not-owner
+			// verdict so field debugging can tell the two apart.
+			m.logger.Warn("owner verification unavailable (transport failure); keeping community queued for retry",
+				zap.String("id", types3.EncodeHex(community.id)),
+				zap.Uint64("chainID", chainID),
+				zap.Error(err))
 			continue
 		}
 
@@ -623,7 +654,13 @@ func (m *Manager) validateCommunity(communityToValidateData []communityToValidat
 
 		response, err := m.HandleCommunityDescriptionMessage(signer, description, community.payload, ownerPK)
 		if err != nil {
-			m.logger.Error("failed to handle community", zap.Error(err))
+			// Invalid-class verdict: the owner lookup succeeded but the signed
+			// description does not check out (wrong owner / bad description).
+			// Unlike a transport failure this is terminal, so we drop the entry;
+			// retrying cannot change the outcome (issue #21470-hf).
+			m.logger.Error("community description invalid for resolved owner; dropping from validation queue",
+				zap.String("id", types3.EncodeHex(community.id)),
+				zap.Error(err))
 			err = m.persistence.DeleteCommunityToValidate(community.id, community.clock)
 			if err != nil {
 				m.logger.Error("failed to delete community to validate", zap.Error(err))

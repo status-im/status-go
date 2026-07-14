@@ -407,6 +407,26 @@ func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool
 		}
 
 		if community == nil {
+			// The community is absent from the community table, but it may already
+			// be in hand and merely withheld pending on-chain owner validation. In
+			// that state the description has been fetched and only verification is
+			// blocking persistence; verification retries out-of-band on the
+			// owner-verification loop. Fetching more store-node pages cannot make a
+			// failed verification succeed — it only floods the network and starves
+			// the very RPC calls whose success would end the request (issue
+			// #21470-hf). So once the description is queued for validation, stop.
+			queuedClock, qErr := r.manager.messenger.communitiesManager.HighestQueuedValidationClock(communityID)
+			if qErr != nil {
+				logger.Warn("failed to read community validation queue; continuing to page",
+					zap.String("communityID", r.requestID.DataID),
+					zap.Error(qErr))
+			} else if gateNextPageByValidationQueue(false, queuedClock, r.minimumDataClock) {
+				logger.Info("community description queued for owner validation; stopping pagination (verification retries out-of-band)",
+					zap.Uint64("queuedClock", queuedClock),
+					zap.Uint64("minimumDataClock", r.minimumDataClock))
+				return false, 0
+			}
+
 			// community not found in the database, request next page
 			logger.Debug("community still not fetched")
 			return true, r.config.FurtherPageSize
