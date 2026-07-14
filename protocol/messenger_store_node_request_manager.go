@@ -329,7 +329,32 @@ func (r *storeNodeRequest) finalize() {
 	}
 }
 
+// shouldFetchNextPage decides whether the store-node pager should request
+// another page. It wraps the natural per-page decision with a hard page ceiling
+// (issue #21470-hf): once a request has processed config.MaxPageCount pages
+// without resolving, pagination is stopped even if the natural decision would
+// keep going. This bounds requests that can never terminate (e.g. a token-owned
+// community stuck in owner validation) so they don't drain the full store-node
+// window and overheat the device. Requests that resolve before the cap are
+// completely unaffected. On a cap-forced stop we return false, which drives the
+// request through the same finalize() path as an ordinary "not found" result,
+// so the UI's loading state clears normally.
 func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
+	fetchNext, pageSize := r.shouldFetchNextPageUncapped(envelopesCount)
+
+	fetchNext, pageSize, capTripped := r.config.gateNextPageByCap(fetchNext, pageSize, r.result.stats.FetchedPagesCount)
+	if capTripped {
+		r.manager.logger.Warn("store node request reached page cap; stopping pagination to bound runaway fetch",
+			zap.Any("requestID", r.requestID),
+			zap.Int("fetchedPagesCount", r.result.stats.FetchedPagesCount),
+			zap.Int("fetchedEnvelopesCount", r.result.stats.FetchedEnvelopesCount),
+			zap.Int("maxPageCount", r.config.MaxPageCount))
+	}
+
+	return fetchNext, pageSize
+}
+
+func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool, uint64) {
 	logger := r.manager.logger.With(
 		zap.Any("requestID", r.requestID),
 		zap.Int("envelopesCount", envelopesCount))
