@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -419,7 +420,7 @@ func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
 
-func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
+func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -558,7 +559,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		batchKeys := maps.Keys(batches[pubsubTopic])
 		sort.Ints(batchKeys)
 		for _, k := range batchKeys {
-			err := m.processMailserverBatch(peerInfo, batches[pubsubTopic][k])
+			err := m.processMailserverBatchWithContext(ctx, peerInfo, batches[pubsubTopic][k])
 			if err != nil {
 				m.logger.Error("error syncing topics", zap.Error(err))
 				return nil, err
@@ -618,7 +619,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 }
 
 func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters types2.ChatFilters) (*MessengerResponse, error) {
-	return m.syncFiltersFrom(peerInfo, filters, 0)
+	return m.syncFiltersFrom(m.ctx, peerInfo, filters, 0)
 }
 
 func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Message, error) {
@@ -684,6 +685,16 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 }
 
 func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch) error {
+	return m.processMailserverBatchWithContext(m.ctx, peerInfo, batch)
+}
+
+// processMailserverBatchWithContext is processMailserverBatch with a caller-supplied
+// context, so a request can be cancelled independently of the messenger lifetime
+// (used by the cancellable spectate backfill, issue #21470-hf). The go-waku history
+// paging loop checks ctx.Done() between pages, so cancelling ctx aborts an in-flight
+// request; watermarks are advanced only after a batch completes, so an aborted batch
+// leaves them untouched.
+func (m *Messenger) processMailserverBatchWithContext(ctx context.Context, peerInfo peer.AddrInfo, batch types2.StoreNodeBatch) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -692,7 +703,7 @@ func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch types2.
 		return nil
 	}
 
-	return m.messaging.ProcessMailserverBatch(m.ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
+	return m.messaging.ProcessMailserverBatch(ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
