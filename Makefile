@@ -416,7 +416,7 @@ endif
 statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent $(EXTRA_BUILD_TAGS)' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
