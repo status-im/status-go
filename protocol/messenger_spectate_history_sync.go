@@ -61,15 +61,52 @@ type hashFirstBackfill struct {
 // should skip the body-fetch phase entirely (issue #21470-hf enhancement).
 //
 // The community's channels and its description share ONE content topic, so a hash cannot
-// tell them apart. But the spectator's OWN state can: when the node holds no decryption
-// keys for the community (holdsKeys false) AND the community description is already
-// resolved (the spectate flow fetches it before this backfill runs), every body on that
-// topic is either a description we already hold or an undecryptable channel message.
-// Fetching them is pure heat, so we skip — the hashes are still walked so the watermark
-// advances, and the bodies stay on the store node, re-fetchable in full after a join.
-// A keyed user (joined) legitimately wants the bodies, so it never skips.
-func spectateShouldSkipKeylessBodies(holdsKeys, descriptionResolved bool) bool {
-	return !holdsKeys && descriptionResolved
+// tell them apart. We may skip fetching bodies only when ALL THREE hold:
+//   - holdsKeys is false: the node has no community decryption keys, so gated channels
+//     are undecryptable heat;
+//   - descriptionResolved: the description is already held (the spectate flow resolves it
+//     before this backfill), so we do not need it from here;
+//   - fullyEncrypted: EVERY channel is key-gated. An encrypted community can still contain
+//     PUBLIC channels readable without keys (the Status community is mixed). Because all
+//     channels share one topic, skipping bodies would also drop those public channels'
+//     readable history — so if any public channel exists we must fetch.
+//
+// All three inputs fail safe toward FETCHING, so uncertainty never drops readable data.
+func spectateShouldSkipKeylessBodies(holdsKeys, descriptionResolved, fullyEncrypted bool) bool {
+	return !holdsKeys && descriptionResolved && fullyEncrypted
+}
+
+// allChannelsEncrypted reports whether EVERY channel id is key-gated per the supplied
+// per-channel check (a channel readable without keys makes it false). An empty channel
+// set returns false — fail safe toward fetching, since "no known channels" must never be
+// read as "nothing readable to lose".
+func allChannelsEncrypted(channelIDs []string, encrypted func(string) bool) bool {
+	if len(channelIDs) == 0 {
+		return false
+	}
+	for _, channelID := range channelIDs {
+		if !encrypted(channelID) {
+			return false
+		}
+	}
+	return true
+}
+
+// communityFullyEncryptedForNonMembers reports whether the community has NO channel a
+// keyless spectator could read: every channel is key-gated (see Community.ChannelEncrypted
+// — a channel is readable without keys when it is public / viewable-by-everyone). If any
+// readable channel exists, a keyless spectate must still fetch bodies so that channel's
+// history is not lost (issue #21470-hf enhancement). Fails safe toward fetching.
+func communityFullyEncryptedForNonMembers(community *communities.Community) bool {
+	if community == nil {
+		return false
+	}
+	chats := community.Chats()
+	channelIDs := make([]string, 0, len(chats))
+	for channelID := range chats {
+		channelIDs = append(channelIDs, channelID)
+	}
+	return allChannelsEncrypted(channelIDs, community.ChannelEncrypted)
 }
 
 // mailserverTopicRef identifies a store-node topic (its pubsub + content topic).
@@ -212,14 +249,16 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 			return
 		}
 
-		// Keyless-spectator body skip (issue #21470-hf enhancement): a spectator holds no
-		// community keys and its description is already resolved by the time this backfill
-		// runs, so every body on the shared community content topic is undecryptable or
-		// already held — skip fetching bodies entirely.
+		// Keyless-spectator body skip (issue #21470-hf enhancement): skip fetching bodies
+		// only when the node holds no community keys, the description is already resolved,
+		// AND every channel is key-gated. A mixed community (encrypted, but with public
+		// channels — like Status) keeps full body fetch so its public channels' readable
+		// history is not dropped, since all channels share one content topic.
 		holdsKeys := m.communitiesManager.CommunityHoldsAnyDecryptionKey(community)
 		descriptionResolved := community.Description() != nil
+		fullyEncrypted := communityFullyEncryptedForNonMembers(community)
 		hf := &hashFirstBackfill{
-			skipEncryptedBodies: spectateShouldSkipKeylessBodies(holdsKeys, descriptionResolved),
+			skipEncryptedBodies: spectateShouldSkipKeylessBodies(holdsKeys, descriptionResolved, fullyEncrypted),
 		}
 
 		peerInfo := m.messaging.GetActiveStorenode()

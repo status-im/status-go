@@ -38,20 +38,44 @@ func TestCommunityInitialHistorySync(t *testing.T) {
 }
 
 // TestSpectateShouldSkipKeylessBodies verifies the keyless body-skip gate (issue
-// #21470-hf enhancement). Only a keyless spectator whose description is already resolved
-// may skip fetching bodies — every body on the shared community content topic is then
-// either a description already held or an undecryptable channel message. A keyed user
-// (joined) must never skip; an unresolved description must never skip (we still need it).
+// #21470-hf enhancement). Bodies may be skipped ONLY when the node holds no keys AND the
+// description is already resolved AND every channel is key-gated. In particular a MIXED
+// community (fullyEncrypted=false: an encrypted community with public channels, like
+// Status) must keep full body fetch, or the public channels' readable history is dropped.
+// All three inputs fail safe toward fetching.
 func TestSpectateShouldSkipKeylessBodies(t *testing.T) {
-	require.True(t, spectateShouldSkipKeylessBodies(false /* no keys */, true /* description resolved */),
-		"keyless spectator with a resolved description skips bodies")
+	// the ONLY skip case: keyless + resolved + fully encrypted
+	require.True(t, spectateShouldSkipKeylessBodies(false /* no keys */, true /* resolved */, true /* fully encrypted */),
+		"keyless spectator, resolved description, all channels gated -> skip")
 
-	require.False(t, spectateShouldSkipKeylessBodies(true /* holds keys */, true),
+	// mixed community: a readable public channel exists -> must fetch
+	require.False(t, spectateShouldSkipKeylessBodies(false, true, false /* NOT fully encrypted */),
+		"mixed community (public channel present) must fetch bodies")
+
+	require.False(t, spectateShouldSkipKeylessBodies(true /* holds keys */, true, true),
 		"a keyed (joined) user must fetch bodies")
-	require.False(t, spectateShouldSkipKeylessBodies(false, false /* description not resolved */),
+	require.False(t, spectateShouldSkipKeylessBodies(false, false /* description not resolved */, true),
 		"an unresolved description must still be fetched")
-	require.False(t, spectateShouldSkipKeylessBodies(true, false),
-		"keyed and unresolved: fetch")
+	require.False(t, spectateShouldSkipKeylessBodies(true, false, false),
+		"keyed, unresolved, mixed: fetch")
+}
+
+// TestAllChannelsEncrypted verifies the "every channel is key-gated" derivation (issue
+// #21470-hf enhancement): if ANY channel is readable without keys the community is not
+// fully encrypted, and an empty channel set fails safe (false -> fetch).
+func TestAllChannelsEncrypted(t *testing.T) {
+	// encrypted set: only "gated" channels are key-gated
+	gated := map[string]bool{"gated1": true, "gated2": true, "public": false}
+	enc := func(id string) bool { return gated[id] }
+
+	require.True(t, allChannelsEncrypted([]string{"gated1", "gated2"}, enc),
+		"all channels gated -> fully encrypted")
+	require.False(t, allChannelsEncrypted([]string{"gated1", "public"}, enc),
+		"a readable public channel -> not fully encrypted (mixed)")
+	require.False(t, allChannelsEncrypted(nil, enc),
+		"no known channels must fail safe toward fetching")
+	require.False(t, allChannelsEncrypted([]string{}, enc),
+		"empty channel set must fail safe toward fetching")
 }
 
 // TestCommunityHistorySeedTopics verifies the watermark seeding that bounds a
