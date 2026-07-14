@@ -14,13 +14,13 @@ import (
 // payloads (measured ~2-3GB/11min at ~330% service CPU on a Samsung S21FE). The
 // only byte-cutting lever is the WINDOW, because every channel rides one content
 // topic so per-channel scoping is impossible. Spectate is therefore bounded to a
-// tight 24h window; `from = now - 24h`.
+// scoped window matching the app's default sync period (9 days).
 func TestSpectatedCommunitySyncFrom(t *testing.T) {
-	require.Equal(t, 24*time.Hour, spectatedCommunityInitialSyncPeriod,
-		"spectate window must stay 24h — the measured heat lever")
+	require.Equal(t, 9*24*time.Hour, spectatedCommunityInitialSyncPeriod,
+		"spectate window matches the 9-day default sync period — affordable since hash-first + keyless-skip")
 
 	const now = uint32(1_700_000_000)
-	require.Equal(t, now-uint32(24*60*60), spectatedCommunitySyncFrom(now))
+	require.Equal(t, now-uint32(9*24*60*60), spectatedCommunitySyncFrom(now))
 }
 
 // TestCommunityInitialHistorySync verifies the spectate-vs-join scoping decision
