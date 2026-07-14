@@ -46,11 +46,19 @@ func NewController(
 	logger *zap.Logger,
 	tracer trace.Tracer,
 ) *Controller {
+	proc := processor.NewProcessor(identity, stack, messageConfirmationStorage, hashRatchetStorage, logger, tracer)
+	// #21470 gate #2: drop undecryptable hash-ratchet messages instead of
+	// parking them in SQLite for replay. Device-validated (Samsung S21FE,
+	// spectating the Status community): service RSS 876MB -> 480MB, data dir
+	// 144MB after ~3GB ingested (previously grew by gigabytes of parked
+	// blobs); key distribution (SeqNo==0) and plaintext channels unaffected.
+	// Dropped content remains on the store node and is re-fetched after join.
+	proc.SetDropUndecryptableWithoutKeys(true)
 	return &Controller{
 		identity:                   identity,
 		stack:                      stack,
 		sender:                     sender.NewSender(identity, stack, logger, tracer),
-		processor:                  processor.NewProcessor(identity, stack, messageConfirmationStorage, hashRatchetStorage, logger, tracer),
+		processor:                  proc,
 		messageConfirmationStorage: messageConfirmationStorage,
 		hashRatchetStorage:         hashRatchetStorage,
 		publisher:                  publisher,
