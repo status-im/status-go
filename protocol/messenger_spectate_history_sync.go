@@ -19,14 +19,16 @@ import (
 // spectatedCommunityInitialSyncPeriod bounds the history backfill triggered when a
 // user spectates a community (issue #21470-hf).
 //
-// A spectator holds no community decryption keys, and every channel in a community
-// rides ONE universal content topic, so a full default-period (9-day) backfill pulls
-// the entire community's traffic as undecryptable payloads. Device measurement
-// (Samsung S21FE, fresh account spectating the Status community): ~2-3GB ingested in
-// ~11min at ~330% service CPU, GC-bound. Because all channels share one content
-// topic, per-channel scoping is impossible — the WINDOW is the only byte-cutting
-// lever, so spectate is bounded to 24h.
-const spectatedCommunityInitialSyncPeriod = 24 * time.Hour
+// History: this was briefly 24h as a byte-mitigation when the backfill fetched full
+// bodies for the whole universal topic (measured ~2-3GB / ~11min at ~330% service
+// CPU on a Samsung S21FE). With the backfill now hash-first (bodies fetched only
+// for unknown hashes), keyless spectators skipping undecryptable bodies entirely,
+// and the early-drop gates making residual bodies cheap, the full default sync
+// period is affordable again — so spectators get the same 9-day history horizon as
+// everyone else. The real wins of this path are retained: the sync is scoped to the
+// community's own filters (not the global all-filters sync), cancellable on
+// leave/background, and watermark-seeded.
+const spectatedCommunityInitialSyncPeriod = 9 * 24 * time.Hour
 
 // spectatedCommunitySyncFrom returns the store-node "from" timestamp (unix seconds)
 // for a spectator's scoped backfill: now minus the spectate window.
@@ -35,9 +37,9 @@ func spectatedCommunitySyncFrom(nowUnixSeconds uint32) uint32 {
 }
 
 // communityInitialHistorySync decides how a community's FIRST history backfill is
-// scoped. Spectators get the tight 24h window (deeper history is undecryptable heat);
-// joiners keep today's behavior — a full default-period backfill — because they hold
-// keys and legitimately want the history.
+// scoped. Spectators get a community-scoped default-period window (fetched
+// hash-first); joiners keep today's behavior — the full global backfill — because
+// they hold keys and legitimately want everything.
 func communityInitialHistorySync(spectated bool) (scoped bool, window time.Duration) {
 	if spectated {
 		return true, spectatedCommunityInitialSyncPeriod
