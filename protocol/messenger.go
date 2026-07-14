@@ -2776,6 +2776,32 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 // preserving the same ~1s latency as the previous polling loop.
 const retrieveMessagesDebounceInterval = time.Second
 
+// retrieveMessagesMaxLatency bounds how long a flush can be deferred while
+// matches keep arriving. Without it a sustained envelope flood (e.g. the
+// community-description storm behind #21470) resets the debounce window on
+// every match, the 1s quiet gap never arrives, ProcessAllMessages is starved,
+// and freshly synced messages persisted to the DB are never surfaced to the
+// UI until the app restarts. The ceiling forces a flush at least this often
+// under continuous matches; quiet/normal traffic is unaffected because the
+// debounce interval fits comfortably under it.
+const retrieveMessagesMaxLatency = 3 * time.Second
+
+// nextFlushDeadline decides when the retrieve loop should next call
+// ProcessAllMessages. pendingSince is the time of the first match not yet
+// flushed; now is the time of the match currently being processed. The flush
+// normally fires a debounce window after the latest match, but is capped at
+// maxLatency measured from the first unflushed match so a continuous flood
+// cannot postpone delivery indefinitely. It returns the earlier of the two
+// deadlines.
+func nextFlushDeadline(pendingSince, now time.Time, debounce, maxLatency time.Duration) time.Time {
+	quietDeadline := now.Add(debounce)
+	ceilingDeadline := pendingSince.Add(maxLatency)
+	if ceilingDeadline.Before(quietDeadline) {
+		return ceilingDeadline
+	}
+	return quietDeadline
+}
+
 func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
@@ -2787,27 +2813,46 @@ func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan str
 
 		var debounceTimer *time.Timer
 		var debounceCh <-chan time.Time
+		// Time of the first match since the last flush; zero when no flush is
+		// pending. Anchors the max-latency ceiling.
+		var pendingSince time.Time
+
+		stopTimer := func() {
+			if debounceTimer != nil && !debounceTimer.Stop() {
+				select {
+				case <-debounceTimer.C:
+				default:
+				}
+			}
+		}
 
 		for {
 			select {
 			case <-matchedCh:
-				// Reset the debounce window on every new match to coalesce bursts.
-				if debounceTimer != nil && !debounceTimer.Stop() {
-					select {
-					case <-debounceTimer.C:
-					default:
-					}
+				now := time.Now()
+				if pendingSince.IsZero() {
+					pendingSince = now
 				}
-				debounceTimer = time.NewTimer(retrieveMessagesDebounceInterval)
+				// Reset the debounce window on every new match to coalesce
+				// bursts, but never later than the max-latency ceiling.
+				stopTimer()
+				delay := nextFlushDeadline(pendingSince, now, retrieveMessagesDebounceInterval, retrieveMessagesMaxLatency).Sub(now)
+				if delay < 0 {
+					delay = 0
+				}
+				debounceTimer = time.NewTimer(delay)
 				debounceCh = debounceTimer.C
 
 			case <-debounceCh:
 				debounceCh = nil
+				pendingSince = time.Time{}
 				m.ProcessAllMessages()
 
 			case <-cancel:
+				stopTimer()
 				return
 			case <-m.quit:
+				stopTimer()
 				return
 			}
 		}
