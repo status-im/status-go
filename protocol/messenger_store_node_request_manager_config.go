@@ -2,73 +2,122 @@ package protocol
 
 import "time"
 
-// communityNotFoundCooldownTTL is how long a community id stays on the
-// negative-result cooldown after a store-node request finalized without
-// producing a community (issue #21470-hf). The dev curated directory carries
-// "dead" ids whose descriptions never arrive; without a cooldown any client-side
-// loop (Communities Portal re-requesting per delegate, curated refreshes, …)
-// re-issues FetchCommunity for them back-to-back, each run paging to the cap and
-// finalizing not-found — a sustained CPU/GC storm that overheats the device.
+// communityFetchBackoff{BaseDelay,MaxDelay} parameterise the per-id exponential
+// backoff that throttles store-node community fetches which keep finalizing as
+// not-found (issue #21470-hf). The dev curated directory carries "dead" ids whose
+// descriptions never arrive; without throttling any client-side loop (Communities
+// Portal re-requesting per delegate, curated refreshes, …) re-issues FetchCommunity
+// for them back-to-back, each run paging to the cap and finalizing not-found — a
+// sustained CPU/GC storm that overheats the device.
 //
-// Trade-off: a user's manual retry within the TTL of a definitive not-found
-// no-ops (returns not-found immediately without hitting the network). This is
-// acceptable because the fetch would fail identically anyway — nothing on the
-// store node changed in two minutes — and a successful fetch or an active
-// in-flight request are both unaffected (a live request is joined, not
-// suppressed; a success clears the entry immediately).
-const communityNotFoundCooldownTTL = 2 * time.Minute
+// A flat cooldown (the first cut of this fix) over-suppressed a COLD start: on a
+// loaded store node a capped request often finalizes nil BEFORE the community's
+// large description has been served, and the empirically-observed way descriptions
+// land is the rapid retries that immediately follow. A flat 2-minute ban blocked
+// exactly those retries (device: 346 attempts → 249 suppressed → 0 descriptions
+// resolved in 9 min). Exponential backoff keeps the warm-up cadence almost
+// untouched — the first handful of retries fire within seconds — while a genuinely
+// dead id geometrically converges to one 30-page run per MaxDelay.
+//
+// backoffFor(n) = min(BaseDelay * 2^(n-1), MaxDelay). With Base=5s, Max=2m the
+// schedule is 5s, 10s, 20s, 40s, 80s, then 120s for every further miss.
+const (
+	communityFetchBackoffBaseDelay = 5 * time.Second
+	communityFetchBackoffMaxDelay  = 2 * time.Minute
+)
 
-// communityNotFoundCooldown records, per community id, the time its last
-// store-node request finalized without producing a community. A fresh request
-// for an id whose last nil-result finalize is younger than ttl is suppressed
-// (delivered an immediate not-found) instead of spawning another pager. Entries
-// expire lazily on read — there is no janitor goroutine.
-//
-// It carries no lock of its own: the owning StoreNodeRequestManager guards every
-// access with its activeRequestsLock (the same lock that guards activeRequests
-// and is already held across finalize()), so record/clear/suppress are always
-// called under that lock. It must therefore never be copied by value once
-// populated; the manager holds it by pointer.
-type communityNotFoundCooldown struct {
-	ttl     time.Duration
-	entries map[string]time.Time
+// communityFetchBackoffEntry tracks, per community id, how many consecutive REAL
+// store-node requests finalized without producing a community, and when the most
+// recent such finalize happened. Only a real nil finalize advances the streak; a
+// suppressed attempt never does (no self-extending bans).
+type communityFetchBackoffEntry struct {
+	consecutiveNilFinalizes int
+	lastNilFinalizeAt       time.Time
 }
 
-func newCommunityNotFoundCooldown(ttl time.Duration) *communityNotFoundCooldown {
-	return &communityNotFoundCooldown{
-		ttl:     ttl,
-		entries: map[string]time.Time{},
+// communityFetchBackoff decides whether a fresh community fetch may proceed. A new
+// request for an id is allowed only once now >= lastNilFinalizeAt +
+// backoffFor(consecutiveNilFinalizes); otherwise it is suppressed (delivered an
+// immediate not-found) instead of spawning another pager. Unlike a TTL cooldown,
+// an entry is NOT evicted when its window expires — the streak count must survive
+// an allowed retry so a still-dead id keeps climbing toward MaxDelay. Only a
+// successful fetch (clear) removes the entry.
+//
+// It carries no lock of its own: the owning StoreNodeRequestManager guards every
+// access with its activeRequestsLock (the same lock that guards activeRequests and
+// is already held across finalize()), so record/clear/suppress are always called
+// under that lock. It must therefore never be copied by value once populated; the
+// manager holds it by pointer.
+type communityFetchBackoff struct {
+	baseDelay time.Duration
+	maxDelay  time.Duration
+	entries   map[string]*communityFetchBackoffEntry
+}
+
+func newCommunityFetchBackoff(baseDelay, maxDelay time.Duration) *communityFetchBackoff {
+	return &communityFetchBackoff{
+		baseDelay: baseDelay,
+		maxDelay:  maxDelay,
+		entries:   map[string]*communityFetchBackoffEntry{},
 	}
 }
 
-// recordNilFinalize arms (or re-arms) the cooldown for communityID at now. Called
-// when a community request finalizes with a nil community (not-found, cap-tripped
-// or queued-stop). Re-arming slides the window to the newest finalize.
-func (c *communityNotFoundCooldown) recordNilFinalize(communityID string, now time.Time) {
-	c.entries[communityID] = now
+// backoffFor returns min(baseDelay * 2^(consecutiveMisses-1), maxDelay). Zero (or
+// negative) misses means no backoff. The doubling loop stops at maxDelay so it can
+// never overflow, however large the streak grows.
+func (c *communityFetchBackoff) backoffFor(consecutiveMisses int) time.Duration {
+	if consecutiveMisses <= 0 {
+		return 0
+	}
+	delay := c.baseDelay
+	for i := 1; i < consecutiveMisses; i++ {
+		delay *= 2
+		if delay >= c.maxDelay {
+			return c.maxDelay
+		}
+	}
+	if delay > c.maxDelay {
+		return c.maxDelay
+	}
+	return delay
 }
 
-// clear drops any cooldown for communityID. Called when a community request
-// finalizes WITH a community, so a subsequent legitimate re-fetch is never
-// suppressed by a stale negative result.
-func (c *communityNotFoundCooldown) clear(communityID string) {
+// recordNilFinalize advances the backoff streak for communityID and stamps the
+// finalize time. Called when a REAL community request finalizes with a nil
+// community (not-found, cap-tripped or queued-stop). Each call widens the next
+// allowed-retry window by doubling the backoff.
+func (c *communityFetchBackoff) recordNilFinalize(communityID string, now time.Time) {
+	entry, ok := c.entries[communityID]
+	if !ok {
+		entry = &communityFetchBackoffEntry{}
+		c.entries[communityID] = entry
+	}
+	entry.consecutiveNilFinalizes++
+	entry.lastNilFinalizeAt = now
+}
+
+// clear drops the backoff entry for communityID. Called when a community request
+// finalizes WITH a community, so a subsequent legitimate re-fetch starts from a
+// clean schedule and is never suppressed by a stale negative streak.
+func (c *communityFetchBackoff) clear(communityID string) {
 	delete(c.entries, communityID)
 }
 
 // suppress reports whether a fresh request for communityID should be suppressed,
-// and the remaining cooldown (for logging). An entry at or past the TTL does not
-// suppress and is evicted on read. A missing entry never suppresses.
-func (c *communityNotFoundCooldown) suppress(communityID string, now time.Time) (bool, time.Duration) {
-	last, ok := c.entries[communityID]
+// the current consecutive-miss count and the remaining backoff (both for logging).
+// A missing entry never suppresses. An entry whose window has elapsed does not
+// suppress but is deliberately kept, so a subsequent nil finalize climbs the
+// streak rather than restarting it. Reading never mutates the streak.
+func (c *communityFetchBackoff) suppress(communityID string, now time.Time) (bool, int, time.Duration) {
+	entry, ok := c.entries[communityID]
 	if !ok {
-		return false, 0
+		return false, 0, 0
 	}
-	remaining := c.ttl - now.Sub(last)
+	remaining := entry.lastNilFinalizeAt.Add(c.backoffFor(entry.consecutiveNilFinalizes)).Sub(now)
 	if remaining <= 0 {
-		delete(c.entries, communityID)
-		return false, 0
+		return false, entry.consecutiveNilFinalizes, 0
 	}
-	return true, remaining
+	return true, entry.consecutiveNilFinalizes, remaining
 }
 
 // maxStoreNodeRequestPageCount is a hard ceiling on the number of store-node

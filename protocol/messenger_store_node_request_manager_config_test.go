@@ -7,90 +7,163 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCommunityNotFoundCooldown verifies the negative-result cooldown that stops
-// a fresh store-node community fetch from being spawned right after the same
-// community just finalized as not-found (issue #21470-hf). The dev curated
-// directory carries "dead" community ids whose descriptions never arrive; any
-// client-side loop re-issues FetchCommunity for them, each run pages to the cap,
-// finalizes not-found, and the next call starts a fresh run — a sustained CPU
-// storm. Once an id finalizes with a nil community we record the time; a new
-// request for that id inside the TTL is suppressed instead of spawning a pager.
-// A successful fetch clears the entry, and entries expire on read (no janitor).
-func TestCommunityNotFoundCooldown(t *testing.T) {
-	const ttl = 2 * time.Minute
-	base := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+// TestCommunityFetchBackoff verifies the per-id exponential backoff that throttles
+// repeated store-node community fetches which keep finalizing as not-found (issue
+// #21470-hf). The dev curated directory carries "dead" community ids whose
+// descriptions never arrive; any client-side loop re-issues FetchCommunity for
+// them, each run pages to the cap, finalizes not-found, and the next call starts
+// a fresh run — a sustained CPU storm.
+//
+// An earlier hotfix (b7992077f) used a FLAT 2-minute cooldown after the first
+// nil finalize. On-device that over-suppressed a COLD start: a capped request
+// commonly finalizes nil before the slow, loaded store node has served a
+// community's large description, and the flat cooldown then blocked exactly the
+// rapid retries that empirically are how descriptions land (346 attempts → 249
+// suppressed → 0 descriptions resolved in 9 min). This backoff instead barely
+// touches the warm-up cadence (first retries within seconds) while a genuinely
+// dead id converges to one run per maxDelay.
+//
+// backoffFor(n) = min(baseDelay * 2^(n-1), maxDelay). Only a REAL request that
+// finalizes nil increments n (recordNilFinalize); a suppressed attempt must not
+// self-extend the ban. A success clears the entry entirely.
+func TestCommunityFetchBackoff(t *testing.T) {
+	const base = 5 * time.Second
+	const max = 2 * time.Minute
+	baseTime := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
 
-	t.Run("fresh cooldown suppresses nothing", func(t *testing.T) {
-		c := newCommunityNotFoundCooldown(ttl)
-		suppress, remaining := c.suppress("0xdead", base)
+	t.Run("no entry suppresses nothing", func(t *testing.T) {
+		c := newCommunityFetchBackoff(base, max)
+		suppress, misses, remaining := c.suppress("0xdead", baseTime)
 		require.False(t, suppress)
+		require.Equal(t, 0, misses)
 		require.Equal(t, time.Duration(0), remaining)
 	})
 
-	t.Run("record then a fresh request within the TTL is suppressed", func(t *testing.T) {
-		c := newCommunityNotFoundCooldown(ttl)
-		c.recordNilFinalize("0xdead", base)
+	t.Run("backoff schedule doubles per miss up to the cap", func(t *testing.T) {
+		c := newCommunityFetchBackoff(base, max)
+		require.Equal(t, time.Duration(0), c.backoffFor(0))
+		for _, tc := range []struct {
+			misses int
+			want   time.Duration
+		}{
+			{1, 5 * time.Second},
+			{2, 10 * time.Second},
+			{3, 20 * time.Second},
+			{4, 40 * time.Second},
+			{5, 80 * time.Second},
+			{6, 120 * time.Second},
+			{7, 120 * time.Second},
+			{20, 120 * time.Second},
+		} {
+			require.Equalf(t, tc.want, c.backoffFor(tc.misses), "backoffFor(%d)", tc.misses)
+		}
+	})
 
-		suppress, remaining := c.suppress("0xdead", base.Add(30*time.Second))
+	t.Run("warm-up retries are barely delayed; a dead id converges to the cap", func(t *testing.T) {
+		for _, tc := range []struct {
+			misses int
+			window time.Duration
+		}{
+			{1, 5 * time.Second},
+			{2, 10 * time.Second},
+			{3, 20 * time.Second},
+			{6, 120 * time.Second},
+		} {
+			c := newCommunityFetchBackoff(base, max)
+			for i := 0; i < tc.misses; i++ {
+				c.recordNilFinalize("0xdead", baseTime)
+			}
+			// Just before the window ends: suppressed, one ns of backoff left.
+			suppress, misses, remaining := c.suppress("0xdead", baseTime.Add(tc.window-time.Nanosecond))
+			require.Truef(t, suppress, "misses=%d", tc.misses)
+			require.Equal(t, tc.misses, misses)
+			require.Equal(t, time.Nanosecond, remaining)
+			// Exactly at the window boundary: allowed to retry.
+			suppress, _, remaining = c.suppress("0xdead", baseTime.Add(tc.window))
+			require.Falsef(t, suppress, "misses=%d", tc.misses)
+			require.Equal(t, time.Duration(0), remaining)
+		}
+	})
+
+	t.Run("a suppressed attempt does not increment the counter (no self-extending ban)", func(t *testing.T) {
+		c := newCommunityFetchBackoff(base, max)
+		c.recordNilFinalize("0xdead", baseTime) // n=1, window 5s
+
+		// Hammer suppress within the window; none of these may advance n or slide
+		// the window.
+		for i := 0; i < 5; i++ {
+			suppress, misses, _ := c.suppress("0xdead", baseTime.Add(2*time.Second))
+			require.True(t, suppress)
+			require.Equal(t, 1, misses)
+		}
+		// Still n=1, so the retry is allowed exactly at +5s (window never moved).
+		suppress, misses, _ := c.suppress("0xdead", baseTime.Add(5*time.Second))
+		require.False(t, suppress)
+		require.Equal(t, 1, misses)
+	})
+
+	t.Run("only a real nil finalize advances the backoff", func(t *testing.T) {
+		c := newCommunityFetchBackoff(base, max)
+		c.recordNilFinalize("0xdead", baseTime)                    // n=1
+		c.recordNilFinalize("0xdead", baseTime.Add(5*time.Second)) // n=2, window 10s from +5s
+
+		suppress, misses, remaining := c.suppress("0xdead", baseTime.Add(6*time.Second))
 		require.True(t, suppress)
-		require.Equal(t, 90*time.Second, remaining)
+		require.Equal(t, 2, misses)
+		require.Equal(t, 9*time.Second, remaining)
 	})
 
-	t.Run("a different id is not affected by another id's cooldown", func(t *testing.T) {
-		c := newCommunityNotFoundCooldown(ttl)
-		c.recordNilFinalize("0xdead", base)
+	t.Run("an allowed retry keeps the counter so a dead id keeps climbing", func(t *testing.T) {
+		c := newCommunityFetchBackoff(base, max)
+		c.recordNilFinalize("0xdead", baseTime)
+		c.recordNilFinalize("0xdead", baseTime) // n=2, window 10s
 
-		suppress, remaining := c.suppress("0xlive", base.Add(time.Second))
+		// Past the window: allowed, but the n=2 entry must persist (not evicted like
+		// the old TTL) so the next finalize climbs to n=3, not resets to n=1.
+		suppress, misses, _ := c.suppress("0xdead", baseTime.Add(30*time.Second))
 		require.False(t, suppress)
+		require.Equal(t, 2, misses)
+
+		c.recordNilFinalize("0xdead", baseTime.Add(30*time.Second)) // -> n=3, window 20s
+		suppress, misses, remaining := c.suppress("0xdead", baseTime.Add(31*time.Second))
+		require.True(t, suppress)
+		require.Equal(t, 3, misses)
+		require.Equal(t, 19*time.Second, remaining)
+	})
+
+	t.Run("a different id is independent", func(t *testing.T) {
+		c := newCommunityFetchBackoff(base, max)
+		c.recordNilFinalize("0xdead", baseTime)
+
+		suppress, misses, remaining := c.suppress("0xlive", baseTime.Add(time.Second))
+		require.False(t, suppress)
+		require.Equal(t, 0, misses)
 		require.Equal(t, time.Duration(0), remaining)
 	})
 
-	t.Run("entry past the TTL does not suppress and is evicted on read", func(t *testing.T) {
-		c := newCommunityNotFoundCooldown(ttl)
-		c.recordNilFinalize("0xdead", base)
-
-		suppress, remaining := c.suppress("0xdead", base.Add(ttl+time.Second))
-		require.False(t, suppress)
-		require.Equal(t, time.Duration(0), remaining)
-
-		// A second query at a time that WOULD be inside a fresh TTL still does not
-		// suppress, proving the stale entry was evicted rather than lingering.
-		suppress, _ = c.suppress("0xdead", base.Add(ttl+2*time.Second))
-		require.False(t, suppress)
-	})
-
-	t.Run("exactly at the TTL boundary does not suppress", func(t *testing.T) {
-		c := newCommunityNotFoundCooldown(ttl)
-		c.recordNilFinalize("0xdead", base)
-
-		suppress, remaining := c.suppress("0xdead", base.Add(ttl))
-		require.False(t, suppress)
-		require.Equal(t, time.Duration(0), remaining)
-	})
-
-	t.Run("a successful fetch clears the cooldown", func(t *testing.T) {
-		c := newCommunityNotFoundCooldown(ttl)
-		c.recordNilFinalize("0xdead", base)
+	t.Run("a successful fetch clears the entry and resets the schedule", func(t *testing.T) {
+		c := newCommunityFetchBackoff(base, max)
+		c.recordNilFinalize("0xdead", baseTime)
+		c.recordNilFinalize("0xdead", baseTime) // n=2
 		c.clear("0xdead")
 
-		suppress, remaining := c.suppress("0xdead", base.Add(time.Second))
+		suppress, misses, remaining := c.suppress("0xdead", baseTime.Add(time.Second))
 		require.False(t, suppress)
+		require.Equal(t, 0, misses)
 		require.Equal(t, time.Duration(0), remaining)
-	})
 
-	t.Run("a later not-found re-arms the cooldown from the new time", func(t *testing.T) {
-		c := newCommunityNotFoundCooldown(ttl)
-		c.recordNilFinalize("0xdead", base)
-		// Re-finalize not-found later; the window must slide to the new finalize.
-		c.recordNilFinalize("0xdead", base.Add(5*time.Minute))
-
-		suppress, remaining := c.suppress("0xdead", base.Add(5*time.Minute+time.Second))
+		// After a clear, a fresh nil finalize starts back at n=1 (5s), not where the
+		// prior streak left off.
+		c.recordNilFinalize("0xdead", baseTime.Add(time.Minute))
+		suppress, misses, remaining = c.suppress("0xdead", baseTime.Add(time.Minute+time.Second))
 		require.True(t, suppress)
-		require.Equal(t, ttl-time.Second, remaining)
+		require.Equal(t, 1, misses)
+		require.Equal(t, 4*time.Second, remaining)
 	})
 
-	t.Run("default TTL is enabled and conservative", func(t *testing.T) {
-		require.Equal(t, 2*time.Minute, communityNotFoundCooldownTTL)
+	t.Run("default base/max delays keep warm-up fast and cap steady state", func(t *testing.T) {
+		require.Equal(t, 5*time.Second, communityFetchBackoffBaseDelay)
+		require.Equal(t, 2*time.Minute, communityFetchBackoffMaxDelay)
 	})
 }
 
