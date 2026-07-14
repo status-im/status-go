@@ -664,6 +664,18 @@ func (t *Transport) ProcessMailserverBatch(
 	return t.waku.ProcessMailserverBatch(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
+// ProcessMailserverBatchHashFirst runs a hash-first store-node backfill of the batch:
+// it fetches only the hashes in the window, then full bodies for the hashes not already
+// held locally (issue #21470-hf). Bodies are ingested exactly as the classic path.
+func (t *Transport) ProcessMailserverBatchHashFirst(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	storenode peer.AddrInfo,
+	processEnvelopes bool,
+) (types.HashFirstStats, error) {
+	return t.waku.ProcessMailserverBatchHashFirst(ctx, batch, storenode, processEnvelopes)
+}
+
 func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 	t.waku.SetStorenodeConfigProvider(c)
 }

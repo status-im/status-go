@@ -12,6 +12,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/services/mailservers"
 )
@@ -185,9 +186,10 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 			return
 		}
 
+		stats := &wakutypes.HashFirstStats{}
 		peerInfo := m.messaging.GetActiveStorenode()
 		_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-			response, err := m.syncFiltersFrom(ctx, peerInfo, filters, from)
+			response, err := m.syncFiltersFrom(ctx, peerInfo, filters, from, stats)
 			if err != nil {
 				if ctx.Err() != nil {
 					// Cancelled by leave / background: stop cleanly, without retrying
@@ -209,6 +211,15 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 			m.logger.Error("failed to perform spectated community history request",
 				zap.String("communityID", communityID), zap.Error(err))
 		}
+
+		// One INFO line per backfill: the on-device evidence of the byte cut — hashes
+		// walked vs. bodies actually fetched (issue #21470-hf).
+		m.logger.Info("spectated community hash-first backfill",
+			zap.String("communityID", communityID),
+			zap.Int("hashesSeen", stats.HashesSeen),
+			zap.Int("hashesKnown", stats.HashesKnown),
+			zap.Int("bodiesFetched", stats.BodiesFetched),
+			zap.Int64("bytesEstimate", stats.BytesEstimate))
 	}()
 }
 

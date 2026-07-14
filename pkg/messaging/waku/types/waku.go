@@ -225,6 +225,17 @@ type Waku interface {
 		processEnvelopes bool,
 	) error
 
+	// ProcessMailserverBatchHashFirst runs a hash-first backfill of the batch: it pulls
+	// only the window's message hashes, then fetches full bodies solely for hashes not
+	// already held locally, ingesting them exactly as ProcessMailserverBatch does. It
+	// returns per-batch stats (issue #21470-hf).
+	ProcessMailserverBatchHashFirst(
+		ctx context.Context,
+		batch MailserverBatch,
+		storenode peer.AddrInfo,
+		processEnvelopes bool,
+	) (HashFirstStats, error)
+
 	// IsStorenodeAvailable is used to determine whether a storenode is available or not
 	IsStorenodeAvailable(peerID peer.ID) bool
 
@@ -240,4 +251,25 @@ type MailserverBatch struct {
 	PubsubTopic string
 	Topics      []TopicType
 	ChatIDs     []string
+}
+
+// HashFirstStats reports what a single hash-first store-node backfill did (issue
+// #21470-hf): how many message hashes the metadata-only page walk saw, how many were
+// already known locally (so their bodies were skipped), how many bodies were actually
+// fetched, and an estimate of the fetched body bytes. It is the evidence used to
+// verify the byte cut on device.
+type HashFirstStats struct {
+	HashesSeen    int
+	HashesKnown   int
+	BodiesFetched int
+	BytesEstimate int64
+}
+
+// Add accumulates another batch's stats into s, so a multi-batch backfill can be
+// summarised in a single log line.
+func (s *HashFirstStats) Add(o HashFirstStats) {
+	s.HashesSeen += o.HashesSeen
+	s.HashesKnown += o.HashesKnown
+	s.BodiesFetched += o.BodiesFetched
+	s.BytesEstimate += o.BytesEstimate
 }

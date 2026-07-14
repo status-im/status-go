@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"
@@ -420,7 +421,13 @@ func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
 
-func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
+// syncFiltersFrom backfills the given filters from the store node starting at
+// lastRequest. When hashFirstStats is non-nil the spectate hash-first path is used
+// (issue #21470-hf): each batch fetches only the window's hashes and then bodies for the
+// hashes not already held locally, and per-batch stats are accumulated into
+// hashFirstStats for the caller's once-per-backfill log. A nil hashFirstStats keeps the
+// classic full-body path (the general, non-spectate syncFilters callers).
+func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32, hashFirstStats *wakutypes.HashFirstStats) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -559,7 +566,12 @@ func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo,
 		batchKeys := maps.Keys(batches[pubsubTopic])
 		sort.Ints(batchKeys)
 		for _, k := range batchKeys {
-			err := m.processMailserverBatchWithContext(ctx, peerInfo, batches[pubsubTopic][k])
+			var err error
+			if hashFirstStats != nil {
+				err = m.processMailserverBatchHashFirst(ctx, peerInfo, batches[pubsubTopic][k], hashFirstStats)
+			} else {
+				err = m.processMailserverBatchWithContext(ctx, peerInfo, batches[pubsubTopic][k])
+			}
 			if err != nil {
 				m.logger.Error("error syncing topics", zap.Error(err))
 				return nil, err
@@ -619,7 +631,7 @@ func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo,
 }
 
 func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters types2.ChatFilters) (*MessengerResponse, error) {
-	return m.syncFiltersFrom(m.ctx, peerInfo, filters, 0)
+	return m.syncFiltersFrom(m.ctx, peerInfo, filters, 0, nil)
 }
 
 func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Message, error) {
@@ -704,6 +716,30 @@ func (m *Messenger) processMailserverBatchWithContext(ctx context.Context, peerI
 	}
 
 	return m.messaging.ProcessMailserverBatch(ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
+}
+
+// processMailserverBatchHashFirst is the hash-first counterpart of
+// processMailserverBatchWithContext used by the spectate backfill (issue #21470-hf): it
+// fetches only the window's message hashes and then full bodies for the hashes not
+// already held locally, accumulating per-batch stats into stats. It preserves the same
+// metered-network gate (canSyncWithStoreNodes) and cancellation semantics as the classic
+// path; watermark bookkeeping stays in syncFiltersFrom and advances only after this
+// returns without error, so a cancelled batch marks nothing fetched.
+func (m *Messenger) processMailserverBatchHashFirst(ctx context.Context, peerInfo peer.AddrInfo, batch types2.StoreNodeBatch, stats *wakutypes.HashFirstStats) error {
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return err
+	}
+	if !canSync {
+		return nil
+	}
+
+	batchStats, err := m.messaging.ProcessMailserverBatchHashFirst(ctx, batch, peerInfo, false)
+	if err != nil {
+		return err
+	}
+	stats.Add(batchStats)
+	return nil
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch types2.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {

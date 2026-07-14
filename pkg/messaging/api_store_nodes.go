@@ -9,6 +9,7 @@ import (
 
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
 	types "github.com/status-im/status-go/pkg/messaging/types"
+	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // These methods ideally shouldn't be exposed as they reveal implementation details
@@ -52,6 +53,18 @@ func (a *API) ProcessMailserverBatch(
 	processEnvelopes bool,
 ) error {
 	return a.core.stack.Transport.ProcessMailserverBatch(ctx, *adapters.ToWakuBatch(&batch), storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+// ProcessMailserverBatchHashFirst runs a hash-first store-node backfill of the batch,
+// fetching full bodies only for hashes not already held locally (issue #21470-hf). It
+// returns per-batch stats for the caller's once-per-backfill log.
+func (a *API) ProcessMailserverBatchHashFirst(
+	ctx context.Context,
+	batch types.StoreNodeBatch,
+	storenode peer.AddrInfo,
+	processEnvelopes bool,
+) (wakutypes.HashFirstStats, error) {
+	return a.core.stack.Transport.ProcessMailserverBatchHashFirst(ctx, *adapters.ToWakuBatch(&batch), storenode, processEnvelopes)
 }
 
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
