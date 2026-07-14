@@ -16,8 +16,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -127,13 +125,12 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 
 		defer func() {
 			clearLocalData := true
-			if routeInputParams.SendType == sendtype.Swap {
-				// in case of swap don't clear local data if an approval is placed, but swap tx is not sent yet
-				if m.transactionManager.ApprovalRequiredForPath(pathProcessorCommon.ProcessorSwapParaswapName) &&
-					m.transactionManager.ApprovalPlacedForPath(pathProcessorCommon.ProcessorSwapParaswapName) &&
-					!m.transactionManager.TxPlacedForPath(pathProcessorCommon.ProcessorSwapParaswapName) {
-					clearLocalData = false
-				}
+			// Swap-classified paths (incl. LI.FI bridges) build their main tx only after
+			// the approval tx is mined, so keep the local route data until it is sent.
+			if m.transactionManager.ApprovalRequiredForSwap() &&
+				m.transactionManager.ApprovalPlacedForSwap() &&
+				!m.transactionManager.TxPlacedForSwap() {
+				clearLocalData = false
 			}
 
 			if clearLocalData {

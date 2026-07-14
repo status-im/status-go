@@ -14,6 +14,7 @@ import (
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/transactions"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -26,16 +27,6 @@ func (tm *TransactionManager) ClearLocalRouterTransactionsData() {
 	tm.routerTransactions = nil
 }
 
-func (tm *TransactionManager) ApprovalRequiredForPath(pathProcessorName string) bool {
-	for _, desc := range tm.routerTransactions {
-		if desc.RouterPath.ProcessorName == pathProcessorName &&
-			desc.RouterPath.ApprovalRequired {
-			return true
-		}
-	}
-	return false
-}
-
 func (tm *TransactionManager) ApprovalPlacedForPath(pathProcessorName string) bool {
 	for _, desc := range tm.routerTransactions {
 		if desc.RouterPath.ProcessorName == pathProcessorName && desc.IsApprovalPlaced() {
@@ -45,19 +36,31 @@ func (tm *TransactionManager) ApprovalPlacedForPath(pathProcessorName string) bo
 	return false
 }
 
-func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
+func (tm *TransactionManager) anySwapPath(pred func(*wallettypes.RouterTransactionDetails) bool) bool {
 	for _, desc := range tm.routerTransactions {
-		if desc.RouterPath.ProcessorName == pathProcessorName && desc.IsTxPlaced() {
+		if walletCommon.IsProcessorSwap(desc.RouterPath.ProcessorName) && pred(desc) {
 			return true
 		}
 	}
 	return false
 }
 
+func (tm *TransactionManager) ApprovalRequiredForSwap() bool {
+	return tm.anySwapPath(func(desc *wallettypes.RouterTransactionDetails) bool { return desc.RouterPath.ApprovalRequired })
+}
+
+func (tm *TransactionManager) ApprovalPlacedForSwap() bool {
+	return tm.anySwapPath(func(desc *wallettypes.RouterTransactionDetails) bool { return desc.IsApprovalPlaced() })
+}
+
+func (tm *TransactionManager) TxPlacedForSwap() bool {
+	return tm.anySwapPath(func(desc *wallettypes.RouterTransactionDetails) bool { return desc.IsTxPlaced() })
+}
+
 func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallettypes.RouterTransactionDetails {
 	for _, desc := range tm.routerTransactions {
 		if desc.RouterPath.PathIdentity() == path.PathIdentity() {
-			if desc.RouterPath.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
+			if walletCommon.IsProcessorSwap(desc.RouterPath.ProcessorName) {
 				// since the path is re-evaluated for swap after approval tx is placed we need to use the latest path
 				desc.RouterPath = path
 			}
@@ -245,7 +248,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 			response.Hashes = append(response.Hashes, txDetails.ApprovalTxData.HashToSign)
 
 			// if approval is needed for swap, we cannot build the swap tx before the approval tx is mined
-			if path.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
+			if walletCommon.IsProcessorSwap(path.ProcessorName) {
 				continue
 			}
 		}
@@ -368,7 +371,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context) (trans
 			transactions = append(transactions, response)
 
 			// if approval is needed for swap, then we need to wait for the approval tx to be mined before sending the swap tx
-			if desc.RouterPath.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
+			if walletCommon.IsProcessorSwap(desc.RouterPath.ProcessorName) {
 				continue
 			}
 		}
