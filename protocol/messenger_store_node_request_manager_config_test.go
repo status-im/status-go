@@ -63,3 +63,40 @@ func TestStoreNodeRequestPageCap(t *testing.T) {
 		require.GreaterOrEqual(t, cfg.MaxPageCount, 20, "cap must be generous vs the 1-2 page normal fetch")
 	})
 }
+
+// TestGateNextPageByValidationQueue verifies the decision that stops store-node
+// pagination for a community request once the community's description is already
+// in hand and only blocked on owner validation (issue #21470-hf). For a
+// token-owned community the store-node pager's natural stop condition is
+// "community persisted", but persistence is withheld until on-chain owner
+// verification succeeds. A transport failure during verification is
+// indistinguishable, to the pager, from "not fetched yet", so it wrongly fetches
+// another page — which cannot make a dead RPC succeed and only floods the
+// network. Once the description is queued for validation, more pages genuinely
+// cannot help: verification retries out-of-band on the owner-verification loop.
+func TestGateNextPageByValidationQueue(t *testing.T) {
+	t.Run("community already in DB never stops for validation", func(t *testing.T) {
+		// The found path (clock check) owns this case; the validation gate must
+		// not interfere regardless of what is queued.
+		require.False(t, gateNextPageByValidationQueue(true, 100, 0))
+	})
+
+	t.Run("nothing queued keeps paging (genuine not-found)", func(t *testing.T) {
+		require.False(t, gateNextPageByValidationQueue(false, 0, 0))
+	})
+
+	t.Run("queued description newer than what we hold stops paging", func(t *testing.T) {
+		// Description is in hand, only owner verification is pending; the
+		// verification loop will retry it. More pages cannot help.
+		require.True(t, gateNextPageByValidationQueue(false, 100, 0))
+		require.True(t, gateNextPageByValidationQueue(false, 101, 100))
+	})
+
+	t.Run("queued description not newer than what we hold keeps paging", func(t *testing.T) {
+		// The queued description is stale relative to the clock we already have;
+		// a newer page could still legitimately arrive. Mirrors the found-path
+		// "is this newer" test (community.Clock() <= minimumDataClock).
+		require.False(t, gateNextPageByValidationQueue(false, 100, 100))
+		require.False(t, gateNextPageByValidationQueue(false, 90, 100))
+	})
+}
