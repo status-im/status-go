@@ -54,18 +54,25 @@ type StoreNodeRequestManager struct {
 	activeRequests map[storeNodeRequestID]*storeNodeRequest
 
 	// activeRequestsLock should be locked each time activeRequests is being accessed or changed.
+	// It also guards communityNotFoundCooldown (record/clear/suppress).
 	activeRequestsLock sync.RWMutex
+
+	// communityNotFoundCooldown suppresses back-to-back re-fetches of community
+	// ids that just finalized as not-found (issue #21470-hf). Guarded by
+	// activeRequestsLock.
+	communityNotFoundCooldown *communityNotFoundCooldown
 
 	onPerformingBatch func(types2.StoreNodeBatch)
 }
 
 func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 	return &StoreNodeRequestManager{
-		messenger:          m,
-		logger:             m.logger.Named("StoreNodeRequestManager"),
-		activeRequests:     map[storeNodeRequestID]*storeNodeRequest{},
-		activeRequestsLock: sync.RWMutex{},
-		onPerformingBatch:  nil,
+		messenger:                 m,
+		logger:                    m.logger.Named("StoreNodeRequestManager"),
+		activeRequests:            map[storeNodeRequestID]*storeNodeRequest{},
+		activeRequestsLock:        sync.RWMutex{},
+		communityNotFoundCooldown: newCommunityNotFoundCooldown(communityNotFoundCooldownTTL),
+		onPerformingBatch:         nil,
 	}
 }
 
@@ -148,6 +155,21 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 	request, requestFound := m.activeRequests[requestID]
 
 	if !requestFound {
+		// Negative-result cooldown: if this community id finalized as not-found
+		// within the TTL, don't spawn another pager — deliver an immediate
+		// not-found through the normal subscription/finalize contract. Only
+		// applies to community requests; contact requests are untouched. An
+		// already-active request (requestFound) is joined above, never suppressed
+		// (issue #21470-hf).
+		if requestType == storeNodeCommunityRequest {
+			if suppressed, remaining := m.communityNotFoundCooldown.suppress(dataID, time.Now()); suppressed {
+				m.logger.Info("community fetch suppressed by not-found cooldown",
+					zap.String("communityID", dataID),
+					zap.Duration("remainingTTL", remaining))
+				return m.newImmediateNotFoundSubscription(), nil
+			}
+		}
+
 		// Create corresponding filter
 		var err error
 		var filter *types2.ChatFilter
@@ -175,6 +197,19 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 	}
 
 	return request.subscribe(), nil
+}
+
+// newImmediateNotFoundSubscription returns a subscription that already carries a
+// not-found result (nil community, nil contact, nil error) and is closed. It lets
+// a cooldown-suppressed request satisfy the exact same subscription contract as a
+// live request without spawning a pager, creating a filter, or touching the
+// network (issue #21470-hf). The buffered send never blocks; the caller reads the
+// single result and sees the closed channel.
+func (m *StoreNodeRequestManager) newImmediateNotFoundSubscription() storeNodeResponseSubscription {
+	channel := make(storeNodeResponseSubscription, 1)
+	channel <- storeNodeRequestResult{}
+	close(channel)
+	return channel
 }
 
 // newStoreNodeRequest creates a new storeNodeRequest struct
@@ -328,6 +363,19 @@ func (r *storeNodeRequest) finalize() {
 
 	if r.result.community != nil {
 		r.manager.messenger.passStoredCommunityInfoToSignalHandler(r.result.community)
+	}
+
+	// Maintain the negative-result cooldown for community requests (issue
+	// #21470-hf). A nil community outcome (not-found, cap-tripped, queued-stop)
+	// arms the cooldown so the next fresh request for this id is suppressed; a
+	// successful fetch clears it so a legitimate re-fetch is never blocked. Runs
+	// under activeRequestsLock, already held here.
+	if r.requestID.RequestType == storeNodeCommunityRequest {
+		if r.result.community != nil {
+			r.manager.communityNotFoundCooldown.clear(r.requestID.DataID)
+		} else {
+			r.manager.communityNotFoundCooldown.recordNilFinalize(r.requestID.DataID, time.Now())
+		}
 	}
 
 	delete(r.manager.activeRequests, r.requestID)

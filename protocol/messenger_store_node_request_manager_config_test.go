@@ -2,9 +2,97 @@ package protocol
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+// TestCommunityNotFoundCooldown verifies the negative-result cooldown that stops
+// a fresh store-node community fetch from being spawned right after the same
+// community just finalized as not-found (issue #21470-hf). The dev curated
+// directory carries "dead" community ids whose descriptions never arrive; any
+// client-side loop re-issues FetchCommunity for them, each run pages to the cap,
+// finalizes not-found, and the next call starts a fresh run — a sustained CPU
+// storm. Once an id finalizes with a nil community we record the time; a new
+// request for that id inside the TTL is suppressed instead of spawning a pager.
+// A successful fetch clears the entry, and entries expire on read (no janitor).
+func TestCommunityNotFoundCooldown(t *testing.T) {
+	const ttl = 2 * time.Minute
+	base := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+
+	t.Run("fresh cooldown suppresses nothing", func(t *testing.T) {
+		c := newCommunityNotFoundCooldown(ttl)
+		suppress, remaining := c.suppress("0xdead", base)
+		require.False(t, suppress)
+		require.Equal(t, time.Duration(0), remaining)
+	})
+
+	t.Run("record then a fresh request within the TTL is suppressed", func(t *testing.T) {
+		c := newCommunityNotFoundCooldown(ttl)
+		c.recordNilFinalize("0xdead", base)
+
+		suppress, remaining := c.suppress("0xdead", base.Add(30*time.Second))
+		require.True(t, suppress)
+		require.Equal(t, 90*time.Second, remaining)
+	})
+
+	t.Run("a different id is not affected by another id's cooldown", func(t *testing.T) {
+		c := newCommunityNotFoundCooldown(ttl)
+		c.recordNilFinalize("0xdead", base)
+
+		suppress, remaining := c.suppress("0xlive", base.Add(time.Second))
+		require.False(t, suppress)
+		require.Equal(t, time.Duration(0), remaining)
+	})
+
+	t.Run("entry past the TTL does not suppress and is evicted on read", func(t *testing.T) {
+		c := newCommunityNotFoundCooldown(ttl)
+		c.recordNilFinalize("0xdead", base)
+
+		suppress, remaining := c.suppress("0xdead", base.Add(ttl+time.Second))
+		require.False(t, suppress)
+		require.Equal(t, time.Duration(0), remaining)
+
+		// A second query at a time that WOULD be inside a fresh TTL still does not
+		// suppress, proving the stale entry was evicted rather than lingering.
+		suppress, _ = c.suppress("0xdead", base.Add(ttl+2*time.Second))
+		require.False(t, suppress)
+	})
+
+	t.Run("exactly at the TTL boundary does not suppress", func(t *testing.T) {
+		c := newCommunityNotFoundCooldown(ttl)
+		c.recordNilFinalize("0xdead", base)
+
+		suppress, remaining := c.suppress("0xdead", base.Add(ttl))
+		require.False(t, suppress)
+		require.Equal(t, time.Duration(0), remaining)
+	})
+
+	t.Run("a successful fetch clears the cooldown", func(t *testing.T) {
+		c := newCommunityNotFoundCooldown(ttl)
+		c.recordNilFinalize("0xdead", base)
+		c.clear("0xdead")
+
+		suppress, remaining := c.suppress("0xdead", base.Add(time.Second))
+		require.False(t, suppress)
+		require.Equal(t, time.Duration(0), remaining)
+	})
+
+	t.Run("a later not-found re-arms the cooldown from the new time", func(t *testing.T) {
+		c := newCommunityNotFoundCooldown(ttl)
+		c.recordNilFinalize("0xdead", base)
+		// Re-finalize not-found later; the window must slide to the new finalize.
+		c.recordNilFinalize("0xdead", base.Add(5*time.Minute))
+
+		suppress, remaining := c.suppress("0xdead", base.Add(5*time.Minute+time.Second))
+		require.True(t, suppress)
+		require.Equal(t, ttl-time.Second, remaining)
+	})
+
+	t.Run("default TTL is enabled and conservative", func(t *testing.T) {
+		require.Equal(t, 2*time.Minute, communityNotFoundCooldownTTL)
+	})
+}
 
 // TestStoreNodeRequestPageCap verifies the per-request page ceiling that bounds
 // a runaway store-node history fetch (issue #21470-hf). The cap must only ever
