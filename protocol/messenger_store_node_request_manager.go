@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -270,6 +271,13 @@ type storeNodeRequest struct {
 	minimumDataClock uint64
 	config           StoreNodeRequestConfig
 
+	// descriptionSeen latches true once a description for the requested community
+	// has been processed in this request. Store-node history is paged
+	// newest-first, so any later page can only carry an older description; once
+	// this is set, further paging cannot yield a newer one and is stopped by
+	// gateNextPageByDescriptionSeen (issue #21470-hf).
+	descriptionSeen bool
+
 	// request corresponding metadata to be used in finalize
 	filterToForget *types2.ChatFilter
 
@@ -342,6 +350,14 @@ func (r *storeNodeRequest) finalize() {
 func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
 	fetchNext, pageSize := r.shouldFetchNextPageUncapped(envelopesCount)
 
+	fetchNext, descriptionGateTripped := r.config.gateNextPageByDescriptionSeen(fetchNext, r.descriptionSeen)
+	if descriptionGateTripped {
+		r.manager.logger.Info("community description seen and not newer; stopping pagination (older pages cannot contain newer descriptions)",
+			zap.Any("requestID", r.requestID),
+			zap.Int("fetchedPagesCount", r.result.stats.FetchedPagesCount),
+			zap.Int("fetchedEnvelopesCount", r.result.stats.FetchedEnvelopesCount))
+	}
+
 	fetchNext, pageSize, capTripped := r.config.gateNextPageByCap(fetchNext, pageSize, r.result.stats.FetchedPagesCount)
 	if capTripped {
 		r.manager.logger.Warn("store node request reached page cap; stopping pagination to bound runaway fetch",
@@ -362,8 +378,10 @@ func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool
 	r.result.stats.FetchedEnvelopesCount += envelopesCount
 	r.result.stats.FetchedPagesCount++
 
-	// Force all received envelopes to be processed
-	r.manager.messenger.ProcessAllMessages()
+	// Force all received envelopes to be processed. We keep the resulting
+	// response so a community request can tell whether this page actually
+	// carried a description for the target community (issue #21470-hf).
+	response := r.manager.messenger.ProcessAllMessages()
 
 	// Try to get community from database
 	switch r.requestID.RequestType {
@@ -378,6 +396,14 @@ func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool
 				err:       fmt.Errorf("failed to decode community ID: %w", err),
 			}
 			return false, 0 // failed to decode community ID, no sense to continue the procedure
+		}
+
+		// Store-node history is paged newest-first, so the first page that carries
+		// a description for this community carries the newest available one. Latch
+		// that here; once set, gateNextPageByDescriptionSeen stops paging because
+		// older pages cannot contain a newer description (issue #21470-hf).
+		if !r.descriptionSeen && communityDescriptionSeen(response, communityID) {
+			r.descriptionSeen = true
 		}
 
 		// check if community is waiting for a verification and do a verification manually
@@ -531,4 +557,25 @@ func (r *storeNodeRequest) routine() {
 
 func (r *storeNodeRequest) start() {
 	go r.routine()
+}
+
+// communityDescriptionSeen reports whether the processed-messages response
+// carries a description for the given community. A processed community
+// description surfaces the community in the MessengerResponse via
+// handleCommunityResponse -> AddCommunity — including the equal-clock
+// re-processing that drives issue #21470-hf (UpdateCommunityDescription only
+// rejects strictly-older clocks, so a re-fetched identical description still
+// flows through and is added). Its presence is therefore the request-scoped
+// "a description for this community was processed this page" signal used by
+// gateNextPageByDescriptionSeen.
+func communityDescriptionSeen(response *MessengerResponse, communityID []byte) bool {
+	if response == nil {
+		return false
+	}
+	for _, c := range response.Communities() {
+		if c != nil && bytes.Equal(c.ID(), communityID) {
+			return true
+		}
+	}
+	return false
 }

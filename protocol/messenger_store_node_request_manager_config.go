@@ -60,6 +60,35 @@ func gateNextPageByValidationQueue(communityInDB bool, queuedClock, minimumDataC
 	return queuedClock > minimumDataClock
 }
 
+// gateNextPageByDescriptionSeen decides whether store-node pagination for a
+// community request should stop because a description for the target community
+// has already been processed in this request (issue #21470-hf).
+//
+// Store-node history is paged newest-first: the go-waku HistoryRetriever builds
+// each StoreQueryRequest with PaginationForward unset (proto3 default false =
+// backward) and walks the time window from newest to oldest. So the first
+// description encountered for the community is the newest available, and every
+// later page can only carry an older one. Once any description has been
+// processed, continuing to page cannot yield a newer description; each extra
+// page merely re-unmarshals and re-preprocesses the (large, ~1.4MB) description,
+// driving a GC storm that overheats the device. This is the flood that remains
+// after the page-cap and validation-queue gates: the "community persisted but
+// not newer than minimumDataClock" branch keeps paging to the cap and is
+// re-issued perpetually as the spectated community's description is re-fetched.
+//
+// Like the other gates it only ever converts a "fetch next page" decision into a
+// stop; it never forces paging. When StopWhenDataFound is false the caller wants
+// a full-window walk regardless of what is found (mirroring the success-path
+// `!StopWhenDataFound` return), so this gate is disabled and returns the natural
+// decision unchanged. gateTripped reports whether this gate forced the stop, so
+// the caller can log it distinctly from an ordinary completion.
+func (c StoreNodeRequestConfig) gateNextPageByDescriptionSeen(fetchNext, descriptionSeen bool) (shouldFetch, gateTripped bool) {
+	if fetchNext && c.StopWhenDataFound && descriptionSeen {
+		return false, true
+	}
+	return fetchNext, false
+}
+
 type StoreNodeRequestOption func(*StoreNodeRequestConfig)
 
 func defaultStoreNodeRequestConfig() StoreNodeRequestConfig {

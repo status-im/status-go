@@ -2859,13 +2859,19 @@ func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan str
 	}()
 }
 
-func (m *Messenger) ProcessAllMessages() {
+// ProcessAllMessages retrieves and publishes all pending messages. It returns
+// the resulting MessengerResponse so callers that need to observe what was
+// handled (e.g. the store-node pager checking whether a community description
+// was processed this page — issue #21470-hf) can inspect it; callers that only
+// want the side effect may ignore the return value.
+func (m *Messenger) ProcessAllMessages() *MessengerResponse {
 	response, err := m.RetrieveAll()
 	if err != nil {
 		m.logger.Error("failed to retrieve raw messages", zap.Error(err))
-		return
+		return nil
 	}
 	m.PublishMessengerResponse(response)
+	return response
 }
 
 func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {

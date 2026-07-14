@@ -100,3 +100,89 @@ func TestGateNextPageByValidationQueue(t *testing.T) {
 		require.False(t, gateNextPageByValidationQueue(false, 90, 100))
 	})
 }
+
+// TestGateNextPageByDescriptionSeen verifies the decision that stops store-node
+// pagination for a community request once a description for the target community
+// has already been processed in this request (issue #21470-hf). Store-node
+// history is paged newest-first, so the first description encountered is the
+// newest available and every later page can only carry an older one. Continuing
+// to page therefore cannot yield a newer description; it only re-unmarshals and
+// re-preprocesses the (large) description on each page, driving a GC storm and
+// overheating the device. This is the remaining flood after the page cap and
+// validation-queue gates: the "community persisted but not newer" branch
+// (messenger_store_node_request_manager.go, community.Clock() <= minimumDataClock)
+// which today keeps paging to the cap and is re-issued perpetually.
+func TestGateNextPageByDescriptionSeen(t *testing.T) {
+	t.Run("description not seen keeps the natural decision", func(t *testing.T) {
+		// No description for this community has been processed yet, so paging must
+		// continue up to the cap exactly as before.
+		cfg := StoreNodeRequestConfig{StopWhenDataFound: true}
+		fetch, tripped := cfg.gateNextPageByDescriptionSeen(true, false)
+		require.True(t, fetch)
+		require.False(t, tripped)
+	})
+
+	t.Run("description seen stops paging and reports the trip", func(t *testing.T) {
+		// The core #21470-hf bug: a spectated community is re-fetched,
+		// minimumDataClock == its clock, so every page hits the "not newer" branch
+		// and would keep paging. Once the description was processed this request,
+		// older pages cannot beat it, so we stop and report the trip so the caller
+		// can log it distinctly.
+		cfg := StoreNodeRequestConfig{StopWhenDataFound: true}
+		fetch, tripped := cfg.gateNextPageByDescriptionSeen(true, true)
+		require.False(t, fetch)
+		require.True(t, tripped)
+	})
+
+	t.Run("natural stop is never overridden and never reports a trip", func(t *testing.T) {
+		// The uncapped decision is already "stop" (e.g. found-and-newer, or a
+		// decode/validate error). Even with the description seen, this gate must
+		// not claim responsibility for the stop.
+		cfg := StoreNodeRequestConfig{StopWhenDataFound: true}
+		fetch, tripped := cfg.gateNextPageByDescriptionSeen(false, true)
+		require.False(t, fetch)
+		require.False(t, tripped)
+	})
+
+	t.Run("full-window walk (StopWhenDataFound=false) is never cut short", func(t *testing.T) {
+		// Mirrors the success-path `!StopWhenDataFound` return: a caller that
+		// wants the entire window must keep paging even after the description is
+		// seen. The gate is disabled and returns the natural decision unchanged.
+		cfg := StoreNodeRequestConfig{StopWhenDataFound: false}
+		fetch, tripped := cfg.gateNextPageByDescriptionSeen(true, true)
+		require.True(t, fetch)
+		require.False(t, tripped)
+	})
+}
+
+// TestCommunityDescriptionSeen verifies the request-scoped signal that feeds the
+// description-seen gate: whether the messages processed for a store-node page
+// carried a description for the target community. A processed description
+// surfaces the community in the MessengerResponse (handleCommunityResponse ->
+// AddCommunity), including the equal-clock re-processing that drives issue
+// #21470-hf, so its presence in the response is the "a description for this
+// community was processed this page" signal.
+func TestCommunityDescriptionSeen(t *testing.T) {
+	community := createTestCommunityWithImage(t)
+
+	t.Run("nil response is not seen", func(t *testing.T) {
+		require.False(t, communityDescriptionSeen(nil, community.ID()))
+	})
+
+	t.Run("empty response is not seen", func(t *testing.T) {
+		require.False(t, communityDescriptionSeen(&MessengerResponse{}, community.ID()))
+	})
+
+	t.Run("response carrying the community is seen", func(t *testing.T) {
+		response := &MessengerResponse{}
+		response.AddCommunity(community)
+		require.True(t, communityDescriptionSeen(response, community.ID()))
+	})
+
+	t.Run("response carrying a different community is not seen", func(t *testing.T) {
+		other := createTestCommunityWithImage(t)
+		response := &MessengerResponse{}
+		response.AddCommunity(other)
+		require.False(t, communityDescriptionSeen(response, community.ID()))
+	})
+}
