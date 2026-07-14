@@ -1,6 +1,7 @@
 from time import sleep
 import pytest
 from steps import messenger
+from resources.constants import USE_IPV6
 
 
 @pytest.mark.reliability
@@ -56,6 +57,7 @@ class TestJoinLeaveCommunities:
         messenger.leave_the_community(community_member, community_id)
         messenger.check_node_joined_community(community_member, joined=False, community_id=community_id)
 
+    @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_join_leave_community_with_ip_change(self, community_admin, community_member):
         community_id = messenger.create_community(community_admin)
         messenger.join_community(member=community_member, admin=community_admin, community_id=community_id)

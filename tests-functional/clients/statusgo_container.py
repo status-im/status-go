@@ -359,7 +359,7 @@ class StatusPortsMappings:
         return {f"{m.container_port}/tcp": ("::", None) for m in self._published()}
 
     def ipv4_ports(self):
-        return {f"{m.container_port}/tcp": None for m in self._published()}
+        return {f"{m.container_port}/tcp": ("127.0.0.1", None) for m in self._published()}
 
     def ports(self, ipv6: bool):
         return self.ipv6_ports() if ipv6 else self.ipv4_ports()
