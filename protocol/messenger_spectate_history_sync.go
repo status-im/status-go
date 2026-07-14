@@ -46,6 +46,32 @@ func communityInitialHistorySync(spectated bool) (scoped bool, window time.Durat
 	return false, 0
 }
 
+// hashFirstBackfill carries the spectate hash-first backfill's options and accumulated
+// stats through syncFiltersFrom (issue #21470-hf). A nil *hashFirstBackfill selects the
+// classic full-body path used by the general (non-spectate) syncFilters callers.
+type hashFirstBackfill struct {
+	// skipEncryptedBodies drops the body-fetch phase for a keyless spectator whose
+	// community description is already resolved (see spectateShouldSkipKeylessBodies).
+	skipEncryptedBodies bool
+	// stats accumulates each batch's hash-first counters for the once-per-backfill log.
+	stats wakutypes.HashFirstStats
+}
+
+// spectateShouldSkipKeylessBodies decides whether a spectator's hash-first backfill
+// should skip the body-fetch phase entirely (issue #21470-hf enhancement).
+//
+// The community's channels and its description share ONE content topic, so a hash cannot
+// tell them apart. But the spectator's OWN state can: when the node holds no decryption
+// keys for the community (holdsKeys false) AND the community description is already
+// resolved (the spectate flow fetches it before this backfill runs), every body on that
+// topic is either a description we already hold or an undecryptable channel message.
+// Fetching them is pure heat, so we skip — the hashes are still walked so the watermark
+// advances, and the bodies stay on the store node, re-fetchable in full after a join.
+// A keyed user (joined) legitimately wants the bodies, so it never skips.
+func spectateShouldSkipKeylessBodies(holdsKeys, descriptionResolved bool) bool {
+	return !holdsKeys && descriptionResolved
+}
+
 // mailserverTopicRef identifies a store-node topic (its pubsub + content topic).
 type mailserverTopicRef struct {
 	pubsubTopic  string
@@ -186,10 +212,19 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 			return
 		}
 
-		stats := &wakutypes.HashFirstStats{}
+		// Keyless-spectator body skip (issue #21470-hf enhancement): a spectator holds no
+		// community keys and its description is already resolved by the time this backfill
+		// runs, so every body on the shared community content topic is undecryptable or
+		// already held — skip fetching bodies entirely.
+		holdsKeys := m.communitiesManager.CommunityHoldsAnyDecryptionKey(community)
+		descriptionResolved := community.Description() != nil
+		hf := &hashFirstBackfill{
+			skipEncryptedBodies: spectateShouldSkipKeylessBodies(holdsKeys, descriptionResolved),
+		}
+
 		peerInfo := m.messaging.GetActiveStorenode()
 		_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-			response, err := m.syncFiltersFrom(ctx, peerInfo, filters, from, stats)
+			response, err := m.syncFiltersFrom(ctx, peerInfo, filters, from, hf)
 			if err != nil {
 				if ctx.Err() != nil {
 					// Cancelled by leave / background: stop cleanly, without retrying
@@ -213,13 +248,14 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 		}
 
 		// One INFO line per backfill: the on-device evidence of the byte cut — hashes
-		// walked vs. bodies actually fetched (issue #21470-hf).
+		// walked vs. bodies actually fetched vs. bodies skipped as keyless heat (#21470-hf).
 		m.logger.Info("spectated community hash-first backfill",
 			zap.String("communityID", communityID),
-			zap.Int("hashesSeen", stats.HashesSeen),
-			zap.Int("hashesKnown", stats.HashesKnown),
-			zap.Int("bodiesFetched", stats.BodiesFetched),
-			zap.Int64("bytesEstimate", stats.BytesEstimate))
+			zap.Int("hashesSeen", hf.stats.HashesSeen),
+			zap.Int("hashesKnown", hf.stats.HashesKnown),
+			zap.Int("bodiesFetched", hf.stats.BodiesFetched),
+			zap.Int64("bytesEstimate", hf.stats.BytesEstimate),
+			zap.Int("bodiesSkippedKeyless", hf.stats.BodiesSkippedKeyless))
 	}()
 }
 

@@ -2212,6 +2212,16 @@ func (m *Manager) communityHoldsAnyDecryptionKey(id types3.HexBytes, chats map[s
 	return holds
 }
 
+// CommunityHoldsAnyDecryptionKey is the exported form of communityHoldsAnyDecryptionKey
+// for callers outside the package (the spectate hash-first backfill, issue #21470-hf).
+// It fails open (reports true) for a nil community so unknown state never drops data.
+func (m *Manager) CommunityHoldsAnyDecryptionKey(community *Community) bool {
+	if community == nil {
+		return true
+	}
+	return m.communityHoldsAnyDecryptionKey(community.ID(), community.Chats())
+}
+
 func (m *Manager) hasHashRatchetKeyForGroup(groupID []byte) bool {
 	key, err := m.messaging.GetCurrentKeyForGroup(groupID)
 	if err != nil {

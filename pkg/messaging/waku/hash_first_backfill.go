@@ -91,6 +91,18 @@ func filterUnknownHashes(hashes []wpb.MessageHash, exists func(wpb.MessageHash) 
 	return unknown, known, nil
 }
 
+// planBodyFetch decides which unknown-hash bodies to actually fetch. When skipBodies is
+// set (keyless spectator with a resolved description — every body here is undecryptable),
+// nothing is fetched and all unknowns are counted as skipped; the hashes were still
+// walked, so the watermark advances and the skip is measurable. Otherwise every unknown
+// hash is fetched (issue #21470-hf enhancement).
+func planBodyFetch(unknown []wpb.MessageHash, skipBodies bool) (toFetch []wpb.MessageHash, skippedKeyless int) {
+	if skipBodies {
+		return nil, len(unknown)
+	}
+	return unknown, 0
+}
+
 // ProcessMailserverBatchHashFirst backfills a store-node batch hash-first: it walks the
 // window pulling only message hashes+metadata, filters out envelopes already held
 // locally, then fetches full bodies only for the unknown hashes and feeds them into the
@@ -106,6 +118,7 @@ func (w *Waku) ProcessMailserverBatchHashFirst(
 	batch types.MailserverBatch,
 	storenode peer.AddrInfo,
 	processEnvelopes bool,
+	skipBodies bool,
 ) (types.HashFirstStats, error) {
 	var stats types.HashFirstStats
 
@@ -165,9 +178,15 @@ func (w *Waku) ProcessMailserverBatchHashFirst(
 		return stats, err
 	}
 
+	// Keyless spectator with a resolved description: every remaining body on the shared
+	// community content topic is undecryptable, so skip the body fetch entirely (the
+	// hashes were still walked, so the watermark advances and the skip is measured).
+	toFetch, skippedKeyless := planBodyFetch(unknownHashes, skipBodies)
+	stats.BodiesSkippedKeyless += skippedKeyless
+
 	// Phase 2 — body fetch: pull full bodies ONLY for the unknown hashes, in store-capped
 	// batches, and feed them into the normal ingest path.
-	for _, part := range partitionMessageHashes(unknownHashes, hashFirstMaxHashesPerRequest) {
+	for _, part := range partitionMessageHashes(toFetch, hashFirstMaxHashesPerRequest) {
 		if err := ctx.Err(); err != nil {
 			return stats, err
 		}

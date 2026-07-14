@@ -115,17 +115,41 @@ func TestFilterUnknownHashes_ExistsError(t *testing.T) {
 	require.ErrorIs(t, err, boom)
 }
 
+// TestPlanBodyFetch covers the keyless body-skip decision (issue #21470-hf
+// enhancement): a keyless spectator whose community description is already resolved must
+// fetch NO bodies (every body on the shared community topic is an undecryptable channel
+// message or a description already held), while a keyed user fetches everything.
+func TestPlanBodyFetch(t *testing.T) {
+	unknown := hashesN(1, 2, 3)
+
+	// skip: fetch nothing, count all as keyless-skipped
+	toFetch, skipped := planBodyFetch(unknown, true)
+	require.Empty(t, toFetch, "keyless + resolved description fetches no bodies")
+	require.Equal(t, 3, skipped)
+
+	// no-skip: fetch everything, skip nothing
+	toFetch, skipped = planBodyFetch(unknown, false)
+	require.Equal(t, unknown, toFetch)
+	require.Equal(t, 0, skipped)
+
+	// skip with nothing unknown: no bodies, no skips
+	toFetch, skipped = planBodyFetch(nil, true)
+	require.Empty(t, toFetch)
+	require.Equal(t, 0, skipped)
+}
+
 // TestHashFirstStatsAdd covers the window bookkeeping: a backfill spans several batches,
 // and the once-per-backfill INFO log needs their sum (issue #21470-hf).
 func TestHashFirstStatsAdd(t *testing.T) {
 	var total types.HashFirstStats
-	total.Add(types.HashFirstStats{HashesSeen: 100, HashesKnown: 90, BodiesFetched: 10, BytesEstimate: 1000})
-	total.Add(types.HashFirstStats{HashesSeen: 40, HashesKnown: 39, BodiesFetched: 1, BytesEstimate: 1400})
+	total.Add(types.HashFirstStats{HashesSeen: 100, HashesKnown: 90, BodiesFetched: 10, BytesEstimate: 1000, BodiesSkippedKeyless: 0})
+	total.Add(types.HashFirstStats{HashesSeen: 40, HashesKnown: 9, BodiesFetched: 0, BytesEstimate: 0, BodiesSkippedKeyless: 31})
 
 	require.Equal(t, types.HashFirstStats{
-		HashesSeen:    140,
-		HashesKnown:   129,
-		BodiesFetched: 11,
-		BytesEstimate: 2400,
+		HashesSeen:           140,
+		HashesKnown:          99,
+		BodiesFetched:        10,
+		BytesEstimate:        1000,
+		BodiesSkippedKeyless: 31,
 	}, total)
 }

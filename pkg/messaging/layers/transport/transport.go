@@ -672,8 +672,9 @@ func (t *Transport) ProcessMailserverBatchHashFirst(
 	batch types.MailserverBatch,
 	storenode peer.AddrInfo,
 	processEnvelopes bool,
+	skipBodies bool,
 ) (types.HashFirstStats, error) {
-	return t.waku.ProcessMailserverBatchHashFirst(ctx, batch, storenode, processEnvelopes)
+	return t.waku.ProcessMailserverBatchHashFirst(ctx, batch, storenode, processEnvelopes, skipBodies)
 }
 
 func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {

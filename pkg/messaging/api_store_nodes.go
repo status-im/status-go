@@ -63,8 +63,9 @@ func (a *API) ProcessMailserverBatchHashFirst(
 	batch types.StoreNodeBatch,
 	storenode peer.AddrInfo,
 	processEnvelopes bool,
+	skipBodies bool,
 ) (wakutypes.HashFirstStats, error) {
-	return a.core.stack.Transport.ProcessMailserverBatchHashFirst(ctx, *adapters.ToWakuBatch(&batch), storenode, processEnvelopes)
+	return a.core.stack.Transport.ProcessMailserverBatchHashFirst(ctx, *adapters.ToWakuBatch(&batch), storenode, processEnvelopes, skipBodies)
 }
 
 func (a *API) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {

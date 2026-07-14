@@ -37,6 +37,23 @@ func TestCommunityInitialHistorySync(t *testing.T) {
 	require.Equal(t, time.Duration(0), window)
 }
 
+// TestSpectateShouldSkipKeylessBodies verifies the keyless body-skip gate (issue
+// #21470-hf enhancement). Only a keyless spectator whose description is already resolved
+// may skip fetching bodies — every body on the shared community content topic is then
+// either a description already held or an undecryptable channel message. A keyed user
+// (joined) must never skip; an unresolved description must never skip (we still need it).
+func TestSpectateShouldSkipKeylessBodies(t *testing.T) {
+	require.True(t, spectateShouldSkipKeylessBodies(false /* no keys */, true /* description resolved */),
+		"keyless spectator with a resolved description skips bodies")
+
+	require.False(t, spectateShouldSkipKeylessBodies(true /* holds keys */, true),
+		"a keyed (joined) user must fetch bodies")
+	require.False(t, spectateShouldSkipKeylessBodies(false, false /* description not resolved */),
+		"an unresolved description must still be fetched")
+	require.False(t, spectateShouldSkipKeylessBodies(true, false),
+		"keyed and unresolved: fetch")
+}
+
 // TestCommunityHistorySeedTopics verifies the watermark seeding that bounds a
 // spectator's FIRST backfill to the scoped window (issue #21470-hf). syncFiltersFrom
 // ignores its `lastRequest` argument for topics not yet tracked — a fresh topic

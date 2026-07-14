@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
-	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"
@@ -422,12 +421,12 @@ func getPrioritizedBatches() []int {
 }
 
 // syncFiltersFrom backfills the given filters from the store node starting at
-// lastRequest. When hashFirstStats is non-nil the spectate hash-first path is used
-// (issue #21470-hf): each batch fetches only the window's hashes and then bodies for the
-// hashes not already held locally, and per-batch stats are accumulated into
-// hashFirstStats for the caller's once-per-backfill log. A nil hashFirstStats keeps the
-// classic full-body path (the general, non-spectate syncFilters callers).
-func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32, hashFirstStats *wakutypes.HashFirstStats) (*MessengerResponse, error) {
+// lastRequest. When hf is non-nil the spectate hash-first path is used (issue #21470-hf):
+// each batch fetches only the window's hashes and then bodies for the hashes not already
+// held locally (skipping the body fetch entirely when hf.skipEncryptedBodies is set), and
+// per-batch stats are accumulated into hf.stats for the caller's once-per-backfill log. A
+// nil hf keeps the classic full-body path (the general, non-spectate syncFilters callers).
+func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo, filters types2.ChatFilters, lastRequest uint32, hf *hashFirstBackfill) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -567,8 +566,8 @@ func (m *Messenger) syncFiltersFrom(ctx context.Context, peerInfo peer.AddrInfo,
 		sort.Ints(batchKeys)
 		for _, k := range batchKeys {
 			var err error
-			if hashFirstStats != nil {
-				err = m.processMailserverBatchHashFirst(ctx, peerInfo, batches[pubsubTopic][k], hashFirstStats)
+			if hf != nil {
+				err = m.processMailserverBatchHashFirst(ctx, peerInfo, batches[pubsubTopic][k], hf)
 			} else {
 				err = m.processMailserverBatchWithContext(ctx, peerInfo, batches[pubsubTopic][k])
 			}
@@ -721,11 +720,12 @@ func (m *Messenger) processMailserverBatchWithContext(ctx context.Context, peerI
 // processMailserverBatchHashFirst is the hash-first counterpart of
 // processMailserverBatchWithContext used by the spectate backfill (issue #21470-hf): it
 // fetches only the window's message hashes and then full bodies for the hashes not
-// already held locally, accumulating per-batch stats into stats. It preserves the same
-// metered-network gate (canSyncWithStoreNodes) and cancellation semantics as the classic
-// path; watermark bookkeeping stays in syncFiltersFrom and advances only after this
-// returns without error, so a cancelled batch marks nothing fetched.
-func (m *Messenger) processMailserverBatchHashFirst(ctx context.Context, peerInfo peer.AddrInfo, batch types2.StoreNodeBatch, stats *wakutypes.HashFirstStats) error {
+// already held locally (skipping the body fetch entirely when hf.skipEncryptedBodies is
+// set), accumulating per-batch stats into hf.stats. It preserves the same metered-network
+// gate (canSyncWithStoreNodes) and cancellation semantics as the classic path; watermark
+// bookkeeping stays in syncFiltersFrom and advances only after this returns without error,
+// so a cancelled batch marks nothing fetched.
+func (m *Messenger) processMailserverBatchHashFirst(ctx context.Context, peerInfo peer.AddrInfo, batch types2.StoreNodeBatch, hf *hashFirstBackfill) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -734,11 +734,11 @@ func (m *Messenger) processMailserverBatchHashFirst(ctx context.Context, peerInf
 		return nil
 	}
 
-	batchStats, err := m.messaging.ProcessMailserverBatchHashFirst(ctx, batch, peerInfo, false)
+	batchStats, err := m.messaging.ProcessMailserverBatchHashFirst(ctx, batch, peerInfo, false, hf.skipEncryptedBodies)
 	if err != nil {
 		return err
 	}
-	stats.Add(batchStats)
+	hf.stats.Add(batchStats)
 	return nil
 }
 
