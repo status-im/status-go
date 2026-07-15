@@ -475,6 +475,12 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		contentTopicsPerPubsubTopic[filter.PubsubTopic()] = contentTopics
 	}
 
+	communityDescriptionChatIDs, err := m.communityDescriptionChatIDs()
+	if err != nil {
+		return nil, err
+	}
+	var communityDescriptionFilters []*types2.ChatFilter
+
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
 		if _, ok := batches[pubsubTopic]; !ok {
 			batches[pubsubTopic] = make(map[int]types2.StoreNodeBatch)
@@ -487,6 +493,17 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 				chatID = filter.Identity()
 			} else {
 				chatID = filter.ChatID()
+			}
+
+			// The community description content topic republishes the full
+			// community description (including every member) many times per day.
+			// Only the most recent description is ever used, so sweeping this
+			// topic over the whole sync window downloads gigabytes of stale
+			// duplicates. Skip it here and fetch only the newest description
+			// (single page, newest-first) below. See status-im/status-app#21498.
+			if _, isCommunityDescription := communityDescriptionChatIDs[chatID]; isCommunityDescription {
+				communityDescriptionFilters = append(communityDescriptionFilters, filter)
+				continue
 			}
 
 			topicData, ok := topicsData[fmt.Sprintf("%s-%s", filter.PubsubTopic(), filter.ContentTopic())]
@@ -614,11 +631,68 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 			return nil, err
 		}
 	}
+
+	m.fetchLatestCommunityDescriptions(peerInfo, communityDescriptionFilters)
+
 	return response, nil
 }
 
 func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters types2.ChatFilters) (*MessengerResponse, error) {
 	return m.syncFiltersFrom(peerInfo, filters, 0)
+}
+
+// communityDescriptionChatIDs returns the set of chat IDs that correspond to
+// the community description content topics of joined and spectated communities.
+// These topics carry the full community description, which is republished many
+// times per day. They are fetched with a dedicated StopWhenDataFound request
+// instead of being swept over the whole historic sync window.
+func (m *Messenger) communityDescriptionChatIDs() (map[string]struct{}, error) {
+	communities, err := m.communitiesManager.JoinedOrSpectated()
+	if err != nil {
+		return nil, err
+	}
+	chatIDs := make(map[string]struct{}, len(communities))
+	for _, community := range communities {
+		chatIDs[community.IDString()] = struct{}{}
+	}
+	return chatIDs, nil
+}
+
+// fetchLatestCommunityDescriptions fetches only the most recent description for
+// each of the given community description filters. The store node is queried
+// newest-first and paging stops after the first page, so we download the single
+// latest description instead of every historic copy that was republished over
+// the sync window.
+//
+// Note: we deliberately do not use FetchCommunity here. FetchCommunity keeps
+// paging until it finds a description newer than the one already stored
+// locally; for a community we are already up to date on (the common case while
+// spectating), no such newer copy exists and it would sweep the whole window.
+func (m *Messenger) fetchLatestCommunityDescriptions(peerInfo peer.AddrInfo, filters []*types2.ChatFilter) {
+	if len(filters) == 0 {
+		return
+	}
+
+	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
+	stopAfterFirstPage := func(int) (bool, uint64) {
+		return false, 0
+	}
+
+	for _, filter := range filters {
+		batch := types2.StoreNodeBatch{
+			From:        from,
+			To:          to,
+			PubsubTopic: filter.PubsubTopic(),
+			Topics:      []types2.ContentTopic{filter.ContentTopic()},
+			ChatIDs:     []string{filter.ChatID()},
+		}
+		err := m.processMailserverBatchWithOptions(peerInfo, batch, 1, stopAfterFirstPage, false)
+		if err != nil {
+			m.logger.Error("failed to fetch latest community description",
+				zap.String("chatID", filter.ChatID()),
+				zap.Error(err))
+		}
+	}
 }
 
 func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Message, error) {
