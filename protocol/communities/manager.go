@@ -113,6 +113,7 @@ type Manager struct {
 	stopped                  bool
 	PermissionChecker        PermissionChecker
 	keyDistributor           KeyDistributor
+	keyEntitlement           *communityKeyEntitlement
 	communityLock            *CommunityLock
 	mediaServer              server.MediaServerInterface
 	communityImageVersions   map[string]uint32
@@ -322,6 +323,7 @@ func NewManager(
 		messaging:              messaging,
 		timesource:             timesource,
 		keyDistributor:         keyDistributor,
+		keyEntitlement:         newCommunityKeyEntitlement(),
 		communityLock:          NewCommunityLock(logger),
 		mediaServer:            mediaServer,
 		communityImageVersions: make(map[string]uint32),
@@ -2160,7 +2162,53 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 }
 
 func (m *Manager) NewHashRatchetKeys(keys []*types.HashRatchetInfo) error {
+	// Lift the keyless-spectator gate now that key material has arrived, so the next
+	// description fetch re-evaluates entitlement and attempts decryption. Keys may be
+	// community- or channel-scoped, so clear all cached entitlements rather than map
+	// each group id back to a community.
+	if m.keyEntitlement != nil && len(keys) > 0 {
+		m.keyEntitlement.forgetAll()
+	}
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
+}
+
+// communityHoldsAnyDecryptionKey reports whether this node holds any hash-ratchet
+// key material for the community (its community-level group or any of its channel
+// groups). The result is cached per community and invalidated when new keys arrive
+// (NewHashRatchetKeys). On any lookup error it fails open (reports true) so a
+// transient DB issue can never cause legitimate data to be dropped.
+func (m *Manager) communityHoldsAnyDecryptionKey(id types3.HexBytes, chats map[string]*protobuf.CommunityChat) bool {
+	if m.messaging == nil || m.keyEntitlement == nil {
+		return true
+	}
+
+	cacheKey := id.String()
+	if holds, ok := m.keyEntitlement.known(cacheKey); ok {
+		return holds
+	}
+
+	holds := m.hasHashRatchetKeyForGroup(id)
+	if !holds {
+		for channelID := range chats {
+			if m.hasHashRatchetKeyForGroup(types3.HexBytes(id.String() + channelID)) {
+				holds = true
+				break
+			}
+		}
+	}
+
+	m.keyEntitlement.remember(cacheKey, holds)
+	return holds
+}
+
+func (m *Manager) hasHashRatchetKeyForGroup(groupID []byte) bool {
+	key, err := m.messaging.GetCurrentKeyForGroup(groupID)
+	if err != nil {
+		// Fail open: never drop decryptable data because of a lookup error.
+		return true
+	}
+	// GetCurrentKeyForGroup returns a non-nil, empty ratchet when no key exists.
+	return key != nil && len(key.Key) != 0
 }
 
 // NOTE: encrypted_community_description_cache is not a cache for the community description
@@ -2173,6 +2221,26 @@ func (m *Manager) preprocessDescription(id types3.HexBytes, description *protobu
 	}
 	if decryptedCommunity != nil {
 		return nil, decryptedCommunity, nil
+	}
+
+	// Keyless-spectator early drop (#21470): if the description carries encrypted
+	// private data but this node holds no decryption keys for the community, skip
+	// the per-key decryption attempts entirely — each would be a guaranteed
+	// "no ratchet key" failure. The plaintext outer description is still handled;
+	// only the encrypted inner fields are left encrypted (a spectator cannot see
+	// them anyway). The gate lifts automatically once keys arrive.
+	if len(description.PrivateData) > 0 &&
+		shouldSkipPrivateDataDecryption(true, m.communityHoldsAnyDecryptionKey(id, description.Chats)) {
+		decision := m.keyEntitlement.recordDrop(id.String())
+		if decision.logInfo {
+			m.logger.Info("dropping encrypted community payloads (no decryption keys held)",
+				zap.String("communityID", id.String()), zap.Uint64("droppedCount", decision.count))
+		} else if decision.logDebug {
+			m.logger.Debug("still dropping encrypted community payloads (no decryption keys held)",
+				zap.String("communityID", id.String()), zap.Uint64("droppedCount", decision.count))
+		}
+		upgradeTokenPermissions(description)
+		return nil, description, m.persistence.SaveDecryptedCommunityDescription(id, nil, description)
 	}
 
 	response, err := decryptDescription(id, m, description, m.logger)
