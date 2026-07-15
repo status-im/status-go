@@ -2787,22 +2787,14 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 const retrieveMessagesDebounceInterval = time.Second
 
 // retrieveMessagesMaxLatency bounds how long a flush can be deferred while
-// matches keep arriving. Without it a sustained envelope flood (e.g. the
-// community-description storm behind #21470) resets the debounce window on
-// every match, the 1s quiet gap never arrives, ProcessAllMessages is starved,
-// and freshly synced messages persisted to the DB are never surfaced to the
-// UI until the app restarts. The ceiling forces a flush at least this often
-// under continuous matches; quiet/normal traffic is unaffected because the
-// debounce interval fits comfortably under it.
+// matches keep arriving: a sustained envelope flood resets the debounce window
+// on every match, so without a ceiling ProcessAllMessages is starved and synced
+// messages are never surfaced to the UI.
 const retrieveMessagesMaxLatency = 3 * time.Second
 
-// nextFlushDeadline decides when the retrieve loop should next call
-// ProcessAllMessages. pendingSince is the time of the first match not yet
-// flushed; now is the time of the match currently being processed. The flush
-// normally fires a debounce window after the latest match, but is capped at
-// maxLatency measured from the first unflushed match so a continuous flood
-// cannot postpone delivery indefinitely. It returns the earlier of the two
-// deadlines.
+// nextFlushDeadline returns the earlier of the debounce deadline (a quiet
+// window after the latest match) and the max-latency ceiling (measured from
+// pendingSince, the first unflushed match).
 func nextFlushDeadline(pendingSince, now time.Time, debounce, maxLatency time.Duration) time.Time {
 	quietDeadline := now.Add(debounce)
 	ceilingDeadline := pendingSince.Add(maxLatency)
@@ -2869,11 +2861,9 @@ func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan str
 	}()
 }
 
-// ProcessAllMessages retrieves and publishes all pending messages. It returns
-// the resulting MessengerResponse so callers that need to observe what was
-// handled (e.g. the store-node pager checking whether a community description
-// was processed this page — issue #21470-hf) can inspect it; callers that only
-// want the side effect may ignore the return value.
+// ProcessAllMessages retrieves and publishes all pending messages, returning
+// the resulting MessengerResponse for callers that need to observe what was
+// handled.
 func (m *Messenger) ProcessAllMessages() *MessengerResponse {
 	response, err := m.RetrieveAll()
 	if err != nil {
