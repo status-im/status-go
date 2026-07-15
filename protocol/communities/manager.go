@@ -2162,21 +2162,19 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 }
 
 func (m *Manager) NewHashRatchetKeys(keys []*types.HashRatchetInfo) error {
-	// Lift the keyless-spectator gate now that key material has arrived, so the next
-	// description fetch re-evaluates entitlement and attempts decryption. Keys may be
-	// community- or channel-scoped, so clear all cached entitlements rather than map
-	// each group id back to a community.
+	// New keys may be community- or channel-scoped and cannot be mapped back to
+	// a single community cheaply, so clear all cached entitlements: the next
+	// description must re-evaluate.
 	if m.keyEntitlement != nil && len(keys) > 0 {
 		m.keyEntitlement.forgetAll()
 	}
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
 
-// communityHoldsAnyDecryptionKey reports whether this node holds any hash-ratchet
-// key material for the community (its community-level group or any of its channel
-// groups). The result is cached per community and invalidated when new keys arrive
-// (NewHashRatchetKeys). On any lookup error it fails open (reports true) so a
-// transient DB issue can never cause legitimate data to be dropped.
+// communityHoldsAnyDecryptionKey reports whether this node holds any
+// hash-ratchet key material for the community or any of its channel groups.
+// Cached per community, invalidated on key arrival, fails open on lookup
+// errors.
 func (m *Manager) communityHoldsAnyDecryptionKey(id types3.HexBytes, chats map[string]*protobuf.CommunityChat) bool {
 	if m.messaging == nil || m.keyEntitlement == nil {
 		return true
@@ -2223,21 +2221,13 @@ func (m *Manager) preprocessDescription(id types3.HexBytes, description *protobu
 		return nil, decryptedCommunity, nil
 	}
 
-	// Keyless-spectator early drop (#21470): if the description carries encrypted
-	// private data but this node holds no decryption keys for the community, skip
-	// the per-key decryption attempts entirely — each would be a guaranteed
-	// "no ratchet key" failure. The plaintext outer description is still handled;
-	// only the encrypted inner fields are left encrypted (a spectator cannot see
-	// them anyway). The gate lifts automatically once keys arrive.
-	if len(description.PrivateData) > 0 &&
-		shouldSkipPrivateDataDecryption(true, m.communityHoldsAnyDecryptionKey(id, description.Chats)) {
-		decision := m.keyEntitlement.recordDrop(id.String())
-		if decision.logInfo {
+	// Keyless spectators skip the per-key decryption attempts; the plaintext
+	// outer description is still handled, only the encrypted inner fields stay
+	// encrypted. The gate lifts once keys arrive.
+	if len(description.PrivateData) > 0 && !m.communityHoldsAnyDecryptionKey(id, description.Chats) {
+		if m.keyEntitlement.shouldLogDrop(id.String()) {
 			m.logger.Info("dropping encrypted community payloads (no decryption keys held)",
-				zap.String("communityID", id.String()), zap.Uint64("droppedCount", decision.count))
-		} else if decision.logDebug {
-			m.logger.Debug("still dropping encrypted community payloads (no decryption keys held)",
-				zap.String("communityID", id.String()), zap.Uint64("droppedCount", decision.count))
+				zap.String("communityID", id.String()))
 		}
 		upgradeTokenPermissions(description)
 		return nil, description, m.persistence.SaveDecryptedCommunityDescription(id, nil, description)
