@@ -36,6 +36,26 @@ func (s *SQLitePersistence) SaveMessageSegment(segment *Message, sigPubKey *ecds
 	return err
 }
 
+// GetMessageSegmentsCompletionInfo returns how many segments are stored for the
+// message and the SegmentsCount its data segments advertise. Data segments carry
+// segments_count = N (> 0); parity segments carry 0, so MAX(segments_count) is N
+// once any data segment is stored, and 0 while only parity has arrived. This is a
+// cheap aggregate over just this message's rows (via the primary-key prefix
+// hash+sig_pub_key) that copies no payload blobs (issue #21470-hf).
+func (s *SQLitePersistence) GetMessageSegmentsCompletionInfo(hash []byte, sigPubKey *ecdsa.PublicKey) (int, uint32, error) {
+	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
+
+	var storedCount int
+	var segmentsCount uint32
+	err := s.db.QueryRow(
+		"SELECT COUNT(*), COALESCE(MAX(segments_count), 0) FROM message_segments WHERE hash = ? AND sig_pub_key = ?",
+		hash, sigPubKeyBlob).Scan(&storedCount, &segmentsCount)
+	if err != nil {
+		return 0, 0, err
+	}
+	return storedCount, segmentsCount, nil
+}
+
 // Get ordered message segments for given hash
 func (s *SQLitePersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*Message, error) {
 	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
