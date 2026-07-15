@@ -65,3 +65,42 @@ func (s *CommunityBloomFilterSuite) TestBasic() {
 	s.Require().True(verifyMembershipWithBloomFilter(filter, memberIdentity, &ownerIdentity.PublicKey, encryptedChannelID, description.Clock))
 	s.Require().False(verifyMembershipWithBloomFilter(filter, nonMemberIdentity, &ownerIdentity.PublicKey, encryptedChannelID, description.Clock))
 }
+
+// Regression test: on a device that does not hold the community private key
+// (e.g. right after a profile sync), the publish path can still reach
+// generateBloomFiltersForChannels with a nil key. It must return an error
+// (the caller logs it and marshals the description without filters) instead
+// of crashing the node in ECDH.
+func (s *CommunityBloomFilterSuite) TestNilPrivateKey() {
+	memberIdentity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	communityID := "cid"
+	encryptedChannelID := "enc"
+
+	description := &protobuf.CommunityDescription{
+		ID:    communityID,
+		Clock: 1,
+		Chats: map[string]*protobuf.CommunityChat{
+			encryptedChannelID: {
+				Members: map[string]*protobuf.CommunityMember{
+					crypto.PubkeyToHex(&memberIdentity.PublicKey): {},
+				},
+			},
+		},
+		TokenPermissions: map[string]*protobuf.CommunityTokenPermission{
+			"permissionID": {
+				Id:            "permissionID",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: []*protobuf.TokenCriteria{{}},
+				ChatIds:       []string{ChatID(communityID, encryptedChannelID)},
+			},
+		},
+	}
+
+	s.Require().NotPanics(func() {
+		err = generateBloomFiltersForChannels(description, nil)
+	})
+	s.Require().Error(err)
+	s.Require().Nil(description.Chats[encryptedChannelID].MembersList)
+}

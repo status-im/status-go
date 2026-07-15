@@ -13,6 +13,13 @@ import (
 )
 
 func generateBloomFiltersForChannels(description *protobuf.CommunityDescription, privateKey *ecdsa.PrivateKey) error {
+	// The community private key is absent on devices that don't control the
+	// community (e.g. a freshly profile-synced device); filters can't be
+	// generated without it.
+	if privateKey == nil {
+		return errors.New("private key is required to generate channel bloom filters")
+	}
+
 	for channelID, channel := range description.Chats {
 		if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
 			continue
