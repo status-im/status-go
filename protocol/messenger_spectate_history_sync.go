@@ -24,16 +24,6 @@ func spectatedCommunitySyncFrom(nowUnixSeconds uint32) uint32 {
 	return nowUnixSeconds - uint32(spectatedCommunityInitialSyncPeriod/time.Second)
 }
 
-// communityInitialHistorySync scopes a community's first history backfill:
-// spectators get a community-scoped window; joiners keep the full global
-// backfill.
-func communityInitialHistorySync(spectated bool) (scoped bool, window time.Duration) {
-	if spectated {
-		return true, spectatedCommunityInitialSyncPeriod
-	}
-	return false, 0
-}
-
 type mailserverTopicRef struct {
 	pubsubTopic  string
 	contentTopic string

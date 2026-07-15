@@ -2279,15 +2279,10 @@ func (m *Manager) preprocessDescription(id types3.HexBytes, description *protobu
 	// Keyless spectators skip the per-key decryption attempts; the plaintext
 	// outer description is still handled, only the encrypted inner fields stay
 	// encrypted. The gate lifts once keys arrive.
-	if len(description.PrivateData) > 0 &&
-		shouldSkipPrivateDataDecryption(true, m.communityHoldsAnyDecryptionKey(id, description.Chats)) {
-		decision := m.keyEntitlement.recordDrop(id.String())
-		if decision.logInfo {
+	if len(description.PrivateData) > 0 && !m.communityHoldsAnyDecryptionKey(id, description.Chats) {
+		if m.keyEntitlement.shouldLogDrop(id.String()) {
 			m.logger.Info("dropping encrypted community payloads (no decryption keys held)",
-				zap.String("communityID", id.String()), zap.Uint64("droppedCount", decision.count))
-		} else if decision.logDebug {
-			m.logger.Debug("still dropping encrypted community payloads (no decryption keys held)",
-				zap.String("communityID", id.String()), zap.Uint64("droppedCount", decision.count))
+				zap.String("communityID", id.String()))
 		}
 		upgradeTokenPermissions(description)
 		return nil, description, m.persistence.SaveDecryptedCommunityDescription(id, nil, description)

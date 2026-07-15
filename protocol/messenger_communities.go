@@ -988,7 +988,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community, spectat
 	}
 
 	willSync := false
-	if scoped, _ := communityInitialHistorySync(spectated); !scoped {
+	if !spectated {
 		willSync, err = m.scheduleSyncFilters(filters)
 		if err != nil {
 			logger.Debug("m.scheduleSyncFilters error", zap.Error(err))

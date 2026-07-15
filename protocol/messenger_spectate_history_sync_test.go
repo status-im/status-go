@@ -16,17 +16,6 @@ func TestSpectatedCommunitySyncFrom(t *testing.T) {
 	require.Equal(t, now-uint32(9*24*60*60), spectatedCommunitySyncFrom(now))
 }
 
-// Spectate is scoped; joining must keep today's unscoped behavior.
-func TestCommunityInitialHistorySync(t *testing.T) {
-	scoped, window := communityInitialHistorySync(true /* spectated */)
-	require.True(t, scoped, "spectators must use the scoped window")
-	require.Equal(t, spectatedCommunityInitialSyncPeriod, window)
-
-	scoped, window = communityInitialHistorySync(false /* joined */)
-	require.False(t, scoped, "joining must keep today's unscoped full-period backfill")
-	require.Equal(t, time.Duration(0), window)
-}
-
 // Fresh topics get a seeded watermark; already-tracked topics must be skipped
 // (INSERT-OR-REPLACE would rewind a good watermark); each seeded at most once.
 func TestCommunityHistorySeedTopics(t *testing.T) {
