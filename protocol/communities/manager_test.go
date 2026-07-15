@@ -1844,3 +1844,70 @@ func (s *ManagerSuite) TestCommunityIDIsHydratedWhenMarshaling() {
 	s.Require().NoError(err)
 	s.Require().Equal(community.IDString(), community.config.CommunityDescription.ID)
 }
+
+// TestHandleCommunityDescriptionRedeliveryGate verifies the redelivery gate
+// (issue #21470-hf): a byte-identical redelivery of an already-processed
+// community description is short-circuited (nil response, no error), while newer
+// clocks are still processed, and new hash-ratchet key material lifts the gate so
+// the same description is reprocessed (it may then decrypt private data).
+func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
+	// s.manager is the control node that authors the community; m is a separate
+	// receiver (spectator) node that ingests the published description.
+	m, _ := s.buildManagers(nil)
+
+	signer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+	community, err := s.manager.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	description := community.config.CommunityDescription
+	// Plain community: no token ownership, so it is processed immediately (not queued).
+	s.Require().Equal(uint64(0), CommunityDescriptionTokenOwnerChainID(description))
+
+	buildPayload := func() []byte {
+		payload, err := community.MarshaledDescription()
+		s.Require().NoError(err)
+		payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, signer)
+		s.Require().NoError(err)
+		return payload
+	}
+
+	payload := buildPayload()
+
+	// First delivery is fully processed and yields a response.
+	resp1, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp1)
+
+	// Byte-identical redelivery is short-circuited by the gate (nil response, no error).
+	resp2, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
+	s.Require().NoError(err)
+	s.Require().Nil(resp2)
+
+	// A genuinely newer clock still gets processed.
+	community.config.CommunityDescription.Clock++
+	newerPayload := buildPayload()
+	resp3, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp3)
+
+	// Its identical redelivery is skipped again.
+	resp4, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
+	s.Require().NoError(err)
+	s.Require().Nil(resp4)
+
+	// New hash-ratchet keys arriving must lift the gate so the same description is
+	// reprocessed (it may now decrypt previously-encrypted private data).
+	err = m.NewHashRatchetKeys([]*types.HashRatchetInfo{{GroupID: community.ID(), KeyID: []byte("key-id")}})
+	s.Require().NoError(err)
+
+	resp5, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp5, "gate must be lifted after new keys arrive")
+}

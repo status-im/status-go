@@ -114,6 +114,7 @@ type Manager struct {
 	PermissionChecker        PermissionChecker
 	keyDistributor           KeyDistributor
 	keyEntitlement           *communityKeyEntitlement
+	descriptionGate          *communityDescriptionGate
 	communityLock            *CommunityLock
 	mediaServer              server.MediaServerInterface
 	communityImageVersions   map[string]uint32
@@ -324,6 +325,7 @@ func NewManager(
 		timesource:             timesource,
 		keyDistributor:         keyDistributor,
 		keyEntitlement:         newCommunityKeyEntitlement(),
+		descriptionGate:        newCommunityDescriptionGate(),
 		communityLock:          NewCommunityLock(logger),
 		mediaServer:            mediaServer,
 		communityImageVersions: make(map[string]uint32),
@@ -1517,6 +1519,11 @@ func (m *Manager) DeleteCommunity(id types3.HexBytes) error {
 	if err != nil {
 		return err
 	}
+	// Drop any redelivery-gate entry so a re-fetched description of a deleted
+	// community is fully reprocessed rather than skipped (#21470-hf).
+	if m.descriptionGate != nil {
+		m.descriptionGate.forget(id.String())
+	}
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
@@ -2072,6 +2079,21 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		id = crypto.CompressPubkey(signer)
 	}
 
+	// #21470-hf: fast-path redelivered descriptions before any expensive work.
+	// status-go re-publishes the same ~1.4MB description into every fetch window,
+	// and each redelivered copy otherwise pays proto.Unmarshal + preprocessDescription
+	// (decrypted-cache read+write) + GetByID (re-read/re-unmarshal of the stored
+	// blob) BEFORE the downstream clock comparison rejects it. The gate skips only
+	// strictly-older clocks and byte-identical same-clock redeliveries; it is
+	// cleared when keys arrive or a community is deleted (see communityDescriptionGate).
+	gateKey := types3.HexBytes(id).String()
+	payloadHash := hashDescriptionPayload(payload)
+	if m.descriptionGate != nil && m.descriptionGate.shouldSkip(gateKey, description.Clock, payloadHash) {
+		m.logger.Debug("skipping redelivered community description",
+			zap.String("communityID", gateKey), zap.Uint64("clock", description.Clock))
+		return nil, nil
+	}
+
 	failedToDecrypt, processedDescription, err := m.preprocessDescription(id, description)
 	if err != nil {
 		return nil, err
@@ -2157,6 +2179,14 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	if err != nil {
 		return nil, err
 	}
+	// Advance the redelivery gate only after fully successful processing, so a
+	// byte-identical same-clock redelivery of THIS description can be skipped.
+	// Deliberately NOT advanced on the queue path or the FailedToDecrypt early
+	// return, so validateCommunity's later re-entry and key-arrival reprocessing
+	// are never blocked (#21470-hf).
+	if m.descriptionGate != nil {
+		m.descriptionGate.recordProcessed(gateKey, processedDescription.Clock, payloadHash)
+	}
 	r.FailedToDecrypt = failedToDecrypt
 	return r, nil
 }
@@ -2167,6 +2197,12 @@ func (m *Manager) NewHashRatchetKeys(keys []*types.HashRatchetInfo) error {
 	// description must re-evaluate.
 	if m.keyEntitlement != nil && len(keys) > 0 {
 		m.keyEntitlement.forgetAll()
+	}
+	// Lift the redelivery gate too: a description that was byte-identical to one
+	// already processed may now decrypt previously-encrypted private data, so it
+	// must be reprocessed rather than skipped as a redelivery (#21470-hf).
+	if m.descriptionGate != nil && len(keys) > 0 {
+		m.descriptionGate.forgetAll()
 	}
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
