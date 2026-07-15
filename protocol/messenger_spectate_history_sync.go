@@ -124,13 +124,28 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 		return
 	}
 
-	filters := m.communitySyncFilters(community)
-	if len(filters) == 0 {
+	communityID := community.IDString()
+	now := uint32(m.getTimesource().GetCurrentTime() / 1000)
+	from := spectatedCommunitySyncFrom(now)
+
+	// The community-ID topic carries only re-published CommunityDescriptions —
+	// ~99.8% of a full sweep's bytes for one useful blob. The newest description
+	// is already fetched by FetchCommunity and live delivery stays subscribed,
+	// so that topic is excluded from the history sweep and its watermark is
+	// seeded at now — otherwise the next general sync would find it untracked
+	// and sweep the full window anyway.
+	allFilters := m.communitySyncFilters(community)
+	var sweepFilters, descriptionFilters types2.ChatFilters
+	for _, filter := range allFilters {
+		if filter.ChatID() == communityID {
+			descriptionFilters = append(descriptionFilters, filter)
+			continue
+		}
+		sweepFilters = append(sweepFilters, filter)
+	}
+	if len(sweepFilters) == 0 {
 		return
 	}
-
-	communityID := community.IDString()
-	from := spectatedCommunitySyncFrom(uint32(m.getTimesource().GetCurrentTime() / 1000))
 
 	ctx, cancel := context.WithCancel(m.ctx)
 	token := m.communityHistoryFetches.register(communityID, cancel)
@@ -142,15 +157,20 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 		defer cancel()
 		defer m.communityHistoryFetches.finish(communityID, token)
 
-		if err := m.seedCommunityHistoryWatermarks(filters, int(from)); err != nil {
+		if err := m.seedCommunityHistoryWatermarks(sweepFilters, int(from)); err != nil {
 			m.logger.Warn("failed to seed spectated community history watermarks",
+				zap.String("communityID", communityID), zap.Error(err))
+			return
+		}
+		if err := m.seedCommunityHistoryWatermarks(descriptionFilters, int(now)); err != nil {
+			m.logger.Warn("failed to seed description-topic watermark",
 				zap.String("communityID", communityID), zap.Error(err))
 			return
 		}
 
 		peerInfo := m.messaging.GetActiveStorenode()
 		_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
-			response, err := m.syncFiltersFrom(ctx, peerInfo, filters, from)
+			response, err := m.syncFiltersFrom(ctx, peerInfo, sweepFilters, from)
 			if err != nil {
 				if ctx.Err() != nil {
 					// Cancelled by leave/background — don't retry or penalise the
