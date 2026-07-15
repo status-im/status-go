@@ -75,7 +75,7 @@ func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 // Automatically waits for an available store node.
 // When a `nil` community and `nil` error is returned, that means the community wasn't found at the store node.
 func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityID string, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
-	cfg := buildCommunityStoreNodeRequestConfig(opts)
+	cfg := buildStoreNodeRequestConfig(opts)
 
 	m.logger.Info("requesting community from store node",
 		zap.String("community", communityID),
@@ -342,21 +342,23 @@ func (r *storeNodeRequest) finalize() {
 func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
 	fetchNext, pageSize := r.shouldFetchNextPageUncapped(envelopesCount)
 
-	fetchNext, descriptionGateTripped := r.config.gateNextPageByDescriptionSeen(fetchNext, r.descriptionSeen)
-	if descriptionGateTripped {
+	// Pages are newest-first, so once a description was processed in this
+	// request, later pages cannot carry a newer one.
+	if fetchNext && r.config.StopWhenDataFound && r.descriptionSeen {
 		r.manager.logger.Info("community description seen and not newer; stopping pagination (older pages cannot contain newer descriptions)",
 			zap.Any("requestID", r.requestID),
 			zap.Int("fetchedPagesCount", r.result.stats.FetchedPagesCount),
 			zap.Int("fetchedEnvelopesCount", r.result.stats.FetchedEnvelopesCount))
+		return false, 0
 	}
 
-	fetchNext, pageSize, capTripped := r.config.gateNextPageByCap(fetchNext, pageSize, r.result.stats.FetchedPagesCount)
-	if capTripped {
+	if fetchNext && r.config.MaxPageCount > 0 && r.result.stats.FetchedPagesCount >= r.config.MaxPageCount {
 		r.manager.logger.Warn("store node request reached page cap; stopping pagination to bound runaway fetch",
 			zap.Any("requestID", r.requestID),
 			zap.Int("fetchedPagesCount", r.result.stats.FetchedPagesCount),
 			zap.Int("fetchedEnvelopesCount", r.result.stats.FetchedEnvelopesCount),
 			zap.Int("maxPageCount", r.config.MaxPageCount))
+		return false, 0
 	}
 
 	return fetchNext, pageSize
@@ -376,7 +378,7 @@ func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool
 	// ProcessAllMessages traverses the messenger's whole pending backlog and an
 	// empty page has nothing to flush; the DB check below still runs.
 	var response *MessengerResponse
-	if shouldProcessStoreNodePage(envelopesCount) {
+	if envelopesCount > 0 {
 		response = r.manager.messenger.ProcessAllMessages()
 	} else {
 		logger.Debug("skipping ProcessAllMessages for empty store node page")
@@ -432,20 +434,15 @@ func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool
 		}
 
 		if community == nil {
-			// The community is absent from the community table, but it may already
-			// be in hand and merely withheld pending on-chain owner validation. In
-			// that state the description has been fetched and only verification is
-			// blocking persistence; verification retries out-of-band on the
-			// owner-verification loop. Fetching more store-node pages cannot make a
-			// failed verification succeed — it only floods the network and starves
-			// the very RPC calls whose success would end the request (issue
-			// #21470-hf). So once the description is queued for validation, stop.
+			// The description may already be in hand, merely withheld pending
+			// on-chain owner validation; verification retries out-of-band on the
+			// owner-verification loop, so more pages cannot help.
 			queuedClock, qErr := r.manager.messenger.communitiesManager.HighestQueuedValidationClock(communityID)
 			if qErr != nil {
 				logger.Warn("failed to read community validation queue; continuing to page",
 					zap.String("communityID", r.requestID.DataID),
 					zap.Error(qErr))
-			} else if gateNextPageByValidationQueue(false, queuedClock, r.minimumDataClock) {
+			} else if queuedClock > r.minimumDataClock {
 				logger.Info("community description queued for owner validation; stopping pagination (verification retries out-of-band)",
 					zap.Uint64("queuedClock", queuedClock),
 					zap.Uint64("minimumDataClock", r.minimumDataClock))
