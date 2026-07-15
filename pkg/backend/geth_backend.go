@@ -125,14 +125,9 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 		zap.String("IpfsGatewayURL", gocommon.IpfsGatewayURL))
 
 	if gocommon.IsMobilePlatform() {
-		// #21470: the previous 150MB soft limit sat ~3x below the measured
-		// working set (350-620MB while syncing a large community), which forces
-		// the Go GC into permanent maximum-aggression mode. Measured on a
-		// Samsung S21FE (identical 9-day community sync, ~1.7GB ingested):
-		// with 150MB the GC was 61% of service CPU and the process ran at
-		// 150-390% CPU; with the limit lifted the same walk ran at 46-127%
-		// CPU with GC no longer in the profile's top consumers. 1GB keeps an
-		// OOM guard well above the working set without starving the GC.
+		// A limit below the working set (~350-620MB while syncing a large
+		// community) forces the GC into permanent maximum-aggression mode;
+		// 1GB keeps an OOM guard above it without starving the GC.
 		debug.SetMemoryLimit(1024 * 1024 * 1024) // 1GB
 	}
 
