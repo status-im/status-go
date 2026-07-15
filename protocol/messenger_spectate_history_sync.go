@@ -16,30 +16,17 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
-// spectatedCommunityInitialSyncPeriod bounds the history backfill triggered when a
-// user spectates a community (issue #21470-hf).
-//
-// The window matches the app-wide default sync period so spectators keep the
-// same history horizon as everyone else. What makes it affordable are the
-// processing fixes shipped alongside: undecryptable payloads drop early
-// instead of being ratchet-probed and parked (keyless gates), redelivered
-// descriptions short-circuit before the expensive pipeline (clock/hash gate),
-// segment reassembly is O(N), and the Go memory limit no longer forces
-// permanent GC thrash. The wins of this path itself: the sync is scoped to
-// the community's own filters (not the global all-filters sync), cancellable
-// on leave/background, and watermark-seeded.
+// spectatedCommunityInitialSyncPeriod matches the app-wide default sync period
+// so spectators keep the same history horizon as everyone else.
 const spectatedCommunityInitialSyncPeriod = 9 * 24 * time.Hour
 
-// spectatedCommunitySyncFrom returns the store-node "from" timestamp (unix seconds)
-// for a spectator's scoped backfill: now minus the spectate window.
 func spectatedCommunitySyncFrom(nowUnixSeconds uint32) uint32 {
 	return nowUnixSeconds - uint32(spectatedCommunityInitialSyncPeriod/time.Second)
 }
 
-// communityInitialHistorySync decides how a community's FIRST history backfill is
-// scoped. Spectators get a community-scoped default-period window (fetched
-// hash-first); joiners keep today's behavior — the full global backfill — because
-// they hold keys and legitimately want everything.
+// communityInitialHistorySync scopes a community's first history backfill:
+// spectators get a community-scoped window; joiners keep the full global
+// backfill.
 func communityInitialHistorySync(spectated bool) (scoped bool, window time.Duration) {
 	if spectated {
 		return true, spectatedCommunityInitialSyncPeriod
@@ -47,26 +34,21 @@ func communityInitialHistorySync(spectated bool) (scoped bool, window time.Durat
 	return false, 0
 }
 
-// mailserverTopicRef identifies a store-node topic (its pubsub + content topic).
 type mailserverTopicRef struct {
 	pubsubTopic  string
 	contentTopic string
 }
 
-// mailserverTopicKey is the map key syncFiltersFrom uses to look topics up; the seed
-// path must match it so a seeded topic is recognised as "already tracked".
+// mailserverTopicKey must match the key format syncFiltersFrom uses, so a
+// seeded topic is recognised as already tracked.
 func mailserverTopicKey(pubsubTopic, contentTopic string) string {
 	return fmt.Sprintf("%s-%s", pubsubTopic, contentTopic)
 }
 
-// communityHistorySeedTopics returns the watermark rows to insert so a spectator's
-// first backfill of the given topics is bounded to lastRequest.
-//
-// syncFiltersFrom ignores its lastRequest argument for topics not yet present in the
-// mailserver DB (it hardcodes the default sync period for fresh topics), so without a
-// pre-seeded watermark a spectate would refetch the full default period. Topics
-// already tracked are skipped — AddTopics is INSERT-OR-REPLACE, and rewinding a good
-// watermark would refetch history we already have. Each topic is seeded at most once.
+// communityHistorySeedTopics returns watermark rows for topics not yet tracked:
+// syncFiltersFrom hardcodes the full default sync period for topics missing
+// from the mailserver DB, and already-tracked topics must not be rewound
+// (AddTopics is INSERT-OR-REPLACE).
 func communityHistorySeedTopics(refs []mailserverTopicRef, existing map[string]struct{}, lastRequest int) []mailservers.MailserverTopic {
 	seeded := make(map[string]struct{}, len(refs))
 	var seeds []mailservers.MailserverTopic
@@ -88,11 +70,9 @@ func communityHistorySeedTopics(refs []mailserverTopicRef, existing map[string]s
 	return seeds
 }
 
-// communitySyncFilters returns the transport filters that carry a community's
-// traffic: its single universal content topic plus the community-level filters. It
-// resolves the community's DefaultFilters chat ids to the live filters created when
-// the community was initialised. Every channel rides the one universal (community-id)
-// content topic, so this set covers all of the community's store-node bytes.
+// communitySyncFilters resolves the community's DefaultFilters chat ids to live
+// transport filters; every channel rides the community's one universal content
+// topic, so this set covers all of its store-node traffic.
 func (m *Messenger) communitySyncFilters(community *communities.Community) types2.ChatFilters {
 	var filters types2.ChatFilters
 	seen := make(map[string]struct{})
@@ -110,9 +90,6 @@ func (m *Messenger) communitySyncFilters(community *communities.Community) types
 	return filters
 }
 
-// seedCommunityHistoryWatermarks pre-seeds the mailserver watermark for each of the
-// given filters' topics that is not already tracked, so the spectate backfill's first
-// fetch is bounded to lastRequest instead of the full default sync period.
 func (m *Messenger) seedCommunityHistoryWatermarks(filters types2.ChatFilters, lastRequest int) error {
 	if m.mailserversDatabase == nil {
 		return nil
@@ -142,17 +119,11 @@ func (m *Messenger) seedCommunityHistoryWatermarks(filters types2.ChatFilters, l
 	return m.mailserversDatabase.AddTopics(seeds)
 }
 
-// asyncSyncSpectatedCommunity backfills a freshly-spectated community's history over
-// the scoped 24h window (issue #21470-hf), replacing the global all-filters,
-// full-period backfill that spectating previously triggered. The fetch runs under a
-// per-community cancellable context registered on the messenger, so it stops when the
-// user leaves the community or the app is backgrounded.
-//
-// No message loss: skipped (older or cancelled) history stays on the store node; each
-// completed batch advances the per-topic watermark so later syncs resume exactly where
-// this one stopped; live relay delivery is unaffected; and the missing-message
-// verifier remains a net for anything not covered. A cancelled batch advances no
-// watermark, so nothing is marked fetched that was not.
+// asyncSyncSpectatedCommunity backfills a freshly-spectated community's history
+// over the scoped window, replacing the global all-filters backfill spectating
+// previously triggered. The fetch is cancellable per community (leave /
+// background); a cancelled batch advances no watermark, so later syncs resume
+// where it stopped.
 func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
@@ -192,8 +163,8 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 			response, err := m.syncFiltersFrom(ctx, peerInfo, filters, from)
 			if err != nil {
 				if ctx.Err() != nil {
-					// Cancelled by leave / background: stop cleanly, without retrying
-					// or penalising the storenode's failure accounting.
+					// Cancelled by leave/background — don't retry or penalise the
+					// storenode's failure accounting.
 					m.logger.Debug("spectated community history sync cancelled",
 						zap.String("communityID", communityID))
 					return nil, nil
@@ -214,14 +185,10 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 	}()
 }
 
-// communityHistoryFetchRegistry tracks the cancellable, per-community spectate
-// backfill goroutines so they can be aborted when the user leaves the community or
-// the app is backgrounded (issue #21470-hf, part B). On device the backfill was
-// measured continuing headless after the UI process died; cancellation stops it.
-//
-// Each registration is tagged with a monotonic token so a goroutine finishing on its
-// own only removes the map entry it still owns, never a fresher registration that
-// replaced it (context.CancelFunc values are not comparable, hence the token).
+// communityHistoryFetchRegistry tracks the in-flight per-community backfills so
+// leave/background can cancel them. Registrations carry a monotonic token so a
+// goroutine finishing on its own removes only the entry it still owns, never a
+// fresher registration that replaced it.
 type communityHistoryFetchRegistry struct {
 	mu      sync.Mutex
 	seq     uint64
@@ -239,9 +206,7 @@ func newCommunityHistoryFetchRegistry() *communityHistoryFetchRegistry {
 	}
 }
 
-// register records a new in-flight fetch for communityID, cancelling and replacing
-// any fetch already registered for it (e.g. a rapid re-spectate). It returns a token
-// identifying this registration, to be passed to finish.
+// register cancels and replaces any fetch already registered for communityID.
 func (r *communityHistoryFetchRegistry) register(communityID string, cancel context.CancelFunc) uint64 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -255,8 +220,6 @@ func (r *communityHistoryFetchRegistry) register(communityID string, cancel cont
 	return token
 }
 
-// cancel aborts the in-flight fetch for communityID (leave / unspectate path). It is
-// a no-op if none is registered.
 func (r *communityHistoryFetchRegistry) cancel(communityID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -267,7 +230,6 @@ func (r *communityHistoryFetchRegistry) cancel(communityID string) {
 	}
 }
 
-// cancelAll aborts every in-flight fetch (app backgrounded).
 func (r *communityHistoryFetchRegistry) cancelAll() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -278,9 +240,8 @@ func (r *communityHistoryFetchRegistry) cancelAll() {
 	}
 }
 
-// finish removes the registration for communityID IFF token still identifies the
-// current entry. A goroutine calls this on natural completion; if a newer fetch has
-// since replaced it, the entry is left untouched so the newer fetch stays cancellable.
+// finish removes the registration only if token still identifies the current
+// entry, so a newer fetch that replaced it stays cancellable.
 func (r *communityHistoryFetchRegistry) finish(communityID string, token uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

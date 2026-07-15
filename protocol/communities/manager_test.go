@@ -1845,12 +1845,9 @@ func (s *ManagerSuite) TestCommunityIDIsHydratedWhenMarshaling() {
 	s.Require().Equal(community.IDString(), community.config.CommunityDescription.ID)
 }
 
-// TestHandleCommunityDescriptionRedeliveryGate verifies the redelivery gate
-// (issue #21470-hf). A byte-identical redelivery of an already-processed community
-// description must skip the expensive pipeline yet still SURFACE the already-known
-// community, so the store-node pager's description-seen latch (commit 6cd6ced1a)
-// trips exactly as it would for a fully-processed redelivery. Newer clocks are
-// still processed, and new hash-ratchet key material lifts the gate.
+// A skipped redelivery must still surface the known community (the pager's
+// description-seen latch depends on it); newer clocks process; key arrival
+// lifts the gate.
 func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	// s.manager is the control node that authors the community; m is a separate
 	// receiver (spectator) node that ingests the published description.
@@ -1924,12 +1921,8 @@ func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	s.Require().NotNil(resp5)
 }
 
-// TestHandleCommunityDescriptionRedeliveryCache verifies the redelivery skip path is
-// served from the in-memory community cache instead of a 1.4MB GetByID per skip
-// (issue #21470-hf). It exercises the cache lifecycle at the Manager seam:
-// populate-on-successful-processing, and invalidation on both NewHashRatchetKeys and
-// DeleteCommunity. Description-update invalidation is already covered by SaveCommunity
-// (every successful processing deletes then repopulates the cache entry).
+// Cache lifecycle at the Manager seam: populate on successful processing,
+// invalidate on NewHashRatchetKeys and DeleteCommunity.
 func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryCache() {
 	m, _ := s.buildManagers(nil)
 
