@@ -153,8 +153,8 @@ type Messenger struct {
 	historicSyncInFlight      bool
 	lastHistoricSyncRequestAt time.Time
 
-	// communityHistoryFetches tracks cancellable, per-community spectate backfills
-	// so they can be aborted on leave / app-background (issue #21470-hf).
+	// communityHistoryFetches tracks cancellable, per-community spectate
+	// backfills so leave / app-background can abort them.
 	communityHistoryFetches *communityHistoryFetchRegistry
 
 	connectionStateMutex  sync.RWMutex
@@ -559,8 +559,7 @@ func (m *Messenger) processSentMessage(id string) error {
 func (m *Messenger) SetPaused(paused bool) {
 	m.paused.Store(paused)
 	if paused {
-		// Backgrounding stops any in-flight scoped community history backfills, which
-		// on device were measured continuing headless after the UI died (#21470-hf).
+		// Backgrounding stops any in-flight scoped community history backfills.
 		m.communityHistoryFetches.cancelAll()
 	}
 	if m.ensVerifier != nil {

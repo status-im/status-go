@@ -958,13 +958,10 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Spectated()
 }
 
-// initCommunityChats initialises a community's chats and filters. When spectated is
-// true the broad, full-period history sync is NOT scheduled here — the caller
-// (SpectateCommunity) drives a scoped 24h backfill instead (issue #21470-hf). A
-// keyless spectator's full-period backfill of the community's single universal
-// content topic ingests gigabytes of undecryptable payloads; the broad sync scheduled
-// here would race the scoped one for the topic watermark and defeat the scoping.
-// Joining keeps today's behavior (the broad sync runs).
+// initCommunityChats initialises a community's chats and filters. For a
+// spectated community the broad full-period history sync is not scheduled here
+// — it would race the caller's scoped backfill for the topic watermark;
+// joining keeps the broad sync.
 func (m *Messenger) initCommunityChats(community *communities.Community, spectated bool) ([]*Chat, error) {
 	logger := m.logger.Named("initCommunityChats")
 
@@ -991,7 +988,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community, spectat
 	}
 
 	willSync := false
-	if scoped, _ := communityInitialHistorySync(spectated); !scoped {
+	if !spectated {
 		willSync, err = m.scheduleSyncFilters(filters)
 		if err != nil {
 			logger.Debug("m.scheduleSyncFilters error", zap.Error(err))
@@ -1171,11 +1168,6 @@ func (m *Messenger) SpectateCommunity(communityID types3.HexBytes) (*MessengerRe
 
 	response.AddCommunity(community)
 
-	// #21470-hf: a spectator holds no community keys, so the previous global
-	// full-period backfill of every filter pulled the community's single universal
-	// content topic as gigabytes of undecryptable payloads (measured ~2-3GB/11min at
-	// ~330% service CPU). Backfill ONLY this community's filters over a scoped 24h
-	// window, cancellable on leave / app-background.
 	m.asyncSyncSpectatedCommunity(community)
 
 	return response, nil
@@ -2260,8 +2252,6 @@ func (m *Messenger) LeaveCommunity(communityID types3.HexBytes) (*MessengerRespo
 func (m *Messenger) leaveCommunity(communityID types3.HexBytes) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	// Leaving (or unspectating) a community stops any in-flight scoped history
-	// backfill for it (issue #21470-hf).
 	m.communityHistoryFetches.cancel(communityID.String())
 
 	community, err := m.communitiesManager.LeaveCommunity(communityID)

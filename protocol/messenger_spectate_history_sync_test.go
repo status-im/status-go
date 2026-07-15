@@ -8,42 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSpectatedCommunitySyncFrom verifies the spectate backfill window computation
-// (issue #21470-hf). A keyless spectator's full default-period backfill of a
-// community's single universal content topic ingests gigabytes of undecryptable
-// payloads (measured ~2-3GB/11min at ~330% service CPU on a Samsung S21FE). The
-// only byte-cutting lever is the WINDOW, because every channel rides one content
-// topic so per-channel scoping is impossible. Spectate is therefore bounded to a
-// scoped window matching the app's default sync period (9 days).
 func TestSpectatedCommunitySyncFrom(t *testing.T) {
 	require.Equal(t, 9*24*time.Hour, spectatedCommunityInitialSyncPeriod,
-		"spectate window matches the 9-day default sync period — affordable since hash-first + keyless-skip")
+		"spectate window matches the 9-day default sync period")
 
 	const now = uint32(1_700_000_000)
 	require.Equal(t, now-uint32(9*24*60*60), spectatedCommunitySyncFrom(now))
 }
 
-// TestCommunityInitialHistorySync verifies the spectate-vs-join scoping decision
-// (issue #21470-hf). A spectator holds no decryption keys, so deeper history is
-// pure heat and is scoped to 24h. A joiner holds keys and legitimately wants the
-// full default-period backfill, so joining must KEEP today's behavior (unscoped).
-func TestCommunityInitialHistorySync(t *testing.T) {
-	scoped, window := communityInitialHistorySync(true /* spectated */)
-	require.True(t, scoped, "spectators must use the scoped window")
-	require.Equal(t, spectatedCommunityInitialSyncPeriod, window)
-
-	scoped, window = communityInitialHistorySync(false /* joined */)
-	require.False(t, scoped, "joining must keep today's unscoped full-period backfill")
-	require.Equal(t, time.Duration(0), window)
-}
-
-// TestCommunityHistorySeedTopics verifies the watermark seeding that bounds a
-// spectator's FIRST backfill to the scoped window (issue #21470-hf). syncFiltersFrom
-// ignores its `lastRequest` argument for topics not yet tracked — a fresh topic
-// always defaults to the full sync period. So before syncing we seed each of the
-// community's topics with a `now-24h` watermark. Topics already tracked must be
-// SKIPPED (INSERT-OR-REPLACE would otherwise rewind a good watermark and refetch),
-// and each topic is seeded at most once.
+// Fresh topics get a seeded watermark; already-tracked topics must be skipped
+// (INSERT-OR-REPLACE would rewind a good watermark); each seeded at most once.
 func TestCommunityHistorySeedTopics(t *testing.T) {
 	const from = 1_699_913_600 // now - 24h
 
@@ -84,10 +58,6 @@ type fakeCancel struct {
 
 func (f fakeCancel) cancel() { *f.calls++ }
 
-// TestCommunityHistoryFetchRegistry_LeaveAndBackground verifies the cancel-registry
-// semantics that make the spectate backfill cancellable (issue #21470-hf, part B):
-// the device-measured backfill continues headless after the UI dies, so leaving a
-// community and backgrounding the app must both stop it.
 func TestCommunityHistoryFetchRegistry_LeaveAndBackground(t *testing.T) {
 	r := newCommunityHistoryFetchRegistry()
 
