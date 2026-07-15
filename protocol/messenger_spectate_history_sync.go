@@ -19,15 +19,15 @@ import (
 // spectatedCommunityInitialSyncPeriod bounds the history backfill triggered when a
 // user spectates a community (issue #21470-hf).
 //
-// History: this was briefly 24h as a byte-mitigation when the backfill fetched full
-// bodies for the whole universal topic (measured ~2-3GB / ~11min at ~330% service
-// CPU on a Samsung S21FE). With the backfill now hash-first (bodies fetched only
-// for unknown hashes), keyless spectators skipping undecryptable bodies entirely,
-// and the early-drop gates making residual bodies cheap, the full default sync
-// period is affordable again — so spectators get the same 9-day history horizon as
-// everyone else. The real wins of this path are retained: the sync is scoped to the
-// community's own filters (not the global all-filters sync), cancellable on
-// leave/background, and watermark-seeded.
+// The window matches the app-wide default sync period so spectators keep the
+// same history horizon as everyone else. What makes it affordable are the
+// processing fixes shipped alongside: undecryptable payloads drop early
+// instead of being ratchet-probed and parked (keyless gates), redelivered
+// descriptions short-circuit before the expensive pipeline (clock/hash gate),
+// segment reassembly is O(N), and the Go memory limit no longer forces
+// permanent GC thrash. The wins of this path itself: the sync is scoped to
+// the community's own filters (not the global all-filters sync), cancellable
+// on leave/background, and watermark-seeded.
 const spectatedCommunityInitialSyncPeriod = 9 * 24 * time.Hour
 
 // spectatedCommunitySyncFrom returns the store-node "from" timestamp (unix seconds)
