@@ -483,6 +483,25 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 
 	permission := fetchCommunityCollectiblePermission(community, id)
 
+	fillCollectibleMetadata(collectible, community, tokenMetadata, communityToken, permission)
+
+	return nil
+}
+
+// fillCollectibleMetadata enriches collectible from the community description
+// token metadata. communityToken may be nil: the community_tokens table is
+// populated by a separate sync path and can lag behind the community
+// description (e.g. right after a profile sync on a fresh device).
+func fillCollectibleMetadata(
+	collectible *thirdparty.FullCollectibleData,
+	community *communities.Community,
+	tokenMetadata *protobuf.CommunityTokenMetadata,
+	communityToken *communitiestoken.CommunityToken,
+	permission *communities.CommunityTokenPermission,
+) {
+	id := collectible.CollectibleData.ID
+	communityID := collectible.CollectibleData.CommunityID
+
 	privilegesLevel := communitiestoken.CommunityLevel
 	if permission != nil {
 		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
@@ -496,7 +515,9 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
 	collectible.CollectibleData.ImagePayload = imagePayload
 	collectible.CollectibleData.Traits = getCollectibleCommunityTraits(communityToken)
-	collectible.CollectibleData.Soulbound = !communityToken.Transferable
+	if communityToken != nil {
+		collectible.CollectibleData.Soulbound = !communityToken.Transferable
+	}
 
 	if collectible.CollectionData == nil {
 		collectible.CollectionData = &thirdparty.CollectionData{
@@ -514,8 +535,6 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 	collectible.CollectibleCommunityInfo = &thirdparty.CollectibleCommunityInfo{
 		PrivilegesLevel: privilegesLevel,
 	}
-
-	return nil
 }
 
 func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermission_Type) communitiestoken.PrivilegesLevel {

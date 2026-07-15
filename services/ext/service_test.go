@@ -7,6 +7,8 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 func TestServicePauseResumeBackgroundWithNilMessenger(t *testing.T) {
@@ -25,4 +27,28 @@ func TestServicePauseResumeBackgroundWithMessenger(t *testing.T) {
 	require.Equal(t, common.ServiceStatePaused, svc.PausableState())
 	require.NoError(t, svc.Resume())
 	require.Equal(t, common.ServiceStateRunning, svc.PausableState())
+}
+
+// Regression test: right after a profile sync the community description
+// (token metadata) can arrive before the community_tokens rows are synced,
+// so the community token lookup legitimately returns nil. Filling metadata
+// must tolerate that instead of crashing the node.
+func TestFillCollectibleMetadataWithMissingCommunityToken(t *testing.T) {
+	collectible := &thirdparty.FullCollectibleData{
+		CollectibleData: thirdparty.CollectibleData{
+			CommunityID: "0x0123",
+		},
+	}
+	tokenMetadata := &protobuf.CommunityTokenMetadata{
+		Name:        "Community Collectible",
+		Description: "desc",
+	}
+
+	require.NotPanics(t, func() {
+		fillCollectibleMetadata(collectible, nil, tokenMetadata, nil, nil)
+	})
+
+	require.Equal(t, "Community Collectible", collectible.CollectibleData.Name)
+	require.False(t, collectible.CollectibleData.Soulbound)
+	require.NotNil(t, collectible.CollectionData)
 }
