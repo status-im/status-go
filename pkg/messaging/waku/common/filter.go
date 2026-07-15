@@ -85,6 +85,23 @@ func NewFilters(defaultPubsubTopic string, logger *zap.Logger) *Filters {
 	}
 }
 
+// PendingMessageCount returns the total number of decrypted messages waiting across all
+// installed filter stores for the retrieve loop to consume. It is the backpressure signal
+// for the hash-first body fetch: fetched envelopes are decrypted (ReceivedMessage.Open)
+// and handed to these unbounded per-filter stores, so this count is what balloons when the
+// fetch outpaces the (slow) consumer (issue #21470-hf).
+func (fs *Filters) PendingMessageCount() int {
+	fs.RLock()
+	defer fs.RUnlock()
+	total := 0
+	for _, watcher := range fs.watchers {
+		if watcher.Messages != nil {
+			total += watcher.Messages.Count()
+		}
+	}
+	return total
+}
+
 // Install will add a new filter to the filter collection
 func (fs *Filters) Install(watcher *Filter) (string, error) {
 	if watcher.KeySym != nil && watcher.KeyAsym != nil {

@@ -88,6 +88,10 @@ func (msg *ReceivedMessage) isAsymmetricEncryption() bool {
 type MessageStore interface {
 	Add(*ReceivedMessage) error
 	Pop() ([]*ReceivedMessage, error)
+	// Count reports how many messages are currently held (added but not yet popped).
+	// It is the per-filter contribution to the hash-first body-fetch backpressure
+	// signal (issue #21470-hf).
+	Count() int
 }
 
 // NewMemoryMessageStore returns pointer to an instance of the MemoryMessageStore.
@@ -138,6 +142,13 @@ func (store *MemoryMessageStore) Add(msg *ReceivedMessage) error {
 		store.messages[msg.Hash()] = msg
 	}
 	return nil
+}
+
+// Count returns how many messages are currently held in the store.
+func (store *MemoryMessageStore) Count() int {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	return len(store.messages)
 }
 
 // Pop returns all available messages and cleans the store.

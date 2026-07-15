@@ -326,7 +326,8 @@ func (m *Messenger) requestAllHistoricMessages(withRetries bool, aggregateRespon
 				zap.Int("hashesSeen", hf.stats.HashesSeen),
 				zap.Int("hashesKnown", hf.stats.HashesKnown),
 				zap.Int("bodiesFetched", hf.stats.BodiesFetched),
-				zap.Int64("bytesEstimate", hf.stats.BytesEstimate))
+				zap.Int64("bytesEstimate", hf.stats.BytesEstimate),
+				zap.Int("bodyFetchThrottled", hf.stats.BodyFetchThrottled))
 		}()
 
 		if withRetries {

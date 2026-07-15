@@ -268,6 +268,11 @@ type HashFirstStats struct {
 	// no decryption keys for the community and its description is already resolved, so
 	// every such body is an undecryptable channel message (issue #21470-hf enhancement).
 	BodiesSkippedKeyless int
+	// BodyFetchThrottled counts how many times the body fetch PAUSED because the ingest
+	// backlog (decrypted envelopes awaiting the retrieve loop) was above the high-water
+	// mark — the flow control that keeps the fetch from ballooning memory ahead of the
+	// slow consumer (issue #21470-hf). Counts pause events, not envelopes.
+	BodyFetchThrottled int
 }
 
 // Add accumulates another batch's stats into s, so a multi-batch backfill can be
@@ -278,4 +283,5 @@ func (s *HashFirstStats) Add(o HashFirstStats) {
 	s.BodiesFetched += o.BodiesFetched
 	s.BytesEstimate += o.BytesEstimate
 	s.BodiesSkippedKeyless += o.BodiesSkippedKeyless
+	s.BodyFetchThrottled += o.BodyFetchThrottled
 }

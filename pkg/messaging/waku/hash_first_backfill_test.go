@@ -1,6 +1,7 @@
 package wakuv2
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -11,6 +12,50 @@ import (
 
 	types "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
+
+// TestWaitForIngestCapacity covers the pure flow-control decision that backpressures the
+// hash-first body fetch against the ingest backlog (issue #21470-hf): it does not pause
+// when disabled or below the high-water mark, pauses until the backlog drains, and honours
+// context cancellation while paused.
+func TestWaitForIngestCapacity(t *testing.T) {
+	const poll = time.Millisecond
+
+	t.Run("disabled high-water never pauses", func(t *testing.T) {
+		paused, err := waitForIngestCapacity(context.Background(), func() int { return 10000 }, 0, poll)
+		require.NoError(t, err)
+		require.False(t, paused)
+	})
+
+	t.Run("below high-water does not pause", func(t *testing.T) {
+		paused, err := waitForIngestCapacity(context.Background(), func() int { return 10 }, 100, poll)
+		require.NoError(t, err)
+		require.False(t, paused)
+	})
+
+	t.Run("pauses until the backlog drains", func(t *testing.T) {
+		depth := 145
+		calls := 0
+		depthFn := func() int {
+			calls++
+			d := depth
+			depth -= 20 // consumer drains ~20 per poll
+			return d
+		}
+		paused, err := waitForIngestCapacity(context.Background(), depthFn, 100, poll)
+		require.NoError(t, err)
+		require.True(t, paused)
+		// Initial over-threshold check + at least one re-check after a poll.
+		require.GreaterOrEqual(t, calls, 2)
+	})
+
+	t.Run("respects context cancellation while paused", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		paused, err := waitForIngestCapacity(ctx, func() int { return 10000 }, 100, poll)
+		require.ErrorIs(t, err, context.Canceled)
+		require.True(t, paused)
+	})
+}
 
 // hashN builds a distinct, deterministic message hash from n.
 func hashN(n byte) wpb.MessageHash {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
@@ -50,7 +51,21 @@ const (
 	// topics per request. The general (all-filters) history sync batches many more topics
 	// than the spectate path, so the metadata walk must chunk them (issue #21470-hf).
 	hashFirstMaxContentTopicsPerRequest = 10
+
+	// hashFirstIngestHighWater bounds how many fetched-but-not-yet-consumed envelopes
+	// (decrypted messages sitting in the per-filter stores awaiting the retrieve loop) the
+	// body fetch lets accumulate before pausing. Without this the fetch outruns the slow
+	// per-description consumer and the backlog balloons memory: at ~1.4MB per
+	// community-description envelope, letting the msgQueue fill to its 1024 cap is ~1.4GB.
+	// Capping the in-flight backlog here keeps the transient peak an order of magnitude
+	// lower while still pipelining fetch and ingest (issue #21470-hf).
+	hashFirstIngestHighWater = 128
 )
+
+// hashFirstBackpressurePoll is how often a paused body fetch re-checks the ingest backlog.
+// This is flow control, not a hot path, so a coarse interval keeps the poll cost negligible
+// while still resuming promptly once the consumer drains (issue #21470-hf).
+const hashFirstBackpressurePoll = 100 * time.Millisecond
 
 // hashFirstMaxWindow caps the duration of a single metadata store query. The classic
 // HistoryRetriever caps each query to 24h and walks a longer range backward (see
@@ -192,6 +207,39 @@ func planBodyFetch(unknown []wpb.MessageHash, skipBodies bool) (toFetch []wpb.Me
 	return unknown, 0
 }
 
+// waitForIngestCapacity blocks the body fetch until the ingest backlog reported by depth
+// drops below highWater, polling every poll. It returns immediately (paused=false) when
+// highWater <= 0 (disabled) or the backlog is already below it. While paused it honours
+// ctx cancellation, returning the ctx error so leave/background aborts promptly. This is
+// pure flow control: it holds no locks while sleeping, so the (separate) retrieve-loop and
+// decrypt goroutines keep draining the backlog and it always makes progress unless the
+// caller is cancelled (issue #21470-hf).
+func waitForIngestCapacity(ctx context.Context, depth func() int, highWater int, poll time.Duration) (paused bool, err error) {
+	if highWater <= 0 || depth() < highWater {
+		return false, nil
+	}
+	paused = true
+	for {
+		if err := ctx.Err(); err != nil {
+			return paused, err
+		}
+		select {
+		case <-ctx.Done():
+			return paused, ctx.Err()
+		case <-time.After(poll):
+		}
+		if depth() < highWater {
+			return paused, nil
+		}
+	}
+}
+
+// pendingIngestCount is the body-fetch backpressure signal: the number of decrypted
+// envelopes waiting in the filter stores for the retrieve loop to consume (issue #21470-hf).
+func (w *Waku) pendingIngestCount() int {
+	return w.filters.PendingMessageCount()
+}
+
 // ProcessMailserverBatchHashFirst backfills a store-node batch hash-first: it walks the
 // window pulling only message hashes+metadata, filters out envelopes already held
 // locally, then fetches full bodies only for the unknown hashes and feeds them into the
@@ -280,6 +328,20 @@ func (w *Waku) ProcessMailserverBatchHashFirst(
 			return stats, err
 		}
 		for {
+			// Backpressure: before enqueuing another page of (large) decrypted bodies,
+			// wait for the ingest backlog to fall below the high-water mark so fetched
+			// envelopes cannot pile up faster than the slow per-description consumer
+			// drains them (issue #21470-hf).
+			paused, err := waitForIngestCapacity(ctx, w.pendingIngestCount, hashFirstIngestHighWater, hashFirstBackpressurePoll)
+			if err != nil {
+				return stats, err
+			}
+			if paused {
+				stats.BodyFetchThrottled++
+				w.logger.Debug("hash-first body fetch throttled: ingest backlog above high-water",
+					zap.Int("highWater", hashFirstIngestHighWater),
+					zap.Int("pending", w.pendingIngestCount()))
+			}
 			if err := w.ingestBodyPage(bodyResult, processEnvelopes, &stats); err != nil {
 				return stats, err
 			}

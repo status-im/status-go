@@ -354,3 +354,78 @@ func TestWatchers(t *testing.T) {
 		require.Equal(t, tst[i].msgCnt, count[i])
 	}
 }
+
+// newCountTestMessage builds a distinct ReceivedMessage on the given content topic;
+// distinct seeds yield distinct envelope hashes (issue #21470-hf backpressure signal).
+func newCountTestMessage(t *testing.T, contentTopic string, seed byte) *ReceivedMessage {
+	data := make([]byte, 8)
+	data[0] = seed
+	msg := &pb.WakuMessage{
+		Payload:      data,
+		ContentTopic: contentTopic,
+		Timestamp:    proto.Int64(time.Now().UnixNano() + int64(seed)),
+		Meta:         []byte{},
+	}
+	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), testShard)
+	rm := NewReceivedMessage(envelope, "test")
+	require.NotNil(t, rm)
+	return rm
+}
+
+// TestMemoryMessageStoreCount verifies the store reports its pending size, does not
+// double-count duplicate hashes, and returns to zero after Pop — the primitive the
+// hash-first body-fetch backpressure signal is built on (issue #21470-hf).
+func TestMemoryMessageStoreCount(t *testing.T) {
+	filter, err := generateFilter(t, true)
+	require.NoError(t, err)
+	ct := maps.Keys(filter.ContentTopics)[0].ContentTopic()
+
+	store := NewMemoryMessageStore()
+	require.Equal(t, 0, store.Count())
+
+	for i := 0; i < 3; i++ {
+		require.NoError(t, store.Add(newCountTestMessage(t, ct, byte(i))))
+	}
+	require.Equal(t, 3, store.Count())
+
+	// Same message added twice is stored (and counted) once.
+	dup := newCountTestMessage(t, ct, 9)
+	require.NoError(t, store.Add(dup))
+	require.NoError(t, store.Add(dup))
+	require.Equal(t, 4, store.Count())
+
+	popped, err := store.Pop()
+	require.NoError(t, err)
+	require.Len(t, popped, 4)
+	require.Equal(t, 0, store.Count())
+}
+
+// TestFiltersPendingMessageCount verifies the aggregate backpressure signal sums the
+// pending messages across every installed filter store and drops as they are consumed
+// (issue #21470-hf).
+func TestFiltersPendingMessageCount(t *testing.T) {
+	filters := NewFilters(testShard, createLogger(t))
+
+	f1, err := generateFilter(t, true)
+	require.NoError(t, err)
+	f2, err := generateFilter(t, true)
+	require.NoError(t, err)
+	_, err = filters.Install(f1)
+	require.NoError(t, err)
+	_, err = filters.Install(f2)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, filters.PendingMessageCount())
+
+	ct1 := maps.Keys(f1.ContentTopics)[0].ContentTopic()
+	require.NoError(t, f1.Messages.Add(newCountTestMessage(t, ct1, 1)))
+	require.NoError(t, f1.Messages.Add(newCountTestMessage(t, ct1, 2)))
+	ct2 := maps.Keys(f2.ContentTopics)[0].ContentTopic()
+	require.NoError(t, f2.Messages.Add(newCountTestMessage(t, ct2, 3)))
+
+	require.Equal(t, 3, filters.PendingMessageCount())
+
+	_, err = f1.Messages.Pop()
+	require.NoError(t, err)
+	require.Equal(t, 1, filters.PendingMessageCount())
+}

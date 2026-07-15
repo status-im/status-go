@@ -296,7 +296,8 @@ func (m *Messenger) asyncSyncSpectatedCommunity(community *communities.Community
 			zap.Int("hashesKnown", hf.stats.HashesKnown),
 			zap.Int("bodiesFetched", hf.stats.BodiesFetched),
 			zap.Int64("bytesEstimate", hf.stats.BytesEstimate),
-			zap.Int("bodiesSkippedKeyless", hf.stats.BodiesSkippedKeyless))
+			zap.Int("bodiesSkippedKeyless", hf.stats.BodiesSkippedKeyless),
+			zap.Int("bodyFetchThrottled", hf.stats.BodyFetchThrottled))
 	}()
 }
 
