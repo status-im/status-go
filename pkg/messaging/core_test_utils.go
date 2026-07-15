@@ -54,6 +54,13 @@ func (f *TestMessagingEnvironment) SubscribePostEvents() chan *PostMessageSubscr
 	return f.waku.SubscribePostEvents()
 }
 
+// SetProcessMailserverBatchHook installs a hook that intercepts every store
+// (mailserver) batch request issued through this environment. Passing nil
+// restores the default behavior of forwarding to the underlying waku.
+func (f *TestMessagingEnvironment) SetProcessMailserverBatchHook(hook func(ctx context.Context, batch types.MailserverBatch, storenode peer.AddrInfo, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error) {
+	f.waku.processMailserverBatchHook = hook
+}
+
 func (f *TestMessagingEnvironment) SimulateOffline() func() {
 	f.waku.Waku.(*wakuv3.Waku).SkipPublishToTopic(true)
 	return func() {
@@ -65,6 +72,25 @@ func (f *TestMessagingEnvironment) SimulateOffline() func() {
 type testWakuWrapper struct {
 	types.Waku
 	api *testPublicWakuAPI
+
+	// processMailserverBatchHook, when set, intercepts every store (mailserver)
+	// batch request instead of forwarding it to the underlying waku. Used by
+	// tests to observe store queries without a real store node.
+	processMailserverBatchHook func(ctx context.Context, batch types.MailserverBatch, storenode peer.AddrInfo, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error
+}
+
+func (tw *testWakuWrapper) ProcessMailserverBatch(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	storenode peer.AddrInfo,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	if tw.processMailserverBatchHook != nil {
+		return tw.processMailserverBatchHook(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+	}
+	return tw.Waku.ProcessMailserverBatch(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (tw *testWakuWrapper) PublicWakuAPI() types.PublicWakuAPI {
