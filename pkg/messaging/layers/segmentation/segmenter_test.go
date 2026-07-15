@@ -1,6 +1,7 @@
 package segmentation
 
 import (
+	"crypto/ecdsa"
 	_ "embed"
 	"testing"
 
@@ -185,4 +186,137 @@ func (s *MessageSegmentationSuite) TestProtobufMissDecoding() {
 
 	// Ensure that the sanity check for the segmented message fails, as expected.
 	s.Require().False(segmentedMessage.IsValid())
+}
+
+// countingPersistence wraps a real Persistence and counts GetMessageSegments
+// calls, so tests can assert the expensive full-segment read (which copies every
+// stored payload blob out of sqlcipher) happens only once, on completion —
+// instead of on every arriving segment (the O(N^2) behavior, issue #21470-hf).
+type countingPersistence struct {
+	Persistence
+	getSegmentsCalls int
+}
+
+func (c *countingPersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*Message, error) {
+	c.getSegmentsCalls++
+	return c.Persistence.GetMessageSegments(hash, sigPubKey)
+}
+
+func (s *MessageSegmentationSuite) newCountingSegmenter() (*Segmenter, *countingPersistence) {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     migrations.AssetNames(),
+			AssetFunc: migrations.Asset,
+		},
+	}))
+	s.Require().NoError(err)
+	counting := &countingPersistence{Persistence: NewSQLitePersistence(db)}
+	return NewSegmenter(counting, zap.Must(zap.NewDevelopment())), counting
+}
+
+// TestReadsAllSegmentsOnlyOnCompletion (no parity) verifies that arriving segments
+// before the last do NOT trigger a full read of every stored segment, and the last
+// one triggers exactly one such read (issue #21470-hf: O(N) instead of O(N^2)).
+func (s *MessageSegmentationSuite) TestReadsAllSegmentsOnlyOnCompletion() {
+	segmenter, counting := s.newCountingSegmenter()
+
+	signer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	segmentsCount := 5 // floor(5*0.125)=0 parity segments
+	segSize := (len(s.testPayload) + segmentsCount - 1) / segmentsCount
+	segs, err := segmenter.Segment(s.testPayload, segSize)
+	s.Require().NoError(err)
+	s.Require().Len(segs, segmentsCount)
+
+	for i := 0; i < segmentsCount-1; i++ {
+		_, _, err := segmenter.Reconstruct(segs[i], &signer.PublicKey, nil)
+		s.Require().ErrorIs(err, ErrIncomplete)
+	}
+	s.Require().Equal(0, counting.getSegmentsCalls, "must not read all segments before completion")
+
+	payload, _, err := segmenter.Reconstruct(segs[segmentsCount-1], &signer.PublicKey, nil)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch(s.testPayload, payload)
+	s.Require().Equal(1, counting.getSegmentsCalls, "reads all segments exactly once, on completion")
+}
+
+// TestReadsAllSegmentsOnlyOnCompletionOutOfOrder verifies the completion precheck
+// is order-independent: the full read still fires exactly once, on the arrival that
+// brings the stored count up to SegmentsCount.
+func (s *MessageSegmentationSuite) TestReadsAllSegmentsOnlyOnCompletionOutOfOrder() {
+	segmenter, counting := s.newCountingSegmenter()
+
+	signer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	segmentsCount := 5
+	segSize := (len(s.testPayload) + segmentsCount - 1) / segmentsCount
+	segs, err := segmenter.Segment(s.testPayload, segSize)
+	s.Require().NoError(err)
+
+	order := []int{3, 0, 4, 1, 2}
+	for i, idx := range order {
+		payload, _, err := segmenter.Reconstruct(segs[idx], &signer.PublicKey, nil)
+		if i < segmentsCount-1 {
+			s.Require().ErrorIs(err, ErrIncomplete)
+			s.Require().Equal(0, counting.getSegmentsCalls)
+		} else {
+			s.Require().NoError(err)
+			s.Require().ElementsMatch(s.testPayload, payload)
+			s.Require().Equal(1, counting.getSegmentsCalls)
+		}
+	}
+}
+
+// TestDuplicateSegmentDoesNotTriggerRead verifies a duplicate arrival (which
+// REPLACEs its row and leaves the stored count unchanged) neither completes the
+// message nor triggers a full read.
+func (s *MessageSegmentationSuite) TestDuplicateSegmentDoesNotTriggerRead() {
+	segmenter, counting := s.newCountingSegmenter()
+
+	signer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	segmentsCount := 5
+	segSize := (len(s.testPayload) + segmentsCount - 1) / segmentsCount
+	segs, err := segmenter.Segment(s.testPayload, segSize)
+	s.Require().NoError(err)
+
+	_, _, err = segmenter.Reconstruct(segs[0], &signer.PublicKey, nil)
+	s.Require().ErrorIs(err, ErrIncomplete)
+	_, _, err = segmenter.Reconstruct(segs[0], &signer.PublicKey, nil) // duplicate
+	s.Require().ErrorIs(err, ErrIncomplete)
+	s.Require().Equal(0, counting.getSegmentsCalls, "duplicate must not trigger a full read")
+}
+
+// TestParityCompletionReadsOnce verifies the completion precheck fires the single
+// full read even when the completing segment is a parity segment (reedsolomon
+// reconstruction with one data segment missing).
+func (s *MessageSegmentationSuite) TestParityCompletionReadsOnce() {
+	segmenter, counting := s.newCountingSegmenter()
+
+	signer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	segmentsCount := 8 // floor(8*0.125)=1 parity segment
+	segSize := (len(s.testPayload) + segmentsCount - 1) / segmentsCount
+	segs, err := segmenter.Segment(s.testPayload, segSize)
+	s.Require().NoError(err)
+	s.Require().Len(segs, segmentsCount+1) // 8 data + 1 parity
+
+	// Deliver 7 of the 8 data segments (index 0..6), then the parity segment
+	// (index 8) which brings the stored count to 8 and completes via parity.
+	arrival := []int{0, 1, 2, 3, 4, 5, 6, 8}
+	for i, idx := range arrival {
+		payload, _, err := segmenter.Reconstruct(segs[idx], &signer.PublicKey, nil)
+		if i < segmentsCount-1 {
+			s.Require().ErrorIs(err, ErrIncomplete)
+			s.Require().Equal(0, counting.getSegmentsCalls)
+		} else {
+			s.Require().NoError(err)
+			s.Require().ElementsMatch(s.testPayload, payload)
+			s.Require().Equal(1, counting.getSegmentsCalls)
+		}
+	}
 }

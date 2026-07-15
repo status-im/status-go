@@ -153,6 +153,21 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, tran
 		return nil, nil, err
 	}
 
+	// Cheap completion precheck (issue #21470-hf): a message can only be reassembled
+	// once at least SegmentsCount segments (data + parity) are stored. Until then,
+	// skip the expensive GetMessageSegments below, which copies every stored payload
+	// blob out of sqlcipher — for an N-segment message arriving one segment at a time
+	// that full read would otherwise run on every arrival (O(N^2) blob copies).
+	// This is a NECESSARY-condition filter only; the authoritative completeness and
+	// hash checks still run on the fully loaded segments below.
+	storedCount, expectedCount, err := s.persistence.GetMessageSegmentsCompletionInfo(segmentMessage.EntireMessageHash, sigPubKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	if expectedCount == 0 || storedCount < int(expectedCount) {
+		return nil, nil, ErrIncomplete
+	}
+
 	segments, err := s.persistence.GetMessageSegments(segmentMessage.EntireMessageHash, sigPubKey)
 	if err != nil {
 		return nil, nil, err
