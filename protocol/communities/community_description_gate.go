@@ -32,11 +32,14 @@ type descriptionGateEntry struct {
 //     Community.UpdateCommunityDescription, which rejects them as outdated), and
 //   - the byte-identical same-clock redelivery (a guaranteed no-op).
 //
-// It deliberately does NOT gate a same-clock description whose content differs:
-// Community.UpdateCommunityDescription intentionally reprocesses identical clocks
-// so a previously-encrypted description can be re-evaluated once the decryption key
-// arrives. For that same reason the gate is cleared when new hash-ratchet keys
-// arrive (Manager.NewHashRatchetKeys) and when a community is deleted
+// For a KEYS-HELD community it deliberately does NOT gate a same-clock description
+// whose content differs: Community.UpdateCommunityDescription intentionally
+// reprocesses identical clocks so a previously-encrypted description can be
+// re-evaluated once the decryption key arrives. For a KEYLESS spectator that
+// exception is dropped — an equal-clock re-encrypted republish is useless to a node
+// with no keys, so it is skipped regardless of content (see shouldSkip). For both
+// cases the gate is cleared when new hash-ratchet keys arrive
+// (Manager.NewHashRatchetKeys) and when a community is deleted
 // (Manager.DeleteCommunity), so those legitimate reprocessing paths are never
 // starved.
 //
@@ -63,12 +66,31 @@ func hashDescriptionPayload(payload []byte) [32]byte {
 }
 
 // shouldSkip reports whether a description with the given clock and content hash
-// can be skipped because it can neither advance nor change local state. It returns
-// true only for a strictly-older clock, or an equal clock whose content hash matches
-// the last fully-processed description for this community. Everything else (unknown
-// community, newer clock, equal clock with different content) returns false so the
-// handler proceeds.
-func (g *communityDescriptionGate) shouldSkip(id string, clock uint64, hash [32]byte) bool {
+// can be skipped because it can neither advance nor change local state. holdsKeys
+// says whether this node holds ANY hash-ratchet decryption key for the community;
+// it must be fail-open (true) on any entitlement-lookup error so a transient DB
+// issue never turns into a dropped description.
+//
+// A strictly-older clock is always skippable (it can never win the downstream clock
+// comparison in Community.UpdateCommunityDescription). For an EQUAL clock the rule
+// depends on whether keys are held:
+//
+//   - keys held (member, or fail-open): skip only the byte-identical redelivery.
+//     A same-clock description with DIFFERENT content still proceeds, because
+//     community.go intentionally reprocesses identical clocks so a previously
+//     encrypted description is re-evaluated once the decryption key arrives — the
+//     member key-rotation path. This preserves the pre-refinement behaviour exactly.
+//
+//   - keyless (spectator): skip an equal-clock description REGARDLESS of content
+//     hash. status-go re-encrypts each logical description version ~40 times, so a
+//     keyless node is handed the same clock with different payload bytes over and
+//     over; it can gain nothing from a re-encrypted copy (its encrypted inner fields
+//     are skipped anyway, and key ARRIVAL lifts the whole gate via forgetAll), so
+//     reprocessing only burns CPU. Issue #21470-hf.
+//
+// Everything else (unknown community, newer clock) returns false so the handler
+// proceeds.
+func (g *communityDescriptionGate) shouldSkip(id string, clock uint64, hash [32]byte, holdsKeys bool) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	entry, ok := g.entries[id]
@@ -78,8 +100,11 @@ func (g *communityDescriptionGate) shouldSkip(id string, clock uint64, hash [32]
 	if clock < entry.clock {
 		return true
 	}
-	if clock == entry.clock && hash == entry.contentHash {
-		return true
+	if clock == entry.clock {
+		if !holdsKeys {
+			return true
+		}
+		return hash == entry.contentHash
 	}
 	return false
 }
