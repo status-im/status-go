@@ -1883,7 +1883,7 @@ func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	payload := buildPayload()
 
 	// The gate starts empty: the first delivery must not be skipped.
-	s.Require().False(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(payload)))
+	s.Require().False(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(payload), keysHeld))
 
 	// First delivery is fully processed and yields a response.
 	resp1, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
@@ -1891,7 +1891,7 @@ func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	s.Require().NotNil(resp1)
 
 	// The gate now records this description, so a byte-identical redelivery is a skip.
-	s.Require().True(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(payload)))
+	s.Require().True(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(payload), keysHeld))
 
 	// Byte-identical redelivery is short-circuited but STILL surfaces the community
 	// (non-nil, matching ID, empty changes) so downstream description-seen latches.
@@ -1910,16 +1910,81 @@ func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	resp3, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp3)
-	s.Require().True(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(newerPayload)))
+	s.Require().True(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(newerPayload), keysHeld))
 
 	// New hash-ratchet keys arriving must lift the gate so the same description can
 	// be reprocessed (it may now decrypt previously-encrypted private data).
 	err = m.NewHashRatchetKeys([]*types.HashRatchetInfo{{GroupID: community.ID(), KeyID: []byte("key-id")}})
 	s.Require().NoError(err)
-	s.Require().False(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(newerPayload)),
+	s.Require().False(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(newerPayload), keysHeld),
 		"gate must be lifted after new keys arrive")
 
 	resp5, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp5)
+}
+
+// TestHandleCommunityDescriptionRedeliveryCache verifies the redelivery skip path is
+// served from the in-memory community cache instead of a 1.4MB GetByID per skip
+// (issue #21470-hf). It exercises the cache lifecycle at the Manager seam:
+// populate-on-successful-processing, and invalidation on both NewHashRatchetKeys and
+// DeleteCommunity. Description-update invalidation is already covered by SaveCommunity
+// (every successful processing deletes then repopulates the cache entry).
+func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryCache() {
+	m, _ := s.buildManagers(nil)
+
+	signer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+	community, err := s.manager.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	description := community.config.CommunityDescription
+	gateKey := community.IDString()
+	buildPayload := func() []byte {
+		payload, err := community.MarshaledDescription()
+		s.Require().NoError(err)
+		payload, err = v.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, signer)
+		s.Require().NoError(err)
+		return payload
+	}
+	payload := buildPayload()
+
+	// The cache starts empty for an unseen community.
+	s.Require().Nil(m.cache.Get(gateKey), "cache must be empty before first processing")
+
+	// POPULATE-ON-PROCESS: after a successful full processing the just-processed
+	// community is cached so the first redelivery skip serves it without a GetByID.
+	_, err = m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
+	s.Require().NoError(err)
+	cached := m.cache.Get(gateKey)
+	s.Require().NotNil(cached, "community must be cached after successful processing")
+	s.Require().True(bytes.Equal(community.ID(), cached.Value().ID()), "cached community must match")
+
+	// The redelivery skip surfaces the community (from cache) with empty changes.
+	resp, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().NotNil(resp.Community)
+	s.Require().Equal(community.IDString(), resp.Community.IDString())
+
+	// INVALIDATE on NewHashRatchetKeys: keys arriving must drop the cached community
+	// (its next read reflects any now-decryptable state after reprocessing).
+	err = m.NewHashRatchetKeys([]*types.HashRatchetInfo{{GroupID: community.ID(), KeyID: []byte("key-id")}})
+	s.Require().NoError(err)
+	s.Require().Nil(m.cache.Get(gateKey), "new keys must invalidate the cached community")
+
+	// Reprocess to repopulate, then INVALIDATE on DeleteCommunity.
+	_, err = m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(m.cache.Get(gateKey), "reprocessing must repopulate the cache")
+
+	err = m.DeleteCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Nil(m.cache.Get(gateKey), "deleting the community must invalidate the cached community")
 }
