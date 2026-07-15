@@ -188,10 +188,8 @@ func (s *MessageSegmentationSuite) TestProtobufMissDecoding() {
 	s.Require().False(segmentedMessage.IsValid())
 }
 
-// countingPersistence wraps a real Persistence and counts GetMessageSegments
-// calls, so tests can assert the expensive full-segment read (which copies every
-// stored payload blob out of sqlcipher) happens only once, on completion —
-// instead of on every arriving segment (the O(N^2) behavior, issue #21470-hf).
+// countingPersistence counts GetMessageSegments calls so tests can assert the
+// full-segment read happens only once, on completion.
 type countingPersistence struct {
 	Persistence
 	getSegmentsCalls int
@@ -214,9 +212,6 @@ func (s *MessageSegmentationSuite) newCountingSegmenter() (*Segmenter, *counting
 	return NewSegmenter(counting, zap.Must(zap.NewDevelopment())), counting
 }
 
-// TestReadsAllSegmentsOnlyOnCompletion (no parity) verifies that arriving segments
-// before the last do NOT trigger a full read of every stored segment, and the last
-// one triggers exactly one such read (issue #21470-hf: O(N) instead of O(N^2)).
 func (s *MessageSegmentationSuite) TestReadsAllSegmentsOnlyOnCompletion() {
 	segmenter, counting := s.newCountingSegmenter()
 
@@ -241,9 +236,6 @@ func (s *MessageSegmentationSuite) TestReadsAllSegmentsOnlyOnCompletion() {
 	s.Require().Equal(1, counting.getSegmentsCalls, "reads all segments exactly once, on completion")
 }
 
-// TestReadsAllSegmentsOnlyOnCompletionOutOfOrder verifies the completion precheck
-// is order-independent: the full read still fires exactly once, on the arrival that
-// brings the stored count up to SegmentsCount.
 func (s *MessageSegmentationSuite) TestReadsAllSegmentsOnlyOnCompletionOutOfOrder() {
 	segmenter, counting := s.newCountingSegmenter()
 
@@ -269,9 +261,7 @@ func (s *MessageSegmentationSuite) TestReadsAllSegmentsOnlyOnCompletionOutOfOrde
 	}
 }
 
-// TestDuplicateSegmentDoesNotTriggerRead verifies a duplicate arrival (which
-// REPLACEs its row and leaves the stored count unchanged) neither completes the
-// message nor triggers a full read.
+// A duplicate arrival REPLACEs its row and leaves the stored count unchanged.
 func (s *MessageSegmentationSuite) TestDuplicateSegmentDoesNotTriggerRead() {
 	segmenter, counting := s.newCountingSegmenter()
 
@@ -290,9 +280,6 @@ func (s *MessageSegmentationSuite) TestDuplicateSegmentDoesNotTriggerRead() {
 	s.Require().Equal(0, counting.getSegmentsCalls, "duplicate must not trigger a full read")
 }
 
-// TestParityCompletionReadsOnce verifies the completion precheck fires the single
-// full read even when the completing segment is a parity segment (reedsolomon
-// reconstruction with one data segment missing).
 func (s *MessageSegmentationSuite) TestParityCompletionReadsOnce() {
 	segmenter, counting := s.newCountingSegmenter()
 

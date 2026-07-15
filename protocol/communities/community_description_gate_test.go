@@ -17,13 +17,9 @@ const (
 	keyless  = false
 )
 
-// TestDescriptionGateTruthTable exercises the redelivery gate decision across the
-// whole truth table (issue #21470-hf) for a KEYS-HELD community (member): unknown
-// community, strictly-older clock, byte-identical same-clock redelivery,
-// same-clock-different-content, and a newer clock. Only a strictly-older clock or a
-// byte-identical same-clock redelivery may be skipped; everything else must proceed
-// to full processing. The same-clock-different-content rule is what keeps key
-// rotation working for members, so it must survive.
+// Keys-held: only a strictly-older clock or a byte-identical same-clock
+// redelivery may be skipped; same-clock-different-content must proceed (key
+// rotation).
 func TestDescriptionGateTruthTable(t *testing.T) {
 	const id = "0xcommunity"
 	payloadA := []byte("description-bytes-A")
@@ -61,14 +57,8 @@ func TestDescriptionGateTruthTable(t *testing.T) {
 	require.False(t, g.shouldSkip("0xother", 1, hashA, keysHeld), "other community must proceed")
 }
 
-// TestDescriptionGateKeylessTruthTable exercises the gate for a KEYLESS spectator
-// (holds no decryption keys). status-go re-encrypts each logical description ~40
-// times per version, so a keyless node sees the same clock with DIFFERENT payload
-// bytes over and over. A keyless spectator can gain nothing from a re-encrypted
-// equal-clock copy (its encrypted inner fields are skipped anyway, and key ARRIVAL
-// is handled by forgetAll), so the gate must skip equal-clock republishes
-// REGARDLESS of content hash — the one behaviour that differs from a keys-held
-// community (issue #21470-hf).
+// Keyless: equal-clock republishes are skipped regardless of content hash —
+// the one behaviour that differs from keys-held.
 func TestDescriptionGateKeylessTruthTable(t *testing.T) {
 	const id = "0xcommunity"
 	hashA := hashOf([]byte("description-bytes-A"))
@@ -97,11 +87,8 @@ func TestDescriptionGateKeylessTruthTable(t *testing.T) {
 	require.False(t, g.shouldSkip(id, 11, hashB, keyless), "keyless newer clock must proceed regardless of content")
 }
 
-// TestDescriptionGateFailOpenTreatedAsKeysHeld documents that the fail-open case
-// (entitlement lookup errored, so the Manager reports holdsKeys=true) is exactly the
-// keys-held branch: an equal-clock DIFFERENT-content description still proceeds, so a
-// transient DB error can never make a keyless-style skip drop a description that a
-// member would have reprocessed.
+// Fail-open (holdsKeys=true on lookup error) must behave exactly like the
+// keys-held branch.
 func TestDescriptionGateFailOpenTreatedAsKeysHeld(t *testing.T) {
 	const id = "0xcommunity"
 	hashA := hashOf([]byte("A"))
@@ -114,9 +101,6 @@ func TestDescriptionGateFailOpenTreatedAsKeysHeld(t *testing.T) {
 	require.False(t, g.shouldSkip(id, 10, hashB, keysHeld), "fail-open (keys-held) equal-clock different-content must proceed")
 }
 
-// TestDescriptionGateRecordIsMonotonic verifies recordProcessed never moves the
-// recorded clock backwards, so an out-of-order older success cannot shadow a newer
-// one and cause a newer redelivery to be wrongly skipped.
 func TestDescriptionGateRecordIsMonotonic(t *testing.T) {
 	const id = "0xcommunity"
 	hash := hashOf([]byte("x"))
@@ -130,8 +114,6 @@ func TestDescriptionGateRecordIsMonotonic(t *testing.T) {
 	require.True(t, g.shouldSkip(id, 4, hash, keysHeld), "older than recorded 20 skips")
 }
 
-// TestDescriptionGateForget verifies a single-community invalidation (community
-// delete) forces the next description to be fully reprocessed.
 func TestDescriptionGateForget(t *testing.T) {
 	const id = "0xcommunity"
 	hash := hashOf([]byte("x"))
@@ -144,9 +126,6 @@ func TestDescriptionGateForget(t *testing.T) {
 	require.False(t, g.shouldSkip(id, 10, hash, keysHeld), "after forget, identical redelivery reprocesses")
 }
 
-// TestDescriptionGateForgetAll verifies key-arrival invalidation lifts the gate for
-// every community so a byte-identical description can be reprocessed and decrypt
-// now-available private data.
 func TestDescriptionGateForgetAll(t *testing.T) {
 	hash := hashOf([]byte("x"))
 	g := newCommunityDescriptionGate()
