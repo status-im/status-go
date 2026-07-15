@@ -1855,10 +1855,11 @@ func (s *ManagerSuite) TestCommunityIDIsHydratedWhenMarshaling() {
 }
 
 // TestHandleCommunityDescriptionRedeliveryGate verifies the redelivery gate
-// (issue #21470-hf): a byte-identical redelivery of an already-processed
-// community description is short-circuited (nil response, no error), while newer
-// clocks are still processed, and new hash-ratchet key material lifts the gate so
-// the same description is reprocessed (it may then decrypt private data).
+// (issue #21470-hf). A byte-identical redelivery of an already-processed community
+// description must skip the expensive pipeline yet still SURFACE the already-known
+// community, so the store-node pager's description-seen latch (commit 6cd6ced1a)
+// trips exactly as it would for a fully-processed redelivery. Newer clocks are
+// still processed, and new hash-ratchet key material lifts the gate.
 func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	// s.manager is the control node that authors the community; m is a separate
 	// receiver (spectator) node that ingests the published description.
@@ -1879,6 +1880,7 @@ func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	// Plain community: no token ownership, so it is processed immediately (not queued).
 	s.Require().Equal(uint64(0), CommunityDescriptionTokenOwnerChainID(description))
 
+	gateKey := community.IDString()
 	buildPayload := func() []byte {
 		payload, err := community.MarshaledDescription()
 		s.Require().NoError(err)
@@ -1889,15 +1891,27 @@ func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 
 	payload := buildPayload()
 
+	// The gate starts empty: the first delivery must not be skipped.
+	s.Require().False(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(payload)))
+
 	// First delivery is fully processed and yields a response.
 	resp1, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp1)
 
-	// Byte-identical redelivery is short-circuited by the gate (nil response, no error).
+	// The gate now records this description, so a byte-identical redelivery is a skip.
+	s.Require().True(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(payload)))
+
+	// Byte-identical redelivery is short-circuited but STILL surfaces the community
+	// (non-nil, matching ID, empty changes) so downstream description-seen latches.
 	resp2, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, payload, nil)
 	s.Require().NoError(err)
-	s.Require().Nil(resp2)
+	s.Require().NotNil(resp2)
+	s.Require().NotNil(resp2.Community)
+	s.Require().Equal(community.IDString(), resp2.Community.IDString())
+	s.Require().NotNil(resp2.Changes)
+	s.Require().Empty(resp2.Changes.MembersAdded)
+	s.Require().Empty(resp2.Changes.ChatsAdded)
 
 	// A genuinely newer clock still gets processed.
 	community.config.CommunityDescription.Clock++
@@ -1905,18 +1919,16 @@ func (s *ManagerSuite) TestHandleCommunityDescriptionRedeliveryGate() {
 	resp3, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp3)
+	s.Require().True(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(newerPayload)))
 
-	// Its identical redelivery is skipped again.
-	resp4, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
-	s.Require().NoError(err)
-	s.Require().Nil(resp4)
-
-	// New hash-ratchet keys arriving must lift the gate so the same description is
-	// reprocessed (it may now decrypt previously-encrypted private data).
+	// New hash-ratchet keys arriving must lift the gate so the same description can
+	// be reprocessed (it may now decrypt previously-encrypted private data).
 	err = m.NewHashRatchetKeys([]*types.HashRatchetInfo{{GroupID: community.ID(), KeyID: []byte("key-id")}})
 	s.Require().NoError(err)
+	s.Require().False(m.descriptionGate.shouldSkip(gateKey, description.Clock, hashDescriptionPayload(newerPayload)),
+		"gate must be lifted after new keys arrive")
 
 	resp5, err := m.HandleCommunityDescriptionMessage(&signer.PublicKey, description, newerPayload, nil)
 	s.Require().NoError(err)
-	s.Require().NotNil(resp5, "gate must be lifted after new keys arrive")
+	s.Require().NotNil(resp5)
 }
