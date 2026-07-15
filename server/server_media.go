@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"net/url"
+	"os"
 	"strconv"
 
 	"go.uber.org/zap"
@@ -73,6 +75,43 @@ type MediaServer struct {
 	config *MediaServerConfig
 }
 
+const (
+	mediaServerHostEnvVar = "STATUS_GO_MEDIA_SERVER_HOST"
+	mediaServerPortEnvVar = "STATUS_GO_MEDIA_SERVER_PORT"
+)
+
+func applyMediaServerAddrEnv(config *MediaServerConfig) error {
+	envHost, hasHost := os.LookupEnv(mediaServerHostEnvVar)
+	hasHost = hasHost && envHost != ""
+	envPort, hasPort := os.LookupEnv(mediaServerPortEnvVar)
+	hasPort = hasPort && envPort != ""
+	if !hasHost && !hasPort {
+		return nil
+	}
+
+	host, port, err := net.SplitHostPort(config.address)
+	if err != nil {
+		return errorspkg.Wrap(err, "failed to parse media server address")
+	}
+
+	if hasHost {
+		if _, err := netip.ParseAddr(envHost); err != nil {
+			return fmt.Errorf("invalid %s %q: must be an IP address", mediaServerHostEnvVar, envHost)
+		}
+		host = envHost
+	}
+
+	if hasPort {
+		if p, err := strconv.ParseUint(envPort, 10, 16); err != nil || p == 0 {
+			return fmt.Errorf("invalid %s %q: must be an integer in range 1-65535", mediaServerPortEnvVar, envPort)
+		}
+		port = envPort
+	}
+
+	config.address = net.JoinHostPort(host, port)
+	return nil
+}
+
 func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
 	if disableTLS {
 		return nil, nil
@@ -103,6 +142,10 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 
 	for _, opt := range opts {
 		opt(s.config)
+	}
+
+	if err := applyMediaServerAddrEnv(s.config); err != nil {
+		return nil, err
 	}
 
 	addrPort, err := netip.ParseAddrPort(s.config.address)
