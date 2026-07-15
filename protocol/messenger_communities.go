@@ -1179,9 +1179,6 @@ func (m *Messenger) SpectateCommunity(communityID types3.HexBytes) (*MessengerRe
 
 	response.AddCommunity(community)
 
-	// sync community
-	m.asyncRequestAllHistoricMessages()
-
 	return response, nil
 }
 
