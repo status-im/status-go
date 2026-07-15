@@ -2089,9 +2089,23 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	gateKey := types3.HexBytes(id).String()
 	payloadHash := hashDescriptionPayload(payload)
 	if m.descriptionGate != nil && m.descriptionGate.shouldSkip(gateKey, description.Clock, payloadHash) {
-		m.logger.Debug("skipping redelivered community description",
-			zap.String("communityID", gateKey), zap.Uint64("clock", description.Clock))
-		return nil, nil
+		// Skip the expensive pipeline (preprocessDescription's decrypted-cache
+		// read+write and handleCommunityDescriptionMessageCommon's ~1.4MB re-save),
+		// but still SURFACE the already-known community with empty changes. The
+		// store-node pager latches "description seen" from the community appearing
+		// in the handled response and stops paging once it holds the newest
+		// description (issue #21470-hf, commit 6cd6ced1a); returning nil here would
+		// hide the redelivery from that latch and make the pager run to its page
+		// cap. Fail open: if the community is not readable, fall through to full
+		// processing rather than fabricate a skip.
+		m.communityLock.Lock(id)
+		community, err := m.GetByID(id)
+		m.communityLock.Unlock(id)
+		if err == nil && community != nil {
+			m.logger.Debug("surfacing redelivered community description without reprocessing",
+				zap.String("communityID", gateKey), zap.Uint64("clock", description.Clock))
+			return &CommunityResponse{Community: community, Changes: community.emptyCommunityChanges()}, nil
+		}
 	}
 
 	failedToDecrypt, processedDescription, err := m.preprocessDescription(id, description)
