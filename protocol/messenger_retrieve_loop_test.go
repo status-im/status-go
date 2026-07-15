@@ -5,11 +5,8 @@ import (
 	"time"
 )
 
-// TestNextFlushDeadline verifies the scheduling decision that bounds the
-// retrieve-loop debounce latency: normally the flush fires after a quiet
-// window (debounce) following the last match, but under a sustained match
-// flood the ceiling (maxLatency measured from the first unflushed match)
-// caps how long the flush can be delayed. See issue #21470.
+// The flush normally fires a quiet window after the last match; under a
+// sustained flood the max-latency ceiling caps how long it can be delayed.
 func TestNextFlushDeadline(t *testing.T) {
 	base := time.Unix(1000, 0)
 	debounce := time.Second

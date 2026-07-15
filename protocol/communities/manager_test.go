@@ -1306,12 +1306,8 @@ func (s *ManagerSuite) TestCommunityQueue() {
 	s.Require().Empty(communitiesToValidate)
 }
 
-// TestHighestQueuedValidationClock verifies the queue read the store-node pager
-// uses to decide it may stop paging (issue #21470-hf): once a community's
-// description is queued for owner validation, HighestQueuedValidationClock
-// reports the greatest queued clock so the pager can compare it against the
-// clock it already holds. With nothing queued (or for an unrelated community) it
-// reports 0, so the pager keeps paging as before.
+// HighestQueuedValidationClock must report the greatest queued clock for the
+// community, and 0 when nothing relevant is queued.
 func (s *ManagerSuite) TestHighestQueuedValidationClock() {
 	verifier := &testOwnerVerifier{}
 	m, _ := s.buildManagers(verifier)
@@ -1338,14 +1334,9 @@ func (s *ManagerSuite) TestHighestQueuedValidationClock() {
 	s.Require().Equal(uint64(0), clock, "unrelated community is unaffected")
 }
 
-// TestCommunityQueueRetriesTransportError verifies the core correctness fix
-// (issue #21470-hf): a transport-class failure of owner verification (RPC
-// timeout / dead proxy / rate limit) must NOT reject the community and must NOT
-// clear the queue — the description stays queued so verification is retried
-// out-of-band, and succeeds once the RPC recovers, publishing
-// TokenCommunityValidated. This decouples verification retries from store-node
-// paging: the pager stops once the description is queued, and recovery happens
-// here rather than by fetching more pages.
+// A transport-class failure of owner verification must not reject the
+// community or clear the queue — the description stays queued and verification
+// retries succeed once the RPC recovers.
 func (s *ManagerSuite) TestCommunityQueueRetriesTransportError() {
 	owner, err := crypto.GenerateKey()
 	s.Require().NoError(err)

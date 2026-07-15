@@ -6,11 +6,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestStoreNodeRequestPageCap verifies the per-request page ceiling that bounds
-// a runaway store-node history fetch (issue #21470-hf). The cap must only ever
-// turn a "fetch next page" decision into a stop; it must never force extra
-// paging, and it must be a no-op when the natural decision is already to stop
-// (e.g. StopWhenDataFound with the data found) or when the cap is disabled.
+// The cap must only ever turn a "fetch next page" decision into a stop — never
+// force extra paging, and be a no-op when the natural decision is already to
+// stop or the cap is disabled.
 func TestStoreNodeRequestPageCap(t *testing.T) {
 	const cap = 30
 
@@ -64,16 +62,9 @@ func TestStoreNodeRequestPageCap(t *testing.T) {
 	})
 }
 
-// TestCommunityStoreNodeRequestPageCap verifies that community fetches get a much
-// tighter page cap than contact fetches (issue #21470-hf). Store queries page
-// newest-first (go-waku history.go: PaginationForward unset = backward) and
-// community descriptions are republished periodically, so a live community's
-// description appears within the first few pages; with the description-seen gate
-// (6cd6ced1a) a hit stops the request anyway, so deep paging can only ever chew
-// empty/irrelevant history. The device evidence: dead curated ids each cost a
-// ~minutes-long 30-page run with fetchedEnvelopesCount=0 at cap-trip. Contact
-// fetches keep the generous 30-page cap; only the community construction site is
-// tightened, never the shared default.
+// Community fetches use their own page-cap knob, independent of contact
+// fetches (both currently 30). Only the community construction site reads the
+// community knob; the shared default is never rerouted through it.
 func TestCommunityStoreNodeRequestPageCap(t *testing.T) {
 	t.Run("community construction caps at 30 pages", func(t *testing.T) {
 		require.Equal(t, 30, maxCommunityStoreNodeRequestPageCount)
@@ -108,33 +99,18 @@ func TestCommunityStoreNodeRequestPageCap(t *testing.T) {
 	})
 }
 
-// TestShouldProcessStoreNodePage verifies the decision that skips the forced
-// per-page Messenger.ProcessAllMessages when the just-fetched page carried zero
-// envelopes (issue #21470-hf). That call exists solely to flush THIS request's
-// envelopes into the DB before the GetByID check; with zero envelopes there is
-// nothing of ours to flush, yet ProcessAllMessages still walks the messenger's
-// whole pending backlog. During the legitimate channel backfill that means
-// re-walking a fat queue on every empty page — up to the page cap, continuously,
-// for each dead curated id — the CPU/GC storm seen on device (GC 67%, service
-// 320-370%). Skipping the walk on empty pages removes that amplification; the DB
-// check still runs (a parallel channel-sync page may have delivered the
-// description).
+// The forced per-page ProcessAllMessages only exists to flush the request's
+// just-fetched envelopes before the GetByID check, so it must be skipped for
+// empty pages.
 func TestShouldProcessStoreNodePage(t *testing.T) {
 	require.False(t, shouldProcessStoreNodePage(0), "empty page has nothing of ours to flush")
 	require.True(t, shouldProcessStoreNodePage(1), "a page with envelopes must be processed")
 	require.True(t, shouldProcessStoreNodePage(50), "a full page must be processed")
 }
 
-// TestGateNextPageByValidationQueue verifies the decision that stops store-node
-// pagination for a community request once the community's description is already
-// in hand and only blocked on owner validation (issue #21470-hf). For a
-// token-owned community the store-node pager's natural stop condition is
-// "community persisted", but persistence is withheld until on-chain owner
-// verification succeeds. A transport failure during verification is
-// indistinguishable, to the pager, from "not fetched yet", so it wrongly fetches
-// another page — which cannot make a dead RPC succeed and only floods the
-// network. Once the description is queued for validation, more pages genuinely
-// cannot help: verification retries out-of-band on the owner-verification loop.
+// Pagination must stop once the community's description is already in hand and
+// only blocked on owner validation — more pages cannot make verification
+// succeed, and it retries out-of-band on the owner-verification loop.
 func TestGateNextPageByValidationQueue(t *testing.T) {
 	t.Run("community already in DB never stops for validation", func(t *testing.T) {
 		// The found path (clock check) owns this case; the validation gate must
@@ -162,17 +138,9 @@ func TestGateNextPageByValidationQueue(t *testing.T) {
 	})
 }
 
-// TestGateNextPageByDescriptionSeen verifies the decision that stops store-node
-// pagination for a community request once a description for the target community
-// has already been processed in this request (issue #21470-hf). Store-node
-// history is paged newest-first, so the first description encountered is the
-// newest available and every later page can only carry an older one. Continuing
-// to page therefore cannot yield a newer description; it only re-unmarshals and
-// re-preprocesses the (large) description on each page, driving a GC storm and
-// overheating the device. This is the remaining flood after the page cap and
-// validation-queue gates: the "community persisted but not newer" branch
-// (messenger_store_node_request_manager.go, community.Clock() <= minimumDataClock)
-// which today keeps paging to the cap and is re-issued perpetually.
+// Pagination must stop once a description for the target community has been
+// processed in this request: pages are newest-first, so later pages can only
+// carry older descriptions.
 func TestGateNextPageByDescriptionSeen(t *testing.T) {
 	t.Run("description not seen keeps the natural decision", func(t *testing.T) {
 		// No description for this community has been processed yet, so paging must
@@ -184,11 +152,8 @@ func TestGateNextPageByDescriptionSeen(t *testing.T) {
 	})
 
 	t.Run("description seen stops paging and reports the trip", func(t *testing.T) {
-		// The core #21470-hf bug: a spectated community is re-fetched,
-		// minimumDataClock == its clock, so every page hits the "not newer" branch
-		// and would keep paging. Once the description was processed this request,
-		// older pages cannot beat it, so we stop and report the trip so the caller
-		// can log it distinctly.
+		// Re-fetch of a spectated community: every page hits the "not newer"
+		// branch and would keep paging to the cap without this gate.
 		cfg := StoreNodeRequestConfig{StopWhenDataFound: true}
 		fetch, tripped := cfg.gateNextPageByDescriptionSeen(true, true)
 		require.False(t, fetch)

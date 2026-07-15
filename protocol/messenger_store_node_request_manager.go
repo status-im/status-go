@@ -271,11 +271,9 @@ type storeNodeRequest struct {
 	minimumDataClock uint64
 	config           StoreNodeRequestConfig
 
-	// descriptionSeen latches true once a description for the requested community
-	// has been processed in this request. Store-node history is paged
-	// newest-first, so any later page can only carry an older description; once
-	// this is set, further paging cannot yield a newer one and is stopped by
-	// gateNextPageByDescriptionSeen (issue #21470-hf).
+	// descriptionSeen latches true once a description for the requested
+	// community has been processed in this request; pages are newest-first, so
+	// later pages can only carry older descriptions.
 	descriptionSeen bool
 
 	// request corresponding metadata to be used in finalize
@@ -337,16 +335,10 @@ func (r *storeNodeRequest) finalize() {
 	}
 }
 
-// shouldFetchNextPage decides whether the store-node pager should request
-// another page. It wraps the natural per-page decision with a hard page ceiling
-// (issue #21470-hf): once a request has processed config.MaxPageCount pages
-// without resolving, pagination is stopped even if the natural decision would
-// keep going. This bounds requests that can never terminate (e.g. a token-owned
-// community stuck in owner validation) so they don't drain the full store-node
-// window and overheat the device. Requests that resolve before the cap are
-// completely unaffected. On a cap-forced stop we return false, which drives the
-// request through the same finalize() path as an ordinary "not found" result,
-// so the UI's loading state clears normally.
+// shouldFetchNextPage wraps the natural per-page decision with the
+// description-seen and page-cap gates. A gate-forced stop returns false, which
+// drives the request through the same finalize() path as an ordinary "not
+// found" result, so the UI's loading state clears normally.
 func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
 	fetchNext, pageSize := r.shouldFetchNextPageUncapped(envelopesCount)
 
@@ -378,18 +370,11 @@ func (r *storeNodeRequest) shouldFetchNextPageUncapped(envelopesCount int) (bool
 	r.result.stats.FetchedEnvelopesCount += envelopesCount
 	r.result.stats.FetchedPagesCount++
 
-	// Force all received envelopes to be processed. We keep the resulting
-	// response so a community request can tell whether this page actually
-	// carried a description for the target community (issue #21470-hf).
-	//
-	// Skip the walk entirely for an empty page: ProcessAllMessages traverses the
-	// messenger's whole pending backlog, but its only job here is to flush THIS
-	// page's envelopes into the DB before the GetByID check. With zero envelopes
-	// there is nothing of ours to flush, and during a channel backfill re-walking
-	// that fat queue on every empty page — to the cap, per dead id — is the CPU/GC
-	// storm behind the device overheat (issue #21470-hf). The DB check below still
-	// runs, so a description delivered by a parallel channel-sync page is not
-	// missed; only the redundant processing is dropped.
+	// Flush this page's envelopes into the DB before the GetByID check, keeping
+	// the response so a community request can tell whether this page carried a
+	// description for the target community. Skipped for empty pages —
+	// ProcessAllMessages traverses the messenger's whole pending backlog and an
+	// empty page has nothing to flush; the DB check below still runs.
 	var response *MessengerResponse
 	if shouldProcessStoreNodePage(envelopesCount) {
 		response = r.manager.messenger.ProcessAllMessages()
