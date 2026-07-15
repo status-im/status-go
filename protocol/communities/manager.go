@@ -1535,6 +1535,8 @@ func (m *Manager) DeleteCommunity(id types3.HexBytes) error {
 	if m.descriptionGate != nil {
 		m.descriptionGate.forget(id.String())
 	}
+	// Drop the cached community so a redelivery skip can never surface a deleted one.
+	m.cache.Delete(id.String())
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
@@ -2099,7 +2101,14 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	// cleared when keys arrive or a community is deleted (see communityDescriptionGate).
 	gateKey := types3.HexBytes(id).String()
 	payloadHash := hashDescriptionPayload(payload)
-	if m.descriptionGate != nil && m.descriptionGate.shouldSkip(gateKey, description.Clock, payloadHash) {
+	// holdsKeys drives the equal-clock gate rule: a keyless spectator skips ALL
+	// equal-clock republishes (status-go re-encrypts each version ~40 times, useless
+	// to a keyless node), while a keys-held community keeps the byte-identical-only
+	// rule so key rotation still reprocesses. communityHoldsAnyDecryptionKey is
+	// cached and fails open (reports true) on any lookup error, so an entitlement
+	// error degrades safely to the keys-held rule (#21470-hf).
+	holdsKeys := m.communityHoldsAnyDecryptionKey(id, description.Chats)
+	if m.descriptionGate != nil && m.descriptionGate.shouldSkip(gateKey, description.Clock, payloadHash, holdsKeys) {
 		// Skip the expensive pipeline (preprocessDescription's decrypted-cache
 		// read+write and handleCommunityDescriptionMessageCommon's ~1.4MB re-save),
 		// but still SURFACE the already-known community with empty changes. The
@@ -2109,10 +2118,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		// hide the redelivery from that latch and make the pager run to its page
 		// cap. Fail open: if the community is not readable, fall through to full
 		// processing rather than fabricate a skip.
-		m.communityLock.Lock(id)
-		community, err := m.GetByID(id)
-		m.communityLock.Unlock(id)
-		if err == nil && community != nil {
+		if community := m.cachedCommunityForRedelivery(id); community != nil {
 			m.logger.Debug("surfacing redelivered community description without reprocessing",
 				zap.String("communityID", gateKey), zap.Uint64("clock", description.Clock))
 			return &CommunityResponse{Community: community, Changes: community.emptyCommunityChanges()}, nil
@@ -2212,8 +2218,44 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	if m.descriptionGate != nil {
 		m.descriptionGate.recordProcessed(gateKey, processedDescription.Clock, payloadHash)
 	}
+	// Warm the redelivery cache with the freshly-processed community so the next
+	// gated redelivery is served without a ~1.4MB GetByID. handleCommunityDescription-
+	// MessageCommon already deleted the stale entry via SaveCommunity, so this sets the
+	// current one (#21470-hf).
+	m.cache.Set(gateKey, ReadonlyCommunity(community), ttlcache.DefaultTTL)
 	r.FailedToDecrypt = failedToDecrypt
 	return r, nil
+}
+
+// cachedCommunityForRedelivery returns the community for a gated (skipped) description
+// redelivery. It serves the shared readonly community cache first — the whole point of
+// the gate is to avoid the ~1.4MB GetByID (SQLite read + proto.Unmarshal) that each
+// skip would otherwise pay — and falls back to a single GetByID on a cache miss,
+// populating the cache so subsequent skips are free. Returns nil (caller falls through
+// to full processing) if the community cannot be read.
+//
+// The cache is coherent for this use: every persisted community mutation funnels
+// through Manager.SaveCommunity, which deletes the entry, so a hit can never be staler
+// than the last persisted description. The skip path only needs the community to
+// (a) trip the store-node description-seen latch, which keys off the community ID alone
+// (communityDescriptionSeen), and (b) be surfaced with empty changes. The store-node
+// pager's minimumDataClock comparison reads the PERSISTED clock via its own GetByID,
+// never this cached copy, so a slightly-stale clock here cannot change pager behaviour.
+func (m *Manager) cachedCommunityForRedelivery(id types3.HexBytes) *Community {
+	idString := id.String()
+	if item := m.cache.Get(idString); item != nil {
+		if community, ok := item.Value().(*Community); ok {
+			return community
+		}
+	}
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+	community, err := m.GetByID(id)
+	if err != nil || community == nil {
+		return nil
+	}
+	m.cache.Set(idString, ReadonlyCommunity(community), ttlcache.DefaultTTL)
+	return community
 }
 
 func (m *Manager) NewHashRatchetKeys(keys []*types.HashRatchetInfo) error {
@@ -2229,6 +2271,14 @@ func (m *Manager) NewHashRatchetKeys(keys []*types.HashRatchetInfo) error {
 	// must be reprocessed rather than skipped as a redelivery (#21470-hf).
 	if m.descriptionGate != nil && len(keys) > 0 {
 		m.descriptionGate.forgetAll()
+	}
+	// Drop cached communities too: a community processed while keyless was cached
+	// without its decrypted private data, so the cached copy must not be reused once
+	// keys arrive. Keys may be channel-scoped and cannot be mapped back to a single
+	// community cheaply, so clear all — the same reason descriptionGate.forgetAll does
+	// (#21470-hf). Cleared entries simply re-read from the DB on next access.
+	if len(keys) > 0 {
+		m.cache.DeleteAll()
 	}
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
