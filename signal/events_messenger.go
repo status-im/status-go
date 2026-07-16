@@ -18,7 +18,7 @@ const (
 	EventCuratedCommunitiesRefreshStarted = "curated.communities.refresh.started"
 
 	// EventCuratedCommunityResolved triggered per curated community once its description resolution completes
-	EventCuratedCommunityResolved = "curated.communities.refresh.communityResolved"
+	EventCuratedCommunityResolved = "curated.communities.refresh.resolved"
 
 	// EventCuratedCommunitiesRefreshFinished triggered when a curated communities refresh ends
 	EventCuratedCommunitiesRefreshFinished = "curated.communities.refresh.finished"
@@ -64,7 +64,7 @@ func SendStatusUpdatesTimedOut(statusUpdates interface{}) {
 
 // CuratedCommunityResolvedSignal reports a curated community whose description resolution finished
 type CuratedCommunityResolvedSignal struct {
-	CommunityID string `json:"communityId"`
+	CommunityID string `json:"communityID"`
 	Stored      bool   `json:"stored"`
 }
 

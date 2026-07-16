@@ -150,7 +150,9 @@ func (m *Messenger) refreshCuratedCommunities(directory func() (*communities.Cur
 		defer m.shutdownWaitGroup.Done()
 		defer m.curatedCommunitiesRefresh.end()
 
-		m.config.messengerSignalsHandler.CuratedCommunitiesRefreshStarted()
+		if h := m.config.messengerSignalsHandler; h != nil {
+			h.CuratedCommunitiesRefreshStarted()
+		}
 
 		var resolved, unresolved int
 		curatedCommunities, err := directory()
@@ -163,7 +165,14 @@ func (m *Messenger) refreshCuratedCommunities(directory func() (*communities.Cur
 			resolved, unresolved = m.resolveCuratedCommunities(ctx, curatedCommunities.ContractCommunities, resolve)
 		}
 
-		m.config.messengerSignalsHandler.CuratedCommunitiesRefreshFinished(resolved, unresolved, ctx.Err() != nil)
+		// Clear the single-flight state before emitting finished so a refresh
+		// triggered right after is not dropped. Capture the cancelled flag first,
+		// because end() cancels ctx.
+		cancelled := ctx.Err() != nil
+		m.curatedCommunitiesRefresh.end()
+		if h := m.config.messengerSignalsHandler; h != nil {
+			h.CuratedCommunitiesRefreshFinished(resolved, unresolved, cancelled)
+		}
 	}()
 
 	return nil
@@ -193,7 +202,9 @@ func (m *Messenger) resolveCuratedCommunities(ctx context.Context, communityIDs 
 			defer func() { <-sem }()
 
 			stored := resolve(ctx, communityID)
-			m.config.messengerSignalsHandler.CuratedCommunityResolved(communityID, stored)
+			if h := m.config.messengerSignalsHandler; h != nil {
+				h.CuratedCommunityResolved(communityID, stored)
+			}
 
 			mu.Lock()
 			if stored {

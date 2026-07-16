@@ -240,9 +240,9 @@ func (api *PublicAPI) CommunityTags(parent context.Context) map[string]string {
 	return requests.AvailableTagsEmojis()
 }
 
-// CuratedCommunities returns the list of curated communities stored in the smart contract. If a community is
-// already known by the node, its description will be returned and and will asynchronously retrieve the
-// description for the communities it does not know
+// CuratedCommunities returns the curated communities from the smart contract together with any description
+// already stored locally. It is a pure read and never queries store nodes; use RefreshCuratedCommunities to
+// resolve descriptions the node does not have.
 func (api *PublicAPI) CuratedCommunities(parent context.Context) (*communities.KnownCommunitiesResponse, error) {
 	return api.service.messenger.CuratedCommunities()
 }
