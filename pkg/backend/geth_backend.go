@@ -127,8 +127,9 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 	if gocommon.IsMobilePlatform() {
 		// A limit below the working set (~350-620MB while syncing a large
 		// community) forces the GC into permanent maximum-aggression mode;
-		// 1GB keeps an OOM guard above it without starving the GC.
-		debug.SetMemoryLimit(1024 * 1024 * 1024) // 1GB
+		// 500MB keeps an OOM guard while leaving the GC headroom for the
+		// common case.
+		debug.SetMemoryLimit(500 * 1024 * 1024) // 500MB
 	}
 
 	return backend
