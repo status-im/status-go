@@ -247,6 +247,18 @@ func (api *PublicAPI) CuratedCommunities(parent context.Context) (*communities.K
 	return api.service.messenger.CuratedCommunities()
 }
 
+// RefreshCuratedCommunities resolves the curated directory entries against store
+// nodes. Progress is reported via curated communities signals.
+func (api *PublicAPI) RefreshCuratedCommunities(parent context.Context) error {
+	return api.service.messenger.RefreshCuratedCommunities()
+}
+
+// StopCuratedCommunitiesRefresh cancels an in-flight curated communities refresh.
+func (api *PublicAPI) StopCuratedCommunitiesRefresh(parent context.Context) error {
+	api.service.messenger.StopCuratedCommunitiesRefresh()
+	return nil
+}
+
 // SpectateCommunity spectates community with the given ID
 // Meaning user is only a spectator, not a member
 func (api *PublicAPI) SpectateCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {

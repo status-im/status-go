@@ -3,8 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
-	"reflect"
-	"time"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -15,85 +14,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/services/wallet/common"
 )
-
-const (
-	curatedCommunitiesUpdateInterval = time.Hour
-	communitiesUpdateFailureInterval = time.Minute
-)
-
-// Regularly gets list of curated communities and signals them to client
-func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
-	logger := m.logger.Named("curatedCommunitiesUpdateLoop")
-
-	if m.contractMaker == nil {
-		logger.Warn("not starting curated communities loop: contract maker not initialized")
-		return
-	}
-
-	go func() {
-		defer gocommon.LogOnPanic()
-		// Initialize interval to 0 for immediate execution
-		var interval time.Duration = 0
-
-		cache, err := m.communitiesManager.GetCuratedCommunities()
-		if err != nil {
-			logger.Error("failed to start curated communities loop", zap.Error(err))
-			return
-		}
-
-		for {
-			select {
-			case <-time.After(interval):
-				if m.shouldPauseCuratedCommunitiesUpdateLoop() {
-					interval = curatedCommunitiesUpdateInterval
-					continue
-				}
-				// Immediate execution on first run, then set to regular interval
-				interval = curatedCommunitiesUpdateInterval
-
-				logger.Debug("updating curated communities")
-				curatedCommunities, err := m.getCuratedCommunitiesFromContract()
-				if err != nil {
-					interval = communitiesUpdateFailureInterval
-					logger.Error("failed to get curated communities from contract", zap.Error(err))
-					continue
-				}
-
-				if reflect.DeepEqual(cache.ContractCommunities, curatedCommunities.ContractCommunities) &&
-					reflect.DeepEqual(cache.ContractFeaturedCommunities, curatedCommunities.ContractFeaturedCommunities) {
-					// nothing changed
-					continue
-				}
-
-				err = m.communitiesManager.SetCuratedCommunities(curatedCommunities)
-				if err == nil {
-					cache = curatedCommunities
-				} else {
-					logger.Error("failed to save curated communities", zap.Error(err))
-				}
-
-				response, err := m.fetchCuratedCommunities(curatedCommunities)
-				if err != nil {
-					interval = communitiesUpdateFailureInterval
-					logger.Error("failed to fetch curated communities", zap.Error(err))
-					continue
-				}
-
-				m.config.messengerSignalsHandler.SendCuratedCommunitiesUpdate(response)
-
-			case <-m.quit:
-				return
-			}
-		}
-	}()
-}
-
-func (m *Messenger) shouldPauseCuratedCommunitiesUpdateLoop() bool {
-	// TODO when we implement back the setting for the user to select if they want to
-	// fetch on expensive networks, use canSyncWithStoreNodes()
-	// https://github.com/status-im/status-app/issues/18388
-	return m.isPaused() || m.getConnectionState().IsExpensive()
-}
 
 func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCommunities, error) {
 	if m.contractMaker == nil {
@@ -141,38 +61,172 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 	}, nil
 }
 
-func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.CuratedCommunities) (*communities.KnownCommunitiesResponse, error) {
+// CuratedCommunities returns the curated directory ids together with any
+// description already stored locally. It is a pure read: it never queries store
+// nodes. Use RefreshCuratedCommunities to resolve missing descriptions.
+func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
+	curatedCommunities, err := m.communitiesManager.GetCuratedCommunities()
+	if err != nil {
+		return nil, err
+	}
+
 	response, err := m.communitiesManager.GetStoredDescriptionForCommunities(curatedCommunities.ContractCommunities)
 	if err != nil {
 		return nil, err
 	}
 	response.ContractFeaturedCommunities = curatedCommunities.ContractFeaturedCommunities
 
-	m.shutdownWaitGroup.Add(1)
-
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer m.shutdownWaitGroup.Done()
-		m.logger.Debug("fetching unknown curated communities")
-
-		for _, communityID := range response.UnknownCommunities {
-			_, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityID, nil)
-			if err != nil {
-				m.logger.Error("failed to fetch curated community",
-					zap.String("communityID", communityID),
-					zap.Error(err),
-				)
-			}
-		}
-	}()
-
 	return response, nil
 }
 
-func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
-	curatedCommunities, err := m.communitiesManager.GetCuratedCommunities()
-	if err != nil {
-		return nil, err
+// curatedCommunityResolver resolves a single curated directory entry against
+// store nodes and reports whether a description is now stored locally.
+type curatedCommunityResolver func(ctx context.Context, communityID string) bool
+
+// curatedCommunitiesRefresh tracks the single in-flight curated refresh so a
+// second refresh joins the running one instead of starting a new walk.
+type curatedCommunitiesRefresh struct {
+	mu      sync.Mutex
+	running bool
+	cancel  context.CancelFunc
+}
+
+// begin starts a new refresh derived from parent, unless one is already running.
+func (r *curatedCommunitiesRefresh) begin(parent context.Context) (context.Context, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.running {
+		return nil, false
 	}
-	return m.fetchCuratedCommunities(curatedCommunities)
+
+	ctx, cancel := context.WithCancel(parent)
+	r.running = true
+	r.cancel = cancel
+	return ctx, true
+}
+
+func (r *curatedCommunitiesRefresh) end() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.cancel != nil {
+		r.cancel()
+		r.cancel = nil
+	}
+	r.running = false
+}
+
+func (r *curatedCommunitiesRefresh) stop() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.cancel != nil {
+		r.cancel()
+	}
+}
+
+// RefreshCuratedCommunities reads the curated directory and resolves every entry
+// (known and unknown) against store nodes. Progress is reported via signals. A
+// refresh started while one is already running joins the in-progress run.
+func (m *Messenger) RefreshCuratedCommunities() error {
+	return m.refreshCuratedCommunities(m.getCuratedCommunitiesFromContract, m.fetchAndStoreCuratedCommunity)
+}
+
+// StopCuratedCommunitiesRefresh cancels the in-flight refresh, if any.
+func (m *Messenger) StopCuratedCommunitiesRefresh() {
+	m.curatedCommunitiesRefresh.stop()
+}
+
+func (m *Messenger) refreshCuratedCommunities(directory func() (*communities.CuratedCommunities, error), resolve curatedCommunityResolver) error {
+	ctx, started := m.curatedCommunitiesRefresh.begin(m.ctx)
+	if !started {
+		return nil
+	}
+
+	m.shutdownWaitGroup.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
+		defer m.curatedCommunitiesRefresh.end()
+
+		m.config.messengerSignalsHandler.CuratedCommunitiesRefreshStarted()
+
+		var resolved, unresolved int
+		curatedCommunities, err := directory()
+		if err != nil {
+			m.logger.Error("failed to read curated communities directory", zap.Error(err))
+		} else {
+			if err := m.communitiesManager.SetCuratedCommunities(curatedCommunities); err != nil {
+				m.logger.Error("failed to store curated communities", zap.Error(err))
+			}
+			resolved, unresolved = m.resolveCuratedCommunities(ctx, curatedCommunities.ContractCommunities, resolve)
+		}
+
+		m.config.messengerSignalsHandler.CuratedCommunitiesRefreshFinished(resolved, unresolved, ctx.Err() != nil)
+	}()
+
+	return nil
+}
+
+func (m *Messenger) resolveCuratedCommunities(ctx context.Context, communityIDs []string, resolve curatedCommunityResolver) (resolved, unresolved int) {
+	const maxConcurrentResolves = 3
+
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+	sem := make(chan struct{}, maxConcurrentResolves)
+
+	for _, communityID := range communityIDs {
+		select {
+		case <-ctx.Done():
+			wg.Wait()
+			return resolved, unresolved
+		case sem <- struct{}{}:
+		}
+
+		wg.Add(1)
+		go func(communityID string) {
+			defer gocommon.LogOnPanic()
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			stored := resolve(ctx, communityID)
+			m.config.messengerSignalsHandler.CuratedCommunityResolved(communityID, stored)
+
+			mu.Lock()
+			if stored {
+				resolved++
+			} else {
+				unresolved++
+			}
+			mu.Unlock()
+		}(communityID)
+	}
+
+	wg.Wait()
+	return resolved, unresolved
+}
+
+// fetchAndStoreCuratedCommunity resolves a single curated entry through the
+// bounded store node request manager and reports whether a description is now
+// stored locally.
+func (m *Messenger) fetchAndStoreCuratedCommunity(ctx context.Context, communityID string) bool {
+	_, _, err := m.storeNodeRequestsManager.FetchCommunity(ctx, communityID, nil)
+	if err != nil {
+		m.logger.Error("failed to resolve curated community",
+			zap.String("communityID", communityID),
+			zap.Error(err))
+	}
+
+	response, err := m.communitiesManager.GetStoredDescriptionForCommunities([]string{communityID})
+	if err != nil {
+		m.logger.Error("failed to check stored curated community description",
+			zap.String("communityID", communityID),
+			zap.Error(err))
+		return false
+	}
+
+	return len(response.Descriptions) > 0
 }

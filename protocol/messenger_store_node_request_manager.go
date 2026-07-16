@@ -74,7 +74,7 @@ func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 // Automatically waits for an available store node.
 // When a `nil` community and `nil` error is returned, that means the community wasn't found at the store node.
 func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityID string, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
-	cfg := buildStoreNodeRequestConfig(opts)
+	cfg := buildStoreNodeRequestConfig(storeNodeCommunityRequest, opts)
 
 	m.logger.Info("requesting community from store node",
 		zap.String("community", communityID),
@@ -110,7 +110,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 // If a `nil` contact and a `nil` error are returned, it means that the contact wasn't found at the store node.
 func (m *StoreNodeRequestManager) FetchContact(ctx context.Context, contactID string, opts []StoreNodeRequestOption) (*contacts.Contact, StoreNodeRequestStats, error) {
 
-	cfg := buildStoreNodeRequestConfig(opts)
+	cfg := buildStoreNodeRequestConfig(storeNodeContactRequest, opts)
 
 	m.logger.Info("requesting contact from store node",
 		zap.Any("contactID", contactID),
@@ -286,8 +286,9 @@ type storeNodeRequest struct {
 // If data wasn't found in store node, then a data will be set to `nil`.
 // stats will contain information about the performed request that might be useful for testing.
 type storeNodeRequestResult struct {
-	err   error
-	stats StoreNodeRequestStats
+	err     error
+	stats   StoreNodeRequestStats
+	outcome storeNodeRequestOutcome
 	// One of data fields (community or contact) will be present depending on request type
 	community *communities.Community
 	contact   *contacts.Contact
@@ -337,6 +338,9 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 	r.result.stats.FetchedEnvelopesCount += envelopesCount
 	r.result.stats.FetchedPagesCount++
 
+	// Store queries are newest-first; MaxPages bounds the drain.
+	capReached := r.config.MaxPages > 0 && uint64(r.result.stats.FetchedPagesCount) >= r.config.MaxPages
+
 	// Force all received envelopes to be processed
 	r.manager.messenger.ProcessAllMessages()
 
@@ -384,7 +388,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 		if community == nil {
 			// community not found in the database, request next page
 			logger.Debug("community still not fetched")
-			return true, r.config.FurtherPageSize
+			return !capReached, r.config.FurtherPageSize
 		}
 
 		// We check here if the community was fetched actually fetched and updated, because it
@@ -398,13 +402,15 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 				zap.Any("existingClock", community.Clock()),
 				zap.Any("minimumDataClock", r.minimumDataClock),
 			)
-			return true, r.config.FurtherPageSize
+			r.result.outcome = storeNodeRequestAlreadyUpToDate
+			return !capReached, r.config.FurtherPageSize
 		}
 
 		logger.Debug("community found",
 			zap.String("displayName", community.Name()))
 
 		r.result.community = community
+		r.result.outcome = storeNodeRequestResolved
 
 	case storeNodeContactRequest:
 		contact := r.manager.messenger.GetContactByID(r.requestID.DataID)
@@ -412,16 +418,17 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 		if contact == nil {
 			// contact not found in the database, request next page
 			logger.Debug("contact still not fetched")
-			return true, r.config.FurtherPageSize
+			return !capReached, r.config.FurtherPageSize
 		}
 
 		logger.Debug("contact found",
 			zap.String("displayName", contact.DisplayName))
 
 		r.result.contact = contact
+		r.result.outcome = storeNodeRequestResolved
 	}
 
-	return !r.config.StopWhenDataFound, r.config.FurtherPageSize
+	return !r.config.StopWhenDataFound && !capReached, r.config.FurtherPageSize
 }
 
 func (r *storeNodeRequest) routine() {
@@ -463,7 +470,7 @@ func (r *storeNodeRequest) routine() {
 	}
 
 	// Start store node request
-	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
+	from, to := r.manager.messenger.calculateMailserverTimeBounds(r.config.FetchWindow)
 
 	storeNode := r.manager.messenger.messaging.GetActiveStorenode()
 	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {

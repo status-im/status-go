@@ -56,7 +56,9 @@ type MessengerSignalsHandler interface {
 	DiscordChannelImportCancelled(channelID string)
 	SendBackedUpProfile(response *backupsync.BackedUpDataResponse)
 	SendBackedUpSettings(response *backupsync.BackedUpDataResponse)
-	SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse)
+	CuratedCommunitiesRefreshStarted()
+	CuratedCommunityResolved(communityID string, stored bool)
+	CuratedCommunitiesRefreshFinished(resolved, unresolved int, cancelled bool)
 }
 
 type config struct {
@@ -118,7 +120,6 @@ func messengerDefaultConfig() config {
 	}
 
 	c.codeControlFlags.AutoRequestHistoricMessages = true
-	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
 
 	c.tracer = trace.NewNoopTracer()
 

@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	initialStoreNodeRequestPageSize = 4
 	defaultStoreNodeRequestPageSize = 50
 
 	// tolerance is how many seconds of potentially out-of-order messages we want to fetch
@@ -475,10 +474,6 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 		contentTopicsPerPubsubTopic[filter.PubsubTopic()] = contentTopics
 	}
 
-	communityDescriptionChatIDs, err := m.communityDescriptionChatIDs()
-	if err != nil {
-		return nil, err
-	}
 	var communityDescriptionFilters []*types2.ChatFilter
 
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
@@ -501,7 +496,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters types2.ChatF
 			// topic over the whole sync window downloads gigabytes of stale
 			// duplicates. Skip it here and fetch only the newest description
 			// (single page, newest-first) below. See status-im/status-app#21498.
-			if _, isCommunityDescription := communityDescriptionChatIDs[chatID]; isCommunityDescription {
+			if isCommunityDescriptionChatID(chatID) {
 				communityDescriptionFilters = append(communityDescriptionFilters, filter)
 				continue
 			}
@@ -641,21 +636,30 @@ func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters types2.ChatFilte
 	return m.syncFiltersFrom(peerInfo, filters, 0)
 }
 
-// communityDescriptionChatIDs returns the set of chat IDs that correspond to
-// the community description content topics of joined and spectated communities.
-// These topics carry the full community description, which is republished many
-// times per day. They are fetched with a dedicated StopWhenDataFound request
-// instead of being swept over the whole historic sync window.
-func (m *Messenger) communityDescriptionChatIDs() (map[string]struct{}, error) {
-	communities, err := m.communitiesManager.JoinedOrSpectated()
-	if err != nil {
-		return nil, err
+// isCommunityDescriptionChatID reports whether chatID is a community description
+// content topic. Such a topic's chatID is a community ID: the hex encoding of a
+// compressed secp256k1 public key ("0x02"/"0x03" prefix + 64 lowercase hex
+// chars). This shape is unique to community descriptions in the filter set:
+// community channel topics carry a suffix (e.g. "-memberUpdate"), contact-code
+// topics derive from uncompressed ("0x04") keys with a suffix, and 1-1/personal
+// chat IDs are uncompressed keys or named strings. Matching by shape rather than
+// by membership also excludes description topics of communities that are neither
+// joined nor spectated (e.g. temporary filters installed while resolving a
+// community), which would otherwise be swept over the whole historic window.
+func isCommunityDescriptionChatID(chatID string) bool {
+	const compressedKeyHexLen = len("0x") + 33*2 // "0x" + 33-byte compressed key
+	if len(chatID) != compressedKeyHexLen {
+		return false
 	}
-	chatIDs := make(map[string]struct{}, len(communities))
-	for _, community := range communities {
-		chatIDs[community.IDString()] = struct{}{}
+	if chatID[:4] != "0x02" && chatID[:4] != "0x03" {
+		return false
 	}
-	return chatIDs, nil
+	for _, c := range chatID[4:] {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 // fetchLatestCommunityDescriptions fetches only the most recent description for

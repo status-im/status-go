@@ -165,6 +165,14 @@ func (m *MessengerSignalsHandler) SendBackedUpSettings(response *backupsync.Back
 	signal.SendBackedUpSettings(response)
 }
 
-func (m *MessengerSignalsHandler) SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse) {
-	signal.SendCuratedCommunitiesUpdate(response)
+func (m *MessengerSignalsHandler) CuratedCommunitiesRefreshStarted() {
+	signal.SendCuratedCommunitiesRefreshStarted()
+}
+
+func (m *MessengerSignalsHandler) CuratedCommunityResolved(communityID string, stored bool) {
+	signal.SendCuratedCommunityResolved(communityID, stored)
+}
+
+func (m *MessengerSignalsHandler) CuratedCommunitiesRefreshFinished(resolved, unresolved int, cancelled bool) {
+	signal.SendCuratedCommunitiesRefreshFinished(resolved, unresolved, cancelled)
 }

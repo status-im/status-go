@@ -14,8 +14,14 @@ const (
 	// EventStatusUpdatesTimedOut Event Automatic Status Updates Timed out
 	EventStatusUpdatesTimedOut = "status.updates.timedout"
 
-	// EventCuratedCommunitiesUpdate triggered when it is time to refresh the list of curated communities
-	EventCuratedCommunitiesUpdate = "curated.communities.update"
+	// EventCuratedCommunitiesRefreshStarted triggered when a curated communities refresh begins
+	EventCuratedCommunitiesRefreshStarted = "curated.communities.refresh.started"
+
+	// EventCuratedCommunityResolved triggered per curated community once its description resolution completes
+	EventCuratedCommunityResolved = "curated.communities.refresh.communityResolved"
+
+	// EventCuratedCommunitiesRefreshFinished triggered when a curated communities refresh ends
+	EventCuratedCommunitiesRefreshFinished = "curated.communities.refresh.finished"
 )
 
 // MessageDeliveredSignal specifies chat and message that was delivered
@@ -56,6 +62,31 @@ func SendStatusUpdatesTimedOut(statusUpdates interface{}) {
 	send(EventStatusUpdatesTimedOut, statusUpdates)
 }
 
-func SendCuratedCommunitiesUpdate(curatedCommunitiesUpdate interface{}) {
-	send(EventCuratedCommunitiesUpdate, curatedCommunitiesUpdate)
+// CuratedCommunityResolvedSignal reports a curated community whose description resolution finished
+type CuratedCommunityResolvedSignal struct {
+	CommunityID string `json:"communityId"`
+	Stored      bool   `json:"stored"`
+}
+
+// CuratedCommunitiesRefreshFinishedSignal reports the outcome counts of a curated communities refresh
+type CuratedCommunitiesRefreshFinishedSignal struct {
+	Resolved   int  `json:"resolved"`
+	Unresolved int  `json:"unresolved"`
+	Cancelled  bool `json:"cancelled"`
+}
+
+func SendCuratedCommunitiesRefreshStarted() {
+	send(EventCuratedCommunitiesRefreshStarted, nil)
+}
+
+func SendCuratedCommunityResolved(communityID string, stored bool) {
+	send(EventCuratedCommunityResolved, CuratedCommunityResolvedSignal{CommunityID: communityID, Stored: stored})
+}
+
+func SendCuratedCommunitiesRefreshFinished(resolved, unresolved int, cancelled bool) {
+	send(EventCuratedCommunitiesRefreshFinished, CuratedCommunitiesRefreshFinishedSignal{
+		Resolved:   resolved,
+		Unresolved: unresolved,
+		Cancelled:  cancelled,
+	})
 }

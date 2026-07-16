@@ -188,7 +188,6 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 		WithMultiAccounts(madb),
 		WithAccount(multiAcc),
 		WithDatasync(),
-		WithCuratedCommunitiesUpdateLoop(false),
 		WithStubOnlineChecker(),
 		WithENSVerifier(ensVerifier),
 		WithMessageSigner(NewSignerStub()),
