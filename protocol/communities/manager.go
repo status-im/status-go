@@ -419,6 +419,7 @@ func (m *Manager) SetMediaServerProperties() {
 type Subscription struct {
 	archivetypes.HistoryArchiveSignals
 	Community                            *Community
+	CommunityTokensMetadataLoaded        *Community
 	CommunityEventsMessage               *CommunityEventsMessage
 	AcceptedRequestsToJoin               []types3.HexBytes
 	RejectedRequestsToJoin               []types3.HexBytes
@@ -4512,7 +4513,7 @@ func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
 		default:
 		}
 
-		m.publish(&Subscription{Community: community})
+		m.publish(&Subscription{CommunityTokensMetadataLoaded: community})
 	}()
 }
 
