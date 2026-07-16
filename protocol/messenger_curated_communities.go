@@ -91,10 +91,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 }
 
 func (m *Messenger) shouldPauseCuratedCommunitiesUpdateLoop() bool {
-	// TODO when we implement back the setting for the user to select if they want to
-	// fetch on expensive networks, use canSyncWithStoreNodes()
-	// https://github.com/status-im/status-app/issues/18388
-	return m.isPaused() || m.getConnectionState().IsExpensive()
+	return m.isPaused()
 }
 
 func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCommunities, error) {
