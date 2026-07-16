@@ -94,6 +94,27 @@ func (s *ManagerSuite) SetupTest() {
 	s.archiveManager = t
 }
 
+func (s *ManagerSuite) TestCommunityTokensMetadataLoadedDoesNotPublishCommunity() {
+	community, err := s.manager.CreateCommunity(&requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}, false)
+	s.Require().NoError(err)
+
+	subscription := s.manager.Subscribe()
+	s.manager.handleCommunityTokensMetadataAsync(community.IDString())
+
+	select {
+	case event := <-subscription:
+		s.Require().Nil(event.Community)
+		s.Require().NotNil(event.CommunityTokensMetadataLoaded)
+		s.Require().Equal(community.IDString(), event.CommunityTokensMetadataLoaded.IDString())
+	case <-time.After(2 * time.Second):
+		s.FailNow("community token metadata completion was not signaled")
+	}
+}
+
 func intToBig(n int64) *hexutil.Big {
 	return (*hexutil.Big)(big.NewInt(n))
 }
