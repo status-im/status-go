@@ -10,6 +10,9 @@ import (
 	"github.com/status-im/status-go/pkg/messaging"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
+	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestMessengerFetchLatestCommunityDescriptionsSuite(t *testing.T) {
@@ -21,6 +24,18 @@ type MessengerFetchLatestCommunityDescriptionsSuite struct {
 
 	messagingEnv *messaging.TestMessagingEnvironment
 	m            *Messenger
+}
+
+func (s *MessengerFetchLatestCommunityDescriptionsSuite) createLocalCommunity() *communities.Community {
+	response, err := s.m.CreateCommunity(&requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}, true)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	return response.Communities()[0]
 }
 
 func (s *MessengerFetchLatestCommunityDescriptionsSuite) SetupTest() {
@@ -110,4 +125,22 @@ func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestNoFiltersIsNoop() {
 	s.m.fetchLatestCommunityDescriptions(peer.AddrInfo{}, nil)
 
 	s.Require().Empty(*recorded, "no store request should be made when there are no filters")
+}
+
+// TestReusedFilterForgottenForNonMember verifies that a description filter
+// reused by a store-node request is forgotten for a community that is neither
+// joined nor spectated (so it does not leave a live subscription behind), and
+// kept for a joined/spectated community and for contact requests.
+func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestReusedFilterForgottenForNonMember() {
+	// A validly-shaped community id (compressed pubkey) that is not in the DB.
+	unknownID := "0x02b5bdaf5a25fcfe2ee14c501fab1836b8de57f61621080c3d52073d16de0d98d6"
+	s.Require().True(s.m.storeNodeRequestsManager.reusedFilterShouldForget(storeNodeCommunityRequest, unknownID),
+		"a community that is neither joined nor spectated must not keep a reused filter")
+
+	joined := s.createLocalCommunity()
+	s.Require().False(s.m.storeNodeRequestsManager.reusedFilterShouldForget(storeNodeCommunityRequest, joined.IDString()),
+		"a joined/spectated community keeps its live description subscription")
+
+	s.Require().False(s.m.storeNodeRequestsManager.reusedFilterShouldForget(storeNodeContactRequest, unknownID),
+		"contact requests are unaffected")
 }
