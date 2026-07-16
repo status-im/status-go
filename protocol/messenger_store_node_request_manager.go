@@ -329,6 +329,10 @@ func (r *storeNodeRequest) finalize() {
 	}
 }
 
+func (r *storeNodeRequest) hasFoundCommunityDescription(clock uint64) bool {
+	return !r.config.RequireNewerCommunityDescription || clock > r.minimumDataClock
+}
+
 func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
 	logger := r.manager.logger.With(
 		zap.Any("requestID", r.requestID),
@@ -393,7 +397,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 		// Would be perfect if we could track that the community was in these particular envelopes,
 		// but I don't think that's possible right now. We check if clock was updated instead.
 
-		if community.Clock() <= r.minimumDataClock {
+		if !r.hasFoundCommunityDescription(community.Clock()) {
 			logger.Debug("local community description is not newer than existing",
 				zap.Any("existingClock", community.Clock()),
 				zap.Any("minimumDataClock", r.minimumDataClock),
