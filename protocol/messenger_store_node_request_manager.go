@@ -143,11 +143,11 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 		// Create corresponding filter
 		var err error
 		var filter *types2.ChatFilter
-		filterCreated := false
+		filterShouldForget := false
 
-		filter, filterCreated, err = m.getFilter(requestType, dataID, shard)
+		filter, filterShouldForget, err = m.getFilter(requestType, dataID, shard)
 		if err != nil {
-			if filterCreated {
+			if filterShouldForget {
 				m.forgetFilter(filter)
 			}
 			return nil, fmt.Errorf("failed to create community filter: %w", err)
@@ -158,7 +158,7 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 		request.pubsubTopic = filter.PubsubTopic()
 		request.requestID = requestID
 		request.contentTopic = filter.ContentTopic()
-		if filterCreated {
+		if filterShouldForget {
 			request.filterToForget = filter
 		}
 
@@ -179,13 +179,16 @@ func (m *StoreNodeRequestManager) newStoreNodeRequest(ctx context.Context) *stor
 }
 
 // getFilter checks if a filter for a given community is already created and creates one of not found.
-// Returns the found/created filter, a flag if the filter was created by the function and an error.
+// Returns the found/created filter, a flag telling whether the filter must be
+// forgotten once the request finishes, and an error. A newly created filter is
+// always temporary. A reused filter is kept only for joined/spectated
+// communities (they keep a live description subscription); for any other
+// community it is a snapshot and must not outlive the request.
 func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *types2.Shard) (*types2.ChatFilter, bool, error) {
 	// First check if such filter already exists.
 	filter := m.messenger.messaging.ChatFilterByChatID(dataID)
 	if filter != nil {
-		//we don't remember filter id associated with community because it was already installed
-		return filter, false, nil
+		return filter, m.reusedFilterShouldForget(requestType, dataID), nil
 	}
 
 	switch requestType {
@@ -234,6 +237,28 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	}
 
 	return filter, true, nil
+}
+
+// reusedFilterShouldForget reports whether a pre-existing filter reused for a
+// request must be removed once the request finishes. Joined and spectated
+// communities keep their live description subscription; every other community is
+// a snapshot, so a stray description filter must not be left subscribed.
+func (m *StoreNodeRequestManager) reusedFilterShouldForget(requestType storeNodeRequestType, dataID string) bool {
+	if requestType != storeNodeCommunityRequest {
+		return false
+	}
+	communityID, err := types.DecodeHex(dataID)
+	if err != nil {
+		return false
+	}
+	community, err := m.messenger.communitiesManager.GetByID(communityID)
+	if err != nil && err != communities.ErrOrgNotFound {
+		return false
+	}
+	if community != nil && (community.Joined() || community.Spectated()) {
+		return false
+	}
+	return true
 }
 
 // forgetFilter uninstalls the given filter
