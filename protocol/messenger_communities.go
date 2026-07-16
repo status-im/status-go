@@ -125,6 +125,9 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 	if org == nil {
 		return nil
 	}
+	if !org.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
 
 	m.logger.Debug("publishing community",
 		zap.String("communityID", org.IDString()),
@@ -408,14 +411,17 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					return
 				}
 				if sub.Community != nil {
-					if sub.Community == nil {
-						continue
-					}
 					// NOTE: because we use a pointer here, there's a race condition where the community would be updated before it's compared to the previous one.
 					// This results in keys not being propagated as the copy would not see any changes
 					communityCopy := sub.Community.CreateDeepCopy()
 
 					publishOrgAndDistributeEncryptionKeys(communityCopy)
+				}
+				if sub.CommunityTokensMetadataLoaded != nil && m.config.messengerSignalsHandler != nil {
+					communityCopy := sub.CommunityTokensMetadataLoaded.CreateDeepCopy()
+					response := &MessengerResponse{}
+					response.AddCommunity(communityCopy)
+					m.config.messengerSignalsHandler.MessengerResponse(response)
 				}
 
 				if sub.CommunityEventsMessage != nil {
