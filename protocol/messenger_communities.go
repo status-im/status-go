@@ -398,7 +398,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				if !more {
 					return
 				}
-				if sub.Community != nil {
+				if sub.Community != nil && sub.Community.IsControlNode() {
 					// NOTE: because we use a pointer here, there's a race condition where the community would be updated before it's compared to the previous one.
 					// This results in keys not being propagated as the copy would not see any changes
 					communityCopy := sub.Community.CreateDeepCopy()
