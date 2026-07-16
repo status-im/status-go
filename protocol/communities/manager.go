@@ -4481,8 +4481,10 @@ func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 }
 
 func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
+	m.quitWg.Add(1)
 	go func() {
 		defer utils.LogOnPanic()
+		defer m.quitWg.Done()
 
 		select {
 		case <-m.quit:
@@ -4492,16 +4494,25 @@ func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
 
 		community, err := m.GetByIDString(communityID)
 		if err != nil {
+			m.logger.Error("failed to get community for tokens metadata handling",
+				zap.String("communityID", communityID), zap.Error(err))
 			return
 		}
 
 		err = m.handleCommunityTokensMetadata(community)
 		if err != nil {
+			m.logger.Error("failed to handle community tokens metadata",
+				zap.String("communityID", communityID), zap.Error(err))
 			return
 		}
 
-		m.publish(&Subscription{Community: community})
+		select {
+		case <-m.quit:
+			return
+		default:
+		}
 
+		m.publish(&Subscription{Community: community})
 	}()
 }
 
