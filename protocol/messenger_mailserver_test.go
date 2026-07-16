@@ -227,6 +227,24 @@ func (s *MessengerBoundedResolveSuite) createLocalCommunity() *communities.Commu
 	return response.Communities()[0]
 }
 
+// TestReusedFilterForgottenForNonMember verifies that a description filter
+// reused by a store-node request is forgotten for a community that is neither
+// joined nor spectated (so it does not leave a live subscription behind), and
+// kept for a joined/spectated community and for contact requests.
+func (s *MessengerBoundedResolveSuite) TestReusedFilterForgottenForNonMember() {
+	// A validly-shaped community id (compressed pubkey) that is not in the DB.
+	unknownID := "0x02b5bdaf5a25fcfe2ee14c501fab1836b8de57f61621080c3d52073d16de0d98d6"
+	s.Require().True(s.m.storeNodeRequestsManager.reusedFilterShouldForget(storeNodeCommunityRequest, unknownID),
+		"a community that is neither joined nor spectated must not keep a reused filter")
+
+	joined := s.createLocalCommunity()
+	s.Require().False(s.m.storeNodeRequestsManager.reusedFilterShouldForget(storeNodeCommunityRequest, joined.IDString()),
+		"a joined/spectated community keeps its live description subscription")
+
+	s.Require().False(s.m.storeNodeRequestsManager.reusedFilterShouldForget(storeNodeContactRequest, unknownID),
+		"contact requests are unaffected")
+}
+
 // TestStopsAtPageCapUnresolved verifies that a request whose description never
 // resolves (e.g. a description whose segments span past the page cap) stops at
 // the configured MaxPages and ends unresolved instead of sweeping the window.
