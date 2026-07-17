@@ -17,7 +17,13 @@ func TestShouldPauseCuratedCommunitiesUpdateLoop(t *testing.T) {
 
 	require.False(t, m.shouldPauseCuratedCommunitiesUpdateLoop())
 
+	// An expensive network does not pause the loop: curated community discovery
+	// is not yet able to fetch descriptions on its own, so gating it here would
+	// leave the Portal empty. See status-app#18388.
 	m.setConnectionState(connection.State{Expensive: true})
+	require.False(t, m.shouldPauseCuratedCommunitiesUpdateLoop())
+
+	m.paused.Store(true)
 	require.True(t, m.shouldPauseCuratedCommunitiesUpdateLoop())
 }
 
