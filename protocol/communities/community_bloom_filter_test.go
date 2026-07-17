@@ -68,9 +68,9 @@ func (s *CommunityBloomFilterSuite) TestBasic() {
 
 // Regression test: on a device that does not hold the community private key
 // (e.g. right after a profile sync), the publish path can still reach
-// generateBloomFiltersForChannels with a nil key. It must return an error
-// (the caller logs it and marshals the description without filters) instead
-// of crashing the node in ECDH.
+// generateBloomFiltersForChannels with a nil key. Filter generation must be
+// skipped so the description is marshaled without filters, instead of crashing
+// the node in ECDH.
 func (s *CommunityBloomFilterSuite) TestNilPrivateKey() {
 	memberIdentity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -101,6 +101,6 @@ func (s *CommunityBloomFilterSuite) TestNilPrivateKey() {
 	s.Require().NotPanics(func() {
 		err = generateBloomFiltersForChannels(description, nil)
 	})
-	s.Require().Error(err)
+	s.Require().NoError(err)
 	s.Require().Nil(description.Chats[encryptedChannelID].MembersList)
 }
