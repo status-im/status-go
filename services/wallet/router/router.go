@@ -1243,6 +1243,14 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		ApprovalGasAmount:       approvalGasLimit,
 	}
 
+	// processors that route through an underlying tool/exchange (e.g. LI.FI -> "1inch")
+	// can surface it here; others simply leave path.Tool empty
+	if tp, ok := pathProcessor.(interface {
+		GetProviderTool(pathprocessor.ProcessorInputParams) string
+	}); ok {
+		path.Tool = tp.GetProviderTool(processorInputParams)
+	}
+
 	tokenBalance, ok := r.activeBalanceMap.Load(makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol))
 	if ok {
 		tokenBalanceBigInt, ok := tokenBalance.(*big.Int)

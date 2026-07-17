@@ -16,6 +16,7 @@ import (
 type Path struct {
 	RouterInputParamsUuid string
 	ProcessorName         string
+	Tool                  string            // Underlying provider/tool used within the processor (e.g. LI.FI's "1inch"); empty if not applicable
 	FromChain             *params.Network   // Source chain
 	ToChain               *params.Network   // Destination chain
 	FromToken             *tokentypes.Token // Source token
@@ -103,6 +104,7 @@ func (p *Path) Copy() *Path {
 	newPath := &Path{
 		RouterInputParamsUuid:      p.RouterInputParamsUuid,
 		ProcessorName:              p.ProcessorName,
+		Tool:                       p.Tool,
 		SuggestedTxGasAmount:       p.SuggestedTxGasAmount,
 		SuggestedApprovalGasAmount: p.SuggestedApprovalGasAmount,
 		TxGasFeeMode:               p.TxGasFeeMode,
