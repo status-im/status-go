@@ -150,6 +150,16 @@ func (s *LiFiProcessor) GetContractAddress(params ProcessorInputParams) (common.
 	return quote.Estimate.ApprovalAddress, nil
 }
 
+// GetProviderTool returns the underlying tool/exchange LI.FI routes through (e.g. "1inch")
+// for the current quote, or an empty string if it can't be resolved.
+func (s *LiFiProcessor) GetProviderTool(params ProcessorInputParams) string {
+	quote, err := s.getOrFetchQuote(params)
+	if err != nil || quote == nil {
+		return ""
+	}
+	return quote.Tool
+}
+
 func (s *LiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	key := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
 	quote, err := s.getQuote(key)
