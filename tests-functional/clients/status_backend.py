@@ -42,6 +42,7 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
 class StatusBackend(RpcClient, SignalClient, ApiClient):
+    name: str = ""
     container: StatusBackendContainer | None = None
     _media_server_port_gen = itertools.count(constants.STATUS_MEDIA_SERVER_PORT, 1)
     _connector_ws_port_gen = itertools.count(constants.STATUS_CONNECTOR_WS_PORT, 1)
@@ -202,25 +203,18 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         return self.api_request_json(method, data)
 
-    def _set_networks(self, data, **kwargs):
-        self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
-
-        # Allow callers (fixtures/tests) to add additional networks on top of the default Anvil network.
-        # - networks_override: full replacement for networksOverride (list[dict])
-        # - extra_networks_override: appended to the default Anvil network (list[dict])
-        networks_override = kwargs.get("networks_override", None)
-        extra_networks_override = kwargs.get("extra_networks_override", []) or []
-
+    def _build_anvil_network(self, provider_type="embedded-direct", **kwargs):
+        network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
         anvil_network = {
-            "chainID": self.network_id,
+            "chainID": network_id,
             "chainName": "Anvil",
             "rpcProviders": [
                 {
-                    "chainId": self.network_id,
+                    "chainId": network_id,
                     "name": "Anvil Direct",
                     "url": Config.anvil_url,
                     "enableRpsLimiter": False,
-                    "type": "embedded-direct",
+                    "type": provider_type,
                     "enabled": True,
                     "authType": "no-auth",
                 }
@@ -235,7 +229,18 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "isActive": True,
             "isDeactivatable": False,
         }
-        anvil_network = self._set_token_overrides(anvil_network, kwargs.get("token_overrides", []))
+        return self._set_token_overrides(anvil_network, kwargs.get("token_overrides", []))
+
+    def _set_networks(self, data, **kwargs):
+        self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
+
+        # Allow callers (fixtures/tests) to add additional networks on top of the default Anvil network.
+        # - networks_override: full replacement for networksOverride (list[dict])
+        # - extra_networks_override: appended to the default Anvil network (list[dict])
+        networks_override = kwargs.get("networks_override", None)
+        extra_networks_override = kwargs.get("extra_networks_override", []) or []
+
+        anvil_network = self._build_anvil_network(**kwargs)
 
         data["testNetworksEnabled"] = False
         data["networkId"] = self.network_id
@@ -243,6 +248,15 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             data["networksOverride"] = networks_override
         else:
             data["networksOverride"] = [anvil_network, *extra_networks_override]
+
+    def add_anvil_network(self, **kwargs):
+        # LoginAccount rebuilds the network list from defaults (status-im/status-go#6010, #5597), so a
+        # paired device that signs in via login() never gets the Anvil chain and drops token-gated
+        # community messages. wallet_addEthereumChain (Upsert) keeps only USER providers, so add the
+        # chain with a user provider — an embedded one is stripped, leaving the chain with no usable
+        # provider, which fails as "could not find any enabled RPC providers for chain: 31337".
+        network = self._build_anvil_network(provider_type="user", **kwargs)
+        return self.wallet_service.add_ethereum_chain(network)
 
     def _set_proxy_credentials(self, data):
         if "STATUS_BUILD_PROXY_USER" not in os.environ:
