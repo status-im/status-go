@@ -13,6 +13,14 @@ import (
 )
 
 func generateBloomFiltersForChannels(description *protobuf.CommunityDescription, privateKey *ecdsa.PrivateKey) error {
+	// Bloom filters require the community private key to derive the shared secret.
+	// It is absent on devices that don't control the community (e.g. a freshly
+	// profile-synced device), which is expected, so skip generation instead of
+	// dereferencing a nil key.
+	if privateKey == nil {
+		return nil
+	}
+
 	for channelID, channel := range description.Chats {
 		if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
 			continue
