@@ -2026,6 +2026,16 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 
 // sendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
+	if len(message.ResponseTo) != 0 {
+		exists, err := m.persistence.MessagesExist([]string{message.ResponseTo})
+		if err != nil {
+			return nil, err
+		}
+		if !exists[message.ResponseTo] {
+			return nil, ErrInvalidResponseTo
+		}
+	}
+
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
 		return nil, err
