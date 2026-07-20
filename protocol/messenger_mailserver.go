@@ -536,11 +536,8 @@ func (m *Messenger) syncFilters(filters types2.ChatFilters) (*MessengerResponse,
 	return m.syncFiltersFrom(filters, 0)
 }
 
-// communityDescriptionChatIDs returns the set of chat IDs that correspond to
-// the community description content topics of joined and spectated communities.
-// These topics carry the full community description, which is republished many
-// times per day. They are fetched with a dedicated StopWhenDataFound request
-// instead of being swept over the whole historic sync window.
+// communityDescriptionChatIDs returns chat IDs for joined and spectated communities.
+// We fetch only the latest description for each one instead of all old copies.
 func (m *Messenger) communityDescriptionChatIDs() (map[string]struct{}, error) {
 	communities, err := m.communitiesManager.JoinedOrSpectated()
 	if err != nil {
@@ -553,16 +550,9 @@ func (m *Messenger) communityDescriptionChatIDs() (map[string]struct{}, error) {
 	return chatIDs, nil
 }
 
-// fetchLatestCommunityDescriptions fetches only the most recent description for
-// each of the given community description filters. The store node is queried
-// newest-first and paging stops after the first page, so we download the single
-// latest description instead of every historic copy that was republished over
-// the sync window.
-//
-// Note: we deliberately do not use FetchCommunity here. FetchCommunity keeps
-// paging until it finds a description newer than the one already stored
-// locally; for a community we are already up to date on (the common case while
-// spectating), no such newer copy exists and it would sweep the whole window.
+// fetchLatestCommunityDescriptions gets the latest description for each
+// community filter and stops after the first page of results.
+// This avoids downloading many older copies.
 func (m *Messenger) fetchLatestCommunityDescriptions(filters []*types2.ChatFilter) {
 	if len(filters) == 0 {
 		return

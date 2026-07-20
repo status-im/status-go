@@ -258,9 +258,10 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	s.connectionStateMu.Lock()
 	hasLastState := s.hasLastConnectionState
 	lastState := s.lastConnectionState
+	messenger := s.messenger
 	s.connectionStateMu.Unlock()
-	if hasLastState {
-		s.messenger.ConnectionChanged(lastState)
+	if hasLastState && messenger != nil {
+		messenger.ConnectionChanged(lastState)
 	}
 
 	s.MarkStarted()
