@@ -12,7 +12,7 @@ type SendPublicParams struct {
 	Priority            *MessagePriority
 	HashRatchet         *SendPublicHashRatchetParams
 	CommunityPublicKey  *ecdsa.PublicKey
-	CommunityID         []byte
+	ChatID              string
 }
 
 type SendPublicHashRatchetParams struct {

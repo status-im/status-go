@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/controller"
 	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
@@ -46,6 +47,10 @@ type Core struct {
 	connectionState connection.State
 
 	wakumetrics *wakumetrics2.Client
+}
+
+type sdsEnvelopeHashesTracker interface {
+	TrackedEnvelopeHashes(identifier []byte) ([]string, error)
 }
 
 // Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
@@ -82,6 +87,7 @@ type CoreParams struct {
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
 	var err error
 	stack := &common.MessagingStack{}
+	var core *Core
 
 	stack.Transport, err = transport.NewTransport(
 		waku,
@@ -107,11 +113,22 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.tracer,
 	)
 
-	stack.Reliability = reliability.NewReliability(
+	missingDepsHandler := func(messageID string, missingDeps []string, channelID string) error {
+		if config.missingDepsObserver != nil {
+			config.missingDepsObserver(messageID, missingDeps, channelID)
+		}
+		return core.fetchMissingDependenciesAsync(messageID, missingDeps, channelID)
+	}
+
+	stack.Reliability, err = reliability.NewReliability(
 		config.persistence.MVDSStorage(),
 		params.Identity,
+		missingDepsHandler,
 		config.logger,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	publisher := pubsub.NewPublisher()
 
@@ -132,7 +149,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	core := &Core{
+	core = &Core{
 		config:     *config,
 		identity:   params.Identity,
 		waku:       waku,
@@ -145,38 +162,51 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		quit:       make(chan struct{}),
 	}
 
-	if config.missingDepsObserver != nil {
-		stack.Reliability.SetMissingDependenciesHandler(func(messageID string, missingDeps []string, channelID string) error {
-			config.missingDepsObserver(messageID, missingDeps, channelID)
-			return core.fetchMissingDependenciesAsync(messageID, missingDeps, channelID)
-		})
-	} else {
-		stack.Reliability.SetMissingDependenciesHandler(core.fetchMissingDependenciesAsync)
-	}
 	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
 
 	return core, nil
 }
 
-func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
+func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker, messageID string) []byte {
 	decodedMessageID, err := cryptotypes.DecodeHex(messageID)
 	if err != nil {
-		c.logger.Debug("failed to decode SDS message ID for retrieval hint",
+		logger.Debug("failed to decode SDS message ID for retrieval hint",
 			zap.String("messageID", messageID),
 			zap.Error(err),
 		)
 		return nil
 	}
 
-	hash, ok := c.stack.Transport.FirstTrackedEnvelopeHash(decodedMessageID)
-	if !ok {
-		c.logger.Debug("no tracked envelope hash for SDS message ID",
+	hashes, err := tracker.TrackedEnvelopeHashes(decodedMessageID)
+	if err != nil {
+		logger.Debug("no tracked envelope hash for SDS message ID",
 			zap.String("messageID", messageID),
+			zap.Error(err),
 		)
 		return nil
 	}
 
-	return []byte(hash)
+	envelopeHashes := make([][]byte, len(hashes))
+	for i, hash := range hashes {
+		envelopeHashes[i] = []byte(hash)
+	}
+
+	hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{
+		EnvelopeHashes: envelopeHashes,
+	})
+	if err != nil {
+		logger.Debug("failed to marshal SDS retrieval hint",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	return hint
+}
+
+func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
+	return buildSDSRetrievalHint(c.logger, c.stack.Transport, messageID)
 }
 
 func NewCore(params CoreParams, options ...Options) (*Core, error) {
@@ -232,6 +262,7 @@ func (c *Core) start() error {
 func (c *Core) stop() error {
 	close(c.quit)
 	c.cancel()
+	defer c.wg.Wait()
 
 	err := c.controller.Stop()
 	if err != nil {
@@ -249,8 +280,6 @@ func (c *Core) stop() error {
 	if err != nil {
 		return err
 	}
-
-	c.wg.Wait()
 
 	return nil
 }

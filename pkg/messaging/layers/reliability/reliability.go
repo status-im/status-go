@@ -18,6 +18,7 @@ import (
 
 	datasync2 "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 )
 
 // pausedDuration is the tick interval handed to the mvds node while the host is
@@ -64,18 +65,22 @@ type Reliability struct {
 	retrievalHintProvider   RetrievalHintProvider
 }
 
-func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, logger *zap.Logger) *Reliability {
+func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
+	if missingDepsHandler == nil {
+		return nil, errors.New("missingDepsHandler is required")
+	}
 	logger = logger.Named("reliability")
 	r := &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
 		logger:                logger,
+		missingDepsHandler:    missingDepsHandler,
 	}
 
 	r.sdsManager = newSdsReliabilityManager(logger.Named("sds"), r.handleMissingDependencies, r.provideRetrievalHint)
 
-	return r
+	return r, nil
 }
 
 // SetMissingDependenciesHandler configures how SDS missing dependencies should be handled.
@@ -115,8 +120,22 @@ func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missing
 
 	missingDepsAsString := make([]string, 0, len(missingDeps))
 	for _, dep := range missingDeps {
-		if len(dep.RetrievalHint) > 0 {
-			missingDepsAsString = append(missingDepsAsString, string(dep.RetrievalHint))
+		if len(dep.RetrievalHint) == 0 {
+			continue
+		}
+
+		var hint protobuf.RetrievalHint
+		if err := proto.Unmarshal(dep.RetrievalHint, &hint); err != nil {
+			r.logger.Debug("failed to unmarshal retrieval hint",
+				zap.String("messageId", string(dep.MessageID)),
+				zap.Error(err))
+			continue
+		}
+
+		for _, envelopeHash := range hint.EnvelopeHashes {
+			if len(envelopeHash) > 0 {
+				missingDepsAsString = append(missingDepsAsString, string(envelopeHash))
+			}
 		}
 	}
 	if len(missingDepsAsString) == 0 {
