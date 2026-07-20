@@ -48,43 +48,8 @@ jobs:
     - name: Build status-backend
       run: docker build . --tag "statusgo-local" --build-arg "cache_id=${GITHUB_RUN_ID}"
 
-    # Backends publish their ports on 127.0.0.1; reaching a loopback-bound published port needs route_localnet.
-    - name: Enable loopback routing for published container ports
-      run: sudo sysctl -w net.ipv4.conf.all.route_localnet=1
-
     - name: Run environment
       run: docker compose -f tests-functional/docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
-
-    - name: DIAG publish + env dump
-      if: matrix.config.name == 'ipv4'
-      run: |
-        set -x
-        set +e
-        docker version
-        docker info 2>/dev/null | grep -iE "userland|storage driver|cgroup|iptables|nftables|Server Version"
-        sysctl net.ipv4.conf.all.route_localnet
-        cid=$(docker run -d --network tests-functional_default -p 127.0.0.1::3333 statusgo-local status-backend --address 0.0.0.0:3333 --pprof false)
-        sleep 6
-        docker inspect "$cid" --format '{{json .NetworkSettings.Ports}}'
-        port=$(docker inspect "$cid" --format '{{(index (index .NetworkSettings.Ports "3333/tcp") 0).HostPort}}')
-        cip=$(docker inspect "$cid" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}:{{$v.IPAddress}} {{end}}')
-        echo "PORT=$port NETS=$cip"
-        docker logs "$cid" 2>&1 | head
-        echo "=== [single net] curl 127.0.0.1:$port ==="
-        curl -s -m5 "http://127.0.0.1:$port/health" && echo " OK_LOOPBACK" || echo " REFUSED_LOOPBACK"
-        echo "=== curl each container ip:3333 ==="
-        for kv in $cip; do ip=${kv#*:}; curl -s -m5 "http://$ip:3333/health" && echo " OK $kv" || echo " REFUSED $kv"; done
-        echo "=== connect bridge (mirror reliability) + re-probe loopback ==="
-        docker network connect bridge "$cid"; sleep 2
-        port2=$(docker inspect "$cid" --format '{{(index (index .NetworkSettings.Ports "3333/tcp") 0).HostPort}}')
-        echo "PORT_after_bridge=$port2"
-        curl -s -m5 "http://127.0.0.1:$port2/health" && echo " OK_LOOPBACK_dual" || echo " REFUSED_LOOPBACK_dual"
-        echo "=== iptables/nft/ss ==="
-        sudo iptables -t nat -S 2>/dev/null | grep -E "3333|:$port" || echo "no v4 iptables nat match (nftables?)"
-        sudo nft list ruleset 2>/dev/null | grep -E "3333|$port" | head || echo "no nft match"
-        sudo ss -tlnp 2>/dev/null | grep -E ":$port|docker-proxy" || echo "nothing listening on $port"
-        docker rm -f "$cid"
-        echo DIAG_DONE
 
     - name: Run tests
       env:
