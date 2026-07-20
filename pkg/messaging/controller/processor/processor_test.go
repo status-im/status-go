@@ -27,6 +27,7 @@ import (
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	segmentation "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
 	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
@@ -61,11 +62,13 @@ func (s *ProcessorSuite) newStandaloneReliability() *reliability.Reliability {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	r := reliability.NewReliability(
+	r, err := reliability.NewReliability(
 		mvdsnode.NewSQLitePersistence(db),
 		identity,
+		func(string, []string, string) error { return nil },
 		s.logger,
 	)
+	s.Require().NoError(err)
 
 	s.T().Cleanup(r.Stop)
 
@@ -140,11 +143,13 @@ func (s *ProcessorSuite) SetupTest() {
 		trace.NewNoopTracer(),
 	)
 
-	stack.Reliability = reliability.NewReliability(
+	stack.Reliability, err = reliability.NewReliability(
 		mvdsnode.NewSQLitePersistence(db),
 		identity,
+		func(string, []string, string) error { return nil },
 		s.logger,
 	)
+	s.Require().NoError(err)
 
 	err = stack.Reliability.Start(func(*ecdsa.PublicKey, []byte, [][]byte) error { return nil })
 	s.Require().NoError(err)
@@ -385,9 +390,9 @@ func (s *ProcessorSuite) TestGetEphemeralKey() {
 
 func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	payload := []byte("hello")
-	sdsChannelID := "community123|channel-1"
+	sdsChannelID := "community123channel-1"
 
-	wrappedPayload, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, sdsChannelID)
+	wrappedPayload, _, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, sdsChannelID)
 	s.Require().NoError(err)
 	s.Require().True(len(wrappedPayload) > 0)
 
@@ -416,7 +421,7 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 	senderReliability := s.newStandaloneReliability()
 	receiverReliability := s.newStandaloneReliability()
 
-	channelID := "community123|general"
+	channelID := "community123general"
 	oldPayload := []byte("old-community-message")
 	newPayload := []byte("new-community-message")
 
@@ -425,7 +430,11 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 	expectedOldHint := "store-hash-" + expectedOldMessageID
 
 	senderReliability.SetRetrievalHintProvider(func(messageID string) []byte {
-		return []byte("store-hash-" + messageID)
+		hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{
+			EnvelopeHashes: [][]byte{[]byte("store-hash-" + messageID)},
+		})
+		s.Require().NoError(err)
+		return hint
 	})
 
 	type missingDepsCall struct {
@@ -450,9 +459,9 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 		return nil
 	})
 
-	wrappedOldPayload, err := senderReliability.WrapPayloadForSDS(oldPayload, channelID)
+	wrappedOldPayload, _, err := senderReliability.WrapPayloadForSDS(oldPayload, channelID)
 	s.Require().NoError(err)
-	wrappedNewPayload, err := senderReliability.WrapPayloadForSDS(newPayload, channelID)
+	wrappedNewPayload, _, err := senderReliability.WrapPayloadForSDS(newPayload, channelID)
 	s.Require().NoError(err)
 
 	originalReliability := s.processor.stack.Reliability

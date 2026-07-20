@@ -58,7 +58,7 @@ func newSdsReliabilityManager(
 }
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
-func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byte, error) {
+func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byte, []byte, error) {
 	sdsMessageID := crypto.Keccak256(payload)
 
 	r.logger.Debug("original payload wrapped with SDS",
@@ -68,10 +68,10 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 	)
 	sdsWrappedPayload, err := r.sdsManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), channelID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to wrap message with SDS")
+		return nil, nil, errors.Wrap(err, "failed to wrap message with SDS")
 	}
 
-	return sdsWrappedPayload, nil
+	return sdsWrappedPayload, sdsMessageID, nil
 }
 
 func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {

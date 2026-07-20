@@ -4,15 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
 func TestBuildChannelID(t *testing.T) {
-	communityID := []byte("community-id")
-	contentTopic := "content-topic"
+	chatID := "community-chat-id"
 
-	channelID := BuildChannelID(communityID, contentTopic)
+	channelID := BuildChannelID(chatID)
 
-	require.Equal(t, cryptotypes.EncodeHex(communityID)+"|"+contentTopic, channelID)
+	require.Equal(t, chatID, channelID)
 }

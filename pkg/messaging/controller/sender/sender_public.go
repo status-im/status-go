@@ -19,7 +19,34 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-const sdsForCommunitiesEnabled = true
+const sdsForCommunitiesEnabled = false
+
+type publicSDSWrapper interface {
+	WrapPayloadForSDS(payload []byte, channelID string) (wrappedPayload []byte, messageID []byte, err error)
+}
+
+func wrapPayloadForPublicSDS(logger *zap.Logger, wrapper publicSDSWrapper, payload []byte, chatID string) ([]byte, []byte, error) {
+	if len(chatID) == 0 {
+		logger.Warn("SDS wrap skipped for public community payload due to missing chat ID")
+		return payload, nil, nil
+	}
+
+	sdsChannelID := reliability.BuildChannelID(chatID)
+	sdsWrappedPayload, sdsMessageIDBytes, err := wrapper.WrapPayloadForSDS(payload, sdsChannelID)
+	if err != nil {
+		if strings.Contains(err.Error(), "reMessageTooLarge") {
+			logger.Warn("SDS wrap skipped for oversized public community payload",
+				zap.Int("payloadLength", len(payload)),
+				zap.Error(err),
+			)
+			return payload, nil, nil
+		}
+
+		return payload, nil, errors.Wrap(err, "failed to wrap payload for SDS")
+	}
+
+	return sdsWrappedPayload, sdsMessageIDBytes, nil
+}
 
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
 	messageID := messagingtypes.MessageID(params.Sender, params.Payload)
@@ -42,29 +69,11 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 		zap.Any("hashRatchet", params.HashRatchet),
 	)
 
-	if sdsForCommunitiesEnabled && len(params.CommunityID) > 0 {
-		sdsChannelID := reliability.BuildChannelID(params.CommunityID, params.ContentTopic)
-		sdsMessageIDBytes = crypto.Keccak256(params.Payload)
-		sdsMessageIDHex := cryptotypes.EncodeHex(sdsMessageIDBytes)
-		logger.Debug("send public message with SDS",
-			zap.String("communityID", cryptotypes.EncodeHex(params.CommunityID)),
-			zap.String("sdsChannelID", sdsChannelID),
-			zap.String("sdsMessageID", sdsMessageIDHex),
-		)
-
-		sdsWrappedPayload, err := s.stack.Reliability.WrapPayloadForSDS(params.Payload, sdsChannelID)
-		if err != nil {
-			if strings.Contains(err.Error(), "reMessageTooLarge") {
-				logger.Warn("SDS wrap skipped for oversized public community payload",
-					zap.Int("payloadLength", len(params.Payload)),
-					zap.Error(err),
-				)
-				sdsMessageIDBytes = nil
-			} else {
-				return errors.Wrap(err, "failed to wrap payload for SDS")
-			}
-		} else {
-			params.Payload = sdsWrappedPayload
+	if sdsForCommunitiesEnabled {
+		var wrapErr error
+		params.Payload, sdsMessageIDBytes, wrapErr = wrapPayloadForPublicSDS(logger, s.stack.Reliability, params.Payload, params.ChatID)
+		if wrapErr != nil {
+			return wrapErr
 		}
 	}
 

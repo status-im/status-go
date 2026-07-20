@@ -674,11 +674,12 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 	}
 }
 
-// FirstTrackedEnvelopeHash returns the first tracked envelope hash for a given
-// message identifier. The returned hash is hex-encoded (0x-prefixed).
-func (t *Transport) FirstTrackedEnvelopeHash(identifier []byte) (string, bool) {
+// TrackedEnvelopeHashes returns all tracked envelope hashes for a given message
+// identifier. A single message maps to multiple envelopes when it is split by
+// the segmentation layer. The returned hashes are hex-encoded (0x-prefixed).
+func (t *Transport) TrackedEnvelopeHashes(identifier []byte) ([]string, error) {
 	if t.envelopesMonitor == nil {
-		return "", false
+		return nil, errors.New("envelopes monitor not initialized")
 	}
 
 	key := types2.HexBytes(identifier).String()
@@ -688,10 +689,15 @@ func (t *Transport) FirstTrackedEnvelopeHash(identifier []byte) (string, bool) {
 
 	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[key]
 	if !ok || len(hashes) == 0 {
-		return "", false
+		return nil, errors.New("no tracked envelope hash found")
 	}
 
-	return hashes[0].String(), true
+	result := make([]string, len(hashes))
+	for i, hash := range hashes {
+		result[i] = hash.String()
+	}
+
+	return result, nil
 }
 
 func (t *Transport) MaxMessageSize() uint32 {
