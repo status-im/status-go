@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/services/wallet/common"
 )
@@ -137,10 +135,6 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 }
 
 func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.CuratedCommunities) (*communities.KnownCommunitiesResponse, error) {
-	if err := m.subscribeToCuratedCommunityDescriptions(curatedCommunities.ContractCommunities); err != nil {
-		return nil, err
-	}
-
 	response, err := m.communitiesManager.GetStoredDescriptionForCommunities(curatedCommunities.ContractCommunities)
 	if err != nil {
 		return nil, err
@@ -169,25 +163,6 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 	}()
 
 	return response, nil
-}
-
-func (m *Messenger) subscribeToCuratedCommunityDescriptions(communityIDs []string) error {
-	for _, communityID := range communityIDs {
-		hadFilter := m.messaging.ChatFilterByChatID(communityID) != nil
-		filter, created, err := m.storeNodeRequestsManager.getFilter(storeNodeCommunityRequest, communityID, types2.DefaultShard())
-		if err != nil {
-			if created && filter != nil {
-				m.storeNodeRequestsManager.forgetFilter(filter)
-			}
-			if !hadFilter {
-				if f := m.messaging.ChatFilterByChatID(communityID); f != nil {
-					m.storeNodeRequestsManager.forgetFilter(f)
-				}
-			}
-			return fmt.Errorf("failed to subscribe to curated community %s: %w", communityID, err)
-		}
-	}
-	return nil
 }
 
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
