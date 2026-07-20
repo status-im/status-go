@@ -48,6 +48,10 @@ jobs:
     - name: Build status-backend
       run: docker build . --tag "statusgo-local" --build-arg "cache_id=${GITHUB_RUN_ID}"
 
+    # Backends publish their ports on 127.0.0.1; reaching a loopback-bound published port needs route_localnet.
+    - name: Enable loopback routing for published container ports
+      run: sudo sysctl -w net.ipv4.conf.all.route_localnet=1
+
     - name: Run environment
       run: docker compose -f tests-functional/docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
 
