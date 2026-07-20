@@ -46,6 +46,7 @@ type Persistence interface {
 	GetRatchetInfo(bundleID []byte, theirIdentity []byte, installationID string) (*RatchetInfo, error)
 	GetAnyRatchetInfo(identity []byte, installationID string) (*RatchetInfo, error)
 	RatchetInfoConfirmed(bundleID []byte, theirIdentity []byte, installationID string) error
+	DeleteSessionsForInstallation(identity []byte, installationID string) error
 	GetHashRatchetCache(ratchet *HashRatchetKeyCompatibility, seqNo uint32) (*HRCache, error)
 	GetCurrentKeyForGroup(groupID []byte) (*HashRatchetKeyCompatibility, error)
 	GetKeysForGroup(groupID []byte) ([]*HashRatchetKeyCompatibility, error)
