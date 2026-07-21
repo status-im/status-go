@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync/atomic"
 
 	sqlcipher "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 
@@ -29,6 +30,8 @@ const (
 	V3CipherPageSize = 1024
 	sqlMainDatabase  = "main"
 )
+
+var sqlcipherDriverID uint64
 
 // DecryptDB completely removes the encryption from the db
 func DecryptDB(oldPath string, newPath string, key string, kdfIterationsNumber int) error {
@@ -165,7 +168,7 @@ func buildSqlcipherDSN(path string) (string, error) {
 }
 
 func openDB(path string, key string, kdfIterationsNumber int, cipherPageSize int) (*sql.DB, error) {
-	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", len(sql.Drivers()))
+	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", atomic.AddUint64(&sqlcipherDriverID, 1))
 	sql.Register(driverName, &sqlcipher.SQLiteDriver{
 		ConnectHook: func(conn *sqlcipher.SQLiteConn) error {
 			if _, err := conn.Exec("PRAGMA foreign_keys=ON", []driver.Value{}); err != nil {

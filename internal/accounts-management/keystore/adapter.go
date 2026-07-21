@@ -129,6 +129,27 @@ func (a *Adapter) AccountDecryptedKey(address cryptotypes.Address, passphrase st
 	return
 }
 
+func (a *Adapter) AccountDecryptedPrivateKey(address cryptotypes.Address, passphrase string) (account KeystoreAccount, privateKey *ecdsa.PrivateKey, err error) {
+	defer func() {
+		err = mapToKeystoreError(err)
+	}()
+
+	var gethAccount accounts.Account
+	gethAccount, err = a.find(address)
+	if err != nil {
+		return
+	}
+
+	ethKey, err := readKeystoreFileAndDecryptedPrivateKey(gethAccount.URL.Path, passphrase)
+	if err != nil {
+		return
+	}
+
+	account = keystoreAccountFrom(gethAccount)
+	privateKey = ethKey.PrivateKey
+	return
+}
+
 func (a *Adapter) Delete(address cryptotypes.Address, passphrase string) (err error) {
 	defer func() {
 		err = mapToKeystoreError(err)

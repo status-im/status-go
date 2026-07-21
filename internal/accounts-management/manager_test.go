@@ -412,6 +412,25 @@ func (s *ManagerTestSuite) TestSetChatAccountForExistingProfile() {
 	s.Require().NotNil(selectedChatAccount)
 	s.Equal(genAcc.PrivateKeyHex(), selectedChatAccount.PrivateKeyHex())
 	s.Equal(genAcc.Address(), selectedChatAccount.Address())
+	s.Nil(selectedChatAccount.ExtendedKey())
+}
+
+func (s *ManagerTestSuite) TestSetChatAccountWithProfileKeypairSkipsPersistenceLookup() {
+	profileKeypair := s.createAndStoreProfileKeypair()
+	s.accManager.setChatAccountAndProfileKeyUID(nil, "")
+
+	s.Require().NoError(s.accManager.SetChatAccountWithProfileKeypair(
+		s.chatAddress,
+		s.password,
+		nil,
+		profileKeypair,
+	))
+
+	selectedChatAccount, err := s.accManager.SelectedChatAccount()
+	s.Require().NoError(err)
+	s.Equal(s.chatAddress, selectedChatAccount.Address())
+	s.Nil(selectedChatAccount.ExtendedKey())
+	s.Equal(profileKeypair.KeyUID, s.accManager.profileKeyUID)
 }
 
 func (s *ManagerTestSuite) TestLogout() {

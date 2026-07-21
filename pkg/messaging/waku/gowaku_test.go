@@ -1,9 +1,11 @@
 package wakuv2
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -24,6 +26,47 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 )
+
+type failingDNSResolver struct {
+	err    error
+	called chan struct{}
+}
+
+func (r *failingDNSResolver) LookupTXT(context.Context, string) ([]string, error) {
+	select {
+	case r.called <- struct{}{}:
+	default:
+	}
+	return nil, r.err
+}
+
+func TestNewRetrievesInitialDiscV5BootstrapNodes(t *testing.T) {
+	expectedErr := errors.New("DNS lookup failed")
+	resolver := &failingDNSResolver{
+		err:    expectedErr,
+		called: make(chan struct{}, 1),
+	}
+	cfg := &Config{
+		DiscV5BootstrapNodes: []string{
+			"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@nodes.example.org",
+		},
+		Resolver: resolver,
+	}
+
+	waku, err := New(nil, cfg, nil, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		waku.cancel()
+		waku.envelopeCache.Stop()
+		waku.wg.Wait()
+	})
+
+	select {
+	case <-resolver.called:
+	default:
+		t.Fatal("expected initial DiscV5 bootstrap nodes to be retrieved through DNS")
+	}
+}
 
 func TestWakuLifecycleState(t *testing.T) {
 	// New() alone is safe to call with nil params; Start()/Stop() are not used

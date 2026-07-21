@@ -75,10 +75,11 @@ var (
 )
 
 type LoginParams struct {
-	ChatAddress  types.Address          `json:"chatAddress"`
-	Password     string                 `json:"password"`
-	MainAccount  types.Address          `json:"mainAccount"` // TODO: remove this field
-	MultiAccount *multiaccounts.Account `json:"multiAccount"`
+	ChatAddress    types.Address                `json:"chatAddress"`
+	Password       string                       `json:"password"`
+	MainAccount    types.Address                `json:"mainAccount"` // TODO: remove this field
+	MultiAccount   *multiaccounts.Account       `json:"multiAccount"`
+	ProfileKeypair *accsmanagementtypes.Keypair `json:"-"`
 }
 
 // StatusBackend implements the Status.im service over go-ethereum
@@ -419,6 +420,101 @@ func (b *StatusBackend) runDBFileMigrations(account multiaccounts.Account, passw
 }
 
 func (b *StatusBackend) ensureDBsOpened(account multiaccounts.Account, password string) (err error) {
+	b.mu.Lock()
+	dbsUnset := b.walletDB == nil && b.appDB == nil
+	b.mu.Unlock()
+	if dbsUnset {
+		appDBPath, pathErr := b.getAppDBPath(account.KeyUID)
+		if pathErr == nil {
+			walletDBPath, walletPathErr := b.getWalletDBPath(account.KeyUID)
+			legacyAppDBPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
+			unsupportedAppDBPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
+			if walletPathErr == nil && fileExists(walletDBPath) && fileExists(appDBPath) &&
+				!fileExists(legacyAppDBPath) && !fileExists(unsupportedAppDBPath) {
+				return b.ensureEstablishedDBsOpened(account, password, appDBPath, walletDBPath)
+			}
+		}
+	}
+
+	return b.ensureDBsOpenedSequential(account, password)
+}
+
+func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account, password, appDBPath, walletDBPath string) (err error) {
+	b.mu.Lock()
+	if b.walletDB != nil || b.appDB != nil {
+		b.mu.Unlock()
+		return b.ensureDBsOpenedSequential(account, password)
+	}
+	defer b.mu.Unlock()
+
+	walletResultCh := make(chan struct {
+		db  *sql.DB
+		err error
+	}, 1)
+	appResultCh := make(chan struct {
+		db  *sql.DB
+		err error
+	}, 1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		db, openErr := walletdatabase.OpenDB(walletDBPath, password, account.KDFIterations)
+		walletResultCh <- struct {
+			db  *sql.DB
+			err error
+		}{db: db, err: openErr}
+	}()
+	go func() {
+		defer gocommon.LogOnPanic()
+		db, openErr := appdatabase.OpenDB(appDBPath, password, account.KDFIterations)
+		appResultCh <- struct {
+			db  *sql.DB
+			err error
+		}{db: db, err: openErr}
+	}()
+
+	walletResult := <-walletResultCh
+	appResult := <-appResultCh
+	if walletResult.err != nil {
+		if appResult.db != nil {
+			_ = appResult.db.Close()
+		}
+		return walletResult.err
+	}
+	if appResult.err != nil {
+		_ = walletResult.db.Close()
+		return appResult.err
+	}
+
+	if err = walletdatabase.MigrateDB(walletResult.db); err != nil {
+		_ = walletResult.db.Close()
+		_ = appResult.db.Close()
+		return err
+	}
+	appdatabase.CurrentAppDBKeyUID = account.KeyUID
+	if err = appdatabase.MigrateDB(appResult.db); err != nil {
+		_ = walletResult.db.Close()
+		_ = appResult.db.Close()
+		return err
+	}
+	b.walletDB = walletResult.db
+	b.statusNode.SetWalletDB(b.walletDB)
+	b.appDB = appResult.db
+	b.statusNode.SetAppDB(b.appDB)
+
+	accountsDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		_ = b.walletDB.Close()
+		_ = b.appDB.Close()
+		b.walletDB = nil
+		b.appDB = nil
+		return err
+	}
+	b.accountsManager.SetPersistence(accountsDB)
+
+	return nil
+}
+
+func (b *StatusBackend) ensureDBsOpenedSequential(account multiaccounts.Account, password string) (err error) {
 	// After wallet DB initial migration, the tables moved to wallet DB are removed from appDB
 	// so better migrate wallet DB first to avoid removal if wallet DB migration fails
 	if err = b.ensureWalletDBOpened(account, password); err != nil {
@@ -541,6 +637,9 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 	}
 	// get logged in
 	if b.LocalPairingStateManager.IsPairing() {
+		if err == nil {
+			b.statusNode.StartTokenManager()
+		}
 		return nil
 	}
 	return b.LoggedIn(acc.KeyUID, err)
@@ -595,6 +694,9 @@ func (b *StatusBackend) LoginAccount(request *requests.Login) error {
 		_ = b.StopNode()
 	}
 	if b.LocalPairingStateManager.IsPairing() {
+		if err == nil {
+			b.statusNode.StartTokenManager()
+		}
 		return nil
 	}
 	err = b.LoggedIn(request.KeyUID, err)
@@ -700,24 +802,32 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 	}
 	b.account = multiAccount
 
+	chatAddr, err := accountsDB.GetChatAddress()
+	if err != nil {
+		return errors.Wrap(err, "failed to get chat address")
+	}
+
+	walletAddr, err := accountsDB.GetWalletAddress()
+	if err != nil {
+		return errors.Wrap(err, "failed to get wallet address")
+	}
+
+	profileKeypair, err := accountsDB.GetProfileKeypair()
+	if err != nil {
+		return errors.Wrap(err, "failed to get profile keypair")
+	}
+
 	err = b.StartNode(b.config)
 	if err != nil {
 		b.logger.Info("failed to start node")
 		return errors.Wrap(err, "failed to start node")
 	}
 
-	chatAddr, err := accountsDB.GetChatAddress()
-	if err != nil {
-		return errors.Wrap(err, "failed to get chat address")
-	}
-	walletAddr, err := accountsDB.GetWalletAddress()
-	if err != nil {
-		return errors.Wrap(err, "failed to get wallet address")
-	}
 	login := LoginParams{
-		Password:    request.Password,
-		ChatAddress: chatAddr,
-		MainAccount: walletAddr,
+		Password:       request.Password,
+		ChatAddress:    chatAddr,
+		MainAccount:    walletAddr,
+		ProfileKeypair: profileKeypair,
 	}
 
 	err = b.SelectAccount(login, request.ChatPrivateKey())
@@ -888,7 +998,11 @@ func (b *StatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
 }
 
 func (b *StatusBackend) Login(keyUID, password string) error {
-	return b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil, nil)
+	err := b.startNodeWithAccount(multiaccounts.Account{KeyUID: keyUID}, password, nil, nil)
+	if err == nil {
+		b.statusNode.StartTokenManager()
+	}
+	return err
 }
 
 func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
@@ -900,6 +1014,9 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 	// get logged in
 	if !b.LocalPairingStateManager.IsPairing() {
 		return b.LoggedIn(acc.KeyUID, err)
+	}
+	if err == nil {
+		b.statusNode.StartTokenManager()
 	}
 	return err
 }
@@ -913,6 +1030,7 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
 		return err
 	}
+
 	acc, err := b.getAccountByKeyUID(keyUID)
 	if err != nil {
 		return err
@@ -929,7 +1047,9 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 			return err
 		}
 	}
+
 	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
+	b.statusNode.StartTokenManager()
 	return nil
 }
 
@@ -1027,6 +1147,7 @@ func (b *StatusBackend) ChangeDatabasePassword(keyUID string, password string, n
 				b.logger.Error("failed to start node", zap.Error(err))
 				return
 			}
+			b.statusNode.StartTokenManager()
 		}
 	}
 	defer restartNode()
@@ -2212,7 +2333,7 @@ func (b *StatusBackend) SelectAccount(loginParams LoginParams, privateKey *ecdsa
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	err := b.accountsManager.SetChatAccount(loginParams.ChatAddress, loginParams.Password, privateKey)
+	err := b.accountsManager.SetChatAccountWithProfileKeypair(loginParams.ChatAddress, loginParams.Password, privateKey, loginParams.ProfileKeypair)
 	if err != nil {
 		return err
 	}

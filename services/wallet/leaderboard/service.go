@@ -82,18 +82,20 @@ func NewMarketDataService(config ServiceConfig, walletDB *sql.DB, feed *event.Fe
 
 // Start begins the data refresh loops
 func (s *MarketDataService) Start(ctx context.Context) {
-	s.storage.Start()
+	s.storage.StartAsync()
 	s.fetcher.Start(ctx)
 }
 
 // Stop halts all data refresh operations
 func (s *MarketDataService) Stop() {
 	s.fetcher.Stop()
+	s.storage.WaitForStart()
 	s.UnsubscribeFromLeaderboard() //nolint:errcheck
 }
 
 // GetCombinedData returns cryptocurrency data with updated price information
 func (s *MarketDataService) GetCombinedData() []Cryptocurrency {
+	s.storage.WaitForStart()
 	return s.storage.GetCombinedData()
 }
 
@@ -156,6 +158,7 @@ func (s *MarketDataService) sendLeaderboardPageUpdate() {
 
 func (s *MarketDataService) FetchLeaderboardPageAsync(page, pageSize, sortOrder int, currency string) {
 	s.scheduler.Enqueue(fetchLeaderboardPageTask, func(ctx context.Context) (interface{}, error) {
+		s.storage.WaitForStart()
 		if s.storage.IsDataStale() {
 			s.fetcher.FetchMarkets(ctx) //nolint:errcheck
 		}

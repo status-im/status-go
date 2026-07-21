@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
 )
 
@@ -18,6 +19,7 @@ const DATA_STALE_THRESHOLD = 10 * time.Minute
 type DataStorage struct {
 	// Data and synchronization
 	cryptoData []Cryptocurrency
+	startWG    sync.WaitGroup
 
 	marketDataPersistence MarketDataPersistenceInterface
 	priceData             PriceMap
@@ -41,6 +43,19 @@ func (s *DataStorage) Start() {
 	s.dataMutex.Lock()
 	defer s.dataMutex.Unlock()
 	s.cryptoData, _ = s.marketDataPersistence.GetCryptocurrencies()
+}
+
+func (s *DataStorage) StartAsync() {
+	s.startWG.Add(1)
+	go func() {
+		defer common.LogOnPanic()
+		defer s.startWG.Done()
+		s.Start()
+	}()
+}
+
+func (s *DataStorage) WaitForStart() {
+	s.startWG.Wait()
 }
 
 // UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically
