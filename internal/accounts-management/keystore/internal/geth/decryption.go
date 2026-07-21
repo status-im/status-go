@@ -69,6 +69,54 @@ type cipherparamsJSON struct {
 	IV string `json:"iv"`
 }
 
+// DecryptPrivateKey decrypts only the private key portion of a keystore JSON blob.
+func DecryptPrivateKey(keyjson []byte, auth string) (*types.Key, error) {
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(keyjson, &m); err != nil {
+		return nil, err
+	}
+
+	var (
+		keyBytes, keyId []byte
+		err             error
+	)
+
+	subAccountIndex, ok := m["subaccountindex"].(float64)
+	if !ok {
+		subAccountIndex = 0
+	}
+
+	if version, ok := m["version"].(string); ok && version == "1" {
+		k := new(encryptedKeyJSONV1)
+		if err := json.Unmarshal(keyjson, k); err != nil {
+			return nil, err
+		}
+		keyBytes, keyId, err = decryptKeyV1(k, auth)
+	} else {
+		k := new(EncryptedKeyJSONV3)
+		if err := json.Unmarshal(keyjson, k); err != nil {
+			return nil, err
+		}
+		keyBytes, keyId, err = decryptKeyV3(k, auth)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	privateKey := crypto.ToECDSAUnsafe(keyBytes)
+	id, err := uuid.FromBytes(keyId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Key{
+		ID:              id,
+		Address:         crypto.PubkeyToAddress(privateKey.PublicKey),
+		PrivateKey:      privateKey,
+		SubAccountIndex: uint32(subAccountIndex),
+	}, nil
+}
+
 // DecryptKey decrypts a key from a json blob, returning the private key itself.
 func DecryptKey(keyjson []byte, auth string) (*types.Key, error) {
 	// Parse the json into a simple map to fetch the key version

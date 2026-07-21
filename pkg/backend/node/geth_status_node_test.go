@@ -19,7 +19,7 @@ func TestStatusNodeStart(t *testing.T) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
 
-	// StatusNode startup always creates & starts TokenManager, which requires at least one active network.
+	// StatusNode startup creates TokenManager, which requires at least one active network.
 	config.Networks = testutil.MinimalActiveNetworks()
 
 	n := New(nil, nil, testutils.MustCreateTestLogger())
@@ -46,12 +46,23 @@ func TestStatusNodeStart(t *testing.T) {
 	require.True(t, n.IsRunning())
 	require.NotNil(t, n.Config())
 	require.NotNil(t, n.RPCClient())
+	require.NotNil(t, n.TokenManager())
+	require.Nil(t, n.tokenManagerStartDone)
 
 	// try to start already started node
 	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
 
+	n.StartTokenManager()
+	startDone := n.tokenManagerStartDone
+	require.NotNil(t, startDone)
+
+	n.StartTokenManager()
+	require.Equal(t, startDone, n.tokenManagerStartDone)
+	<-startDone
+
 	// stop node
 	require.NoError(t, n.Stop())
+	require.Nil(t, n.tokenManagerStartDone)
 	// try to stop already stopped node
 	require.EqualError(t, n.Stop(), ErrNoRunningNode.Error())
 
@@ -67,7 +78,7 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	err := os.MkdirAll(keyStoreDir, os.ModePerm)
 	require.NoError(t, err)
 
-	// Start requires at least one active network because TokenManager is started during node startup.
+	// Start requires at least one active network because TokenManager is created during node startup.
 	config := params.NodeConfig{
 		RootDataDir: dir,
 		Networks:    testutil.MinimalActiveNetworks(),

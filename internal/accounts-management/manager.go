@@ -11,6 +11,7 @@ import (
 	accsmanagementerrors "github.com/status-im/status-go/internal/accounts-management/errors"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
@@ -117,8 +118,34 @@ func (m *AccountsManager) loadAccountInternally(address cryptotypes.Address, pas
 	return account, nil
 }
 
+func (m *AccountsManager) loadPrivateKeyInternally(address cryptotypes.Address, password string) (*generator.Account, error) {
+	if m.keystore == nil {
+		return nil, ErrKeystoreMissing
+	}
+
+	_, privateKey, err := m.keystore.AccountDecryptedPrivateKey(address, password)
+	if err != nil {
+		m.logger.Error("error loading account", zap.String("address", address.Hex()), zap.Error(err))
+		if errors.Is(err, keystore.ErrKeystoreFileMissing) {
+			m.logger.Error("cannot locate account for address", zap.String("address", address.Hex()))
+			return nil, keystore.ErrKeystoreFileMissing.Copy().WithContext("address", address.Hex())
+		}
+		return nil, err
+	}
+
+	return generator.NewAccount(privateKey, nil), nil
+}
+
 // SetChatAccount sets the chat account and keystore either by address and password or by private key
 func (m *AccountsManager) SetChatAccount(address cryptotypes.Address, password string, privateKey *ecdsa.PrivateKey) error {
+	return m.setChatAccount(address, password, privateKey, nil)
+}
+
+func (m *AccountsManager) SetChatAccountWithProfileKeypair(address cryptotypes.Address, password string, privateKey *ecdsa.PrivateKey, profileKeypair *accsmanagementtypes.Keypair) error {
+	return m.setChatAccount(address, password, privateKey, profileKeypair)
+}
+
+func (m *AccountsManager) setChatAccount(address cryptotypes.Address, password string, privateKey *ecdsa.PrivateKey, profileKeypair *accsmanagementtypes.Keypair) error {
 	if address == cryptotypes.ZeroAddress() && privateKey == nil {
 		return ErrAddressAndPasswordOrPrivateKeyRequired
 	}
@@ -131,7 +158,10 @@ func (m *AccountsManager) SetChatAccount(address cryptotypes.Address, password s
 		return nil
 	}
 
-	profileKeypair, err := m.persistence.GetProfileKeypair()
+	var err error
+	if profileKeypair == nil {
+		profileKeypair, err = m.persistence.GetProfileKeypair()
+	}
 	if err != nil {
 		return err
 	}
@@ -146,7 +176,7 @@ func (m *AccountsManager) SetChatAccount(address cryptotypes.Address, password s
 	if privateKey != nil {
 		selectedChatAccount = generator.NewAccount(privateKey, nil)
 	} else {
-		selectedChatAccount, err = m.loadAccountInternally(address, password)
+		selectedChatAccount, err = m.loadPrivateKeyInternally(address, password)
 		if err != nil {
 			return err
 		}

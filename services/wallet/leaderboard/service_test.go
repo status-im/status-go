@@ -20,6 +20,26 @@ type MockFetcher struct {
 	storage *DataStorage
 }
 
+type blockingMarketDataPersistence struct {
+	started chan struct{}
+	release chan struct{}
+	data    []Cryptocurrency
+}
+
+func (p *blockingMarketDataPersistence) UpsertCryptocurrencies([]Cryptocurrency) error {
+	return nil
+}
+
+func (p *blockingMarketDataPersistence) GetCryptocurrencies() ([]Cryptocurrency, error) {
+	close(p.started)
+	<-p.release
+	return p.data, nil
+}
+
+func (p *blockingMarketDataPersistence) DeleteCryptocurrencies([]string) error {
+	return nil
+}
+
 func NewMockFetcher(storage *DataStorage) *MockFetcher {
 	f := &MockFetcher{
 		storage: storage,
@@ -74,6 +94,51 @@ func TestServiceStartStop(t *testing.T) {
 
 	service.Start(context.Background())
 	service.Stop()
+}
+
+func TestServiceWaitsForAsyncStorageStart(t *testing.T) {
+	persistence := &blockingMarketDataPersistence{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		data:    mockCrypto,
+	}
+	storage := &DataStorage{
+		priceData:             make(PriceMap),
+		marketDataPersistence: persistence,
+	}
+	service := &MarketDataService{
+		storage:             storage,
+		fetcher:             &MockFetcher{storage: storage},
+		subscriptionManager: NewSubscriptionManager(),
+	}
+
+	service.Start(context.Background())
+	<-persistence.started
+
+	combinedData := make(chan []Cryptocurrency, 1)
+	go func() {
+		combinedData <- service.GetCombinedData()
+	}()
+	stopDone := make(chan struct{})
+	go func() {
+		service.Stop()
+		close(stopDone)
+	}()
+
+	select {
+	case <-combinedData:
+		t.Fatal("GetCombinedData returned before storage initialization completed")
+	default:
+	}
+	select {
+	case <-stopDone:
+		t.Fatal("Stop returned before storage initialization completed")
+	default:
+	}
+
+	close(persistence.release)
+	require.Equal(t, mockCrypto, <-combinedData)
+	<-stopDone
 }
 
 func TestUnsubscribeWhenNotSubscribed(t *testing.T) {
