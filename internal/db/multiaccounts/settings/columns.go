@@ -449,6 +449,11 @@ var (
 		dBColumnName:   "profile_migration_needed",
 		valueHandler:   BoolHandler,
 	}
+	AutoApplyKeypairMigrations = SettingField{
+		reactFieldName: "auto-apply-keypair-migrations",
+		dBColumnName:   "auto_apply_keypair_migrations",
+		valueHandler:   BoolHandler,
+	}
 	URLUnfurlingMode = SettingField{
 		reactFieldName: "url-unfurling-mode",
 		dBColumnName:   "url_unfurling_mode",
@@ -556,6 +561,7 @@ var (
 		AutoRefreshTokensEnabled,
 		LastTokensUpdate,
 		ThirdpartyServicesEnabled,
+		AutoApplyKeypairMigrations,
 	}
 )
 
