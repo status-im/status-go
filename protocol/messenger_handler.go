@@ -3197,41 +3197,42 @@ func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPo
 	return accs, nil
 }
 
-func (m *Messenger) handleProfileKeypairMigration(state *ReceivedMessageState, fromLocalPairing bool, message *protobuf.SyncKeypair) (handled bool, err error) {
+func (m *Messenger) handleProfileKeypairMigration(state *ReceivedMessageState, fromLocalPairing bool, message *protobuf.SyncKeypair) (migrationNeeded bool, err error) {
 	if message == nil {
-		return false, errors.New("handleProfileKeypairMigration receive a nil message")
+		err = errors.New("handleProfileKeypairMigration receive a nil message")
+		return
 	}
 
 	if fromLocalPairing {
-		return false, nil
+		return
 	}
 
 	if m.account.KeyUID != message.KeyUid {
-		return false, nil
+		return
 	}
 
-	dbKeypair, err := m.settings.GetKeypairByKeyUID(message.KeyUid)
+	var dbKeypair *accsmanagementtypes.Keypair
+	dbKeypair, err = m.settings.GetKeypairByKeyUID(message.KeyUid)
 	if err != nil {
-		return false, err
+		return
 	}
 
 	if dbKeypair.Clock >= message.Clock {
-		return false, nil
+		return
 	}
 
-	migrationNeeded := dbKeypair.MigratedToColdWallet() && message.ColdWallet == "" || // `true` if profile keypair cold wallet was removed on one of paired devices
+	migrationNeeded = dbKeypair.MigratedToColdWallet() && message.ColdWallet == "" || // `true` if profile keypair cold wallet was removed on one of paired devices
 		!dbKeypair.MigratedToColdWallet() && message.ColdWallet != "" // `true` if profile keypair was migrated to a cold wallet on one of paired devices
 	err = m.settings.SaveSettingField(settings2.ProfileMigrationNeeded, migrationNeeded)
 	if err != nil {
-		return false, err
+		return
 	}
 
 	state.Response.AddSetting(&settings2.SyncSettingField{SettingField: settings2.ProfileMigrationNeeded, Value: migrationNeeded})
-
-	return migrationNeeded, nil
+	return
 }
 
-func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPairing bool, acNofificationCallback func() error) (*accsmanagementtypes.Keypair, error) {
+func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPairing bool, applyColdWalletState bool, acNofificationCallback func() error) (*accsmanagementtypes.Keypair, error) {
 	if message == nil {
 		return nil, errors.New("handleSyncKeypair receive a nil message")
 	}
@@ -3267,9 +3268,19 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		for _, acc := range dbKeypair.Accounts {
 			oldAddresses[acc.Address] = !acc.Removed
 		}
+
+		// Keep this device's signing method (auto-apply disabled, or a profile conversion
+		// flow is pending): preserve the local cold wallet state instead of adopting the
+		// wire value; all other fields still apply. For keypairs unknown locally there is
+		// no state to preserve, the wire value is used.
+		if !applyColdWalletState {
+			kp.ColdWallet = dbKeypair.ColdWallet
+		}
 	}
 
-	syncKpMigratedToKeycard := message.ColdWallet != ""
+	// Intentionally derived from the effective (possibly preserved) value, not the wire value,
+	// so the operability transitions below stay consistent with what will be stored.
+	syncKpMigratedToKeycard := kp.ColdWallet != ""
 
 	for _, sAcc := range message.Accounts {
 		accountOperability, err := m.resolveAccountOperability(sAcc,
@@ -3285,6 +3296,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 	}
 
 	if !fromLocalPairing &&
+		applyColdWalletState &&
 		dbKeypair != nil &&
 		!dbKeypair.MigratedToColdWallet() &&
 		syncKpMigratedToKeycard {
@@ -3452,17 +3464,33 @@ func (m *Messenger) handleSyncKeypairInternal(state *ReceivedMessageState, messa
 		}
 	}
 
-	// check for the profile keypair migration first on paired device
-	handled, err := m.handleProfileKeypairMigration(state, fromLocalPairing, message)
-	if err != nil {
-		return err
+	// The auto-apply setting is device-local: when disabled, incoming syncs update keypair metadata only and never change this device's signing method (cold wallet state).
+	// Local pairing bypasses it — the initial transfer must carry the full state.
+	autoApply := true
+	if !fromLocalPairing {
+		var err error
+		autoApply, err = m.settings.AutoApplyKeypairMigrations()
+		if err != nil {
+			return err
+		}
 	}
 
-	if handled {
-		return nil
+	applyColdWalletState := autoApply
+	if autoApply {
+		// check for the profile keypair migration first on paired device
+		migrationNeeded, err := m.handleProfileKeypairMigration(state, fromLocalPairing, message)
+		if err != nil {
+			return err
+		}
+
+		// Even the migration is needed, the metadata (name, accounts, colors, ...) still applies below, but the local
+		// cold wallet state is preserved until the user completes the migration flow
+		if migrationNeeded {
+			applyColdWalletState = false
+		}
 	}
 
-	kp, err := m.handleSyncKeypair(message, fromLocalPairing, func() error {
+	kp, err := m.handleSyncKeypair(message, fromLocalPairing, applyColdWalletState, func() error {
 		return m.addNewKeypairAddedOnPairedDeviceACNotification(message.KeyUid, state.Response)
 	})
 	if err != nil {

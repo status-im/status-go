@@ -81,6 +81,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.SendPushNotifications = true
 	s.InstallationID = messaging.GenerateInstallationID()
 	s.UseMailservers = true
+	s.AutoApplyKeypairMigrations = true
 
 	s.PreviewPrivacy = true
 	s.Currency = "usd"

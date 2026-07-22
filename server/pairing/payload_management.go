@@ -175,6 +175,7 @@ func (rmm *RawMessagePayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 		}
 	}
 	if syncRawMessage.SettingsJsonBytes != nil {
+		rmm.payload.setting.AutoApplyKeypairMigrations = true
 		err = json.Unmarshal(syncRawMessage.SettingsJsonBytes, rmm.payload.setting)
 		if err != nil {
 			return err
