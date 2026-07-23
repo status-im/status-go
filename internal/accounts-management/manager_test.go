@@ -537,6 +537,30 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 	}
 }
 
+func (s *ManagerTestSuite) TestReEncryptKeyStoreDirSkipsFilesystemMetadataFiles() {
+	keypair := s.createAndStoreProfileKeypair()
+
+	dsStorePath := filepath.Join(s.getKeyDir(), ".DS_Store")
+	s.Require().NoError(os.WriteFile(dsStorePath, []byte{0x00, 0x00, 0x00, 0x01}, 0600))
+
+	err := s.accManager.ReEncryptKeyStoreDir(testPassword, newTestPassword)
+	s.Require().NoError(err)
+
+	_, err = os.Stat(dsStorePath)
+	s.Require().True(os.IsNotExist(err))
+
+	accountsToCheck := []string{keypair.DerivedFrom}
+	for _, acc := range keypair.Accounts {
+		accountsToCheck = append(accountsToCheck, acc.Address.Hex())
+	}
+
+	for _, acc := range accountsToCheck {
+		account, err := s.accManager.LoadAccount(types2.HexToAddress(acc), newTestPassword)
+		s.Require().NoError(err)
+		s.Require().NotNil(account)
+	}
+}
+
 func (s *ManagerTestSuite) TestDeleteAccount() {
 	keypair := s.createAndStoreProfileKeypair()
 
