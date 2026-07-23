@@ -599,6 +599,17 @@ func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
 	return api.service.StartMessenger()
 }
 
+func (api *PublicAPI) ConnectionStatus() types2.ConnectionStatus {
+	if api.service == nil || api.service.messaging == nil {
+		return types2.ConnectionStatus{
+			IsOnline: false,
+			State:    types2.ConnectionStateDisconnected,
+		}
+	}
+
+	return api.service.messaging.ConnectionStatus()
+}
+
 func (api *PublicAPI) SetUserStatus(ctx context.Context, status int, customText string) error {
 	return api.service.messenger.SetUserStatus(ctx, status, customText)
 }
