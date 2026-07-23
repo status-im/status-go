@@ -47,6 +47,11 @@ func ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
 			return nil
 		}
 
+		// skip filesystem metadata files (e.g. .DS_Store created by macOS Finder) and other hidden files
+		if strings.HasPrefix(fileInfo.Name(), ".") {
+			return nil
+		}
+
 		rawKeyFile, e := ioutil.ReadFile(path)
 		if e != nil {
 			return fmt.Errorf("invalid account key file: %v", e)
