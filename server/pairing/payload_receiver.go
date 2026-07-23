@@ -456,17 +456,27 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 	}
 
 	for name, data := range kfps.keys {
-		found := false
+		address := ""
 		for _, key := range kfps.expectedKeystoreFilesToReceive {
 			if strings.Contains(name, strings.ToLower(key)) {
-				found = true
+				address = strings.ToLower(key)
+				break
 			}
 		}
-		if !found {
+		if address == "" {
 			continue
 		}
 
-		err := ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
+		// skip storing keystore file if it already exists
+		exists, err := keystoreFileForAddressExists(keyStorePath, address)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+
+		err = ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
 		if err != nil {
 			writeErr := fmt.Errorf("failed to write key to path '%s' : %w", filepath.Join(keyStorePath, name), err)
 			// If we get an error on any of the key files attempt to revert
@@ -488,4 +498,23 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 	}
 
 	return nil
+}
+
+func keystoreFileForAddressExists(keyStorePath, address string) (bool, error) {
+	entries, err := os.ReadDir(keyStorePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if strings.Contains(strings.ToLower(entry.Name()), address) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
