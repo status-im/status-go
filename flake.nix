@@ -14,17 +14,21 @@
 
   inputs = {
     # We are pinning the commit because ultimately we want to use same commit across different projects.
-    # A commit from nixpkgs 24.11 release : https://github.com/NixOS/nixpkgs/tree/release-24.11
-    nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
+    # A commit from nixpkgs 25.11 release : https://github.com/NixOS/nixpkgs/tree/release-25.11
+    # Same commit as used by logos-messaging/logos-delivery.
+    nixpkgs.url = "github:NixOS/nixpkgs/535f3e6942cb1cead3929c604320d3db54b542b9";
+    # We cannot do follows for lmn and logos-storage-nim: their pinned revisions
+    # don't evaluate against nixpkgs 25.11 (Android SDK version pins are gone from
+    # androidenv there). They use their own locked nixpkgs until we bump the revisions.
+    # For lmn the locked nixpkgs is the same 24.11 commit we used before,
+    # so cached libwaku artifacts are reused as-is.
     lmn = {
       url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=cccc8ab6fda0e54752936db0d5c80b02a2c34a3a";
-      inputs.nixpkgs.follows = "nixpkgs";
       # https://github.com/vacp2p/zerokit/commit/b1e4e485ad8e7a13b402c0ad2604ef879d927be4
       inputs.zerokit.url = "github:vacp2p/zerokit/b1e4e485ad8e7a13b402c0ad2604ef879d927be4";
     };
     logos-storage-nim = {
       url = "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&rev=3c09f008bb5266a669fd19f18368f9e8b861b664";
-      inputs.nixpkgs.follows = "nixpkgs";
       # https://github.com/logos-storage/circom-compat-ffi/pull/11
       inputs.circom-compat.url = "github:logos-storage/circom-compat-ffi/3cca4e91054a4d2bb5335feb19138362ce0fe417";
     };

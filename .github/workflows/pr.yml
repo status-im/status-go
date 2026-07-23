@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.24
+          go-version: 1.26
 
       - name: Get dependencies
         run: go mod download
@@ -56,7 +56,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.3.1
+          version: v2.12.2
           args: --build-tags=gowaku_no_rln,lint,use_logos_storage,use_torrent
 
       - name: lint-panics

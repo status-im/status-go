@@ -13,11 +13,14 @@ in mkShell {
 
   buildInputs = with pkgs; [
     git jq which gcc rustc cargo openjdk openssl nim go
-    golangci-lint go-junit-report gopls codecov-cli
-    protobuf3_24 protoc-gen-go gotestsum
+    golangci-lint go-junit-report gopls
+    protobuf_29 protoc-gen-go gotestsum
     libsds libwaku libstorage
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper
+  ] ++ lib.optionals (!(stdenv.isLinux && isAarch64)) [
+    # codecov.io stopped publishing linux-arm64 CLI binaries.
+    codecov-cli
   ];
 
   shellHook = ''
