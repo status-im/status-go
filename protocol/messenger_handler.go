@@ -2145,6 +2145,7 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		return ErrMessageNotAllowed
 	}
 
+	var communityChatAccessible = true
 	if chat.ChatType == ChatTypeCommunityChat {
 		communityID, err := types3.DecodeHex(chat.CommunityID)
 		if err != nil {
@@ -2176,6 +2177,9 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 				zap.String("communityID", chat.CommunityID))
 			return errors.New("received a messaged from banned user")
 		}
+
+		communityChatID := chat.CommunityChatID()
+		communityChatAccessible = community.CanView(&m.identity.PublicKey, communityChatID)
 	}
 
 	// It looks like status-mobile created profile chats as public chats
@@ -2209,7 +2213,7 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 	// Our own message, mark as sent
 	if isSyncMessage {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
-	} else if !receivedMessage.Seen {
+	} else if !receivedMessage.Seen && communityChatAccessible {
 		// Increase unviewed count
 		skipUpdateUnviewedCountForAlbums := false
 		if receivedMessage.ContentType == protobuf.ChatMessage_IMAGE {
