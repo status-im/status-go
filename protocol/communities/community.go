@@ -106,6 +106,7 @@ type Community struct {
 type ReadonlyCommunity interface {
 	ID() types.HexBytes
 	IsControlNode() bool
+	CanView(pk *ecdsa.PublicKey, chatID string) bool
 	CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error)
 	IsBanned(pk *ecdsa.PublicKey) bool
 }

@@ -826,6 +826,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 
+	bobChat, ok := s.bob.allChats.Load(chat.ID)
+	s.Require().True(ok)
+	unreadBeforeRestrictedMessage := bobChat.UnviewedMessagesCount
+
 	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
 		return ok && len(channel.Members) == 0
@@ -892,6 +896,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 	s.Require().True(community.ChannelHasPermissions(chat.CommunityChatID()))
 	s.Require().NoError(err)
 	s.Require().False(community.IsMemberLikelyInChat(chat.CommunityChatID()))
+
+	// Send a message while Bob cannot view the channel.
+	// Even if transport delivers it, unread count must not increase.
+	_ = s.sendChatMessage(s.owner, chat.ID, "message while bob cannot view channel")
+
+	_, err = s.bob.RetrieveAll()
+	s.Require().NoError(err)
+
+	bobChat, ok = s.bob.allChats.Load(chat.ID)
+	s.Require().True(ok)
+	s.Require().Equal(unreadBeforeRestrictedMessage, bobChat.UnviewedMessagesCount)
 
 	// make bob satisfy channel criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
