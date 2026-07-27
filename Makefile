@@ -189,7 +189,7 @@ ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 		cd "$(LOGOS_STORAGE_SOURCE_DIR)" && git fetch --tags; \
 	fi
 	cd "$(LOGOS_STORAGE_SOURCE_DIR)" && \
-		git switch --force --detach "$(LOGOS_STORAGE_VERSION)" && \
+		git switch --no-recurse-submodules --force --detach "$(LOGOS_STORAGE_VERSION)" && \
 		git clean -fdx && \
 		git submodule update --init --recursive --force
 endif
@@ -338,7 +338,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
 	fi
 	cd "$(NIM_SDS_SOURCE_DIR)" && \
-		git switch --force --detach "$(NIM_SDS_VERSION)" && \
+		git switch --no-recurse-submodules --force --detach "$(NIM_SDS_VERSION)" && \
 		git clean -fdx && \
 		git submodule update --init --recursive --force
 endif
