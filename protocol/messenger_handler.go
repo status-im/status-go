@@ -3273,6 +3273,10 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 			oldAddresses[acc.Address] = !acc.Removed
 		}
 
+		if message.Xpub == "" {
+			kp.XPub = dbKeypair.XPub
+		}
+
 		// Keep this device's signing method (auto-apply disabled, or a profile conversion
 		// flow is pending): preserve the local cold wallet state instead of adopting the
 		// wire value; all other fields still apply. For keypairs unknown locally there is

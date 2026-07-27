@@ -258,3 +258,30 @@ func (s *MessengerSyncKeypairsAutoApplySuite) TestProfileMigrationNeededNotSetWh
 		s.Require().Equal(accsmanagementtypes.AccountFullyOperable, acc.Operable)
 	}
 }
+
+// Regression: SaveOrUpdateKeypair writes xpub unconditionally, so an empty wire
+// xpub must not wipe a previously stored wallet xpub. UpdateKeypairXPub already
+// treats empty xpub as "leave unchanged"; the sync path should match.
+func (s *MessengerSyncKeypairsAutoApplySuite) TestEmptyWireXPubDoesNotWipeStoredXPub() {
+	const storedXPub = "xpub6BugbotRegressionWalletXPubDoNotWipeOnEmptySyncMessage"
+
+	kp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
+	kp.Clock = 1
+	kp.XPub = storedXPub
+	kp.ColdWallet = accsmanagementtypes.ColdWalletTypeStatusKeycard
+	for _, acc := range kp.Accounts {
+		acc.Operable = accsmanagementtypes.AccountFullyOperable
+	}
+	s.Require().NoError(s.m.settings.SaveOrUpdateKeypair(kp))
+
+	message := s.syncMessageFor(kp, 2, "Renamed On Paired Device", accsmanagementtypes.ColdWalletTypeStatusKeycard)
+	message.Xpub = ""
+
+	s.handleSync(message, false)
+
+	dbKp := s.dbKeypair(kp.KeyUID)
+	s.Require().Equal("Renamed On Paired Device", dbKp.Name)
+	s.Require().Equal(accsmanagementtypes.ColdWalletTypeStatusKeycard, dbKp.ColdWallet)
+	s.Require().Equal(storedXPub, dbKp.XPub, "empty SyncKeypair.xpub must leave the stored wallet xpub unchanged")
+}

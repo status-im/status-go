@@ -619,6 +619,62 @@ func (s *ManagerTestSuite) TestDeleteKeypair() {
 	s.Equal(0, len(files))
 }
 
+// Regression: CreateKeypairFromMnemonicAndStore documents that accounts are
+// stored to the keystore only when the keypair is not a cold wallet / keycard,
+// but the implementation always calls storeKeystoreFilesForAccounts.
+func (s *ManagerTestSuite) TestCreateKeypairFromMnemonicAndStoreDoesNotWriteKeystoreWhenCold() {
+	s.persistence.EXPECT().GetKeypairByKeyUID(s.masterAccount.KeyUID()).Return(
+		nil, types.ErrDbKeypairNotFound,
+	).Times(1)
+
+	s.persistence.EXPECT().GetPositionForNextNewAccount().Return(int64(0), nil).Times(1)
+
+	s.persistence.EXPECT().SaveOrUpdateKeypair(gomock.Any()).DoAndReturn(
+		func(kp *types.Keypair) error {
+			s.Require().Equal(types.ColdWalletTypeStatusKeycard, kp.ColdWallet)
+			return nil
+		},
+	).Times(1)
+
+	s.persistence.EXPECT().GetProfileKeypair().Return(
+		&types.Keypair{
+			KeyUID: s.masterAccount.KeyUID(),
+		},
+		nil,
+	).Times(1)
+
+	walletAccount := &types.AccountCreationDetails{
+		Path: common.PathDefaultWalletAccount,
+	}
+
+	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(
+		s.mnemonic, s.password, "kp-name", types.ColdWalletTypeStatusKeycard, walletAccount, true, 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(keypair)
+	s.Require().Equal(types.ColdWalletTypeStatusKeycard, keypair.ColdWallet)
+
+	files, err := os.ReadDir(s.getKeyDir())
+	s.Require().NoError(err)
+	s.Require().Empty(files, "cold wallet keypair must not persist private keys in the local keystore")
+}
+
+// Regression: MigrateKeypairToColdWallet must refuse an empty password instead of
+// silently flipping cold_wallet while leaving keystore files on disk.
+func (s *ManagerTestSuite) TestMigrateKeypairToColdWalletRequiresPassword() {
+	keypair := s.createAndStoreProfileKeypair()
+	keypair.Type = types.KeypairTypeSeed
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
+
+	err := s.accManager.MigrateKeypairToColdWallet(keypair.KeyUID, "", types.ColdWalletTypeStatusKeycard, 1)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, ErrNoPasswordProvided)
+
+	files, err := os.ReadDir(s.getKeyDir())
+	s.Require().NoError(err)
+	s.Require().Len(files, 3, "keystore files must remain until a password-backed wipe runs")
+}
+
 func (s *ManagerTestSuite) TestCleanKeystoreFiles() {
 	testCases := []struct {
 		name                     string

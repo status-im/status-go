@@ -93,10 +93,12 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 		return
 	}
 
-	// store accounts to keystore
-	err = m.storeKeystoreFilesForAccounts(masterAccount, derivedAccounts, password)
-	if err != nil {
-		return
+	// store accounts to keystore, unless the keypair lives on a cold wallet device
+	if coldWallet == types.ColdWalletTypeNone {
+		err = m.storeKeystoreFilesForAccounts(masterAccount, derivedAccounts, password)
+		if err != nil {
+			return
+		}
 	}
 
 	// set the chat account if it's a profile keypair
@@ -547,7 +549,11 @@ func (m *AccountsManager) MigrateKeypairToColdWallet(keyUID string, password str
 		return err
 	}
 
-	if !kpDb.MigratedToColdWallet() && password != "" {
+	if !kpDb.MigratedToColdWallet() {
+		if password == "" {
+			return ErrNoPasswordProvided
+		}
+
 		err = m.deleteKeystoreFilesForKeypairInternally(kpDb, password)
 		if err != nil {
 			return err
