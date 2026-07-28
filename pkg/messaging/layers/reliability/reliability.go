@@ -42,6 +42,10 @@ type MissingDependenciesHandler func(messageID string, missingDeps []string, cha
 // SDS message ID.
 type RetrievalHintProvider func(messageID string) []byte
 
+// MessageSentHandler is triggered when SDS confirms an outgoing message was
+// observed in an incoming message's bloom filter or causal history.
+type MessageSentHandler func(messageID string)
+
 type Reliability struct {
 	identity              *ecdsa.PrivateKey
 	mvdsPersistence       mvdsnode.Persistence
@@ -63,6 +67,9 @@ type Reliability struct {
 
 	retrievalHintProviderMu sync.RWMutex
 	retrievalHintProvider   RetrievalHintProvider
+
+	messageSentHandlerMu sync.RWMutex
+	messageSentHandler   MessageSentHandler
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
@@ -78,7 +85,7 @@ func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.Pr
 		missingDepsHandler:    missingDepsHandler,
 	}
 
-	r.sdsManager = newSdsReliabilityManager(logger.Named("sds"), r.handleMissingDependencies, r.provideRetrievalHint)
+	r.sdsManager = newSdsReliabilityManager(logger.Named("sds"), r.handleSDSMessageSent, r.handleMissingDependencies, r.provideRetrievalHint)
 
 	return r, nil
 }
@@ -95,6 +102,23 @@ func (r *Reliability) SetRetrievalHintProvider(provider RetrievalHintProvider) {
 	r.retrievalHintProviderMu.Lock()
 	defer r.retrievalHintProviderMu.Unlock()
 	r.retrievalHintProvider = provider
+}
+
+// SetMessageSentHandler configures the handler for outgoing SDS delivery
+// confirmations.
+func (r *Reliability) SetMessageSentHandler(handler MessageSentHandler) {
+	r.messageSentHandlerMu.Lock()
+	defer r.messageSentHandlerMu.Unlock()
+	r.messageSentHandler = handler
+}
+
+func (r *Reliability) handleSDSMessageSent(messageID sds.MessageID, _ string) {
+	r.messageSentHandlerMu.RLock()
+	handler := r.messageSentHandler
+	r.messageSentHandlerMu.RUnlock()
+	if handler != nil {
+		handler(string(messageID))
+	}
 }
 
 func (r *Reliability) provideRetrievalHint(messageID sds.MessageID) []byte {

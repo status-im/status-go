@@ -440,8 +440,11 @@ func SetLightClient(db *sql.DB, enabled bool) error {
 }
 
 func SetStoreConfirmationForMessagesSent(db *sql.DB, enabled bool) error {
-	_, err := db.Exec(`UPDATE wakuv2_config SET enable_store_confirmation_for_messages_sent = ?`, enabled)
-	return err
+	// Deprecated compatibility API. Publication success now determines sent
+	// status, so this flag must not alter persisted or runtime behavior.
+	_ = db
+	_ = enabled
+	return nil
 }
 
 func SetLogLevel(db *sql.DB, logLevel string) error {

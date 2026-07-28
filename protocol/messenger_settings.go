@@ -13,6 +13,8 @@ func (m *Messenger) SetLightClient(request *requests.SetLightClient) error {
 }
 
 func (m *Messenger) SetStoreConfirmationForMessagesSent(request *requests.SetStoreConfirmationForMessagesSent) error {
+	// Deprecated compatibility API; the setting no longer affects delivery
+	// tracking and intentionally performs no configuration change.
 	return nodecfg.SetStoreConfirmationForMessagesSent(m.database, request.Enabled)
 }
 

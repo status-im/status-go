@@ -674,6 +674,25 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 	}
 }
 
+// TrackWithSDSAlias tracks an application message for publish confirmation and
+// associates its SDS ID solely for SDS retrieval hints and delivery callbacks.
+func (t *Transport) TrackWithSDSAlias(applicationMessageID, sdsMessageID []byte, hashes [][]byte, newMessages []*types.NewMessage) {
+	if t.envelopesMonitor == nil {
+		return
+	}
+	t.Track(applicationMessageID, hashes, newMessages)
+	t.envelopesMonitor.AddSDSAlias(applicationMessageID, sdsMessageID)
+}
+
+// TakeApplicationMessageIDForSDS resolves and consumes an outgoing SDS ID's
+// application message ID after its delivery confirmation.
+func (t *Transport) TakeApplicationMessageIDForSDS(sdsMessageID []byte) ([]byte, bool) {
+	if t.envelopesMonitor == nil {
+		return nil, false
+	}
+	return t.envelopesMonitor.TakeApplicationMessageIDForSDS(sdsMessageID)
+}
+
 // TrackedEnvelopeHashes returns all tracked envelope hashes for a given message
 // identifier. A single message maps to multiple envelopes when it is split by
 // the segmentation layer. The returned hashes are hex-encoded (0x-prefixed).

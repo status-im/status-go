@@ -52,7 +52,8 @@ type WakuV2Config struct {
 	// AutoUpdate instructs the node to update their own ip address and port with the values seen by other nodes
 	AutoUpdate bool
 
-	// EnableStoreConfirmationForMessagesSent indicates whether storenodes must be queried periodically to confirm if messages sent are actually propagated in the network
+	// Deprecated: retained for compatibility; sent status is based on successful
+	// publication and does not query store nodes.
 	EnableStoreConfirmationForMessagesSent bool
 }
 

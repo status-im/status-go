@@ -12,3 +12,10 @@ type SentMessage struct {
 	Installations []*types.Installation
 	MessageIDs    [][]byte
 }
+
+// DeliveredMessage identifies application messages confirmed delivered by a
+// reliability layer. Community SDS confirmations are translated to application
+// message IDs before this event is published.
+type DeliveredMessage struct {
+	MessageIDs [][]byte
+}

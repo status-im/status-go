@@ -151,7 +151,7 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 	)
 
 	if len(sdsMessageIDBytes) > 0 {
-		s.stack.Transport.TrackMany([][]byte{[]byte(messageID), sdsMessageIDBytes}, hashes, wakuMessages)
+		s.stack.Transport.TrackWithSDSAlias([]byte(messageID), sdsMessageIDBytes, hashes, wakuMessages)
 	} else {
 		s.stack.Transport.Track(messageID, hashes, wakuMessages)
 	}

@@ -44,23 +44,25 @@ type Config struct {
 	// Mode selects Core (full/relay, the default) vs Edge (light). It derives the
 	// peer-exchange / discv5 flags below and is the single source of truth for
 	// the light-vs-full distinction (see IsLightClient).
-	Mode                                   Mode             `toml:",omitempty"`
-	WakuNodes                              []string         `toml:",omitempty"`
-	DiscV5BootstrapNodes                   []string         `toml:",omitempty"`
-	Nameserver                             string           `toml:",omitempty"` // Optional nameserver to use for dns discovery
-	Resolver                               ethdisc.Resolver `toml:",omitempty"` // Optional resolver to use for dns discovery
-	EnableDiscV5                           bool             `toml:",omitempty"` // Indicates whether discv5 is enabled or not
-	DiscoveryLimit                         int              `toml:",omitempty"` // Indicates the number of nodes to discover with peer exchange client
-	AutoUpdate                             bool             `toml:",omitempty"`
-	UDPPort                                int              `toml:",omitempty"`
-	MetricsEnabled                         bool             `toml:",omitempty"`
-	DefaultShardPubsubTopic                string           `toml:",omitempty"` // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
-	DefaultShardedPubsubTopics             []string         `toml:", omitempty"`
-	ClusterID                              uint16           `toml:",omitempty"`
-	EnableConfirmations                    bool             `toml:",omitempty"` // Enable sending message confirmations
-	SkipPublishToTopic                     bool             `toml:",omitempty"` // Used in testing
-	EnableStoreConfirmationForMessagesSent bool             `toml:",omitempty"` //Flag that enables checking with store node for sent message confimration
-	UseThrottledPublish                    bool             `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
+	Mode                       Mode             `toml:",omitempty"`
+	WakuNodes                  []string         `toml:",omitempty"`
+	DiscV5BootstrapNodes       []string         `toml:",omitempty"`
+	Nameserver                 string           `toml:",omitempty"` // Optional nameserver to use for dns discovery
+	Resolver                   ethdisc.Resolver `toml:",omitempty"` // Optional resolver to use for dns discovery
+	EnableDiscV5               bool             `toml:",omitempty"` // Indicates whether discv5 is enabled or not
+	DiscoveryLimit             int              `toml:",omitempty"` // Indicates the number of nodes to discover with peer exchange client
+	AutoUpdate                 bool             `toml:",omitempty"`
+	UDPPort                    int              `toml:",omitempty"`
+	MetricsEnabled             bool             `toml:",omitempty"`
+	DefaultShardPubsubTopic    string           `toml:",omitempty"` // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
+	DefaultShardedPubsubTopics []string         `toml:", omitempty"`
+	ClusterID                  uint16           `toml:",omitempty"`
+	EnableConfirmations        bool             `toml:",omitempty"` // Enable sending message confirmations
+	SkipPublishToTopic         bool             `toml:",omitempty"` // Used in testing
+	// Deprecated: retained for configuration compatibility. Sent status is based
+	// on successful publication and never queries a store node.
+	EnableStoreConfirmationForMessagesSent bool `toml:",omitempty"`
+	UseThrottledPublish                    bool `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
 }
 
 // IsLightClient reports whether the node is a light (Edge) node. Mode is the
