@@ -27,7 +27,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig, true)
 
-	require.Len(t, actualNetworks, 29)
+	require.Len(t, actualNetworks, 31)
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
@@ -58,6 +58,8 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		case common.ScrollSepolia:
 		case common.BlastMainnet:
 		case common.BlastSepolia:
+		case common.RobinhoodMainnet:
+		case common.RobinhoodTestnet:
 		case common.BSCMainnet:
 		case common.BSCTestnet:
 		default:

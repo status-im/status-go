@@ -130,7 +130,7 @@ func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
 	switch chainID {
 	case common.EthereumMainnet, common.EthereumHoodi, common.EthereumSepolia, common.AnvilMainnet, common.BSCMainnet, common.BSCTestnet:
 		return gas.ChainClassL1, nil
-	case common.ArbitrumMainnet, common.ArbitrumSepolia:
+	case common.ArbitrumMainnet, common.ArbitrumSepolia, common.RobinhoodMainnet, common.RobinhoodTestnet:
 		return gas.ChainClassArbStack, nil
 	case common.OptimismMainnet, common.OptimismSepolia, common.BaseMainnet, common.BaseSepolia, common.UnichainMainnet,
 		common.UnichainSepolia, common.InkMainnet, common.InkSepolia, common.AbstractMainnet, common.AbstractTestnet,
