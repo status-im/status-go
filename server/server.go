@@ -246,12 +246,39 @@ func (s *Server) applyHandlers() {
 	s.server.Handler = mux
 }
 
+// listenerAlive verifies the bound listener actually accepts connections.
+// On iOS a process suspension can kill the listening socket without the accept
+// loop ever returning an error, leaving `running` true while every client
+// connect is refused (observed when the app is suspended on the login screen,
+// before the pausable-services bridge has anything to drive).
+func (s *Server) listenerAlive() bool {
+	addr := s.GetListeningAddrPort()
+	if addr == "" {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
 func (s *Server) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.running.Load() {
-		return nil
+		if s.listenerAlive() {
+			return nil
+		}
+		s.logger.Warn("server marked running but listener is dead; rebinding")
+		currentServer := s.server
+		s.running.Store(false)
+		s.mu.Unlock()
+		_ = currentServer.Close()
+		s.serveWg.Wait()
+		s.mu.Lock()
 	}
 
 	// Once Shutdown has been called on a server, it may not be reused;
