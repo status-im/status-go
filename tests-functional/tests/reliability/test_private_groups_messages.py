@@ -49,11 +49,23 @@ class TestPrivateGroupMessages:
 
         with messenger.node_pause(community_member):
             message_text = f"test_message_{uuid4()}"
-            community_admin.wakuext_service.send_group_chat_message(private_group_id, message_text)
+            response = community_admin.wakuext_service.send_group_chat_message(private_group_id, message_text)
+            message_id = response.get("messages", [])[0].get("id", "")
+            assert message_id, "Sender did not get a message id back"
             sleep(30)
-        with community_member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_text):
+        with community_member.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=message_text,
+            start="beginning",
+            timeout=60,
+        ):
             pass
-        with community_admin.expect_signal(SignalType.MESSAGE_DELIVERED):
+        with community_admin.expect_signal(
+            SignalType.MESSAGE_DELIVERED,
+            pattern=message_id,
+            start="beginning",
+            timeout=60,
+        ):
             pass
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
