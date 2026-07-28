@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-const sdsForCommunitiesEnabled = false
+const sdsForCommunitiesEnabled = true
 
 type publicSDSWrapper interface {
 	WrapPayloadForSDS(payload []byte, channelID string) (wrappedPayload []byte, messageID []byte, err error)
