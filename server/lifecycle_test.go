@@ -129,3 +129,33 @@ func TestServerToBackgroundReturnsPromptlyAndStopsAcceptingConnections(t *testin
 		t.Fatal("timed out waiting for blocked request to finish")
 	}
 }
+
+// Simulates the iOS suspension failure: the OS kills the listening socket
+// without the accept loop returning (running stays true), so a later Start()
+// must detect the dead listener and rebind instead of early-returning.
+func TestStartRebindsWhenListenerDiesSilently(t *testing.T) {
+	s := NewServer(zap.NewNop(), &Config{
+		AddrPort: netip.MustParseAddrPort("127.0.0.1:0"),
+	})
+
+	require.NoError(t, s.Start())
+	require.Eventually(t, func() bool {
+		return s.GetPort() != 0 && s.listenerAlive()
+	}, time.Second, 10*time.Millisecond)
+	firstPort := s.GetPort()
+
+	// Kill the listener out from under the server; Serve returns an error and
+	// the serve goroutine exits, but on iOS running can remain true — force
+	// that state to model it.
+	require.NoError(t, s.listener.Close())
+	s.serveWg.Wait()
+	s.running.Store(true)
+	require.False(t, s.listenerAlive())
+
+	require.NoError(t, s.Start())
+	require.Eventually(t, func() bool {
+		return s.IsRunning() && s.listenerAlive()
+	}, time.Second, 10*time.Millisecond)
+	require.Equal(t, firstPort, s.GetPort())
+	require.NoError(t, s.Stop())
+}

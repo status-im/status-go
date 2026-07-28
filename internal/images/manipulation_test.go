@@ -146,7 +146,7 @@ func TestCrop(t *testing.T) {
 		{
 			"elephant.jpg",
 			[]params{
-				{topLeftSquare, topLeftSquare, 1459, nil},
+				{topLeftSquare, topLeftSquare, 1455, nil},
 				{offsetSquare, rect, 0, errors.New("crop dimensions out of bounds of image, image width '80px' & height '80px'; crop bottom right coordinate at X '160px' Y '160px'")},
 				{outOfBoundsSquare, rect, 0, errors.New("crop dimensions out of bounds of image, image width '80px' & height '80px'; crop bottom right coordinate at X '1000000px' Y '1000000px'")},
 			},
@@ -155,7 +155,7 @@ func TestCrop(t *testing.T) {
 			"rose.webp",
 			[]params{
 				{topLeftSquare, topLeftSquare, 1183, nil},
-				{offsetSquare, offsetSquare, 1251, nil},
+				{offsetSquare, offsetSquare, 1252, nil},
 				{outOfBoundsSquare, rect, 0, errors.New("crop dimensions out of bounds of image, image width '400px' & height '301px'; crop bottom right coordinate at X '1000000px' Y '1000000px'")},
 			},
 		},
@@ -163,7 +163,7 @@ func TestCrop(t *testing.T) {
 			"spin.gif",
 			[]params{
 				{topLeftSquare, topLeftSquare, 693, nil},
-				{offsetSquare, offsetSquare, 1339, nil},
+				{offsetSquare, offsetSquare, 1337, nil},
 				{outOfBoundsSquare, rect, 0, errors.New("crop dimensions out of bounds of image, image width '256px' & height '256px'; crop bottom right coordinate at X '1000000px' Y '1000000px'")},
 			},
 		},

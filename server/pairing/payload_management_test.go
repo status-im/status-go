@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/pkg/backend"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server/servertest"
 )
@@ -28,6 +30,37 @@ const (
 	password    = "password"
 	keyUID      = "0x6b9a74f33316e02479c33ed23cf16e0408dca3e1b9ab8f361630859543eb0d46"
 )
+
+func TestRawMessagePayloadMarshallerTransfersAutoApplyKeypairMigrations(t *testing.T) {
+	// the device-local auto-apply setting is inherited once, at pairing time: an
+	// explicitly disabled value on the sending device must survive the transfer
+	sender := NewRawMessagesPayload()
+	sender.setting.KeyUID = keyUID
+	sender.setting.AutoApplyKeypairMigrations = false
+
+	data, err := NewRawMessagePayloadMarshaller(sender).MarshalProtobuf()
+	require.NoError(t, err)
+
+	receiver := NewRawMessagesPayload()
+	require.NoError(t, NewRawMessagePayloadMarshaller(receiver).UnmarshalProtobuf(data))
+	require.Equal(t, keyUID, receiver.setting.KeyUID)
+	require.False(t, receiver.setting.AutoApplyKeypairMigrations)
+}
+
+func TestRawMessagePayloadMarshallerDefaultsAutoApplyKeypairMigrationsForOlderSenders(t *testing.T) {
+	// a sender running an older version doesn't carry the key in its settings JSON;
+	// the receiver must fall back to enabled (the setting's default) instead of false
+	syncRawMessage := &protobuf.SyncRawMessage{
+		SettingsJsonBytes: []byte(`{"key-uid":"` + keyUID + `"}`),
+	}
+	data, err := proto.Marshal(syncRawMessage)
+	require.NoError(t, err)
+
+	receiver := NewRawMessagesPayload()
+	require.NoError(t, NewRawMessagePayloadMarshaller(receiver).UnmarshalProtobuf(data))
+	require.Equal(t, keyUID, receiver.setting.KeyUID)
+	require.True(t, receiver.setting.AutoApplyKeypairMigrations)
+}
 
 var (
 	expected = multiaccounts.Account{

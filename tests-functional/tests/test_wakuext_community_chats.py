@@ -30,7 +30,7 @@ class TestCommunityChats:
         display_name = "chat_" + str(uuid4())
         return {
             "identity": {
-                "displayName": display_name,
+                "display_name": display_name,
                 "emoji": "😀",
                 "color": "#1f2c75",
                 "description": display_name,
@@ -48,7 +48,7 @@ class TestCommunityChats:
         assert len(communities) == 1
         community_chats = communities[0].get("chats")
 
-        # assert chats[0].get("displayName") == chat_payload["identity"]["displayName"] #  https://github.com/status-im/status-go/issues/6985
+        assert chats[0].get("name") == chat_payload["identity"]["display_name"]
         assert chats[0].get("color") == chat_payload["identity"]["color"]
         assert chats[0].get("emoji") == chat_payload["identity"]["emoji"]
         assert chats[0].get("description") == chat_payload["identity"]["description"]
@@ -58,7 +58,7 @@ class TestCommunityChats:
         chats_by_position = {chat["position"]: chat for chat in community_chats.values()}
         # position 1 should be the default chat
         assert chats_by_position[0].get("name") == "general"
-        # assert chats_by_position[1].get("name") == chat_payload["identity"]["displayName"] # https://github.com/status-im/status-go/issues/6985
+        assert chats_by_position[1].get("name") == chat_payload["identity"]["display_name"]
         assert chats_by_position[1].get("hideIfPermissionsNotMet") == chat_payload["hideIfPermissionsNotMet"]
         assert chats_by_position[1].get("permissions") == chat_payload["permissions"]
         added_chat_id = chats_by_position[1].get("id")
@@ -68,13 +68,14 @@ class TestCommunityChats:
 
         edit_payload = {
             "identity": {
-                "displayName": "edited_" + str(uuid4()),
+                "display_name": "edited_" + str(uuid4()),
                 "emoji": "🔑",
                 "color": "#212331",
                 "description": "edited_" + str(uuid4()),
             }
         }
         edit_resp = creator.wakuext_service.edit_community_chat(community_id, added_chat_id, edit_payload)
+        assert edit_resp.get("chats")[0].get("name") == edit_payload["identity"]["display_name"]
         assert edit_resp.get("chats")[0].get("color") == edit_payload["identity"]["color"]
         assert edit_resp.get("chats")[0].get("emoji") == edit_payload["identity"]["emoji"]
         assert edit_resp.get("chats")[0].get("description") == edit_payload["identity"]["description"]

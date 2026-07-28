@@ -248,7 +248,7 @@ networkid ?= StatusChain
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
-DOCKER_TEST_IMAGE = golang:1.13
+DOCKER_TEST_IMAGE = golang:1.26.5-trixie
 
 GO_CMD_PATHS := $(filter-out library, $(wildcard cmd/*))
 GO_CMD_NAMES := $(notdir $(GO_CMD_PATHS))

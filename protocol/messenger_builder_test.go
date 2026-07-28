@@ -274,9 +274,10 @@ func (u *unhandledMessagesTracker) addMessage(msg *common.StatusMessage, err err
 
 func newTestSettings() *settings2.Settings {
 	return &settings2.Settings{
-		DisplayName:               DefaultProfileDisplayName,
-		ProfilePicturesShowTo:     1,
-		ProfilePicturesVisibility: 1,
-		URLUnfurlingMode:          settings2.URLUnfurlingAlwaysAsk,
+		DisplayName:                DefaultProfileDisplayName,
+		ProfilePicturesShowTo:      1,
+		ProfilePicturesVisibility:  1,
+		URLUnfurlingMode:           settings2.URLUnfurlingAlwaysAsk,
+		AutoApplyKeypairMigrations: true,
 	}
 }

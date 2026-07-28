@@ -23,6 +23,20 @@ linters:
     gosec:
       excludes:
         - G115
+        # TODO: triage findings from rules added between golangci-lint 2.3 and 2.12
+        - G117
+        - G118
+        - G122
+        - G201
+        - G202
+        - G602
+        - G703
+        - G704
+        - G705
+    govet:
+      disable:
+        # TODO: clean up deprecated io/ioutil usages, then enable
+        - inline
   exclusions:
     generated: lax
     presets:
@@ -53,6 +67,11 @@ linters:
         text: lib._Ctype_char, which can be annoying to use
       - path: (.+)\.go$
         text: SA1019
+      # golangci-lint 2.12 detects hardcoded test credentials that 2.3 did not.
+      - linters:
+          - gosec
+        path: _test\.go$
+        text: 'G101:'
 
 formatters:
   enable:
