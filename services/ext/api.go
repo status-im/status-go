@@ -1347,10 +1347,6 @@ func (api *PublicAPI) SetLightClient(request *requests.SetLightClient) error {
 	return api.service.messenger.SetLightClient(request)
 }
 
-func (api *PublicAPI) SetStoreConfirmationForMessagesSent(request *requests.SetStoreConfirmationForMessagesSent) error {
-	return api.service.messenger.SetStoreConfirmationForMessagesSent(request)
-}
-
 // Deprecated: Use SetLogLevel from status.go instead. BTW, mobile don't use this anymore.
 func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
 	return api.service.messenger.SetLogLevel(request)

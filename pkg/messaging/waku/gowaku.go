@@ -108,8 +108,6 @@ type IMetricsHandler interface {
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerConnFailures(peerConnFailures map[string]int)
-	PushMessageCheckSuccess()
-	PushMessageCheckFailure()
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
@@ -1159,10 +1157,6 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.MetricsEnabled {
 		sender.WithMessageSentEmitter(w.node.Host())
 	}
-
-	// EnableStoreConfirmationForMessagesSent is retained for configuration
-	// compatibility only. Sent status is confirmed by successful publication, so
-	// no store-node message checker is installed.
 
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
 		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
