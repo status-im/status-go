@@ -506,7 +506,7 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "Outgoing messages will be marked as failed if it's not get stored in 10 seconds.",
+      "description": "Successful publishing marks outgoing messages sent immediately.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -593,30 +593,19 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "increase(waku_store_query_successes_total[5m])",
+          "expr": "increase(waku_envelope_sent_errors_total[5m])",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
           "instant": false,
           "interval": "",
-          "legendFormat": "Store Success (5m)",
+          "legendFormat": "Publish failures (5m)",
           "range": true,
           "refId": "B",
           "useBackend": false
-        },
-        {
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "increase(waku_store_query_failures_total[5m])",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "legendFormat": "Store Failed (5m)",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
         }
       ],
-      "title": "Message Stored Check",
+      "title": "Publish Failures",
       "type": "timeseries"
     },
     {

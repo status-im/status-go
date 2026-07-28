@@ -59,10 +59,7 @@ type Config struct {
 	ClusterID                  uint16           `toml:",omitempty"`
 	EnableConfirmations        bool             `toml:",omitempty"` // Enable sending message confirmations
 	SkipPublishToTopic         bool             `toml:",omitempty"` // Used in testing
-	// Deprecated: retained for configuration compatibility. Sent status is based
-	// on successful publication and never queries a store node.
-	EnableStoreConfirmationForMessagesSent bool `toml:",omitempty"`
-	UseThrottledPublish                    bool `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
+	UseThrottledPublish        bool             `toml:",omitempty"` // Flag that indicates whether a rate limited priority queue will be used to send messages or not
 }
 
 // IsLightClient reports whether the node is a light (Edge) node. Mode is the

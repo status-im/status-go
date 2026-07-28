@@ -51,9 +51,7 @@ type CreateAccount struct {
 
 	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient bool    `json:"wakuV2LightClient"`
-	// Deprecated compatibility field; it no longer affects message status.
-	WakuV2EnableStoreConfirmationForMessagesSent bool   `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
-	WakuV2Fleet                                  string `json:"wakuV2Fleet"`
+	WakuV2Fleet       string  `json:"wakuV2Fleet"`
 
 	LogLevel    *string `json:"logLevel"`
 	LogFilePath string  `json:"logFilePath"` // absolute path

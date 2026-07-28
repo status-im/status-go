@@ -97,8 +97,7 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		return
 	}
 
-	// A successful publish is the authoritative sent confirmation. Store-node
-	// presence is deliberately not part of message status tracking.
+	// A successful publish is the authoritative sent confirmation.
 	w.SendEnvelopeEvent(common.EnvelopeEvent{
 		Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
 		Event: common.EventEnvelopeSent,

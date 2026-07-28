@@ -86,14 +86,6 @@ func (c *Client) PushPeerConnFailures(peerConnFailures map[string]int) {
 	}
 }
 
-func (c *Client) PushMessageCheckSuccess() {
-	metrics.StoreQuerySuccesses.Inc()
-}
-
-func (c *Client) PushMessageCheckFailure() {
-	metrics.StoreQueryFailures.Inc()
-}
-
 func (c *Client) PushPeerCountByShard(peerCountByShard map[uint16]uint) {
 	for shard, count := range peerCountByShard {
 		metrics.PeersByShard.WithLabelValues(strconv.FormatUint(uint64(shard), 10)).Set(float64(count))

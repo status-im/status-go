@@ -379,7 +379,7 @@ type wakuParams struct {
 
 	// port / udpPort / nameserver are the only node settings a caller configures
 	// (zero/empty falls back to the waku defaults). Everything else — host,
-	// discovery limit, max message size, store-confirmation, etc. — is defaulted
+	// discovery limit, max message size, etc. — is defaulted
 	// by the waku layer or derived from the mode.
 	port       int
 	udpPort    int
