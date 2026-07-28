@@ -8,22 +8,22 @@
 
 let
   optionalString = pkgs.lib.optionalString;
+
+  # Fixes fatal: not a git repository (or any of the parent directories): .git
+  fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
 in pkgs.buildGoModule {
   pname = "status-go";
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
+
+  # WARNING: Needs to be updated when go.mod is changed.
   vendorHash = "sha256-0QqHYOfGHYevs6I4ZbO8Fr4umeadgYk4LA52pApbe34=";
 
   inherit meta version;
 
-  nativeBuildInputs = let
-    # Fixes fatal: not a git repository (or any of the parent directories): .git
-    fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
-  in
-    with pkgs; [
-      mockgen
-      protoc-gen-go
-      protobuf_29
-      fakeGit
+  nativeBuildInputs = with pkgs; [
+    mockgen
+    protoc-gen-go
+    protobuf_29
   ];
 
   phases = ["unpackPhase" "configurePhase" "buildPhase"];
@@ -38,13 +38,16 @@ in pkgs.buildGoModule {
   # FIXME: Remove this when go 1.23 or later versions fix this madness.
   allowGoReference = true;
 
-  # Code generation should be run before buildPhase because buildGoModule
-  # performs dependency inspection before buildPhase, and will fail if generated files are missing.
-  preBuild = ''
-    # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
+  # Fix /homeless-shelter error and provide commit without affecting go modules.
+  preConfigure = ''
     export HOME=$TMPDIR
+    export PATH="${fakeGit}/bin:$PATH"
+  '';
 
-   make generate GO_GENERATE_CMD='go generate'
+  # Code generation should be run before buildPhase because buildGoModule
+  # performs deps check before buildPhase, and will fail without generated files.
+  preBuild = ''
+    make generate GO_GENERATE_CMD='go generate'
   '';
 
   # Build the Go library
