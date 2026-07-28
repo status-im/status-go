@@ -3,12 +3,8 @@
 let
   inherit (pkgs) lib stdenv;
   inherit (stdenv.hostPlatform) isDarwin isWindows isCygwin isAarch64;
-  /* Override the default SDK to enable darwin-x86_64 builds */
-  appleSdk11Stdenv = pkgs.overrideSDK stdenv "11.0";
-  sdk11mkShell = pkgs.mkShell.override { stdenv = appleSdk11Stdenv; };
-  mkShell = if isDarwin then sdk11mkShell else pkgs.mkShell;
 
-in mkShell {
+in pkgs.mkShell {
   name = "status-go-shell";
 
   buildInputs = with pkgs; [
@@ -19,7 +15,6 @@ in mkShell {
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper
   ] ++ lib.optionals (!(stdenv.isLinux && isAarch64)) [
-    # codecov.io stopped publishing linux-arm64 CLI binaries.
     codecov-cli
   ];
 
