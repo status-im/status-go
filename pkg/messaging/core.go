@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
+	"github.com/status-im/status-go/pkg/messaging/events"
 	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
@@ -51,6 +52,10 @@ type Core struct {
 
 type sdsEnvelopeHashesTracker interface {
 	TrackedEnvelopeHashes(identifier []byte) ([]string, error)
+}
+
+type sdsApplicationMessageIDTracker interface {
+	TakeApplicationMessageIDForSDS(sdsMessageID []byte) ([]byte, bool)
 }
 
 // Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
@@ -163,6 +168,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	}
 
 	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
+	stack.Reliability.SetMessageSentHandler(core.handleSDSMessageSent)
 
 	return core, nil
 }
@@ -207,6 +213,31 @@ func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker,
 
 func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
 	return buildSDSRetrievalHint(c.logger, c.stack.Transport, messageID)
+}
+
+func (c *Core) handleSDSMessageSent(sdsMessageID string) {
+	publishSDSMessageDelivered(c.logger, c.stack.Transport, c.publisher, sdsMessageID)
+}
+
+func publishSDSMessageDelivered(
+	logger *zap.Logger,
+	tracker sdsApplicationMessageIDTracker,
+	publisher *pubsub.Publisher,
+	sdsMessageID string,
+) {
+	decodedSDSMessageID, err := cryptotypes.DecodeHex(sdsMessageID)
+	if err != nil {
+		logger.Debug("failed to decode SDS delivery confirmation", zap.String("messageID", sdsMessageID), zap.Error(err))
+		return
+	}
+
+	applicationMessageID, ok := tracker.TakeApplicationMessageIDForSDS(decodedSDSMessageID)
+	if !ok {
+		logger.Debug("ignoring delivery confirmation for untracked SDS message", zap.String("messageID", sdsMessageID))
+		return
+	}
+
+	pubsub.Publish(publisher, events.DeliveredMessage{MessageIDs: [][]byte{applicationMessageID}})
 }
 
 func NewCore(params CoreParams, options ...Options) (*Core, error) {

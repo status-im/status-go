@@ -326,7 +326,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuFilterLightNode())
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
-		cfg.EnableStoreConfirmationForMessagesSent = false
 		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
 		opts = append(opts, node.WithShards(waku.defaultShardInfo.ShardIDs))
 	} else {
@@ -341,7 +340,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.cfg.MinPeersForRelay, relayOpts...))
 		opts = append(opts, node.WithMaxPeerConnections(maxRelayPeers))
 		cfg.EnablePeerExchangeClient = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
-		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
 	if !cfg.IsLightClient() {
@@ -1162,43 +1160,9 @@ func (w *Waku) startMessageSender() error {
 		sender.WithMessageSentEmitter(w.node.Host())
 	}
 
-	if w.cfg.EnableStoreConfirmationForMessagesSent {
-		msgStoredChan := make(chan gethcommon.Hash, 1000)
-		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		// The store node is selected on demand by the StoreClient (the go-waku
-		// storenode cycle is gone); MessageSentCheck queries it by hash to confirm
-		// that published messages propagated.
-		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), storeClientPeerProvider{w.storeClient}, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
-		sender.WithMessageSentCheck(messageSentCheck)
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			defer w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case hash := <-msgStoredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeSent,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckSuccess()
-					}
-				case hash := <-msgExpiredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeExpired,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckFailure()
-					}
-				}
-			}
-		}()
-	}
+	// EnableStoreConfirmationForMessagesSent is retained for configuration
+	// compatibility only. Sent status is confirmed by successful publication, so
+	// no store-node message checker is installed.
 
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
 		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,

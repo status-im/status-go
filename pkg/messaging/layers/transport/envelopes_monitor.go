@@ -61,6 +61,11 @@ func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *Envelopes
 
 		// key is stringified message identifier
 		messageEnvelopeHashes: make(map[string][]types2.Hash),
+
+		// key is an SDS message identifier; value is its application message
+		// identifier. SDS aliases are tracked for retrieval hints but must never
+		// be reported as independently sent UI messages.
+		sdsApplicationMessageIDs: make(map[string]string),
 	}
 }
 
@@ -79,9 +84,10 @@ type EnvelopesMonitor struct {
 
 	mu sync.Mutex
 
-	envelopes             map[types2.Hash]*monitoredEnvelope
-	batches               map[types2.Hash]map[types2.Hash]struct{}
-	messageEnvelopeHashes map[string][]types2.Hash
+	envelopes                map[types2.Hash]*monitoredEnvelope
+	batches                  map[types2.Hash]map[types2.Hash]struct{}
+	messageEnvelopeHashes    map[string][]types2.Hash
+	sdsApplicationMessageIDs map[string]string
 
 	awaitOnlyMailServerConfirmations bool
 
@@ -90,6 +96,44 @@ type EnvelopesMonitor struct {
 	isMailserver func(peer types.EnodeID) bool
 
 	logger *zap.Logger
+}
+
+// AddSDSAlias records the SDS identifier associated with an application
+// message. The alias shares its envelope hashes for retrieval hints but is not
+// added to monitoredEnvelope.messageIDs, so publish acknowledgements only emit
+// the application identifier.
+func (m *EnvelopesMonitor) AddSDSAlias(applicationMessageID, sdsMessageID []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	applicationKey := types2.HexBytes(applicationMessageID).String()
+	sdsKey := types2.HexBytes(sdsMessageID).String()
+	hashes, ok := m.messageEnvelopeHashes[applicationKey]
+	if !ok {
+		return
+	}
+	m.messageEnvelopeHashes[sdsKey] = hashes
+	m.sdsApplicationMessageIDs[sdsKey] = applicationKey
+}
+
+// TakeApplicationMessageIDForSDS resolves and consumes an SDS delivery
+// association. Subsequent duplicate callbacks are ignored.
+func (m *EnvelopesMonitor) TakeApplicationMessageIDForSDS(sdsMessageID []byte) ([]byte, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	sdsKey := types2.HexBytes(sdsMessageID).String()
+	applicationKey, ok := m.sdsApplicationMessageIDs[sdsKey]
+	if !ok {
+		return nil, false
+	}
+	applicationMessageID, err := types2.DecodeHex(applicationKey)
+	if err != nil {
+		return nil, false
+	}
+	delete(m.sdsApplicationMessageIDs, sdsKey)
+	delete(m.messageEnvelopeHashes, sdsKey)
+	return applicationMessageID, true
 }
 
 // Start processing events.
@@ -345,6 +389,13 @@ func (m *EnvelopesMonitor) clearMessageState(envelopeID types2.Hash) {
 	}
 	delete(m.envelopes, envelopeID)
 	for _, messageID := range envelope.messageIDs {
-		delete(m.messageEnvelopeHashes, types2.HexBytes(messageID).String())
+		messageKey := types2.HexBytes(messageID).String()
+		delete(m.messageEnvelopeHashes, messageKey)
+		for sdsKey, applicationKey := range m.sdsApplicationMessageIDs {
+			if applicationKey == messageKey {
+				delete(m.sdsApplicationMessageIDs, sdsKey)
+				delete(m.messageEnvelopeHashes, sdsKey)
+			}
+		}
 	}
 }

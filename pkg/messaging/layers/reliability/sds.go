@@ -11,6 +11,7 @@ import (
 
 func newSdsReliabilityManager(
 	logger *zap.Logger,
+	onMessageSent func(messageId sds.MessageID, channelId string),
 	onMissingDependencies func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string),
 	retrievalHintProvider func(messageId sds.MessageID) []byte,
 ) *sds.ReliabilityManager {
@@ -23,6 +24,9 @@ func newSdsReliabilityManager(
 	callbacks := sds.EventCallbacks{
 		OnMessageSent: func(messageId sds.MessageID, channelId string) {
 			logger.Debug("message sent with sds", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
+			if onMessageSent != nil {
+				onMessageSent(messageId, channelId)
+			}
 		},
 		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string) {
 			logger.Debug("missing dependencies",

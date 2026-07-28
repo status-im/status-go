@@ -69,6 +69,18 @@ func TestHandleMissingDependenciesDecodesAllHashes(t *testing.T) {
 	require.Equal(t, []string{"0x01", "0x02", "0x03"}, captured)
 }
 
+func TestHandleSDSMessageSentForwardsMessageID(t *testing.T) {
+	r := newTestReliability(t)
+
+	var received string
+	r.SetMessageSentHandler(func(messageID string) {
+		received = messageID
+	})
+
+	r.handleSDSMessageSent(sds.MessageID("0x1234"), "community-chat")
+	require.Equal(t, "0x1234", received)
+}
+
 func TestHandleMissingDependenciesSkipsInvalidHint(t *testing.T) {
 	r := newTestReliability(t)
 
