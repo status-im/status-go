@@ -23,8 +23,7 @@ linters:
     gosec:
       excludes:
         - G115
-        # TODO: rules below were introduced by the golangci-lint 2.3 -> 2.12 upgrade
-        # (Go 1.26). Existing findings should be triaged and rules enabled separately.
+        # TODO: triage findings from rules added between golangci-lint 2.3 and 2.12
         - G117
         - G118
         - G122
@@ -36,8 +35,7 @@ linters:
         - G705
     govet:
       disable:
-        # TODO: introduced by the golangci-lint 2.3 -> 2.12 upgrade (Go 1.26).
-        # Suggests mechanical inlining of deprecated io/ioutil wrappers; clean up separately.
+        # TODO: clean up deprecated io/ioutil usages, then enable
         - inline
   exclusions:
     generated: lax
