@@ -14,25 +14,18 @@
 
   inputs = {
     # We are pinning the commit because ultimately we want to use same commit across different projects.
-    # A commit from nixpkgs 24.11 release : https://github.com/NixOS/nixpkgs/tree/release-24.11
-    nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
-    lmn = {
-      url = "git+https://github.com/logos-messaging/logos-messaging-nim?submodules=1&rev=cccc8ab6fda0e54752936db0d5c80b02a2c34a3a";
-      inputs.nixpkgs.follows = "nixpkgs";
-      # https://github.com/vacp2p/zerokit/commit/b1e4e485ad8e7a13b402c0ad2604ef879d927be4
-      inputs.zerokit.url = "github:vacp2p/zerokit/b1e4e485ad8e7a13b402c0ad2604ef879d927be4";
-    };
+    # A commit from nixpkgs 25.11 release : https://github.com/NixOS/nixpkgs/tree/release-25.11
+    nixpkgs.url = "github:NixOS/nixpkgs/535f3e6942cb1cead3929c604320d3db54b542b9";
     logos-storage-nim = {
-      url = "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&rev=3c09f008bb5266a669fd19f18368f9e8b861b664";
+      # TODO: temporary pin, see https://github.com/logos-storage/logos-storage-nim/pull/1492
+      url = "git+https://github.com/igor-sirotin/logos-storage-nim?submodules=1&rev=978c560aed6dc4cff6b602e94fc0fcc66fea6399";
       inputs.nixpkgs.follows = "nixpkgs";
-      # https://github.com/logos-storage/circom-compat-ffi/pull/11
-      inputs.circom-compat.url = "github:logos-storage/circom-compat-ffi/3cca4e91054a4d2bb5335feb19138362ce0fe417";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&ref=refs/tags/v0.3.3&rev=259830c9cfa7dbad3bd2f792097ad3e180fb2e1c";
   };
 
-  outputs = { self, nixpkgs, lmn, logos-storage-nim, nim-sds }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -41,7 +34,7 @@
     ];
     forAllSystems = f: nixpkgs.lib.genAttrs stableSystems (system: f system);
     pkgsOverlay = import ./nix/overlay.nix;
-    # nim-sds/lmn/logos-storage-nim hardcode XDG_CACHE_HOME=/tmp, which causes
+    # nim-sds/logos-storage-nim hardcode XDG_CACHE_HOME=/tmp, which causes
     # nim cache collisions at /tmp/nim/<name>_d/ on macOS
     useTmpdirForNimCache = drv: drv.overrideAttrs (old: {
       preBuild = ''export XDG_CACHE_HOME="$TMPDIR"'' + "\n" + (old.preBuild or "");
@@ -56,7 +49,6 @@
         overlays = [
           pkgsOverlay
           (final: prev: {
-            libwaku    = useTmpdirForNimCache lmn.packages.${system}.libwaku;
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
           })

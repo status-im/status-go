@@ -1,6 +1,6 @@
 module github.com/status-im/status-go
 
-go 1.24.0
+go 1.26.0
 
 tool (
 	github.com/kevinburke/go-bindata/v4/go-bindata

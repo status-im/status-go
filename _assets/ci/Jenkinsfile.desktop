@@ -4,7 +4,7 @@ library 'status-jenkins-lib@v1.9.39'
 
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */
-  agent { label "${params.AGENT_LABEL} && go-1.24" }
+  agent { label "${params.AGENT_LABEL} && go-1.26" }
 
   parameters {
     string(
@@ -126,7 +126,7 @@ def assembePath(List<String> extraPaths) {
       'C:/Windows/system32/WindowsPowerShell/v1.0',
       'C:/Windows/system32',
       'C:/Windows',
-      'C:/ProgramData/scoop/apps/go/1.24.7/bin',
+      'C:/ProgramData/scoop/apps/go/1.26.5/bin',
       'C:/ProgramData/scoop/apps/nim/2.2.6/bin',
       'C:/ProgramData/scoop/apps/cmake/3.31.6/bin',
       'C:/ProgramData/scoop/apps/python/3.13.5',

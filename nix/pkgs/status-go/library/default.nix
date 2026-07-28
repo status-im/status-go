@@ -22,7 +22,7 @@ in pkgs.buildGoModule {
     with pkgs; [
       mockgen
       protoc-gen-go
-      protobuf3_24
+      protobuf_29
       fakeGit
   ];
 
