@@ -2,10 +2,7 @@
   "nodes": {
     "circom-compat": {
       "inputs": {
-        "nixpkgs": [
-          "logos-storage-nim",
-          "nixpkgs"
-        ]
+        "nixpkgs": "nixpkgs"
       },
       "locked": {
         "lastModified": 1779967405,
@@ -22,53 +19,33 @@
         "type": "github"
       }
     },
-    "lmn": {
-      "inputs": {
-        "nixpkgs": "nixpkgs",
-        "zerokit": "zerokit"
-      },
-      "locked": {
-        "lastModified": 1769507691,
-        "narHash": "sha256-NDWEPV5t9KKVrfn7X924Bf+cNXFj0Cqp6rx2h+TQt5M=",
-        "ref": "refs/heads/master",
-        "rev": "cccc8ab6fda0e54752936db0d5c80b02a2c34a3a",
-        "revCount": 2196,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/logos-messaging/logos-messaging-nim"
-      },
-      "original": {
-        "rev": "cccc8ab6fda0e54752936db0d5c80b02a2c34a3a",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/logos-messaging/logos-messaging-nim"
-      }
-    },
     "logos-storage-nim": {
       "inputs": {
         "circom-compat": "circom-compat",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": [
+          "nixpkgs"
+        ]
       },
       "locked": {
-        "lastModified": 1769016529,
-        "narHash": "sha256-pzUrdFKSEraZQzO2a9Uj5oDMas+Vtpu6+p4bG+lRnsk=",
+        "lastModified": 1785259017,
+        "narHash": "sha256-VBcjkXeEuVDjNYFuZ4a4JD8DG1cQpseLniJlRz1OjaA=",
         "ref": "refs/heads/master",
-        "rev": "3c09f008bb5266a669fd19f18368f9e8b861b664",
-        "revCount": 877,
+        "rev": "978c560aed6dc4cff6b602e94fc0fcc66fea6399",
+        "revCount": 878,
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/logos-storage/logos-storage-nim"
+        "url": "https://github.com/igor-sirotin/logos-storage-nim"
       },
       "original": {
-        "rev": "3c09f008bb5266a669fd19f18368f9e8b861b664",
+        "rev": "978c560aed6dc4cff6b602e94fc0fcc66fea6399",
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/logos-storage/logos-storage-nim"
+        "url": "https://github.com/igor-sirotin/logos-storage-nim"
       }
     },
     "nim-sds": {
       "inputs": {
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1783637210,
@@ -90,27 +67,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1757590060,
-        "narHash": "sha256-EWwwdKLMZALkgHFyKW7rmyhxECO74+N+ZO5xTDnY/5c=",
+        "lastModified": 1736200483,
+        "narHash": "sha256-JO+lFN2HsCwSLMUWXHeOad6QUxOuwe9UOAF/iSl1J4I=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
-      "locked": {
-        "lastModified": 1751274312,
-        "narHash": "sha256-/bVBlRpECLVzjV19t5KMdMFWSwKLtb5RyXdjz3LJT+g=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "50ab793786d9de88ee30ec4e4c24fb4236fc2674",
+        "rev": "3f0a8ac25fb674611b98089ca3a5dd6480175751",
         "type": "github"
       },
       "original": {
@@ -120,7 +81,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_3": {
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1757590060,
         "narHash": "sha256-EWwwdKLMZALkgHFyKW7rmyhxECO74+N+ZO5xTDnY/5c=",
@@ -136,7 +97,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_4": {
+    "nixpkgs_3": {
       "locked": {
         "lastModified": 1780511130,
         "narHash": "sha256-2v9lT4ya59Lh1FqPeLnz1MoX9y/wz2huqfe9RtQZITk=",
@@ -154,55 +115,9 @@
     },
     "root": {
       "inputs": {
-        "lmn": "lmn",
         "logos-storage-nim": "logos-storage-nim",
         "nim-sds": "nim-sds",
-        "nixpkgs": "nixpkgs_4"
-      }
-    },
-    "rust-overlay": {
-      "inputs": {
-        "nixpkgs": [
-          "lmn",
-          "zerokit",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1748399823,
-        "narHash": "sha256-kahD8D5hOXOsGbNdoLLnqCL887cjHkx98Izc37nDjlA=",
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "rev": "d68a69dc71bc19beb3479800392112c2f6218159",
-        "type": "github"
-      },
-      "original": {
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "type": "github"
-      }
-    },
-    "zerokit": {
-      "inputs": {
-        "nixpkgs": [
-          "lmn",
-          "nixpkgs"
-        ],
-        "rust-overlay": "rust-overlay"
-      },
-      "locked": {
-        "lastModified": 1779969584,
-        "narHash": "sha256-xr45wlSgWn8u6ZmK3gplwCQYDchJoy36hU9LezOEpAA=",
-        "owner": "vacp2p",
-        "repo": "zerokit",
-        "rev": "b1e4e485ad8e7a13b402c0ad2604ef879d927be4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "vacp2p",
-        "repo": "zerokit",
-        "rev": "b1e4e485ad8e7a13b402c0ad2604ef879d927be4",
-        "type": "github"
+        "nixpkgs": "nixpkgs_3"
       }
     }
   },
