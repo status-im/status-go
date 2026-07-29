@@ -730,11 +730,9 @@ func (m *AccountsManager) DeleteAccount(address types2.Address, password string,
 	return
 }
 
+// DeleteKeypair removes a keypair and its keystore files. The password is required unless the
+// keypair is migrated to a cold wallet (no keystore files exist for it).
 func (m *AccountsManager) DeleteKeypair(keyUID string, password string, clock uint64) (keypair *types.Keypair, err error) {
-	if password == "" {
-		return nil, ErrNoPasswordProvided
-	}
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
