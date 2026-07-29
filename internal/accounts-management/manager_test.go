@@ -619,6 +619,54 @@ func (s *ManagerTestSuite) TestDeleteKeypair() {
 	s.Equal(0, len(files))
 }
 
+func (s *ManagerTestSuite) TestDeleteAccountOfColdWalletKeypairWithoutPassword() {
+	acc := s.deriveTestAccountAtPath(common.PathDefaultWalletAccount)
+	keypair := &types.Keypair{
+		KeyUID:     s.masterAccount.KeyUID(),
+		Type:       types.KeypairTypeSeed,
+		ColdWallet: types.ColdWalletTypeStatusKeycard,
+		Accounts:   []*types.Account{acc},
+	}
+
+	s.persistence.EXPECT().GetAccountByAddress(acc.Address).Return(acc, nil).Times(2)
+	s.persistence.EXPECT().GetKeypairByKeyUID(acc.KeyUID).Return(keypair, nil).Times(1)
+	s.persistence.EXPECT().RemoveAccount(acc.Address, uint64(0)).Return(nil).Times(1)
+
+	deletedAcc, err := s.accManager.DeleteAccount(acc.Address, "", 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(deletedAcc)
+	s.Require().Equal(acc.Address, deletedAcc.Address)
+}
+
+func (s *ManagerTestSuite) TestDeleteColdWalletKeypairWithoutPassword() {
+	keypair := &types.Keypair{
+		KeyUID:     s.masterAccount.KeyUID(),
+		Type:       types.KeypairTypeSeed,
+		ColdWallet: types.ColdWalletTypeStatusKeycard,
+	}
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
+	s.persistence.EXPECT().RemoveKeypair(keypair.KeyUID, uint64(0)).Return(nil).Times(1)
+
+	deletedKp, err := s.accManager.DeleteKeypair(keypair.KeyUID, "", 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(deletedKp)
+	s.Require().Equal(keypair.KeyUID, deletedKp.KeyUID)
+}
+
+func (s *ManagerTestSuite) TestDeleteRegularKeypairWithoutPasswordRejected() {
+	keypair := &types.Keypair{
+		KeyUID: s.masterAccount.KeyUID(),
+		Type:   types.KeypairTypeSeed,
+	}
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
+
+	_, err := s.accManager.DeleteKeypair(keypair.KeyUID, "", 0)
+	s.Require().Error(err)
+	s.Require().True(errors.Is(err, ErrNoPasswordProvided))
+}
+
 // Regression: CreateKeypairFromMnemonicAndStore documents that accounts are
 // stored to the keystore only when the keypair is not a cold wallet / keycard,
 // but the implementation always calls storeKeystoreFilesForAccounts.
