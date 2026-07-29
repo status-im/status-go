@@ -18,6 +18,7 @@ import (
 	"github.com/afex/hystrix-go/hystrix"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
+	"github.com/status-im/extkeys"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -730,7 +731,36 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 		return errors.Wrap(err, "failed to update account")
 	}
 
+	err = b.backfillKeypairsXPubOnLogin(request, accountsDB)
+	if err != nil {
+		return errors.Wrap(err, "failed to backfill keypairs xpub")
+	}
+
 	return nil
+}
+
+func (b *StatusBackend) backfillKeypairsXPubOnLogin(request *requests.Login, accountsDB *accounts.Database) error {
+	if request.WalletXPub != "" {
+		kp, err := accountsDB.GetKeypairByKeyUID(request.KeyUID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get the profile keypair")
+		}
+		if kp != nil && kp.XPub == "" {
+			extKey, err := extkeys.NewKeyFromString(request.WalletXPub)
+			if err != nil {
+				return errors.Wrap(err, "invalid wallet xpub provided in the login request")
+			}
+			if extKey.IsPrivate {
+				return errors.New("private extended key provided as the wallet xpub in the login request")
+			}
+			err = accountsDB.UpdateKeypairXPub(kp.KeyUID, request.WalletXPub, kp.ColdWallet, kp.Clock)
+			if err != nil {
+				return errors.Wrap(err, "failed to store the profile keypair xpub")
+			}
+		}
+	}
+
+	return b.accountsManager.BackfillKeypairsXPub(request.Password)
 }
 
 // UpdateNodeConfigFleet loads the fleet from the settings and updates the node configuration
