@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -90,6 +91,7 @@ type Controller struct {
 
 	stopCh             chan struct{}
 	fetchDebounceFn    func(f func())
+	firstFetchPending  atomic.Bool
 	pendingFullFetch   bool
 	pendingFetchConfig FetchConfig
 
@@ -137,6 +139,9 @@ func (c *Controller) Start() {
 	}
 
 	c.stopCh = make(chan struct{})
+	// Arm the leading edge: the first fetch after a (re)start serves a cold UI
+	// waiting on never-fetched balances, so it must not sit out the debounce.
+	c.firstFetchPending.Store(true)
 
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
@@ -336,6 +341,16 @@ func (c *Controller) TriggerFullFetch() {
 }
 
 func (c *Controller) triggerFetch() {
+	if c.firstFetchPending.CompareAndSwap(true, false) {
+		// Leading edge: run the first post-Start fetch immediately. fetchNow pops
+		// the pending flags under lock, so a concurrently debounced run just
+		// finds nothing left to do.
+		go func() {
+			defer gocommon.LogOnPanic()
+			c.fetchNow()
+		}()
+		return
+	}
 	c.fetchDebounceFn(c.fetchNow)
 }
 

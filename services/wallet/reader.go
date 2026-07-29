@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -79,6 +80,7 @@ type Reader struct {
 	walletFeed                     *event.Feed
 	lastWalletTokenUpdateTimestamp sync.Map
 	reloadDebounceFn               func(f func())
+	firstReloadPending             atomic.Bool
 
 	stopCh chan struct{}
 }
@@ -89,6 +91,10 @@ func (r *Reader) Start() error {
 	}
 
 	r.stopCh = make(chan struct{})
+	// Arm the leading edge: a cold UI is waiting on the very first balances, so
+	// the first completed refresh must announce the reload without sitting out
+	// the debounce.
+	r.firstReloadPending.Store(true)
 
 	// Start balance change watcher
 	r.startBalanceChangeWatcher()
@@ -343,7 +349,11 @@ func (r *Reader) refreshBalanceCache(ctx context.Context, chainIDs []uint64, add
 
 	r.updateTokenUpdateTimestamp(addresses)
 
-	r.reloadDebounceFn(r.triggerWalletReload)
+	if r.firstReloadPending.CompareAndSwap(true, false) {
+		r.triggerWalletReload()
+	} else {
+		r.reloadDebounceFn(r.triggerWalletReload)
+	}
 
 	return
 }

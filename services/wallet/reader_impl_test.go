@@ -29,6 +29,7 @@ import (
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock/storage"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 var (
@@ -589,4 +590,53 @@ func TestReader_SkipsUICacheRefreshWhenFetchUnchangedAndAlreadyFetched(t *testin
 	})
 
 	time.Sleep(100 * time.Millisecond)
+}
+
+func TestReader_FirstBalanceRefreshEmitsReloadImmediately(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	walletFeed := &event.Feed{}
+	reader := NewReader(tokenManager, nil, walletFeed, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	events := make(chan walletevent.Event, 10)
+	sub := walletFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	).AnyTimes()
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).Return(nil).AnyTimes()
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+
+	// Cold start: the first completed balance refresh must announce the reload
+	// right away (leading edge), not after reloadDebounceTime.
+	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
+
+	select {
+	case ev := <-events:
+		require.Equal(t, EventWalletTickReload, ev.Type)
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("expected an immediate wallet reload event after the first balance refresh")
+	}
+
+	// Follow-up refreshes stay debounced: no immediate second event.
+	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
+	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
+
+	select {
+	case <-events:
+		t.Fatal("follow-up refreshes must coalesce through the debounce, not emit immediately")
+	case <-time.After(300 * time.Millisecond):
+	}
 }
