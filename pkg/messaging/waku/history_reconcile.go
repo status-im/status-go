@@ -18,26 +18,62 @@ const (
 	historyReconcileMinInterval   = 30 * time.Second
 )
 
-// OnHistoryReconcileNeeded returns a channel signalled whenever history should
-// be reconciled with the store nodes: periodically while connectivity is not
+type historyReconcileTracker struct {
+	reliable       bool
+	checkedAt      time.Time
+	unreliableFrom time.Time
+	lastReconcile  time.Time
+}
+
+func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTracker {
+	tracker := historyReconcileTracker{reliable: reliable, checkedAt: now}
+	if !reliable {
+		tracker.unreliableFrom = now
+	}
+	return tracker
+}
+
+func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInterval time.Duration) (types.HistoryReconcileWindow, bool) {
+	wasReliable := t.reliable
+	t.reliable = reliable
+	if wasReliable && !reliable {
+		t.unreliableFrom = t.checkedAt
+	}
+	t.checkedAt = now
+
+	if !shouldReconcileHistory(reliable, wasReliable, t.lastReconcile, now, minInterval) {
+		return types.HistoryReconcileWindow{}, false
+	}
+	if t.unreliableFrom.IsZero() {
+		t.unreliableFrom = now
+	}
+	t.lastReconcile = now
+	window := types.HistoryReconcileWindow{From: t.unreliableFrom, To: now}
+	if reliable {
+		t.unreliableFrom = time.Time{}
+	}
+	return window, true
+}
+
+// OnHistoryReconcileNeeded returns unreliable delivery windows that should be
+// reconciled with the store nodes: periodically while connectivity is not
 // reliable, and once more when it recovers (closing the unreliable window).
-// It is a buffered level-trigger; consumers that are slow or paused coalesce
-// pending signals instead of queueing them.
 //
 // Temporary: this channel exists because the Waku node cannot yet own the
 // fetch itself. It already has the subscription (filter) list, but lacks the
-// per-topic "when was it last fetched" watermark, which the Messenger persists
-// in the app DB (mailserver_topics). Eventually logos-delivery will own
-// reconciliation and history backfill entirely, including persisting
-// lastFetched per topic: its Messaging API already reconciles
+// per-topic "known complete through" cursor, which the Messenger persists in
+// the app DB (mailserver_topics). Eventually logos-delivery will own
+// reconciliation and history backfill entirely, including persisting that
+// cursor per topic: its Messaging API already reconciles
 // (https://github.com/logos-messaging/logos-delivery/issues/3941) but does not
-// yet fetch history, and neither exposes nor persists lastFetched. That gap
+// yet fetch history, and neither exposes nor persists a completeness cursor.
+// That gap
 // should be closed in logos-delivery before integration — otherwise ownership
-// is split and persistence breaks, since we cannot persist lastFetched on its
+// is split and persistence breaks, since we cannot persist the cursor on its
 // behalf. Until then the fetch stays in the Messenger (Transport would be a
 // nicer interim home, but it is a stopgap either way), and this signal bridges
 // the two.
-func (w *Waku) OnHistoryReconcileNeeded() <-chan struct{} {
+func (w *Waku) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return w.historyReconcileNeeded
 }
 
@@ -56,22 +92,24 @@ func (w *Waku) startHistoryReconcileLoop() {
 		sub := w.PauseBroadcaster.Subscribe()
 		defer sub.Unsubscribe()
 
-		reliable := w.reliablyConnected()
-		var lastReconcile time.Time
+		tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
 
 		pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
 			Interval: historyReconcileCheckInterval,
 			OnTick: func() {
-				wasReliable := reliable
-				reliable = w.reliablyConnected()
-				if !shouldReconcileHistory(reliable, wasReliable, lastReconcile, time.Now(), historyReconcileMinInterval) {
+				now := time.Now()
+				reliable := w.reliablyConnected()
+				window, needed := tracker.observe(reliable, now, historyReconcileMinInterval)
+				if !needed {
 					return
 				}
-				lastReconcile = time.Now()
-				w.logger.Debug("history reconciliation needed", zap.Bool("reliable", reliable))
+				w.logger.Debug("history reconciliation needed",
+					zap.Bool("reliable", reliable),
+					zap.Time("from", window.From),
+					zap.Time("to", window.To))
 				select {
-				case w.historyReconcileNeeded <- struct{}{}:
-				default: // a signal is already pending; coalesce
+				case w.historyReconcileNeeded <- window:
+				case <-w.ctx.Done():
 				}
 			},
 		}, sub.C())
@@ -87,6 +125,13 @@ func (w *Waku) startHistoryReconcileLoop() {
 // reconcile is a separate policy decision, deliberately not made here.
 func (w *Waku) reliablyConnected() bool {
 	return w.ConnectionState() == types.ConnectionStateConnected
+}
+
+// HistoryDeliveryReliable is stricter than reliablyConnected for light nodes:
+// their filter-subscription health is not observable, so Connected alone must
+// not advance persisted history completeness cursors.
+func (w *Waku) HistoryDeliveryReliable() bool {
+	return !w.cfg.IsLightClient() && w.reliablyConnected()
 }
 
 // shouldReconcileHistory decides whether a reconciliation is due at a tick:

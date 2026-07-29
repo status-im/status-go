@@ -55,8 +55,14 @@ func (a *API) ConnectionStatus() types.ConnectionStatus {
 // be reconciled with the store nodes (#7568): periodically while connectivity
 // is not reliable (relay mesh not Connected on every default shard), and once
 // more when it recovers.
-func (a *API) OnHistoryReconcileNeeded() <-chan struct{} {
+func (a *API) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return a.core.stack.Transport.OnHistoryReconcileNeeded()
+}
+
+// HistoryDeliveryReliable reports whether live delivery can safely advance
+// initialized history cursors without issuing a store query.
+func (a *API) HistoryDeliveryReliable() bool {
+	return a.core.stack.Transport.HistoryDeliveryReliable()
 }
 
 // SubscribeFilterMatched returns a channel that is notified whenever an incoming

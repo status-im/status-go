@@ -111,12 +111,14 @@ type Waku interface {
 	// from it via ConnectionState.IsOnline().
 	ConnectionState() ConnectionState
 
-	// OnHistoryReconcileNeeded returns a channel signalled whenever history
-	// should be reconciled with the store nodes (#7568): periodically while
-	// connectivity is not reliable (relay mesh not Connected on every default
-	// shard), and once more when connectivity recovers. Buffered
-	// level-trigger; pending signals coalesce.
-	OnHistoryReconcileNeeded() <-chan struct{}
+	// OnHistoryReconcileNeeded returns the unreliable delivery windows that
+	// should be reconciled with store nodes (#7568).
+	OnHistoryReconcileNeeded() <-chan HistoryReconcileWindow
+
+	// HistoryDeliveryReliable reports whether a full-node relay mesh is healthy
+	// enough that active topics can advance their history completeness cursor
+	// without querying a store node. It is deliberately false for light nodes.
+	HistoryDeliveryReliable() bool
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 

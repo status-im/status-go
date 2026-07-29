@@ -175,12 +175,10 @@ type Waku struct {
 	// so it needs no lock of its own.
 	topicHealth   map[string]peermanager.TopicHealth
 	onlineChecker *onlinechecker.DefaultOnlineChecker
-	// historyReconcileNeeded is signalled by the history-reconcile loop (see
-	// history_reconcile.go) whenever the consumer should fetch history from the
-	// store nodes. Buffered (1) level-trigger: sends never block, a pending
-	// signal coalesces with later ones. Temporary until logos-delivery owns
+	// historyReconcileNeeded carries unreliable delivery windows detected by
+	// the history-reconcile loop. Temporary until logos-delivery owns
 	// reconciliation end to end — see OnHistoryReconcileNeeded.
-	historyReconcileNeeded chan struct{}
+	historyReconcileNeeded chan types.HistoryReconcileWindow
 	// stateMu guards state and stateInitialized. ConnectionChanged is invoked
 	// from the OS/mobile path while checkForConnectionChanges and
 	// handleNetworkChangeFromApp run on the internal poller goroutine, so all
@@ -256,7 +254,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		connectionNotifChan:         make(chan node.PeerConnection, 20),
 		connStatusSubscriptions:     make(map[string]*types.ConnStatusSubscription),
 		topicHealth:                 make(map[string]peermanager.TopicHealth),
-		historyReconcileNeeded:      make(chan struct{}, 1),
+		historyReconcileNeeded:      make(chan types.HistoryReconcileWindow, 16),
 		ctx:                         ctx,
 		cancel:                      cancel,
 		wg:                          sync.WaitGroup{},

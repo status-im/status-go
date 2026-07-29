@@ -8,6 +8,7 @@ import (
 // PartiallyConnected / Connected) surfaced to the Messaging API, re-exported
 // from the waku layer that produces it.
 type ConnectionState = wakutypes.ConnectionState
+type HistoryReconcileWindow = wakutypes.HistoryReconcileWindow
 
 const (
 	ConnectionStateDisconnected       = wakutypes.ConnectionStateDisconnected

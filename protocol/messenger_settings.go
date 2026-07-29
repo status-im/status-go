@@ -21,7 +21,7 @@ func (m *Messenger) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobi
 		return err
 	}
 	if request.Enabled {
-		m.asyncRequestAllHistoricMessages()
+		m.notifyHistoricSyncWorker()
 	}
 	return nil
 }

@@ -147,11 +147,14 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
-	historicSyncMu       sync.Mutex
-	historicSyncInFlight bool
-	// historicSyncTrigger feeds the historic-sync worker; buffered (1) so
-	// triggers coalesce (see asyncRequestAllHistoricMessages).
+	historicSyncMu           sync.Mutex
+	historicSyncInFlight     bool
+	historicSyncQueueMu      sync.Mutex
+	historicSyncPending      []historicSyncRequest
+	historicSyncWorkerActive atomic.Bool
+	// historicSyncTrigger wakes the worker after pending work is added.
 	historicSyncTrigger  chan struct{}
+	historyPausedAt      atomic.Int64
 	ratchetNotFoundDelay time.Duration
 
 	connectionState       connection.State
@@ -555,7 +558,12 @@ func (m *Messenger) processSentMessage(id string) error {
 }
 
 func (m *Messenger) SetPaused(paused bool) {
-	m.paused.Store(paused)
+	now := m.historicSyncNow()
+	wasPaused := m.paused.Swap(paused)
+	if paused && !wasPaused {
+		m.checkpointHistoryWatermarks(now)
+		m.historyPausedAt.Store(now.Unix())
+	}
 	if m.ensVerifier != nil {
 		m.ensVerifier.SetPaused(paused)
 	}
@@ -580,8 +588,12 @@ func (m *Messenger) SetPaused(paused bool) {
 		if m.httpServer != nil {
 			m.httpServer.ToForeground()
 		}
-		if m.started {
-			m.asyncRequestAllHistoricMessages()
+		if m.started && wasPaused {
+			pausedAt := m.historyPausedAt.Swap(0)
+			from := time.Unix(pausedAt, 0)
+			if pausedAt > 0 && from.Before(now) {
+				m.asyncRequestHistoricMessages(types2.HistoryReconcileWindow{From: from, To: now})
+			}
 		}
 	} else if m.httpServer != nil {
 		m.httpServer.ToBackground()
@@ -649,6 +661,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchConnectionChange()
 	m.startHistoricSyncWorker()
 	m.startHistoryReconciliationLoop()
+	m.startHistoryWatermarkCheckpointLoop()
 	m.watchChatsToUnmute()
 	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
@@ -820,12 +833,6 @@ func (m *Messenger) handleConnectionChange(online bool) {
 			m.logger.Error("could not publish on contact code", zap.Error(err))
 		}
 		m.shouldPublishContactCode = false
-	}
-
-	// Start fetching messages from store nodes.
-	// Skip when backgrounded: the sync will run when the app returns to foreground.
-	if online && !m.isPaused() {
-		m.asyncRequestAllHistoricMessages()
 	}
 
 	// Update ENS verifier
@@ -1336,20 +1343,41 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 func (m *Messenger) watchConnectionChange() {
 	state := m.Online()
 	// lastCheck, sleepDetention and keepAlive helps us recognizing when computer was offline because of sleep, lid closed, etc.
-	lastCheck := time.Now().Unix()
-	sleepDetentionInSecs := int64(20)
-	keepAlivePeriod := 15 * time.Second // must be lower than sleepDetentionInSecs
+	lastCheck := time.Now()
+	lastHistoryCheck := m.historicSyncNow()
+	var offlineSince time.Time
+	sleepDetention := 20 * time.Second
+	keepAlivePeriod := 15 * time.Second // must be lower than sleepDetention
 
 	processNewState := func(newState bool) {
-		now := time.Now().Unix()
-		force := now-lastCheck > sleepDetentionInSecs
+		now := time.Now()
+		historyNow := m.historicSyncNow()
+		previousCheck := lastHistoryCheck
+		force := now.Sub(lastCheck) > sleepDetention
 		lastCheck = now
+		lastHistoryCheck = historyNow
 		if !force && state == newState {
 			return
+		}
+		wasOnline := state
+		if wasOnline && !newState {
+			offlineSince = previousCheck
 		}
 		state = newState
 		m.logger.Debug("connection changed", zap.Bool("online", state), zap.Bool("force", force))
 		m.handleConnectionChange(state)
+		if !m.isPaused() && newState {
+			switch {
+			case !wasOnline && !offlineSince.IsZero() && offlineSince.Before(historyNow):
+				m.asyncRequestHistoricMessages(types2.HistoryReconcileWindow{From: offlineSince, To: historyNow})
+				offlineSince = time.Time{}
+			case wasOnline && force && previousCheck.Before(historyNow):
+				// The process did not observe connectivity during this interval
+				// (typically system sleep), so treat it as unreliable.
+				m.asyncRequestHistoricMessages(types2.HistoryReconcileWindow{From: previousCheck, To: historyNow})
+			}
+			m.notifyHistoricSyncWorker()
+		}
 	}
 
 	subscribedConnectionStatus := func(subscription types2.ConnectionStatusSubscription) {
@@ -1607,6 +1635,9 @@ func (m *Messenger) Shutdown() (err error) {
 	default:
 	}
 
+	if !m.isPaused() {
+		m.checkpointHistoryWatermarks(m.historicSyncNow())
+	}
 	close(m.quit)
 	m.cancel()
 

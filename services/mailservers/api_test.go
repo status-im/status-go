@@ -68,7 +68,22 @@ func TestTopic(t *testing.T) {
 	require.Equal(t, topics[0].LastRequest, 1)
 
 	require.Equal(t, topics[1].ContentTopic, topicD)
-	require.NotEmpty(t, topics[1].LastRequest)
+	require.Zero(t, topics[1].LastRequest)
 	require.True(t, topics[1].Negotiated)
 	require.True(t, topics[1].Discovery)
+
+	require.NoError(t, db.AdvanceLastRequest(10))
+	topics, err = db.Topics()
+	require.NoError(t, err)
+	require.Equal(t, 10, topics[0].LastRequest)
+	require.Zero(t, topics[1].LastRequest, "uninitialized topics must not be advanced")
+
+	require.NoError(t, db.AddTopics([]MailserverTopic{{
+		PubsubTopic:  types.DefaultShardPubsubTopic(),
+		ContentTopic: topicA,
+		LastRequest:  5,
+	}}))
+	topics, err = db.Topics()
+	require.NoError(t, err)
+	require.Equal(t, 10, topics[0].LastRequest, "completed cursors must never regress")
 }

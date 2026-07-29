@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -124,6 +125,22 @@ func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestNoFiltersIsNoop() {
 	s.m.fetchLatestCommunityDescriptions(nil)
 
 	s.Require().Empty(*recorded, "no store request should be made when there are no filters")
+}
+
+func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestReconciliationWindowBoundsDescriptionFetch() {
+	recorded := s.recordMailserverBatches()
+	filter := descriptionFilter("0xcommunity1", "/waku/2/pubsub-a", "0xcontenttopic1")
+	to := s.m.calculateMailserverTo()
+	window := &types2.HistoryReconcileWindow{
+		From: to.Add(-100 * time.Second),
+		To:   to,
+	}
+
+	s.m.fetchLatestCommunityDescriptions([]*types2.ChatFilter{filter}, window)
+
+	s.Require().Len(*recorded, 1)
+	s.Require().Equal(window.From.Add(-time.Duration(tolerance)*time.Second), (*recorded)[0].batch.From)
+	s.Require().Equal(window.To, (*recorded)[0].batch.To)
 }
 
 // TestReusedFilterForgottenForNonMember verifies that a description filter

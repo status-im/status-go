@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
-	"time"
 
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
@@ -17,7 +16,9 @@ type MailserverTopic struct {
 	Discovery    bool     `json:"discovery?"`
 	Negotiated   bool     `json:"negotiated?"`
 	ChatIDs      []string `json:"chat-ids"`
-	LastRequest  int      `json:"last-request"` // default is 1
+	// LastRequest is the timestamp through which this topic is known complete.
+	// Zero means the topic has not completed its initial history fetch yet.
+	LastRequest int `json:"last-request"`
 }
 
 // sqlStringSlice helps to serialize a slice of strings into a single column using JSON serialization.
@@ -66,14 +67,19 @@ func (d *Database) AddTopics(topics []MailserverTopic) (err error) {
 
 	for _, topic := range topics {
 		chatIDs := sqlStringSlice(topic.ChatIDs)
-		_, err = tx.Exec(`INSERT OR REPLACE INTO mailserver_topics(
+		_, err = tx.Exec(`INSERT INTO mailserver_topics(
 			  pubsub_topic,
 			  topic,
 			  chat_ids,
 			  last_request,
 			  discovery,
 			  negotiated
-		  ) VALUES (?, ?, ?, ?, ?, ?)`,
+		  ) VALUES (?, ?, ?, ?, ?, ?)
+		  ON CONFLICT(topic, pubsub_topic) DO UPDATE SET
+			  chat_ids = excluded.chat_ids,
+			  last_request = MAX(mailserver_topics.last_request, excluded.last_request),
+			  discovery = excluded.discovery,
+			  negotiated = excluded.negotiated`,
 			topic.PubsubTopic,
 			topic.ContentTopic,
 			chatIDs,
@@ -124,6 +130,18 @@ func (d *Database) ResetLastRequest(pubsubTopic, contentTopic string) error {
 	return err
 }
 
+// AdvanceLastRequest marks every initialized topic complete through the given
+// timestamp. Topics with a zero cursor are deliberately left untouched so a
+// reliable live connection cannot suppress their initial history fetch.
+func (d *Database) AdvanceLastRequest(lastRequest int) error {
+	_, err := d.db.Exec(`
+		UPDATE mailserver_topics
+		SET last_request = ?
+		WHERE last_request > 0 AND last_request < ?
+	`, lastRequest, lastRequest)
+	return err
+}
+
 // SetTopics deletes all topics excepts the one set, or upsert those if
 // missing
 func (d *Database) SetTopics(filters messagingtypes.ChatFilters) (err error) {
@@ -168,8 +186,6 @@ func (d *Database) SetTopics(filters messagingtypes.ChatFilters) (err error) {
 		_, err = tx.Exec(query, topicsArgs...)
 	}
 
-	// Default to now - 1.day
-	lastRequest := (time.Now().Add(-24 * time.Hour)).Unix()
 	// Insert if not existing
 	for _, filter := range filters {
 		// fetch
@@ -179,7 +195,7 @@ func (d *Database) SetTopics(filters messagingtypes.ChatFilters) (err error) {
 			return
 		} else if err == sql.ErrNoRows {
 			// we insert the topic
-			_, err = tx.Exec(`INSERT INTO mailserver_topics(topic,pubsub_topic,last_request,discovery,negotiated) VALUES (?,?,?,?,?)`, filter.ContentTopic().String(), filter.PubsubTopic(), lastRequest, filter.IsDiscovery(), filter.IsNegotiated())
+			_, err = tx.Exec(`INSERT INTO mailserver_topics(topic,pubsub_topic,last_request,discovery,negotiated) VALUES (?,?,?,?,?)`, filter.ContentTopic().String(), filter.PubsubTopic(), 0, filter.IsDiscovery(), filter.IsNegotiated())
 		}
 		if err != nil {
 			return

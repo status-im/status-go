@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 func TestShouldReconcileHistory(t *testing.T) {
@@ -65,4 +67,67 @@ func TestShouldReconcileHistory(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestHistoryReconcileTrackerBoundsUnreliableWindow(t *testing.T) {
+	start := time.Unix(1_000, 0)
+	tracker := newHistoryReconcileTracker(true, start)
+
+	_, needed := tracker.observe(true, start.Add(10*time.Second), historyReconcileMinInterval)
+	require.False(t, needed)
+
+	// The transition occurred between observations, so use the previous known
+	// reliable time as the conservative lower boundary.
+	window, needed := tracker.observe(false, start.Add(20*time.Second), historyReconcileMinInterval)
+	require.True(t, needed)
+	require.Equal(t, start.Add(10*time.Second), window.From)
+	require.Equal(t, start.Add(20*time.Second), window.To)
+
+	window, needed = tracker.observe(false, start.Add(50*time.Second), historyReconcileMinInterval)
+	require.True(t, needed)
+	require.Equal(t, start.Add(10*time.Second), window.From)
+	require.Equal(t, start.Add(50*time.Second), window.To)
+
+	window, needed = tracker.observe(true, start.Add(60*time.Second), historyReconcileMinInterval)
+	require.True(t, needed)
+	require.Equal(t, start.Add(10*time.Second), window.From)
+	require.Equal(t, start.Add(60*time.Second), window.To)
+
+	_, needed = tracker.observe(true, start.Add(90*time.Second), historyReconcileMinInterval)
+	require.False(t, needed)
+}
+
+func TestHistoryReconcileTrackerPreservesDisjointWindows(t *testing.T) {
+	start := time.Unix(2_000, 0)
+	tracker := newHistoryReconcileTracker(true, start)
+
+	first, needed := tracker.observe(false, start.Add(10*time.Second), historyReconcileMinInterval)
+	require.True(t, needed)
+	_, needed = tracker.observe(true, start.Add(20*time.Second), historyReconcileMinInterval)
+	require.True(t, needed)
+
+	tracker.observe(true, start.Add(50*time.Second), historyReconcileMinInterval)
+	second, needed := tracker.observe(false, start.Add(60*time.Second), historyReconcileMinInterval)
+	require.True(t, needed)
+
+	require.Equal(t, start, first.From)
+	require.Equal(t, start.Add(50*time.Second), second.From)
+	require.True(t, first.To.Before(second.From))
+}
+
+func TestHistoryDeliveryReliableExcludesLightNodes(t *testing.T) {
+	core := &Waku{
+		cfg:       &Config{Mode: ModeCore},
+		connState: types.ConnectionStateConnected,
+	}
+	require.True(t, core.HistoryDeliveryReliable())
+
+	core.connState = types.ConnectionStatePartiallyConnected
+	require.False(t, core.HistoryDeliveryReliable())
+
+	edge := &Waku{
+		cfg:       &Config{Mode: ModeEdge},
+		connState: types.ConnectionStateConnected,
+	}
+	require.False(t, edge.HistoryDeliveryReliable())
 }

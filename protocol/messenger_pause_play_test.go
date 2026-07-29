@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestSetPausedUpdatesMessengerFlag(t *testing.T) {
@@ -14,4 +15,27 @@ func TestSetPausedUpdatesMessengerFlag(t *testing.T) {
 
 	m.SetPaused(false)
 	require.False(t, m.isPaused())
+}
+
+func TestSetPausedEnqueuesBoundedForegroundCatchup(t *testing.T) {
+	m := &Messenger{
+		started:             true,
+		logger:              zap.NewNop(),
+		historicSyncTrigger: make(chan struct{}, 1),
+	}
+
+	m.SetPaused(true)
+	m.SetPaused(false)
+
+	m.historicSyncQueueMu.Lock()
+	require.Len(t, m.historicSyncPending, 1)
+	request := m.historicSyncPending[0]
+	m.historicSyncQueueMu.Unlock()
+	require.True(t, request.bounded())
+	require.True(t, request.From.Before(request.To))
+
+	m.SetPaused(false)
+	m.historicSyncQueueMu.Lock()
+	require.Len(t, m.historicSyncPending, 1, "idempotent resume must not enqueue another catch-up")
+	m.historicSyncQueueMu.Unlock()
 }
