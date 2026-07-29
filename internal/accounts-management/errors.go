@@ -39,6 +39,8 @@ const (
 	ErrCodeWrongPasswordProvided
 	ErrCodeCannotRemoveProfileKeypair
 	ErrCodeNoPasswordProvided
+	ErrCodeNoPasswordProvidedAndNoXPubStored
+	ErrCodeCannotDeriveAccountFromXPub
 )
 
 var (
@@ -66,6 +68,8 @@ var (
 	ErrKeypairIsNotColdWallet                          = errors.NewError(ErrCodeKeypairIsNotColdWallet, "keypair is not a cold wallet keypair", getErrorCategory)
 	ErrCannotRemoveProfileKeypair                      = errors.NewError(ErrCodeCannotRemoveProfileKeypair, "cannot remove profile keypair", getErrorCategory)
 	ErrNoPasswordProvided                              = errors.NewError(ErrCodeNoPasswordProvided, "no password provided", getErrorCategory)
+	ErrNoPasswordProvidedAndNoXPubStored               = errors.NewError(ErrCodeNoPasswordProvidedAndNoXPubStored, "no password provided and no extended public key stored for the keypair", getErrorCategory)
+	ErrCannotDeriveAccountFromXPub                     = errors.NewError(ErrCodeCannotDeriveAccountFromXPub, "account path cannot be derived from the keypair's extended public key", getErrorCategory)
 )
 
 func ErrKeystoreDirectoryError(err error) *errors.AccountsError {
@@ -88,7 +92,7 @@ func getErrorCategory(code errors.ErrorCode) errors.ErrorCategory {
 		ErrCodeKeypairAlreadyAdded, ErrCodeAccountAlreadyAdded, ErrCodeChatAccountNotFoundInDerivedAccounts,
 		ErrCodeKeypairMustHaveAtLeastOneWalletAccount, ErrCodeCannotAddAccountsToKeypairImportedViaPrivateKey,
 		ErrCodeCannotMigrateProfileKeypair, ErrCodeKeypairIsNotColdWallet, ErrCodeWrongPasswordProvided,
-		ErrCodeNoPasswordProvided:
+		ErrCodeNoPasswordProvided, ErrCodeNoPasswordProvidedAndNoXPubStored, ErrCodeCannotDeriveAccountFromXPub:
 		return ErrorCategoryValidation
 	case ErrCodeCannotAddDefaultWalletAccount, ErrCodeCannotAddDefaultChatAccount, ErrCodeCannotRemoveDefaultWalletAccount,
 		ErrCodeCannotRemoveDefaultChatAccount, ErrCodeCannotRemoveProfileKeypair:
