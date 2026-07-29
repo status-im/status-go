@@ -17,8 +17,8 @@
     # A commit from nixpkgs 25.11 release : https://github.com/NixOS/nixpkgs/tree/release-25.11
     nixpkgs.url = "github:NixOS/nixpkgs/535f3e6942cb1cead3929c604320d3db54b542b9";
     logos-storage-nim = {
-      # TODO: temporary pin, see https://github.com/logos-storage/logos-storage-nim/pull/1492
-      url = "git+https://github.com/igor-sirotin/logos-storage-nim?submodules=1&rev=978c560aed6dc4cff6b602e94fc0fcc66fea6399";
+      # TODO: temporary pin, see https://github.com/logos-storage/logos-storage-nim/pull/1496
+      url = "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&rev=978c560aed6dc4cff6b602e94fc0fcc66fea6399";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
