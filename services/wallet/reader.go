@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -79,6 +80,7 @@ type Reader struct {
 	walletFeed                     *event.Feed
 	lastWalletTokenUpdateTimestamp sync.Map
 	reloadDebounceFn               func(f func())
+	firstReloadPending             atomic.Bool
 
 	stopCh chan struct{}
 }
@@ -143,6 +145,9 @@ func (r *Reader) startBalanceChangeWatcher() {
 						continue
 					}
 
+					if event.OldState.FetchedAt == multistandardbalance.NeverFetched {
+						r.firstReloadPending.Store(true)
+					}
 					r.refreshBalanceCache(context.TODO(), []uint64{event.Key.ChainID}, []common.Address{event.Key.Account})
 				}
 			}
@@ -343,7 +348,14 @@ func (r *Reader) refreshBalanceCache(ctx context.Context, chainIDs []uint64, add
 
 	r.updateTokenUpdateTimestamp(addresses)
 
-	r.reloadDebounceFn(r.triggerWalletReload)
+	if r.firstReloadPending.CompareAndSwap(true, false) {
+		go func() {
+			defer gocommon.LogOnPanic()
+			r.triggerWalletReload()
+		}()
+	} else {
+		r.reloadDebounceFn(r.triggerWalletReload)
+	}
 
 	return
 }
