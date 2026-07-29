@@ -23,6 +23,7 @@ import (
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
@@ -290,6 +291,12 @@ func (c *Controller) startWalletEventsWatcher() {
 			if len(fetchConfig) > 0 {
 				c.fetchImmediatelyWithConfig(fetchConfig)
 			}
+		case token.EventTokenListsUpdated:
+			// A cold-start leading-edge fetch runs before the token lists are
+			// loaded, so its ERC20 config is empty. Re-arm the leading edge and
+			// re-fetch now that the lists are available.
+			c.firstFetchPending.Store(true)
+			c.triggerFetch()
 		default:
 			// Unrelated event, do not trigger a fetch
 			return

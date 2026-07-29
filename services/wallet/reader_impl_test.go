@@ -640,3 +640,57 @@ func TestReader_FirstBalanceRefreshEmitsReloadImmediately(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 }
+
+func TestReader_NeverFetchedCompletionEmitsReloadImmediately(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	walletFeed := &event.Feed{}
+	reader := NewReader(tokenManager, nil, walletFeed, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	events := make(chan walletevent.Event, 10)
+	sub := walletFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	).AnyTimes()
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).Return(nil).AnyTimes()
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+
+	// Consume the post-Start leading edge.
+	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
+	select {
+	case <-events:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("expected the leading-edge reload event")
+	}
+
+	// A completion for a never-fetched (chain, account) pair is the first data a
+	// cold UI can show for it — the reload must go out immediately, not after
+	// the debounce.
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            multistandardbalance.BalancesKey{ChainID: chainID, Account: account},
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: false,
+		OldState:       multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case ev := <-events:
+		require.Equal(t, EventWalletTickReload, ev.Type)
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("expected an immediate reload for a never-fetched pair's first completion")
+	}
+}

@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -294,6 +295,9 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
 					logutils.ZapLogger().Error("failed to set last tokens update", zap.Error(err))
 				}
 				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
+				if tm.walletFeed != nil {
+					tm.walletFeed.Send(walletevent.Event{Type: EventTokenListsUpdated})
+				}
 			}
 		}
 	}()

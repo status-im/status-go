@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	mock_multistandardbalance "github.com/status-im/status-go/services/wallet/multistandardbalance/mock"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -1207,4 +1208,97 @@ func TestController_FirstFetchAfterStartBypassesDebounce(t *testing.T) {
 	controller.TriggerFullFetch()
 	time.Sleep(debounceTime / 4)
 	require.Equal(t, 1, getFetchCalls(), "rapid re-triggers must stay debounced (no extra fetch inside the window)")
+}
+
+func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	storage := mock_multistandardbalance.NewMockStorage(ctrl)
+	fetcher := mock_multistandardbalance.NewMockBalanceFetcher(ctrl)
+	accountsProvider := mock_multistandardbalance.NewMockAccountsProvider(ctrl)
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_multistandardbalance.NewMockNetworksProvider(ctrl)
+	tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
+	collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
+	lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+	logger := zap.NewNop()
+
+	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
+	network1 := &params.Network{ChainID: 1}
+
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.BytesToAddress(address1.Bytes()),
+		ChainID: 1,
+	}
+	neverFetched := multistandardbalance.State{}
+	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(nil, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
+	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
+
+	tokenListProvider.EXPECT().GetTokenContractAddresses(uint64(1)).Return([]common.Address{}, nil).AnyTimes()
+	collectibleListProvider.EXPECT().GetCollectiblesList(uint64(1), common.BytesToAddress(address1.Bytes())).Return([]multistandardbalance.CollectibleID{}, []multistandardbalance.CollectibleID{}, nil).AnyTimes()
+
+	var fetchCalls int
+	var fetchMutex sync.Mutex
+	fetcher.EXPECT().FetchBalances(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
+		fetchMutex.Lock()
+		fetchCalls++
+		fetchMutex.Unlock()
+		ch := make(chan multistandardfetcher.FetchResult)
+		close(ch)
+		return ch, nil
+	}).AnyTimes()
+
+	getFetchCalls := func() int {
+		fetchMutex.Lock()
+		defer fetchMutex.Unlock()
+		return fetchCalls
+	}
+
+	const debounceTime = 2 * time.Second
+	config := multistandardbalance.ControllerConfig{
+		FetchDebounceTime: debounceTime,
+		FetchPeriod:       1 * time.Hour,
+	}
+
+	walletFeed := &event.Feed{}
+	controller := multistandardbalance.NewController(
+		config,
+		storage,
+		fetcher,
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		tokenListProvider,
+		collectibleListProvider,
+		lastBlockManager,
+		walletFeed,
+		logger,
+	)
+
+	controller.Start()
+	defer controller.Stop()
+
+	// Consume the post-Start leading edge.
+	require.Eventually(t, func() bool {
+		return getFetchCalls() == 1
+	}, 300*time.Millisecond, 10*time.Millisecond, "expected the leading-edge fetch after Start")
+
+	// Cold start ordering: the first fetch ran before the token lists were
+	// available (empty ERC20 config). When the lists finish loading, the
+	// controller must re-fetch immediately, not after the debounce.
+	walletFeed.Send(walletevent.Event{Type: token.EventTokenListsUpdated})
+
+	require.Eventually(t, func() bool {
+		return getFetchCalls() == 2
+	}, 300*time.Millisecond, 10*time.Millisecond,
+		"token-lists-updated should trigger an immediate re-fetch")
 }

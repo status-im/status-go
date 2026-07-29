@@ -149,6 +149,12 @@ func (r *Reader) startBalanceChangeWatcher() {
 						continue
 					}
 
+					if event.OldState.FetchedAt == multistandardbalance.NeverFetched {
+						// First-ever data for this (chain, account) pair: a cold UI
+						// is waiting on it, so the reload must not sit out the
+						// debounce.
+						r.firstReloadPending.Store(true)
+					}
 					r.refreshBalanceCache(context.TODO(), []uint64{event.Key.ChainID}, []common.Address{event.Key.Account})
 				}
 			}
