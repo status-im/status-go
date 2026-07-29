@@ -1351,6 +1351,94 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 		"a second token-lists update must stay debounced, not fetch immediately")
 }
 
+func TestController_ProviderErrorAtStartCountsAsColdStart(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	storage := mock_multistandardbalance.NewMockStorage(ctrl)
+	fetcher := mock_multistandardbalance.NewMockBalanceFetcher(ctrl)
+	accountsProvider := mock_multistandardbalance.NewMockAccountsProvider(ctrl)
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_multistandardbalance.NewMockNetworksProvider(ctrl)
+	tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
+	collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
+	lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+	logger := zap.NewNop()
+
+	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
+	network1 := &params.Network{ChainID: 1}
+
+	// The cold-start probe at Start() hits a not-yet-ready accounts provider;
+	// the provider recovers by the time the first fetch runs.
+	accountsProvider.EXPECT().GetWalletAddresses().Return(nil, errors.New("provider not ready")).Times(1)
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.BytesToAddress(address1.Bytes()),
+		ChainID: 1,
+	}
+	neverFetched := multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
+	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(nil, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
+	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
+
+	tokenListProvider.EXPECT().GetTokenContractAddresses(uint64(1)).Return([]common.Address{}, nil).AnyTimes()
+	collectibleListProvider.EXPECT().GetCollectiblesList(uint64(1), common.BytesToAddress(address1.Bytes())).Return([]multistandardbalance.CollectibleID{}, []multistandardbalance.CollectibleID{}, nil).AnyTimes()
+
+	var fetchCalls int
+	var fetchMutex sync.Mutex
+	fetcher.EXPECT().FetchBalances(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
+		fetchMutex.Lock()
+		fetchCalls++
+		fetchMutex.Unlock()
+		ch := make(chan multistandardfetcher.FetchResult)
+		close(ch)
+		return ch, nil
+	}).AnyTimes()
+
+	getFetchCalls := func() int {
+		fetchMutex.Lock()
+		defer fetchMutex.Unlock()
+		return fetchCalls
+	}
+
+	const debounceTime = 2 * time.Second
+	config := multistandardbalance.ControllerConfig{
+		FetchDebounceTime: debounceTime,
+		FetchPeriod:       1 * time.Hour,
+	}
+
+	controller := multistandardbalance.NewController(
+		config,
+		storage,
+		fetcher,
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		tokenListProvider,
+		collectibleListProvider,
+		lastBlockManager,
+		nil, // walletFeed
+		logger,
+	)
+
+	controller.Start()
+	defer controller.Stop()
+
+	// A provider error during the cold-start probe must count as cold (the
+	// sources may simply not be ready yet on a fresh boot), so the first fetch
+	// still bypasses the debounce.
+	require.Eventually(t, func() bool {
+		return getFetchCalls() == 1
+	}, 300*time.Millisecond, 10*time.Millisecond,
+		"provider error at Start must arm the leading edge (cold start)")
+}
+
 func TestController_WarmStartKeepsDebounce(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

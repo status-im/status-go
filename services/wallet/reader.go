@@ -358,7 +358,13 @@ func (r *Reader) refreshBalanceCache(ctx context.Context, chainIDs []uint64, add
 	r.updateTokenUpdateTimestamp(addresses)
 
 	if r.firstReloadPending.CompareAndSwap(true, false) {
-		r.triggerWalletReload()
+		// Feed.Send blocks until every subscriber consumes; keep it off the
+		// balance-change watcher goroutine, whose publisher drops events when
+		// its buffer backs up. (The debounced path already runs off a timer.)
+		go func() {
+			defer gocommon.LogOnPanic()
+			r.triggerWalletReload()
+		}()
 	} else {
 		r.reloadDebounceFn(r.triggerWalletReload)
 	}

@@ -430,7 +430,7 @@ func (c *Controller) needsToFetch(state State) bool {
 func (c *Controller) getAllAccounts() ([]common.Address, error) {
 	accounts, err := c.accountsProvider.GetWalletAddresses()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	gethAccounts := make([]common.Address, len(accounts))
 	for i, account := range accounts {
@@ -442,7 +442,7 @@ func (c *Controller) getAllAccounts() ([]common.Address, error) {
 func (c *Controller) getAllNetworks() ([]uint64, error) {
 	networks, err := c.networksProvider.GetActiveNetworks()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	chains := make([]uint64, len(networks))
 	for i, network := range networks {
