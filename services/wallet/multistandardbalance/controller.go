@@ -23,7 +23,6 @@ import (
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
@@ -90,11 +89,12 @@ type Controller struct {
 
 	publisher *pubsub.Publisher
 
-	stopCh             chan struct{}
-	fetchDebounceFn    func(f func())
-	firstFetchPending  atomic.Bool
-	pendingFullFetch   bool
-	pendingFetchConfig FetchConfig
+	stopCh                     chan struct{}
+	fetchDebounceFn            func(f func())
+	firstFetchPending          atomic.Bool
+	tokenListsColdFetchPending atomic.Bool
+	pendingFullFetch           bool
+	pendingFetchConfig         FetchConfig
 
 	chainFetchMu      sync.Mutex
 	chainFetchCancels map[uint64]context.CancelFunc
@@ -140,9 +140,12 @@ func (c *Controller) Start() {
 	}
 
 	c.stopCh = make(chan struct{})
-	// Arm the leading edge: the first fetch after a (re)start serves a cold UI
-	// waiting on never-fetched balances, so it must not sit out the debounce.
+	// Arm the leading edges: the first fetch after a (re)start serves a cold UI
+	// waiting on never-fetched balances, so it must not sit out the debounce —
+	// and the first token-lists update completes that cold round (see the
+	// wallet-events watcher), so it gets the same treatment exactly once.
 	c.firstFetchPending.Store(true)
+	c.tokenListsColdFetchPending.Store(true)
 
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
@@ -291,12 +294,17 @@ func (c *Controller) startWalletEventsWatcher() {
 			if len(fetchConfig) > 0 {
 				c.fetchImmediatelyWithConfig(fetchConfig)
 			}
-		case token.EventTokenListsUpdated:
+		case walletevent.EventTokenListsUpdated:
 			// A cold-start leading-edge fetch runs before the token lists are
-			// loaded, so its ERC20 config is empty. Re-arm the leading edge and
-			// re-fetch now that the lists are available.
-			c.firstFetchPending.Store(true)
-			c.triggerFetch()
+			// loaded, so its ERC20 round is empty — and that empty round stamps
+			// the ERC20 state as fetched, which a state-gated (non-full) trigger
+			// would then skip. Request a FULL fetch so the newly listed tokens
+			// are fetched regardless of state; only the first update after Start
+			// bypasses the debounce, later refreshes coalesce normally.
+			if c.tokenListsColdFetchPending.CompareAndSwap(true, false) {
+				c.firstFetchPending.Store(true)
+			}
+			c.TriggerFullFetch()
 		default:
 			// Unrelated event, do not trigger a fetch
 			return
@@ -350,8 +358,9 @@ func (c *Controller) TriggerFullFetch() {
 func (c *Controller) triggerFetch() {
 	if c.firstFetchPending.CompareAndSwap(true, false) {
 		// Leading edge: run the first post-Start fetch immediately. fetchNow pops
-		// the pending flags under lock, so a concurrently debounced run just
-		// finds nothing left to do.
+		// the pending flags under lock; a concurrently debounced run recomputes
+		// from persisted state, so the worst case is a redundant round, not lost
+		// or double-applied data.
 		go func() {
 			defer gocommon.LogOnPanic()
 			c.fetchNow()

@@ -255,7 +255,7 @@ func (tm *Manager) Start(ctx context.Context) error {
 	tm.startAccountsWatcher()
 	tm.startNetworksWatcher()
 
-	tm.notifyCh = make(chan struct{})
+	tm.notifyCh = make(chan struct{}, 1)
 	return tm.startTokenListsNotifier(ctx)
 }
 
@@ -296,7 +296,13 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
 				}
 				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
 				if tm.walletFeed != nil {
-					tm.walletFeed.Send(walletevent.Event{Type: EventTokenListsUpdated})
+					// Send from a separate goroutine: Feed.Send blocks until every
+					// subscriber has consumed the value, and a stalled notifier loop
+					// would miss stopCh and drop follow-up notifications.
+					go func() {
+						defer gocommon.LogOnPanic()
+						tm.walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+					}()
 				}
 			}
 		}

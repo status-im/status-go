@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
 	mock_multistandardbalance "github.com/status-im/status-go/services/wallet/multistandardbalance/mock"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
-	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -1226,6 +1225,7 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 
 	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
 	network1 := &params.Network{ChainID: 1}
+	erc20Token := common.HexToAddress("0x00000000000000000000000000000000000000AA")
 
 	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
 	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
@@ -1235,33 +1235,30 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 		Account: common.BytesToAddress(address1.Bytes()),
 		ChainID: 1,
 	}
-	neverFetched := multistandardbalance.State{}
-	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(nil, neverFetched, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
-	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
-	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
+	// Cold-start premise of the fix: the first round already stamped the (empty)
+	// ERC20 state as fetched, so a purely state-gated re-fetch would skip ERC20.
+	fetched := multistandardbalance.State{FetchedAt: time.Now().Unix()}
+	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(0), fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, fetched, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
 	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
 
-	tokenListProvider.EXPECT().GetTokenContractAddresses(uint64(1)).Return([]common.Address{}, nil).AnyTimes()
+	// The lists were empty for the first round and now contain a token.
+	tokenListProvider.EXPECT().GetTokenContractAddresses(uint64(1)).Return([]common.Address{erc20Token}, nil).AnyTimes()
 	collectibleListProvider.EXPECT().GetCollectiblesList(uint64(1), common.BytesToAddress(address1.Bytes())).Return([]multistandardbalance.CollectibleID{}, []multistandardbalance.CollectibleID{}, nil).AnyTimes()
 
-	var fetchCalls int
 	var fetchMutex sync.Mutex
+	var fetchConfigs []multistandardfetcher.FetchConfig
 	fetcher.EXPECT().FetchBalances(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
 		fetchMutex.Lock()
-		fetchCalls++
+		fetchConfigs = append(fetchConfigs, config)
 		fetchMutex.Unlock()
 		ch := make(chan multistandardfetcher.FetchResult)
 		close(ch)
 		return ch, nil
 	}).AnyTimes()
-
-	getFetchCalls := func() int {
-		fetchMutex.Lock()
-		defer fetchMutex.Unlock()
-		return fetchCalls
-	}
 
 	const debounceTime = 2 * time.Second
 	config := multistandardbalance.ControllerConfig{
@@ -1287,18 +1284,48 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 	controller.Start()
 	defer controller.Stop()
 
-	// Consume the post-Start leading edge.
-	require.Eventually(t, func() bool {
-		return getFetchCalls() == 1
-	}, 300*time.Millisecond, 10*time.Millisecond, "expected the leading-edge fetch after Start")
+	// Let the post-Start full-fetch round run and settle; only rounds started
+	// AFTER the token-lists event may satisfy the assertion.
+	time.Sleep(100 * time.Millisecond)
+	fetchMutex.Lock()
+	preEventRounds := len(fetchConfigs)
+	fetchMutex.Unlock()
 
-	// Cold start ordering: the first fetch ran before the token lists were
-	// available (empty ERC20 config). When the lists finish loading, the
-	// controller must re-fetch immediately, not after the debounce.
-	walletFeed.Send(walletevent.Event{Type: token.EventTokenListsUpdated})
+	// When the token lists finish loading, the controller must immediately run a
+	// round whose ERC20 config actually contains the newly listed token — a
+	// state-gated re-fetch would skip it because the ERC20 state reads as fresh.
+	walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
 
 	require.Eventually(t, func() bool {
-		return getFetchCalls() == 2
+		fetchMutex.Lock()
+		defer fetchMutex.Unlock()
+		for _, cfg := range fetchConfigs[preEventRounds:] {
+			for _, tokens := range cfg.ERC20 {
+				for _, tokenAddr := range tokens {
+					if tokenAddr == erc20Token {
+						return true
+					}
+				}
+			}
+		}
+		return false
 	}, 300*time.Millisecond, 10*time.Millisecond,
-		"token-lists-updated should trigger an immediate re-fetch")
+		"token-lists-updated should immediately re-fetch with the newly listed ERC20 token in the config")
+
+	// Only the FIRST update after Start bypasses the debounce. Token lists also
+	// refresh periodically (autoRefresh) and on network changes; those must
+	// coalesce through the normal debounce instead of aborting/restarting
+	// in-flight rounds.
+	fetchMutex.Lock()
+	postColdRounds := len(fetchConfigs)
+	fetchMutex.Unlock()
+
+	walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+	time.Sleep(300 * time.Millisecond)
+
+	fetchMutex.Lock()
+	afterSecondEvent := len(fetchConfigs)
+	fetchMutex.Unlock()
+	require.Equal(t, postColdRounds, afterSecondEvent,
+		"a second token-lists update must stay debounced, not fetch immediately")
 }

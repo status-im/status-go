@@ -39,7 +39,9 @@ import (
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
-// WalletTickReload emitted every 15mn to reload the wallet balance and history
+// EventWalletTickReload tells the client to re-read wallet balances/history: it
+// is emitted (leading edge for first-ever data, otherwise debounced) after
+// balance refreshes complete.
 const EventWalletTickReload walletevent.EventType = "wallet-tick-reload"
 const reloadDebounceTime = 5 * time.Second
 
