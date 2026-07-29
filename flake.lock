@@ -34,13 +34,13 @@
         "revCount": 878,
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/igor-sirotin/logos-storage-nim"
+        "url": "https://github.com/logos-storage/logos-storage-nim"
       },
       "original": {
         "rev": "978c560aed6dc4cff6b602e94fc0fcc66fea6399",
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/igor-sirotin/logos-storage-nim"
+        "url": "https://github.com/logos-storage/logos-storage-nim"
       }
     },
     "nim-sds": {
