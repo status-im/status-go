@@ -1141,7 +1141,7 @@ func TestController_FirstFetchAfterStartBypassesDebounce(t *testing.T) {
 		Account: common.BytesToAddress(address1.Bytes()),
 		ChainID: 1,
 	}
-	neverFetched := multistandardbalance.State{}
+	neverFetched := multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(nil, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
@@ -1235,13 +1235,31 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 		Account: common.BytesToAddress(address1.Bytes()),
 		ChainID: 1,
 	}
-	// Cold-start premise of the fix: the first round already stamped the (empty)
-	// ERC20 state as fetched, so a purely state-gated re-fetch would skip ERC20.
-	fetched := multistandardbalance.State{FetchedAt: time.Now().Unix()}
-	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(0), fetched, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
-	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
-	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, fetched, nil).AnyTimes()
+	// Cold-start premise of the fix: states start never-fetched (so Start arms
+	// the leading edges), and the first round stamps them as fetched — after
+	// which a purely state-gated re-fetch would skip ERC20.
+	var stateMutex sync.Mutex
+	roundRan := false
+	currentState := func() multistandardbalance.State {
+		stateMutex.Lock()
+		defer stateMutex.Unlock()
+		if roundRan {
+			return multistandardbalance.State{FetchedAt: time.Now().Unix()}
+		}
+		return multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
+	}
+	storage.EXPECT().GetNativeBalance(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (*big.Int, multistandardbalance.State, error) {
+		return big.NewInt(0), currentState(), nil
+	}).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
+		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
+	}).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
+		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
+	}).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.HashableCollectibleID]*big.Int, multistandardbalance.State, error) {
+		return map[multistandardbalance.HashableCollectibleID]*big.Int{}, currentState(), nil
+	}).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
 	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
 
@@ -1255,6 +1273,9 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 		fetchMutex.Lock()
 		fetchConfigs = append(fetchConfigs, config)
 		fetchMutex.Unlock()
+		stateMutex.Lock()
+		roundRan = true
+		stateMutex.Unlock()
 		ch := make(chan multistandardfetcher.FetchResult)
 		close(ch)
 		return ch, nil
@@ -1329,3 +1350,104 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 	require.Equal(t, postColdRounds, afterSecondEvent,
 		"a second token-lists update must stay debounced, not fetch immediately")
 }
+
+func TestController_WarmStartKeepsDebounce(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	storage := mock_multistandardbalance.NewMockStorage(ctrl)
+	fetcher := mock_multistandardbalance.NewMockBalanceFetcher(ctrl)
+	accountsProvider := mock_multistandardbalance.NewMockAccountsProvider(ctrl)
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_multistandardbalance.NewMockNetworksProvider(ctrl)
+	tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
+	collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
+	lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+	logger := zap.NewNop()
+
+	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
+	network1 := &params.Network{ChainID: 1}
+
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.BytesToAddress(address1.Bytes()),
+		ChainID: 1,
+	}
+	// Warm profile: everything was fetched recently (a mobile resume, not a
+	// cold login).
+	fetched := multistandardbalance.State{FetchedAt: time.Now().Unix()}
+	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(0), fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, fetched, nil).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
+	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
+
+	tokenListProvider.EXPECT().GetTokenContractAddresses(uint64(1)).Return([]common.Address{}, nil).AnyTimes()
+	collectibleListProvider.EXPECT().GetCollectiblesList(uint64(1), common.BytesToAddress(address1.Bytes())).Return([]multistandardbalance.CollectibleID{}, []multistandardbalance.CollectibleID{}, nil).AnyTimes()
+
+	var fetchCalls int
+	var fetchMutex sync.Mutex
+	fetcher.EXPECT().FetchBalances(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
+		fetchMutex.Lock()
+		fetchCalls++
+		fetchMutex.Unlock()
+		ch := make(chan multistandardfetcher.FetchResult)
+		close(ch)
+		return ch, nil
+	}).AnyTimes()
+
+	getFetchCalls := func() int {
+		fetchMutex.Lock()
+		defer fetchMutex.Unlock()
+		return fetchCalls
+	}
+
+	const debounceTime = 1 * time.Second
+	config := multistandardbalance.ControllerConfig{
+		FetchDebounceTime: debounceTime,
+		FetchPeriod:       1 * time.Hour,
+	}
+
+	walletFeed := &event.Feed{}
+	controller := multistandardbalance.NewController(
+		config,
+		storage,
+		fetcher,
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		tokenListProvider,
+		collectibleListProvider,
+		lastBlockManager,
+		walletFeed,
+		logger,
+	)
+
+	controller.Start()
+	defer controller.Stop()
+
+	// A warm (re)start — e.g. mobile foreground — must keep the pre-existing
+	// debounced behavior: no immediate fetch burst on resume.
+	time.Sleep(300 * time.Millisecond)
+	require.Equal(t, 0, getFetchCalls(), "warm Start must not fire an immediate fetch")
+
+	// The debounced initial fetch still happens.
+	require.Eventually(t, func() bool {
+		return getFetchCalls() == 1
+	}, 3*debounceTime, 10*time.Millisecond, "debounced initial fetch should still run")
+
+	// A token-lists update on a warm profile is routine (autoRefresh) and must
+	// also stay debounced.
+	fetchMutex.Lock()
+	preEvent := getFetchCallsLocked(&fetchCalls)
+	fetchMutex.Unlock()
+	walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+	time.Sleep(300 * time.Millisecond)
+	require.Equal(t, preEvent, getFetchCalls(), "warm token-lists update must stay debounced")
+}
+
+func getFetchCallsLocked(calls *int) int { return *calls }

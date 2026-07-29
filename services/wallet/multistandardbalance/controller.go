@@ -140,12 +140,17 @@ func (c *Controller) Start() {
 	}
 
 	c.stopCh = make(chan struct{})
-	// Arm the leading edges: the first fetch after a (re)start serves a cold UI
-	// waiting on never-fetched balances, so it must not sit out the debounce —
-	// and the first token-lists update completes that cold round (see the
-	// wallet-events watcher), so it gets the same treatment exactly once.
-	c.firstFetchPending.Store(true)
-	c.tokenListsColdFetchPending.Store(true)
+	// Arm the leading edges only for a COLD start (some pair has never been
+	// fetched): the first fetch then serves a UI waiting on never-fetched
+	// balances and must not sit out the debounce — and the first token-lists
+	// update completes that cold round (see the wallet-events watcher), so it
+	// gets the same treatment exactly once. A warm (re)start — e.g. a mobile
+	// resume — keeps the plain debounced behavior, so foregrounding the app
+	// does not fire an immediate fetch burst.
+	if c.hasNeverFetchedBalances() {
+		c.firstFetchPending.Store(true)
+		c.tokenListsColdFetchPending.Store(true)
+	}
 
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
@@ -161,6 +166,53 @@ func (c *Controller) Stop() {
 
 	c.cancelAllChainFetches()
 	c.stopWalletEventsWatcher()
+}
+
+// hasNeverFetchedBalances reports whether any (account, chain) pair has a
+// balance type that was never fetched. Provider/storage errors count as cold:
+// on a genuinely cold boot those sources may not be ready yet, and a wasted
+// leading edge is cheaper than a cold UI waiting out the debounce.
+func (c *Controller) hasNeverFetchedBalances() bool {
+	accounts, err := c.getAllAccounts()
+	if err != nil {
+		return true
+	}
+	networks, err := c.getAllNetworks()
+	if err != nil {
+		return true
+	}
+	for _, account := range accounts {
+		for _, network := range networks {
+			key := BalancesKey{Account: account, ChainID: network}
+			states := make([]State, 0, 4)
+			if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			if _, state, err := c.storage.GetERC721Balances(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			if _, state, err := c.storage.GetERC1155Balances(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			for _, state := range states {
+				if state.FetchedAt == NeverFetched {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (c *Controller) startChainFetch(chainID uint64) (context.Context, context.CancelFunc) {

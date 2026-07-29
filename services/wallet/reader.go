@@ -82,7 +82,11 @@ type Reader struct {
 	walletFeed                     *event.Feed
 	lastWalletTokenUpdateTimestamp sync.Map
 	reloadDebounceFn               func(f func())
-	firstReloadPending             atomic.Bool
+	// Armed by the balance-change watcher when a completion covers a
+	// never-fetched pair — the first data a cold UI can show — so that refresh
+	// announces the reload immediately instead of sitting out the debounce.
+	// Warm refreshes (e.g. after a mobile resume) stay debounced.
+	firstReloadPending atomic.Bool
 
 	stopCh chan struct{}
 }
@@ -93,10 +97,6 @@ func (r *Reader) Start() error {
 	}
 
 	r.stopCh = make(chan struct{})
-	// Arm the leading edge: a cold UI is waiting on the very first balances, so
-	// the first completed refresh must announce the reload without sitting out
-	// the debounce.
-	r.firstReloadPending.Store(true)
 
 	// Start balance change watcher
 	r.startBalanceChangeWatcher()

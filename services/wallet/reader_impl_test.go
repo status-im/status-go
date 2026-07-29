@@ -592,7 +592,7 @@ func TestReader_SkipsUICacheRefreshWhenFetchUnchangedAndAlreadyFetched(t *testin
 	time.Sleep(100 * time.Millisecond)
 }
 
-func TestReader_FirstBalanceRefreshEmitsReloadImmediately(t *testing.T) {
+func TestReader_WarmBalanceRefreshStaysDebounced(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -619,24 +619,14 @@ func TestReader_FirstBalanceRefreshEmitsReloadImmediately(t *testing.T) {
 	account := testAccAddress1
 	chainID := walletcommon.OptimismMainnet
 
-	// Cold start: the first completed balance refresh must announce the reload
-	// right away (leading edge), not after reloadDebounceTime.
-	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
-
-	select {
-	case ev := <-events:
-		require.Equal(t, EventWalletTickReload, ev.Type)
-	case <-time.After(300 * time.Millisecond):
-		t.Fatal("expected an immediate wallet reload event after the first balance refresh")
-	}
-
-	// Follow-up refreshes stay debounced: no immediate second event.
+	// Warm profile (e.g. a mobile resume): refreshes coalesce through the
+	// debounce — Start must not arm an immediate announcement.
 	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
 	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
 
 	select {
 	case <-events:
-		t.Fatal("follow-up refreshes must coalesce through the debounce, not emit immediately")
+		t.Fatal("warm refreshes must coalesce through the debounce, not emit immediately")
 	case <-time.After(300 * time.Millisecond):
 	}
 }
@@ -668,12 +658,12 @@ func TestReader_NeverFetchedCompletionEmitsReloadImmediately(t *testing.T) {
 	account := testAccAddress1
 	chainID := walletcommon.OptimismMainnet
 
-	// Consume the post-Start leading edge.
+	// A warm refresh does not announce immediately (no Start-armed edge).
 	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
 	select {
 	case <-events:
+		t.Fatal("warm refresh must not announce immediately")
 	case <-time.After(300 * time.Millisecond):
-		t.Fatal("expected the leading-edge reload event")
 	}
 
 	// A completion for a never-fetched (chain, account) pair is the first data a
