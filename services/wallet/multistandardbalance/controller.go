@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -88,10 +89,12 @@ type Controller struct {
 
 	publisher *pubsub.Publisher
 
-	stopCh             chan struct{}
-	fetchDebounceFn    func(f func())
-	pendingFullFetch   bool
-	pendingFetchConfig FetchConfig
+	stopCh                     chan struct{}
+	fetchDebounceFn            func(f func())
+	firstFetchPending          atomic.Bool
+	tokenListsColdFetchPending atomic.Bool
+	pendingFullFetch           bool
+	pendingFetchConfig         FetchConfig
 
 	chainFetchMu      sync.Mutex
 	chainFetchCancels map[uint64]context.CancelFunc
@@ -137,6 +140,11 @@ func (c *Controller) Start() {
 	}
 
 	c.stopCh = make(chan struct{})
+	// Arm the leading edges only for a COLD start (some pair has never been fetched)
+	if c.hasNeverFetchedBalances() {
+		c.firstFetchPending.Store(true)
+		c.tokenListsColdFetchPending.Store(true)
+	}
 
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
@@ -152,6 +160,51 @@ func (c *Controller) Stop() {
 
 	c.cancelAllChainFetches()
 	c.stopWalletEventsWatcher()
+}
+
+// hasNeverFetchedBalances reports whether any (account, chain) pair has a
+// balance type that was never fetched
+func (c *Controller) hasNeverFetchedBalances() bool {
+	accounts, err := c.getAllAccounts()
+	if err != nil {
+		return true
+	}
+	networks, err := c.getAllNetworks()
+	if err != nil {
+		return true
+	}
+	for _, account := range accounts {
+		for _, network := range networks {
+			key := BalancesKey{Account: account, ChainID: network}
+			states := make([]State, 0, 4)
+			if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			if _, state, err := c.storage.GetERC721Balances(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			if _, state, err := c.storage.GetERC1155Balances(context.Background(), key); err == nil {
+				states = append(states, state)
+			} else {
+				return true
+			}
+			for _, state := range states {
+				if state.FetchedAt == NeverFetched {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (c *Controller) startChainFetch(chainID uint64) (context.Context, context.CancelFunc) {
@@ -285,6 +338,11 @@ func (c *Controller) startWalletEventsWatcher() {
 			if len(fetchConfig) > 0 {
 				c.fetchImmediatelyWithConfig(fetchConfig)
 			}
+		case walletevent.EventTokenListsUpdated:
+			if c.tokenListsColdFetchPending.CompareAndSwap(true, false) {
+				c.firstFetchPending.Store(true)
+			}
+			c.TriggerFullFetch()
 		default:
 			// Unrelated event, do not trigger a fetch
 			return
@@ -336,6 +394,13 @@ func (c *Controller) TriggerFullFetch() {
 }
 
 func (c *Controller) triggerFetch() {
+	if c.firstFetchPending.CompareAndSwap(true, false) {
+		go func() {
+			defer gocommon.LogOnPanic()
+			c.fetchNow()
+		}()
+		return
+	}
 	c.fetchDebounceFn(c.fetchNow)
 }
 
@@ -347,7 +412,7 @@ func (c *Controller) needsToFetch(state State) bool {
 func (c *Controller) getAllAccounts() ([]common.Address, error) {
 	accounts, err := c.accountsProvider.GetWalletAddresses()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	gethAccounts := make([]common.Address, len(accounts))
 	for i, account := range accounts {
@@ -359,7 +424,7 @@ func (c *Controller) getAllAccounts() ([]common.Address, error) {
 func (c *Controller) getAllNetworks() ([]uint64, error) {
 	networks, err := c.networksProvider.GetActiveNetworks()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	chains := make([]uint64, len(networks))
 	for i, network := range networks {
