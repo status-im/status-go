@@ -7,9 +7,9 @@ import (
 )
 
 func TestBuildChannelID(t *testing.T) {
-	chatID := "community-chat-id"
+	communityID := "community-id"
 
-	channelID := BuildChannelID(chatID)
+	channelID := BuildChannelID(communityID)
 
-	require.Equal(t, chatID, channelID)
+	require.Equal(t, communityID, channelID)
 }
