@@ -26,7 +26,7 @@ func (s *sdsWrapperStub) WrapPayloadForSDS(payload []byte, channelID string) ([]
 	return s.wrappedPayload, s.messageID, s.err
 }
 
-func TestWrapPayloadForPublicSDS_MissingChatID(t *testing.T) {
+func TestWrapPayloadForPublicSDS_MissingCommunityID(t *testing.T) {
 	logger := zap.NewNop()
 	payload := []byte("payload")
 	stub := &sdsWrapperStub{}
@@ -42,18 +42,19 @@ func TestWrapPayloadForPublicSDS_MissingChatID(t *testing.T) {
 func TestWrapPayloadForPublicSDS_OversizedPayload(t *testing.T) {
 	logger := zap.NewNop()
 	payload := []byte("payload")
+	communityID := "community-id"
 	stub := &sdsWrapperStub{
 		err: errors.New("reMessageTooLarge: message exceeds allowed size"),
 	}
 
-	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, "community-chat")
+	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, communityID)
 
 	require.NoError(t, err)
 	require.Equal(t, payload, wrapped)
 	require.Nil(t, messageID)
 	require.True(t, stub.called)
 	require.Equal(t, payload, stub.wantPayload)
-	require.Equal(t, reliability.BuildChannelID("community-chat"), stub.wantChannelID)
+	require.Equal(t, reliability.BuildChannelID(communityID), stub.wantChannelID)
 }
 
 func TestWrapPayloadForPublicSDS_WrapError(t *testing.T) {
@@ -63,7 +64,7 @@ func TestWrapPayloadForPublicSDS_WrapError(t *testing.T) {
 		err: errors.New("boom"),
 	}
 
-	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, "community-chat")
+	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, "community-id")
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to wrap payload for SDS")
@@ -83,7 +84,7 @@ func TestWrapPayloadForPublicSDS_Success(t *testing.T) {
 		messageID:      wantedMessageID,
 	}
 
-	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, "community-chat")
+	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, "community-id")
 
 	require.NoError(t, err)
 	require.Equal(t, wantedWrapped, wrapped)

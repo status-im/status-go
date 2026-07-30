@@ -24,6 +24,13 @@ import (
 
 var ErrModifiedRawMessage = errors.New("modified rawMessage")
 
+func encodeCommunityID(communityID []byte) string {
+	if len(communityID) == 0 {
+		return ""
+	}
+	return types2.EncodeHex(communityID)
+}
+
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey
 	messaging *messaging.API
@@ -187,7 +194,7 @@ func (s *MessageSender) SendPublic(
 		Payload:             wrappedMessage,
 		PubsubTopic:         rawMessage.PubsubTopic,
 		ContentTopic:        rawMessage.ContentTopic,
-		ChatID:              rawMessage.LocalChatID,
+		CommunityID:         encodeCommunityID(rawMessage.CommunityID),
 		SkipEncryptionLayer: rawMessage.SkipEncryptionLayer,
 		Ephemeral:           rawMessage.Ephemeral,
 		Priority:            rawMessage.Priority,
@@ -390,7 +397,7 @@ func (s *MessageSender) SendCommunity(
 			Payload:      wrappedMessage,
 			PubsubTopic:  rawMessage.PubsubTopic,
 			ContentTopic: rawMessage.ContentTopic,
-			ChatID:       rawMessage.LocalChatID,
+			CommunityID:  encodeCommunityID(rawMessage.CommunityID),
 			HashRatchet:  hashRatchetParams,
 		})
 
@@ -406,7 +413,7 @@ func (s *MessageSender) SendCommunity(
 			Payload:            wrappedMessage,
 			PubsubTopic:        rawMessage.PubsubTopic,
 			ContentTopic:       rawMessage.ContentTopic,
-			ChatID:             rawMessage.LocalChatID,
+			CommunityID:        encodeCommunityID(rawMessage.CommunityID),
 			HashRatchet:        hashRatchetParams,
 			CommunityPublicKey: pubkey,
 		})

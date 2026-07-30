@@ -25,13 +25,13 @@ type publicSDSWrapper interface {
 	WrapPayloadForSDS(payload []byte, channelID string) (wrappedPayload []byte, messageID []byte, err error)
 }
 
-func wrapPayloadForPublicSDS(logger *zap.Logger, wrapper publicSDSWrapper, payload []byte, chatID string) ([]byte, []byte, error) {
-	if len(chatID) == 0 {
-		logger.Warn("SDS wrap skipped for public community payload due to missing chat ID")
+func wrapPayloadForPublicSDS(logger *zap.Logger, wrapper publicSDSWrapper, payload []byte, communityID string) ([]byte, []byte, error) {
+	if len(communityID) == 0 {
+		logger.Warn("SDS wrap skipped for public community payload due to missing community ID")
 		return payload, nil, nil
 	}
 
-	sdsChannelID := reliability.BuildChannelID(chatID)
+	sdsChannelID := reliability.BuildChannelID(communityID)
 	sdsWrappedPayload, sdsMessageIDBytes, err := wrapper.WrapPayloadForSDS(payload, sdsChannelID)
 	if err != nil {
 		if strings.Contains(err.Error(), "reMessageTooLarge") {
@@ -71,7 +71,12 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 
 	if sdsForCommunitiesEnabled {
 		var wrapErr error
-		params.Payload, sdsMessageIDBytes, wrapErr = wrapPayloadForPublicSDS(logger, s.stack.Reliability, params.Payload, params.ChatID)
+		communityID := params.CommunityID
+		if len(communityID) == 0 && params.CommunityPublicKey != nil {
+			communityID = cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
+		}
+
+		params.Payload, sdsMessageIDBytes, wrapErr = wrapPayloadForPublicSDS(logger, s.stack.Reliability, params.Payload, communityID)
 		if wrapErr != nil {
 			return wrapErr
 		}
