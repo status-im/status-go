@@ -58,25 +58,25 @@ Sends a request for historic messages to a mail server.
 Signals
 -------
 
-Sends sent signal once per envelope.
+Sends sent signal once all envelopes of a message are confirmed as sent.
 
 ```json
 {
-  "type": "envelope.sent",
+  "type": "messages.sent",
   "event": {
-    "hash": "0xea0b93079ed32588628f1cabbbb5ed9e4d50b7571064c2962c3853972db67790"
+    "ids": ["0xea0b93079ed32588628f1cabbbb5ed9e4d50b7571064c2962c3853972db67790"]
   }
 }
 ```
 
-Sends expired signal if envelope dropped from whisper local queue before it was
-sent to any peer on the network.
+Sends expired signal if a message failed to be sent.
 
 ```json
 {
-  "type": "envelope.expired",
+  "type": "messages.expired",
   "event": {
-    "hash": "0x754f4c12dccb14886f791abfeb77ffb86330d03d5a4ba6f37a8c21281988b69e"
+    "ids": ["0x754f4c12dccb14886f791abfeb77ffb86330d03d5a4ba6f37a8c21281988b69e"],
+    "message": "envelope expired due to connectivity issues"
   }
 }
 ```
