@@ -96,6 +96,8 @@ else ifeq ($(detected_OS),Linux)
 endif
 export GOPATH ?= $(HOME)/go
 
+export GOPROXY ?= https://proxy.golang.org|direct
+
 GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
