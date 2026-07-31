@@ -48,7 +48,12 @@ type Downloader struct {
 	inputTaskChan   chan taskRequest
 	client          *http.Client
 
-	quit chan struct{}
+	// stopMu orders wg.Add against wg.Wait: Get takes it for reading before
+	// adding, Stop takes it for writing to close quit, so no Add can slip in
+	// once Stop has begun waiting.
+	stopMu   sync.RWMutex
+	stopOnce sync.Once
+	quit     chan struct{}
 }
 
 func NewDownloader(rootDir string) *Downloader {
@@ -70,7 +75,7 @@ func NewDownloader(rootDir string) *Downloader {
 			Timeout: time.Second * 5,
 		},
 
-		quit: make(chan struct{}, 1),
+		quit: make(chan struct{}),
 	}
 
 	go d.taskDispatcher()
@@ -80,7 +85,11 @@ func NewDownloader(rootDir string) *Downloader {
 }
 
 func (d *Downloader) Stop() {
-	close(d.quit)
+	d.stopOnce.Do(func() {
+		d.stopMu.Lock()
+		close(d.quit)
+		d.stopMu.Unlock()
+	})
 
 	d.cancel()
 
@@ -122,7 +131,12 @@ func (d *Downloader) taskDispatcher() {
 				if !ok {
 					return
 				}
-				d.rateLimiterChan <- request
+				// Quit-aware: rateLimiterChan may be full with no worker left to
+				// drain it, which would park this goroutine for good.
+				select {
+				case d.rateLimiterChan <- request:
+				case <-d.quit:
+				}
 			default:
 			}
 		},
@@ -190,7 +204,17 @@ func (d *Downloader) Get(hash string, download bool) ([]byte, error) {
 
 	doneChan := make(chan taskResponse, 1)
 
+	// Register under the read lock so Stop cannot begin waiting between the
+	// quit check and the Add.
+	d.stopMu.RLock()
+	select {
+	case <-d.quit:
+		d.stopMu.RUnlock()
+		return nil, ErrDownloaderStopped
+	default:
+	}
 	d.wg.Add(1)
+	d.stopMu.RUnlock()
 	defer d.wg.Done()
 
 	// Both hand-offs must give up on quit: Stop waits on wg, so a request left
