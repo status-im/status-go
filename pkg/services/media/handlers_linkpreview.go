@@ -106,7 +106,8 @@ func checkForFetchImageError(err error, logger *zap.Logger, parsedImageParams Im
 }
 
 func (s *Server) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -114,14 +115,15 @@ func (s *Server) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.Reque
 
 	parsed := validateAndReturnImageParams(r, w, s.GetLogger())
 	if parsed.URL != "" {
-		thumbnail, err := getThumbnailPayload(s.db, parsed.MessageID, parsed.URL)
+		thumbnail, err := getThumbnailPayload(db, parsed.MessageID, parsed.URL)
 		checkForFetchImageError(err, s.GetLogger(), parsed, w, "thumbnail")
 		getMimeTypeAndWriteImage(w, s.GetLogger(), thumbnail)
 	}
 }
 
 func (s *Server) handleLinkPreviewFavicon(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -129,7 +131,7 @@ func (s *Server) handleLinkPreviewFavicon(w http.ResponseWriter, r *http.Request
 
 	parsed := validateAndReturnImageParams(r, w, s.GetLogger())
 	if parsed.URL != "" {
-		favicon, err := getFaviconPayload(s.db, parsed.MessageID, parsed.URL)
+		favicon, err := getFaviconPayload(db, parsed.MessageID, parsed.URL)
 		checkForFetchImageError(err, s.GetLogger(), parsed, w, "favicon")
 		getMimeTypeAndWriteImage(w, s.GetLogger(), favicon)
 	}
@@ -243,7 +245,7 @@ func (s *Server) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r *http
 		return
 	}
 
-	thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(s.db, parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
+	thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(s.appDatabase(), parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
 	if err != nil {
 		http.Error(w, err.Error(), httpsStatusCode)
 		return
