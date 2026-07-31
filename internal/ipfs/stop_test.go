@@ -1,6 +1,7 @@
 package ipfs
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -66,4 +67,56 @@ func TestGetAfterStopFailsWithoutPanic(t *testing.T) {
 		_, err := d.Get(testContentHash, false)
 		require.ErrorIs(t, err, ErrDownloaderStopped)
 	}
+}
+
+// Regression: with rateLimiterChan full and no worker left to drain it, the
+// dispatcher must still observe quit rather than park on its send forever.
+func TestDispatcherUnblocksOnQuitWithFullRateLimiter(t *testing.T) {
+	d := &Downloader{
+		inputTaskChan:   make(chan taskRequest, 10),
+		rateLimiterChan: make(chan taskRequest, 1),
+		quit:            make(chan struct{}),
+	}
+
+	exited := make(chan struct{})
+	go func() { d.taskDispatcher(); close(exited) }()
+
+	// First fills rateLimiterChan, second parks the dispatcher on the send.
+	d.inputTaskChan <- taskRequest{cid: "a", doneChan: make(chan taskResponse, 1)}
+	d.inputTaskChan <- taskRequest{cid: "b", doneChan: make(chan taskResponse, 1)}
+	time.Sleep(3 * time.Second / maxRequestsPerSecond)
+
+	close(d.quit)
+
+	select {
+	case <-exited:
+	case <-time.After(3 * time.Second):
+		t.Fatal("dispatcher stayed blocked on a full rateLimiterChan after quit")
+	}
+}
+
+// Regression: Get registering on the WaitGroup must not race Stop's Wait,
+// which panics with "WaitGroup misuse". Run this package with -race.
+func TestConcurrentGetAndStop(t *testing.T) {
+	for round := 0; round < 50; round++ {
+		d := NewDownloader(t.TempDir())
+
+		var callers sync.WaitGroup
+		for i := 0; i < 8; i++ {
+			callers.Add(1)
+			go func() {
+				defer callers.Done()
+				_, _ = d.Get(testContentHash, false)
+			}()
+		}
+		go d.Stop()
+		callers.Wait()
+	}
+}
+
+// Stop is exported; calling it twice must not panic on close of a closed channel.
+func TestDoubleStopDoesNotPanic(t *testing.T) {
+	d := NewDownloader(t.TempDir())
+	d.Stop()
+	d.Stop()
 }
