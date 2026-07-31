@@ -222,7 +222,15 @@ func (n *StatusNode) Start(config *params.NodeConfig) error {
 
 	n.logger.Debug("starting with options", zap.Stringer("ClusterConfig", &config.ClusterConfig))
 
-	return n.startWithDB(config)
+	if err := n.startWithDB(config); err != nil {
+		// startWithDB builds the node incrementally, so a failure leaves it
+		// partially constructed. Roll the flag back: callers gate teardown on
+		// IsRunning, and Stop assumes every field was assigned.
+		n.running.Store(false)
+		return err
+	}
+
+	return nil
 }
 
 func (n *StatusNode) StartLocalBackup() error {
