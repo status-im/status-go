@@ -31,8 +31,9 @@ type StickersBuyProcessor struct {
 
 func NewStickersBuyProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface) *StickersBuyProcessor {
 	return &StickersBuyProcessor{
-		contractMaker: contracts.NewContractMaker(ethClientGetter),
-		transactor:    transactor,
+		contractMaker:   contracts.NewContractMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
 	}
 }
 
