@@ -1539,3 +1539,120 @@ func TestController_WarmStartKeepsDebounce(t *testing.T) {
 }
 
 func getFetchCallsLocked(calls *int) int { return *calls }
+
+func TestController_ColdStartLeadingEdgeDoesNotSurviveRestart(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	storage := mock_multistandardbalance.NewMockStorage(ctrl)
+	fetcher := mock_multistandardbalance.NewMockBalanceFetcher(ctrl)
+	accountsProvider := mock_multistandardbalance.NewMockAccountsProvider(ctrl)
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_multistandardbalance.NewMockNetworksProvider(ctrl)
+	tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
+	collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
+	lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+	logger := zap.NewNop()
+
+	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
+	network1 := &params.Network{ChainID: 1}
+
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
+
+	key := multistandardbalance.BalancesKey{
+		Account: common.BytesToAddress(address1.Bytes()),
+		ChainID: 1,
+	}
+	var stateMutex sync.Mutex
+	roundRan := false
+	currentState := func() multistandardbalance.State {
+		stateMutex.Lock()
+		defer stateMutex.Unlock()
+		if roundRan {
+			return multistandardbalance.State{FetchedAt: time.Now().Unix()}
+		}
+		return multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
+	}
+	storage.EXPECT().GetNativeBalance(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (*big.Int, multistandardbalance.State, error) {
+		return big.NewInt(0), currentState(), nil
+	}).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
+		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
+	}).AnyTimes()
+	storage.EXPECT().GetERC721Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
+		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
+	}).AnyTimes()
+	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.HashableCollectibleID]*big.Int, multistandardbalance.State, error) {
+		return map[multistandardbalance.HashableCollectibleID]*big.Int{}, currentState(), nil
+	}).AnyTimes()
+	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
+	storage.EXPECT().ClearMissingChains(gomock.Any(), gomock.Any()).AnyTimes()
+
+	tokenListProvider.EXPECT().GetTokenContractAddresses(uint64(1)).Return([]common.Address{}, nil).AnyTimes()
+	collectibleListProvider.EXPECT().GetCollectiblesList(uint64(1), common.BytesToAddress(address1.Bytes())).Return([]multistandardbalance.CollectibleID{}, []multistandardbalance.CollectibleID{}, nil).AnyTimes()
+
+	var fetchMutex sync.Mutex
+	fetchCalls := 0
+	fetcher.EXPECT().FetchBalances(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
+		fetchMutex.Lock()
+		fetchCalls++
+		fetchMutex.Unlock()
+		stateMutex.Lock()
+		roundRan = true
+		stateMutex.Unlock()
+		ch := make(chan multistandardfetcher.FetchResult)
+		close(ch)
+		return ch, nil
+	}).AnyTimes()
+
+	getFetchCalls := func() int {
+		fetchMutex.Lock()
+		defer fetchMutex.Unlock()
+		return fetchCalls
+	}
+
+	const debounceTime = 2 * time.Second
+	config := multistandardbalance.ControllerConfig{
+		FetchDebounceTime: debounceTime,
+		FetchPeriod:       1 * time.Hour,
+	}
+
+	walletFeed := &event.Feed{}
+	controller := multistandardbalance.NewController(
+		config,
+		storage,
+		fetcher,
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		tokenListProvider,
+		collectibleListProvider,
+		lastBlockManager,
+		walletFeed,
+		logger,
+	)
+
+	// Cold session: the leading edge fires, but the token lists never update
+	// before the app is backgrounded.
+	controller.Start()
+	require.Eventually(t, func() bool {
+		return getFetchCalls() == 1
+	}, time.Second, 10*time.Millisecond, "cold Start must fetch on the leading edge")
+	controller.Stop()
+
+	// Warm restart (resume): everything is fetched, so nothing may bypass the
+	// debounce anymore - including a cold-start edge armed in the previous session.
+	controller.Start()
+	defer controller.Stop()
+	callsAfterRestart := getFetchCalls()
+
+	walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+	time.Sleep(300 * time.Millisecond)
+	require.Equal(t, callsAfterRestart, getFetchCalls(), "a cold-start edge must not survive Stop/Start")
+
+	require.Eventually(t, func() bool {
+		return getFetchCalls() > callsAfterRestart
+	}, 3*debounceTime, 10*time.Millisecond, "the token-lists update must still be fetched after the debounce")
+}

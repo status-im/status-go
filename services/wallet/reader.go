@@ -109,6 +109,7 @@ func (r *Reader) Stop() {
 	close(r.stopCh)
 	r.stopCh = nil
 
+	r.firstReloadPending.Store(false)
 	r.lastWalletTokenUpdateTimestamp = sync.Map{}
 }
 
