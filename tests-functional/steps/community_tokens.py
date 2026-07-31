@@ -67,11 +67,17 @@ def wait_until_join_permissions_satisfied(
     backend: StatusBackend,
     community_id: str,
     wallet_address: str,
-    attempts: int = 10,
+    attempts: int = 15,
     delay: int = 2,
     refresh_community: bool = True,
 ) -> dict:
     """Poll until token-gated join permissions are satisfied for the wallet."""
+    # The cached permission check reads the balance controller's storage, and
+    # fetch_or_get_cached_wallet_balances is a cache read (forceRefresh is not
+    # honored) — trigger a real on-chain refetch so a balance funded after the
+    # wallet's first fetch becomes visible (the fetch fires after the
+    # controller's debounce, ~10s).
+    backend.wallet_service.restart_wallet_reload_timer()
     backend.wallet_service.fetch_or_get_cached_wallet_balances([wallet_address], True)
     permissions_resp = None
     for _ in range(attempts):
