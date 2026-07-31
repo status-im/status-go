@@ -22,6 +22,10 @@ import (
 
 const maxRequestsPerSecond = 3
 
+// ErrDownloaderStopped is returned by Get for requests that cannot be served
+// because the downloader is shutting down.
+var ErrDownloaderStopped = errors.New("ipfs downloader stopped")
+
 type taskResponse struct {
 	err      error
 	response []byte
@@ -81,18 +85,27 @@ func (d *Downloader) Stop() {
 	d.cancel()
 
 	d.wg.Wait()
-
-	close(d.inputTaskChan)
-	close(d.rateLimiterChan)
+	// The task channels are deliberately left open: callers racing with Stop
+	// select on quit instead, and a closed channel would turn that race into a
+	// send-on-closed-channel panic.
 }
 
 func (d *Downloader) worker() {
 	defer common.LogOnPanic()
-	for request := range d.rateLimiterChan {
-		resp, err := d.download(request.cid, request.download)
-		request.doneChan <- taskResponse{
-			err:      err,
-			response: resp,
+	for {
+		select {
+		case <-d.quit:
+			return
+		case request, ok := <-d.rateLimiterChan:
+			if !ok {
+				return
+			}
+			resp, err := d.download(request.cid, request.download)
+			// doneChan is buffered, so an abandoned request never blocks here.
+			request.doneChan <- taskResponse{
+				err:      err,
+				response: resp,
+			}
 		}
 	}
 }
@@ -178,19 +191,26 @@ func (d *Downloader) Get(hash string, download bool) ([]byte, error) {
 	doneChan := make(chan taskResponse, 1)
 
 	d.wg.Add(1)
+	defer d.wg.Done()
 
-	d.inputTaskChan <- taskRequest{
+	// Both hand-offs must give up on quit: Stop waits on wg, so a request left
+	// queued here would deadlock shutdown.
+	select {
+	case d.inputTaskChan <- taskRequest{
 		cid:      cid,
 		download: download,
 		doneChan: doneChan,
+	}:
+	case <-d.quit:
+		return nil, ErrDownloaderStopped
 	}
 
-	done := <-doneChan
-	close(doneChan)
-
-	d.wg.Done()
-
-	return done.response, done.err
+	select {
+	case done := <-doneChan:
+		return done.response, done.err
+	case <-d.quit:
+		return nil, ErrDownloaderStopped
+	}
 }
 
 func (d *Downloader) exists(cid string) (bool, []byte, error) {
