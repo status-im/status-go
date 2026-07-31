@@ -684,3 +684,73 @@ func TestReader_NeverFetchedCompletionEmitsReloadImmediately(t *testing.T) {
 		t.Fatal("expected an immediate reload for a never-fetched pair's first completion")
 	}
 }
+
+func TestReader_ColdReloadEdgeDoesNotSurviveRestart(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	walletFeed := &event.Feed{}
+	reader := NewReader(tokenManager, nil, walletFeed, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+	key := multistandardbalance.BalancesKey{ChainID: chainID, Account: account}
+
+	// Cold session: a never-fetched completion arms the immediate reload, but the
+	// refresh it belongs to fails before announcing anything.
+	refreshAttempted := make(chan struct{})
+	tokenManager.EXPECT().GetCachedBalances().DoAndReturn(func() (map[common.Address][]tokenTypes.StorageToken, error) {
+		close(refreshAttempted)
+		return nil, errors.New("cached balances unavailable")
+	})
+
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            key,
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: false,
+		OldState:       multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case <-refreshAttempted:
+	case <-time.After(time.Second):
+		t.Fatal("expected a UI cache refresh attempt for the first completion")
+	}
+
+	reader.Stop()
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	events := make(chan walletevent.Event, 10)
+	sub := walletFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	).AnyTimes()
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).Return(nil).AnyTimes()
+
+	// Warm session (e.g. a mobile resume): a routine balance change must stay
+	// debounced - the previous session's edge must not announce it immediately.
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            key,
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: true,
+		OldState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case ev := <-events:
+		t.Fatalf("a cold reload edge must not survive Stop/Start, got %q immediately", ev.Type)
+	case <-time.After(300 * time.Millisecond):
+	}
+}

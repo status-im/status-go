@@ -141,10 +141,9 @@ func (c *Controller) Start() {
 
 	c.stopCh = make(chan struct{})
 	// Arm the leading edges only for a COLD start (some pair has never been fetched)
-	if c.hasNeverFetchedBalances() {
-		c.firstFetchPending.Store(true)
-		c.tokenListsColdFetchPending.Store(true)
-	}
+	coldStart := c.hasNeverFetchedBalances()
+	c.firstFetchPending.Store(coldStart)
+	c.tokenListsColdFetchPending.Store(coldStart)
 
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
@@ -157,6 +156,9 @@ func (c *Controller) Stop() {
 		close(c.stopCh)
 		c.stopCh = nil
 	}
+
+	c.firstFetchPending.Store(false)
+	c.tokenListsColdFetchPending.Store(false)
 
 	c.cancelAllChainFetches()
 	c.stopWalletEventsWatcher()
