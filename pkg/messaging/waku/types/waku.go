@@ -102,8 +102,6 @@ type Waku interface {
 	// Resume re-arms goroutines suspended by Pause. Idempotent.
 	Resume() error
 
-	// Peers is retained only for the Python functional tests (see tests-functional);
-	// it is not used by status-app.
 	Peers() PeerStats
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)

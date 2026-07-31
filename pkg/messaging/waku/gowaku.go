@@ -1380,8 +1380,6 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	})
 }
 
-// Peers is retained only for the Python functional tests (see tests-functional);
-// it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
 }

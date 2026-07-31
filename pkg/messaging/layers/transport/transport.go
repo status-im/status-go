@@ -738,8 +738,6 @@ func (t *Transport) OnHistoryReconcileNeeded() <-chan struct{} {
 	return t.waku.OnHistoryReconcileNeeded()
 }
 
-// Peers is retained only for the Python functional tests (see tests-functional);
-// it is not used by status-app.
 func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
