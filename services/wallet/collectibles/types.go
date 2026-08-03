@@ -24,6 +24,7 @@ type CollectibleData struct {
 	Name               string                         `json:"name"`
 	Description        *string                        `json:"description,omitempty"`
 	ImageURL           *string                        `json:"image_url,omitempty"`
+	ThumbnailURL       *string                        `json:"thumbnail_url,omitempty"`
 	AnimationURL       *string                        `json:"animation_url,omitempty"`
 	AnimationMediaType *string                        `json:"animation_media_type,omitempty"`
 	Traits             *[]thirdparty.CollectibleTrait `json:"traits,omitempty"`
@@ -106,6 +107,7 @@ func fullCollectibleDataToHeader(c *thirdparty.FullCollectibleData) Collectible 
 		CollectibleData: &CollectibleData{
 			Name:               c.CollectibleData.Name,
 			ImageURL:           &c.CollectibleData.ImageURL,
+			ThumbnailURL:       &c.CollectibleData.ThumbnailURL,
 			AnimationURL:       &c.CollectibleData.AnimationURL,
 			AnimationMediaType: &c.CollectibleData.AnimationMediaType,
 			BackgroundColor:    &c.CollectibleData.BackgroundColor,
@@ -142,6 +144,7 @@ func fullCollectibleDataToDetails(c *thirdparty.FullCollectibleData) Collectible
 			Name:               c.CollectibleData.Name,
 			Description:        &c.CollectibleData.Description,
 			ImageURL:           &c.CollectibleData.ImageURL,
+			ThumbnailURL:       &c.CollectibleData.ThumbnailURL,
 			AnimationURL:       &c.CollectibleData.AnimationURL,
 			AnimationMediaType: &c.CollectibleData.AnimationMediaType,
 			BackgroundColor:    &c.CollectibleData.BackgroundColor,
