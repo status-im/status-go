@@ -26,6 +26,16 @@ type blockingMarketDataPersistence struct {
 	data    []Cryptocurrency
 }
 
+type startAttempt struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+type restartableMarketDataPersistence struct {
+	attempts chan startAttempt
+	data     []Cryptocurrency
+}
+
 func (p *blockingMarketDataPersistence) UpsertCryptocurrencies([]Cryptocurrency) error {
 	return nil
 }
@@ -37,6 +47,21 @@ func (p *blockingMarketDataPersistence) GetCryptocurrencies() ([]Cryptocurrency,
 }
 
 func (p *blockingMarketDataPersistence) DeleteCryptocurrencies([]string) error {
+	return nil
+}
+
+func (p *restartableMarketDataPersistence) UpsertCryptocurrencies([]Cryptocurrency) error {
+	return nil
+}
+
+func (p *restartableMarketDataPersistence) GetCryptocurrencies() ([]Cryptocurrency, error) {
+	attempt := <-p.attempts
+	close(attempt.started)
+	<-attempt.release
+	return p.data, nil
+}
+
+func (p *restartableMarketDataPersistence) DeleteCryptocurrencies([]string) error {
 	return nil
 }
 
@@ -139,6 +164,52 @@ func TestServiceWaitsForAsyncStorageStart(t *testing.T) {
 	close(persistence.release)
 	require.Equal(t, mockCrypto, <-combinedData)
 	<-stopDone
+}
+
+func TestDataStorageStartDoesNotOverwriteFetchedData(t *testing.T) {
+	persistence := &blockingMarketDataPersistence{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		data:    mockCrypto,
+	}
+	storage := &DataStorage{
+		priceData:             make(PriceMap),
+		marketDataPersistence: persistence,
+	}
+	fetchedData := []Cryptocurrency{{ID: "fresh-market-data"}}
+
+	storage.StartAsync()
+	<-persistence.started
+	require.True(t, storage.UpdateCryptoDataWithEtag(fetchedData, "fresh-etag"))
+
+	close(persistence.release)
+	storage.WaitForStart()
+
+	require.Equal(t, fetchedData, storage.GetCryptoData())
+}
+
+func TestDataStorageCanRestartAfterStart(t *testing.T) {
+	firstAttempt := startAttempt{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	persistence := &restartableMarketDataPersistence{
+		attempts: make(chan startAttempt, 1),
+		data:     mockCrypto,
+	}
+	storage := &DataStorage{
+		priceData:             make(PriceMap),
+		marketDataPersistence: persistence,
+	}
+
+	persistence.attempts <- firstAttempt
+	storage.StartAsync()
+	<-firstAttempt.started
+	close(firstAttempt.release)
+	storage.WaitForStart()
+
+	storage.StartAsync()
+	storage.WaitForStart()
 }
 
 func TestUnsubscribeWhenNotSubscribed(t *testing.T) {

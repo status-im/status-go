@@ -72,6 +72,7 @@ import (
 var (
 	// ErrDBNotAvailable is returned if a method is called before the DB is available for usage
 	ErrDBNotAvailable = errors.New("DB is unavailable")
+	newAccountsDB     = accounts.NewDB
 )
 
 type LoginParams struct {
@@ -496,19 +497,16 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 		_ = appResult.db.Close()
 		return err
 	}
-	b.walletDB = walletResult.db
-	b.statusNode.SetWalletDB(b.walletDB)
-	b.appDB = appResult.db
-	b.statusNode.SetAppDB(b.appDB)
-
-	accountsDB, err := accounts.NewDB(b.appDB)
+	accountsDB, err := newAccountsDB(appResult.db)
 	if err != nil {
-		_ = b.walletDB.Close()
-		_ = b.appDB.Close()
-		b.walletDB = nil
-		b.appDB = nil
+		_ = walletResult.db.Close()
+		_ = appResult.db.Close()
 		return err
 	}
+	b.walletDB = walletResult.db
+	b.appDB = appResult.db
+	b.statusNode.SetWalletDB(b.walletDB)
+	b.statusNode.SetAppDB(b.appDB)
 	b.accountsManager.SetPersistence(accountsDB)
 
 	return nil
