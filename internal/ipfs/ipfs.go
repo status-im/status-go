@@ -78,8 +78,17 @@ func NewDownloader(rootDir string) *Downloader {
 		quit: make(chan struct{}),
 	}
 
-	go d.taskDispatcher()
-	go d.worker()
+	// Tracked on the same WaitGroup as Get callers so Stop cannot return while
+	// either goroutine is still touching the ipfs dir.
+	d.wg.Add(2)
+	go func() {
+		defer d.wg.Done()
+		d.taskDispatcher()
+	}()
+	go func() {
+		defer d.wg.Done()
+		d.worker()
+	}()
 
 	return d
 }
@@ -105,10 +114,7 @@ func (d *Downloader) worker() {
 		select {
 		case <-d.quit:
 			return
-		case request, ok := <-d.rateLimiterChan:
-			if !ok {
-				return
-			}
+		case request := <-d.rateLimiterChan:
 			resp, err := d.download(request.cid, request.download)
 			// doneChan is buffered, so an abandoned request never blocks here.
 			request.doneChan <- taskResponse{
@@ -127,10 +133,7 @@ func (d *Downloader) taskDispatcher() {
 		Interval: time.Second / maxRequestsPerSecond,
 		OnTick: func() {
 			select {
-			case request, ok := <-d.inputTaskChan:
-				if !ok {
-					return
-				}
+			case request := <-d.inputTaskChan:
 				// Quit-aware: rateLimiterChan may be full with no worker left to
 				// drain it, which would park this goroutine for good.
 				select {
@@ -229,11 +232,22 @@ func (d *Downloader) Get(hash string, download bool) ([]byte, error) {
 		return nil, ErrDownloaderStopped
 	}
 
+	return d.awaitResult(doneChan)
+}
+
+func (d *Downloader) awaitResult(doneChan chan taskResponse) ([]byte, error) {
 	select {
 	case done := <-doneChan:
 		return done.response, done.err
 	case <-d.quit:
-		return nil, ErrDownloaderStopped
+		// select picks uniformly among ready cases, so re-check: a result the
+		// worker already delivered beats the shutdown error.
+		select {
+		case done := <-doneChan:
+			return done.response, done.err
+		default:
+			return nil, ErrDownloaderStopped
+		}
 	}
 }
 

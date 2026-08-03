@@ -1,6 +1,8 @@
 package ipfs
 
 import (
+	"errors"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -92,6 +94,82 @@ func TestDispatcherUnblocksOnQuitWithFullRateLimiter(t *testing.T) {
 	case <-exited:
 	case <-time.After(3 * time.Second):
 		t.Fatal("dispatcher stayed blocked on a full rateLimiterChan after quit")
+	}
+}
+
+// blockingRoundTripper parks the worker inside download() until the test
+// releases it, so the test owns the moment Stop is called.
+type blockingRoundTripper struct {
+	inFlight chan struct{}
+	release  chan struct{}
+	entered  sync.Once
+}
+
+func newBlockingRoundTripper() *blockingRoundTripper {
+	return &blockingRoundTripper{
+		inFlight: make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+}
+
+func (b *blockingRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	b.entered.Do(func() { close(b.inFlight) })
+	<-b.release
+	return nil, errors.New("transport released")
+}
+
+// The node tears down its data directory right after Stop returns, so Stop must
+// not hand back control while the worker is still inside download() writing into
+// it. d.wg tracked only Get callers, never the worker or the dispatcher.
+func TestStopWaitsForInFlightDownload(t *testing.T) {
+	d := NewDownloader(t.TempDir())
+
+	transport := newBlockingRoundTripper()
+	d.client = &http.Client{Transport: transport}
+
+	go func() { _, _ = d.Get(testContentHash, false) }()
+
+	select {
+	case <-transport.inFlight:
+	case <-time.After(5 * time.Second):
+		t.Fatal("worker never entered download")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		d.Stop()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+		t.Fatal("Stop returned while the worker was still downloading")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	close(transport.release)
+
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return after the download finished")
+	}
+}
+
+// A select over a ready doneChan and a closed quit picks uniformly, so a result
+// the worker already delivered used to be thrown away in favour of the shutdown
+// error about half the time. Looped so a uniform pick cannot pass by luck.
+func TestAwaitResultPrefersDeliveredResponse(t *testing.T) {
+	d := &Downloader{quit: make(chan struct{})}
+	close(d.quit)
+
+	for i := 0; i < 100; i++ {
+		doneChan := make(chan taskResponse, 1)
+		doneChan <- taskResponse{response: []byte("payload")}
+
+		resp, err := d.awaitResult(doneChan)
+		require.NoError(t, err)
+		require.Equal(t, []byte("payload"), resp)
 	}
 }
 
