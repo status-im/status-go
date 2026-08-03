@@ -157,15 +157,23 @@ func (c *Controller) Stop() {
 		c.stopCh = nil
 	}
 
-	c.firstFetchPending.Store(false)
-	c.tokenListsColdFetchPending.Store(false)
-
 	c.cancelAllChainFetches()
 	c.stopWalletEventsWatcher()
+
+	// After the watcher is stopped (Stop waits for the callback to return), so a
+	// token-lists event racing teardown can't leave a leading edge armed.
+	c.firstFetchPending.Store(false)
+	c.tokenListsColdFetchPending.Store(false)
 }
 
 // hasNeverFetchedBalances reports whether any (account, chain) pair has a
-// balance type that was never fetched
+// never-fetched native or ERC20 balance.
+//
+// Collectible types are deliberately excluded: an account owning no
+// collectibles on a chain never produces an ERC721/ERC1155 fetch job
+// (buildMultiStandardFetcherFetchConfigs only adds a map entry for a non-empty
+// list, and the SDK builds one job per entry), so their state stays
+// NeverFetched forever and would make every start look cold.
 func (c *Controller) hasNeverFetchedBalances() bool {
 	accounts, err := c.getAllAccounts()
 	if err != nil {
@@ -178,31 +186,11 @@ func (c *Controller) hasNeverFetchedBalances() bool {
 	for _, account := range accounts {
 		for _, network := range networks {
 			key := BalancesKey{Account: account, ChainID: network}
-			states := make([]State, 0, 4)
-			if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err == nil {
-				states = append(states, state)
-			} else {
+			if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err != nil || state.FetchedAt == NeverFetched {
 				return true
 			}
-			if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err == nil {
-				states = append(states, state)
-			} else {
+			if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err != nil || state.FetchedAt == NeverFetched {
 				return true
-			}
-			if _, state, err := c.storage.GetERC721Balances(context.Background(), key); err == nil {
-				states = append(states, state)
-			} else {
-				return true
-			}
-			if _, state, err := c.storage.GetERC1155Balances(context.Background(), key); err == nil {
-				states = append(states, state)
-			} else {
-				return true
-			}
-			for _, state := range states {
-				if state.FetchedAt == NeverFetched {
-					return true
-				}
 			}
 		}
 	}
