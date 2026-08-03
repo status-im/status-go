@@ -128,7 +128,7 @@ Connect to `ws://<host>:<port>/signals` as the **first step** before any other A
 | `mailserver.available` | Mailserver available | — |
 | `history.request.started` | Fetching message history | — |
 | `history.request.completed` | History fetch done | — |
-| `envelope.sent` | Message envelope sent via Waku | — |
+| `messages.sent` | Messages confirmed as sent via Waku | `ids[]` |
 
 ### `node.login` Signal Details
 

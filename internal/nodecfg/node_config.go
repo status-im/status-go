@@ -60,10 +60,10 @@ func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO shhext_config (
-		pfs_enabled, installation_id, mailserver_confirmations,
+		pfs_enabled, installation_id,
 		verify_ens_contract_address, bandwidth_stats_enabled, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, 'id')`,
-		c.ShhextConfig.PFSEnabled, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations,
+	) VALUES (?, ?, ?, ?, 'id')`,
+		c.ShhextConfig.PFSEnabled, c.ShhextConfig.InstallationID,
 		c.ShhextConfig.VerifyENSContractAddress, c.ShhextConfig.BandwidthStatsEnabled)
 	if err != nil {
 		return err
@@ -306,11 +306,11 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	}
 
 	err = tx.QueryRow(`
-	SELECT pfs_enabled, installation_id, mailserver_confirmations,
+	SELECT pfs_enabled, installation_id,
 	verify_ens_contract_address,
 	bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations,
+		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.InstallationID,
 		&nodecfg.ShhextConfig.VerifyENSContractAddress,
 		&nodecfg.ShhextConfig.BandwidthStatsEnabled,
 	)

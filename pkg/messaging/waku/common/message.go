@@ -48,21 +48,6 @@ type ReceivedMessage struct {
 	hash common.Hash
 }
 
-// EnvelopeError code and optional description of the error.
-type EnvelopeError struct {
-	Hash        common.Hash
-	Code        uint
-	Description string
-}
-
-// MessagesResponse sent as a response after processing batch of envelopes.
-type MessagesResponse struct {
-	// Hash is a hash of all envelopes sent in the single batch.
-	Hash common.Hash
-	// Per envelope error.
-	Errors []EnvelopeError
-}
-
 func NewReceivedMessage(env Envelope, msgType MessageType) *ReceivedMessage {
 	ct, err := ExtractTopicFromContentTopic(env.Message().ContentTopic)
 	if err != nil {

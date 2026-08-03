@@ -181,9 +181,11 @@ type Messenger struct {
 	retrievedMessagesIteratorFactory func(map[types2.ChatFilter][]*types2.ReceivedMessage) MessagesIterator
 }
 
-type EnvelopeEventsInterceptor struct {
-	EnvelopeEventsHandler types2.EnvelopeEventsHandler
-	Messenger             *Messenger
+// MessageEventsInterceptor consumes the transport's message-level delivery
+// events, lets the Messenger update its own state first and then forwards the
+// events to the messenger signals handler (the API layer).
+type MessageEventsInterceptor struct {
+	Messenger *Messenger
 }
 
 type LatestContactRequest struct {
@@ -215,54 +217,39 @@ func (m *Messenger) ResolvePrimaryName(mentionID string) (string, error) {
 	return contact.PrimaryName(), nil
 }
 
-// EnvelopeSent triggered when envelope delivered at least to 1 peer.
-func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) {
-	if interceptor.Messenger != nil {
-		signalIDs := make([][]byte, 0, len(identifiers))
-		for _, identifierBytes := range identifiers {
-			messageID := cryptotypes.EncodeHex(identifierBytes)
-			err := interceptor.Messenger.processSentMessage(messageID)
-			if err != nil {
-				interceptor.Messenger.logger.Info("messenger failed to process sent messages", zap.Error(err))
-			}
-
-			message, err := interceptor.Messenger.MessageByID(messageID)
-			if err != nil {
-				interceptor.Messenger.logger.Error("failed to query message outgoing status", zap.Error(err))
-				continue
-			}
-			if message.OutgoingStatus == common.OutgoingStatusDelivered {
-				// We don't want to send the signal if the message was already marked as delivered
-				continue
-			}
-			signalIDs = append(signalIDs, identifierBytes)
+// MessagesSent triggered when messages are confirmed as sent into the network.
+func (interceptor MessageEventsInterceptor) MessagesSent(identifiers [][]byte) {
+	signalIDs := make([][]byte, 0, len(identifiers))
+	for _, identifierBytes := range identifiers {
+		messageID := cryptotypes.EncodeHex(identifierBytes)
+		err := interceptor.Messenger.processSentMessage(messageID)
+		if err != nil {
+			interceptor.Messenger.logger.Info("messenger failed to process sent messages", zap.Error(err))
 		}
-		interceptor.EnvelopeEventsHandler.EnvelopeSent(signalIDs)
-	} else {
-		// NOTE(rasom): In case if interceptor.Messenger is not nil and
-		// some error occurred on processing sent message we don't want
-		// to send envelop.sent signal to the client, thus `else` cause
-		// is necessary.
-		interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
+
+		message, err := interceptor.Messenger.MessageByID(messageID)
+		if err != nil {
+			interceptor.Messenger.logger.Error("failed to query message outgoing status", zap.Error(err))
+			continue
+		}
+		if message.OutgoingStatus == common.OutgoingStatusDelivered {
+			// We don't want to send the signal if the message was already marked as delivered
+			continue
+		}
+		signalIDs = append(signalIDs, identifierBytes)
+	}
+
+	if len(signalIDs) > 0 && interceptor.Messenger.config.messengerSignalsHandler != nil {
+		interceptor.Messenger.config.messengerSignalsHandler.MessagesSent(signalIDs)
 	}
 }
 
-// EnvelopeExpired triggered when envelope is expired but wasn't delivered to any peer.
-func (interceptor EnvelopeEventsInterceptor) EnvelopeExpired(identifiers [][]byte, err error) {
-	//we don't track expired events in Messenger, so just redirect to handler
-	interceptor.EnvelopeEventsHandler.EnvelopeExpired(identifiers, err)
-}
-
-// MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (interceptor EnvelopeEventsInterceptor) MailServerRequestCompleted(requestID cryptotypes.Hash, lastEnvelopeHash cryptotypes.Hash, cursor []byte, err error) {
-	//we don't track mailserver requests in Messenger, so just redirect to handler
-	interceptor.EnvelopeEventsHandler.MailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
-}
-
-// MailServerRequestExpired triggered when the mailserver request expires
-func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash cryptotypes.Hash) {
-	//we don't track mailserver requests in Messenger, so just redirect to handler
-	interceptor.EnvelopeEventsHandler.MailServerRequestExpired(hash)
+// MessagesExpired triggered when messages failed to be sent.
+func (interceptor MessageEventsInterceptor) MessagesExpired(identifiers [][]byte, err error) {
+	// we don't track expired events in Messenger, so just forward to the signals handler
+	if interceptor.Messenger.config.messengerSignalsHandler != nil {
+		interceptor.Messenger.config.messengerSignalsHandler.MessagesExpired(identifiers, err)
+	}
 }
 
 func NewMessenger(
@@ -496,12 +483,9 @@ func NewMessenger(
 		messenger.shutdownTasks = append(messenger.shutdownTasks, c.ensVerifier.Stop)
 	}
 
-	if c.envelopeEventsConfig != nil {
-		interceptor := EnvelopeEventsInterceptor{c.envelopeEventsConfig.EnvelopeEventsHandler, messenger}
-		err := messenger.messaging.SetEnvelopeEventsHandler(interceptor)
-		if err != nil {
-			logger.Info("Unable to set envelopes event handler", zap.Error(err))
-		}
+	interceptor := MessageEventsInterceptor{Messenger: messenger}
+	if err := messenger.messaging.SetMessageEventsHandler(interceptor); err != nil {
+		logger.Info("Unable to set message events handler", zap.Error(err))
 	}
 
 	return messenger, nil

@@ -1373,7 +1373,6 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	// decodes and routes it. De-duplication is owned by the transport's
 	// persistent processed-message cache, so nothing is marked processed here.
 	w.envelopeFeed.Send(common.EnvelopeEvent{
-		Topic: e.ContentTopic,
 		Hash:  e.Hash(),
 		Event: common.EventEnvelopeAvailable,
 		Data:  newReceivedMessage(e),

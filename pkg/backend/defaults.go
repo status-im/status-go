@@ -32,7 +32,6 @@ const (
 	DefaultAPILogFile                         = "api.log"
 	DefaultLogLevel                           = "ERROR"
 	DefaultCurrentNetwork                     = "mainnet_rpc"
-	DefaultMaxMessageDeliveryAttempts         = 3
 )
 
 var (
@@ -340,8 +339,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		InstallationID:                         installationID,
-		MailServerConfirmations:                true,
-		MaxMessageDeliveryAttempts:             DefaultMaxMessageDeliveryAttempts,
 		DataSyncEnabled:                        true,
 		PFSEnabled:                             true,
 		AllowForceCommunityMembersReevaluation: os.Getenv("STATUS_ALLOW_FORCE_REEVAL") == "1",

@@ -7,8 +7,6 @@ import (
 
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
-	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 type config struct {
@@ -21,14 +19,10 @@ type config struct {
 
 func newConfig(options ...Options) *config {
 	config := &config{
-		logger: zap.NewNop(),
-		tracer: trace.NewNoopTracer(),
-		envelopesMonitorConfig: &transport.EnvelopesMonitorConfig{
-			IsMailserver: func(wakutypes.EnodeID) bool {
-				return false
-			},
-		},
-		metricsEnabled: false,
+		logger:                 zap.NewNop(),
+		tracer:                 trace.NewNoopTracer(),
+		envelopesMonitorConfig: &transport.EnvelopesMonitorConfig{},
+		metricsEnabled:         false,
 	}
 
 	for _, option := range options {
@@ -50,15 +44,6 @@ func WithLogger(logger *zap.Logger) Options {
 func WithTracer(tracer trace.Tracer) Options {
 	return func(c *config) {
 		c.tracer = tracer
-	}
-}
-
-func WithEnvelopeEventsConfig(econf *types2.EnvelopeEventsConfig) Options {
-	return func(c *config) {
-		if econf != nil {
-			c.envelopesMonitorConfig.EnvelopeEventsHandler = econf.EnvelopeEventsHandler
-			c.envelopesMonitorConfig.AwaitOnlyMailServerConfirmations = econf.MailServerConfirmations
-		}
 	}
 }
 

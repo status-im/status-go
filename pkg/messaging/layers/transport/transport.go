@@ -754,7 +754,9 @@ func (t *Transport) CleanMessagesProcessed(timestamp uint64) error {
 	return t.cache.Clean(timestamp)
 }
 
-func (t *Transport) SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) error {
+// SetMessageEventsHandler registers the consumer of the transport's
+// message-level delivery events (see MessageEventsHandler).
+func (t *Transport) SetMessageEventsHandler(handler MessageEventsHandler) error {
 	if t.envelopesMonitor == nil {
 		return errors.New("Current transport has no envelopes monitor")
 	}

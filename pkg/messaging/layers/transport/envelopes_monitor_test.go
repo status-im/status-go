@@ -8,9 +8,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
-
-	"github.com/status-im/status-go/internal/crypto"
 	types3 "github.com/status-im/status-go/internal/crypto/types"
 	types2 "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -21,25 +18,21 @@ var (
 	testIDs    = [][]byte{[]byte("id")}
 )
 
-type envelopeEventsHandlerMock struct {
-	envelopeSentCalls [][][]byte // slice of EnvelopeSent arguments
+type messageEventsHandlerMock struct {
+	messagesSentCalls [][][]byte // slice of MessagesSent arguments
 }
 
-func (h *envelopeEventsHandlerMock) EnvelopeSent(identifiers [][]byte) {
-	h.envelopeSentCalls = append(h.envelopeSentCalls, identifiers)
+func (h *messageEventsHandlerMock) MessagesSent(messageIDs [][]byte) {
+	h.messagesSentCalls = append(h.messagesSentCalls, messageIDs)
 }
-func (h *envelopeEventsHandlerMock) EnvelopeExpired([][]byte, error) {
-}
-func (h *envelopeEventsHandlerMock) MailServerRequestCompleted(types3.Hash, types3.Hash, []byte, error) {
-}
-func (h *envelopeEventsHandlerMock) MailServerRequestExpired(types3.Hash) {
+func (h *messageEventsHandlerMock) MessagesExpired([][]byte, error) {
 }
 
 type EnvelopesMonitorSuite struct {
 	suite.Suite
 
 	monitor           *EnvelopesMonitor
-	eventsHandlerMock *envelopeEventsHandlerMock
+	eventsHandlerMock *messageEventsHandlerMock
 }
 
 func TestEnvelopesMonitorSuite(t *testing.T) {
@@ -47,16 +40,14 @@ func TestEnvelopesMonitorSuite(t *testing.T) {
 }
 
 func (s *EnvelopesMonitorSuite) SetupTest() {
-	s.eventsHandlerMock = &envelopeEventsHandlerMock{}
+	s.eventsHandlerMock = &messageEventsHandlerMock{}
 	s.monitor = NewEnvelopesMonitor(
 		nil,
 		EnvelopesMonitorConfig{
-			EnvelopeEventsHandler:            s.eventsHandlerMock,
-			AwaitOnlyMailServerConfirmations: false,
-			IsMailserver:                     func(types2.EnodeID) bool { return false },
-			Logger:                           zap.NewNop(),
+			Logger: zap.NewNop(),
 		},
 	)
+	s.monitor.handler = s.eventsHandlerMock
 }
 
 func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
@@ -84,30 +75,6 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePostedOutOfOrder() {
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
 }
 
-func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
-	testBatch := types3.Hash{1}
-	pkey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	node := enode.NewV4(&pkey.PublicKey, nil, 0, 0)
-	err = s.monitor.Add(testIDs, testHashes, []*types2.NewMessage{{}})
-	s.Require().NoError(err)
-	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
-	s.monitor.handleEvent(types2.EnvelopeEvent{
-		Event: types2.EventEnvelopeSent,
-		Hash:  testHash,
-		Batch: testBatch,
-	})
-	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
-	s.monitor.handleEvent(types2.EnvelopeEvent{
-		Event: types2.EventBatchAcknowledged,
-		Batch: testBatch,
-		Peer:  types2.EnodeID(node.ID()),
-	})
-	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
-}
-
 func (s *EnvelopesMonitorSuite) TestRemoved() {
 	err := s.monitor.Add(testIDs, testHashes, []*types2.NewMessage{{}})
 	s.Require().NoError(err)
@@ -117,33 +84,6 @@ func (s *EnvelopesMonitorSuite) TestRemoved() {
 		Hash:  testHash,
 	})
 	s.NotContains(s.monitor.envelopes, testHash)
-}
-
-func (s *EnvelopesMonitorSuite) TestIgnoreNotFromMailserver() {
-	// enables filter in the tracker to drop confirmations from non-mailserver peers
-	s.monitor.awaitOnlyMailServerConfirmations = true
-	err := s.monitor.Add(testIDs, testHashes, []*types2.NewMessage{{}})
-	s.Require().NoError(err)
-	s.monitor.handleEvent(types2.EnvelopeEvent{
-		Event: types2.EventEnvelopeSent,
-		Hash:  testHash,
-		Peer:  types2.EnodeID{1}, // could be empty, doesn't impact test behaviour
-	})
-	s.Require().Equal(EnvelopePosted, s.monitor.GetState(testHash))
-}
-
-func (s *EnvelopesMonitorSuite) TestReceived() {
-	s.monitor.isMailserver = func(peer types2.EnodeID) bool {
-		return true
-	}
-	err := s.monitor.Add(testIDs, testHashes, []*types2.NewMessage{{}})
-	s.Require().NoError(err)
-	s.Contains(s.monitor.envelopes, testHash)
-	s.monitor.handleEvent(types2.EnvelopeEvent{
-		Event: types2.EventEnvelopeReceived,
-		Hash:  testHash,
-	})
-	s.Require().Equal(EnvelopeSent, s.monitor.GetState(testHash))
 }
 
 func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
@@ -156,7 +96,7 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 	for _, hash := range hashes {
 		s.Contains(s.monitor.envelopes, hash)
 	}
-	s.Require().Empty(s.eventsHandlerMock.envelopeSentCalls)
+	s.Require().Empty(s.eventsHandlerMock.messagesSentCalls)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[0]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[1]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[2]].state)
@@ -165,7 +105,7 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 		Event: types2.EventEnvelopeSent,
 		Hash:  hashes[0],
 	})
-	s.Require().Empty(s.eventsHandlerMock.envelopeSentCalls)
+	s.Require().Empty(s.eventsHandlerMock.messagesSentCalls)
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[hashes[0]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[1]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[2]].state)
@@ -174,7 +114,7 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 		Event: types2.EventEnvelopeSent,
 		Hash:  hashes[1],
 	})
-	s.Require().Empty(s.eventsHandlerMock.envelopeSentCalls)
+	s.Require().Empty(s.eventsHandlerMock.messagesSentCalls)
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[hashes[0]].state)
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[hashes[1]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[2]].state)
@@ -184,8 +124,8 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 		Hash:  hashes[2],
 	})
 	// Identifiers should be marked as sent only if all corresponding envelopes are sent
-	s.Require().Len(s.eventsHandlerMock.envelopeSentCalls, 1)
-	s.Require().True(reflect.DeepEqual(messageIDs, s.eventsHandlerMock.envelopeSentCalls[0]))
+	s.Require().Len(s.eventsHandlerMock.messagesSentCalls, 1)
+	s.Require().True(reflect.DeepEqual(messageIDs, s.eventsHandlerMock.messagesSentCalls[0]))
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[hashes[0]].state)
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[hashes[1]].state)
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[hashes[2]].state)
@@ -213,7 +153,7 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 		Hash:  hashes[2],
 	})
 
-	s.Require().Empty(s.eventsHandlerMock.envelopeSentCalls)
+	s.Require().Empty(s.eventsHandlerMock.messagesSentCalls)
 	s.Require().Empty(s.monitor.messageEnvelopeHashes)
 	s.Require().Len(s.monitor.envelopes, 2)
 }

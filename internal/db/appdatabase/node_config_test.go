@@ -48,7 +48,6 @@ func randomNodeConfig() *params.NodeConfig {
 		ShhextConfig: params.ShhextConfig{
 			PFSEnabled:               randomBool(),
 			InstallationID:           randomString(),
-			MailServerConfirmations:  randomBool(),
 			VerifyENSContractAddress: randomString(),
 			BandwidthStatsEnabled:    randomBool(),
 		},

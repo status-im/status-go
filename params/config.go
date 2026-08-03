@@ -312,12 +312,6 @@ type ShhextConfig struct {
 	PFSEnabled bool
 	// InstallationId id of the current installation
 	InstallationID string
-	// MailServerConfirmations should be true if client wants to receive confirmatons only from a selected mail servers.
-	MailServerConfirmations bool
-
-	// MaxMessageDeliveryAttempts defines how many times we will try to deliver not-acknowledged envelopes.
-	MaxMessageDeliveryAttempts int
-
 	// DatasyncEnabled indicates whether we should enable dataasync
 	DataSyncEnabled bool
 

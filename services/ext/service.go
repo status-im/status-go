@@ -32,7 +32,6 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
 	messaging2 "github.com/status-im/status-go/pkg/messaging"
-	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
@@ -63,14 +62,6 @@ func isPinnedBootstrapDisabledByEnv() bool {
 	default:
 		return false
 	}
-}
-
-// EnvelopeEventsHandler used for two different event types.
-type EnvelopeEventsHandler interface {
-	EnvelopeSent([][]byte)
-	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(types2.Hash, types2.Hash, []byte, error)
-	MailServerRequestExpired(types2.Hash)
 }
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
@@ -170,12 +161,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		return err
 	}
 
-	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
-		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
-		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
-		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
-	}
-
 	tracer := trace.NewNoopTracer()
 	if s.config.OTELConfig.Enabled {
 		name := params.Account.Name
@@ -197,7 +182,6 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		},
 		messaging2.WithSQLitePersistence(params.AppDB),
 		messaging2.WithLogger(s.logger),
-		messaging2.WithEnvelopeEventsConfig(envelopeEventsConfig),
 		messaging2.WithMetrics(params.MetricsEnabled),
 		messaging2.WithTracer(tracer),
 	)
@@ -215,7 +199,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	)
 
 	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer,
-		s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService,
+		s.rpcClient, s.multiAccountsDB, params.Account, s.accountsDB, params.WalletService,
 		params.CommunityTokensService, s.logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher,
 		ensVerifier, params.TokenManager, params.TokenBalanceManager, params.NetworkManager)
 	if err != nil {
@@ -333,7 +317,6 @@ func buildMessengerOptions(
 	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,
-	envelopeEventsConfig *messagingtypes.EnvelopeEventsConfig,
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
 	communityTokensService *communitytokens.Service,
@@ -358,7 +341,6 @@ func buildMessengerOptions(
 		protocol.WithMailserversDatabase(mailserversDB.NewDB(appDb)),
 		protocol.WithAccount(account),
 		protocol.WithBrowserDatabase(browsers.NewDB(appDb)),
-		protocol.WithEnvelopeEventsConfig(envelopeEventsConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
 		protocol.WithENSVerifier(ensVerifier),
 		protocol.WithClusterConfig(config.ClusterConfig),

@@ -20,7 +20,7 @@ class TestDeliveryConfirmation:
 
     * ``delivered`` — driven by an MVDS delivery ACK from the recipient. Verified
       with the recipient online (``test_delivery_confirmation_online``).
-    * ``sent`` — driven by ``envelope.sent`` (the envelope reaching at least one
+    * ``sent`` — driven by ``messages.sent`` (the envelope reaching at least one
       peer, i.e. the store node), independent of MVDS. Verified with the
       recipient offline (``test_sent_status_while_recipient_offline``), so MVDS
       cannot ACK and the only way the status can advance is the envelope-sent
@@ -75,7 +75,7 @@ class TestDeliveryConfirmation:
         # The recipient stays offline for the whole exchange, so MVDS datasync can
         # never ACK the message. The message can therefore only ever reach "sent"
         # (envelope published to a peer), never "delivered" — which isolates the
-        # envelope.sent path from MVDS delivery. All assertions stay inside the
+        # messages.sent path from MVDS delivery. All assertions stay inside the
         # pause block so the recipient can't come back and ACK mid-test.
         with messenger.node_pause(receiver):
             response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
@@ -83,16 +83,16 @@ class TestDeliveryConfirmation:
             assert message_id, "Sender did not get a message id back"
 
             # `message_id` is only known after the send, so wait post-hoc and scan
-            # from the beginning to avoid matching envelope.sent signals from
+            # from the beginning to avoid matching messages.sent signals from
             # make_contacts.
-            with sender.expect_signal(SignalType.ENVELOPE_SENT, pattern=message_id, timeout=120, start="beginning"):
+            with sender.expect_signal(SignalType.MESSAGES_SENT, pattern=message_id, timeout=120, start="beginning"):
                 pass
 
             # Exact match: "sent" (not "delivered") proves the status came from the
             # envelope-sent path and not from an MVDS ACK.
             self._assert_outgoing_status(sender, message_id, "sent")
 
-            # envelope.sent means the envelope already reached a peer, so it is
+            # messages.sent means the envelope already reached a peer, so it is
             # already persisted at the store node: a single REST read confirms it
             # was published to the network (not just marked locally), with MVDS
             # provably out of the picture (recipient offline). No polling needed.
