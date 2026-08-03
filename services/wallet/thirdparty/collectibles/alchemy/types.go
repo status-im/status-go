@@ -128,7 +128,11 @@ type Image struct {
 	ImageURL string `json:"pngUrl"`
 	// ContentType describes the media behind CachedAnimationURL, which the
 	// provider populates for still assets too.
-	ContentType          string `json:"contentType"`
+	ContentType string `json:"contentType"`
+	// ThumbnailURL is Alchemy's own resized preview, small enough for a list
+	// element. Absent for some assets, in which case consumers fall back to
+	// ImageURL.
+	ThumbnailURL         string `json:"thumbnailUrl"`
 	CachedAnimationURL   string `json:"cachedUrl"`
 	OriginalAnimationURL string `json:"originalUrl"`
 }
@@ -240,6 +244,7 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 		Name:         c.Name,
 		Description:  c.Description,
 		ImageURL:     c.Image.ImageURL,
+		ThumbnailURL: c.Image.ThumbnailURL,
 		AnimationURL: c.animationURL(),
 		Traits:       alchemyToCollectibleTraits(rawMetadata.Attributes),
 		TokenURI:     c.TokenURI,
