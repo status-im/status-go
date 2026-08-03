@@ -61,6 +61,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Description:  "Today marks your Second Rariversary! Can you believe it’s already been two years? Time flies when you’re having fun! Thank you for everything you contribute!",
 				Permalink:    "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729416",
 				ImageURL:     "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s1000",
+				ThumbnailURL: "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s250",
 				Traits: []thirdparty.CollectibleTrait{
 					{
 						TraitType: "Theme",
@@ -95,6 +96,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Description:  "Today marks your Third Rariversary! Can you believe it’s already been three years? Time flies when you’re having fun! We’ve loved working with you these years and can’t wait to see what the next few years bring. Thank you for everything you contribute!",
 				Permalink:    "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729414",
 				ImageURL:     "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s1000",
+				ThumbnailURL: "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s250",
 				Traits: []thirdparty.CollectibleTrait{
 					{
 						TraitType: "Theme",
@@ -121,4 +123,55 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 	collectiblesData := raribleToCollectiblesData(container.Collectibles, true)
 
 	assert.Equal(t, expectedCollectiblesData, collectiblesData)
+}
+
+func TestGetThumbnailURL(t *testing.T) {
+	preview := Content{Type: "IMAGE", URL: "preview", Representation: "PREVIEW"}
+	portrait := Content{Type: "IMAGE", URL: "portrait", Representation: "PORTRAIT"}
+	big := Content{Type: "IMAGE", URL: "big", Representation: "BIG"}
+	original := Content{Type: "IMAGE", URL: "original", Representation: "ORIGINAL"}
+	video := Content{Type: "VIDEO", URL: "video", Representation: "PREVIEW"}
+
+	testCases := []struct {
+		name     string
+		contents []Content
+		expected string
+	}{
+		{
+			name:     "prefers the preview over every larger representation",
+			contents: []Content{original, big, portrait, preview},
+			expected: "preview",
+		},
+		{
+			name:     "falls back to the portrait when there is no preview",
+			contents: []Content{original, big, portrait},
+			expected: "portrait",
+		},
+		{
+			name:     "stays empty rather than offering the original as a thumbnail",
+			contents: []Content{original},
+			expected: "",
+		},
+		{
+			name:     "stays empty rather than offering the big representation",
+			contents: []Content{original, big},
+			expected: "",
+		},
+		{
+			name:     "ignores video content",
+			contents: []Content{video, original},
+			expected: "",
+		},
+		{
+			name:     "handles an item with no content at all",
+			contents: []Content{},
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, getThumbnailURL(tc.contents))
+		})
+	}
 }
