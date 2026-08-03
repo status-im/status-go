@@ -15,8 +15,6 @@ type MetricsCollection struct {
 	NodePeerId                   *prometheus.GaugeVec
 	MessageDeliveryConfirmations prometheus.Counter
 	PeerConnectionFailures       prometheus.Counter
-	StoreQuerySuccesses          prometheus.Counter
-	StoreQueryFailures           prometheus.Counter
 	PeersByOrigin                *prometheus.GaugeVec
 	PeersByShard                 *prometheus.GaugeVec
 	RawMessagesSizeBytes         *prometheus.CounterVec
@@ -102,20 +100,6 @@ var metrics = MetricsCollection{
 		[]string{"error_type", "protocols"},
 	),
 
-	StoreQuerySuccesses: prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "waku_store_query_successes_total",
-			Help: "Frequency of successful store confirmation queries",
-		},
-	),
-
-	StoreQueryFailures: prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "waku_store_query_failures_total",
-			Help: "Frequency of failed store confirmation queries",
-		},
-	),
-
 	MissedMessages: prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "waku_missed_messages_total",
@@ -159,8 +143,6 @@ var collectors = []prometheus.Collector{
 	metrics.PeersByShard,
 	metrics.PeerConnectionFailures,
 	metrics.PeerDialFailures,
-	metrics.StoreQuerySuccesses,
-	metrics.StoreQueryFailures,
 	metrics.MissedMessages,
 	metrics.NodePeerId,
 	metrics.RawMessagesSizeBytes,

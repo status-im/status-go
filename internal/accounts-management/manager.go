@@ -199,9 +199,8 @@ func (m *AccountsManager) Accounts() ([]cryptotypes.Address, error) {
 	return addresses, nil
 }
 
-// GetVerifiedWalletAccount gets a verified wallet account by address and password
-// If the account is not found, it tries to generate the account if there is an account this account can be derived from
-// TODO: need to check it that's needed at all, cause `generatePartialAccountKey` was used for the old mobile app - maybe we should remove it
+// GetVerifiedWalletAccount gets a verified wallet account by address and password.
+// If the account has no its own keystore file (partially operable account), then its key is derived from the master keystore file and stored.
 func (m *AccountsManager) GetVerifiedWalletAccount(address cryptotypes.Address, password string) (*generator.Account, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

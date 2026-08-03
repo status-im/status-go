@@ -6,14 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
 	mvdsstate "github.com/status-im/mvds/state"
 	"github.com/stretchr/testify/require"
+	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 )
 
 func noopDispatch(*ecdsa.PublicKey, []byte, [][]byte) error { return nil }
@@ -31,7 +34,81 @@ func newTestReliability(t *testing.T) *Reliability {
 	t.Helper()
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	return NewReliability(newTestPersistence(t), key, zap.NewNop())
+	r, err := NewReliability(newTestPersistence(t), key, func(string, []string, string) error { return nil }, zap.NewNop())
+	require.NoError(t, err)
+	return r
+}
+
+func TestHandleMissingDependenciesDecodesAllHashes(t *testing.T) {
+	r := newTestReliability(t)
+
+	var captured []string
+	r.SetMissingDependenciesHandler(func(_ string, missingDeps []string, _ string) error {
+		captured = append(captured, missingDeps...)
+		return nil
+	})
+
+	depOneHint, err := proto.Marshal(&protobuf.RetrievalHint{
+		EnvelopeHashes: [][]byte{[]byte("0x01"), []byte("0x02")},
+	})
+	require.NoError(t, err)
+	depTwoHint, err := proto.Marshal(&protobuf.RetrievalHint{
+		EnvelopeHashes: [][]byte{[]byte("0x03")},
+	})
+	require.NoError(t, err)
+
+	r.handleMissingDependencies(
+		sds.MessageID("message-id"),
+		[]sds.HistoryEntry{
+			{MessageID: sds.MessageID("dep-1"), RetrievalHint: depOneHint},
+			{MessageID: sds.MessageID("dep-2"), RetrievalHint: depTwoHint},
+		},
+		"channel-id",
+	)
+
+	require.Equal(t, []string{"0x01", "0x02", "0x03"}, captured)
+}
+
+func TestHandleSDSMessageSentForwardsMessageID(t *testing.T) {
+	r := newTestReliability(t)
+
+	var received string
+	r.SetMessageSentHandler(func(messageID string) {
+		received = messageID
+	})
+
+	r.handleSDSMessageSent(sds.MessageID("0x1234"), "community-chat")
+	require.Equal(t, "0x1234", received)
+}
+
+func TestHandleMissingDependenciesSkipsInvalidHint(t *testing.T) {
+	r := newTestReliability(t)
+
+	called := false
+	r.SetMissingDependenciesHandler(func(_ string, _ []string, _ string) error {
+		called = true
+		return nil
+	})
+
+	// Non-protobuf bytes must not reach the handler.
+	r.handleMissingDependencies(
+		sds.MessageID("message-id"),
+		[]sds.HistoryEntry{
+			{MessageID: sds.MessageID("dep-1"), RetrievalHint: []byte{0xff, 0xff, 0xff, 0xff}},
+		},
+		"channel-id",
+	)
+
+	require.False(t, called)
+}
+
+func TestNewReliabilityRequiresMissingDepsHandler(t *testing.T) {
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	r, err := NewReliability(newTestPersistence(t), key, nil, zap.NewNop())
+	require.Error(t, err)
+	require.Nil(t, r)
 }
 
 func TestReliabilityPauseResume(t *testing.T) {
@@ -111,7 +188,8 @@ func TestReliabilityBuildNodeFailureLeavesNoZombie(t *testing.T) {
 	// Fail the 2nd NewPersistentNode (the recreate in SetPaused); the 1st (Start)
 	// succeeds.
 	persistence := &epochFailsOnNthBuild{Persistence: newTestPersistence(t), n: 2}
-	r := NewReliability(persistence, key, zap.NewNop())
+	r, err := NewReliability(persistence, key, func(string, []string, string) error { return nil }, zap.NewNop())
+	require.NoError(t, err)
 	t.Cleanup(r.Stop)
 
 	require.NoError(t, r.Start(noopDispatch))

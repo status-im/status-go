@@ -24,6 +24,13 @@ import (
 
 var ErrModifiedRawMessage = errors.New("modified rawMessage")
 
+func encodeCommunityID(communityID []byte) string {
+	if len(communityID) == 0 {
+		return ""
+	}
+	return types2.EncodeHex(communityID)
+}
+
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey
 	messaging *messaging.API
@@ -187,11 +194,11 @@ func (s *MessageSender) SendPublic(
 		Payload:             wrappedMessage,
 		PubsubTopic:         rawMessage.PubsubTopic,
 		ContentTopic:        rawMessage.ContentTopic,
+		CommunityID:         encodeCommunityID(rawMessage.CommunityID),
 		SkipEncryptionLayer: rawMessage.SkipEncryptionLayer,
 		Ephemeral:           rawMessage.Ephemeral,
 		Priority:            rawMessage.Priority,
 		HashRatchet:         hashRatchetParams,
-		CommunityID:         rawMessage.CommunityID,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send public message")
@@ -390,8 +397,8 @@ func (s *MessageSender) SendCommunity(
 			Payload:      wrappedMessage,
 			PubsubTopic:  rawMessage.PubsubTopic,
 			ContentTopic: rawMessage.ContentTopic,
+			CommunityID:  encodeCommunityID(rawMessage.CommunityID),
 			HashRatchet:  hashRatchetParams,
-			CommunityID:  rawMessage.CommunityID,
 		})
 
 	} else {
@@ -406,9 +413,9 @@ func (s *MessageSender) SendCommunity(
 			Payload:            wrappedMessage,
 			PubsubTopic:        rawMessage.PubsubTopic,
 			ContentTopic:       rawMessage.ContentTopic,
+			CommunityID:        encodeCommunityID(rawMessage.CommunityID),
 			HashRatchet:        hashRatchetParams,
 			CommunityPublicKey: pubkey,
-			CommunityID:        rawMessage.CommunityID,
 		})
 	}
 

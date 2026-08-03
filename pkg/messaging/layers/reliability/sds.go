@@ -9,7 +9,12 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
-func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
+func newSdsReliabilityManager(
+	logger *zap.Logger,
+	onMessageSent func(messageId sds.MessageID, channelId string),
+	onMissingDependencies func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string),
+	retrievalHintProvider func(messageId sds.MessageID) []byte,
+) *sds.ReliabilityManager {
 	reliabilityManager, err := sds.NewReliabilityManager(logger)
 	if err != nil {
 		logger.Error("failed to create ReliabilityManager", zap.Error(err))
@@ -19,17 +24,36 @@ func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
 	callbacks := sds.EventCallbacks{
 		OnMessageSent: func(messageId sds.MessageID, channelId string) {
 			logger.Debug("message sent with sds", zap.String("messageId", string(messageId)), zap.String("channelId", channelId))
+			if onMessageSent != nil {
+				onMessageSent(messageId, channelId)
+			}
 		},
 		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string) {
 			logger.Debug("missing dependencies",
 				zap.String("messageId", string(messageId)),
 				zap.String("channelId", channelId),
 				zap.Any("missingDeps", missingDeps))
+
+			if onMissingDependencies != nil {
+				onMissingDependencies(messageId, missingDeps, channelId)
+			}
 		},
 		OnMessageReady: func(messageId sds.MessageID, channelId string) {
 			logger.Debug("message ready",
 				zap.String("messageId", string(messageId)),
 				zap.String("channelId", channelId))
+		},
+		RetrievalHintProvider: func(messageId sds.MessageID) []byte {
+			if retrievalHintProvider == nil {
+				return nil
+			}
+
+			hint := retrievalHintProvider(messageId)
+			logger.Debug("resolved retrieval hint for sds message",
+				zap.String("messageId", string(messageId)),
+				zap.Int("hintLen", len(hint)))
+
+			return hint
 		},
 	}
 	reliabilityManager.RegisterCallbacks(callbacks)
@@ -38,20 +62,20 @@ func newSdsReliabilityManager(logger *zap.Logger) *sds.ReliabilityManager {
 }
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
-func (r *Reliability) WrapPayloadForSDS(payload []byte, communityID []byte) ([]byte, error) {
+func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byte, []byte, error) {
 	sdsMessageID := crypto.Keccak256(payload)
 
 	r.logger.Debug("original payload wrapped with SDS",
-		zap.String("channelId", cryptotypes.EncodeHex(communityID)),
+		zap.String("channelId", channelID),
 		zap.Int("payloadLength", len(payload)),
 		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
 	)
-	sdsWrappedPayload, err := r.sdsManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), cryptotypes.EncodeHex(communityID))
+	sdsWrappedPayload, err := r.sdsManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), channelID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to wrap a community message with SDS")
+		return nil, nil, errors.Wrap(err, "failed to wrap message with SDS")
 	}
 
-	return sdsWrappedPayload, nil
+	return sdsWrappedPayload, sdsMessageID, nil
 }
 
 func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+// RetrievalHint carries the transport-level information needed to refetch an SDS
+// message from a storenode. A message may be backed by multiple waku envelopes
+// when it is split by the segmentation layer, so all of their hashes are
+// included.
+message RetrievalHint {
+  // Hex-encoded (0x-prefixed) waku envelope hashes backing the SDS message.
+  repeated bytes envelope_hashes = 1;
+}

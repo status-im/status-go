@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -254,7 +255,7 @@ func (tm *Manager) Start(ctx context.Context) error {
 	tm.startAccountsWatcher()
 	tm.startNetworksWatcher()
 
-	tm.notifyCh = make(chan struct{})
+	tm.notifyCh = make(chan struct{}, 1)
 	return tm.startTokenListsNotifier(ctx)
 }
 
@@ -294,6 +295,15 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
 					logutils.ZapLogger().Error("failed to set last tokens update", zap.Error(err))
 				}
 				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
+				if tm.walletFeed != nil {
+					// Send from a separate goroutine: Feed.Send blocks until every
+					// subscriber has consumed the value, and a stalled notifier loop
+					// would miss stopCh and drop follow-up notifications.
+					go func() {
+						defer gocommon.LogOnPanic()
+						tm.walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+					}()
+				}
 			}
 		}
 	}()

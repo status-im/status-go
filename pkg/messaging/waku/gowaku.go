@@ -48,6 +48,7 @@ import (
 	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -56,7 +57,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
+	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -105,8 +108,6 @@ type IMetricsHandler interface {
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerConnFailures(peerConnFailures map[string]int)
-	PushMessageCheckSuccess()
-	PushMessageCheckFailure()
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
@@ -323,7 +324,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuFilterLightNode())
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
-		cfg.EnableStoreConfirmationForMessagesSent = false
 		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
 		opts = append(opts, node.WithShards(waku.defaultShardInfo.ShardIDs))
 	} else {
@@ -338,7 +338,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.cfg.MinPeersForRelay, relayOpts...))
 		opts = append(opts, node.WithMaxPeerConnections(maxRelayPeers))
 		cfg.EnablePeerExchangeClient = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
-		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
 	if !cfg.IsLightClient() {
@@ -1159,44 +1158,6 @@ func (w *Waku) startMessageSender() error {
 		sender.WithMessageSentEmitter(w.node.Host())
 	}
 
-	if w.cfg.EnableStoreConfirmationForMessagesSent {
-		msgStoredChan := make(chan gethcommon.Hash, 1000)
-		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		// The store node is selected on demand by the StoreClient (the go-waku
-		// storenode cycle is gone); MessageSentCheck queries it by hash to confirm
-		// that published messages propagated.
-		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), storeClientPeerProvider{w.storeClient}, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
-		sender.WithMessageSentCheck(messageSentCheck)
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			defer w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case hash := <-msgStoredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeSent,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckSuccess()
-					}
-				case hash := <-msgExpiredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeExpired,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckFailure()
-					}
-				}
-			}
-		}()
-	}
-
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
 		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
 		// basically disabling the rate limit functionality
@@ -1680,6 +1641,79 @@ func (w *Waku) StoreQuery(
 	processEnvelopes bool,
 ) error {
 	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	if w.storeClient == nil {
+		return peer.AddrInfo{}
+	}
+
+	return w.storeClient.nextStorenode()
+}
+
+func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error {
+	if len(messageHashes) == 0 {
+		return nil
+	}
+
+	parsedHashes := make([]pb.MessageHash, 0, len(messageHashes))
+	for _, messageHash := range messageHashes {
+		decodedHash, err := hexutil.Decode(messageHash)
+		if err != nil {
+			w.logger.Debug("invalid message hash for storenode fetch", zap.String("messageHash", messageHash), zap.Error(err))
+			continue
+		}
+		parsedHashes = append(parsedHashes, pb.ToMessageHash(decodedHash))
+	}
+
+	if len(parsedHashes) == 0 {
+		return nil
+	}
+
+	// Enrich the storenode AddrInfo with addresses from the peerstore
+	storenodeInfo := w.node.Host().Peerstore().PeerInfo(storenode.ID)
+	// Encapsulate the peer ID into the multiaddresses as expected by the missing API
+	encapsulatedAddrs := utils.EncapsulatePeerID(storenodeInfo.ID, storenodeInfo.Addrs...)
+	storenodeInfo.Addrs = encapsulatedAddrs
+
+	type hashRequestor interface {
+		GetMessagesByHash(ctx context.Context, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error)
+	}
+
+	requestor, ok := missing.NewDefaultStorenodeRequestor(w.node.Store()).(hashRequestor)
+	if !ok {
+		return errors.New("storenode requestor does not support fetching by hash")
+	}
+
+	result, err := requestor.GetMessagesByHash(ctx, storenodeInfo, uint64(len(parsedHashes)), parsedHashes)
+	if err != nil {
+		return err
+	}
+
+	if result == nil {
+		return nil
+	}
+
+	for {
+		messages := result.Messages()
+
+		for _, mkv := range messages {
+			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
+			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, true); err != nil {
+				return err
+			}
+		}
+
+		if result.IsComplete() {
+			break
+		}
+
+		if err := result.Next(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (w *Waku) Metrics() string {

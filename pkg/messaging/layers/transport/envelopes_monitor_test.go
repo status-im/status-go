@@ -72,6 +72,31 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
 	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
 }
 
+func (s *EnvelopesMonitorSuite) TestSDSAliasDoesNotProduceSeparateSentMessage() {
+	applicationMessageID := []byte{0x01, 0x02}
+	sdsMessageID := []byte{0x03, 0x04}
+
+	err := s.monitor.Add([][]byte{applicationMessageID}, testHashes, []*types2.NewMessage{{}})
+	s.Require().NoError(err)
+	s.monitor.AddSDSAlias(applicationMessageID, sdsMessageID)
+
+	resolvedMessageID, ok := s.monitor.TakeApplicationMessageIDForSDS(sdsMessageID)
+	s.Require().True(ok)
+	s.Equal(applicationMessageID, resolvedMessageID)
+	_, ok = s.monitor.TakeApplicationMessageIDForSDS(sdsMessageID)
+	s.False(ok)
+
+	s.monitor.handleEvent(types2.EnvelopeEvent{
+		Event: types2.EventEnvelopeSent,
+		Hash:  testHash,
+	})
+	s.Require().Len(s.eventsHandlerMock.envelopeSentCalls, 1)
+	s.Equal([][]byte{applicationMessageID}, s.eventsHandlerMock.envelopeSentCalls[0])
+
+	_, ok = s.monitor.TakeApplicationMessageIDForSDS([]byte{0xff})
+	s.False(ok)
+}
+
 func (s *EnvelopesMonitorSuite) TestEnvelopePostedOutOfOrder() {
 	s.monitor.handleEvent(types2.EnvelopeEvent{
 		Event: types2.EventEnvelopeSent,

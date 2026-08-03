@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -604,6 +603,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.started = true
 
 	m.sender.Start()
+	m.watchReliabilityDeliveryEvents()
 
 	err := m.InitFilters()
 	if err != nil {
@@ -3470,9 +3470,16 @@ func (m *Messenger) processStatusMessage(
 }
 
 func (m *Messenger) markDeliveredMessages(acks []cryptotypes.HexBytes) {
+	messageIDs := make([]string, 0, len(acks))
 	for _, ack := range acks {
-		messageID := ack.String()
-		m.logger.Debug("got datasync acknowledge for message", zap.String("ack", hex.EncodeToString(ack)), zap.String("messageID", messageID))
+		messageIDs = append(messageIDs, ack.String())
+	}
+	m.markDeliveredMessageIDs(messageIDs)
+}
+
+func (m *Messenger) markDeliveredMessageIDs(messageIDs []string) {
+	for _, messageID := range messageIDs {
+		m.logger.Debug("marking outgoing message delivered", zap.String("messageID", messageID))
 
 		err := m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
 		if err != nil {

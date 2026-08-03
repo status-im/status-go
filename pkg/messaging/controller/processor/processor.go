@@ -260,6 +260,11 @@ func (r *Processor) processSegmentationLayer(m *messagingtypes.Message) error {
 		m.SegmentationLayer.Segmented = true
 		m.SegmentationLayer.Completed = false
 		err = nil
+	case segmentation.ErrAlreadyCompleted:
+		// A duplicate segment for an already reconstructed message should be ignored.
+		m.SegmentationLayer.Segmented = true
+		m.SegmentationLayer.Completed = false
+		err = nil
 	case segmentation.ErrInvalidPayload:
 		m.SegmentationLayer.Segmented = false
 		m.SegmentationLayer.Completed = false

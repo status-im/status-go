@@ -18,6 +18,7 @@ import (
 
 	datasync2 "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 )
 
 // pausedDuration is the tick interval handed to the mvds node while the host is
@@ -32,6 +33,18 @@ var errNotStarted = errors.New("reliability layer not started")
 //	wrappedPayload: the datasync wrapped payload
 //	messages: the original messages that were wrapped
 type MessageDispatcher func(publicKey *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) error
+
+// MissingDependenciesHandler is triggered when SDS reports missing dependencies
+// for an incoming message.
+type MissingDependenciesHandler func(messageID string, missingDeps []string, channelID string) error
+
+// RetrievalHintProvider returns a transport-level retrieval hint for a given
+// SDS message ID.
+type RetrievalHintProvider func(messageID string) []byte
+
+// MessageSentHandler is triggered when SDS confirms an outgoing message was
+// observed in an incoming message's bloom filter or causal history.
+type MessageSentHandler func(messageID string)
 
 type Reliability struct {
 	identity              *ecdsa.PrivateKey
@@ -48,16 +61,113 @@ type Reliability struct {
 	dispatch MessageDispatcher
 	paused   bool
 	tick     time.Duration // outbound-loop interval the active node was built with
+
+	missingDepsHandlerMu sync.RWMutex
+	missingDepsHandler   MissingDependenciesHandler
+
+	retrievalHintProviderMu sync.RWMutex
+	retrievalHintProvider   RetrievalHintProvider
+
+	messageSentHandlerMu sync.RWMutex
+	messageSentHandler   MessageSentHandler
 }
 
-func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, logger *zap.Logger) *Reliability {
+func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
+	if missingDepsHandler == nil {
+		return nil, errors.New("missingDepsHandler is required")
+	}
 	logger = logger.Named("reliability")
-	return &Reliability{
+	r := &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		sdsManager:            newSdsReliabilityManager(logger.Named("sds")),
 		logger:                logger,
+		missingDepsHandler:    missingDepsHandler,
+	}
+
+	r.sdsManager = newSdsReliabilityManager(logger.Named("sds"), r.handleSDSMessageSent, r.handleMissingDependencies, r.provideRetrievalHint)
+
+	return r, nil
+}
+
+// SetMissingDependenciesHandler configures how SDS missing dependencies should be handled.
+func (r *Reliability) SetMissingDependenciesHandler(handler MissingDependenciesHandler) {
+	r.missingDepsHandlerMu.Lock()
+	defer r.missingDepsHandlerMu.Unlock()
+	r.missingDepsHandler = handler
+}
+
+// SetRetrievalHintProvider configures how SDS retrieval hints are resolved.
+func (r *Reliability) SetRetrievalHintProvider(provider RetrievalHintProvider) {
+	r.retrievalHintProviderMu.Lock()
+	defer r.retrievalHintProviderMu.Unlock()
+	r.retrievalHintProvider = provider
+}
+
+// SetMessageSentHandler configures the handler for outgoing SDS delivery
+// confirmations.
+func (r *Reliability) SetMessageSentHandler(handler MessageSentHandler) {
+	r.messageSentHandlerMu.Lock()
+	defer r.messageSentHandlerMu.Unlock()
+	r.messageSentHandler = handler
+}
+
+func (r *Reliability) handleSDSMessageSent(messageID sds.MessageID, _ string) {
+	r.messageSentHandlerMu.RLock()
+	handler := r.messageSentHandler
+	r.messageSentHandlerMu.RUnlock()
+	if handler != nil {
+		handler(string(messageID))
+	}
+}
+
+func (r *Reliability) provideRetrievalHint(messageID sds.MessageID) []byte {
+	r.retrievalHintProviderMu.RLock()
+	provider := r.retrievalHintProvider
+	r.retrievalHintProviderMu.RUnlock()
+
+	if provider == nil {
+		return nil
+	}
+
+	return provider(string(messageID))
+}
+
+func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missingDeps []sds.HistoryEntry, channelID string) {
+	r.missingDepsHandlerMu.RLock()
+	handler := r.missingDepsHandler
+	r.missingDepsHandlerMu.RUnlock()
+
+	if handler == nil || len(missingDeps) == 0 {
+		return
+	}
+
+	missingDepsAsString := make([]string, 0, len(missingDeps))
+	for _, dep := range missingDeps {
+		if len(dep.RetrievalHint) == 0 {
+			continue
+		}
+
+		var hint protobuf.RetrievalHint
+		if err := proto.Unmarshal(dep.RetrievalHint, &hint); err != nil {
+			r.logger.Debug("failed to unmarshal retrieval hint",
+				zap.String("messageId", string(dep.MessageID)),
+				zap.Error(err))
+			continue
+		}
+
+		for _, envelopeHash := range hint.EnvelopeHashes {
+			if len(envelopeHash) > 0 {
+				missingDepsAsString = append(missingDepsAsString, string(envelopeHash))
+			}
+		}
+	}
+	if len(missingDepsAsString) == 0 {
+		return
+	}
+
+	if err := handler(string(messageID), missingDepsAsString, channelID); err != nil {
+		r.logger.Debug("failed to fetch missing dependencies from sds callback", zap.Error(err))
 	}
 }
 
