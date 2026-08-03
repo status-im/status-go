@@ -1094,10 +1094,6 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
-// Peers and PeerID are retained only for the Python functional tests
-// (tests-functional): Peers backs the wait_for_online / test_discovery checks
-// and PeerID backs node identification. They are not used by status-app.
-
 func (api *PublicAPI) Peers() types2.PeerStats {
 	return api.service.messenger.Peers()
 }
