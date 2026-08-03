@@ -251,6 +251,7 @@ type Content struct {
 	Type           string `json:"@type"`
 	URL            string `json:"url"`
 	Representation string `json:"representation"`
+	MimeType       string `json:"mimeType"`
 	Available      bool   `json:"available"`
 }
 
@@ -410,16 +411,23 @@ func getBiggestContentURL(contents []Content, contentType string, includeOrigina
 	return ret.URL
 }
 
+// getAnimationURL returns content that actually moves, or an empty string. An
+// image is only offered as animation when its mime type can carry one: handing
+// back a still original here means every consumer that reads "animation"
+// downloads the full-size asset for nothing.
 func getAnimationURL(contents []Content) string {
-	// Try to get the biggest content of type "VIDEO"
-	ret := getBiggestContentURL(contents, "VIDEO", true)
-
-	// If empty, try to get the biggest content of type "IMAGE", including the "ORIGINAL" representation
-	if ret == "" {
-		ret = getBiggestContentURL(contents, "IMAGE", true)
+	if ret := getBiggestContentURL(contents, "VIDEO", true); ret != "" {
+		return ret
 	}
 
-	return ret
+	animated := make([]Content, 0, len(contents))
+	for _, content := range contents {
+		if thirdparty.IsAnimatedMediaType(content.MimeType) {
+			animated = append(animated, content)
+		}
+	}
+
+	return getBiggestContentURL(animated, "IMAGE", true)
 }
 
 func getImageURL(contents []Content) string {
@@ -437,10 +445,6 @@ func getImageURL(contents []Content) string {
 func (c *Collectible) toCollectibleData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	imageURL := getImageURL(c.Metadata.Contents)
 	animationURL := getAnimationURL(c.Metadata.Contents)
-
-	if animationURL == "" {
-		animationURL = imageURL
-	}
 
 	return thirdparty.CollectibleData{
 		ID:           id,
