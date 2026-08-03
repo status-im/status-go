@@ -430,6 +430,26 @@ func getAnimationURL(contents []Content) string {
 	return getBiggestContentURL(animated, "IMAGE", true)
 }
 
+// Representations small enough to serve as a list thumbnail, smallest first.
+var thumbnailRepresentations = []string{"PREVIEW", "PORTRAIT"}
+
+// getThumbnailURL returns the provider's own small preview, or an empty string
+// when Rarible does not offer one for this item. BIG and ORIGINAL deliberately
+// do not qualify: they are the full-size asset, and an empty thumbnail tells
+// the client to fall back to the image URL rather than pretending a preview
+// exists.
+func getThumbnailURL(contents []Content) string {
+	for _, representation := range thumbnailRepresentations {
+		for _, content := range contents {
+			if content.Type == "IMAGE" && content.Representation == representation {
+				return content.URL
+			}
+		}
+	}
+
+	return ""
+}
+
 func getImageURL(contents []Content) string {
 	// Get the biggest content of type "IMAGE", excluding the "ORIGINAL" representation
 	ret := getBiggestContentURL(contents, "IMAGE", false)
@@ -454,6 +474,7 @@ func (c *Collectible) toCollectibleData(id thirdparty.CollectibleUniqueID) third
 		Description:  c.Metadata.Description,
 		Permalink:    c.Metadata.ExternalURI,
 		ImageURL:     imageURL,
+		ThumbnailURL: getThumbnailURL(c.Metadata.Contents),
 		AnimationURL: animationURL,
 		Traits:       raribleToCollectibleTraits(c.Metadata.Attributes),
 		TokenURI:     c.Metadata.OriginalMetaURI,
