@@ -125,7 +125,10 @@ type ContractList struct {
 }
 
 type Image struct {
-	ImageURL             string `json:"pngUrl"`
+	ImageURL string `json:"pngUrl"`
+	// ContentType describes the media behind CachedAnimationURL, which the
+	// provider populates for still assets too.
+	ContentType          string `json:"contentType"`
 	CachedAnimationURL   string `json:"cachedUrl"`
 	OriginalAnimationURL string `json:"originalUrl"`
 }
@@ -215,6 +218,18 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 	return ret
 }
 
+// animationURL returns the cached asset only when it can actually move.
+// Alchemy fills cachedUrl for still collectibles as well, so passing it on
+// unconditionally makes every still NFT look animated and costs consumers a
+// full-size download for nothing.
+func (c *Asset) animationURL() string {
+	if !thirdparty.IsAnimatedMediaType(c.Image.ContentType) {
+		return ""
+	}
+
+	return c.Image.CachedAnimationURL
+}
+
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	rawMetadata := c.Raw.RawMetadata.(RawMetadata)
 
@@ -225,7 +240,7 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 		Name:         c.Name,
 		Description:  c.Description,
 		ImageURL:     c.Image.ImageURL,
-		AnimationURL: c.Image.CachedAnimationURL,
+		AnimationURL: c.animationURL(),
 		Traits:       alchemyToCollectibleTraits(rawMetadata.Attributes),
 		TokenURI:     c.TokenURI,
 	}
