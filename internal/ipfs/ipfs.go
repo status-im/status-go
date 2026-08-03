@@ -79,13 +79,16 @@ func NewDownloader(rootDir string) *Downloader {
 	}
 
 	// Tracked on the same WaitGroup as Get callers so Stop cannot return while
-	// either goroutine is still touching the ipfs dir.
+	// either goroutine is still touching the ipfs dir. wg.Done is deferred after
+	// the panic guard so it still runs before LogOnPanic re-raises.
 	d.wg.Add(2)
 	go func() {
+		defer common.LogOnPanic()
 		defer d.wg.Done()
 		d.taskDispatcher()
 	}()
 	go func() {
+		defer common.LogOnPanic()
 		defer d.wg.Done()
 		d.worker()
 	}()
@@ -109,7 +112,6 @@ func (d *Downloader) Stop() {
 }
 
 func (d *Downloader) worker() {
-	defer common.LogOnPanic()
 	for {
 		select {
 		case <-d.quit:
@@ -126,7 +128,6 @@ func (d *Downloader) worker() {
 }
 
 func (d *Downloader) taskDispatcher() {
-	defer common.LogOnPanic()
 	sub := d.Subscribe()
 	defer sub.Unsubscribe()
 	pt := common.NewPausableTicker(common.PausableTickerConfig{
