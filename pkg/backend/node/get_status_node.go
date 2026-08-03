@@ -368,6 +368,11 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 	if err := n.createTokenManager(); err != nil {
 		return err
 	}
+	if err := n.tokenManager.Start(context.Background()); err != nil {
+		return errorspkg.Wrap(err, "failed to start token manager")
+	}
+	n.tokenManagerStartDone = make(chan struct{})
+	close(n.tokenManagerStartDone)
 
 	if err := n.initServices(config, n.mediaServer); err != nil {
 		return err
@@ -530,6 +535,7 @@ func (n *StatusNode) Stop() error {
 	if n.tokenManagerStartDone != nil {
 		<-n.tokenManagerStartDone
 		n.tokenManagerStartDone = nil
+		n.tokenManager.Stop()
 	}
 	n.timeSourceSrvc.Stop()
 

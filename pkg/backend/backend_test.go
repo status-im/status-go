@@ -134,6 +134,30 @@ func TestEnsureDBsOpenedEstablishedDatabasesRejectsWrongPassword(t *testing.T) {
 	require.Nil(t, backend.walletDB)
 }
 
+func TestEnsureDBsOpenedEstablishedDatabasesDoesNotRegisterDBsOnAccountsDBFailure(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, true)
+	backend := testContext.backend
+
+	require.NoError(t, backend.closeDBs())
+	backend.statusNode.SetAppDB(nil)
+	backend.statusNode.SetWalletDB(nil)
+
+	previousNewAccountsDB := newAccountsDB
+	newAccountsDB = func(*sql.DB) (*accounts.Database, error) {
+		return nil, fmt.Errorf("failed to create accounts db")
+	}
+	t.Cleanup(func() {
+		newAccountsDB = previousNewAccountsDB
+	})
+
+	err := backend.ensureDBsOpened(*testContext.multiAcc, testPassword)
+	require.EqualError(t, err, "failed to create accounts db")
+	require.Nil(t, backend.appDB)
+	require.Nil(t, backend.walletDB)
+	require.Nil(t, backend.statusNode.GetAppDB())
+	require.Nil(t, backend.statusNode.GetWalletDB())
+}
+
 func handleError(t *testing.T, err error) {
 	if err != nil {
 		t.Logf("deferred function error: '%s'", err)

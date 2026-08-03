@@ -18,8 +18,10 @@ const DATA_STALE_THRESHOLD = 10 * time.Minute
 // DataStorage manages the storage and retrieval of market data
 type DataStorage struct {
 	// Data and synchronization
-	cryptoData []Cryptocurrency
-	startWG    sync.WaitGroup
+	cryptoData            []Cryptocurrency
+	cryptoDataInitialized bool
+	startMu               sync.Mutex
+	startDone             chan struct{}
 
 	marketDataPersistence MarketDataPersistenceInterface
 	priceData             PriceMap
@@ -40,22 +42,43 @@ func NewDataStorage(walletDB *sql.DB) *DataStorage {
 }
 
 func (s *DataStorage) Start() {
+	s.dataMutex.RLock()
+	if s.cryptoDataInitialized {
+		s.dataMutex.RUnlock()
+		return
+	}
+	s.dataMutex.RUnlock()
+
+	cryptoData, _ := s.marketDataPersistence.GetCryptocurrencies()
+
 	s.dataMutex.Lock()
 	defer s.dataMutex.Unlock()
-	s.cryptoData, _ = s.marketDataPersistence.GetCryptocurrencies()
+	if !s.cryptoDataInitialized {
+		s.cryptoData = cryptoData
+		s.cryptoDataInitialized = true
+	}
 }
 
 func (s *DataStorage) StartAsync() {
-	s.startWG.Add(1)
+	s.startMu.Lock()
+	startDone := make(chan struct{})
+	s.startDone = startDone
+	s.startMu.Unlock()
+
 	go func() {
 		defer common.LogOnPanic()
-		defer s.startWG.Done()
+		defer close(startDone)
 		s.Start()
 	}()
 }
 
 func (s *DataStorage) WaitForStart() {
-	s.startWG.Wait()
+	s.startMu.Lock()
+	startDone := s.startDone
+	s.startMu.Unlock()
+	if startDone != nil {
+		<-startDone
+	}
 }
 
 // UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically
@@ -68,6 +91,7 @@ func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag strin
 	s.dataMutex.Lock()
 	defer s.dataMutex.Unlock()
 
+	s.cryptoDataInitialized = true
 	currentIds := s.extractCryptocurrencyIDs(s.cryptoData)
 	s.cryptoData = data
 	s.cryptoEtag = etag

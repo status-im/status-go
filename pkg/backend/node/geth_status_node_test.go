@@ -5,6 +5,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,10 @@ func TestStatusNodeStart(t *testing.T) {
 	require.NotNil(t, n.Config())
 	require.NotNil(t, n.RPCClient())
 	require.NotNil(t, n.TokenManager())
-	require.Nil(t, n.tokenManagerStartDone)
+	require.NotNil(t, n.tokenManagerStartDone)
+	nativeToken, err := n.TokenManager().GetTokenByChainAddress(walletcommon.EthereumMainnet, common.Address{})
+	require.NoError(t, err)
+	require.NotNil(t, nativeToken)
 
 	// try to start already started node
 	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
