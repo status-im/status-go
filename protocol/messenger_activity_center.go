@@ -173,6 +173,9 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 		if err != nil {
 			return nil, err
 		}
+		if chat == nil {
+			continue
+		}
 		response.AddChat(chat)
 		response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
 			ChatID:            chatID,
