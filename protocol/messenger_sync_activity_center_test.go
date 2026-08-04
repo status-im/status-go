@@ -68,6 +68,37 @@ func (s *MessengerSyncActivityCenterSuite) TestSyncDeleted() {
 	s.syncTest(ActivityCenterNotificationTypeMention, true, (*Messenger).MarkActivityCenterNotificationsDeleted, func(n *ActivityCenterNotification) bool { return n.Deleted })
 }
 
+func (s *MessengerSyncActivityCenterSuite) TestDeleteActivityCenterNotificationsByChatIDSyncs() {
+	chatID := "deleted-channel"
+	now := uint64(time.Now().Unix())
+	notification := &ActivityCenterNotification{
+		ID:               types.HexBytes{0x01},
+		ChatID:           chatID,
+		Timestamp:        now,
+		Type:             ActivityCenterNotificationTypeMention,
+		MembershipStatus: ActivityCenterMembershipStatusIdle,
+		UpdatedAt:        now,
+	}
+	_, err := s.m.persistence.SaveActivityCenterNotification(notification, true)
+	s.Require().NoError(err)
+	_, err = s.m2.persistence.SaveActivityCenterNotification(notification, true)
+	s.Require().NoError(err)
+
+	response, err := s.m.deleteActivityCenterNotificationsByChatID(context.Background(), chatID)
+	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().True(response.ActivityCenterNotifications()[0].Deleted)
+
+	_, err = WaitOnMessengerResponse(s.m2, func(response *MessengerResponse) bool {
+		return response.ActivityCenterState() != nil
+	}, "activity center notification deletion not received")
+	s.Require().NoError(err)
+
+	remoteNotification, err := s.m2.persistence.GetActivityCenterNotificationByID(notification.ID)
+	s.Require().NoError(err)
+	s.Require().True(remoteNotification.Deleted)
+}
+
 func (s *MessengerSyncActivityCenterSuite) TestSyncRead() {
 	s.syncTest(ActivityCenterNotificationTypeMention, false, (*Messenger).MarkActivityCenterNotificationsRead, func(n *ActivityCenterNotification) bool { return n.Read })
 }
