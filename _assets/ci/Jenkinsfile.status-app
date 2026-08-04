@@ -16,6 +16,14 @@ pipeline {
     }
   }
 
+  parameters {
+    string(
+      name: 'STATUS_APP_BRANCH',
+      defaultValue: params.STATUS_APP_BRANCH ?: 'master',
+      description: 'Name of the status-app branch to build.'
+    )
+  }
+
   options {
     timestamps()
     ansiColor('xterm')
@@ -34,6 +42,8 @@ pipeline {
     /* GIT_COMMIT is the status-go commit being tested. status-app's
      * platform jobs use this to override vendor/status-go. */
     STATUS_GO_REF = "${env.GIT_COMMIT}"
+    /* Hack-fix for params not being set in env on first job run. */
+    STATUS_APP_BRANCH = "${params.STATUS_APP_BRANCH}"
   }
 
   stages {
@@ -45,7 +55,10 @@ pipeline {
               steps { script {
                 linux_x86_64 = build(
                   job:        'status-app/systems/linux/x86_64/package',
-                  parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+                  parameters: jenkins.mapToParams([
+                    BRANCH:        env.STATUS_APP_BRANCH,
+                    STATUS_GO_REF: env.STATUS_GO_REF,
+                  ]),
                   wait:       true,
                   propagate:  true,
                 )
@@ -57,6 +70,7 @@ pipeline {
                 build(
                   job:        'status-app/systems/linux/x86_64/tests-e2e',
                   parameters: jenkins.mapToParams([
+                    BRANCH:          env.STATUS_APP_BRANCH,
                     BUILD_SOURCE:    linux_x86_64.fullProjectName,
                     TEST_SCOPE_FLAG: '-m=critical',
                   ]),
@@ -73,7 +87,10 @@ pipeline {
               steps { script {
                 windows_x86_64 = build(
                   job:        'status-app/systems/windows/x86_64/package',
-                  parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+                  parameters: jenkins.mapToParams([
+                    BRANCH:        env.STATUS_APP_BRANCH,
+                    STATUS_GO_REF: env.STATUS_GO_REF,
+                  ]),
                   wait:       true,
                   propagate:  true,
                 )
@@ -85,6 +102,7 @@ pipeline {
                 build(
                   job:        'status-app/systems/windows/x86_64/tests-e2e',
                   parameters: jenkins.mapToParams([
+                    BRANCH:          env.STATUS_APP_BRANCH,
                     BUILD_SOURCE:    windows_x86_64.fullProjectName,
                     TEST_SCOPE_FLAG: '-m=critical',
                   ]),
@@ -99,7 +117,10 @@ pipeline {
           steps { script {
             build(
               job:        'status-app/systems/macos/aarch64/package',
-              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              parameters: jenkins.mapToParams([
+                BRANCH:        env.STATUS_APP_BRANCH,
+                STATUS_GO_REF: env.STATUS_GO_REF,
+              ]),
               wait:       true,
               propagate:  true,
             )
@@ -109,7 +130,10 @@ pipeline {
           steps { script {
             build(
               job:        'status-app/systems/ios/aarch64/package',
-              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              parameters: jenkins.mapToParams([
+                BRANCH:        env.STATUS_APP_BRANCH,
+                STATUS_GO_REF: env.STATUS_GO_REF,
+              ]),
               wait:       true,
               propagate:  true,
             )
@@ -119,7 +143,10 @@ pipeline {
           steps { script {
             build(
               job:        'status-app/systems/android/arm64/package',
-              parameters: jenkins.mapToParams([STATUS_GO_REF: env.STATUS_GO_REF]),
+              parameters: jenkins.mapToParams([
+                BRANCH:        env.STATUS_APP_BRANCH,
+                STATUS_GO_REF: env.STATUS_GO_REF,
+              ]),
               wait:       true,
               propagate:  true,
             )
