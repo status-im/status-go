@@ -4090,7 +4090,9 @@ func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, u
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	m.allChats.Store(chatID, chat)
+	if chat != nil {
+		m.allChats.Store(chatID, chat)
+	}
 	return count, countWithMentions, chat, nil
 }
 
