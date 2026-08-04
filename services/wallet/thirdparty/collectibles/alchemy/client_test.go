@@ -372,23 +372,28 @@ func TestFetchOwnedAssetsRespectsContextCancellation(t *testing.T) {
 func TestAssetAnimation(t *testing.T) {
 	const cachedURL = "https://nft-cdn.alchemy.com/eth-mainnet/cached"
 
+	const cachedSize = int64(2850000)
+
 	testCases := []struct {
 		name              string
 		contentType       string
 		expectedURL       string
 		expectedMediaType string
+		expectedSize      int64
 	}{
 		{
 			name:              "carries the provider's content type for a video",
 			contentType:       "video/mp4",
 			expectedURL:       cachedURL,
 			expectedMediaType: "video/mp4",
+			expectedSize:      cachedSize,
 		},
 		{
 			name:              "carries the provider's content type for an animated image",
 			contentType:       "image/gif",
 			expectedURL:       cachedURL,
 			expectedMediaType: "image/gif",
+			expectedSize:      cachedSize,
 		},
 		{
 			// Alchemy fills cachedUrl for stills too, so the content type is the
@@ -397,12 +402,14 @@ func TestAssetAnimation(t *testing.T) {
 			contentType:       "image/png",
 			expectedURL:       "",
 			expectedMediaType: "",
+			expectedSize:      0,
 		},
 		{
 			name:              "reports no animation when the content type is missing",
 			contentType:       "",
 			expectedURL:       "",
 			expectedMediaType: "",
+			expectedSize:      0,
 		},
 	}
 
@@ -411,11 +418,15 @@ func TestAssetAnimation(t *testing.T) {
 			asset := Asset{Image: Image{
 				ContentType:        tc.contentType,
 				CachedAnimationURL: cachedURL,
+				Size:               cachedSize,
 			}}
 
-			url, mediaType := asset.animation()
+			url, mediaType, size := asset.animation()
 			assert.Equal(t, tc.expectedURL, url)
 			assert.Equal(t, tc.expectedMediaType, mediaType)
+			// image.size describes the cached asset, so it belongs to the
+			// animation slot only when the animation slot is filled.
+			assert.Equal(t, tc.expectedSize, size)
 		})
 	}
 }

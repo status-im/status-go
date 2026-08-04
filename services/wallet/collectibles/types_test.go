@@ -82,3 +82,115 @@ func TestFullCollectiblesToCommunityHeader(t *testing.T) {
 	communityHeaders := fullCollectiblesDataToCommunityHeader(collectibles)
 	require.Equal(t, 5, len(communityHeaders))
 }
+
+func sizedCollectible(imageSize, thumbnailSize, animationSize int64) thirdparty.FullCollectibleData {
+	c := getNonCommunityCollectible()
+	c.CollectibleData.ImageURL = "image"
+	c.CollectibleData.ThumbnailURL = "thumbnail"
+	c.CollectibleData.AnimationURL = "animation"
+	c.CollectibleData.AnimationMediaType = "video/mp4"
+	c.CollectibleData.ImageSize = imageSize
+	c.CollectibleData.ThumbnailSize = thumbnailSize
+	c.CollectibleData.AnimationSize = animationSize
+	return c
+}
+
+func TestApplyAssetSizeLimit(t *testing.T) {
+	const cap = 1000
+
+	testCases := []struct {
+		name              string
+		maxSize           int64
+		imageSize         int64
+		thumbnailSize     int64
+		animationSize     int64
+		expectedImage     string
+		expectedThumbnail string
+		expectedAnimation string
+	}{
+		{
+			name:              "no cap set leaves even an enormous asset alone",
+			maxSize:           0,
+			imageSize:         cap * 1000,
+			thumbnailSize:     cap * 1000,
+			animationSize:     cap * 1000,
+			expectedImage:     "image",
+			expectedThumbnail: "thumbnail",
+			expectedAnimation: "animation",
+		},
+		{
+			name:              "a size the provider did not report passes",
+			maxSize:           cap,
+			expectedImage:     "image",
+			expectedThumbnail: "thumbnail",
+			expectedAnimation: "animation",
+		},
+		{
+			name:              "an asset exactly at the cap is not over it",
+			maxSize:           cap,
+			imageSize:         cap,
+			thumbnailSize:     cap,
+			animationSize:     cap,
+			expectedImage:     "image",
+			expectedThumbnail: "thumbnail",
+			expectedAnimation: "animation",
+		},
+		{
+			name:              "an oversized animation leaves the still behind",
+			maxSize:           cap,
+			imageSize:         cap - 1,
+			thumbnailSize:     cap - 1,
+			animationSize:     cap + 1,
+			expectedImage:     "image",
+			expectedThumbnail: "thumbnail",
+			expectedAnimation: "",
+		},
+		{
+			name:              "an oversized image leaves the thumbnail behind",
+			maxSize:           cap,
+			imageSize:         cap + 1,
+			thumbnailSize:     cap - 1,
+			animationSize:     cap - 1,
+			expectedImage:     "",
+			expectedThumbnail: "thumbnail",
+			expectedAnimation: "animation",
+		},
+		{
+			name:              "nothing small enough leaves nothing at all",
+			maxSize:           cap,
+			imageSize:         cap + 1,
+			thumbnailSize:     cap + 1,
+			animationSize:     cap + 1,
+			expectedImage:     "",
+			expectedThumbnail: "",
+			expectedAnimation: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := []thirdparty.FullCollectibleData{
+				sizedCollectible(tc.imageSize, tc.thumbnailSize, tc.animationSize),
+			}
+
+			applyAssetSizeLimit(data, tc.maxSize)
+
+			c := data[0].CollectibleData
+			require.Equal(t, tc.expectedImage, c.ImageURL)
+			require.Equal(t, tc.expectedThumbnail, c.ThumbnailURL)
+			require.Equal(t, tc.expectedAnimation, c.AnimationURL)
+		})
+	}
+}
+
+// An animation URL and its media type are one fact: consumers read an empty URL
+// as "this collectible is still", and a media type left behind would contradict
+// that.
+func TestApplyAssetSizeLimitDropsTheAnimationMediaTypeWithTheURL(t *testing.T) {
+	data := []thirdparty.FullCollectibleData{sizedCollectible(0, 0, 2000)}
+
+	applyAssetSizeLimit(data, 1000)
+
+	require.Empty(t, data[0].CollectibleData.AnimationURL)
+	require.Empty(t, data[0].CollectibleData.AnimationMediaType)
+}

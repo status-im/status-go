@@ -105,6 +105,11 @@ type Service struct {
 
 	closeCh chan struct{}
 
+	// maxAssetSize is the largest asset, in bytes, we are willing to hand a
+	// client a URL for. Set by the client, read on every response, so it is
+	// atomic rather than guarded by the service's lifecycle.
+	maxAssetSize atomic.Int64
+
 	logger *zap.Logger
 }
 
@@ -344,6 +349,17 @@ func (s *Service) RefetchOwnedCollectibles() {
 	s.ownershipController.RefetchOwnedCollectibles()
 }
 
+// SetMaxAssetSize caps the size of a single collectible asset, in bytes, that
+// the client is willing to be handed a URL for. Zero or less lifts the cap.
+//
+// The client owns the number because it is the one paying for the download and
+// the one that can measure what it cost; status-go only knows the sizes the
+// providers reported. Applied on read, so a new value takes effect on the next
+// response without refetching anything.
+func (s *Service) SetMaxAssetSize(size int64) {
+	s.maxAssetSize.Store(size)
+}
+
 func (s *Service) Start(ctx context.Context) {
 	if s.closeCh != nil {
 		return
@@ -442,6 +458,9 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 		if err != nil {
 			return nil, err
 		}
+		// The one place every shape of collectible response passes through, so
+		// the cap is applied once rather than per shape.
+		applyAssetSizeLimit(collectibles, s.maxAssetSize.Load())
 		switch dataType {
 		case CollectibleDataTypeHeader:
 			return fullCollectiblesDataToHeaders(collectibles), nil

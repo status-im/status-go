@@ -253,6 +253,9 @@ type Content struct {
 	Representation string `json:"representation"`
 	MimeType       string `json:"mimeType"`
 	Available      bool   `json:"available"`
+	// Size is the size in bytes of this representation. Rarible reports it per
+	// representation, so every URL we pick from here comes with its own.
+	Size int64 `json:"size"`
 }
 
 type ContractOwnershipContainer struct {
@@ -446,32 +449,42 @@ var thumbnailRepresentations = []string{"PREVIEW", "PORTRAIT"}
 // do not qualify: they are the full-size asset, and an empty thumbnail tells
 // the client to fall back to the image URL rather than pretending a preview
 // exists.
-func getThumbnailURL(contents []Content) string {
+func getThumbnail(contents []Content) Content {
 	for _, representation := range thumbnailRepresentations {
 		for _, content := range contents {
 			if content.Type == "IMAGE" && content.Representation == representation {
-				return content.URL
+				return content
 			}
 		}
 	}
 
-	return ""
+	return Content{}
 }
 
-func getImageURL(contents []Content) string {
+func getThumbnailURL(contents []Content) string {
+	return getThumbnail(contents).URL
+}
+
+func getImage(contents []Content) Content {
 	// Get the biggest content of type "IMAGE", excluding the "ORIGINAL" representation
-	ret := getBiggestContentURL(contents, "IMAGE", false)
+	ret := getBiggestContent(contents, "IMAGE", false)
 
 	// If empty, allow the "ORIGINAL" representation
-	if ret == "" {
-		ret = getBiggestContentURL(contents, "IMAGE", true)
+	if ret.URL == "" {
+		ret = getBiggestContent(contents, "IMAGE", true)
 	}
 
 	return ret
 }
 
+func getImageURL(contents []Content) string {
+	return getImage(contents).URL
+}
+
 func (c *Collectible) toCollectibleData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	animation := getAnimation(c.Metadata.Contents)
+	image := getImage(c.Metadata.Contents)
+	thumbnail := getThumbnail(c.Metadata.Contents)
 
 	return thirdparty.CollectibleData{
 		ID:                 id,
@@ -480,10 +493,13 @@ func (c *Collectible) toCollectibleData(id thirdparty.CollectibleUniqueID) third
 		Name:               c.Metadata.Name,
 		Description:        c.Metadata.Description,
 		Permalink:          c.Metadata.ExternalURI,
-		ImageURL:           getImageURL(c.Metadata.Contents),
-		ThumbnailURL:       getThumbnailURL(c.Metadata.Contents),
+		ImageURL:           image.URL,
+		ImageSize:          image.Size,
+		ThumbnailURL:       thumbnail.URL,
+		ThumbnailSize:      thumbnail.Size,
 		AnimationURL:       animation.URL,
 		AnimationMediaType: animation.MimeType,
+		AnimationSize:      animation.Size,
 		Traits:             raribleToCollectibleTraits(c.Metadata.Attributes),
 		TokenURI:           c.Metadata.OriginalMetaURI,
 	}

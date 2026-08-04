@@ -99,6 +99,45 @@ func getContractType(c *thirdparty.FullCollectibleData) w_common.ContractType {
 	return w_common.ContractTypeUnknown
 }
 
+// applyAssetSizeLimit drops the URL of every asset a provider reported as
+// larger than maxSize, in place, before the data reaches a client.
+//
+// Dropping rather than flagging is what keeps this free of client work: an
+// empty animation URL already means "this collectible is still", and an empty
+// image URL already means "fall back to the thumbnail", so an oversized asset
+// degrades down the chain consumers already walk and ends at the placeholder
+// they already show. The cost is that there is no way to ask for it anyway —
+// a client never learns the URL existed.
+//
+// A size of zero means the provider did not report one, which is the common
+// case rather than a suspicious one: Alchemy sizes the asset it cached but not
+// the renders it derives on delivery. Those pass. So does everything when
+// maxSize is not set, which is how a client that has not asked for a cap gets
+// today's behaviour.
+func applyAssetSizeLimit(data []thirdparty.FullCollectibleData, maxSize int64) {
+	if maxSize <= 0 {
+		return
+	}
+
+	for i := range data {
+		c := &data[i].CollectibleData
+
+		if c.AnimationSize > maxSize {
+			c.AnimationURL = ""
+			c.AnimationMediaType = ""
+			c.AnimationSize = 0
+		}
+		if c.ImageSize > maxSize {
+			c.ImageURL = ""
+			c.ImageSize = 0
+		}
+		if c.ThumbnailSize > maxSize {
+			c.ThumbnailURL = ""
+			c.ThumbnailSize = 0
+		}
+	}
+}
+
 func fullCollectibleDataToHeader(c *thirdparty.FullCollectibleData) Collectible {
 	ret := Collectible{
 		DataType:     CollectibleDataTypeHeader,

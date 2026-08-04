@@ -42,9 +42,12 @@ func NewCollectibleDataDB(sqlDb *sql.DB) *CollectibleDataDB {
 // only reported for media that can actually move.
 // 2: the animation media type comes from the provider rather than from a HEAD
 // request against the animation URL, and the two can disagree.
-const collectibleMetadataVersion = 2
+// 3: rows carry the size the provider reported for each media URL. Older rows
+// have no size, which reads as "the provider did not say" and lets the asset
+// past the size cap, so they have to be refetched rather than trusted.
+const collectibleMetadataVersion = 3
 
-const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, thumbnail_url, image_payload, animation_url, animation_media_type, background_color, token_uri, community_id, soulbound"
+const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, thumbnail_url, image_size, thumbnail_size, animation_size, image_payload, animation_url, animation_media_type, background_color, token_uri, community_id, soulbound"
 
 // metadata_version is written on every insert and read only when deciding what
 // needs refetching. It describes the cache rather than the collectible, so it
@@ -168,6 +171,9 @@ func setCollectiblesData(creator sqlite.StatementCreator, collectibles []thirdpa
 			c.Permalink,
 			c.ImageURL,
 			c.ThumbnailURL,
+			c.ImageSize,
+			c.ThumbnailSize,
+			c.AnimationSize,
 			c.ImagePayload,
 			c.AnimationURL,
 			c.AnimationMediaType,
@@ -246,6 +252,9 @@ func scanCollectiblesDataRow(row *sql.Row) (*thirdparty.CollectibleData, error) 
 		&c.Permalink,
 		&c.ImageURL,
 		&c.ThumbnailURL,
+		&c.ImageSize,
+		&c.ThumbnailSize,
+		&c.AnimationSize,
 		&c.ImagePayload,
 		&c.AnimationURL,
 		&c.AnimationMediaType,

@@ -55,13 +55,15 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 						Int: expectedTokenID0,
 					},
 				},
-				ContractType: w_common.ContractTypeUnknown,
-				Provider:     "rarible",
-				Name:         "Rariversary #002",
-				Description:  "Today marks your Second Rariversary! Can you believe it’s already been two years? Time flies when you’re having fun! Thank you for everything you contribute!",
-				Permalink:    "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729416",
-				ImageURL:     "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s1000",
-				ThumbnailURL: "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s250",
+				ContractType:  w_common.ContractTypeUnknown,
+				Provider:      "rarible",
+				Name:          "Rariversary #002",
+				Description:   "Today marks your Second Rariversary! Can you believe it’s already been two years? Time flies when you’re having fun! Thank you for everything you contribute!",
+				Permalink:     "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729416",
+				ImageURL:      "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s1000",
+				ThumbnailURL:  "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s250",
+				ImageSize:     1216435,
+				ThumbnailSize: 96841,
 				Traits: []thirdparty.CollectibleTrait{
 					{
 						TraitType: "Theme",
@@ -90,13 +92,15 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 						Int: expectedTokenID1,
 					},
 				},
-				ContractType: w_common.ContractTypeUnknown,
-				Provider:     "rarible",
-				Name:         "Rariversary #003",
-				Description:  "Today marks your Third Rariversary! Can you believe it’s already been three years? Time flies when you’re having fun! We’ve loved working with you these years and can’t wait to see what the next few years bring. Thank you for everything you contribute!",
-				Permalink:    "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729414",
-				ImageURL:     "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s1000",
-				ThumbnailURL: "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s250",
+				ContractType:  w_common.ContractTypeUnknown,
+				Provider:      "rarible",
+				Name:          "Rariversary #003",
+				Description:   "Today marks your Third Rariversary! Can you believe it’s already been three years? Time flies when you’re having fun! We’ve loved working with you these years and can’t wait to see what the next few years bring. Thank you for everything you contribute!",
+				Permalink:     "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729414",
+				ImageURL:      "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s1000",
+				ThumbnailURL:  "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s250",
+				ImageSize:     988277,
+				ThumbnailSize: 68280,
 				Traits: []thirdparty.CollectibleTrait{
 					{
 						TraitType: "Theme",
@@ -242,4 +246,40 @@ func TestGetAnimation(t *testing.T) {
 			assert.Equal(t, tc.expectedMediaType, animation.MimeType)
 		})
 	}
+}
+
+// Rarible reports a size per representation, so whichever one a pick lands on
+// has to bring its own size along - the picks are what the size cap reads.
+func TestCollectibleDataCarriesSizePerRepresentation(t *testing.T) {
+	preview := Content{Type: "IMAGE", URL: "preview", Representation: "PREVIEW", MimeType: "image/png", Size: 9000}
+	big := Content{Type: "IMAGE", URL: "big", Representation: "BIG", MimeType: "image/png", Size: 43000}
+	animation := Content{Type: "VIDEO", URL: "animation", Representation: "ORIGINAL", MimeType: "video/mp4", Size: 2850000}
+
+	collectible := Collectible{}
+	collectible.Metadata.Contents = []Content{preview, big, animation}
+
+	data := collectible.toCollectibleData(thirdparty.CollectibleUniqueID{})
+
+	assert.Equal(t, "big", data.ImageURL)
+	assert.Equal(t, int64(43000), data.ImageSize)
+	assert.Equal(t, "preview", data.ThumbnailURL)
+	assert.Equal(t, int64(9000), data.ThumbnailSize)
+	assert.Equal(t, "animation", data.AnimationURL)
+	assert.Equal(t, int64(2850000), data.AnimationSize)
+}
+
+// A representation Rarible did not size must not read as "zero bytes", which is
+// how an absent size is spelled everywhere downstream.
+func TestCollectibleDataLeavesAnUnreportedSizeAtZero(t *testing.T) {
+	image := Content{Type: "IMAGE", URL: "image", Representation: "BIG", MimeType: "image/png"}
+
+	collectible := Collectible{}
+	collectible.Metadata.Contents = []Content{image}
+
+	data := collectible.toCollectibleData(thirdparty.CollectibleUniqueID{})
+
+	assert.Equal(t, "image", data.ImageURL)
+	assert.Zero(t, data.ImageSize)
+	assert.Empty(t, data.ThumbnailURL)
+	assert.Zero(t, data.ThumbnailSize)
 }
