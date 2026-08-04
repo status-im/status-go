@@ -116,6 +116,50 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	s.Require().Equal(uint64(1), count)
 }
 
+func (s *ActivityCenterPersistenceTestSuite) TestDeleteActivityCenterNotificationsByChatID() {
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("deleted-channel", &testTimeSource{})
+	err = p.SaveChat(*chat)
+	s.Require().NoError(err)
+
+	otherChat := CreatePublicChat("remaining-channel", &testTimeSource{})
+	err = p.SaveChat(*otherChat)
+	s.Require().NoError(err)
+
+	notifications := s.createNotifications(p, []*ActivityCenterNotification{
+		{ChatID: chat.ID, Type: ActivityCenterNotificationTypeMention},
+		{ChatID: chat.ID, Type: ActivityCenterNotificationTypeReply},
+		{ChatID: otherChat.ID, Type: ActivityCenterNotificationTypeMention},
+	})
+
+	updatedAt := currentMilliseconds() + 1
+	deletedNotifications, err := p.DeleteActivityCenterNotificationsByChatID(chat.ID, updatedAt)
+	s.Require().NoError(err)
+	s.Require().Len(deletedNotifications, 2)
+	for _, notification := range deletedNotifications {
+		s.Require().Equal(chat.ID, notification.ChatID)
+		s.Require().True(notification.Deleted)
+		s.Require().Equal(updatedAt, notification.UpdatedAt)
+	}
+
+	for _, notification := range notifications[:2] {
+		persistedNotification, err := p.GetActivityCenterNotificationByID(notification.ID)
+		s.Require().NoError(err)
+		s.Require().True(persistedNotification.Deleted)
+	}
+
+	persistedNotification, err := p.GetActivityCenterNotificationByID(notifications[2].ID)
+	s.Require().NoError(err)
+	s.Require().False(persistedNotification.Deleted)
+
+	count, err := p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(1), count)
+}
+
 func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificationsForMessage() {
 	db, err := openTestDB()
 	s.Require().NoError(err)

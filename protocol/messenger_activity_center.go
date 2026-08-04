@@ -250,6 +250,36 @@ func (m *Messenger) MarkActivityCenterNotificationsDeleted(ctx context.Context, 
 	return response, nil
 }
 
+func (m *Messenger) deleteActivityCenterNotificationsByChatID(ctx context.Context, chatID string) (*MessengerResponse, error) {
+	updatedAt := m.GetCurrentTimeInMillis()
+	notifications, err := m.persistence.DeleteActivityCenterNotificationsByChatID(chatID, updatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddActivityCenterNotifications(notifications)
+	state, err := m.persistence.GetActivityCenterState()
+	if err != nil {
+		return nil, err
+	}
+	response.SetActivityCenterState(state)
+
+	if len(notifications) == 0 {
+		return response, nil
+	}
+
+	ids := make([]types.HexBytes, 0, len(notifications))
+	for _, notification := range notifications {
+		ids = append(ids, notification.ID)
+	}
+	if err = m.syncActivityCenterDeletedByIDs(ctx, ids, updatedAt); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (m *Messenger) AddActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification, syncAction func(context.Context, []types.HexBytes, uint64) error) error {
 	return m.addActivityCenterNotification(response, notification, syncAction)
 }

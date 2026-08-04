@@ -869,6 +869,45 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsDeleted(ids []types.H
 	return notifications, updateActivityCenterState(tx, updatedAt)
 }
 
+func (db sqlitePersistence) DeleteActivityCenterNotificationsByChatID(chatID string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.Query(fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE chat_id = ? AND NOT deleted`,
+		allFieldsForTableActivityCenterNotification), chatID)
+	if err != nil {
+		return nil, err
+	}
+	notifications, err := db.parseRowFromTableActivityCenterNotification(rows, func(notification *ActivityCenterNotification) {
+		notification.Deleted = true
+		notification.UpdatedAt = updatedAt
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(`UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE chat_id = ? AND NOT deleted`, updatedAt, chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = updateActivityCenterState(tx, updatedAt)
+	return notifications, err
+}
+
 func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBytes, updatedAt uint64) error {
 	if len(ids) == 0 {
 		return nil
