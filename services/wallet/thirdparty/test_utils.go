@@ -43,6 +43,11 @@ func GenerateTestCollectiblesData(count int) (result []CollectibleData) {
 			ImagePayload:       []byte(fmt.Sprintf("imagepayload-%d", i)),
 			AnimationURL:       fmt.Sprintf("animationurl-%d", i),
 			AnimationMediaType: fmt.Sprintf("animationmediatype-%d", i),
+			// Distinct and non-zero so a round trip that mixed the three up, or
+			// dropped them, cannot pass.
+			ImageSize:     int64(i+1) * 100,
+			ThumbnailSize: int64(i+1) * 10,
+			AnimationSize: int64(i+1) * 1000,
 			Traits: []CollectibleTrait{
 				{
 					TraitType:   fmt.Sprintf("traittype-%d", i),

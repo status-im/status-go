@@ -278,6 +278,19 @@ func (api *API) GetCollectiblesByUniqueIDAsync(requestID int32, uniqueIDs []thir
 	return nil
 }
 
+// SetMaxCollectibleAssetSize caps the size in bytes of a single collectible
+// asset the client is willing to be handed a URL for; zero or less lifts the
+// cap. Deliberately its own call rather than a parameter on the two fetches
+// above: those are hot, positional, and called from several places, so a client
+// and a backend that disagree about the cap should end up with the cap not
+// applied rather than with collectibles that do not load at all.
+func (api *API) SetMaxCollectibleAssetSize(size int64) error {
+	logutils.ZapLogger().Debug("wallet.api.SetMaxCollectibleAssetSize", zap.Int64("size", size))
+
+	api.s.collectibles.SetMaxAssetSize(size)
+	return nil
+}
+
 func (api *API) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
 	logutils.ZapLogger().Debug("wallet.api.FetchCollectionSocialsAsync", zap.Any("contractID", contractID))
 

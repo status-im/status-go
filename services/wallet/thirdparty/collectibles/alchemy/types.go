@@ -135,6 +135,10 @@ type Image struct {
 	ThumbnailURL         string `json:"thumbnailUrl"`
 	CachedAnimationURL   string `json:"cachedUrl"`
 	OriginalAnimationURL string `json:"originalUrl"`
+	// Size is the size in bytes of the asset behind CachedAnimationURL. The
+	// provider says nothing about the size of pngUrl or thumbnailUrl, which are
+	// renders it derives on delivery.
+	Size int64 `json:"size"`
 }
 
 type Asset struct {
@@ -230,18 +234,20 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 // The media type travels with the URL because the provider has already told us
 // what it is. Returning only the URL would send the consumer off to fetch the
 // headers of an asset we classified from this very field.
-func (c *Asset) animation() (url string, mediaType string) {
+// The size comes back with them for the same reason: image.size describes the
+// cached asset, so it is the animation's size whenever there is an animation.
+func (c *Asset) animation() (url string, mediaType string, size int64) {
 	if !thirdparty.IsAnimatedMediaType(c.Image.ContentType) {
-		return "", ""
+		return "", "", 0
 	}
 
-	return c.Image.CachedAnimationURL, c.Image.ContentType
+	return c.Image.CachedAnimationURL, c.Image.ContentType, c.Image.Size
 }
 
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	rawMetadata := c.Raw.RawMetadata.(RawMetadata)
 
-	animationURL, animationMediaType := c.animation()
+	animationURL, animationMediaType, animationSize := c.animation()
 
 	return thirdparty.CollectibleData{
 		ID:                 id,
@@ -253,6 +259,7 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 		ThumbnailURL:       c.Image.ThumbnailURL,
 		AnimationURL:       animationURL,
 		AnimationMediaType: animationMediaType,
+		AnimationSize:      animationSize,
 		Traits:             alchemyToCollectibleTraits(rawMetadata.Attributes),
 		TokenURI:           c.TokenURI,
 	}
