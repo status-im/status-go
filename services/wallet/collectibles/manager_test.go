@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -184,7 +183,7 @@ func TestManager_FillAnimationMediatype(t *testing.T) {
 		requests.Store(0)
 		asset := assetWith(server.URL, "video/mp4")
 
-		require.NoError(t, manager.fillAnimationMediatype(context.Background(), asset))
+		manager.fillAnimationMediatype(context.Background(), asset)
 
 		assert.Equal(t, "video/mp4", asset.CollectibleData.AnimationMediaType)
 		assert.Equal(t, server.URL, asset.CollectibleData.AnimationURL)
@@ -195,7 +194,7 @@ func TestManager_FillAnimationMediatype(t *testing.T) {
 		requests.Store(0)
 		asset := assetWith(server.URL, "")
 
-		require.NoError(t, manager.fillAnimationMediatype(context.Background(), asset))
+		manager.fillAnimationMediatype(context.Background(), asset)
 
 		assert.Equal(t, "video/webm", asset.CollectibleData.AnimationMediaType)
 		assert.Equal(t, server.URL, asset.CollectibleData.AnimationURL)
@@ -206,7 +205,7 @@ func TestManager_FillAnimationMediatype(t *testing.T) {
 		requests.Store(0)
 		asset := assetWith("", "")
 
-		require.NoError(t, manager.fillAnimationMediatype(context.Background(), asset))
+		manager.fillAnimationMediatype(context.Background(), asset)
 
 		assert.Zero(t, requests.Load())
 	})
@@ -214,7 +213,7 @@ func TestManager_FillAnimationMediatype(t *testing.T) {
 	t.Run("drops an animation whose media type cannot be resolved", func(t *testing.T) {
 		asset := assetWith(unreachableURL, "")
 
-		require.NoError(t, manager.fillAnimationMediatype(context.Background(), asset))
+		manager.fillAnimationMediatype(context.Background(), asset)
 
 		assert.Empty(t, asset.CollectibleData.AnimationURL)
 		assert.Empty(t, asset.CollectibleData.AnimationMediaType)
