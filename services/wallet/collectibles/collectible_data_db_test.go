@@ -40,9 +40,9 @@ func TestUpdateCollectiblesData(t *testing.T) {
 	}
 
 	// Check for missing IDs
-	idsNotInDB, err := db.GetIDsNotInDB(ids)
+	idsNeedingFetch, err := db.GetIDsNeedingFetch(ids)
 	require.NoError(t, err)
-	require.Empty(t, idsNotInDB)
+	require.Empty(t, idsNeedingFetch)
 
 	extraID0 := thirdparty.CollectibleUniqueID{
 		ContractID: thirdparty.ContractID{
@@ -60,14 +60,14 @@ func TestUpdateCollectiblesData(t *testing.T) {
 	}
 	extraIds := []thirdparty.CollectibleUniqueID{extraID0, extraID1}
 
-	idsNotInDB, err = db.GetIDsNotInDB(extraIds)
+	idsNeedingFetch, err = db.GetIDsNeedingFetch(extraIds)
 	require.NoError(t, err)
-	require.ElementsMatch(t, extraIds, idsNotInDB)
+	require.ElementsMatch(t, extraIds, idsNeedingFetch)
 
 	combinedIds := append(ids, extraIds...)
-	idsNotInDB, err = db.GetIDsNotInDB(combinedIds)
+	idsNeedingFetch, err = db.GetIDsNeedingFetch(combinedIds)
 	require.NoError(t, err)
-	require.ElementsMatch(t, extraIds, idsNotInDB)
+	require.ElementsMatch(t, extraIds, idsNeedingFetch)
 
 	// Check for loaded data
 	loadedMap, err := db.GetData(ids)
@@ -110,6 +110,42 @@ func TestUpdateCollectiblesData(t *testing.T) {
 
 	require.Equal(t, c0, loadedMap[c0.ID.HashKey()])
 	require.Equal(t, c1, loadedMap[c1.ID.HashKey()])
+}
+
+func TestCollectiblesCachedByOlderMappingAreRefetched(t *testing.T) {
+	db, cleanDB := setupCollectibleDataDBTest(t)
+	defer cleanDB()
+
+	data := thirdparty.GenerateTestCollectiblesData(3)
+	require.NoError(t, db.SetData(data, true))
+
+	ids := make([]thirdparty.CollectibleUniqueID, 0, len(data))
+	for _, collectible := range data {
+		ids = append(ids, collectible.ID)
+	}
+
+	// Rows just written by the current mapping need nothing.
+	needingFetch, err := db.GetIDsNeedingFetch(ids)
+	require.NoError(t, err)
+	require.Empty(t, needingFetch)
+
+	// Rows left behind by an older mapping - the state every cached row is in
+	// right after a migration adds a field - must be refetched even though they
+	// are present.
+	_, err = db.db.Exec(`UPDATE collectible_data_cache SET metadata_version = ?`, collectibleMetadataVersion-1)
+	require.NoError(t, err)
+
+	needingFetch, err = db.GetIDsNeedingFetch(ids)
+	require.NoError(t, err)
+	require.ElementsMatch(t, ids, needingFetch)
+
+	// Writing without allowUpdate still records that the mapping ran, so a
+	// collectible whose data cannot be improved is not refetched on every read.
+	require.NoError(t, db.SetData(data, false))
+
+	needingFetch, err = db.GetIDsNeedingFetch(ids)
+	require.NoError(t, err)
+	require.Empty(t, needingFetch)
 }
 
 func TestUpdateCommunityData(t *testing.T) {

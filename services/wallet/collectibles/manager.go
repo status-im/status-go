@@ -448,7 +448,7 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueID
 }
 
 func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID, asyncFetch bool) error {
-	missingIDs, err := o.collectiblesDataDB.GetIDsNotInDB(uniqueIDs)
+	missingIDs, err := o.collectiblesDataDB.GetIDsNeedingFetch(uniqueIDs)
 	if err != nil {
 		return err
 	}
