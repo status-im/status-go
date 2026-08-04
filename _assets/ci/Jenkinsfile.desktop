@@ -59,6 +59,8 @@ pipeline {
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
+    /* nim-sds source directory */
+    NIM_SDS_SOURCE_DIR = "${env.WORKSPACE_TMP}/nim-sds"
   }
 
   stages {
