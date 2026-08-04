@@ -368,3 +368,54 @@ func TestFetchOwnedAssetsRespectsContextCancellation(t *testing.T) {
 	)
 	require.Error(t, err)
 }
+
+func TestAssetAnimation(t *testing.T) {
+	const cachedURL = "https://nft-cdn.alchemy.com/eth-mainnet/cached"
+
+	testCases := []struct {
+		name              string
+		contentType       string
+		expectedURL       string
+		expectedMediaType string
+	}{
+		{
+			name:              "carries the provider's content type for a video",
+			contentType:       "video/mp4",
+			expectedURL:       cachedURL,
+			expectedMediaType: "video/mp4",
+		},
+		{
+			name:              "carries the provider's content type for an animated image",
+			contentType:       "image/gif",
+			expectedURL:       cachedURL,
+			expectedMediaType: "image/gif",
+		},
+		{
+			// Alchemy fills cachedUrl for stills too, so the content type is the
+			// only thing keeping the full-size asset out of the animation slot.
+			name:              "reports no animation for a still image",
+			contentType:       "image/png",
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+		{
+			name:              "reports no animation when the content type is missing",
+			contentType:       "",
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asset := Asset{Image: Image{
+				ContentType:        tc.contentType,
+				CachedAnimationURL: cachedURL,
+			}}
+
+			url, mediaType := asset.animation()
+			assert.Equal(t, tc.expectedURL, url)
+			assert.Equal(t, tc.expectedMediaType, mediaType)
+		})
+	}
+}

@@ -175,3 +175,71 @@ func TestGetThumbnailURL(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAnimation(t *testing.T) {
+	video := Content{Type: "VIDEO", URL: "video", Representation: "ORIGINAL", MimeType: "video/mp4"}
+	videoNoMime := Content{Type: "VIDEO", URL: "video", Representation: "ORIGINAL"}
+	gif := Content{Type: "IMAGE", URL: "gif", Representation: "ORIGINAL", MimeType: "image/gif"}
+	still := Content{Type: "IMAGE", URL: "still", Representation: "ORIGINAL", MimeType: "image/png"}
+	stillNoMime := Content{Type: "IMAGE", URL: "still", Representation: "ORIGINAL"}
+
+	testCases := []struct {
+		name              string
+		contents          []Content
+		expectedURL       string
+		expectedMediaType string
+	}{
+		{
+			name:              "carries the mime type of the video it picked",
+			contents:          []Content{still, video},
+			expectedURL:       "video",
+			expectedMediaType: "video/mp4",
+		},
+		{
+			name:              "carries the mime type of an animated image",
+			contents:          []Content{still, gif},
+			expectedURL:       "gif",
+			expectedMediaType: "image/gif",
+		},
+		{
+			name:              "prefers video over an animated image",
+			contents:          []Content{gif, video},
+			expectedURL:       "video",
+			expectedMediaType: "video/mp4",
+		},
+		{
+			name:              "reports no animation for a still image",
+			contents:          []Content{still},
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+		{
+			name:              "reports no animation when the mime type is unknown",
+			contents:          []Content{stillNoMime},
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+		{
+			// The consumer falls back to resolving the media type itself, so the
+			// video is still offered rather than dropped.
+			name:              "offers a video whose mime type the provider omitted",
+			contents:          []Content{videoNoMime},
+			expectedURL:       "video",
+			expectedMediaType: "",
+		},
+		{
+			name:              "handles an item with no content at all",
+			contents:          []Content{},
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			animation := getAnimation(tc.contents)
+			assert.Equal(t, tc.expectedURL, animation.URL)
+			assert.Equal(t, tc.expectedMediaType, animation.MimeType)
+		})
+	}
+}

@@ -907,14 +907,28 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 	}()
 }
 
+// fillAnimationMediatype resolves the media type of an animation the provider
+// did not describe. Both providers do describe it - Alchemy in image.contentType,
+// Rarible in the content's mimeType - and they classify the asset from that same
+// field before offering it as an animation at all, so asking the network again
+// for what we were just told costs one serial round trip per collectible and
+// answers nothing new.
+//
+// The request stays as a fallback because a provider is free to hand back an
+// animation with no media type, and because it doubles as a reachability check:
+// an animation we cannot fetch the headers of is dropped rather than handed to
+// the client to fail on.
 func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
-	if len(asset.CollectibleData.AnimationURL) > 0 {
-		contentType, err := o.doContentTypeRequest(ctx, asset.CollectibleData.AnimationURL)
-		if err != nil {
-			asset.CollectibleData.AnimationURL = ""
-		}
-		asset.CollectibleData.AnimationMediaType = contentType
+	if len(asset.CollectibleData.AnimationURL) == 0 || len(asset.CollectibleData.AnimationMediaType) > 0 {
+		return nil
 	}
+
+	contentType, err := o.doContentTypeRequest(ctx, asset.CollectibleData.AnimationURL)
+	if err != nil {
+		asset.CollectibleData.AnimationURL = ""
+	}
+	asset.CollectibleData.AnimationMediaType = contentType
+
 	return nil
 }
 

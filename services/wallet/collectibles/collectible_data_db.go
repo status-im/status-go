@@ -40,7 +40,9 @@ func NewCollectibleDataDB(sqlDb *sql.DB) *CollectibleDataDB {
 //
 // 1: collectibles carry the provider's own thumbnail, and an animation URL is
 // only reported for media that can actually move.
-const collectibleMetadataVersion = 1
+// 2: the animation media type comes from the provider rather than from a HEAD
+// request against the animation URL, and the two can disagree.
+const collectibleMetadataVersion = 2
 
 const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, thumbnail_url, image_payload, animation_url, animation_media_type, background_color, token_uri, community_id, soulbound"
 
