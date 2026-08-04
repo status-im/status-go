@@ -222,32 +222,39 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 	return ret
 }
 
-// animationURL returns the cached asset only when it can actually move.
-// Alchemy fills cachedUrl for still collectibles as well, so passing it on
-// unconditionally makes every still NFT look animated and costs consumers a
-// full-size download for nothing.
-func (c *Asset) animationURL() string {
+// animation returns the cached asset and its media type, but only when the asset
+// can actually move. Alchemy fills cachedUrl for still collectibles as well, so
+// passing it on unconditionally makes every still NFT look animated and costs
+// consumers a full-size download for nothing.
+//
+// The media type travels with the URL because the provider has already told us
+// what it is. Returning only the URL would send the consumer off to fetch the
+// headers of an asset we classified from this very field.
+func (c *Asset) animation() (url string, mediaType string) {
 	if !thirdparty.IsAnimatedMediaType(c.Image.ContentType) {
-		return ""
+		return "", ""
 	}
 
-	return c.Image.CachedAnimationURL
+	return c.Image.CachedAnimationURL, c.Image.ContentType
 }
 
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	rawMetadata := c.Raw.RawMetadata.(RawMetadata)
 
+	animationURL, animationMediaType := c.animation()
+
 	return thirdparty.CollectibleData{
-		ID:           id,
-		ContractType: alchemyToContractType(c.Contract.TokenType),
-		Provider:     AlchemyID,
-		Name:         c.Name,
-		Description:  c.Description,
-		ImageURL:     c.Image.ImageURL,
-		ThumbnailURL: c.Image.ThumbnailURL,
-		AnimationURL: c.animationURL(),
-		Traits:       alchemyToCollectibleTraits(rawMetadata.Attributes),
-		TokenURI:     c.TokenURI,
+		ID:                 id,
+		ContractType:       alchemyToContractType(c.Contract.TokenType),
+		Provider:           AlchemyID,
+		Name:               c.Name,
+		Description:        c.Description,
+		ImageURL:           c.Image.ImageURL,
+		ThumbnailURL:       c.Image.ThumbnailURL,
+		AnimationURL:       animationURL,
+		AnimationMediaType: animationMediaType,
+		Traits:             alchemyToCollectibleTraits(rawMetadata.Attributes),
+		TokenURI:           c.TokenURI,
 	}
 }
 
