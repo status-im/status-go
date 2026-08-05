@@ -141,8 +141,8 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 }
 
 // startHistoryCursorMonitor advances initialized topic cursors while
-// a foreground full node has a healthy relay mesh. This records reliable live
-// delivery without issuing store queries and bounds catch-up after a crash.
+// a full node has a healthy relay mesh. This records reliable live delivery
+// without issuing store queries and bounds catch-up after a crash.
 func (m *Messenger) startHistoryCursorMonitor() {
 	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
 		return
@@ -160,14 +160,12 @@ func (m *Messenger) startHistoryCursorMonitor() {
 			case <-m.quit:
 				return
 			case <-ticker.C:
-				if !m.isPaused() {
-					// Stay one tolerance window behind the observation so a
-					// concurrent reliability transition cannot advance a cursor
-					// into the newly unreliable interval.
-					m.advanceHistoryCursors(
-						m.historicSyncNow().Add(-time.Duration(tolerance) * time.Second),
-					)
-				}
+				// Stay one tolerance window behind the observation so a
+				// concurrent reliability transition cannot advance a cursor
+				// into the newly unreliable interval.
+				m.advanceHistoryCursors(
+					m.historicSyncNow().Add(-time.Duration(tolerance) * time.Second),
+				)
 			}
 		}
 	}()
@@ -303,6 +301,11 @@ func (m *Messenger) startHistoricSyncWorker() {
 				deadline := time.Now().Add(historicSyncRetryTimeout)
 				deferred := false
 				for {
+					if m.isPaused() {
+						m.requeueHistoricSync(request)
+						deferred = true
+						break
+					}
 					lastAttempt = time.Now()
 					executed, err := m.runAutomaticHistoricSync(request)
 					if err == nil && executed {

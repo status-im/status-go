@@ -154,7 +154,6 @@ type Messenger struct {
 	historicSyncWorkerActive atomic.Bool
 	// historicSyncTrigger wakes the worker after pending work is added.
 	historicSyncTrigger  chan struct{}
-	historyPausedAt      atomic.Int64
 	ratchetNotFoundDelay time.Duration
 
 	connectionState       connection.State
@@ -562,7 +561,6 @@ func (m *Messenger) SetPaused(paused bool) {
 	wasPaused := m.paused.Swap(paused)
 	if paused && !wasPaused {
 		m.advanceHistoryCursors(now)
-		m.historyPausedAt.Store(now.Unix())
 	}
 	if m.ensVerifier != nil {
 		m.ensVerifier.SetPaused(paused)
@@ -588,12 +586,8 @@ func (m *Messenger) SetPaused(paused bool) {
 		if m.httpServer != nil {
 			m.httpServer.ToForeground()
 		}
-		if m.started && wasPaused {
-			pausedAt := m.historyPausedAt.Swap(0)
-			from := time.Unix(pausedAt, 0)
-			if pausedAt > 0 && from.Before(now) {
-				m.asyncRequestHistoricMessages(types2.HistoryReconcileWindow{From: from, To: now})
-			}
+		if wasPaused {
+			m.notifyHistoricSyncWorker()
 		}
 	} else if m.httpServer != nil {
 		m.httpServer.ToBackground()

@@ -240,6 +240,9 @@ func (m *Messenger) requestAllHistoricMessages(aggregateResponses bool) (*Messen
 }
 
 func (m *Messenger) runAutomaticHistoricSync(request historicSyncRequest) (bool, error) {
+	if m.isPaused() {
+		return false, nil
+	}
 	_, executed, err := m.requestAllHistoricMessagesWithOptions(false, syncFiltersOptions{
 		Window: &types2.HistoryReconcileWindow{From: request.From, To: request.To},
 	})
