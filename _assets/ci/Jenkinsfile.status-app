@@ -53,30 +53,12 @@ pipeline {
           stages {
             stage('Package') {
               steps { script {
-                linux_x86_64 = build(
-                  job:        'status-app/systems/linux/x86_64/package',
-                  parameters: jenkins.mapToParams([
-                    BRANCH:        env.STATUS_APP_BRANCH,
-                    STATUS_GO_REF: env.STATUS_GO_REF,
-                  ]),
-                  wait:       true,
-                  propagate:  true,
-                )
+                linux_x86_64 = triggerJob('linux', 'x86_64')
               } }
             }
-            /* Only reached if the Linux package build above succeeded. */
             stage('E2E') {
               steps { script {
-                build(
-                  job:        'status-app/systems/linux/x86_64/tests-e2e',
-                  parameters: jenkins.mapToParams([
-                    BRANCH:          env.STATUS_APP_BRANCH,
-                    BUILD_SOURCE:    linux_x86_64.fullProjectName,
-                    TEST_SCOPE_FLAG: '-m=critical',
-                  ]),
-                  wait:       true,
-                  propagate:  true,
-                )
+                triggerE2E('linux', 'x86_64', linux_x86_64.fullProjectName)
               } }
             }
           }
@@ -85,71 +67,29 @@ pipeline {
           stages {
             stage('Package') {
               steps { script {
-                windows_x86_64 = build(
-                  job:        'status-app/systems/windows/x86_64/package',
-                  parameters: jenkins.mapToParams([
-                    BRANCH:        env.STATUS_APP_BRANCH,
-                    STATUS_GO_REF: env.STATUS_GO_REF,
-                  ]),
-                  wait:       true,
-                  propagate:  true,
-                )
+                windows_x86_64 = triggerJob('windows', 'x86_64')
               } }
             }
-            /* Only reached if the Windows package build above succeeded. */
             stage('E2E') {
               steps { script {
-                build(
-                  job:        'status-app/systems/windows/x86_64/tests-e2e',
-                  parameters: jenkins.mapToParams([
-                    BRANCH:          env.STATUS_APP_BRANCH,
-                    BUILD_SOURCE:    windows_x86_64.fullProjectName,
-                    TEST_SCOPE_FLAG: '-m=critical',
-                  ]),
-                  wait:       true,
-                  propagate:  true,
-                )
+                triggerE2E('windows', 'x86_64', windows_x86_64.fullProjectName)
               } }
             }
           }
         }
         stage('MacOS/aarch64') {
           steps { script {
-            build(
-              job:        'status-app/systems/macos/aarch64/package',
-              parameters: jenkins.mapToParams([
-                BRANCH:        env.STATUS_APP_BRANCH,
-                STATUS_GO_REF: env.STATUS_GO_REF,
-              ]),
-              wait:       true,
-              propagate:  true,
-            )
+            triggerJob('macos', 'aarch64')
           } }
         }
         stage('iOS/aarch64') {
           steps { script {
-            build(
-              job:        'status-app/systems/ios/aarch64/package',
-              parameters: jenkins.mapToParams([
-                BRANCH:        env.STATUS_APP_BRANCH,
-                STATUS_GO_REF: env.STATUS_GO_REF,
-              ]),
-              wait:       true,
-              propagate:  true,
-            )
+            triggerJob('ios', 'aarch64')
           } }
         }
         stage('Android/arm64') {
           steps { script {
-            build(
-              job:        'status-app/systems/android/arm64/package',
-              parameters: jenkins.mapToParams([
-                BRANCH:        env.STATUS_APP_BRANCH,
-                STATUS_GO_REF: env.STATUS_GO_REF,
-              ]),
-              wait:       true,
-              propagate:  true,
-            )
+            triggerJob('android', 'arm64')
           } }
         }
       }
@@ -164,4 +104,29 @@ pipeline {
       dir(env.WORKSPACE_TMP) { deleteDir() }
     }
   }
+}
+
+def triggerJob(String platform, String arch) {
+  return build(
+    job:        "status-app/systems/${platform}/${arch}/package",
+    parameters: jenkins.mapToParams([
+      BRANCH:        env.STATUS_APP_BRANCH,
+      STATUS_GO_REF: env.STATUS_GO_REF,
+    ]),
+    wait:       true,
+    propagate:  true,
+  )
+}
+
+def triggerE2E(String platform, String arch, String buildSource) {
+  return build(
+    job:        "status-app/systems/${platform}/${arch}/tests-e2e",
+    parameters: jenkins.mapToParams([
+      BRANCH:          env.STATUS_APP_BRANCH,
+      BUILD_SOURCE:    buildSource,
+      TEST_SCOPE_FLAG: '-m=critical',
+    ]),
+    wait:       true,
+    propagate:  true,
+  )
 }
