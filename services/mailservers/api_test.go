@@ -72,7 +72,7 @@ func TestTopic(t *testing.T) {
 	require.True(t, topics[1].Negotiated)
 	require.True(t, topics[1].Discovery)
 
-	require.NoError(t, db.AdvanceLastRequest(10))
+	require.NoError(t, db.AdvanceHistoryCursors(10))
 	topics, err = db.Topics()
 	require.NoError(t, err)
 	require.Equal(t, 10, topics[0].LastRequest)

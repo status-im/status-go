@@ -130,15 +130,15 @@ func (d *Database) ResetLastRequest(pubsubTopic, contentTopic string) error {
 	return err
 }
 
-// AdvanceLastRequest marks every initialized topic complete through the given
-// timestamp. Topics with a zero cursor are deliberately left untouched so a
-// reliable live connection cannot suppress their initial history fetch.
-func (d *Database) AdvanceLastRequest(lastRequest int) error {
+// AdvanceHistoryCursors marks every initialized topic complete through the
+// given timestamp. Topics with a zero cursor are deliberately left untouched
+// so a reliable live connection cannot suppress their initial history fetch.
+func (d *Database) AdvanceHistoryCursors(through int) error {
 	_, err := d.db.Exec(`
 		UPDATE mailserver_topics
 		SET last_request = ?
 		WHERE last_request > 0 AND last_request < ?
-	`, lastRequest, lastRequest)
+	`, through, through)
 	return err
 }
 

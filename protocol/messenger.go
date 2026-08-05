@@ -150,7 +150,7 @@ type Messenger struct {
 	historicSyncMu           sync.Mutex
 	historicSyncInFlight     bool
 	historicSyncQueueMu      sync.Mutex
-	historicSyncPending      []historicSyncRequest
+	historicSyncQueue        []historicSyncRequest
 	historicSyncWorkerActive atomic.Bool
 	// historicSyncTrigger wakes the worker after pending work is added.
 	historicSyncTrigger  chan struct{}
@@ -561,7 +561,7 @@ func (m *Messenger) SetPaused(paused bool) {
 	now := m.historicSyncNow()
 	wasPaused := m.paused.Swap(paused)
 	if paused && !wasPaused {
-		m.checkpointHistoryWatermarks(now)
+		m.advanceHistoryCursors(now)
 		m.historyPausedAt.Store(now.Unix())
 	}
 	if m.ensVerifier != nil {
@@ -661,7 +661,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchConnectionChange()
 	m.startHistoricSyncWorker()
 	m.startHistoryReconciliationLoop()
-	m.startHistoryWatermarkCheckpointLoop()
+	m.startHistoryCursorMonitor()
 	m.watchChatsToUnmute()
 	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
@@ -1636,7 +1636,7 @@ func (m *Messenger) Shutdown() (err error) {
 	}
 
 	if !m.isPaused() {
-		m.checkpointHistoryWatermarks(m.historicSyncNow())
+		m.advanceHistoryCursors(m.historicSyncNow())
 	}
 	close(m.quit)
 	m.cancel()

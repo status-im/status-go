@@ -91,5 +91,5 @@ func TestEnqueueHistoricSyncConcurrent(t *testing.T) {
 	require.Equal(t, []historicSyncRequest{{
 		From: from,
 		To:   from.Add(100 * time.Second),
-	}}, m.historicSyncPending)
+	}}, m.historicSyncQueue)
 }

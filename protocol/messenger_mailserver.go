@@ -268,22 +268,7 @@ func (m *Messenger) requestAllHistoricMessagesWithOptions(aggregateResponses boo
 		return nil, false, nil
 	}
 
-	m.historicSyncMu.Lock()
-	if m.historicSyncInFlight {
-		m.historicSyncMu.Unlock()
-		m.logger.Debug("defer historic sync request (already in progress)")
-		return nil, false, nil
-	}
-	m.historicSyncInFlight = true
-	m.historicSyncMu.Unlock()
-	defer func() {
-		m.historicSyncMu.Lock()
-		m.historicSyncInFlight = false
-		m.historicSyncMu.Unlock()
-		m.notifyHistoricSyncWorker()
-	}()
-
-	response, err := func() (*MessengerResponse, error) {
+	return m.withHistoricSyncInFlight(func() (*MessengerResponse, error) {
 		var allResponses *MessengerResponse
 		if aggregateResponses {
 			allResponses = &MessengerResponse{}
@@ -312,20 +297,19 @@ func (m *Messenger) requestAllHistoricMessagesWithOptions(aggregateResponses boo
 			allResponses.AddMessages(response.Messages())
 		}
 		return allResponses, nil
-	}()
-	return response, true, err
+	})
 }
 
 // withHistoricSyncInFlight runs fn unless another historic sync is already in
 // progress. Automatic syncs are serialized and spaced by the historic-sync
 // worker (startHistoricSyncWorker); this gate protects against a manual
 // RequestAllHistoricMessages (RPC) racing the worker.
-func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
+func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, error)) (*MessengerResponse, bool, error) {
 	m.historicSyncMu.Lock()
 	if m.historicSyncInFlight {
 		m.historicSyncMu.Unlock()
 		m.logger.Debug("skip historic sync request (already in progress)")
-		return nil, nil
+		return nil, false, nil
 	}
 	m.historicSyncInFlight = true
 	m.historicSyncMu.Unlock()
@@ -333,9 +317,11 @@ func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, erro
 		m.historicSyncMu.Lock()
 		m.historicSyncInFlight = false
 		m.historicSyncMu.Unlock()
+		m.notifyHistoricSyncWorker()
 	}()
 
-	return fn()
+	response, err := fn()
+	return response, true, err
 }
 
 type syncFiltersOptions struct {

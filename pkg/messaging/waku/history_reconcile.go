@@ -33,7 +33,7 @@ func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTr
 	return tracker
 }
 
-func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInterval time.Duration) (types.HistoryReconcileWindow, bool) {
+func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInterval time.Duration) *types.HistoryReconcileWindow {
 	wasReliable := t.reliable
 	t.reliable = reliable
 	if wasReliable && !reliable {
@@ -42,7 +42,7 @@ func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInter
 	t.checkedAt = now
 
 	if !shouldReconcileHistory(reliable, wasReliable, t.lastReconcile, now, minInterval) {
-		return types.HistoryReconcileWindow{}, false
+		return nil
 	}
 	if t.unreliableFrom.IsZero() {
 		t.unreliableFrom = now
@@ -52,7 +52,7 @@ func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInter
 	if reliable {
 		t.unreliableFrom = time.Time{}
 	}
-	return window, true
+	return &window
 }
 
 // OnHistoryReconcileNeeded returns unreliable delivery windows that should be
@@ -99,8 +99,8 @@ func (w *Waku) startHistoryReconcileLoop() {
 			OnTick: func() {
 				now := time.Now()
 				reliable := w.reliablyConnected()
-				window, needed := tracker.observe(reliable, now, historyReconcileMinInterval)
-				if !needed {
+				window := tracker.observe(reliable, now, historyReconcileMinInterval)
+				if window == nil {
 					return
 				}
 				w.logger.Debug("history reconciliation needed",
@@ -108,7 +108,7 @@ func (w *Waku) startHistoryReconcileLoop() {
 					zap.Time("from", window.From),
 					zap.Time("to", window.To))
 				select {
-				case w.historyReconcileNeeded <- window:
+				case w.historyReconcileNeeded <- *window:
 				case <-w.ctx.Done():
 				}
 			},

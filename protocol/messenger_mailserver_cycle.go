@@ -10,7 +10,7 @@ import (
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
-const historyWatermarkCheckpointInterval = time.Minute
+const historyCursorMonitorInterval = time.Minute
 
 func (m *Messenger) historicSyncNow() time.Time {
 	if m.messaging == nil {
@@ -133,17 +133,17 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 				if window.From.IsZero() {
 					continue
 				}
-				m.checkpointHistoryWatermarks(window.From)
+				m.advanceHistoryCursors(window.From)
 				m.asyncRequestHistoricMessages(window)
 			}
 		}
 	}()
 }
 
-// startHistoryWatermarkCheckpointLoop advances initialized topic cursors while
+// startHistoryCursorMonitor advances initialized topic cursors while
 // a foreground full node has a healthy relay mesh. This records reliable live
 // delivery without issuing store queries and bounds catch-up after a crash.
-func (m *Messenger) startHistoryWatermarkCheckpointLoop() {
+func (m *Messenger) startHistoryCursorMonitor() {
 	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
 		return
 	}
@@ -153,7 +153,7 @@ func (m *Messenger) startHistoryWatermarkCheckpointLoop() {
 		defer gocommon.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 
-		ticker := time.NewTicker(historyWatermarkCheckpointInterval)
+		ticker := time.NewTicker(historyCursorMonitorInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -164,7 +164,7 @@ func (m *Messenger) startHistoryWatermarkCheckpointLoop() {
 					// Stay one tolerance window behind the observation so a
 					// concurrent reliability transition cannot advance a cursor
 					// into the newly unreliable interval.
-					m.checkpointHistoryWatermarks(
+					m.advanceHistoryCursors(
 						m.historicSyncNow().Add(-time.Duration(tolerance) * time.Second),
 					)
 				}
@@ -173,13 +173,13 @@ func (m *Messenger) startHistoryWatermarkCheckpointLoop() {
 	}()
 }
 
-func (m *Messenger) checkpointHistoryWatermarks(through time.Time) {
+func (m *Messenger) advanceHistoryCursors(through time.Time) {
 	if through.IsZero() || m.mailserversDatabase == nil || m.messaging == nil ||
 		!m.messaging.HistoryDeliveryReliable() {
 		return
 	}
 	m.historicSyncQueueMu.Lock()
-	hasPending := len(m.historicSyncPending) > 0
+	hasPending := len(m.historicSyncQueue) > 0
 	m.historicSyncQueueMu.Unlock()
 	if hasPending || m.historicSyncWorkerActive.Load() {
 		return
@@ -189,8 +189,8 @@ func (m *Messenger) checkpointHistoryWatermarks(through time.Time) {
 	if m.historicSyncInFlight {
 		return
 	}
-	if err := m.mailserversDatabase.AdvanceLastRequest(int(through.Unix())); err != nil {
-		m.logger.Warn("failed to checkpoint history completeness", zap.Error(err))
+	if err := m.mailserversDatabase.AdvanceHistoryCursors(int(through.Unix())); err != nil {
+		m.logger.Warn("failed to advance history cursors", zap.Error(err))
 	}
 }
 
@@ -215,8 +215,8 @@ func (m *Messenger) enqueueHistoricSync(request historicSyncRequest) {
 		zap.Time("to", request.To))
 
 	m.historicSyncQueueMu.Lock()
-	m.historicSyncPending = append(m.historicSyncPending, request)
-	m.historicSyncPending = coalesceHistoricSyncRequests(m.historicSyncPending)
+	m.historicSyncQueue = append(m.historicSyncQueue, request)
+	m.historicSyncQueue = coalesceHistoricSyncRequests(m.historicSyncQueue)
 	m.historicSyncQueueMu.Unlock()
 
 	m.notifyHistoricSyncWorker()
@@ -232,18 +232,18 @@ func (m *Messenger) notifyHistoricSyncWorker() {
 func (m *Messenger) takeHistoricSync() (historicSyncRequest, bool) {
 	m.historicSyncQueueMu.Lock()
 	defer m.historicSyncQueueMu.Unlock()
-	if len(m.historicSyncPending) == 0 {
+	if len(m.historicSyncQueue) == 0 {
 		return historicSyncRequest{}, false
 	}
-	request := m.historicSyncPending[0]
-	m.historicSyncPending = m.historicSyncPending[1:]
+	request := m.historicSyncQueue[0]
+	m.historicSyncQueue = m.historicSyncQueue[1:]
 	return request, true
 }
 
 func (m *Messenger) requeueHistoricSync(request historicSyncRequest) {
 	m.historicSyncQueueMu.Lock()
-	m.historicSyncPending = append(m.historicSyncPending, request)
-	m.historicSyncPending = coalesceHistoricSyncRequests(m.historicSyncPending)
+	m.historicSyncQueue = append(m.historicSyncQueue, request)
+	m.historicSyncQueue = coalesceHistoricSyncRequests(m.historicSyncQueue)
 	m.historicSyncQueueMu.Unlock()
 }
 

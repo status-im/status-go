@@ -28,14 +28,14 @@ func TestSetPausedEnqueuesBoundedForegroundCatchup(t *testing.T) {
 	m.SetPaused(false)
 
 	m.historicSyncQueueMu.Lock()
-	require.Len(t, m.historicSyncPending, 1)
-	request := m.historicSyncPending[0]
+	require.Len(t, m.historicSyncQueue, 1)
+	request := m.historicSyncQueue[0]
 	m.historicSyncQueueMu.Unlock()
 	require.True(t, request.bounded())
 	require.True(t, request.From.Before(request.To))
 
 	m.SetPaused(false)
 	m.historicSyncQueueMu.Lock()
-	require.Len(t, m.historicSyncPending, 1, "idempotent resume must not enqueue another catch-up")
+	require.Len(t, m.historicSyncQueue, 1, "idempotent resume must not enqueue another catch-up")
 	m.historicSyncQueueMu.Unlock()
 }
