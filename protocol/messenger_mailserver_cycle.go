@@ -12,6 +12,8 @@ import (
 
 const historyCursorMonitorInterval = time.Minute
 
+// historicSyncNow returns the upper-bound timestamp for history sync requests,
+// using the Messenger clock when available and wall time during initialization.
 func (m *Messenger) historicSyncNow() time.Time {
 	if m.messaging == nil {
 		return time.Now()
@@ -306,12 +308,16 @@ func (m *Messenger) startHistoricSyncWorker() {
 						deferred = true
 						break
 					}
+					previousAttempt := lastAttempt
 					lastAttempt = time.Now()
 					executed, err := m.runAutomaticHistoricSync(request)
 					if err == nil && executed {
 						break
 					}
 					if err == nil {
+						// A skipped run never touched a store node, so it must not
+						// consume the rate-limit budget of the next real attempt.
+						lastAttempt = previousAttempt
 						// Offline and policy-blocked requests stay pending. Their
 						// corresponding online/resume/setting transition wakes us.
 						m.requeueHistoricSync(request)

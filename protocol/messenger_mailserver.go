@@ -599,7 +599,7 @@ func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options s
 		}
 	}
 
-	m.fetchLatestCommunityDescriptions(communityDescriptionFilters, options.Window)
+	m.fetchLatestCommunityDescriptions(communityDescriptionFilters)
 
 	return response, nil
 }
@@ -625,27 +625,12 @@ func (m *Messenger) communityDescriptionChatIDs() (map[string]struct{}, error) {
 // fetchLatestCommunityDescriptions gets the latest description for each
 // community filter and stops after the first page of results.
 // This avoids downloading many older copies.
-func (m *Messenger) fetchLatestCommunityDescriptions(filters []*types2.ChatFilter, windows ...*types2.HistoryReconcileWindow) {
+func (m *Messenger) fetchLatestCommunityDescriptions(filters []*types2.ChatFilter) {
 	if len(filters) == 0 {
 		return
 	}
 
 	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
-	var window *types2.HistoryReconcileWindow
-	if len(windows) > 0 {
-		window = windows[0]
-	}
-	if window != nil {
-		if !window.To.IsZero() {
-			to = window.To
-		}
-		if !window.From.IsZero() {
-			windowFrom := window.From.Add(-time.Duration(tolerance) * time.Second)
-			if windowFrom.After(from) {
-				from = windowFrom
-			}
-		}
-	}
 	if !from.Before(to) {
 		return
 	}
