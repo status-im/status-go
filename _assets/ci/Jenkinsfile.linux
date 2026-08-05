@@ -63,6 +63,7 @@ pipeline {
 
   stages {
     stage('Setup') {
+        options { timeout(time: 5, unit: 'MINUTES') }
         steps {
           script {
             if (!env.PLATFORM.startsWith('windows')) {
@@ -74,6 +75,7 @@ pipeline {
   }
 
     stage('Deps') {
+      options { timeout(time: 15, unit: 'MINUTES') }
       steps { script {
         nix.develop('make status-go-deps', pure: false)
       }
@@ -81,6 +83,7 @@ pipeline {
   }
 
     stage('Generate') {
+      options { timeout(time: 15, unit: 'MINUTES') }
       steps { script {
         nix.develop('make generate', pure: false)
       }
@@ -88,6 +91,7 @@ pipeline {
   }
 
     stage('Build Static Lib') {
+        options { timeout(time: 25, unit: 'MINUTES') }
         steps {
             script {
                 nix.develop('make statusgo-library', pure: false)
@@ -96,6 +100,7 @@ pipeline {
         }
 
     stage('Build Shared Lib') {
+        options { timeout(time: 25, unit: 'MINUTES') }
         steps {
             script {
                 nix.develop('make statusgo-shared-library', pure: false)
@@ -104,12 +109,14 @@ pipeline {
         }
 
     stage('Archive') {
+        options { timeout(time: 10, unit: 'MINUTES') }
         steps {
           zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
             }
         }
 
     stage('Upload') {
+        options { timeout(time: 10, unit: 'MINUTES') }
         steps {
             script {
                 env.PKG_URL = s5cmd.upload(ARTIFACT)

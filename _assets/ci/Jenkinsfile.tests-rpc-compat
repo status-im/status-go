@@ -69,6 +69,7 @@ pipeline {
 
   stages {
     stage('Compatibility Tests') {
+      options { timeout(time: 85, unit: 'MINUTES') }
       steps { script {
         withCredentials([
           usernamePassword(
