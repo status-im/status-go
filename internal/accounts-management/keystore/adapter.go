@@ -198,6 +198,16 @@ func (a *Adapter) ReEncryptKeyStoreDir(oldPass, newPass string) (err error) {
 	return
 }
 
+// ReEncryptKeyStoreDirAtPath re-encrypts all keystore files in the given directory
+func ReEncryptKeyStoreDirAtPath(keystoreDir, oldPass, newPass string) error {
+	return mapToKeystoreError(geth.ReEncryptKeyStoreDir(keystoreDir, oldPass, newPass))
+}
+
+// VerifyKeyStoreDirAtPath checks that every key file in the directory decrypts with password
+func VerifyKeyStoreDirAtPath(keystoreDir, password string) error {
+	return mapToKeystoreError(geth.VerifyKeyStoreDir(keystoreDir, password))
+}
+
 func (a *Adapter) MigrateKeyStoreDir(newDir string) (err error) {
 	defer func() {
 		err = mapToKeystoreError(err)

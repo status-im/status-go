@@ -826,7 +826,7 @@ func TestConvertAccount(t *testing.T) {
 	}
 
 	// Ensure we're able to open the DB
-	err = testContext.backend.ensureAppDBOpened(*testContext.multiAcc, testPassword)
+	err = testContext.backend.ensureAppDBOpened(*testContext.multiAcc, dbCredentials{secret: testPassword, kdfIter: testContext.multiAcc.KDFIterations})
 	require.NoError(t, err)
 
 	// db creation
@@ -872,7 +872,7 @@ func TestConvertAccount(t *testing.T) {
 	}()
 
 	// Ensure we're able to open the DB
-	err = testContext.backend.ensureAppDBOpened(keycardAccount, keycardPassword)
+	err = testContext.backend.ensureAppDBOpened(keycardAccount, dbCredentials{secret: keycardPassword, kdfIter: keycardAccount.KDFIterations})
 	require.NoError(t, err)
 
 	// db creation after re-encryption
@@ -901,7 +901,7 @@ func TestConvertAccount(t *testing.T) {
 	}
 
 	// Ensure we're able to open the DB
-	err = testContext.backend.ensureAppDBOpened(keycardAccount, testPassword)
+	err = testContext.backend.ensureAppDBOpened(keycardAccount, dbCredentials{secret: testPassword, kdfIter: keycardAccount.KDFIterations})
 	require.NoError(t, err)
 
 	// db creation after re-encryption

@@ -151,6 +151,85 @@ func TestVerifyAccountPassword(t *testing.T) {
 	}
 }
 
+// TestSecretResolver verifies that keystore operations translate the
+// client-provided password through the configured secret resolver, and fall
+// back to the raw password when the keystore files are still encrypted with
+// it (interrupted encryption-scheme migration).
+func TestSecretResolver(t *testing.T) {
+	// testdata/test-account1-status-chain.pk is encrypted with "password".
+	const (
+		filename     = "testdata/test-account1-status-chain.pk"
+		keyUID       = "0x0000000000000000000000000000000000000000000000000000000000000001"
+		address      = "0xbF164ca341326a03b547c05B343b2E21eFAe24b9"
+		filePassword = "password"
+		clientKEK    = "client-kek"
+	)
+
+	newManagerWithTestKey := func(t *testing.T) *AccountsManager {
+		accManager, err := NewAccountsManager(testutils.MustCreateTestLogger())
+		require.NoError(t, err)
+		accManager.SetRootDataDir(t.TempDir())
+		ks, err := accManager.createKeystore(keyUID)
+		require.NoError(t, err)
+		require.NoError(t, os.Link(filename, filepath.Join(ks.KeystorePath(), filepath.Base(filename))))
+		ks, err = accManager.createKeystore(keyUID)
+		require.NoError(t, err)
+		accManager.setKeystore(ks)
+		return accManager
+	}
+
+	t.Run("resolved secret decrypts the keystore", func(t *testing.T) {
+		accManager := newManagerWithTestKey(t)
+		// Migrated profile in steady state: the resolver maps the client KEK
+		// to the secret the keystore files are encrypted with.
+		accManager.SetSecretResolver(func(password string) (string, error) {
+			require.Equal(t, clientKEK, password)
+			return filePassword, nil
+		})
+
+		ok, err := accManager.VerifyAccountPassword(cryptotypes.HexToAddress(address), clientKEK)
+		require.NoError(t, err)
+		require.True(t, ok)
+	})
+
+	t.Run("fallback to raw password after interrupted migration", func(t *testing.T) {
+		accManager := newManagerWithTestKey(t)
+		// Interrupted migration: the resolver yields a DEK, but the keystore
+		// files are still encrypted with the raw password.
+		accManager.SetSecretResolver(func(password string) (string, error) {
+			require.Equal(t, filePassword, password)
+			return "dek-the-keystore-does-not-use-yet", nil
+		})
+
+		ok, err := accManager.VerifyAccountPassword(cryptotypes.HexToAddress(address), filePassword)
+		require.NoError(t, err)
+		require.True(t, ok)
+	})
+
+	t.Run("resolver rejection fails before touching the keystore", func(t *testing.T) {
+		accManager := newManagerWithTestKey(t)
+		resolverErr := errors.New("invalid key-encryption key")
+		accManager.SetSecretResolver(func(string) (string, error) {
+			return "", resolverErr
+		})
+
+		ok, err := accManager.VerifyAccountPassword(cryptotypes.HexToAddress(address), filePassword)
+		require.ErrorIs(t, err, resolverErr)
+		require.False(t, ok)
+	})
+
+	t.Run("wrong secret with wrong fallback still fails", func(t *testing.T) {
+		accManager := newManagerWithTestKey(t)
+		accManager.SetSecretResolver(func(string) (string, error) {
+			return "some-dek", nil
+		})
+
+		ok, err := accManager.VerifyAccountPassword(cryptotypes.HexToAddress(address), "wrong-password")
+		require.Error(t, err)
+		require.False(t, ok)
+	})
+}
+
 // TestVerifyAccountPasswordWithAccountBeforeEIP55 verifies if VerifyAccountPassword
 // can handle accounts before introduction of EIP55.
 func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {

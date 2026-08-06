@@ -28,6 +28,7 @@ import (
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	generator "github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
@@ -108,7 +109,34 @@ type StatusBackend struct {
 	logger            *zap.Logger
 	preLoginLogConfig *logutils.PreLoginLogConfig
 
+	secretCache profileSecretCache
+
 	shutdownTasks []func() error
+}
+
+// dbCredentials carries the resolved sqlcipher credentials for opening the profile databases.
+type dbCredentials struct {
+	secret          string
+	kdfIter         int
+	fallbackSecret  string
+	fallbackKdfIter int
+}
+
+// openDBWithCredsFallback opens a database with the resolved secret, retrying with the fallback credentials (when present)
+// so a crash mid-migration never locks the user out. The primary error is reported if both fail.
+func (b *StatusBackend) openDBWithCredsFallback(dbName string, creds dbCredentials, open func(secret string, kdfIter int) (*sql.DB, error)) (*sql.DB, error) {
+	db, err := open(creds.secret, creds.kdfIter)
+	if err == nil || creds.fallbackSecret == "" || creds.fallbackSecret == creds.secret {
+		return db, err
+	}
+
+	fallbackDB, fallbackErr := open(creds.fallbackSecret, creds.fallbackKdfIter)
+	if fallbackErr != nil {
+		return nil, err
+	}
+	b.logger.Warn("database opened with legacy credentials after failed DEK open; encryption-scheme migration was likely interrupted",
+		zap.String("db", dbName))
+	return fallbackDB, nil
 }
 
 // NewStatusBackend create a new StatusBackend instance
@@ -378,9 +406,14 @@ func (b *StatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string) er
 		}
 	}
 
+	if err := envelope.Remove(b.rootDataDir, keyUID); err != nil {
+		return err
+	}
+
 	if b.account != nil && b.account.KeyUID == keyUID {
 		// reset active account
 		b.account = nil
+		b.clearProfileSecretCache()
 	}
 
 	return os.RemoveAll(keyStoreDir)
@@ -423,10 +456,22 @@ func (b *StatusBackend) runDBFileMigrations(account multiaccounts.Account, passw
 }
 
 func (b *StatusBackend) ensureDBsOpened(account multiaccounts.Account, password string) (err error) {
+	resolved, err := b.resolveProfileSecret(account.KeyUID, password, account.KDFIterations)
+	if err != nil {
+		return err
+	}
+	creds := dbCredentials{secret: resolved.secret, kdfIter: resolved.dbKdfIter}
+	if resolved.migrated {
+		creds.fallbackSecret = resolved.legacySecret
+		creds.fallbackKdfIter = resolved.legacyKdfIter
+	}
+
 	b.mu.Lock()
 	dbsUnset := b.walletDB == nil && b.appDB == nil
 	b.mu.Unlock()
 	if dbsUnset {
+		b.setSecretResolverForProfile(account.KeyUID, account.KDFIterations)
+
 		appDBPath, pathErr := b.getAppDBPath(account.KeyUID)
 		if pathErr == nil {
 			walletDBPath, walletPathErr := b.getWalletDBPath(account.KeyUID)
@@ -434,19 +479,19 @@ func (b *StatusBackend) ensureDBsOpened(account multiaccounts.Account, password 
 			unsupportedAppDBPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
 			if walletPathErr == nil && fileExists(walletDBPath) && fileExists(appDBPath) &&
 				!fileExists(legacyAppDBPath) && !fileExists(unsupportedAppDBPath) {
-				return b.ensureEstablishedDBsOpened(account, password, appDBPath, walletDBPath)
+				return b.ensureEstablishedDBsOpened(account, creds, appDBPath, walletDBPath)
 			}
 		}
 	}
 
-	return b.ensureDBsOpenedSequential(account, password)
+	return b.ensureDBsOpenedSequential(account, creds)
 }
 
-func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account, password, appDBPath, walletDBPath string) (err error) {
+func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account, creds dbCredentials, appDBPath, walletDBPath string) (err error) {
 	b.mu.Lock()
 	if b.walletDB != nil || b.appDB != nil {
 		b.mu.Unlock()
-		return b.ensureDBsOpenedSequential(account, password)
+		return b.ensureDBsOpenedSequential(account, creds)
 	}
 	defer b.mu.Unlock()
 
@@ -460,7 +505,9 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 	}, 1)
 	go func() {
 		defer panics.LogOnPanic()
-		db, openErr := walletdb.OpenDB(walletDBPath, password, account.KDFIterations)
+		db, openErr := b.openDBWithCredsFallback("wallet", creds, func(secret string, kdfIter int) (*sql.DB, error) {
+			return walletdb.OpenDB(walletDBPath, secret, kdfIter)
+		})
 		walletResultCh <- struct {
 			db  *sql.DB
 			err error
@@ -468,7 +515,9 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 	}()
 	go func() {
 		defer panics.LogOnPanic()
-		db, openErr := appdatabase.OpenDB(appDBPath, password, account.KDFIterations)
+		db, openErr := b.openDBWithCredsFallback("app", creds, func(secret string, kdfIter int) (*sql.DB, error) {
+			return appdatabase.OpenDB(appDBPath, secret, kdfIter)
+		})
 		appResultCh <- struct {
 			db  *sql.DB
 			err error
@@ -514,21 +563,21 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 	return nil
 }
 
-func (b *StatusBackend) ensureDBsOpenedSequential(account multiaccounts.Account, password string) (err error) {
+func (b *StatusBackend) ensureDBsOpenedSequential(account multiaccounts.Account, creds dbCredentials) (err error) {
 	// After wallet DB initial migration, the tables moved to wallet DB are removed from appDB
 	// so better migrate wallet DB first to avoid removal if wallet DB migration fails
-	if err = b.ensureWalletDBOpened(account, password); err != nil {
+	if err = b.ensureWalletDBOpened(account, creds); err != nil {
 		return err
 	}
 
-	if err = b.ensureAppDBOpened(account, password); err != nil {
+	if err = b.ensureAppDBOpened(account, creds); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
+func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, creds dbCredentials) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.appDB != nil {
@@ -538,13 +587,16 @@ func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, passwor
 		return errors.New("root datadir wasn't provided")
 	}
 
-	dbFilePath, err := b.runDBFileMigrations(account, password)
+	account.KDFIterations = creds.kdfIter
+	dbFilePath, err := b.runDBFileMigrations(account, creds.secret)
 	if err != nil {
 		return errors.New("Failed to migrate db file: " + err.Error())
 	}
 
 	appdatabase.CurrentAppDBKeyUID = account.KeyUID
-	b.appDB, err = appdatabase.InitializeDB(dbFilePath, password, account.KDFIterations)
+	b.appDB, err = b.openDBWithCredsFallback("app", creds, func(secret string, kdfIter int) (*sql.DB, error) {
+		return appdatabase.InitializeDB(dbFilePath, secret, kdfIter)
+	})
 	if err != nil {
 		b.logger.Error("failed to initialize db", zap.Error(err))
 		return err
@@ -588,7 +640,7 @@ func (b *StatusBackend) appDBExists(keyUID string) bool {
 	return fileExists(path)
 }
 
-func (b *StatusBackend) ensureWalletDBOpened(account multiaccounts.Account, password string) (err error) {
+func (b *StatusBackend) ensureWalletDBOpened(account multiaccounts.Account, creds dbCredentials) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.walletDB != nil {
@@ -600,7 +652,9 @@ func (b *StatusBackend) ensureWalletDBOpened(account multiaccounts.Account, pass
 		return err
 	}
 
-	b.walletDB, err = walletdb.InitializeDB(dbWalletPath, password, account.KDFIterations)
+	b.walletDB, err = b.openDBWithCredsFallback("wallet", creds, func(secret string, kdfIter int) (*sql.DB, error) {
+		return walletdb.InitializeDB(dbWalletPath, secret, kdfIter)
+	})
 	if err != nil {
 		b.logger.Error("failed to initialize wallet db", zap.Error(err))
 		return err
@@ -1058,6 +1112,11 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 }
 
 func (b *StatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, password, directory string) error {
+	resolved, err := b.resolveProfileSecret(acc.KeyUID, password, acc.KDFIterations)
+	if err != nil {
+		return err
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.appDB != nil {
@@ -1067,12 +1126,13 @@ func (b *StatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, pas
 		return errors.New("root datadir wasn't provided")
 	}
 
-	dbPath, err := b.runDBFileMigrations(acc, password)
+	acc.KDFIterations = resolved.dbKdfIter
+	dbPath, err := b.runDBFileMigrations(acc, resolved.secret)
 	if err != nil {
 		return err
 	}
 
-	err = sqlite.DecryptDB(dbPath, directory, password, acc.KDFIterations)
+	err = sqlite.DecryptDB(dbPath, directory, resolved.secret, resolved.dbKdfIter)
 	if err != nil {
 		b.logger.Error("failed to initialize db", zap.Error(err))
 		return err
@@ -1081,6 +1141,11 @@ func (b *StatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, pas
 }
 
 func (b *StatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account, password, databasePath string) error {
+	resolved, err := b.resolveProfileSecret(acc.KeyUID, password, acc.KDFIterations)
+	if err != nil {
+		return err
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.appDB != nil {
@@ -1092,7 +1157,7 @@ func (b *StatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account, pas
 		return err
 	}
 
-	err = sqlite.EncryptDB(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	err = sqlite.EncryptDB(databasePath, path, resolved.secret, resolved.dbKdfIter, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		b.logger.Error("failed to initialize db", zap.Error(err))
 		return err
@@ -2252,6 +2317,7 @@ func (b *StatusBackend) Logout() error {
 
 	b.AccountsManager().Logout()
 	b.account = nil
+	b.clearProfileSecretCache()
 
 	if b.statusNode != nil {
 		if b.statusNode.IsRunning() {

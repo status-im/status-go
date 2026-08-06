@@ -130,3 +130,29 @@ func ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
 
 	return nil
 }
+
+// VerifyKeyStoreDir checks that every key file in the directory decrypts with password
+func VerifyKeyStoreDir(keyDirPath, password string) error {
+	if _, err := os.Stat(keyDirPath); os.IsNotExist(err) {
+		return nil
+	}
+
+	return filepath.Walk(keyDirPath, func(path string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("walk callback error: %v", err)
+		}
+		if fileInfo.IsDir() || strings.HasPrefix(fileInfo.Name(), ".") {
+			return nil
+		}
+
+		rawKeyFile, e := ioutil.ReadFile(path)
+		if e != nil {
+			return fmt.Errorf("invalid account key file: %v", e)
+		}
+
+		if _, e = DecryptKey(rawKeyFile, password); e != nil {
+			return fmt.Errorf("key file does not decrypt: %v, name: %s", e, fileInfo.Name())
+		}
+		return nil
+	})
+}
