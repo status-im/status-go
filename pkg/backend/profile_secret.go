@@ -168,6 +168,15 @@ func (b *StatusBackend) dbOpenSecrets() (app, wallet string) {
 	return c.dbAppOpenedWith, c.dbWalletOpenedWith
 }
 
+// ResolveKeystoreSecret translates a client-provided password into the secret the profile's keystore files are encrypted with
+func (b *StatusBackend) ResolveKeystoreSecret(keyUID, password string) (string, error) {
+	resolved, err := b.resolveProfileSecret(keyUID, password, 0)
+	if err != nil {
+		return "", err
+	}
+	return resolved.secret, nil
+}
+
 // setSecretResolverForProfile points the accounts manager's keystore operations at this profile's secret resolution.
 func (b *StatusBackend) setSecretResolverForProfile(keyUID string, kdfIterations int) {
 	b.accountsManager.SetSecretResolver(func(password string) (string, error) {
