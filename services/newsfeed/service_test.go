@@ -121,7 +121,7 @@ func (s *MessengerNewsFeedSuite) TestHandleNewsFeedItemWithNamespacedCustomField
 func (s *MessengerNewsFeedSuite) TestGetCustomFieldFromCustomMap() {
 	item := &gofeed.Item{
 		Custom: map[string]string{
-			"newsLink":            "https://status.app/direct",
+			"newsLink":             "https://status.app/direct",
 			"status:newsLinkLabel": "Update from namespaced custom",
 		},
 	}

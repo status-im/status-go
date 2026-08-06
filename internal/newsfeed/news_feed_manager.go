@@ -10,8 +10,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 )
 
-const STATUS_DESKTOP_FEED_URL = "https://status.app/desktop-news/rss"
-const STATUS_MOBILE_FEED_URL = "https://status.app/mobile-news/rss"
+const STATUS_DESKTOP_FEED_URL = "https://status.app/desktop-news/rss/v2"
+const STATUS_MOBILE_FEED_URL = "https://status.app/mobile-news/rss/v2"
 
 type FeedParser interface {
 	ParseURL(url string) (*gofeed.Feed, error)
