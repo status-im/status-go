@@ -109,32 +109,42 @@ type StatusBackend struct {
 
 	secretCache profileSecretCache
 
+	reEncryptionMu sync.Mutex
+
 	shutdownTasks []func() error
 }
 
 // dbCredentials carries the resolved sqlcipher credentials for opening the profile databases.
 type dbCredentials struct {
-	secret          string
-	kdfIter         int
-	fallbackSecret  string
-	fallbackKdfIter int
+	secret    string
+	kdfIter   int
+	fallbacks []dbFallbackCredential
 }
 
 // openDBWithCredsFallback opens a database with the resolved secret, retrying with the fallback credentials (when present)
-// so a crash mid-migration never locks the user out. The primary error is reported if both fail.
+// so a crash mid-migration/rekey never locks the user out. The secret that succeeded is recorded for login-time repair.
+// The primary error is reported if all attempts fail.
 func (b *StatusBackend) openDBWithCredsFallback(dbName string, creds dbCredentials, open func(secret string, kdfIter int) (*sql.DB, error)) (*sql.DB, error) {
 	db, err := open(creds.secret, creds.kdfIter)
-	if err == nil || creds.fallbackSecret == "" || creds.fallbackSecret == creds.secret {
-		return db, err
+	if err == nil {
+		b.recordDBOpenSecret(dbName, creds.secret)
+		return db, nil
 	}
 
-	fallbackDB, fallbackErr := open(creds.fallbackSecret, creds.fallbackKdfIter)
-	if fallbackErr != nil {
-		return nil, err
+	for _, fallback := range creds.fallbacks {
+		if fallback.secret == "" || fallback.secret == creds.secret {
+			continue
+		}
+		fallbackDB, fallbackErr := open(fallback.secret, fallback.kdfIter)
+		if fallbackErr == nil {
+			b.logger.Warn("database opened with fallback credentials after failed primary open; encryption-scheme migration/rekey was likely interrupted",
+				zap.String("db", dbName))
+			b.recordDBOpenSecret(dbName, fallback.secret)
+			return fallbackDB, nil
+		}
 	}
-	b.logger.Warn("database opened with legacy credentials after failed DEK open; encryption-scheme migration was likely interrupted",
-		zap.String("db", dbName))
-	return fallbackDB, nil
+
+	return nil, err
 }
 
 // NewStatusBackend create a new StatusBackend instance
@@ -458,11 +468,7 @@ func (b *StatusBackend) ensureDBsOpened(account multiaccounts.Account, password 
 	if err != nil {
 		return err
 	}
-	creds := dbCredentials{secret: resolved.secret, kdfIter: resolved.dbKdfIter}
-	if resolved.migrated {
-		creds.fallbackSecret = resolved.legacySecret
-		creds.fallbackKdfIter = resolved.legacyKdfIter
-	}
+	creds := dbCredentials{secret: resolved.secret, kdfIter: resolved.dbKdfIter, fallbacks: resolved.fallbacks}
 
 	b.mu.Lock()
 	dbsUnset := b.walletDB == nil && b.appDB == nil
@@ -803,6 +809,11 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 		return errors.Wrap(err, "failed to open database")
 	}
 
+	// Fix any interrupted encryption-scheme migration/rekey before the keystore is used.
+	if err := b.repairProfileEncryption(acc.KeyUID, request.Password, acc.KDFIterations); err != nil {
+		return errors.Wrap(err, "failed to repair profile encryption")
+	}
+
 	defaultCfg := &params.NodeConfig{
 		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
 		KeycardPairingDataFile: filepath.Join(b.rootDataDir, DefaultKeycardPairingDataFileRelativePath),
@@ -968,6 +979,11 @@ func (b *StatusBackend) startNodeWithAccount(acc multiaccounts.Account, password
 	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
 		return err
+	}
+
+	// Fix any interrupted encryption-scheme migration/rekey before the keystore is used.
+	if err := b.repairProfileEncryption(acc.KeyUID, password, acc.KDFIterations); err != nil {
+		return errors.Wrap(err, "failed to repair profile encryption")
 	}
 
 	err = b.loadNodeConfig(inputNodeCfg)
@@ -1167,154 +1183,361 @@ func (b *StatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword
 	return nil
 }
 
-func (b *StatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
-	acc, err := b.multiaccountsDB.GetAccount(keyUID)
-	if err != nil {
-		return err
+// ChangeDatabasePassword re-encrypts the profile's secrets from password to newPassword.
+//   - profile on the DEK scheme, rekey=false → fast path: only the wrapped-DEK file is re-wrapped (no new DEK is generated)
+//   - profile on the DEK scheme, rekey=true → deep rekey: fresh DEK, databases and keystore re-encrypted (new DEK is generated)
+//   - legacy profile → one-time migration to the DEK scheme (full re-encryption, new DEK is generated)
+func (b *StatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string, rekey bool) error {
+	restart, err := b.changeDatabasePasswordSerialized(keyUID, password, newPassword, rekey)
+	if restart != nil {
+		restart()
 	}
+	return err
+}
 
+// changeDatabasePasswordSerialized holds the re-encryption lock for the whole mutation, returns the node-restart step
+// (when one is needed) to run after unlocking the lock.
+func (b *StatusBackend) changeDatabasePasswordSerialized(keyUID, password, newPassword string, rekey bool) (restart func(), err error) {
+	b.reEncryptionMu.Lock()
+	defer b.reEncryptionMu.Unlock()
+
+	if envelope.Exists(b.rootDataDir, keyUID) {
+		if !rekey {
+			// Fast path: nothing that is open (databases, keystore, node) changes.
+			if err := envelope.Rewrap(b.rootDataDir, keyUID, password, newPassword); err != nil {
+				return nil, err
+			}
+			b.refreshSecretCacheKEK(keyUID, newPassword)
+			return nil, nil
+		}
+		return b.rekeyProfile(keyUID, password, newPassword)
+	}
+	return b.migrateProfileToDEK(keyUID, password, newPassword)
+}
+
+// isCurrentAccountOpen reports whether the currently opened app DB belongs to the given profile.
+func (b *StatusBackend) isCurrentAccountOpen(keyUID string) (bool, error) {
 	internalDbPath, err := dbsetup.GetDBFilename(b.appDB)
 	if err != nil {
-		return fmt.Errorf("failed to get database file name, %w", err)
+		return false, fmt.Errorf("failed to get database file name, %w", err)
 	}
 
 	appDBPath, err := b.getAppDBPath(keyUID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// In order to overcome Mac OS symlink issue, we check if the internalDbPath contains the appDBPath.
 	// Cause on macOS, `/var` is actually a symlink to `/private/var`.
-	isCurrentAccount := strings.Contains(internalDbPath, appDBPath)
-
-	restartNode := func() {
-		if isCurrentAccount {
-			pass := password
-			if err == nil {
-				pass = newPassword
-			}
-
-			err := b.StopNode()
-			if err != nil {
-				b.logger.Error("failed to stop node", zap.Error(err))
-				return
-			}
-
-			// TODO https://github.com/status-im/status-go/issues/3906
-			// Fix restarting node, as it always fails but the error is ignored
-			// because UI calls Logout and Quit afterwards. It should not be UI-dependent
-			// and should be handled gracefully here if it makes sense to run dummy node after
-			// logout
-			err = b.startNodeWithAccount(*acc, pass, b.config, nil)
-			if err != nil {
-				b.logger.Error("failed to start node", zap.Error(err))
-				return
-			}
-			b.statusNode.StartTokenManager()
-		}
-	}
-	defer restartNode()
-
-	logout := func() {
-		if isCurrentAccount {
-			_ = b.Logout()
-		}
-	}
-	noLogout := func() {}
-
-	// First change app DB password, because it also reencrypts the keystore,
-	// otherwise if we call changeWalletDbPassword first and logout, we will fail
-	// to reencrypt	the keystore
-	err = b.changeAppDBPassword(acc, logout, password, newPassword)
-	if err != nil {
-		return err
-	}
-
-	// Already logged out but pass a param to decouple the logic for testing
-	err = b.changeWalletDBPassword(acc, noLogout, password, newPassword)
-	if err != nil {
-		// Revert the password to original
-		err2 := b.changeAppDBPassword(acc, noLogout, newPassword, password)
-		if err2 != nil {
-			b.logger.Error("failed to revert app db password", zap.Error(err2))
-		}
-
-		return err
-	}
-
-	return nil
+	return internalDbPath != "" && strings.Contains(internalDbPath, appDBPath), nil
 }
 
-func (b *StatusBackend) changeAppDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
-	tmpDbPath, cleanup, err := b.createTempDBFile("v4.db")
+// restartNodeAfterReEncryption preserves the historical restart-after-password-change behavior.
+func (b *StatusBackend) restartNodeAfterReEncryption(acc *multiaccounts.Account, password string) {
+	err := b.StopNode()
 	if err != nil {
-		return err
+		b.logger.Error("failed to stop node", zap.Error(err))
+		return
 	}
-	defer cleanup()
 
-	dbPath, err := b.getAppDBPath(account.KeyUID)
+	err = b.startNodeWithAccount(*acc, password, b.config, nil)
 	if err != nil {
-		return err
+		b.logger.Error("failed to start node", zap.Error(err))
+		return
 	}
-
-	// Exporting database to a temporary file with a new password
-	err = sqlite.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
-	if err != nil {
-		return err
-	}
-
-	err = b.reEncryptKeyStoreDir(password, newPassword)
-	if err != nil {
-		return err
-	}
-
-	// Replacing the old database with the new one requires closing all connections to the database
-	// This is done by stopping the node and restarting it with the new DB
-	logout()
-
-	// Replacing the old database files with the new ones, ignoring the wal and shm errors
-	replaceCleanup, err := replaceDBFile(dbPath, tmpDbPath)
-	if replaceCleanup != nil {
-		defer replaceCleanup()
-	}
-
-	if err != nil {
-		// Restore the old account
-		_ = b.reEncryptKeyStoreDir(newPassword, password)
-		return err
-	}
-
-	return nil
+	b.statusNode.StartTokenManager()
 }
 
-func (b *StatusBackend) changeWalletDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
-	tmpDbPath, cleanup, err := b.createTempDBFile("wallet.db")
-	if err != nil {
-		return err
+// reEncryptionCrashHook, when set (tests only), simulates a process crash at named boundaries of the migration/rekey flows.
+// A returned error aborts the flow at that exact point with no further cleanup, leaving the on-disk state for login-time repair.
+var reEncryptionCrashHook func(stage string) error
+
+func reEncryptionCrash(stage string) error {
+	if reEncryptionCrashHook == nil {
+		return nil
 	}
-	defer cleanup()
+	return reEncryptionCrashHook(stage)
+}
 
-	dbPath, err := b.getWalletDBPath(account.KeyUID)
+// migrateProfileToDEK performs the one-time migration of a legacy profile to the DEK scheme, both databases and
+// the keystore are re-encrypted with a fresh random DEK, wrapped with newKEK.
+func (b *StatusBackend) migrateProfileToDEK(keyUID, oldKEK, newKEK string) (restart func(), err error) {
+	acc, err := b.multiaccountsDB.GetAccount(keyUID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Exporting database to a temporary file with a new password
-	err = sqlite.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	isCurrentAccount, err := b.isCurrentAccountOpen(keyUID)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	restartWith := func(password string) func() {
+		if !isCurrentAccount {
+			return nil
+		}
+		return func() { b.restartNodeAfterReEncryption(acc, password) }
 	}
 
-	// Replacing the old database with the new one requires closing all connections to the database
-	// This is done by stopping the node and restarting it with the new DB
-	logout()
+	dek, err := envelope.Generate()
+	if err != nil {
+		return nil, err
+	}
 
-	// Replacing the old database files with the new ones, ignoring the wal and shm errors
-	replaceCleanup, err := replaceDBFile(dbPath, tmpDbPath)
+	signal.SendReEncryptionStarted()
+	defer signal.SendReEncryptionFinished()
+
+	// Envelope first, wrapped with the OLD KEK: if crash happens login keeps working via the raw-password fallbacks and repair
+	if err := envelope.Write(b.rootDataDir, keyUID, dek, oldKEK, sqlite.ReducedKDFIterationsNumber); err != nil {
+		return nil, err
+	}
+	if err := reEncryptionCrash("migrate:envelope-written"); err != nil {
+		return nil, err
+	}
+
+	// Keystore to the DEK. On error don't remove the envelope, so next login-time repair can determine the actual state
+	if err := b.reEncryptKeyStoreDir(oldKEK, dek); err != nil {
+		return nil, fmt.Errorf("failed to re-encrypt keystore: %w", err)
+	}
+	if err := reEncryptionCrash("migrate:keystore-reencrypted"); err != nil {
+		return nil, err
+	}
+
+	revertKeystoreAndEnvelope := func() {
+		if err := b.reEncryptKeyStoreDir(dek, oldKEK); err != nil {
+			b.logger.Error("failed to revert keystore re-encryption; repair will run at next login", zap.Error(err))
+			return // keep the envelope: the keystore may be on the DEK and need it
+		}
+		_ = envelope.Remove(b.rootDataDir, keyUID)
+	}
+
+	// Export both databases before swapping either, so no revert-re-encryption is needed
+	appDBPath, err := b.getAppDBPath(keyUID)
+	if err != nil {
+		revertKeystoreAndEnvelope()
+		return nil, err
+	}
+	walletDBPath, err := b.getWalletDBPath(keyUID)
+	if err != nil {
+		revertKeystoreAndEnvelope()
+		return nil, err
+	}
+
+	appTmpPath, appCleanup, err := b.createTempDBFile("v4.db")
+	if err != nil {
+		revertKeystoreAndEnvelope()
+		return nil, err
+	}
+	defer appCleanup()
+	err = sqlite.ExportDBWithKDFChange(appDBPath, oldKEK, acc.KDFIterations, appTmpPath, dek, sqlite.ReducedKDFIterationsNumber, nil, nil)
+	if err != nil {
+		revertKeystoreAndEnvelope()
+		return nil, fmt.Errorf("failed to export app database: %w", err)
+	}
+
+	walletTmpPath, walletCleanup, err := b.createTempDBFile("wallet.db")
+	if err != nil {
+		revertKeystoreAndEnvelope()
+		return nil, err
+	}
+	defer walletCleanup()
+	err = sqlite.ExportDBWithKDFChange(walletDBPath, oldKEK, acc.KDFIterations, walletTmpPath, dek, sqlite.ReducedKDFIterationsNumber, nil, nil)
+	if err != nil {
+		revertKeystoreAndEnvelope()
+		return nil, fmt.Errorf("failed to export wallet database: %w", err)
+	}
+	if err := reEncryptionCrash("migrate:dbs-exported"); err != nil {
+		return nil, err
+	}
+
+	// Replacing the database files requires closing all connections to them first
+	if isCurrentAccount {
+		_ = b.Logout()
+	}
+
+	// Swap both databases
+	replaceCleanup, err := replaceDBFile(appDBPath, appTmpPath)
 	if replaceCleanup != nil {
-		defer replaceCleanup()
+		replaceCleanup()
 	}
-	return err
+	if err != nil {
+		revertKeystoreAndEnvelope()
+		return restartWith(oldKEK), err
+	}
+	if err := reEncryptionCrash("migrate:app-swapped"); err != nil {
+		return nil, err
+	}
+
+	replaceCleanup, err = replaceDBFile(walletDBPath, walletTmpPath)
+	if replaceCleanup != nil {
+		replaceCleanup()
+	}
+	if err != nil {
+		// The app DB is already on the DEK, no rollback from here, the wallet DB stays on the old password, the next login will repair it
+		b.logger.Error("wallet database swap failed mid-migration; will be repaired at login", zap.Error(err))
+		return restartWith(oldKEK), err
+	}
+	if err := reEncryptionCrash("migrate:dbs-swapped"); err != nil {
+		return nil, err
+	}
+
+	// The kdf value lives inside the envelope, keep the column in sync for observability
+	if err := b.multiaccountsDB.UpdateAccountKDFIterations(keyUID, sqlite.ReducedKDFIterationsNumber); err != nil {
+		b.logger.Error("failed to update kdfIterations after migration", zap.Error(err))
+	}
+
+	// Commit the new KEK
+	if err := envelope.Rewrap(b.rootDataDir, keyUID, oldKEK, newKEK); err != nil {
+		// Fully migrated but still wrapped with the old password, report failure so the client keeps using the old password
+		return restartWith(oldKEK), err
+	}
+
+	b.clearProfileSecretCache()
+
+	return restartWith(newKEK), nil
+}
+
+// rekeyProfile performs a deep rekey of a profile already on the DEK scheme - a new DEK is generated and the databases
+// and keystore are re-encrypted with it.
+func (b *StatusBackend) rekeyProfile(keyUID, oldKEK, newKEK string) (restart func(), err error) {
+	// Verify oldKEK before anything is touched
+	oldDEK, dbKdfIter, err := envelope.Unwrap(b.rootDataDir, keyUID, oldKEK)
+	if err != nil {
+		return nil, err
+	}
+
+	acc, err := b.multiaccountsDB.GetAccount(keyUID)
+	if err != nil {
+		return nil, err
+	}
+
+	isCurrentAccount, err := b.isCurrentAccountOpen(keyUID)
+	if err != nil {
+		return nil, err
+	}
+	restartWith := func(password string) func() {
+		if !isCurrentAccount {
+			return nil
+		}
+		return func() { b.restartNodeAfterReEncryption(acc, password) }
+	}
+
+	newDEK, err := envelope.Generate()
+	if err != nil {
+		return nil, err
+	}
+
+	signal.SendReEncryptionStarted()
+	defer signal.SendReEncryptionFinished()
+
+	// Pending envelope first (new DEK wrapped with the OLD KEK): every crash state below stays openable with the old password
+	if err := envelope.WritePending(b.rootDataDir, keyUID, newDEK, oldKEK, sqlite.ReducedKDFIterationsNumber); err != nil {
+		return nil, err
+	}
+	if err := reEncryptionCrash("rekey:pending-written"); err != nil {
+		return nil, err
+	}
+
+	abort := func() {
+		_ = envelope.RemovePending(b.rootDataDir, keyUID)
+	}
+
+	// Export both databases from old DEK to new DEK
+	appDBPath, err := b.getAppDBPath(keyUID)
+	if err != nil {
+		abort()
+		return nil, err
+	}
+	walletDBPath, err := b.getWalletDBPath(keyUID)
+	if err != nil {
+		abort()
+		return nil, err
+	}
+
+	appTmpPath, appCleanup, err := b.createTempDBFile("v4.db")
+	if err != nil {
+		abort()
+		return nil, err
+	}
+	defer appCleanup()
+	err = sqlite.ExportDBWithKDFChange(appDBPath, oldDEK, dbKdfIter, appTmpPath, newDEK, sqlite.ReducedKDFIterationsNumber, nil, nil)
+	if err != nil {
+		abort()
+		return nil, fmt.Errorf("failed to export app database: %w", err)
+	}
+
+	walletTmpPath, walletCleanup, err := b.createTempDBFile("wallet.db")
+	if err != nil {
+		abort()
+		return nil, err
+	}
+	defer walletCleanup()
+	err = sqlite.ExportDBWithKDFChange(walletDBPath, oldDEK, dbKdfIter, walletTmpPath, newDEK, sqlite.ReducedKDFIterationsNumber, nil, nil)
+	if err != nil {
+		abort()
+		return nil, fmt.Errorf("failed to export wallet database: %w", err)
+	}
+	if err := reEncryptionCrash("rekey:dbs-exported"); err != nil {
+		return nil, err
+	}
+
+	// Keystore from old DEK to new DEK. On error don't remove the pending envelope, so next login-time repair can determine the actual state
+	if err := b.reEncryptKeyStoreDir(oldDEK, newDEK); err != nil {
+		return nil, fmt.Errorf("failed to re-encrypt keystore: %w", err)
+	}
+	if err := reEncryptionCrash("rekey:keystore-reencrypted"); err != nil {
+		return nil, err
+	}
+
+	// Replacing the database files requires closing all connections to them first
+	if isCurrentAccount {
+		_ = b.Logout()
+	}
+
+	// Swap both databases
+	replaceCleanup, err := replaceDBFile(appDBPath, appTmpPath)
+	if replaceCleanup != nil {
+		replaceCleanup()
+	}
+	if err != nil {
+		// Nothing swapped yet, roll the keystore back and abort cleanly
+		if revertErr := b.reEncryptKeyStoreDir(newDEK, oldDEK); revertErr != nil {
+			b.logger.Error("failed to revert keystore re-encryption; repair will run at login", zap.Error(revertErr))
+			return restartWith(oldKEK), err
+		}
+		abort()
+		return restartWith(oldKEK), err
+	}
+	if err := reEncryptionCrash("rekey:app-swapped"); err != nil {
+		return nil, err
+	}
+
+	replaceCleanup, err = replaceDBFile(walletDBPath, walletTmpPath)
+	if replaceCleanup != nil {
+		replaceCleanup()
+	}
+	if err != nil {
+		// The app DB is already on the new DEK, no rollback from here, the pending envelope keeps the profile openable, the next login will repair it
+		b.logger.Error("wallet database swap failed mid-rekey; will be repaired at login", zap.Error(err))
+		return restartWith(oldKEK), err
+	}
+	if err := reEncryptionCrash("rekey:dbs-swapped"); err != nil {
+		return nil, err
+	}
+
+	// Commit the new DEK wrapped with the new KEK
+	if err := envelope.Write(b.rootDataDir, keyUID, newDEK, newKEK, sqlite.ReducedKDFIterationsNumber); err != nil {
+		// Databases and keystore are on the new DEK, the pending envelope (old password) still opens them, the next login will repair it
+		return restartWith(oldKEK), err
+	}
+	if err := reEncryptionCrash("rekey:committed"); err != nil {
+		return nil, err
+	}
+
+	_ = envelope.RemovePending(b.rootDataDir, keyUID)
+
+	b.clearProfileSecretCache()
+
+	return restartWith(newKEK), nil
 }
 
 func (b *StatusBackend) createTempDBFile(pattern string) (tmpDbPath string, cleanup func(), err error) {
@@ -1403,12 +1626,28 @@ func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s
 		return err
 	}
 
+	if envelope.Exists(b.rootDataDir, account.KeyUID) {
+		if err := b.ChangeDatabasePassword(account.KeyUID, oldPassword, newPassword, false); err != nil {
+			return err
+		}
+		b.updateSessionAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
+		return nil
+	}
+
 	err = b.closeDBs()
 	if err != nil {
 		return err
 	}
 
-	return b.ChangeDatabasePassword(account.KeyUID, oldPassword, newPassword)
+	return b.ChangeDatabasePassword(account.KeyUID, oldPassword, newPassword, false)
+}
+
+func (b *StatusBackend) updateSessionAccountKeycardPairing(keyUID, keycardPairing string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.account != nil && b.account.KeyUID == keyUID {
+		b.account.KeycardPairing = keycardPairing
+	}
 }
 
 // CreateAccountAndLogin creates a new account and logs in with it.
@@ -1713,16 +1952,29 @@ func (b *StatusBackend) ConvertToRegularAccount(mnemonic string, currPassword st
 		return err
 	}
 
+	if envelope.Exists(b.rootDataDir, generatedAccountInfo.KeyUID) {
+		if err := b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword, false); err != nil {
+			return err
+		}
+		b.updateSessionAccountKeycardPairing(generatedAccountInfo.KeyUID, "")
+		return nil
+	}
+
 	err = b.closeDBs()
 	if err != nil {
 		return err
 	}
 
-	return b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword)
+	return b.ChangeDatabasePassword(generatedAccountInfo.KeyUID, currPassword, newPassword, false)
 }
 
 func (b *StatusBackend) VerifyProfilePassword(password string) (bool, error) {
 	return b.statusNode.AccountService().VerifyPassword(password)
+}
+
+// ProfileEncryptionInfo reports whether the profile uses the DEK encryption scheme
+func (b *StatusBackend) ProfileEncryptionInfo(keyUID string) (migrated bool) {
+	return envelope.Exists(b.rootDataDir, keyUID)
 }
 
 func (b *StatusBackend) VerifyDatabasePassword(keyUID string, password string) error {
@@ -1895,6 +2147,19 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	nodeConfig, err := b.prepareConfig(request, keyUID, settings.InstallationID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare node config")
+	}
+
+	// Brand-new profiles use the DEK encryption scheme from the start
+	if !envelope.Exists(b.rootDataDir, keyUID) && !b.appDBExists(keyUID) && !b.walletDBExists(keyUID) {
+		dek, err := envelope.Generate()
+		if err != nil {
+			return nil, err
+		}
+		if err := envelope.Write(b.rootDataDir, keyUID, dek, request.Password, sqlite.ReducedKDFIterationsNumber); err != nil {
+			return nil, err
+		}
+		// High-entropy DEK needs no key stretching
+		multiAccount.KDFIterations = sqlite.ReducedKDFIterationsNumber
 	}
 
 	err = b.ensureDBsOpened(*multiAccount, request.Password)

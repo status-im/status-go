@@ -833,6 +833,11 @@ func TestConvertAccount(t *testing.T) {
 	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, testContext.profileKeypair.KeyUID, testPassword, keycardPassword)
 	require.NoError(t, err)
 
+	require.NotNil(t, testContext.backend.appDB)
+	activeAccount, err := testContext.backend.GetActiveAccount()
+	require.NoError(t, err)
+	require.Equal(t, keycardAccount.KeycardPairing, activeAccount.KeycardPairing)
+
 	// Validating results of converting to a keycard account.
 	// All keystore files for the account which is migrated need to be removed.
 	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
@@ -857,7 +862,7 @@ func TestConvertAccount(t *testing.T) {
 	}()
 
 	// Ensure we're able to open the DB
-	err = testContext.backend.ensureAppDBOpened(keycardAccount, dbCredentials{secret: keycardPassword, kdfIter: keycardAccount.KDFIterations})
+	err = testContext.backend.ensureDBsOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
 
 	// db creation after re-encryption
@@ -873,6 +878,10 @@ func TestConvertAccount(t *testing.T) {
 	err = testContext.backend.ConvertToRegularAccount(testContext.mnemonic, keycardPassword, testPassword)
 	require.NoError(t, err)
 
+	activeAccount, err = testContext.backend.GetActiveAccount()
+	require.NoError(t, err)
+	require.Empty(t, activeAccount.KeycardPairing)
+
 	// Validating results of converting to a regular account.
 	// All keystore files for need to be created.
 	ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
@@ -886,7 +895,7 @@ func TestConvertAccount(t *testing.T) {
 	}
 
 	// Ensure we're able to open the DB
-	err = testContext.backend.ensureAppDBOpened(keycardAccount, dbCredentials{secret: testPassword, kdfIter: keycardAccount.KDFIterations})
+	err = testContext.backend.ensureDBsOpened(keycardAccount, testPassword)
 	require.NoError(t, err)
 
 	// db creation after re-encryption
@@ -1021,7 +1030,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 
 	// Change password
 	const newPassword = "newPassword"
-	err = testContext.backend.ChangeDatabasePassword(testContext.profileKeypair.KeyUID, testPassword, newPassword)
+	err = testContext.backend.ChangeDatabasePassword(testContext.profileKeypair.KeyUID, testPassword, newPassword, false)
 	require.NoError(t, err)
 
 	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
