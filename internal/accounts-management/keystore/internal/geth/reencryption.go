@@ -13,7 +13,8 @@ import (
 	"github.com/status-im/status-go/internal/accounts-management/types"
 )
 
-func reEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
+// ReEncryptKey decrypts a raw keystore file with pass and re-encrypts it with newPass
+func ReEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
 	cryptoJSON, e := RawKeyToCryptoJSON(rawKey)
 	if e != nil {
 		return reEncryptedKey, fmt.Errorf("convert to crypto json error: %v", e)
@@ -57,7 +58,7 @@ func ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
 			return fmt.Errorf("invalid account key file: %v", e)
 		}
 
-		reEncryptedKey, e := reEncryptKey(rawKeyFile, oldPass, newPass)
+		reEncryptedKey, e := ReEncryptKey(rawKeyFile, oldPass, newPass)
 		if e != nil {
 			return fmt.Errorf("unable to re-encrypt key file: %v, path: %s, name: %s", e, path, fileInfo.Name())
 		}

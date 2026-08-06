@@ -208,6 +208,12 @@ func VerifyKeyStoreDirAtPath(keystoreDir, password string) error {
 	return mapToKeystoreError(geth.VerifyKeyStoreDir(keystoreDir, password))
 }
 
+// ReEncryptRawKey decrypts a raw keystore file with oldPass and re-encrypts it with newPass
+func ReEncryptRawKey(rawKey []byte, oldPass, newPass string) ([]byte, error) {
+	reEncrypted, err := geth.ReEncryptKey(rawKey, oldPass, newPass)
+	return reEncrypted, mapToKeystoreError(err)
+}
+
 func (a *Adapter) MigrateKeyStoreDir(newDir string) (err error) {
 	defer func() {
 		err = mapToKeystoreError(err)
