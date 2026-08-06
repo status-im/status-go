@@ -371,6 +371,14 @@ func (db *Database) UpdateAccountKeycardPairing(keyUID string, keycardPairing st
 	return err
 }
 
+func (db *Database) UpdateAccountKDFIterations(keyUID string, kdfIterations int) error {
+	if kdfIterations <= 0 {
+		kdfIterations = dbsetup.ReducedKDFIterationsNumber
+	}
+	_, err := db.db.Exec("UPDATE accounts SET kdfIterations = ? WHERE keyUid = ?", kdfIterations, keyUID)
+	return err
+}
+
 func (db *Database) UpdateAccountTimestamp(keyUID string, loginTimestamp int64) error {
 	_, err := db.db.Exec("UPDATE accounts SET loginTimestamp = ? WHERE keyUid = ?", loginTimestamp, keyUID)
 	return err

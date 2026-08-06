@@ -16,28 +16,34 @@ type profileSecretCache struct {
 	kekFingerprint []byte
 	dekHex         string
 	dbKdfIter      int
+
+	primaryFromPending bool // true when dekHex came from the pending envelope
+
+	pendingDekHex    string
+	pendingDbKdfIter int
+
+	dbAppOpenedWith    string
+	dbWalletOpenedWith string
+}
+
+// dbFallbackCredential is an alternative credential for opening a database (when the primary one fails).
+type dbFallbackCredential struct {
+	secret  string
+	kdfIter int
 }
 
 // resolvedProfileSecret is the outcome of translating a client-provided password into the secret.
 type resolvedProfileSecret struct {
-	secret    string
-	dbKdfIter int
-	migrated  bool // true when the profile uses the DEK encryption scheme.
-	// legacySecret/legacyKdfIter are here for the crash-recovery fallback
-	legacySecret  string
-	legacyKdfIter int
+	secret             string
+	dbKdfIter          int
+	migrated           bool                   // true when the profile uses the DEK encryption scheme.
+	primaryFromPending bool                   // true when the main envelope rejected the password and the secret came from the pending envelope instead.
+	fallbacks          []dbFallbackCredential // tried in order when a database fails to open with secret
 }
 
 // resolveProfileSecret translates (keyUID, password) into the secret used for the databases and keystore files.
 // It returns either the secret or password if the profile is not migrated and an error if the password is wrong.
 func (b *StatusBackend) resolveProfileSecret(keyUID, password string, kdfIterationsFallback int) (resolvedProfileSecret, error) {
-	legacy := resolvedProfileSecret{
-		secret:        password,
-		dbKdfIter:     kdfIterationsFallback,
-		legacySecret:  password,
-		legacyKdfIter: kdfIterationsFallback,
-	}
-
 	c := &b.secretCache
 	c.mu.Lock()
 	if c.keyUID == keyUID && c.dekHex != "" {
@@ -45,11 +51,15 @@ func (b *StatusBackend) resolveProfileSecret(keyUID, password string, kdfIterati
 		if subtle.ConstantTimeCompare(fingerprint[:], c.kekFingerprint) == 1 ||
 			subtle.ConstantTimeCompare([]byte(password), []byte(c.dekHex)) == 1 {
 			resolved := resolvedProfileSecret{
-				secret:        c.dekHex,
-				dbKdfIter:     c.dbKdfIter,
-				migrated:      true,
-				legacySecret:  password,
-				legacyKdfIter: kdfIterationsFallback,
+				secret:             c.dekHex,
+				dbKdfIter:          c.dbKdfIter,
+				migrated:           true,
+				primaryFromPending: c.primaryFromPending,
+				fallbacks:          []dbFallbackCredential{{secret: password, kdfIter: kdfIterationsFallback}},
+			}
+			if c.pendingDekHex != "" && c.pendingDekHex != c.dekHex {
+				resolved.fallbacks = append(resolved.fallbacks,
+					dbFallbackCredential{secret: c.pendingDekHex, kdfIter: c.pendingDbKdfIter})
 			}
 			c.mu.Unlock()
 			return resolved, nil
@@ -58,11 +68,29 @@ func (b *StatusBackend) resolveProfileSecret(keyUID, password string, kdfIterati
 	c.mu.Unlock()
 
 	if !envelope.Exists(b.rootDataDir, keyUID) {
-		return legacy, nil
+		return resolvedProfileSecret{
+			secret:    password,
+			dbKdfIter: kdfIterationsFallback,
+		}, nil
 	}
 
+	pendingDek, pendingIter := "", 0
+	if envelope.PendingExists(b.rootDataDir, keyUID) {
+		pendingDek, pendingIter, _ = envelope.UnwrapPending(b.rootDataDir, keyUID, password)
+	}
+
+	primary, primaryIter := "", 0
+	primaryFromPending := false
 	dekHex, dbKdfIter, err := envelope.Unwrap(b.rootDataDir, keyUID, password)
-	if err != nil {
+	if err == nil {
+		primary, primaryIter = dekHex, dbKdfIter
+	} else if pendingDek != "" {
+		// The main envelope rejects this password but the pending one accepts it, so the pending DEK is what the databases
+		// are encrypted with (mostly).
+		primary, primaryIter = pendingDek, pendingIter
+		primaryFromPending = true
+		pendingDek, pendingIter = "", 0
+	} else {
 		return resolvedProfileSecret{}, err
 	}
 
@@ -70,17 +98,25 @@ func (b *StatusBackend) resolveProfileSecret(keyUID, password string, kdfIterati
 	c.mu.Lock()
 	c.keyUID = keyUID
 	c.kekFingerprint = fingerprint[:]
-	c.dekHex = dekHex
-	c.dbKdfIter = dbKdfIter
+	c.dekHex = primary
+	c.dbKdfIter = primaryIter
+	c.primaryFromPending = primaryFromPending
+	c.pendingDekHex = pendingDek
+	c.pendingDbKdfIter = pendingIter
 	c.mu.Unlock()
 
-	return resolvedProfileSecret{
-		secret:        dekHex,
-		dbKdfIter:     dbKdfIter,
-		migrated:      true,
-		legacySecret:  password,
-		legacyKdfIter: kdfIterationsFallback,
-	}, nil
+	resolved := resolvedProfileSecret{
+		secret:             primary,
+		dbKdfIter:          primaryIter,
+		migrated:           true,
+		primaryFromPending: primaryFromPending,
+		fallbacks:          []dbFallbackCredential{{secret: password, kdfIter: kdfIterationsFallback}},
+	}
+	if pendingDek != "" && pendingDek != primary {
+		resolved.fallbacks = append(resolved.fallbacks,
+			dbFallbackCredential{secret: pendingDek, kdfIter: pendingIter})
+	}
+	return resolved, nil
 }
 
 // clearProfileSecretCache clears the cached secret.
@@ -91,7 +127,45 @@ func (b *StatusBackend) clearProfileSecretCache() {
 	c.kekFingerprint = nil
 	c.dekHex = ""
 	c.dbKdfIter = 0
+	c.primaryFromPending = false
+	c.pendingDekHex = ""
+	c.pendingDbKdfIter = 0
+	c.dbAppOpenedWith = ""
+	c.dbWalletOpenedWith = ""
 	c.mu.Unlock()
+}
+
+// refreshSecretCacheKEK updates the cached KEK fingerprint after the envelope was re-wrapped with
+// a new KEK (fast password change).
+func (b *StatusBackend) refreshSecretCacheKEK(keyUID, newKEK string) {
+	c := &b.secretCache
+	c.mu.Lock()
+	if c.keyUID == keyUID && c.dekHex != "" {
+		fingerprint := sha256.Sum256([]byte(newKEK))
+		c.kekFingerprint = fingerprint[:]
+	}
+	c.mu.Unlock()
+}
+
+// recordDBOpenSecret notes which secret successfully opened a database.
+func (b *StatusBackend) recordDBOpenSecret(dbName, secret string) {
+	c := &b.secretCache
+	c.mu.Lock()
+	switch dbName {
+	case "app":
+		c.dbAppOpenedWith = secret
+	case "wallet":
+		c.dbWalletOpenedWith = secret
+	}
+	c.mu.Unlock()
+}
+
+// dbOpenSecrets returns which secrets opened the app and wallet databases.
+func (b *StatusBackend) dbOpenSecrets() (app, wallet string) {
+	c := &b.secretCache
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.dbAppOpenedWith, c.dbWalletOpenedWith
 }
 
 // setSecretResolverForProfile points the accounts manager's keystore operations at this profile's secret resolution.
