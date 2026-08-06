@@ -54,8 +54,8 @@ type Reliability struct {
 	logger                *zap.Logger
 
 	// mu guards lifecycle transitions (Start/Stop/SetPaused/buildNode) so they
-	// don't interleave. The hot path (Unwrap / WrapAndQueue) only does an atomic
-	// Load of `datasync` and never takes mu.
+	// don't interleave. The hot path (Unwrap / WrapAndQueue) never takes mu;
+	// datasync uses atomic loads and SDS uses sdsOpsMu.
 	mu       sync.Mutex
 	datasync atomic.Pointer[datasync2.DataSync]
 	dispatch MessageDispatcher
@@ -70,11 +70,31 @@ type Reliability struct {
 
 	messageSentHandlerMu sync.RWMutex
 	messageSentHandler   MessageSentHandler
+
+	sdsManagerFactory sdsManagerFactoryFunc
+
+	// sdsOpsMu coordinates SDS manager calls with shutdown. SDS hot-path calls
+	// hold RLock for the full native call; Close holds Lock before Cleanup so
+	// Cleanup cannot race with in-flight SDS manager usage.
+	sdsOpsMu sync.RWMutex
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
+	return newReliabilityWithSDSFactory(datasyncPersistence, identity, missingDepsHandler, logger, sds.NewReliabilityManager)
+}
+
+func newReliabilityWithSDSFactory(
+	datasyncPersistence mvdsnode.Persistence,
+	identity *ecdsa.PrivateKey,
+	missingDepsHandler MissingDependenciesHandler,
+	logger *zap.Logger,
+	sdsManagerFactory sdsManagerFactoryFunc,
+) (*Reliability, error) {
 	if missingDepsHandler == nil {
 		return nil, errors.New("missingDepsHandler is required")
+	}
+	if sdsManagerFactory == nil {
+		return nil, errors.New("sdsManagerFactory is required")
 	}
 	logger = logger.Named("reliability")
 	r := &Reliability{
@@ -83,11 +103,34 @@ func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.Pr
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
 		logger:                logger,
 		missingDepsHandler:    missingDepsHandler,
+		sdsManagerFactory:     sdsManagerFactory,
 	}
 
-	r.sdsManager = newSdsReliabilityManager(logger.Named("sds"), r.handleSDSMessageSent, r.handleMissingDependencies, r.provideRetrievalHint)
+	if err := r.buildSdsManager(); err != nil {
+		return nil, err
+	}
 
 	return r, nil
+}
+
+// buildSdsManager installs a fresh SDS reliability manager. Close() destroys the
+// previous one, so this must run again on every Start().
+func (r *Reliability) buildSdsManager() error {
+	manager, err := newSdsReliabilityManager(
+		r.sdsManagerFactory,
+		r.logger.Named("sds"),
+		r.handleSDSMessageSent,
+		r.handleMissingDependencies,
+		r.provideRetrievalHint,
+	)
+	if err != nil {
+		return err
+	}
+
+	r.sdsOpsMu.Lock()
+	r.sdsManager = manager
+	r.sdsOpsMu.Unlock()
+	return nil
 }
 
 // SetMissingDependenciesHandler configures how SDS missing dependencies should be handled.
@@ -175,6 +218,11 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.dispatch = dispatch
+	if r.sdsManager == nil {
+		if err := r.buildSdsManager(); err != nil {
+			return err
+		}
+	}
 	duration := datasync2.DatasyncTicker
 	if r.paused {
 		duration = pausedDuration
@@ -277,19 +325,35 @@ func (r *Reliability) SetPaused(paused bool) error {
 	return nil
 }
 
+// Stop idles the data-sync node. The SDS manager deliberately stays alive: its
+// bloom filter and causal history are what let us detect messages missed while
+// offline, so a connectivity drop must not discard them. Use Close for shutdown.
 func (r *Reliability) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.stopLocked()
+}
+
+func (r *Reliability) stopLocked() {
 	if old := r.datasync.Swap(nil); old != nil {
 		old.SetSendingEnabled(false)
 		old.Stop()
 	}
-	if r.sdsManager != nil {
-		err := r.sdsManager.Cleanup()
+}
+
+// Close stops the data-sync node and releases the SDS manager's native resources.
+func (r *Reliability) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stopLocked()
+	r.sdsOpsMu.Lock()
+	defer r.sdsOpsMu.Unlock()
+	if old := r.sdsManager; old != nil {
+		r.sdsManager = nil
+		err := old.Cleanup()
 		if err != nil {
 			r.logger.Error("failed to cleanup sds reliability manager", zap.Error(err))
 		}
-		r.sdsManager = nil
 	}
 }
 

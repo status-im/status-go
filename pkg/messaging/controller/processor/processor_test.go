@@ -70,7 +70,7 @@ func (s *ProcessorSuite) newStandaloneReliability() *reliability.Reliability {
 	)
 	s.Require().NoError(err)
 
-	s.T().Cleanup(r.Stop)
+	s.T().Cleanup(r.Close)
 
 	return r
 }
@@ -153,6 +153,8 @@ func (s *ProcessorSuite) SetupTest() {
 
 	err = stack.Reliability.Start(func(*ecdsa.PublicKey, []byte, [][]byte) error { return nil })
 	s.Require().NoError(err)
+
+	s.T().Cleanup(stack.Reliability.Close)
 
 	s.processor = NewProcessor(
 		identity,

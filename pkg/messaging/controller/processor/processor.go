@@ -166,9 +166,12 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 		}
 	}
 
+	// A broken SDS layer yields a payload that silently fails to decode further up,
+	// so fail the whole envelope instead: it must be retried, not marked processed.
 	err = r.processSDSLayer(responseMessage)
 	if err != nil {
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
+		return nil, err
 	}
 
 	messages, ackedMessageIDs, err := r.processReliabilityLayer(responseMessage, logger)
