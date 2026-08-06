@@ -134,12 +134,17 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 
 // Export takes an encrypted database and re-encrypts it in a new file, with a new key
 func ExportDB(encryptedPath string, key string, kdfIterationsNumber int, newPath string, newKey string, onStart func(), onEnd func()) error {
+	return ExportDBWithKDFChange(encryptedPath, key, kdfIterationsNumber, newPath, newKey, kdfIterationsNumber, onStart, onEnd)
+}
+
+// ExportDBWithKDFChange is like ExportDB but allows the exported database to use a different number of kdf iterations than the source database.
+func ExportDBWithKDFChange(encryptedPath string, key string, kdfIterationsNumber int, newPath string, newKey string, newKdfIterationsNumber int, onStart func(), onEnd func()) error {
 	db, err := openDB(encryptedPath, key, kdfIterationsNumber, V4CipherPageSize)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	return encryptDB(db, newPath, newKey, kdfIterationsNumber, onStart, onEnd)
+	return encryptDB(db, newPath, newKey, newKdfIterationsNumber, onStart, onEnd)
 }
 
 func buildSqlcipherDSN(path string) (string, error) {

@@ -103,14 +103,19 @@ func (m *AccountsManager) storeToKeystore(acc *generator.Account, password strin
 		return ErrAccountIsNil
 	}
 
+	secret, err := m.resolveSecret(password)
+	if err != nil {
+		return err
+	}
+
 	m.logger.Info("storing account to keystore", zap.String("address", acc.Address().Hex()))
 
 	if acc.HasExtendedKey() {
-		_, err = m.keystore.ImportSingleExtendedKey(acc.ExtendedKey(), password)
+		_, err = m.keystore.ImportSingleExtendedKey(acc.ExtendedKey(), secret)
 		return
 	}
 
-	_, err = m.keystore.ImportECDSA(acc.PrivateKey(), password)
+	_, err = m.keystore.ImportECDSA(acc.PrivateKey(), secret)
 	return
 }
 
@@ -135,8 +140,20 @@ func (m *AccountsManager) deleteAccountFromKeystoreIfExists(address cryptotypes.
 		m.logger.Error("cannot delete account, keystore is missing", zap.String("address", address.Hex()))
 		return ErrKeystoreMissing
 	}
+	secret, err := m.resolveSecret(password)
+	if err != nil {
+		return err
+	}
 	m.logger.Info("deleting account", zap.String("address", address.Hex()))
-	err := m.keystore.Delete(address, password)
+	err = m.keystore.Delete(address, secret)
+	if err != nil && !errors.Is(err, keystore.ErrKeystoreFileMissing) && secret != password {
+		// Fallback for interrupted migrations.
+		if fbErr := m.keystore.Delete(address, password); fbErr == nil {
+			m.logger.Warn("keystore file deleted with legacy credentials after failed DEK attempt; encryption-scheme migration was likely interrupted",
+				zap.String("address", address.Hex()))
+			err = nil
+		}
+	}
 	if errors.Is(err, keystore.ErrKeystoreFileMissing) {
 		return nil
 	}

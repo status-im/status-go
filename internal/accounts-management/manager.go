@@ -15,6 +15,9 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 )
 
+// SecretResolver translates the password provided by the client into the secret
+type SecretResolver func(password string) (string, error)
+
 // AccountsManager represents the default account manager implementation
 type AccountsManager struct {
 	mu          sync.RWMutex
@@ -24,6 +27,7 @@ type AccountsManager struct {
 	rootDataDir         string
 	profileKeyUID       string
 	selectedChatAccount *generator.Account
+	secretResolver      SecretResolver
 
 	logger *zap.Logger
 }
@@ -53,6 +57,23 @@ func (m *AccountsManager) SetRootDataDir(rootDataDir string) {
 	defer m.mu.Unlock()
 
 	m.rootDataDir = rootDataDir
+}
+
+// SetSecretResolver sets (or clears, with nil) the resolver
+func (m *AccountsManager) SetSecretResolver(resolver SecretResolver) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.secretResolver = resolver
+}
+
+// resolveSecret applies the configured secret resolver to a client-provided password
+// Callers must hold m.mu (read or write).
+func (m *AccountsManager) resolveSecret(password string) (string, error) {
+	if m.secretResolver == nil {
+		return password, nil
+	}
+	return m.secretResolver(password)
 }
 
 func (m *AccountsManager) setKeystore(keystore KeyStore) {
@@ -98,7 +119,20 @@ func (m *AccountsManager) loadAccountInternally(address cryptotypes.Address, pas
 		return nil, ErrKeystoreMissing
 	}
 
-	_, privateKey, extendedKey, err := m.keystore.AccountDecryptedKey(address, password)
+	secret, err := m.resolveSecret(password)
+	if err != nil {
+		return nil, err
+	}
+
+	_, privateKey, extendedKey, err := m.keystore.AccountDecryptedKey(address, secret)
+	if err != nil && secret != password {
+		// Fallback for interrupted migrations.
+		if _, fbPrivateKey, fbExtendedKey, fbErr := m.keystore.AccountDecryptedKey(address, password); fbErr == nil {
+			m.logger.Warn("keystore file decrypted with legacy credentials after failed DEK decrypt; encryption-scheme migration was likely interrupted",
+				zap.String("address", address.Hex()))
+			privateKey, extendedKey, err = fbPrivateKey, fbExtendedKey, nil
+		}
+	}
 	if err != nil {
 		m.logger.Error("error loading account", zap.String("address", address.Hex()), zap.Error(err))
 		if errors.Is(err, keystore.ErrKeystoreFileMissing) {
@@ -123,7 +157,20 @@ func (m *AccountsManager) loadPrivateKeyInternally(address cryptotypes.Address, 
 		return nil, ErrKeystoreMissing
 	}
 
-	_, privateKey, err := m.keystore.AccountDecryptedPrivateKey(address, password)
+	secret, err := m.resolveSecret(password)
+	if err != nil {
+		return nil, err
+	}
+
+	_, privateKey, err := m.keystore.AccountDecryptedPrivateKey(address, secret)
+	if err != nil && secret != password {
+		// Fallback for interrupted migrations.
+		if _, fbPrivateKey, fbErr := m.keystore.AccountDecryptedPrivateKey(address, password); fbErr == nil {
+			m.logger.Warn("keystore file decrypted with legacy credentials after failed DEK decrypt; encryption-scheme migration was likely interrupted",
+				zap.String("address", address.Hex()))
+			privateKey, err = fbPrivateKey, nil
+		}
+	}
 	if err != nil {
 		m.logger.Error("error loading account", zap.String("address", address.Hex()), zap.Error(err))
 		if errors.Is(err, keystore.ErrKeystoreFileMissing) {
@@ -208,6 +255,7 @@ func (m *AccountsManager) Logout() {
 	m.rootDataDir = ""
 	m.selectedChatAccount = nil
 	m.profileKeyUID = ""
+	m.secretResolver = nil
 	m.logger.Info("logout")
 }
 
