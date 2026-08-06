@@ -1211,8 +1211,34 @@ func changeDatabasePasswordV2(requestJSON string) string {
 		return makeJSONResponse(errors.New("incorrect current password"))
 	}
 
-	err = statusBackend.ChangeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
+	err = statusBackend.ChangeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword, request.Rekey)
 	return makeJSONResponse(err)
+}
+
+// GetProfileEncryptionInfo reports whether the profile uses the DEK encryption
+func GetProfileEncryptionInfo(requestJSON string) string {
+	return callWithResponse(getProfileEncryptionInfo, requestJSON)
+}
+
+func getProfileEncryptionInfo(requestJSON string) string {
+	var request requests.GetProfileEncryptionInfo
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := request.Validate(); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(struct {
+		Migrated bool `json:"migrated"`
+	}{Migrated: statusBackend.ProfileEncryptionInfo(request.KeyUID)})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
 }
 
 // Deprecated: Use ConvertToKeycardAccountV2 instead.

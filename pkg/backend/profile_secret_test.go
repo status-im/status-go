@@ -47,8 +47,7 @@ func TestResolveProfileSecretMigratedProfile(t *testing.T) {
 	require.True(t, resolved.migrated)
 	require.Equal(t, dek, resolved.secret)
 	require.Equal(t, 3200, resolved.dbKdfIter)
-	require.Equal(t, secretTestPassword, resolved.legacySecret)
-	require.Equal(t, 256000, resolved.legacyKdfIter)
+	require.Equal(t, []dbFallbackCredential{{secret: secretTestPassword, kdfIter: 256000}}, resolved.fallbacks)
 }
 
 func TestResolveProfileSecretWrongPassword(t *testing.T) {
@@ -122,10 +121,14 @@ func TestOpenDBWithCredsFallback(t *testing.T) {
 	b := newSecretTestBackend(t)
 
 	openErr := errors.New("file is not a database")
+	credsWithFallbacks := dbCredentials{secret: "dek", kdfIter: 3200, fallbacks: []dbFallbackCredential{
+		{secret: "pw", kdfIter: 256000},
+		{secret: "pendingdek", kdfIter: 3200},
+	}}
 
-	// Primary succeeds: fallback never attempted.
+	// Primary succeeds: fallbacks never attempted.
 	attempts := []string{}
-	db, err := b.openDBWithCredsFallback("app", dbCredentials{secret: "dek", kdfIter: 3200, fallbackSecret: "pw", fallbackKdfIter: 256000},
+	db, err := b.openDBWithCredsFallback("app", credsWithFallbacks,
 		func(secret string, kdfIter int) (*sql.DB, error) {
 			attempts = append(attempts, secret)
 			return nil, nil
@@ -133,33 +136,33 @@ func TestOpenDBWithCredsFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, db)
 	require.Equal(t, []string{"dek"}, attempts)
+	usedApp, _ := b.dbOpenSecrets()
+	require.Equal(t, "dek", usedApp)
 
-	// Primary fails, fallback succeeds.
+	// Primary fails, second fallback succeeds; the winning secret is recorded.
 	attempts = nil
-	_, err = b.openDBWithCredsFallback("app", dbCredentials{secret: "dek", kdfIter: 3200, fallbackSecret: "pw", fallbackKdfIter: 256000},
+	_, err = b.openDBWithCredsFallback("app", credsWithFallbacks,
 		func(secret string, kdfIter int) (*sql.DB, error) {
 			attempts = append(attempts, secret)
-			if secret == "dek" {
-				return nil, openErr
+			if secret == "pendingdek" {
+				return nil, nil
 			}
-			return nil, nil
+			return nil, openErr
 		})
 	require.NoError(t, err)
-	require.Equal(t, []string{"dek", "pw"}, attempts)
+	require.Equal(t, []string{"dek", "pw", "pendingdek"}, attempts)
+	usedApp, _ = b.dbOpenSecrets()
+	require.Equal(t, "pendingdek", usedApp)
 
-	// Both fail: the primary error is reported.
+	// All fail: the primary error is reported.
 	attempts = nil
-	fallbackErr := errors.New("also wrong")
-	_, err = b.openDBWithCredsFallback("app", dbCredentials{secret: "dek", kdfIter: 3200, fallbackSecret: "pw", fallbackKdfIter: 256000},
+	_, err = b.openDBWithCredsFallback("app", credsWithFallbacks,
 		func(secret string, kdfIter int) (*sql.DB, error) {
 			attempts = append(attempts, secret)
-			if secret == "dek" {
-				return nil, openErr
-			}
-			return nil, fallbackErr
+			return nil, errors.New("wrong key: " + secret)
 		})
-	require.ErrorIs(t, err, openErr)
-	require.Equal(t, []string{"dek", "pw"}, attempts)
+	require.ErrorContains(t, err, "wrong key: dek")
+	require.Equal(t, []string{"dek", "pw", "pendingdek"}, attempts)
 
 	// No fallback credentials (legacy profile): single attempt.
 	attempts = nil

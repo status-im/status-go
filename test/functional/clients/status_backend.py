@@ -699,12 +699,20 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         url = f"{self.base_url}/statusgo/debug/FreeOSMemory"
         requests.post(url)
 
-    def change_database_password(self, old_password, new_password):
+    def change_database_password(self, old_password, new_password, rekey=False):
         method = "ChangeDatabasePasswordV2"
         data = {
             "keyUid": self.key_uid,
             "oldPassword": old_password,
             "newPassword": new_password,
+            "rekey": rekey,
+        }
+        return self.api_request_json(method, data)
+
+    def get_profile_encryption_info(self):
+        method = "GetProfileEncryptionInfo"
+        data = {
+            "keyUid": self.key_uid,
         }
         return self.api_request_json(method, data)
 
