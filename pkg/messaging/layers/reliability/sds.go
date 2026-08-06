@@ -9,16 +9,22 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 )
 
+// ErrSDSManagerUnavailable means SDS could not run at all, as opposed to a
+// payload simply not being SDS-wrapped.
+var ErrSDSManagerUnavailable = errors.New("sds reliability manager unavailable")
+
+type sdsManagerFactoryFunc func(*zap.Logger) (*sds.ReliabilityManager, error)
+
 func newSdsReliabilityManager(
+	sdsManagerFactory sdsManagerFactoryFunc,
 	logger *zap.Logger,
 	onMessageSent func(messageId sds.MessageID, channelId string),
 	onMissingDependencies func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string),
 	retrievalHintProvider func(messageId sds.MessageID) []byte,
-) *sds.ReliabilityManager {
-	reliabilityManager, err := sds.NewReliabilityManager(logger)
+) (*sds.ReliabilityManager, error) {
+	reliabilityManager, err := sdsManagerFactory(logger)
 	if err != nil {
-		logger.Error("failed to create ReliabilityManager", zap.Error(err))
-		return nil
+		return nil, errors.Wrap(err, "failed to create ReliabilityManager")
 	}
 
 	callbacks := sds.EventCallbacks{
@@ -58,11 +64,19 @@ func newSdsReliabilityManager(
 	}
 	reliabilityManager.RegisterCallbacks(callbacks)
 
-	return reliabilityManager
+	return reliabilityManager, nil
 }
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
 func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byte, []byte, error) {
+	r.sdsOpsMu.RLock()
+	defer r.sdsOpsMu.RUnlock()
+
+	manager := r.sdsManager
+	if manager == nil {
+		return nil, nil, ErrSDSManagerUnavailable
+	}
+
 	sdsMessageID := crypto.Keccak256(payload)
 
 	r.logger.Debug("original payload wrapped with SDS",
@@ -70,7 +84,7 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 		zap.Int("payloadLength", len(payload)),
 		zap.String("messageId", cryptotypes.EncodeHex(sdsMessageID)),
 	)
-	sdsWrappedPayload, err := r.sdsManager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), channelID)
+	sdsWrappedPayload, err := manager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), channelID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to wrap message with SDS")
 	}
@@ -79,7 +93,15 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 }
 
 func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {
-	unwrappedMessage, err := r.sdsManager.UnwrapReceivedMessage(wrappedPayload)
+	r.sdsOpsMu.RLock()
+	defer r.sdsOpsMu.RUnlock()
+
+	manager := r.sdsManager
+	if manager == nil {
+		return nil, ErrSDSManagerUnavailable
+	}
+
+	unwrappedMessage, err := manager.UnwrapReceivedMessage(wrappedPayload)
 	if err != nil {
 		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
 		// return original payload since wrapping is not mandatory for all kinds of messages
