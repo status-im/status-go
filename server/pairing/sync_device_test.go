@@ -16,8 +16,11 @@ import (
 
 	"github.com/status-im/status-go/common/dbsetup"
 	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
+	keystorepkg "github.com/status-im/status-go/internal/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/db/sqlite"
 	testutils "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/backend"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -105,6 +108,30 @@ func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *backend.S
 	backend := backend.NewStatusBackend(s.logger)
 	backend.UpdateRootDataDir(tmpdir)
 	return backend
+}
+
+func (s *SyncDeviceSuite) reEncryptDBInPlace(path, oldKey string, oldIter int, newKey string, newIter int) {
+	tmpPath := path + ".reencrypted"
+	require.NoError(s.T(), sqlite.ExportDBWithKDFChange(path, oldKey, oldIter, tmpPath, newKey, newIter, nil, nil))
+	require.NoError(s.T(), os.Rename(tmpPath, path))
+	_ = os.Remove(path + "-wal")
+	_ = os.Remove(path + "-shm")
+}
+
+// demigrateBackend converts a logged-in DEK-native backend to the legacy encryption scheme
+// (as if the profile had been created by an older app version) and logs it back in.
+func (s *SyncDeviceSuite) demigrateBackend(b *backend.StatusBackend, tmpdir, keyUID string) {
+	require.NoError(s.T(), b.Logout())
+
+	dek, dekIter, err := envelope.Unwrap(tmpdir, keyUID, s.password)
+	require.NoError(s.T(), err)
+
+	s.reEncryptDBInPlace(filepath.Join(tmpdir, keyUID+"-v4.db"), dek, dekIter, s.password, dbsetup.ReducedKDFIterationsNumber)
+	s.reEncryptDBInPlace(filepath.Join(tmpdir, keyUID+"-wallet.db"), dek, dekIter, s.password, dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(s.T(), keystorepkg.ReEncryptKeyStoreDirAtPath(filepath.Join(tmpdir, backend.DefaultKeystoreRelativePath, keyUID), dek, s.password))
+	require.NoError(s.T(), envelope.Remove(tmpdir, keyUID))
+
+	require.NoError(s.T(), b.LoginAccount(&requests.Login{KeyUID: keyUID, Password: s.password}))
 }
 
 func containsKeystoreFile(directory, key string) bool {
@@ -249,6 +276,13 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	err = accountsManager.ReloadKeystore()
 	require.NoError(s.T(), err)
 
+	// both backends are DEK-native (created by this version): the received files must be
+	// stored under the client's DEK, not the raw password (the manager's raw-password
+	// fallback would mask that, so check the files directly)
+	clientDek, _, err := envelope.Unwrap(clientTmpDir, clientActiveAccount.KeyUID, s.password)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), keystorepkg.VerifyKeyStoreDirAtPath(clientKeystorePath, clientDek))
+
 	// check keystore on client
 	genAcc, err := accountsManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
 	require.NoError(s.T(), err)
@@ -262,6 +296,124 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 		accInfo := genAcc.ToIdentifiedAccountInfo()
 		require.Equal(s.T(), acc.Address.String(), accInfo.Address)
 	}
+}
+
+// TestTransferringKeystoreFilesFromLegacySender covers the KeystoreFilesPayload flow with a
+// LEGACY sender (an old app version) and a DEK-native receiver: the wire format is unchanged
+// and the receiver stores the files under its own DEK.
+func (s *SyncDeviceSuite) TestTransferringKeystoreFilesFromLegacySender() {
+	ctx := context.TODO()
+
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, serverTmpDir)
+
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
+	clientBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, clientTmpDir)
+	defer func() {
+		require.NoError(s.T(), clientBackend.Logout())
+		require.NoError(s.T(), serverBackend.Logout())
+	}()
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
+
+	// Bring the server profile back to the legacy scheme, as an older app version would have it.
+	s.demigrateBackend(serverBackend, serverTmpDir, serverActiveAccount.KeyUID)
+
+	serverBackend.Messenger().SetLocalPairing(true)
+	clientBackend.Messenger().SetLocalPairing(true)
+
+	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	walletAccounts := &accsmanagementtypes.AccountCreationDetails{
+		Path:    accsmanagementcommon.PathDefaultWalletAccount,
+		Name:    "Default Wallet Account",
+		Emoji:   "💰",
+		ColorID: "primary",
+	}
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
+	require.NoError(s.T(), err, "saving seed phrase keypair on legacy server with keystore files created")
+
+	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	clientSeedPhraseKp, err := clientAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
+	require.NoError(s.T(), err, "saving seed phrase keypair on client without keystore files")
+
+	// the legacy server keystore stays password-encrypted
+	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
+	require.False(s.T(), envelope.Exists(serverTmpDir, serverActiveAccount.KeyUID))
+	require.NoError(s.T(), keystorepkg.VerifyKeyStoreDirAtPath(serverKeystorePath, s.password))
+	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverSeedPhraseKp.DerivedFrom[2:]))
+
+	// remove the client's keystore files for the seed keypair, simulating a restored keypair
+	clientKeystorePath := filepath.Join(clientTmpDir, backend.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
+	files, err := os.ReadDir(clientKeystorePath)
+	require.NoError(s.T(), err)
+	for _, file := range files {
+		if strings.Contains(strings.ToLower(file.Name()), strings.ToLower(clientSeedPhraseKp.DerivedFrom[2:])) {
+			require.NoError(s.T(), os.RemoveAll(filepath.Join(clientKeystorePath, file.Name())))
+			continue
+		}
+		for _, acc := range clientSeedPhraseKp.Accounts {
+			if strings.Contains(strings.ToLower(file.Name()), strings.ToLower(acc.Address.String()[2:])) {
+				require.NoError(s.T(), os.RemoveAll(filepath.Join(clientKeystorePath, file.Name())))
+			}
+		}
+	}
+	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
+
+	// transfer
+	var config = KeystoreFilesSenderServerConfig{
+		SenderConfig: &KeystoreFilesSenderConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   serverKeystorePath,
+				LoggedInKeyUID: serverActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToExport: []string{serverSeedPhraseKp.KeyUID},
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(s.T(), err)
+	cs, err := StartUpKeystoreFilesSenderServer(serverBackend, string(configBytes))
+	require.NoError(s.T(), err)
+
+	clientPayloadSourceConfig := KeystoreFilesReceiverClientConfig{
+		ReceiverConfig: &KeystoreFilesReceiverConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   clientKeystorePath,
+				LoggedInKeyUID: clientActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToImport: []string{serverSeedPhraseKp.KeyUID},
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	err = StartUpKeystoreFilesReceivingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	require.NoError(s.T(), err)
+
+	// the client received the files and stored them under its own DEK
+	require.True(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	clientDek, _, err := envelope.Unwrap(clientTmpDir, clientActiveAccount.KeyUID, s.password)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), keystorepkg.VerifyKeyStoreDirAtPath(clientKeystorePath, clientDek))
+
+	// the server keystore is untouched, still legacy
+	require.NoError(s.T(), keystorepkg.VerifyKeyStoreDirAtPath(serverKeystorePath, s.password))
+	require.False(s.T(), envelope.Exists(serverTmpDir, serverActiveAccount.KeyUID))
+
+	// keys remain loadable on the client through the resolver
+	accountsManager := clientBackend.AccountsManager()
+	require.NoError(s.T(), accountsManager.ReloadKeystore())
+	genAcc, err := accountsManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, genAcc.ToIdentifiedAccountInfo().KeyUID)
 }
 
 func (s *SyncDeviceSuite) TestTransferringKeystoreFilesSkipsAlreadyStoredKeystores() {

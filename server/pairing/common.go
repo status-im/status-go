@@ -12,6 +12,8 @@ import (
 
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
+	keystorepkg "github.com/status-im/status-go/internal/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 
@@ -55,6 +57,40 @@ func validateKeys(keys map[string][]byte, password string) error {
 		}
 	}
 
+	return nil
+}
+
+// rootDataDirFromKeystorePath derives the root data dir from a profile keystore path
+// which is either `<root>/keystore/<keyUID>` or `<root>/keystore`
+func rootDataDirFromKeystorePath(keystorePath, keyUID string) string {
+	keystorePath = strings.TrimRight(keystorePath, "/\\")
+	if filepath.Base(keystorePath) == keyUID {
+		return filepath.Dir(filepath.Dir(keystorePath))
+	}
+	return filepath.Dir(keystorePath)
+}
+
+// prepareKeysForTransfer re-encrypts loaded keystore files in memory from the profile's DEK to the transfer password
+// when the profile uses the DEK encryption scheme. The local-pairing wire format therefore stays password-encrypted,
+// compatible with receivers of any version. No-op for legacy profiles.
+func prepareKeysForTransfer(keys map[string][]byte, keystorePath, keyUID, password string) error {
+	rootDataDir := rootDataDirFromKeystorePath(keystorePath, keyUID)
+	if !envelope.Exists(rootDataDir, keyUID) {
+		return nil
+	}
+
+	dek, _, err := envelope.Unwrap(rootDataDir, keyUID, password)
+	if err != nil {
+		return err
+	}
+
+	for name, rawKey := range keys {
+		reEncrypted, err := keystorepkg.ReEncryptRawKey(rawKey, dek, password)
+		if err != nil {
+			return fmt.Errorf("failed to re-encrypt keystore file %s for transfer: %w", name, err)
+		}
+		keys[name] = reEncrypted
+	}
 	return nil
 }
 
@@ -112,7 +148,16 @@ func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error 
 		return err
 	}
 
-	return validateKeys(keys, senderConfig.Password)
+	secret := senderConfig.Password
+	rootDataDir := rootDataDirFromKeystorePath(senderConfig.KeystorePath, senderConfig.KeyUID)
+	if envelope.Exists(rootDataDir, senderConfig.KeyUID) {
+		secret, _, err = envelope.Unwrap(rootDataDir, senderConfig.KeyUID, senderConfig.Password)
+		if err != nil {
+			return err
+		}
+	}
+
+	return validateKeys(keys, secret)
 }
 
 func validateReceiverConfig(s interface{}, receiverConfig *ReceiverConfig) error {

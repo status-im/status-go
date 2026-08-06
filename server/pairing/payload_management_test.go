@@ -16,6 +16,8 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
+	keystorepkg "github.com/status-im/status-go/internal/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/pkg/backend"
@@ -330,19 +332,30 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().NoError(err)
 
 	// TEST PairingPayloadRepository 2 Store()
-	keys := getFiles(pms.T(), filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID))
-
-	pms.Require().Len(keys, 2)
-	pms.Require().Len(keys[pk1fileName], 489)
-	pms.Require().Len(keys[pk2fileName], 489)
+	// The wire payload preserves the sender's password-encrypted file bytes...
+	pms.Require().Len(pp2.keys, 2)
+	pms.Require().Len(pp2.keys[pk1fileName], 489)
+	pms.Require().Len(pp2.keys[pk2fileName], 489)
 
 	h1 := sha256.New()
-	h1.Write(keys[pk1fileName])
+	h1.Write(pp2.keys[pk1fileName])
 	pms.Require().Exactly(account1Hash, h1.Sum(nil))
 
 	h2 := sha256.New()
-	h2.Write(keys[pk2fileName])
+	h2.Write(pp2.keys[pk2fileName])
 	pms.Require().Exactly(account2Hash, h2.Sum(nil))
+
+	// ...while the receiver stores them re-encrypted with its freshly adopted DEK.
+	profileKeystorePath := filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID)
+	keys := getFiles(pms.T(), profileKeystorePath)
+	pms.Require().Len(keys, 2)
+
+	receiverRootDataDir := pms.config2.CreateAccount.RootDataDir
+	pms.Require().True(envelope.Exists(receiverRootDataDir, keyUID))
+	receiverDek, _, err := envelope.Unwrap(receiverRootDataDir, keyUID, password)
+	pms.Require().NoError(err)
+	pms.Require().NoError(keystorepkg.VerifyKeyStoreDirAtPath(profileKeystorePath, receiverDek))
+	pms.Require().Error(keystorepkg.VerifyKeyStoreDirAtPath(profileKeystorePath, password))
 
 	acc, err := pms.config2.DB.GetAccount(keyUID)
 	pms.Require().NoError(err)

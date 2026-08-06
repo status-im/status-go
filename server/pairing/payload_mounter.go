@@ -123,6 +123,12 @@ func (apl *AccountPayloadLoader) Load() error {
 		return err
 	}
 
+	// migrated profiles transfer their keystore files password-encrypted (wire format)
+	err = prepareKeysForTransfer(apl.keys, apl.keystorePath, apl.keyUID, apl.password)
+	if err != nil {
+		return err
+	}
+
 	err = validateKeys(apl.keys, apl.password)
 	if err != nil {
 		return err
@@ -333,6 +339,12 @@ func (kfpl *KeystoreFilesPayloadLoader) Load() error {
 	}
 
 	kfpl.keys = filteredMap
+
+	// migrated profiles transfer their keystore files password-encrypted (wire format)
+	err = prepareKeysForTransfer(kfpl.keys, kfpl.keystorePath, kfpl.loggedInKeyUID, kfpl.password)
+	if err != nil {
+		return err
+	}
 
 	return validateKeys(kfpl.keys, kfpl.password)
 }

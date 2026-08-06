@@ -10,8 +10,11 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
+	keystorepkg "github.com/status-im/status-go/internal/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
@@ -151,7 +154,13 @@ func (aps *AccountPayloadStorer) Store() error {
 		return err
 	}
 
+	_, profileDirStatErr := os.Stat(aps.profileKeystorePathFor(keyUID))
+	profileDirExistedBefore := profileDirStatErr == nil
+
 	if err = aps.storeKeys(aps.keystorePath); err != nil && err != ErrKeyFileAlreadyExists {
+		if !profileDirExistedBefore {
+			aps.cleanupProfileState(keyUID)
+		}
 		return err
 	}
 
@@ -164,7 +173,68 @@ func (aps *AccountPayloadStorer) Store() error {
 		}
 		return nil
 	}
-	return aps.storeMultiAccount()
+
+	// A brand-new profile on this device adopts the DEK encryption scheme right away, so the first login creates the databases
+	// under a device-local DEK. The transferred keystore files (password-encrypted wire format) are re-encrypted to the DEK.
+	if err := aps.adoptDEKScheme(keyUID); err != nil {
+		aps.cleanupProfileState(keyUID)
+		return err
+	}
+
+	if err := aps.storeMultiAccount(); err != nil {
+		aps.cleanupProfileState(keyUID)
+		return err
+	}
+	return nil
+}
+
+// profileKeystorePathFor returns the profile keystore directory for the given keyUID.
+func (aps *AccountPayloadStorer) profileKeystorePathFor(keyUID string) string {
+	path := aps.keystorePath
+	if filepath.Base(strings.TrimRight(path, "/\\")) == backend.DefaultKeystoreRelativePath {
+		path = filepath.Join(path, keyUID)
+	}
+	return path
+}
+
+// cleanupProfileState removes the state created for a profile with passed keyUID
+func (aps *AccountPayloadStorer) cleanupProfileState(keyUID string) {
+	profileKeystorePath := aps.profileKeystorePathFor(keyUID)
+	rootDataDir := rootDataDirFromKeystorePath(profileKeystorePath, keyUID)
+	_ = envelope.Remove(rootDataDir, keyUID)
+	_ = os.RemoveAll(profileKeystorePath)
+	_ = os.RemoveAll(profileKeystorePath + "-backup")
+	_ = os.RemoveAll(profileKeystorePath + "-re-encrypted")
+}
+
+func (aps *AccountPayloadStorer) adoptDEKScheme(keyUID string) error {
+	profileKeystorePath := aps.profileKeystorePathFor(keyUID)
+	rootDataDir := rootDataDirFromKeystorePath(profileKeystorePath, keyUID)
+
+	dek, err := envelope.Generate()
+	if err != nil {
+		return err
+	}
+	if err := envelope.Write(rootDataDir, keyUID, dek, aps.password, sqlite.ReducedKDFIterationsNumber); err != nil {
+		return err
+	}
+
+	if err := keystorepkg.ReEncryptKeyStoreDirAtPath(profileKeystorePath, aps.password, dek); err != nil {
+		if verifyErr := keystorepkg.VerifyKeyStoreDirAtPath(profileKeystorePath, dek); verifyErr == nil {
+			// fully on the DEK - the adoption effectively succeeded
+			aps.kdfIterations = sqlite.ReducedKDFIterationsNumber
+			return nil
+		}
+		if verifyErr := keystorepkg.VerifyKeyStoreDirAtPath(profileKeystorePath, aps.password); verifyErr == nil {
+			// untouched - drop the envelope and leave the profile legacy
+			_ = envelope.Remove(rootDataDir, keyUID)
+			return nil
+		}
+		return err
+	}
+
+	aps.kdfIterations = sqlite.ReducedKDFIterationsNumber
+	return nil
 }
 
 func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
@@ -455,6 +525,13 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 		}
 	}
 
+	// When the logged-in profile uses the DEK encryption scheme, the received files (password-encrypted wire format)
+	// must be stored under the profile's keystore secret
+	storeSecret, err := kfps.backend.ResolveKeystoreSecret(kfps.loggedInKeyUID, kfps.password)
+	if err != nil {
+		return err
+	}
+
 	for name, data := range kfps.keys {
 		address := ""
 		for _, key := range kfps.expectedKeystoreFilesToReceive {
@@ -474,6 +551,13 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 		}
 		if exists {
 			continue
+		}
+
+		if storeSecret != kfps.password {
+			data, err = keystorepkg.ReEncryptRawKey(data, kfps.password, storeSecret)
+			if err != nil {
+				return fmt.Errorf("failed to re-encrypt received keystore file %s: %w", name, err)
+			}
 		}
 
 		err = ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
