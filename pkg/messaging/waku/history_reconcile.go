@@ -83,11 +83,8 @@ func (w *Waku) reliablyConnected() bool {
 	return w.ConnectionState() == types.ConnectionStateConnected
 }
 
-// HistoryDeliveryReliable is stricter than reliablyConnected for light nodes:
-// their filter-subscription health is not observable, so Connected alone must
-// not advance persisted history completeness cursors.
 func (w *Waku) HistoryDeliveryReliable() bool {
-	return !w.cfg.IsLightClient() && w.reliablyConnected()
+	return w.reliablyConnected()
 }
 
 // shouldReconcileHistory decides whether a reconciliation is due at a tick:
