@@ -1336,10 +1336,10 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
 func (m *Messenger) watchConnectionChange() {
 	state := m.Online()
-	// lastCheck, sleepDetention and keepAlive helps us recognizing when computer was offline because of sleep, lid closed, etc.
+	// lastCheck, sleepDetention and keepAlive help recognize system sleep, a gap
+	// that Waku cannot observe while the process is suspended.
 	lastCheck := time.Now()
 	lastHistoryCheck := m.historicSyncNow()
-	var offlineSince time.Time
 	sleepDetention := 20 * time.Second
 	keepAlivePeriod := 15 * time.Second // must be lower than sleepDetention
 
@@ -1354,17 +1354,11 @@ func (m *Messenger) watchConnectionChange() {
 			return
 		}
 		wasOnline := state
-		if wasOnline && !newState {
-			offlineSince = previousCheck
-		}
 		state = newState
 		m.logger.Debug("connection changed", zap.Bool("online", state), zap.Bool("force", force))
 		m.handleConnectionChange(state)
 		if !m.isPaused() && newState {
 			switch {
-			case !wasOnline && !offlineSince.IsZero() && offlineSince.Before(historyNow):
-				m.asyncRequestHistoricMessages(types2.HistoryReconcileWindow{From: offlineSince, To: historyNow})
-				offlineSince = time.Time{}
 			case wasOnline && force && previousCheck.Before(historyNow):
 				// The process did not observe connectivity during this interval
 				// (typically system sleep), so treat it as unreliable.

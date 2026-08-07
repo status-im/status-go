@@ -3,9 +3,6 @@ package wakuv2
 import (
 	"time"
 
-	"go.uber.org/zap"
-
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -14,8 +11,7 @@ const (
 	// receiving everything live, the consumer should periodically fetch history
 	// from the store nodes so silently missed messages are recovered. The node
 	// is confident only with a Connected relay mesh on every default shard.
-	historyReconcileCheckInterval = 10 * time.Second
-	historyReconcileMinInterval   = 30 * time.Second
+	historyReconcileMinInterval = 30 * time.Second
 )
 
 type historyReconcileTracker struct {
@@ -75,46 +71,6 @@ func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInter
 // the two.
 func (w *Waku) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return w.historyReconcileNeeded
-}
-
-// startHistoryReconcileLoop runs the timing/decision half of history
-// reconciliation. The fetch itself lives with the consumer (the protocol
-// layer), which owns the topics and per-chat history cursors; this loop only owns
-// connectivity confidence and cadence. It continues observing while paused;
-// the consumer queues the resulting windows until it resumes.
-func (w *Waku) startHistoryReconcileLoop() {
-	w.wg.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer w.wg.Done()
-
-		tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
-		ticker := time.NewTicker(historyReconcileCheckInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-w.ctx.Done():
-				return
-			case <-ticker.C:
-				now := time.Now()
-				reliable := w.reliablyConnected()
-				window := tracker.observe(reliable, now, historyReconcileMinInterval)
-				if window == nil {
-					continue
-				}
-				w.logger.Debug("history reconciliation needed",
-					zap.Bool("reliable", reliable),
-					zap.Time("from", window.From),
-					zap.Time("to", window.To))
-				select {
-				case w.historyReconcileNeeded <- *window:
-				case <-w.ctx.Done():
-					return
-				}
-			}
-		}
-	}()
 }
 
 // reliablyConnected reports whether connectivity is currently good enough to be

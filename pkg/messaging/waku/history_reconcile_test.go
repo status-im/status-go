@@ -97,6 +97,23 @@ func TestHistoryReconcileTrackerBoundsUnreliableWindow(t *testing.T) {
 	require.Nil(t, window)
 }
 
+func TestHistoryReconcileTrackerCapturesRapidRecovery(t *testing.T) {
+	start := time.Unix(1_500, 0)
+	tracker := newHistoryReconcileTracker(true, start)
+
+	degradedAt := start.Add(time.Second)
+	window := tracker.observe(false, degradedAt, historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, start, window.From)
+	require.Equal(t, degradedAt, window.To)
+
+	recoveredAt := degradedAt.Add(time.Second)
+	window = tracker.observe(true, recoveredAt, historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, start, window.From)
+	require.Equal(t, recoveredAt, window.To)
+}
+
 func TestHistoryReconcileTrackerPreservesDisjointWindows(t *testing.T) {
 	start := time.Unix(2_000, 0)
 	tracker := newHistoryReconcileTracker(true, start)

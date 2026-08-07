@@ -872,53 +872,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer w.wg.Done()
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		sub := w.PauseBroadcaster.Subscribe()
-		defer sub.Unsubscribe()
-		paused := <-sub.C()
-		var tickerC <-chan time.Time
-		if !paused {
-			tickerC = ticker.C
-		}
-		for {
-			select {
-			case <-w.ctx.Done():
-				return
-			case pausedState, ok := <-sub.C():
-				if !ok {
-					return
-				}
-				paused = pausedState
-				if paused {
-					tickerC = nil
-				} else {
-					tickerC = ticker.C
-				}
-			case <-tickerC:
-				w.checkForConnectionChanges()
-			case topicHealth := <-w.topicHealthStatusChan:
-				// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
-				// / SufficientlyHealthy); cache it so checkForConnectionChanges can
-				// tell PartiallyConnected from Connected. Supersedes the old no-op
-				// (status-im/status-go#4628).
-				w.topicHealth[topicHealth.Topic] = topicHealth.Health
-				if !paused {
-					w.checkForConnectionChanges()
-				}
-			case <-w.connectionNotifChan:
-				if !paused {
-					w.checkForConnectionChanges()
-				}
-			}
-		}
-	}()
-
-	w.startHistoryReconcileLoop()
+	w.startConnectionMonitoringLoop()
 
 	if w.cfg.MetricsEnabled {
 		w.wg.Add(1)
@@ -1029,6 +983,127 @@ func (w *Waku) Start() error {
 	return nil
 }
 
+// startConnectionMonitoringLoop starts the connection-state observer and its
+// associated history reconciliation scheduler.
+func (w *Waku) startConnectionMonitoringLoop() {
+	w.wg.Add(1)
+	go w.runConnectionMonitoringLoop()
+}
+
+func (w *Waku) runConnectionMonitoringLoop() {
+	defer gocommon.LogOnPanic()
+	defer w.wg.Done()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	sub := w.PauseBroadcaster.Subscribe()
+	defer sub.Unsubscribe()
+	paused := <-sub.C()
+	tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
+	var reconcileTimer *time.Timer
+	var reconcileTimerC <-chan time.Time
+	var pendingReconciliations []types.HistoryReconcileWindow
+
+	queueReconciliation := func(reliable bool) {
+		window := tracker.observe(reliable, time.Now(), historyReconcileMinInterval)
+		if window != nil {
+			w.logger.Debug("history reconciliation needed",
+				zap.Bool("reliable", reliable),
+				zap.Time("from", window.From),
+				zap.Time("to", window.To))
+			if len(pendingReconciliations) != 0 &&
+				!window.From.After(pendingReconciliations[len(pendingReconciliations)-1].To) {
+				pendingReconciliations[len(pendingReconciliations)-1].To = window.To
+			} else {
+				pendingReconciliations = append(pendingReconciliations, *window)
+			}
+		}
+
+		if tracker.reliable {
+			if reconcileTimer != nil && !reconcileTimer.Stop() {
+				select {
+				case <-reconcileTimer.C:
+				default:
+				}
+			}
+			reconcileTimerC = nil
+			return
+		}
+
+		delay := time.Until(tracker.lastReconcile.Add(historyReconcileMinInterval))
+		if delay < 0 {
+			delay = 0
+		}
+		if reconcileTimer == nil {
+			reconcileTimer = time.NewTimer(delay)
+		} else {
+			if !reconcileTimer.Stop() {
+				select {
+				case <-reconcileTimer.C:
+				default:
+				}
+			}
+			reconcileTimer.Reset(delay)
+		}
+		reconcileTimerC = reconcileTimer.C
+	}
+
+	observeConnectionState := func() {
+		queueReconciliation(w.checkForConnectionChanges() == types.ConnectionStateConnected)
+	}
+	queueReconciliation(tracker.reliable)
+	defer func() {
+		if reconcileTimer != nil {
+			reconcileTimer.Stop()
+		}
+	}()
+	var tickerC <-chan time.Time
+	if !paused {
+		tickerC = ticker.C
+	}
+	for {
+		var reconciliationOut chan<- types.HistoryReconcileWindow
+		var nextReconciliation types.HistoryReconcileWindow
+		if len(pendingReconciliations) != 0 {
+			reconciliationOut = w.historyReconcileNeeded
+			nextReconciliation = pendingReconciliations[0]
+		}
+		select {
+		case <-w.ctx.Done():
+			return
+		case reconciliationOut <- nextReconciliation:
+			pendingReconciliations = pendingReconciliations[1:]
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			paused = pausedState
+			if paused {
+				tickerC = nil
+			} else {
+				tickerC = ticker.C
+				observeConnectionState()
+			}
+		case <-tickerC:
+			observeConnectionState()
+		case <-reconcileTimerC:
+			queueReconciliation(tracker.reliable)
+		case topicHealth := <-w.topicHealthStatusChan:
+			// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
+			// / SufficientlyHealthy); cache it so checkForConnectionChanges can
+			// tell PartiallyConnected from Connected. Supersedes the old no-op
+			// (status-im/status-go#4628).
+			w.topicHealth[topicHealth.Topic] = topicHealth.Health
+			if !paused {
+				observeConnectionState()
+			}
+		case <-w.connectionNotifChan:
+			if !paused {
+				observeConnectionState()
+			}
+		}
+	}
+}
+
 // deriveConnectionState maps the node's current connectivity onto the three-state
 // ConnectionState, mirroring logos-delivery's health monitor
 // (node_health_monitor.nim calculateConnectionState):
@@ -1063,7 +1138,7 @@ func (w *Waku) ConnectionState() types.ConnectionState {
 	return w.connState
 }
 
-func (w *Waku) checkForConnectionChanges() {
+func (w *Waku) checkForConnectionChanges() types.ConnectionState {
 
 	state := w.deriveConnectionState()
 	isOnline := state.IsOnline()
@@ -1097,6 +1172,8 @@ func (w *Waku) checkForConnectionChanges() {
 	if w.shouldFireConnectionChanged(next) {
 		w.ConnectionChanged(next)
 	}
+
+	return state
 }
 
 func (w *Waku) reportPeerMetrics() {
