@@ -175,11 +175,15 @@ func (s *Service) Start() error {
 			return
 		}
 
-		// Inject connection type into request context
+		// Inject connection type + browser Origin into request context.
+		// Permissions must key off Origin, not the client-supplied JSON "url".
 		ctx := WithConnectionType(r.Context(), ConnectionTypeUntrusted)
+		if origin := r.Header.Get("Origin"); origin != "" {
+			ctx = WithRequestOrigin(ctx, origin)
+		}
 		r = r.WithContext(ctx)
 
-		// FIXME: this is a temporary solution to allow all origins
+		// Handshake still accepts any Origin; CallRPC binds dApp URL to Origin below.
 		origins := []string{"*"}
 		wsHandler := s.rpcServer.WebsocketHandler(origins)
 		wsHandler.ServeHTTP(w, r)

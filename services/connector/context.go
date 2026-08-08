@@ -21,11 +21,26 @@ type ContextKey struct {
 
 var (
 	connectionTypeKey = ContextKey{Name: "connectionType"}
+	requestOriginKey  = ContextKey{Name: "requestOrigin"}
 )
 
 // WithConnectionType adds connection type to context
 func WithConnectionType(ctx context.Context, connType ConnectionType) context.Context {
 	return context.WithValue(ctx, connectionTypeKey, connType)
+}
+
+// WithRequestOrigin stores the HTTP Origin from an untrusted browser connection
+// (WebSocket / HTTP). Used to bind dApp identity instead of trusting JSON "url".
+func WithRequestOrigin(ctx context.Context, origin string) context.Context {
+	return context.WithValue(ctx, requestOriginKey, origin)
+}
+
+// GetRequestOrigin returns the browser Origin if present in context.
+func GetRequestOrigin(ctx context.Context) string {
+	if origin, ok := ctx.Value(requestOriginKey).(string); ok {
+		return origin
+	}
+	return ""
 }
 
 // GetConnectionType retrieves connection type from context
