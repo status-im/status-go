@@ -133,19 +133,19 @@ func TestHistoryReconcileTrackerPreservesDisjointWindows(t *testing.T) {
 	require.True(t, first.To.Before(second.From))
 }
 
-func TestHistoryDeliveryReliableExcludesLightNodes(t *testing.T) {
+func TestReliablyConnected(t *testing.T) {
 	core := &Waku{
 		cfg:       &Config{Mode: ModeCore},
 		connState: types.ConnectionStateConnected,
 	}
-	require.True(t, core.HistoryDeliveryReliable())
+	require.True(t, core.reliablyConnected())
 
 	core.connState = types.ConnectionStatePartiallyConnected
-	require.False(t, core.HistoryDeliveryReliable())
+	require.False(t, core.reliablyConnected())
 
 	edge := &Waku{
 		cfg:       &Config{Mode: ModeEdge},
 		connState: types.ConnectionStateConnected,
 	}
-	require.False(t, edge.HistoryDeliveryReliable())
+	require.True(t, edge.reliablyConnected())
 }

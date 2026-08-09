@@ -59,12 +59,6 @@ func (a *API) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return a.core.stack.Transport.OnHistoryReconcileNeeded()
 }
 
-// HistoryDeliveryReliable reports whether live delivery can safely advance
-// initialized history cursors without issuing a store query.
-func (a *API) HistoryDeliveryReliable() bool {
-	return a.core.stack.Transport.HistoryDeliveryReliable()
-}
-
 // SubscribeFilterMatched returns a channel that is notified whenever an incoming
 // envelope matches at least one installed filter. bufSize should be 1.
 // Callers must call UnsubscribeFilterMatched when done.

@@ -83,10 +83,6 @@ func (w *Waku) reliablyConnected() bool {
 	return w.ConnectionState() == types.ConnectionStateConnected
 }
 
-func (w *Waku) HistoryDeliveryReliable() bool {
-	return w.reliablyConnected()
-}
-
 // shouldReconcileHistory decides whether a reconciliation is due at a tick:
 // when the connection just recovered (an unreliable window closed, fetch what
 // it may have missed), or while it stays unreliable and minInterval has passed

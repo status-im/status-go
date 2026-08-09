@@ -115,11 +115,6 @@ type Waku interface {
 	// should be reconciled with store nodes (#7568).
 	OnHistoryReconcileNeeded() <-chan HistoryReconcileWindow
 
-	// HistoryDeliveryReliable reports whether a full-node relay mesh is healthy
-	// enough that active topics can advance their history completeness cursor
-	// without querying a store node. It is deliberately false for light nodes.
-	HistoryDeliveryReliable() bool
-
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
 	MaxMessageSize() uint32

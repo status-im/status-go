@@ -175,7 +175,7 @@ func (m *Messenger) startHistoryCursorMonitor() {
 
 func (m *Messenger) advanceHistoryCursors(through time.Time) {
 	if through.IsZero() || m.mailserversDatabase == nil || m.messaging == nil ||
-		!m.messaging.HistoryDeliveryReliable() {
+		m.messaging.ConnectionStatus().State != messagingtypes.ConnectionStateConnected {
 		return
 	}
 	m.historicSyncQueueMu.Lock()

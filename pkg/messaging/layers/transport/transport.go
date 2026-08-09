@@ -785,10 +785,6 @@ func (t *Transport) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWind
 	return t.waku.OnHistoryReconcileNeeded()
 }
 
-func (t *Transport) HistoryDeliveryReliable() bool {
-	return t.waku != nil && t.waku.HistoryDeliveryReliable()
-}
-
 func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
