@@ -86,6 +86,47 @@ func TestUpdateHasAcceptedTerms(t *testing.T) {
 	require.Equal(t, &expected, account)
 }
 
+func TestAccountKeycardPairingRoundTrip(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	expected := Account{
+		Name:           "string",
+		KeyUID:         keyUID,
+		KeycardPairing: "cc9d96f9b65b551595f3cf7c531beacda24b4937cece7fef70f5236ee80a0808",
+		KDFIterations:  dbsetup.ReducedKDFIterationsNumber,
+	}
+	require.NoError(t, db.SaveAccount(expected))
+
+	account, err := db.GetAccount(keyUID)
+	require.NoError(t, err)
+	require.Equal(t, expected.KeycardPairing, account.KeycardPairing,
+		"Expected the saved keycardPairing back because keycard login authenticates against the stored pairing key")
+
+	accounts, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Len(t, accounts, 1)
+	require.Equal(t, expected.KeycardPairing, accounts[0].KeycardPairing,
+		"Expected GetAccounts to return the same non-empty keycardPairing as GetAccount")
+}
+
+func TestUpdateAccountKeycardPairingSetsAndClears(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	require.NoError(t, db.SaveAccount(Account{KeyUID: keyUID, KDFIterations: dbsetup.ReducedKDFIterationsNumber}))
+
+	require.NoError(t, db.UpdateAccountKeycardPairing(keyUID, "843edb10045d329f4ecfac73fe66f13d"))
+	account, err := db.GetAccount(keyUID)
+	require.NoError(t, err)
+	require.Equal(t, "843edb10045d329f4ecfac73fe66f13d", account.KeycardPairing,
+		"Expected UpdateAccountKeycardPairing to persist the pairing key because it is the only writer used when a keycard is paired post-creation")
+
+	require.NoError(t, db.UpdateAccountKeycardPairing(keyUID, ""))
+	account, err = db.GetAccount(keyUID)
+	require.NoError(t, err)
+	require.Equal(t, "", account.KeycardPairing,
+		"Expected clearing the pairing to persist because unpairing must not leave a stale key behind")
+}
+
 func TestDatabase_GetAccountsCount(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
