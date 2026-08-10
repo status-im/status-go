@@ -70,10 +70,13 @@ func (f *fakeFetcher) waitForReturn(t *testing.T) {
 }
 
 // fakeStorage satisfies CollectibleOwnershipStorage with no-ops.
-type fakeStorage struct{}
+// The zero value reports a timestamp of a previous successful fetch (non-initial load).
+type fakeStorage struct {
+	timestamp int64
+}
 
-func (fakeStorage) GetOwnershipUpdateTimestamp(_ common.Address, _ walletCommon.ChainID) (int64, error) {
-	return 0, nil // non-initial load (timestamp != InvalidTimestamp)
+func (s fakeStorage) GetOwnershipUpdateTimestamp(_ common.Address, _ walletCommon.ChainID) (int64, error) {
+	return s.timestamp, nil
 }
 
 func (fakeStorage) Update(_ walletCommon.ChainID, _ common.Address, _ []thirdparty.CollectibleIDBalance, _ int64) ([]thirdparty.CollectibleUniqueID, []thirdparty.CollectibleUniqueID, []thirdparty.CollectibleUniqueID, error) {
@@ -155,6 +158,70 @@ func TestPeriodicalLoaderRestartReleasesOldGoroutines(t *testing.T) {
 
 	// Clean up
 	pl.Stop()
+}
+
+// TestLoadDelaySkippedOnInitialLoad verifies that the first ever load for an
+// account+chain fetches right away instead of waiting out LoadDelay: there's
+// nothing to debounce yet, and the delay is fully visible to the user.
+func TestLoadDelaySkippedOnInitialLoad(t *testing.T) {
+	fetcher := newFakeFetcher()
+	params := PeriodicalLoaderParams{
+		LoadInterval: 1 * time.Minute,
+		LoaderParams: LoaderParams{
+			LoadDelay:  30 * time.Second,
+			FetchLimit: 50,
+		},
+	}
+	pl := newTestLoader(t, fetcher, fakeStorage{timestamp: InvalidTimestamp}, params)
+
+	pl.Start(false, false)
+
+	select {
+	case <-fetcher.entered:
+	case <-time.After(5 * time.Second):
+		pl.Stop()
+		t.Fatal("initial load waited for LoadDelay before fetching")
+	}
+
+	require.Equal(t, LoaderStateUpdating, pl.GetState())
+
+	pl.Stop()
+	waitForLoadToEnd(t, pl)
+}
+
+// waitForLoadToEnd waits for an interrupted load to unwind, so that the loader
+// goroutines don't outlive the test.
+func waitForLoadToEnd(t *testing.T, pl *PeriodicalLoader) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		state := pl.GetState()
+		return state == LoaderStateIdle || state == LoaderStateError
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
+// TestLoadDelayReportedAsDelayed verifies that a subsequent load still waits out
+// LoadDelay, and that it is reported as delayed (not as updating) while doing so.
+func TestLoadDelayReportedAsDelayed(t *testing.T) {
+	fetcher := newFakeFetcher()
+	params := PeriodicalLoaderParams{
+		LoadInterval: 1 * time.Minute,
+		LoaderParams: LoaderParams{
+			LoadDelay:  5 * time.Second,
+			FetchLimit: 50,
+		},
+	}
+	pl := newTestLoader(t, fetcher, fakeStorage{}, params)
+
+	pl.Start(false, false)
+
+	require.Eventually(t, func() bool {
+		return pl.GetState() == LoaderStateDelayed
+	}, 1*time.Second, 10*time.Millisecond)
+
+	require.Equal(t, 0, fetcher.CallCount(), "no fetch should have been triggered during the load delay")
+
+	pl.Stop()
+	waitForLoadToEnd(t, pl)
 }
 
 // TestPeriodicalLoaderStopDuringDelay verifies that Stop cancels the start
