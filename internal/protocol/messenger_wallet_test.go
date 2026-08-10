@@ -210,7 +210,7 @@ func (s *WalletSuite) saveColdSeedKeypairWithXPub() *accsmanagementtypes.Keypair
 	return kp
 }
 
-func (s *WalletSuite) TestUpdateKeypairPreservesColdWalletStateOnRename() {
+func (s *WalletSuite) TestUpdateKeypairRoundTripsColdWalletStateOnRename() {
 	kp := s.saveColdSeedKeypairWithXPub()
 
 	dbKp, err := s.m.settings.GetKeypairByKeyUID(kp.KeyUID)
