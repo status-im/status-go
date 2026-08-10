@@ -39,7 +39,7 @@ type LoaderParams struct {
 
 func DefaultLoaderParams() LoaderParams {
 	return LoaderParams{
-		LoadDelay:  10 * time.Second,
+		LoadDelay:  1 * time.Second,
 		FetchLimit: 50,
 	}
 }
