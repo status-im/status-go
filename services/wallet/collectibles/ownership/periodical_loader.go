@@ -195,7 +195,7 @@ func (pl *PeriodicalLoader) Load(ctx context.Context) error {
 }
 
 func (pl *PeriodicalLoader) waitFor(stopCh <-chan struct{}, delay time.Duration) (cancelled bool) {
-	delayTimer := time.NewTicker(delay)
+	delayTimer := time.NewTimer(delay)
 	defer delayTimer.Stop()
 	select {
 	case <-delayTimer.C:
