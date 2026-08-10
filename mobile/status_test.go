@@ -125,3 +125,50 @@ func TestDeleteMultiaccountRequestValidation(t *testing.T) {
 		})
 	}
 }
+
+func parseAPIResponse(t *testing.T, raw string) APIResponse {
+	var response APIResponse
+	err := json.Unmarshal([]byte(raw), &response)
+	require.NoError(t, err, "binding must always return a valid JSON envelope")
+	return response
+}
+
+func TestRestoreAccountAndLoginMalformedJSONReturnsErrorEnvelope(t *testing.T) {
+	response := parseAPIResponse(t, restoreAccountAndLogin(`{"mnemonic": not-json}`))
+	require.NotEmpty(t, response.Error, "malformed request JSON should surface an unmarshal error in the envelope, not start a restore")
+}
+
+func TestRestoreAccountAndLoginKeycardRequestRejectsMnemonicSet(t *testing.T) {
+	requestJSON := `{"mnemonic":"some seed words","keycard":{"keyUID":"0x1","whisperPrivateKey":"0xabc"}}`
+	response := parseAPIResponse(t, restoreAccountAndLogin(requestJSON))
+	require.Equal(t, requests.ErrRestoreKeycardAccountMnemonicSet.Error(), response.Error,
+		"a request with keycard set must be routed to keycard validation, which forbids a mnemonic")
+}
+
+func TestRestoreAccountAndLoginKeycardRequestRejectsMissingWhisperPrivateKey(t *testing.T) {
+	requestJSON := `{"keycard":{"keyUID":"0x1"}}`
+	response := parseAPIResponse(t, restoreAccountAndLogin(requestJSON))
+	require.Equal(t, requests.ErrRestoreKeycardAccountNoWhisperPrivateKey.Error(), response.Error,
+		"keycard restore without a whisper private key must be rejected before any restore starts")
+}
+
+func TestRestoreAccountAndLoginRegularRequestRejectsMissingMnemonic(t *testing.T) {
+	response := parseAPIResponse(t, restoreAccountAndLogin(`{}`))
+	require.Equal(t, requests.ErrRestoreRegularAccountMnemonicMissing.Error(), response.Error,
+		"a request without keycard must be routed to regular validation, which requires a mnemonic")
+}
+
+func TestConvertToKeycardAccountV2MalformedJSONReturnsErrorEnvelope(t *testing.T) {
+	response := parseAPIResponse(t, convertToKeycardAccountV2(`{"keycardUID": not-json}`))
+	require.NotEmpty(t, response.Error, "malformed request JSON should surface an unmarshal error in the envelope, not reach the backend")
+}
+
+func TestConvertToKeycardAccountRequestJSONFieldContract(t *testing.T) {
+	requestJSON := `{"keycardUID":"kc-uid","oldPassword":"old","newPassword":"new","account":{"key-uid":"0x1"}}`
+	var request requests.ConvertToKeycardAccount
+	require.NoError(t, json.Unmarshal([]byte(requestJSON), &request), "documented client JSON must unmarshal")
+	require.Equal(t, "kc-uid", request.KeycardUID, "keycardUID field name is the mobile client contract")
+	require.Equal(t, "old", request.OldPassword, "oldPassword field name is the mobile client contract")
+	require.Equal(t, "new", request.NewPassword, "newPassword field name is the mobile client contract")
+	require.Equal(t, "0x1", request.Account.KeyUID, "account.key-uid field name is the mobile client contract")
+}
