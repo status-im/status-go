@@ -516,6 +516,210 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesSkipsAlreadyStoredKeystor
 	}
 }
 
+func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterColdWalletRoundTrip() {
+	ctx := context.TODO()
+
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic1, serverTmpDir)
+
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
+	clientBackend := s.prepareBackendWithAccount(profileKeypairMnemonic1, clientTmpDir)
+	defer func() {
+		require.NoError(s.T(), clientBackend.Logout())
+		require.NoError(s.T(), serverBackend.Logout())
+	}()
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
+
+	walletAccounts := &accsmanagementtypes.AccountCreationDetails{
+		Path:    accsmanagementcommon.PathDefaultWalletAccount,
+		Name:    "Default Wallet Account",
+		Emoji:   "💰",
+		ColorID: "primary",
+	}
+
+	// the full cold-wallet round-trip happens on the server only; the client is given
+	// the resulting keypair state locally, so no cross-device sync waits are involved
+	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic1, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
+	require.NoError(s.T(), err)
+
+	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
+
+	err = serverAccountsAPI.MigrateNonProfileKeypairToColdWallet(ctx, serverSeedPhraseKp.KeyUID, s.password, accsmanagementtypes.ColdWalletTypeStatusKeycard)
+	require.NoError(s.T(), err)
+	require.False(s.T(), containsKeystoreFile(serverKeystorePath, serverSeedPhraseKp.DerivedFrom[2:]), "Expected the keycard migration to delete the keypair's keystore files on the server")
+
+	err = serverAccountsAPI.MigrateNonProfileColdWalletKeypairToApp(ctx, seedKeypairMnemonic1, s.password)
+	require.NoError(s.T(), err)
+	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverSeedPhraseKp.DerivedFrom[2:]), "Expected migrating back to app to recreate the keypair's keystore files on the server")
+
+	serverKp, err := serverAccountsAPI.GetKeypairByKeyUID(ctx, serverSeedPhraseKp.KeyUID)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), accsmanagementtypes.ColdWalletTypeNone, serverKp.ColdWallet, "Expected the server keypair to be back to a regular app keypair after the round-trip")
+
+	// the client holds the same keypair without keystore files - the state a paired
+	// device is left in after syncing a keycard migration (files deleted) and the
+	// migration back (files cannot be recreated remotely)
+	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	clientSeedPhraseKp, err := clientAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic1, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
+	require.NoError(s.T(), err)
+
+	clientKeystoreDir := filepath.Join(clientTmpDir, backend.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
+	files, err := os.ReadDir(clientKeystoreDir)
+	require.NoError(s.T(), err)
+	for _, file := range files {
+		if strings.Contains(strings.ToLower(file.Name()), strings.ToLower(clientSeedPhraseKp.DerivedFrom[2:])) {
+			require.NoError(s.T(), os.RemoveAll(filepath.Join(clientKeystoreDir, file.Name())))
+			continue
+		}
+		for _, acc := range clientSeedPhraseKp.Accounts {
+			if strings.Contains(strings.ToLower(file.Name()), strings.ToLower(acc.Address.String()[2:])) {
+				require.NoError(s.T(), os.RemoveAll(filepath.Join(clientKeystoreDir, file.Name())))
+			}
+		}
+	}
+	require.False(s.T(), containsKeystoreFile(clientKeystoreDir, clientSeedPhraseKp.DerivedFrom[2:]))
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		require.False(s.T(), containsKeystoreFile(clientKeystoreDir, acc.Address.String()[2:]),
+			"Expected the account keystore file removed before the transfer, else regaining it proves nothing")
+	}
+
+	serverBackend.Messenger().SetLocalPairing(true)
+	clientBackend.Messenger().SetLocalPairing(true)
+
+	config := KeystoreFilesSenderServerConfig{
+		SenderConfig: &KeystoreFilesSenderConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   serverKeystorePath,
+				LoggedInKeyUID: serverActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToExport: []string{serverKp.KeyUID},
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(s.T(), err)
+	cs, err := StartUpKeystoreFilesSenderServer(serverBackend, string(configBytes))
+	require.NoError(s.T(), err)
+
+	clientPayloadSourceConfig := KeystoreFilesReceiverClientConfig{
+		ReceiverConfig: &KeystoreFilesReceiverConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   clientKeystoreDir,
+				LoggedInKeyUID: clientActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToImport: []string{clientSeedPhraseKp.KeyUID},
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	err = StartUpKeystoreFilesReceivingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	require.NoError(s.T(), err, "Expected the keystore transfer to accept the round-tripped keypair because both DBs hold it as a regular app keypair")
+
+	require.True(s.T(), containsKeystoreFile(clientKeystoreDir, clientSeedPhraseKp.DerivedFrom[2:]), "Expected the client to regain the master keystore file it lost at the keycard step")
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(clientKeystoreDir, acc.Address.String()[2:]), "Expected the client to regain the keystore file for account %s", acc.Address.String())
+	}
+
+	accountsManager := clientBackend.AccountsManager()
+	require.NoError(s.T(), accountsManager.ReloadKeystore())
+	genAcc, err := accountsManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
+	require.NoError(s.T(), err, "Expected the regained master keystore file to decrypt with the account password")
+	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, genAcc.ToIdentifiedAccountInfo().KeyUID)
+
+	clientKp, err := clientAccountsAPI.GetKeypairByKeyUID(ctx, clientSeedPhraseKp.KeyUID)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), accsmanagementtypes.ColdWalletTypeNone, clientKp.ColdWallet, "Expected the client keypair to remain a regular app keypair after the transfer")
+}
+
+func (s *SyncDeviceSuite) TestKeystoreFilesSenderRejectsWrongPasswordForNonKeycardAccount() {
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, serverTmpDir)
+	defer func() {
+		require.NoError(s.T(), serverBackend.Logout())
+	}()
+
+	serverBackend.Messenger().SetLocalPairing(true)
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+
+	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
+	config := KeystoreFilesSenderServerConfig{
+		SenderConfig: &KeystoreFilesSenderConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   serverKeystorePath,
+				LoggedInKeyUID: serverActiveAccount.KeyUID,
+				Password:       "wrong-password",
+			},
+			KeypairsToExport: []string{serverActiveAccount.KeyUID},
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(s.T(), err)
+
+	_, err = StartUpKeystoreFilesSenderServer(serverBackend, string(configBytes))
+	require.ErrorContains(s.T(), err, "provided password is not correct", "Expected the sender to reject a wrong password up front because a regular (non-keycard) account's password must be verified before any keystore transfer starts")
+}
+
+func (s *SyncDeviceSuite) TestKeystoreFilesSenderSkipsPasswordVerificationForKeycardAccount() {
+	ctx := context.TODO()
+
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, serverTmpDir)
+	defer func() {
+		require.NoError(s.T(), serverBackend.Logout())
+	}()
+
+	serverBackend.Messenger().SetLocalPairing(true)
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+
+	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	walletAccounts := &accsmanagementtypes.AccountCreationDetails{
+		Path:    accsmanagementcommon.PathDefaultWalletAccount,
+		Name:    "Default Wallet Account",
+		Emoji:   "💰",
+		ColorID: "primary",
+	}
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
+	require.NoError(s.T(), err)
+
+	err = serverAccountsAPI.MigrateNonProfileKeypairToColdWallet(ctx, serverSeedPhraseKp.KeyUID, s.password, accsmanagementtypes.ColdWalletTypeStatusKeycard)
+	require.NoError(s.T(), err)
+
+	// a keycard user's login password is PIN-derived and matches no keystore file;
+	// the pairing layer discriminates on the multiaccount's KeycardPairing field
+	serverActiveAccount.KeycardPairing = "keycard-pairing-info"
+
+	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
+	config := KeystoreFilesSenderServerConfig{
+		SenderConfig: &KeystoreFilesSenderConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   serverKeystorePath,
+				LoggedInKeyUID: serverActiveAccount.KeyUID,
+				Password:       "0x-pin-derived-password",
+			},
+			KeypairsToExport: []string{serverSeedPhraseKp.KeyUID},
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(s.T(), err)
+
+	cs, err := StartUpKeystoreFilesSenderServer(serverBackend, string(configBytes))
+	require.NoError(s.T(), err, "Expected password verification to be skipped for a keycard account because its login password never matches a keystore file - enforcing it would block every keycard user from keystore transfer")
+	require.NotEmpty(s.T(), cs, "Expected a connection string because the sender server should start for a keycard account")
+}
+
 func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	s.T().Skip("flaky test")
 
@@ -588,7 +792,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	require.NoError(s.T(), err)
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
-	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
+	require.Equal(s.T(), serverActiveAccount.KeyUID, clientActiveAccount.KeyUID)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// From this point this test is trying to simulate the following scenario:
