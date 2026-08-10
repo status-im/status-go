@@ -2,6 +2,7 @@ package ownership
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -65,11 +66,19 @@ func NewPeriodicalLoader(
 	ret := &PeriodicalLoader{
 		chainID: chainID,
 		account: account,
-		loader:  NewLoader(chainID, account, fetcher, storage, publisher, params.LoaderParams, logger),
 		params:  params,
 		logger:  logger.Named("PeriodicalLoader"),
 	}
 	ret.state.Store(LoaderStateIdle)
+
+	// Let the Loader drive the delayed/updating states, so that a load that is still being
+	// debounced isn't reported as updating
+	loaderParams := params.LoaderParams
+	loaderParams.OnStateChanged = func(state LoaderState) {
+		ret.state.Store(state)
+	}
+	ret.loader = NewLoader(chainID, account, fetcher, storage, publisher, loaderParams, logger)
+
 	return ret
 }
 
@@ -149,27 +158,6 @@ func (pl *PeriodicalLoader) triggerLoadAsync(stopCh <-chan struct{}) {
 }
 
 func (pl *PeriodicalLoader) triggerLoad(stopCh <-chan struct{}) {
-	if pl.GetState() == LoaderStateUpdating {
-		// Another load is in progress which should've finished or have been cancelled at this point
-		pl.logger.Error("skipping Load because it's already in progress",
-			zap.Uint64("chain", uint64(pl.chainID)),
-			zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
-		)
-		return
-	}
-
-	pl.state.Store(LoaderStateUpdating)
-
-	var err error
-	// Handle error at the end (if any) and set state
-	defer func() {
-		if err != nil {
-			pl.state.Store(LoaderStateError)
-			return
-		}
-		pl.state.Store(LoaderStateIdle)
-	}()
-
 	ctx, cancelFn := context.WithCancel(context.Background())
 	defer cancelFn() // Cancel ctx after Load ends
 	go func() {
@@ -181,12 +169,29 @@ func (pl *PeriodicalLoader) triggerLoad(stopCh <-chan struct{}) {
 		}
 	}()
 
-	err = pl.Load(ctx)
+	_ = pl.Load(ctx)
 }
 
-func (pl *PeriodicalLoader) Load(ctx context.Context) (err error) {
-	_, err = pl.loader.Load(ctx)
-	return
+// Runs a load, keeping the reported state in sync with its progress: the Loader reports
+// LoaderStateDelayed/LoaderStateUpdating while it runs, the terminal state is set here.
+func (pl *PeriodicalLoader) Load(ctx context.Context) error {
+	_, err := pl.loader.Load(ctx)
+	if errors.Is(err, ErrLoadAlreadyInProgress) {
+		// The load in progress owns the reported state, leave it alone
+		pl.logger.Error("skipping Load because it's already in progress",
+			zap.Uint64("chain", uint64(pl.chainID)),
+			zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
+		)
+		return err
+	}
+
+	if err != nil {
+		pl.state.Store(LoaderStateError)
+	} else {
+		pl.state.Store(LoaderStateIdle)
+	}
+
+	return err
 }
 
 func (pl *PeriodicalLoader) waitFor(stopCh <-chan struct{}, delay time.Duration) (cancelled bool) {

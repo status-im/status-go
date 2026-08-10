@@ -35,6 +35,10 @@ type LoaderParams struct {
 	// nothing to debounce when the ownership was never fetched before.
 	LoadDelay  time.Duration
 	FetchLimit int // (Optional) Limit the number of collectibles to fetch per page during the initial load
+	// (Optional) Called by the goroutine owning the load whenever it moves between
+	// LoaderStateDelayed (waiting out LoadDelay) and LoaderStateUpdating (fetching), so that
+	// callers can tell a load that is still being debounced from one that is really running.
+	OnStateChanged func(state LoaderState)
 }
 
 func DefaultLoaderParams() LoaderParams {
@@ -85,11 +89,6 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 		zap.String("account", gocommon.TruncateWithDot(l.account.String())),
 	)
 
-	pubsub.Publish(l.publisher, EventOwnedCollectiblesLoadStarted{
-		ChainID: l.chainID,
-		Account: l.account,
-	})
-
 	var err error
 	// Handle error at the end, if any
 	defer func() {
@@ -115,6 +114,25 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 		pageSize = l.params.FetchLimit
 	}
 
+	// The delay coalesces bursts of load requests (settings changes, detected transfers).
+	// There's nothing to coalesce when the ownership for this account+chain was never
+	// fetched, so the initial load hits the provider right away.
+	if !isInitialLoad && l.params.LoadDelay > 0 {
+		l.notifyStateChanged(LoaderStateDelayed)
+		if l.waitFor(ctx, l.params.LoadDelay) {
+			return nil, ctx.Err()
+		}
+	}
+
+	// Only report (and notify) the load as started once the fetching really begins, so that
+	// the client doesn't show it as updating for the whole duration of the delay.
+	l.notifyStateChanged(LoaderStateUpdating)
+
+	pubsub.Publish(l.publisher, EventOwnedCollectiblesLoadStarted{
+		ChainID: l.chainID,
+		Account: l.account,
+	})
+
 	// Start fetching collectibles in chunks
 	pageNr := 0
 	cursor := thirdparty.FetchFromStartCursor
@@ -128,15 +146,6 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 		zap.String("account", gocommon.TruncateWithDot(l.account.String())),
 		zap.Int("page", pageNr),
 	)
-
-	// The delay coalesces bursts of load requests (settings changes, detected transfers).
-	// There's nothing to coalesce when the ownership for this account+chain was never
-	// fetched, so the initial load hits the provider right away.
-	if !isInitialLoad && l.params.LoadDelay > 0 {
-		if l.waitFor(ctx, l.params.LoadDelay) {
-			return nil, ctx.Err()
-		}
-	}
 
 	start := time.Now()
 
@@ -221,6 +230,12 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 	pubsub.Publish(l.publisher, finishedEvent)
 
 	return accumulatedOwnership, nil
+}
+
+func (l *Loader) notifyStateChanged(state LoaderState) {
+	if l.params.OnStateChanged != nil {
+		l.params.OnStateChanged(state)
+	}
 }
 
 func (l *Loader) waitFor(ctx context.Context, delay time.Duration) (cancelled bool) {
