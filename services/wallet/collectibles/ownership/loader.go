@@ -30,8 +30,11 @@ type CollectibleOwnershipStorage interface {
 }
 
 type LoaderParams struct {
-	LoadDelay  time.Duration // (Optional) Delay between notifying a Load start and actually triggering the first fetch, used to "debounce" fetches triggered by settings changes
-	FetchLimit int           // (Optional) Limit the number of collectibles to fetch per page during the initial load
+	// (Optional) Delay between triggering a Load and actually triggering the first fetch, used to
+	// "debounce" fetches triggered by settings changes. Skipped on the initial load, since there's
+	// nothing to debounce when the ownership was never fetched before.
+	LoadDelay  time.Duration
+	FetchLimit int // (Optional) Limit the number of collectibles to fetch per page during the initial load
 }
 
 func DefaultLoaderParams() LoaderParams {
@@ -126,7 +129,10 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 		zap.Int("page", pageNr),
 	)
 
-	if l.params.LoadDelay.Seconds() > 0 {
+	// The delay coalesces bursts of load requests (settings changes, detected transfers).
+	// There's nothing to coalesce when the ownership for this account+chain was never
+	// fetched, so the initial load hits the provider right away.
+	if !isInitialLoad && l.params.LoadDelay > 0 {
 		if l.waitFor(ctx, l.params.LoadDelay) {
 			return nil, ctx.Err()
 		}
