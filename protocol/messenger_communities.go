@@ -641,13 +641,13 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 	}
 
 	pkStr := crypto.PubkeyToHex(signer)
-	members := make(map[string]*protobuf.CommunityMember)
-	members[pkStr] = community.GetMember(signer)
 
 	if community.Encrypted() {
 		keyActions.CommunityKeyAction = communities.EncryptionKeyAction{
 			ActionType: communities.EncryptionKeySendToMembers,
-			Members:    members,
+			Members: map[string]*protobuf.CommunityMember{
+				pkStr: community.GetMember(signer),
+			},
 		}
 	}
 
@@ -664,13 +664,28 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 
 		channelMembers := channel.GetMembers()
 		member, exists := channelMembers[pkStr]
+		if !exists && community.ChannelEncrypted(channelID) {
+			m.logger.Warn("not sending channel encryption key to non-member",
+				zap.String("communityID", community.IDString()),
+				zap.String("channelID", channelID),
+				zap.String("member", pkStr))
+			continue
+		}
+
 		if exists && community.ChannelEncrypted(channelID) {
-			members[pkStr] = member
 			keyActions.ChannelKeysActions[channelID] = communities.EncryptionKeyAction{
 				ActionType: communities.EncryptionKeySendToMembers,
-				Members:    members,
+				Members: map[string]*protobuf.CommunityMember{
+					pkStr: member,
+				},
 			}
 		}
+	}
+
+	if keyActions.CommunityKeyAction.ActionType == communities.EncryptionKeyNone && len(keyActions.ChannelKeysActions) == 0 {
+		m.logger.Warn("no encryption keys to distribute",
+			zap.String("communityID", community.IDString()),
+			zap.String("member", pkStr))
 	}
 
 	return m.communitiesKeyDistributor.Distribute(community, keyActions)
