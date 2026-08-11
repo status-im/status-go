@@ -465,6 +465,7 @@ func NewMessenger(
 		savedAddressesManager:            savedAddressesManager,
 		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
 	}
+	communitiesKeyDistributor.addRawMessageToWatch = messenger.AddRawMessageToWatch
 
 	if c.rpcClient != nil {
 		messenger.contractMaker = contracts.NewContractMaker(c.rpcClient)

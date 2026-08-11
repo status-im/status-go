@@ -18,9 +18,10 @@ import (
 )
 
 type CommunitiesKeyDistributorImpl struct {
-	messaging *messaging.API
-	sender    *common.MessageSender
-	tracer    trace.Tracer
+	messaging            *messaging.API
+	sender               *common.MessageSender
+	tracer               trace.Tracer
+	addRawMessageToWatch func(*common.RawMessage) (*common.RawMessage, error)
 }
 
 func (ckd *CommunitiesKeyDistributorImpl) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
@@ -103,6 +104,8 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		HashRatchetGroupID:    hashRatchetGroupID,
 		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		ResendType:            common.ResendTypeRawMessage,
+		ResendMethod:          common.ResendMethodSendCommunityMessage,
 	}
 
 	ctx, span := ckd.tracer.Start(context.Background(), "CommunitiesKeyDistributor.sendKeyExchangeMessage",
@@ -114,9 +117,11 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 	defer span.End()
 
 	_, err := ckd.sender.SendCommunity(ctx, &rawMessage)
-
 	if err != nil {
 		return err
+	}
+	if ckd.addRawMessageToWatch != nil {
+		_, err = ckd.addRawMessageToWatch(&rawMessage)
 	}
 	return nil
 }
