@@ -60,7 +60,8 @@ type failingCommunitiesKeyDistributor struct {
 }
 
 type recordingCommunitiesKeyDistributor struct {
-	keyActions *communities.EncryptionKeyActions
+	keyActions        *communities.EncryptionKeyActions
+	distributionCount int
 }
 
 func (d *failingCommunitiesKeyDistributor) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
@@ -77,6 +78,7 @@ func (d *recordingCommunitiesKeyDistributor) Generate(community *communities.Com
 
 func (d *recordingCommunitiesKeyDistributor) Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
 	d.keyActions = keyActions
+	d.distributionCount++
 	return nil
 }
 
@@ -2177,6 +2179,39 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptio
 	s.Require().True(exists)
 	channelAction.Members["additional-member"] = &protobuf.CommunityMember{}
 	s.Require().NotContains(distributor.keyActions.CommunityKeyAction.Members, "additional-member")
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestOnNonControlNodeIsIgnored() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
+	s.joinCommunity(community, s.alice)
+
+	err := s.alice.HandleCommunityEncryptionKeysRequest(context.Background(), &ReceivedMessageState{
+		CurrentMessageState: &CurrentMessageState{PublicKey: s.owner.IdentityPublicKey()},
+	}, &protobuf.CommunityEncryptionKeysRequest{CommunityId: community.ID()}, nil)
+	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestRateLimitsMember() {
+	community, _ := createEncryptedCommunity(&s.Suite, s.owner)
+
+	distributor := &recordingCommunitiesKeyDistributor{}
+	originalDistributor := s.owner.communitiesKeyDistributor
+	s.owner.communitiesKeyDistributor = distributor
+	defer func() {
+		s.owner.communitiesKeyDistributor = originalDistributor
+	}()
+
+	state := &ReceivedMessageState{
+		CurrentMessageState: &CurrentMessageState{PublicKey: s.owner.IdentityPublicKey()},
+	}
+	request := &protobuf.CommunityEncryptionKeysRequest{CommunityId: community.ID()}
+
+	err := s.owner.HandleCommunityEncryptionKeysRequest(context.Background(), state, request, nil)
+	s.Require().NoError(err)
+	err = s.owner.HandleCommunityEncryptionKeysRequest(context.Background(), state, request, nil)
+	s.Require().NoError(err)
+	s.Require().Equal(1, distributor.distributionCount)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissionsPerformance() {

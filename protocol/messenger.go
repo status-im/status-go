@@ -140,10 +140,12 @@ type Messenger struct {
 	cancel            context.CancelFunc
 	shutdownWaitGroup sync.WaitGroup
 
-	importingCommunities map[string]bool
-	importingChannels    map[string]bool
-	importRateLimiter    *rate.Limiter
-	importDelayer        struct {
+	importingCommunities                     map[string]bool
+	importingChannels                        map[string]bool
+	importRateLimiter                        *rate.Limiter
+	communityEncryptionKeyRequestRateLimitMu sync.Mutex
+	communityEncryptionKeyRequestLastServed  map[communityEncryptionKeyRequestRateLimitKey]time.Time
+	importDelayer                            struct {
 		wait chan struct{}
 		once sync.Once
 	}
@@ -427,22 +429,23 @@ func NewMessenger(
 			logger: logger,
 			me:     selfContact,
 		},
-		allInstallations:      new(installationMap),
-		installationID:        installationID,
-		modifiedInstallations: new(stringBoolMap),
-		database:              database,
-		multiAccounts:         c.multiAccount,
-		settings:              settings,
-		verificationDatabase:  verification.NewPersistence(database),
-		mailserversDatabase:   c.mailserversDatabase,
-		account:               c.account,
-		quit:                  make(chan struct{}),
-		historicSyncTrigger:   make(chan struct{}, 1),
-		ctx:                   ctx,
-		cancel:                cancel,
-		importingCommunities:  make(map[string]bool),
-		importingChannels:     make(map[string]bool),
-		importRateLimiter:     rate.NewLimiter(rate.Every(importSlowRate), 1),
+		allInstallations:                        new(installationMap),
+		installationID:                          installationID,
+		modifiedInstallations:                   new(stringBoolMap),
+		database:                                database,
+		multiAccounts:                           c.multiAccount,
+		settings:                                settings,
+		verificationDatabase:                    verification.NewPersistence(database),
+		mailserversDatabase:                     c.mailserversDatabase,
+		account:                                 c.account,
+		quit:                                    make(chan struct{}),
+		historicSyncTrigger:                     make(chan struct{}, 1),
+		ctx:                                     ctx,
+		cancel:                                  cancel,
+		importingCommunities:                    make(map[string]bool),
+		importingChannels:                       make(map[string]bool),
+		importRateLimiter:                       rate.NewLimiter(rate.Every(importSlowRate), 1),
+		communityEncryptionKeyRequestLastServed: make(map[communityEncryptionKeyRequestRateLimitKey]time.Time),
 		importDelayer: struct {
 			wait chan struct{}
 			once sync.Once

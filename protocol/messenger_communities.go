@@ -597,10 +597,49 @@ func (m *Messenger) HandleCommunityEncryptionKeysRequest(ctx context.Context, st
 	}
 
 	if !community.IsControlNode() {
-		return communities.ErrNotControlNode
+		m.logger.Debug("ignoring community encryption key request on non-control node",
+			zap.String("communityID", community.IDString()))
+		return nil
 	}
 	signer := state.CurrentMessageState.PublicKey
+	if !m.allowCommunityEncryptionKeysRequest(community.IDString(), crypto.PubkeyToHex(signer)) {
+		m.logger.Debug("ignoring rate-limited community encryption key request",
+			zap.String("communityID", community.IDString()),
+			zap.String("member", crypto.PubkeyToHex(signer)))
+		return nil
+	}
 	return m.handleCommunityEncryptionKeysRequest(community, message.ChatIds, signer)
+}
+
+type communityEncryptionKeyRequestRateLimitKey struct {
+	communityID string
+	memberID    string
+}
+
+const communityEncryptionKeyRequestMinimumInterval = time.Minute
+
+func (m *Messenger) allowCommunityEncryptionKeysRequest(communityID, memberID string) bool {
+	m.communityEncryptionKeyRequestRateLimitMu.Lock()
+	defer m.communityEncryptionKeyRequestRateLimitMu.Unlock()
+
+	if m.communityEncryptionKeyRequestLastServed == nil {
+		m.communityEncryptionKeyRequestLastServed = make(map[communityEncryptionKeyRequestRateLimitKey]time.Time)
+	}
+
+	now := time.Now()
+	for key, servedAt := range m.communityEncryptionKeyRequestLastServed {
+		if now.Sub(servedAt) >= communityEncryptionKeyRequestMinimumInterval {
+			delete(m.communityEncryptionKeyRequestLastServed, key)
+		}
+	}
+
+	key := communityEncryptionKeyRequestRateLimitKey{communityID: communityID, memberID: memberID}
+	if _, exists := m.communityEncryptionKeyRequestLastServed[key]; exists {
+		return false
+	}
+
+	m.communityEncryptionKeyRequestLastServed[key] = now
+	return true
 }
 
 func (m *Messenger) HandleCommunitySharedAddressesRequest(ctx context.Context, state *ReceivedMessageState, message *protobuf.CommunitySharedAddressesRequest, statusMessage *common.StatusMessage) error {
