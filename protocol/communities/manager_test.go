@@ -1686,11 +1686,23 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	s.Require().Len(channels, 0)
 
 	// Channel with prior request should be returned only after backoff interval
-	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+6*tenMinutes)
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+8*tenMinutes)
 	s.Require().NoError(err)
 	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
+
+	for requestCount := 3; requestCount < maxEncryptionKeyRequests; requestCount++ {
+		requestTime := now + 3*tenMinutes + int64(requestCount)*time.Minute.Milliseconds()
+		err = s.manager.updateEncryptionKeysRequests(community.ID(), []string{"channel-id"}, requestTime)
+		s.Require().NoError(err)
+	}
+
+	// A channel with the maximum number of requests is not retried.
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+24*time.Hour.Milliseconds())
+	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
+	s.Require().Empty(channels)
 
 	// Simulate encryption key being received.
 	channel.Members = map[string]*protobuf.CommunityMember{
@@ -1713,6 +1725,86 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
+}
+
+func (s *ManagerSuite) TestEncryptionKeyRequestBackoffDuration() {
+	testCases := []struct {
+		name           string
+		requestedCount uint
+		expectedDelay  time.Duration
+	}{
+		{
+			name:           "zero count uses initial delay",
+			requestedCount: 0,
+			expectedDelay:  encryptionKeyRequestInitialDelay,
+		},
+		{
+			name:           "first request",
+			requestedCount: 1,
+			expectedDelay:  encryptionKeyRequestInitialDelay,
+		},
+		{
+			name:           "second request",
+			requestedCount: 2,
+			expectedDelay:  30 * time.Minute,
+		},
+		{
+			name:           "third request",
+			requestedCount: 3,
+			expectedDelay:  time.Hour,
+		},
+		{
+			name:           "fourth request",
+			requestedCount: 4,
+			expectedDelay:  4 * time.Hour,
+		},
+		{
+			name:           "delay is capped",
+			requestedCount: 5,
+			expectedDelay:  encryptionKeyRequestMaxDelay,
+		},
+		{
+			name:           "large count remains capped",
+			requestedCount: 200,
+			expectedDelay:  encryptionKeyRequestMaxDelay,
+		},
+	}
+
+	for _, testCase := range testCases {
+		s.T().Run(testCase.name, func(t *testing.T) {
+			s.Require().Equal(testCase.expectedDelay, encryptionKeyRequestBackoffDuration(testCase.requestedCount))
+		})
+	}
+}
+
+func (s *ManagerSuite) TestCanRequestEncryptionKey() {
+	testCases := []struct {
+		name           string
+		requestedCount uint
+		canRequest     bool
+	}{
+		{
+			name:           "ninth request is allowed",
+			requestedCount: maxEncryptionKeyRequests - 1,
+			canRequest:     true,
+		},
+		{
+			name:           "tenth request is not allowed",
+			requestedCount: maxEncryptionKeyRequests,
+			canRequest:     false,
+		},
+		{
+			name:           "counts over the cap are not allowed",
+			requestedCount: maxEncryptionKeyRequests + 1,
+			canRequest:     false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		s.T().Run(testCase.name, func(t *testing.T) {
+			s.Require().Equal(testCase.canRequest, canRequestEncryptionKey(testCase.requestedCount))
+		})
+	}
 }
 
 // Covers solution for: https://github.com/status-im/status-desktop/issues/16226
