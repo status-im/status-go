@@ -5017,64 +5017,85 @@ func encryptionKeyRequestChannelIDs(channelIDs []string) []string {
 	return filteredChannelIDs
 }
 
-func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
-	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
+const (
+	requestMissingCommunityEncryptionKeysInitialDelay = 30 * time.Second
+	requestMissingCommunityEncryptionKeysInterval     = 5 * time.Minute
+)
 
+func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
+
+		initialDelay := time.NewTimer(requestMissingCommunityEncryptionKeysInitialDelay)
+		defer initialDelay.Stop()
+
+		select {
+		case <-initialDelay.C:
+			m.requestMissingCommunityEncryptionKeys()
+		case <-m.quit:
+			return
+		}
+
+		ticker := time.NewTicker(requestMissingCommunityEncryptionKeysInterval)
+		defer ticker.Stop()
 		for {
 			select {
-			case <-time.After(5 * time.Minute):
-				if m.isPaused() {
-					continue
-				}
-				communitiesChannels, err := m.communitiesManager.DetermineChannelsForHRKeysRequest()
-				if err != nil {
-					logger.Error("failed to determine channels for encryption keys request", zap.Error(err))
-					continue
-				}
-
-				for _, cc := range communitiesChannels {
-					// Clear retry history for channels that no longer need a key.
-					// ChannelIDsToRequest remains backoff-gated for requests sent below.
-					err = m.communitiesManager.PruneEncryptionKeysRequests(cc.Community.ID(), cc.MissingChannelIDs)
-					if err != nil {
-						logger.Error("failed to prune channels' encryption keys requests",
-							zap.String("communityID", cc.Community.IDString()),
-							zap.Strings("channelIDs", cc.MissingChannelIDs),
-							zap.Error(err))
-						continue
-					}
-
-					if len(cc.ChannelIDsToRequest) == 0 {
-						continue
-					}
-
-					err := m.requestCommunityEncryptionKeys(cc.Community, cc.ChannelIDsToRequest)
-					if err != nil {
-						logger.Error("failed to request channels' encryption keys",
-							zap.String("communityID", cc.Community.IDString()),
-							zap.Strings("channelIDs", cc.ChannelIDsToRequest),
-							zap.Error(err))
-						continue
-					}
-
-					err = m.communitiesManager.UpdateEncryptionKeysRequests(cc.Community.ID(), cc.ChannelIDsToRequest)
-					if err != nil {
-						logger.Error("failed to update channels' encryption keys requests",
-							zap.String("communityID", cc.Community.IDString()),
-							zap.Strings("channelIDs", cc.ChannelIDsToRequest),
-							zap.Error(err))
-					}
-				}
-
+			case <-ticker.C:
+				m.requestMissingCommunityEncryptionKeys()
 			case <-m.quit:
 				return
 			}
 		}
 	}()
+}
+
+func (m *Messenger) requestMissingCommunityEncryptionKeys() {
+	if m.isPaused() {
+		return
+	}
+
+	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
+	communitiesChannels, err := m.communitiesManager.DetermineChannelsForHRKeysRequest()
+	if err != nil {
+		logger.Error("failed to determine channels for encryption keys request", zap.Error(err))
+		return
+	}
+
+	for _, cc := range communitiesChannels {
+		// Clear retry history for channels that no longer need a key.
+		// ChannelIDsToRequest remains backoff-gated for requests sent below.
+		err = m.communitiesManager.PruneEncryptionKeysRequests(cc.Community.ID(), cc.MissingChannelIDs)
+		if err != nil {
+			logger.Error("failed to prune channels' encryption keys requests",
+				zap.String("communityID", cc.Community.IDString()),
+				zap.Strings("channelIDs", cc.MissingChannelIDs),
+				zap.Error(err))
+			continue
+		}
+
+		if len(cc.ChannelIDsToRequest) == 0 {
+			continue
+		}
+
+		err := m.requestCommunityEncryptionKeys(cc.Community, cc.ChannelIDsToRequest)
+		if err != nil {
+			logger.Error("failed to request channels' encryption keys",
+				zap.String("communityID", cc.Community.IDString()),
+				zap.Strings("channelIDs", cc.ChannelIDsToRequest),
+				zap.Error(err))
+			continue
+		}
+
+		err = m.communitiesManager.UpdateEncryptionKeysRequests(cc.Community.ID(), cc.ChannelIDsToRequest)
+		if err != nil {
+			logger.Error("failed to update channels' encryption keys requests",
+				zap.String("communityID", cc.Community.IDString()),
+				zap.Strings("channelIDs", cc.ChannelIDsToRequest),
+				zap.Error(err))
+		}
+	}
 }
 
 func (m *Messenger) IsSeedingHistoryArchive(communityID cryptotypes.HexBytes) bool {

@@ -106,6 +106,21 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	s.Require().Len(communities, 1)
 }
 
+func (s *PersistenceSuite) TestUpdateEncryptionKeyRequestsWithEarlierTimestamp() {
+	communityID := types.HexBytes("community-id")
+	channelIDs := []string{"channel-id"}
+
+	err := s.db.UpdateEncryptionKeyRequests(communityID, channelIDs, 2)
+	s.Require().NoError(err)
+	err = s.db.UpdateEncryptionKeyRequests(communityID, channelIDs, 1)
+	s.Require().NoError(err)
+
+	requests, err := s.db.GetEncryptionKeyRequests(communityID, map[string]struct{}{"channel-id": {}})
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), requests["channel-id"].requestedAt)
+	s.Require().Equal(uint(2), requests["channel-id"].requestedCount)
+}
+
 func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 	sc := &protobuf.SyncInstallationCommunity{
 		Id:          []byte("0x123456"),
