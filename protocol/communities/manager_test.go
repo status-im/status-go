@@ -1727,6 +1727,45 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	s.Require().Equal("channel-id", channels[0])
 }
 
+func (s *ManagerSuite) TestDetermineCommunityEncryptionKeyRequest() {
+	request := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "token membership description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+
+	community, err := s.manager.CreateCommunity(request, true)
+	s.Require().NoError(err)
+
+	_, err = community.UpsertTokenPermission(&protobuf.CommunityTokenPermission{
+		Type: protobuf.CommunityTokenPermission_BECOME_MEMBER,
+	})
+	s.Require().NoError(err)
+
+	community.Description().PrivateData = map[string][]byte{"key": []byte("encrypted description")}
+	community.Description().Members = map[string]*protobuf.CommunityMember{}
+	community.Description().Chats = map[string]*protobuf.CommunityChat{}
+	s.Require().True(community.HasMissingCommunityEncryptionKey())
+
+	missingChannelIDs, channelIDsToRequest, err := s.manager.determineChannelsForHRKeysRequest(community, 1)
+	s.Require().NoError(err)
+	s.Require().Equal([]string{communityEncryptionKeyRequestID}, missingChannelIDs)
+	s.Require().Equal([]string{communityEncryptionKeyRequestID}, channelIDsToRequest)
+
+	err = s.manager.updateEncryptionKeysRequests(community.ID(), channelIDsToRequest, 1)
+	s.Require().NoError(err)
+
+	missingChannelIDs, channelIDsToRequest, err = s.manager.determineChannelsForHRKeysRequest(community, 1)
+	s.Require().NoError(err)
+	s.Require().Equal([]string{communityEncryptionKeyRequestID}, missingChannelIDs)
+	s.Require().Empty(channelIDsToRequest)
+
+	community.Description().Members = map[string]*protobuf.CommunityMember{
+		crypto.PubkeyToHex(&s.manager.identity.PublicKey): {},
+	}
+	s.Require().False(community.HasMissingCommunityEncryptionKey())
+}
+
 func (s *ManagerSuite) TestEncryptionKeyRequestBackoffDuration() {
 	testCases := []struct {
 		name           string

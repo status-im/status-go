@@ -5146,6 +5146,7 @@ const (
 	encryptionKeyRequestInitialDelay = 10 * time.Minute
 	encryptionKeyRequestMaxDelay     = 8 * time.Hour
 	maxEncryptionKeyRequests         = 10
+	communityEncryptionKeyRequestID  = ""
 )
 
 func encryptionKeyRequestBackoffDuration(requestedCount uint) time.Duration {
@@ -5172,6 +5173,9 @@ func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]
 
 	channelsWithMissingKeys := func() map[string]struct{} {
 		r := map[string]struct{}{}
+		if c.HasMissingCommunityEncryptionKey() {
+			r[communityEncryptionKeyRequestID] = struct{}{}
+		}
 		for id := range c.Chats() {
 			if c.HasMissingEncryptionKey(id) {
 				r[id] = struct{}{}

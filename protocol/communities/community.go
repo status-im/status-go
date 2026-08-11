@@ -1941,6 +1941,15 @@ func (o *Community) HasMissingEncryptionKey(channelID string) bool {
 		o.IsMemberLikelyInChat(channelID)
 }
 
+func (o *Community) HasMissingCommunityEncryptionKey() bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	return o.Encrypted() &&
+		len(o.config.CommunityDescription.PrivateData) > 0 &&
+		len(o.config.CommunityDescription.Members) == 0
+}
+
 func TokenPermissionsByType(permissions map[string]*CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {
 	result := make([]*CommunityTokenPermission, 0)
 	for _, tokenPermission := range permissions {
