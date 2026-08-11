@@ -2106,7 +2106,7 @@ func (p *Persistence) GetEncryptionKeyRequests(communityID []byte, channelIDs ma
 	return result, nil
 }
 
-func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string, requestedAt int64) error {
+func (p *Persistence) PruneEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string) error {
 	tx, err := p.db.Begin()
 	if err != nil {
 		return err
@@ -2139,6 +2139,28 @@ func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID cryptotype
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (p *Persistence) UpdateEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string, requestedAt int64) error {
+	if len(channelIDs) == 0 {
+		return nil
+	}
+
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
 
 	stmt, err := tx.Prepare(`
         INSERT INTO community_encryption_keys_requests (community_id, channel_id, requested_at, requested_count)

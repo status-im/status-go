@@ -1641,16 +1641,18 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	tenMinutes := int64(10 * 60 * 1000)
 
 	// Member does not have missing encryption keys
-	channels, err := s.manager.determineChannelsForHRKeysRequest(community, now)
+	missingChannels, channels, err := s.manager.determineChannelsForHRKeysRequest(community, now)
 	s.Require().NoError(err)
+	s.Require().Empty(missingChannels)
 	s.Require().Empty(channels)
 
 	// Simulate missing encryption key
 	channel.Members = map[string]*protobuf.CommunityMember{}
 
 	// Channel without prior request should be returned
-	channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
 	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
 
@@ -1659,13 +1661,15 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	s.Require().NoError(err)
 
 	// Channel with prior request should not be returned before backoff interval
-	channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
 	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 0)
 
 	// Channel with prior request should be returned only after backoff interval
-	channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+tenMinutes)
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+tenMinutes)
 	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
 
@@ -1676,23 +1680,37 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	s.Require().NoError(err)
 
 	// Channel with prior request should not be returned before backoff interval
-	channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+2*tenMinutes)
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+2*tenMinutes)
 	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 0)
 
 	// Channel with prior request should be returned only after backoff interval
-	channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+6*tenMinutes)
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now+6*tenMinutes)
 	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
 
-	// Simulate encryption key being received (it will remove request for given channel)
-	err = s.manager.updateEncryptionKeysRequests(community.ID(), []string{}, now)
+	// Simulate encryption key being received.
+	channel.Members = map[string]*protobuf.CommunityMember{
+		crypto.PubkeyToHex(&s.manager.identity.PublicKey): {},
+	}
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
+	s.Require().NoError(err)
+	s.Require().Empty(missingChannels)
+	s.Require().Empty(channels)
+
+	err = s.manager.PruneEncryptionKeysRequests(community.ID(), missingChannels)
 	s.Require().NoError(err)
 
+	// A later missing key starts with no persisted retry history.
+	channel.Members = map[string]*protobuf.CommunityMember{}
+
 	// Channel without prior request should be returned
-	channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
 	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
 }
