@@ -66,6 +66,56 @@ func (s *CommunityBloomFilterSuite) TestBasic() {
 	s.Require().False(verifyMembershipWithBloomFilter(filter, nonMemberIdentity, &ownerIdentity.PublicKey, encryptedChannelID, description.Clock))
 }
 
+func (s *CommunityBloomFilterSuite) TestEmptyEncryptedChannelDoesNotPreventOtherFilters() {
+	ownerIdentity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	memberIdentity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	communityID := "cid"
+	emptyChannelID := "empty"
+	populatedChannelID := "populated"
+
+	description := &protobuf.CommunityDescription{
+		ID:    communityID,
+		Clock: 1,
+		Chats: map[string]*protobuf.CommunityChat{
+			emptyChannelID: {
+				Members: map[string]*protobuf.CommunityMember{},
+			},
+			populatedChannelID: {
+				Members: map[string]*protobuf.CommunityMember{
+					crypto.PubkeyToHex(&memberIdentity.PublicKey): {},
+				},
+			},
+		},
+		TokenPermissions: map[string]*protobuf.CommunityTokenPermission{
+			"permissionID": {
+				Id:            "permissionID",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: []*protobuf.TokenCriteria{{}},
+				ChatIds: []string{
+					ChatID(communityID, emptyChannelID),
+					ChatID(communityID, populatedChannelID),
+				},
+			},
+		},
+	}
+
+	err = generateBloomFiltersForChannels(description, ownerIdentity)
+	s.Require().NoError(err)
+	s.Require().Nil(description.Chats[emptyChannelID].MembersList)
+	s.Require().NotNil(description.Chats[populatedChannelID].MembersList)
+	s.Require().True(verifyMembershipWithBloomFilter(
+		description.Chats[populatedChannelID].MembersList,
+		memberIdentity,
+		&ownerIdentity.PublicKey,
+		populatedChannelID,
+		description.Clock,
+	))
+}
+
 // Regression test: on a device that does not hold the community private key
 // (e.g. right after a profile sync), the publish path can still reach
 // generateBloomFiltersForChannels with a nil key. Filter generation must be

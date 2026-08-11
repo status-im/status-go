@@ -25,6 +25,10 @@ func generateBloomFiltersForChannels(description *protobuf.CommunityDescription,
 		if !channelEncrypted(ChatID(description.ID, channelID), description.TokenPermissions) {
 			continue
 		}
+		if len(channel.Members) == 0 {
+			channel.MembersList = nil
+			continue
+		}
 
 		filter, err := generateBloomFilter(channel.Members, privateKey, channelID, description.Clock)
 		if err != nil {
