@@ -55,6 +55,18 @@ type TestCommunitiesKeyDistributor struct {
 	mutex         sync.RWMutex
 }
 
+type failingCommunitiesKeyDistributor struct {
+	err error
+}
+
+func (d *failingCommunitiesKeyDistributor) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
+	return d.err
+}
+
+func (d *failingCommunitiesKeyDistributor) Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
+	return d.err
+}
+
 func (tckd *TestCommunitiesKeyDistributor) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
 	return tckd.CommunitiesKeyDistributorImpl.Generate(community, keyActions)
 }
@@ -1950,6 +1962,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	err = <-waitOnChannelKeyToBeDistributedToBob
 	s.Require().NoError(err)
 
+	keyExchangeMessageIDs, err := s.owner.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	s.Require().NoError(err)
+	hasResendableKeyExchangeMessage := false
+	for _, messageID := range keyExchangeMessageIDs {
+		rawMessage, err := s.owner.RawMessageByID(messageID)
+		s.Require().NoError(err)
+		if bytes.Equal(rawMessage.HashRatchetGroupID, []byte(community.IDString()+chat.CommunityChatID())) {
+			s.Require().Equal(common.ResendTypeRawMessage, rawMessage.ResendType)
+			s.Require().Equal(common.ResendMethodSendCommunityMessage, rawMessage.ResendMethod)
+			hasResendableKeyExchangeMessage = true
+		}
+	}
+	s.Require().True(hasResendableKeyExchangeMessage)
+
 	// bob receives community changes
 	// channel members should be empty,
 	// this info is available only to channel members with encryption key
@@ -2008,6 +2034,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	errs := s.bob.handleLocalBackupCommunities(s.bob.buildMessageState(), backupMessage.Communities)
 	s.Require().Len(errs, 0, fmt.Sprintf("expected no errors while handling backup communities. Errors: %v", errs))
 
+	keyRequestMessageIDs, err := s.bob.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST)
+	s.Require().NoError(err)
+	s.Require().Len(keyRequestMessageIDs, 1)
+	keyRequestMessage, err := s.bob.RawMessageByID(keyRequestMessageIDs[0])
+	s.Require().NoError(err)
+	s.Require().Equal(common.ResendTypeRawMessage, keyRequestMessage.ResendType)
+	s.Require().Equal(common.ResendMethodSendCommunityMessage, keyRequestMessage.ResendMethod)
+
 	// regenerate key for the channel in order to check that owner will send keys
 	// on bob request from `HandleBackup`
 	err = s.owner.messaging.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
@@ -2063,6 +2097,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestReturnsDistributionError() {
+	community, _ := createOnRequestCommunity(&s.Suite, s.owner)
+	expectedErr := errors.New("key distribution failed")
+
+	originalDistributor := s.owner.communitiesKeyDistributor
+	s.owner.communitiesKeyDistributor = &failingCommunitiesKeyDistributor{err: expectedErr}
+	defer func() {
+		s.owner.communitiesKeyDistributor = originalDistributor
+	}()
+
+	err := s.owner.handleCommunityEncryptionKeysRequest(community, nil, &s.owner.identity.PublicKey)
+	s.Require().ErrorIs(err, expectedErr)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissionsPerformance() {
