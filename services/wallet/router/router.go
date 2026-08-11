@@ -151,12 +151,30 @@ func (r *Router) GetBestRouteAndAssociatedInputParams() (routes.Route, requests.
 	r.activeRoutesMutex.Lock()
 	defer r.activeRoutesMutex.Unlock()
 	if r.activeRoutes == nil {
+		lastUuid := ""
+		r.lastInputParamsMutex.Lock()
+		if r.lastInputParams != nil {
+			lastUuid = r.lastInputParams.Uuid
+		}
+		r.lastInputParamsMutex.Unlock()
+		r.logger.Warn("GetBestRouteAndAssociatedInputParams: no active route (cleared or last calculation failed/was canceled)",
+			zap.String("lastInputParamsUuid", lastUuid))
 		return nil, requests.RouteInputParams{}
 	}
 
 	r.lastInputParamsMutex.Lock()
 	defer r.lastInputParamsMutex.Unlock()
+	if r.lastInputParams == nil {
+		r.logger.Warn("GetBestRouteAndAssociatedInputParams: active route present but input params are missing",
+			zap.String("activeRoutesUuid", r.activeRoutes.Uuid))
+		return nil, requests.RouteInputParams{}
+	}
 	ip := *r.lastInputParams
+
+	r.logger.Debug("GetBestRouteAndAssociatedInputParams: returning active route",
+		zap.String("activeRoutesUuid", r.activeRoutes.Uuid),
+		zap.String("inputParamsUuid", ip.Uuid),
+		zap.Int("paths", len(r.activeRoutes.Route)))
 
 	return r.activeRoutes.Route.Copy(), ip
 }
@@ -503,9 +521,13 @@ func (r *Router) SuggestedRoutesAsync(input *requests.RouteInputParams) {
 
 func (r *Router) clearActiveRoute() {
 	r.activeRoutesMutex.Lock()
+	clearedUuid := ""
+	if r.activeRoutes != nil {
+		clearedUuid = r.activeRoutes.Uuid
+	}
 	r.activeRoutes = nil
 	r.activeRoutesMutex.Unlock()
-	r.logger.Debug("clearActiveRoute: active route cleared")
+	r.logger.Info("clearActiveRoute: active route cleared", zap.String("clearedUuid", clearedUuid))
 }
 
 func (r *Router) markRouteCanceled(value bool) {
@@ -564,6 +586,21 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		r.activeRoutesMutex.Lock()
 		r.activeRoutes = suggestedRoutes
 		r.activeRoutesMutex.Unlock()
+		if suggestedRoutes == nil {
+			r.routeCanceledMutex.Lock()
+			canceled := r.routeCanceled
+			r.routeCanceledMutex.Unlock()
+			// leaves the router without an active route; a subsequent send for an
+			// earlier uuid will fail with ErrCannotResolveRouteId
+			r.logger.Warn("SuggestedRoutes: finished without active route",
+				zap.String("uuid", input.Uuid),
+				zap.Bool("canceled", canceled),
+				zap.Error(err))
+		} else {
+			r.logger.Info("SuggestedRoutes: active route stored",
+				zap.String("uuid", suggestedRoutes.Uuid),
+				zap.Int("paths", len(suggestedRoutes.Route)))
+		}
 		r.routeCanceledMutex.Lock()
 		if suggestedRoutes != nil && err == nil && !r.routeCanceled {
 			// subscribe for updates

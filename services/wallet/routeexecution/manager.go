@@ -57,6 +57,8 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	go func() {
 		defer status_common.LogOnPanic()
 
+		logutils.ZapLogger().Info("BuildTransactionsFromRoute: started", zap.String("uuid", uuid))
+
 		m.router.StopSuggestedRoutesAsyncCalculation()
 
 		var err error
@@ -78,6 +80,10 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
 		if routeInputParams.Uuid != uuid {
 			// should never be here
+			logutils.ZapLogger().Error("BuildTransactionsFromRoute: cannot resolve route id",
+				zap.String("requestedUuid", uuid),
+				zap.String("activeRouteUuid", routeInputParams.Uuid),
+				zap.Bool("activeRouteMissing", route == nil))
 			err = ErrCannotResolveRouteId
 			return
 		}
@@ -112,6 +118,8 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	go func() {
 		defer status_common.LogOnPanic()
+
+		logutils.ZapLogger().Info("SendRouterTransactionsWithSignatures: started", zap.String("uuid", sendInputParams.Uuid))
 
 		var (
 			err              error
@@ -150,8 +158,12 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			m.eventFeed.Send(event)
 		}()
 
-		_, routeInputParams = m.router.GetBestRouteAndAssociatedInputParams()
+		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
 		if routeInputParams.Uuid != sendInputParams.Uuid {
+			logutils.ZapLogger().Error("SendRouterTransactionsWithSignatures: cannot resolve route id",
+				zap.String("requestedUuid", sendInputParams.Uuid),
+				zap.String("activeRouteUuid", routeInputParams.Uuid),
+				zap.Bool("activeRouteMissing", route == nil))
 			err = ErrCannotResolveRouteId
 			return
 		}
