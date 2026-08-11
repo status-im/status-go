@@ -5142,8 +5142,8 @@ func (c *Community) ToStatusLinkPreview() (*common.StatusCommunityLinkPreview, e
 	return communityLinkPreview, nil
 }
 
-func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]string, error) {
-	result := []string{}
+func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]string, []string, error) {
+	channelsToRequest := []string{}
 
 	channelsWithMissingKeys := func() map[string]struct{} {
 		r := map[string]struct{}{}
@@ -5156,19 +5156,22 @@ func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]
 	}()
 
 	if len(channelsWithMissingKeys) == 0 {
-		return result, nil
+		return nil, channelsToRequest, nil
 	}
 
 	requests, err := m.persistence.GetEncryptionKeyRequests(c.ID(), channelsWithMissingKeys)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	missingChannelIDs := make([]string, 0, len(channelsWithMissingKeys))
 	for channelID := range channelsWithMissingKeys {
+		missingChannelIDs = append(missingChannelIDs, channelID)
+
 		request, ok := requests[channelID]
 		if !ok {
 			// If there's no prior request, ask for encryption key now
-			result = append(result, channelID)
+			channelsToRequest = append(channelsToRequest, channelID)
 			continue
 		}
 
@@ -5178,21 +5181,21 @@ func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]
 		nextRequestTime := request.requestedAt + backoffDuration
 
 		if now >= nextRequestTime {
-			result = append(result, channelID)
+			channelsToRequest = append(channelsToRequest, channelID)
 		}
 	}
 
-	return result, nil
+	return missingChannelIDs, channelsToRequest, nil
 }
 
 type CommunityWithChannelIDs struct {
-	Community  *Community
-	ChannelIDs []string
+	Community           *Community
+	ChannelIDsToRequest []string
+	MissingChannelIDs   []string
 }
 
-// DetermineChannelsForHRKeysRequest identifies channels in a community that
-// should ask for encryption keys based on their current state and past request records,
-// as determined by exponential backoff.
+// DetermineChannelsForHRKeysRequest returns joined communities with their missing
+// channels and the subset eligible for an encryption key request.
 func (m *Manager) DetermineChannelsForHRKeysRequest() ([]*CommunityWithChannelIDs, error) {
 	communities, err := m.Joined()
 	if err != nil {
@@ -5207,28 +5210,31 @@ func (m *Manager) DetermineChannelsForHRKeysRequest() ([]*CommunityWithChannelID
 			continue
 		}
 
-		channelsToRequest, err := m.determineChannelsForHRKeysRequest(c, now)
+		missingChannelIDs, channelsToRequest, err := m.determineChannelsForHRKeysRequest(c, now)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(channelsToRequest) > 0 {
-			result = append(result, &CommunityWithChannelIDs{
-				Community:  c,
-				ChannelIDs: channelsToRequest,
-			})
-		}
+		result = append(result, &CommunityWithChannelIDs{
+			Community:           c,
+			ChannelIDsToRequest: channelsToRequest,
+			MissingChannelIDs:   missingChannelIDs,
+		})
 	}
 
 	return result, nil
 }
 
 func (m *Manager) updateEncryptionKeysRequests(communityID cryptotypes.HexBytes, channelIDs []string, now int64) error {
-	return m.persistence.UpdateAndPruneEncryptionKeyRequests(communityID, channelIDs, now)
+	return m.persistence.UpdateEncryptionKeyRequests(communityID, channelIDs, now)
 }
 
 func (m *Manager) UpdateEncryptionKeysRequests(communityID cryptotypes.HexBytes, channelIDs []string) error {
 	return m.updateEncryptionKeysRequests(communityID, channelIDs, time.Now().UnixMilli())
+}
+
+func (m *Manager) PruneEncryptionKeysRequests(communityID cryptotypes.HexBytes, channelIDs []string) error {
+	return m.persistence.PruneEncryptionKeyRequests(communityID, channelIDs)
 }
 
 func unmarshalCommunityDescriptionMessage(signedDescription []byte, signerPubkey *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
