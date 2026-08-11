@@ -5142,6 +5142,31 @@ func (c *Community) ToStatusLinkPreview() (*common.StatusCommunityLinkPreview, e
 	return communityLinkPreview, nil
 }
 
+const (
+	encryptionKeyRequestInitialDelay = 10 * time.Minute
+	encryptionKeyRequestMaxDelay     = 8 * time.Hour
+	maxEncryptionKeyRequests         = 10
+)
+
+func encryptionKeyRequestBackoffDuration(requestedCount uint) time.Duration {
+	switch requestedCount {
+	case 0, 1:
+		return encryptionKeyRequestInitialDelay
+	case 2:
+		return 30 * time.Minute
+	case 3:
+		return time.Hour
+	case 4:
+		return 4 * time.Hour
+	default:
+		return encryptionKeyRequestMaxDelay
+	}
+}
+
+func canRequestEncryptionKey(requestedCount uint) bool {
+	return requestedCount < maxEncryptionKeyRequests
+}
+
 func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]string, []string, error) {
 	channelsToRequest := []string{}
 
@@ -5175,10 +5200,11 @@ func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]
 			continue
 		}
 
-		// Exponential backoff formula: initial delay * 2^(requestCount - 1)
-		initialDelay := int64(10 * 60 * 1000) // 10 minutes in milliseconds
-		backoffDuration := initialDelay * (1 << (request.requestedCount - 1))
-		nextRequestTime := request.requestedAt + backoffDuration
+		if !canRequestEncryptionKey(request.requestedCount) {
+			continue
+		}
+
+		nextRequestTime := request.requestedAt + encryptionKeyRequestBackoffDuration(request.requestedCount).Milliseconds()
 
 		if now >= nextRequestTime {
 			channelsToRequest = append(channelsToRequest, channelID)
