@@ -775,8 +775,14 @@ func (p *Protocol) HandleHashRatchetKeys(ctx context.Context, groupID []byte, ke
 		}
 	}
 
-	if p.subscriptions != nil {
-		p.subscriptions.NewHashRatchetKeys <- info
+	if p.subscriptions != nil && len(info) > 0 {
+		select {
+		case p.subscriptions.NewHashRatchetKeys <- info:
+		case <-p.subscriptions.Quit:
+		default:
+			p.logger.Warn("dropping hash ratchet key notification because subscription channel is full",
+				zap.Int("keyCount", len(info)))
+		}
 	}
 
 	return info, nil

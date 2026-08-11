@@ -1147,6 +1147,51 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetRekeyCompatibility() {
 	s.Require().NoError(err)
 }
 
+func (s *EncryptionServiceTestSuite) TestHandleHashRatchetKeysDoesNotNotifyWithoutKeys() {
+	subscriptions, err := s.alice.Start(nil)
+	s.Require().NoError(err)
+	defer func() {
+		s.Require().NoError(s.alice.Stop())
+	}()
+
+	info, err := s.alice.HandleHashRatchetKeys(context.Background(), []byte("group"), &HRKeys{}, nil, nil)
+	s.Require().NoError(err)
+	s.Require().Empty(info)
+
+	select {
+	case <-subscriptions.NewHashRatchetKeys:
+		s.Fail("received a hash ratchet key notification without keys")
+	default:
+	}
+}
+
+func (s *EncryptionServiceTestSuite) TestHandleHashRatchetKeysDoesNotBlockOnFullSubscription() {
+	subscriptions, err := s.alice.Start(nil)
+	s.Require().NoError(err)
+	defer func() {
+		s.Require().NoError(s.alice.Stop())
+	}()
+
+	for range maxKeysChannelSize {
+		subscriptions.NewHashRatchetKeys <- nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.alice.HandleHashRatchetKeys(context.Background(), []byte("group"), &HRKeys{
+			Keys: []*HRKey{{Timestamp: 1, Key: []byte("key")}},
+		}, nil, nil)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		s.Require().NoError(err)
+	case <-time.After(time.Second):
+		s.Fail("handling hash ratchet keys blocked on a full subscription")
+	}
+}
+
 // We test that adding a new field and leaving the old blank won't crash the app
 func (s *EncryptionServiceTestSuite) TestHashRatchetRekeyHandleRatchet() {
 	ctx := context.Background()
