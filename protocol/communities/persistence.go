@@ -2169,7 +2169,6 @@ func (p *Persistence) UpdateEncryptionKeyRequests(communityID cryptotypes.HexByt
         DO UPDATE SET
             requested_at = excluded.requested_at,
             requested_count = community_encryption_keys_requests.requested_count + 1
-        WHERE excluded.requested_at > community_encryption_keys_requests.requested_at
     `)
 	if err != nil {
 		return err
