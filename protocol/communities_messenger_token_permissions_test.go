@@ -2113,6 +2113,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptio
 	s.Require().ErrorIs(err, expectedErr)
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestEncryptionKeyRequestChannelIDs() {
+	s.Require().Nil(encryptionKeyRequestChannelIDs([]string{""}))
+	s.Require().Equal([]string{"channel-id"}, encryptionKeyRequestChannelIDs([]string{"", "channel-id"}))
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissionsPerformance() {
 	// This test is created for a performance degradation tracking for reevaluateMember permissions
 	// current scenario mostly track channels permissions reevaluating, but feel free to expand it to

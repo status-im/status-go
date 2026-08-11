@@ -4914,6 +4914,8 @@ func (m *Messenger) shareRevealedAccountsOnSoftKick(community *communities.Commu
 }
 
 func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Community, channelIDs []string) error {
+	channelIDs = encryptionKeyRequestChannelIDs(channelIDs)
+
 	m.logger.Debug("request community encryption keys",
 		zap.String("communityID", community.IDString()),
 		zap.Strings("channels", channelIDs))
@@ -4951,6 +4953,16 @@ func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Commun
 	return err
 }
 
+func encryptionKeyRequestChannelIDs(channelIDs []string) []string {
+	var filteredChannelIDs []string
+	for _, channelID := range channelIDs {
+		if channelID != "" {
+			filteredChannelIDs = append(filteredChannelIDs, channelID)
+		}
+	}
+	return filteredChannelIDs
+}
+
 func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
 
@@ -4972,7 +4984,7 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 
 				for _, cc := range communitiesChannels {
 					// Clear retry history for channels that no longer need a key.
-					// ChannelIDs remains backoff-gated for requests sent below.
+					// ChannelIDsToRequest remains backoff-gated for requests sent below.
 					err = m.communitiesManager.PruneEncryptionKeysRequests(cc.Community.ID(), cc.MissingChannelIDs)
 					if err != nil {
 						logger.Error("failed to prune channels' encryption keys requests",
