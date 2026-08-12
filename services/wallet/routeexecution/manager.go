@@ -115,6 +115,65 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	}()
 }
 
+// SetPermitSignaturesAndBuildTransactions attaches the permit signatures the client just
+// produced, then builds the transactions whose calldata embeds them.
+//
+// It's a separate step because the permit signature goes into the transaction it
+// authorises, so the tx hash can't be computed before the permit is signed. Emits the
+// same SignRouterTransactions signal as BuildTransactionsFromRoute.
+func (m *Manager) SetPermitSignaturesAndBuildTransactions(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
+	go func() {
+		defer status_common.LogOnPanic()
+
+		var err error
+		response := &responses.RouterTransactionsForSigning{
+			SendDetails: &responses.SendDetails{
+				Uuid: sendInputParams.Uuid,
+			},
+		}
+
+		defer func() {
+			if err != nil {
+				m.ClearLocalRouteData()
+				err = statusErrors.CreateErrorResponseFromError(err)
+				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
+			}
+			signal.SendWalletEvent(signal.SignRouterTransactions, response)
+		}()
+
+		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
+		if routeInputParams.Uuid != sendInputParams.Uuid {
+			err = ErrCannotResolveRouteId
+			return
+		}
+
+		if _, err = m.transactionManager.AddPermitSignatures(sendInputParams.Signatures); err != nil {
+			return
+		}
+
+		tokenFrom, _ := m.tokenManager.GetTokenByKey(routeInputParams.TokenKey)
+		tokenTo, _ := m.tokenManager.GetTokenByKey(routeInputParams.ToTokenKey)
+
+		var extraParams pathprocessor.ProcessorInputParams
+		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, tokenFrom, tokenTo, 0)
+		if err != nil {
+			return
+		}
+
+		response.SendDetails.UpdateFields(routeInputParams, routeInputParams.FromChainID, routeInputParams.ToChainID)
+
+		var fromChainID, toChainID uint64
+		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
+			route,
+			m.router.GetPathProcessors(),
+			&extraParams,
+		)
+		if err != nil {
+			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
+		}
+	}()
+}
+
 func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	go func() {
 		defer status_common.LogOnPanic()

@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/lifi"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
@@ -29,6 +30,7 @@ type LiFiProcessor struct {
 	lifiClient      lifi.ClientInterface
 	tokenManager    *walletToken.Manager
 	transactor      transactions.TransactorIface
+	permitResolver  *permit2.Resolver
 	quotes          sync.Map // [fromTokenKey-toTokenKey-amountIn, *lifi.Quote]
 }
 
@@ -38,6 +40,7 @@ func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactio
 		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, lifi.Integrator, ""),
 		tokenManager:    tokenManager,
 		transactor:      transactor,
+		permitResolver:  permit2.NewResolver(ethClientGetter),
 		quotes:          sync.Map{},
 	}
 }
@@ -150,6 +153,35 @@ func (s *LiFiProcessor) GetContractAddress(params ProcessorInputParams) (common.
 	return quote.Estimate.ApprovalAddress, nil
 }
 
+// ResolvePermit reports whether this swap can pull its tokens with an off-chain permit.
+// A nil plan and nil error means the regular approve-then-swap flow applies: native token,
+// chain not enabled or without a Permit2Proxy, or unreadable LI.FI chain metadata. None of
+// those fail the route.
+func (s *LiFiProcessor) ResolvePermit(ctx context.Context, params ProcessorInputParams) (*permit2.Plan, error) {
+	if params.FromToken == nil || params.FromToken.IsNative() || params.TestsMode {
+		return nil, nil
+	}
+
+	chainID := params.FromToken.ChainID
+	if !permit2.EnabledForChain(chainID) {
+		return nil, nil
+	}
+
+	chainInfo, err := s.lifiClient.GetChainInfo(ctx, chainID)
+	if err != nil || chainInfo == nil || !chainInfo.SupportsPermit2() {
+		return nil, nil //nolint:nilerr // no permit support is a valid outcome, not a failure
+	}
+
+	return s.permitResolver.Resolve(ctx, permit2.ResolveParams{
+		ChainID:      chainID,
+		Owner:        params.FromAddr,
+		Token:        params.FromToken.Address,
+		Amount:       params.AmountIn,
+		Permit2:      chainInfo.Permit2,
+		Permit2Proxy: chainInfo.Permit2Proxy,
+	})
+}
+
 // GetProviderTool returns the underlying tool/exchange LI.FI routes through (e.g. "1inch")
 // for the current quote, or an empty string if it can't be resolved.
 func (s *LiFiProcessor) GetProviderTool(params ProcessorInputParams) string {
@@ -238,7 +270,64 @@ func (s *LiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (
 
 	increasedEstimation := float64(estimation) * gasFactor
 
+	// The permit path can't be estimated on-chain: permitTransferFrom reverts until the
+	// signature exists, which is after the route is priced. Use a fixed overhead instead so
+	// the fee shown to the user matches the gas limit on the tx.
+	if params.PermitPlan != nil && params.PermitPlan.Details != nil {
+		increasedEstimation += float64(permitGasOverhead(params.PermitPlan.Details.Type))
+	}
+
 	return uint64(increasedEstimation), nil
+}
+
+// estimatePermitGas prices the wrapped proxy call. Once the permit is signed the tx can be
+// simulated for real, which is the only reliable number: the quote's gas limit was priced
+// for the user calling the diamond directly and covers none of the permit, the transfer
+// into the proxy or the diamond approval. Falls back to the quote plus the fixed overhead,
+// and never returns less than that.
+func (s *LiFiProcessor) estimatePermitGas(chainID uint64, from, to types2.Address, data []byte,
+	quotedGas uint64, permitType permit2.Type) uint64 {
+	fallback := quotedGas + permitGasOverhead(permitType)
+
+	ethClient, err := s.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return fallback
+	}
+
+	toAddress := common.Address(to)
+	estimation, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
+		From:  common.Address(from),
+		To:    &toAddress,
+		Value: big.NewInt(0),
+		Data:  data,
+	})
+	if err != nil {
+		return fallback
+	}
+
+	withMargin := uint64(float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor)
+	if withMargin < fallback {
+		return fallback
+	}
+	return withMargin
+}
+
+// permitGasOverhead is the extra gas the Permit2Proxy call costs on top of the swap: the
+// permit, the token transfer into the proxy and the diamond approval.
+//
+// Measured on a mainnet USDC swap: permit 67,712 + transferFrom 16,149 + allowance 3,448,
+// so ~87k before the diamond is reached. The values below carry margin on top because the
+// 63/64 rule amplifies any shortfall at every level of the swap's call stack: an
+// underestimate runs the deepest call out of gas rather than failing cleanly. The Permit2
+// number is still a guess, permitTransferFrom hasn't been measured against a real tx yet.
+func permitGasOverhead(permitType permit2.Type) uint64 {
+	switch permitType {
+	case permit2.TypeEIP2612:
+		return 120_000
+	case permit2.TypePermit2:
+		return 130_000
+	}
+	return 0
 }
 
 func (s *LiFiProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*lifi.Quote, error) {
@@ -279,14 +368,28 @@ func (s *LiFiProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, las
 		return nil, 0, ErrConvertingAmountToBigInt
 	}
 
-	sendArgs.FromChainID = txReq.ChainID
 	toAddr := types2.HexToAddress(txReq.To)
+	data := types2.Hex2Bytes(txReq.Data)
+
+	// With a permit, the transaction goes to the Permit2Proxy rather than straight to the
+	// LI.FI diamond: the proxy pulls the tokens using the user's signature and forwards
+	// this calldata on. That is what removes the separate approval transaction.
+	if details := sendArgs.PermitDetails; details != nil {
+		data, err = permit2.PackSwapCalldata(details, data)
+		if err != nil {
+			return nil, 0, createLiFiErrorResponse(err)
+		}
+		toAddr = types2.Address(details.Spender)
+		gas = s.estimatePermitGas(txReq.ChainID, types2.HexToAddress(txReq.From), toAddr, data, gas, details.Type)
+	}
+
+	sendArgs.FromChainID = txReq.ChainID
 	sendArgs.From = types2.HexToAddress(txReq.From)
 	sendArgs.To = &toAddr
 	sendArgs.Value = (*hexutil.Big)(value)
 	sendArgs.Gas = (*hexutil.Uint64)(&gas)
 	sendArgs.GasPrice = (*hexutil.Big)(gasPrice)
-	sendArgs.Data = types2.Hex2Bytes(txReq.Data)
+	sendArgs.Data = data
 
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }

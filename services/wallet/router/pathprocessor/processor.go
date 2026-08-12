@@ -3,6 +3,7 @@ package pathprocessor
 //go:generate go tool mockgen -package=mock_pathprocessor -source=processor.go -destination=mock/processor.go
 
 import (
+	"context"
 	"math/big"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -10,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	"github.com/status-im/status-go/services/wallet/requests"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -37,6 +39,13 @@ type PathProcessor interface {
 type PathProcessorClearable interface {
 	// Clear clears the local cache
 	Clear()
+}
+
+// PermitResolver is implemented by processors that can pull the user's tokens with an
+// off-chain permit instead of an approval tx. Optional: the router type-asserts for it
+// and falls back to approve-then-swap when it isn't implemented.
+type PermitResolver interface {
+	ResolvePermit(ctx context.Context, params ProcessorInputParams) (*permit2.Plan, error)
 }
 
 type ProcessorCommunityTokenParams struct {
@@ -69,6 +78,10 @@ type ProcessorInputParams struct {
 
 	// community related params
 	CommunityParams *requests.CommunityRouteInputParams
+
+	// PermitPlan is set by the router once it resolved whether this swap can use a permit.
+	// Processors use it to account for the extra gas the Permit2Proxy call costs.
+	PermitPlan *permit2.Plan
 
 	// for testing purposes
 	TestsMode                 bool

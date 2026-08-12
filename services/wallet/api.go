@@ -673,6 +673,14 @@ func (api *API) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	api.s.routeExecutionManager.BuildTransactionsFromRoute(ctx, uuid)
 }
 
+// SetPermitSignaturesAndBuildTransactions is the second phase of a permit swap: the client
+// sends the signatures for the permit digests from the previous SignRouterTransactions
+// signal and gets back another one carrying the tx hashes to sign.
+func (api *API) SetPermitSignaturesAndBuildTransactions(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
+	logutils.ZapLogger().Debug("[WalletAPI::SetPermitSignaturesAndBuildTransactions] applies permit signatures and builds transactions")
+	api.s.routeExecutionManager.SetPermitSignaturesAndBuildTransactions(ctx, sendInputParams)
+}
+
 func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	logutils.ZapLogger().Debug("[WalletAPI:: SendRouterTransactionsWithSignatures] sign with signatures and send")
 	api.s.routeExecutionManager.SendRouterTransactionsWithSignatures(ctx, sendInputParams)

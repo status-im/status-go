@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -1167,7 +1168,20 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 			zap.Error(err))
 		return nil, err
 	}
-	approvalRequired, approvalAmountRequired, err := r.requireApproval(ctx, input.SendType, &contractAddress, processorInputParams)
+	// With a permit the approval either disappears entirely (EIP-2612 token) or becomes a
+	// one-time approval of the Permit2 singleton. Processors without permit support return
+	// no plan.
+	permitPlan := r.resolvePermitPlan(ctx, pathProcessor, processorInputParams)
+	processorInputParams.PermitPlan = permitPlan
+
+	// A zero spender makes requireApproval report "not required", which is the case where
+	// the permit replaces the approval outright.
+	approvalSpender := contractAddress
+	if permitPlan != nil {
+		approvalSpender = permitPlan.ApprovalSpender
+	}
+
+	approvalRequired, approvalAmountRequired, err := r.requireApproval(ctx, input.SendType, &approvalSpender, processorInputParams)
 	if err != nil {
 		r.logger.Error("buildPath: requireApproval failed",
 			zap.String("uuid", input.Uuid),
@@ -1188,10 +1202,15 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		txPackedData       []byte
 	)
 	if approvalRequired {
+		// Approving Permit2 is deliberately unlimited: a bounded approval would have to be
+		// repeated on the next swap.
+		if permitPlan.NeedsApproval() {
+			approvalAmountRequired = permit2.MaxAllowance()
+		}
 		if processorInputParams.TestsMode {
 			approvalGasLimit = processorInputParams.TestApprovalGasEstimation
 		} else {
-			approvalPackedData, err = walletCommon.PackApprovalInputData(processorInputParams.AmountIn, &contractAddress)
+			approvalPackedData, err = walletCommon.PackApprovalInputData(approvalAmountRequired, &approvalSpender)
 			if err != nil {
 				r.logger.Error("buildPath: PackApprovalInputData failed",
 					zap.String("uuid", input.Uuid),
@@ -1275,9 +1294,13 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 
 		ApprovalRequired:        approvalRequired,
 		ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
-		ApprovalContractAddress: &contractAddress,
+		ApprovalContractAddress: &approvalSpender,
 		ApprovalPackedData:      approvalPackedData,
 		ApprovalGasAmount:       approvalGasLimit,
+	}
+
+	if permitPlan != nil {
+		path.PermitDetails = permitPlan.Details
 	}
 
 	// processors that route through an underlying tool/exchange (e.g. LI.FI -> "1inch")

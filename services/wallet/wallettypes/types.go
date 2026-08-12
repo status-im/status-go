@@ -13,6 +13,7 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
@@ -72,6 +73,10 @@ type SendTxArgs struct {
 	ToToken            *tokentypes.Token `json:"toToken"`
 	ToContractAddress  types2.Address    `json:"toContractAddress"` // represents address of the contract that needs to be used in order to send assets, like ERC721 or ERC1155 tx
 	SlippagePercentage float32           `json:"slippagePercentage"`
+
+	// PermitDetails carries the signed permit for swaps that skip the approval tx. When
+	// set, the processor wraps the swap calldata in the matching Permit2Proxy call.
+	PermitDetails *permit2.Details `json:"permitDetails,omitempty"`
 }
 
 // Valid checks whether this structure is filled in correctly.
