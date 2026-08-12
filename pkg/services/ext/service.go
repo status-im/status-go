@@ -351,6 +351,7 @@ func buildMessengerOptions(
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithEnablePinnedBootstrap(enablePinnedBootstrap),
+		protocol.WithEnableSupportBotContactRequest(true),
 		protocol.WithPushNotifications(),
 		protocol.WithDatabase(appDb),
 		protocol.WithWalletDatabase(walletDb),

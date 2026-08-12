@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/httpserver/servertest"
 	"github.com/status-im/status-go/internal/platform"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -62,6 +63,19 @@ func TestRawMessagePayloadMarshallerDefaultsAutoApplyKeypairMigrationsForOlderSe
 	require.NoError(t, NewRawMessagePayloadMarshaller(receiver).UnmarshalProtobuf(data))
 	require.Equal(t, keyUID, receiver.setting.KeyUID)
 	require.True(t, receiver.setting.AutoApplyKeypairMigrations)
+}
+
+func TestRawMessagePayloadMarshallerMarksSupportBotContactRequestDone(t *testing.T) {
+	sender := NewRawMessagesPayload()
+	sender.setting.KeyUID = keyUID
+	sender.setting.SupportBotContactRequestState = settings.SupportBotContactRequestStatePendingNew
+
+	data, err := NewRawMessagePayloadMarshaller(sender).MarshalProtobuf()
+	require.NoError(t, err)
+
+	receiver := NewRawMessagesPayload()
+	require.NoError(t, NewRawMessagePayloadMarshaller(receiver).UnmarshalProtobuf(data))
+	require.Equal(t, settings.SupportBotContactRequestStateDone, receiver.setting.SupportBotContactRequestState)
 }
 
 var (
