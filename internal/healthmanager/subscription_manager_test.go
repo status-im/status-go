@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/common"
 )
 
 func TestSubscriptionManager(t *testing.T) {
@@ -80,6 +82,7 @@ func TestSubscriptionManager_MultipleEmitsCollapse(t *testing.T) {
 	var mu sync.Mutex
 
 	go func() {
+		defer common.LogOnPanic()
 		for range ch {
 			mu.Lock()
 			received++

@@ -1725,6 +1725,17 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	s.Require().Equal([]string{"channel-id"}, missingChannels)
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
+
+	// If the clock moves backward, a future requested_at should still be eligible
+	// so the next successful request can reset the persisted timestamp.
+	err = s.manager.updateEncryptionKeysRequests(community.ID(), []string{"channel-id"}, now+10*tenMinutes)
+	s.Require().NoError(err)
+
+	missingChannels, channels, err = s.manager.determineChannelsForHRKeysRequest(community, now)
+	s.Require().NoError(err)
+	s.Require().Equal([]string{"channel-id"}, missingChannels)
+	s.Require().Len(channels, 1)
+	s.Require().Equal("channel-id", channels[0])
 }
 
 func (s *ManagerSuite) TestDetermineCommunityEncryptionKeyRequest() {

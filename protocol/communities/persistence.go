@@ -2106,10 +2106,10 @@ func (p *Persistence) GetEncryptionKeyRequests(communityID []byte, channelIDs ma
 	return result, nil
 }
 
-func (p *Persistence) PruneEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string) error {
-	tx, err := p.db.Begin()
-	if err != nil {
-		return err
+func (p *Persistence) PruneEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string) (err error) {
+	tx, err2 := p.db.Begin()
+	if err2 != nil {
+		return err2
 	}
 
 	defer func() {
@@ -2143,14 +2143,14 @@ func (p *Persistence) PruneEncryptionKeyRequests(communityID cryptotypes.HexByte
 	return nil
 }
 
-func (p *Persistence) UpdateEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string, requestedAt int64) error {
+func (p *Persistence) UpdateEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string, requestedAt int64) (err error) {
 	if len(channelIDs) == 0 {
 		return nil
 	}
 
-	tx, err := p.db.Begin()
-	if err != nil {
-		return err
+	tx, err2 := p.db.Begin()
+	if err2 != nil {
+		return err2
 	}
 
 	defer func() {
