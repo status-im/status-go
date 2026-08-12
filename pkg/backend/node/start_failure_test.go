@@ -22,7 +22,8 @@ func TestStartFailureResetsRunning(t *testing.T) {
 	require.NoError(t, err)
 	config.Networks = testutil.MinimalActiveNetworks()
 	// An invalid persisted custom token fails TokenManager creation, so
-	// startWithDB returns early.
+	// startWithDB returns after the RPC client, downloader and media server
+	// were already built.
 	config.WalletConfig.CustomTokens = []*tokentypes.Token{{Token: &types.Token{ChainID: 1, Decimals: 256}}}
 
 	n := New(nil, nil, testutils.MustCreateTestLogger())
@@ -40,4 +41,11 @@ func TestStartFailureResetsRunning(t *testing.T) {
 
 	require.Error(t, n.Start(config), "expected startup to fail with an invalid custom token")
 	require.False(t, n.IsRunning(), "a failed Start must not leave the node marked running")
+
+	// A failed Start must also unwind what startWithDB built before failing,
+	// not just roll the flag back.
+	require.Nil(t, n.rpcClient, "a failed Start must stop and release the RPC client")
+	require.Nil(t, n.downloader, "a failed Start must stop and release the downloader")
+	require.Nil(t, n.config, "a failed Start must not leave a config on a node that never started")
+	require.ErrorIs(t, n.Stop(), ErrNoRunningNode, "Stop after a failed Start must report no running node")
 }
