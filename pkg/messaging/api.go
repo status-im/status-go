@@ -55,7 +55,7 @@ func (a *API) ConnectionStatus() types.ConnectionStatus {
 // be reconciled with the store nodes (#7568): periodically while connectivity
 // is not reliable (relay mesh not Connected on every default shard), and once
 // more when it recovers.
-func (a *API) OnHistoryReconcileNeeded() <-chan struct{} {
+func (a *API) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return a.core.stack.Transport.OnHistoryReconcileNeeded()
 }
 

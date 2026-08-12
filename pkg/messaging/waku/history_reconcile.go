@@ -5,7 +5,6 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -14,69 +13,87 @@ const (
 	// receiving everything live, the consumer should periodically fetch history
 	// from the store nodes so silently missed messages are recovered. The node
 	// is confident only with a Connected relay mesh on every default shard.
-	historyReconcileCheckInterval = 10 * time.Second
-	historyReconcileMinInterval   = 30 * time.Second
+	historyReconcileMinInterval = 30 * time.Second
 )
 
-// OnHistoryReconcileNeeded returns a channel signalled whenever history should
-// be reconciled with the store nodes: periodically while connectivity is not
+type historyReconcileTracker struct {
+	reliable       bool
+	checkedAt      time.Time
+	unreliableFrom time.Time
+	lastReconcile  time.Time
+}
+
+func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTracker {
+	tracker := historyReconcileTracker{reliable: reliable, checkedAt: now}
+	if !reliable {
+		tracker.unreliableFrom = now
+	}
+	return tracker
+}
+
+func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInterval time.Duration) *types.HistoryReconcileWindow {
+	wasReliable := t.reliable
+	t.reliable = reliable
+	if wasReliable && !reliable {
+		t.unreliableFrom = t.checkedAt
+	}
+	t.checkedAt = now
+
+	if !shouldReconcileHistory(reliable, wasReliable, t.lastReconcile, now, minInterval) {
+		return nil
+	}
+	if t.unreliableFrom.IsZero() {
+		t.unreliableFrom = now
+	}
+	t.lastReconcile = now
+	window := types.HistoryReconcileWindow{From: t.unreliableFrom, To: now}
+	if reliable {
+		t.unreliableFrom = time.Time{}
+	}
+	return &window
+}
+
+// queueHistoryReconciliation records a reconciliation window, merging it with
+// the previous pending window when they overlap or touch.
+func (w *Waku) queueHistoryReconciliation(tracker *historyReconcileTracker, pending *[]types.HistoryReconcileWindow, reliable bool, now time.Time) {
+	window := tracker.observe(reliable, now, historyReconcileMinInterval)
+	if window == nil {
+		return
+	}
+
+	w.logger.Debug("history reconciliation needed",
+		zap.Bool("reliable", reliable),
+		zap.Time("from", window.From),
+		zap.Time("to", window.To))
+	if len(*pending) != 0 && !window.From.After((*pending)[len(*pending)-1].To) {
+		// Merge adjacent or overlapping windows so callers receive one
+		// continuous recovery range instead of a fragmented sequence.
+		(*pending)[len(*pending)-1].To = window.To
+	} else {
+		*pending = append(*pending, *window)
+	}
+}
+
+// OnHistoryReconcileNeeded returns unreliable delivery windows that should be
+// reconciled with the store nodes: periodically while connectivity is not
 // reliable, and once more when it recovers (closing the unreliable window).
-// It is a buffered level-trigger; consumers that are slow or paused coalesce
-// pending signals instead of queueing them.
 //
 // Temporary: this channel exists because the Waku node cannot yet own the
 // fetch itself. It already has the subscription (filter) list, but lacks the
-// per-topic "when was it last fetched" watermark, which the Messenger persists
-// in the app DB (mailserver_topics). Eventually logos-delivery will own
-// reconciliation and history backfill entirely, including persisting
-// lastFetched per topic: its Messaging API already reconciles
+// per-topic "known complete through" cursor, which the Messenger persists in
+// the app DB (mailserver_topics). Eventually logos-delivery will own
+// reconciliation and history backfill entirely, including persisting that
+// cursor per topic: its Messaging API already reconciles
 // (https://github.com/logos-messaging/logos-delivery/issues/3941) but does not
-// yet fetch history, and neither exposes nor persists lastFetched. That gap
+// yet fetch history, and neither exposes nor persists a completeness cursor.
+// That gap
 // should be closed in logos-delivery before integration — otherwise ownership
-// is split and persistence breaks, since we cannot persist lastFetched on its
+// is split and persistence breaks, since we cannot persist the cursor on its
 // behalf. Until then the fetch stays in the Messenger (Transport would be a
 // nicer interim home, but it is a stopgap either way), and this signal bridges
 // the two.
-func (w *Waku) OnHistoryReconcileNeeded() <-chan struct{} {
+func (w *Waku) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return w.historyReconcileNeeded
-}
-
-// startHistoryReconcileLoop runs the timing/decision half of history
-// reconciliation. The fetch itself lives with the consumer (the protocol
-// layer), which owns the topics and per-chat watermarks; this loop only owns
-// connectivity confidence and cadence. Suspended while the node is paused
-// (app backgrounded, no ticker armed): SetPaused(false) triggers its own
-// fetch on foreground.
-func (w *Waku) startHistoryReconcileLoop() {
-	w.wg.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer w.wg.Done()
-
-		sub := w.PauseBroadcaster.Subscribe()
-		defer sub.Unsubscribe()
-
-		reliable := w.reliablyConnected()
-		var lastReconcile time.Time
-
-		pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
-			Interval: historyReconcileCheckInterval,
-			OnTick: func() {
-				wasReliable := reliable
-				reliable = w.reliablyConnected()
-				if !shouldReconcileHistory(reliable, wasReliable, lastReconcile, time.Now(), historyReconcileMinInterval) {
-					return
-				}
-				lastReconcile = time.Now()
-				w.logger.Debug("history reconciliation needed", zap.Bool("reliable", reliable))
-				select {
-				case w.historyReconcileNeeded <- struct{}{}:
-				default: // a signal is already pending; coalesce
-				}
-			},
-		}, sub.C())
-		pt.Run(w.ctx.Done())
-	}()
 }
 
 // reliablyConnected reports whether connectivity is currently good enough to be

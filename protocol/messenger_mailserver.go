@@ -235,25 +235,40 @@ func (m *Messenger) RequestAllHistoricMessages() (*MessengerResponse, error) {
 }
 
 func (m *Messenger) requestAllHistoricMessages(aggregateResponses bool) (*MessengerResponse, error) {
+	response, _, err := m.requestAllHistoricMessagesWithOptions(aggregateResponses, syncFiltersOptions{})
+	return response, err
+}
+
+func (m *Messenger) runAutomaticHistoricSync(request historicSyncRequest) (bool, error) {
+	if m.isPaused() {
+		return false, nil
+	}
+	_, executed, err := m.requestAllHistoricMessagesWithOptions(false, syncFiltersOptions{
+		Window: &types2.HistoryReconcileWindow{From: request.From, To: request.To},
+	})
+	return executed, err
+}
+
+func (m *Messenger) requestAllHistoricMessagesWithOptions(aggregateResponses bool, options syncFiltersOptions) (*MessengerResponse, bool, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if !shouldSync {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	if m.mailserversDatabase == nil {
-		return nil, nil
+		return nil, true, nil
 	}
 
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if !canSync {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	return m.withHistoricSyncInFlight(func() (*MessengerResponse, error) {
@@ -276,7 +291,7 @@ func (m *Messenger) requestAllHistoricMessages(aggregateResponses bool) (*Messen
 
 		// Retry and failover are handled per query by the StoreClient (it pins a
 		// store node for the whole query and fails over only at query boundaries).
-		response, err := m.syncFilters(filters)
+		response, err := m.syncFiltersWithOptions(filters, options)
 		if err != nil {
 			return nil, err
 		}
@@ -292,12 +307,12 @@ func (m *Messenger) requestAllHistoricMessages(aggregateResponses bool) (*Messen
 // progress. Automatic syncs are serialized and spaced by the historic-sync
 // worker (startHistoricSyncWorker); this gate protects against a manual
 // RequestAllHistoricMessages (RPC) racing the worker.
-func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
+func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, error)) (*MessengerResponse, bool, error) {
 	m.historicSyncMu.Lock()
 	if m.historicSyncInFlight {
 		m.historicSyncMu.Unlock()
 		m.logger.Debug("skip historic sync request (already in progress)")
-		return nil, nil
+		return nil, false, nil
 	}
 	m.historicSyncInFlight = true
 	m.historicSyncMu.Unlock()
@@ -305,9 +320,34 @@ func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, erro
 		m.historicSyncMu.Lock()
 		m.historicSyncInFlight = false
 		m.historicSyncMu.Unlock()
+		m.notifyHistoricSyncWorker()
 	}()
 
-	return fn()
+	response, err := fn()
+	return response, true, err
+}
+
+type syncFiltersOptions struct {
+	// ExactFrom preserves the archive-builder behavior: existing topics are
+	// queried from this timestamp regardless of their completeness cursor.
+	ExactFrom uint32
+	// Window bounds automatic reconciliation. A zero From means cursor-based
+	// catch-up with only a fixed upper bound (used at startup).
+	Window *types2.HistoryReconcileWindow
+}
+
+func applyHistoryWindowFloor(from uint32, initialized bool, window *types2.HistoryReconcileWindow) uint32 {
+	if !initialized || window == nil || window.From.IsZero() {
+		return from
+	}
+	windowFrom := window.From.Unix() - int64(tolerance)
+	if windowFrom < 0 {
+		windowFrom = 0
+	}
+	if uint32(windowFrom) > from {
+		return uint32(windowFrom)
+	}
+	return from
 }
 
 func getPrioritizedBatches() []int {
@@ -315,6 +355,10 @@ func getPrioritizedBatches() []int {
 }
 
 func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
+	return m.syncFiltersWithOptions(filters, syncFiltersOptions{ExactFrom: lastRequest})
+}
+
+func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options syncFiltersOptions) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -337,6 +381,9 @@ func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint
 	batches := make(map[string]map[int]types2.StoreNodeBatch)
 
 	to := m.calculateMailserverTo()
+	if options.Window != nil && !options.Window.To.IsZero() {
+		to = options.Window.To
+	}
 	syncedTopics := make([]mailservers.MailserverTopic, 0, len(filters))
 
 	sort.Slice(filters[:], func(i, j int) bool {
@@ -348,6 +395,12 @@ func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint
 	currentBatch := 0
 
 	if len(filters) == 0 || filters[0].Priority() == 0 {
+		currentBatch = len(prioritizedBatches)
+	}
+	if options.Window != nil && !options.Window.From.IsZero() {
+		// Windowed reconciliation must evaluate every topic's lower and upper
+		// bounds independently; priority batches may intentionally combine
+		// topics with different cursors.
 		currentBatch = len(prioritizedBatches)
 	}
 
@@ -402,18 +455,16 @@ func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint
 			}
 
 			topicData, ok := topicsData[fmt.Sprintf("%s-%s", filter.PubsubTopic(), filter.ContentTopic())]
+			topicExists := ok
 			var capToDefaultSyncPeriod = true
 			if !ok {
-				if lastRequest == 0 {
-					lastRequest = defaultPeriodFromNow
-				}
 				topicData = mailservers.MailserverTopic{
 					PubsubTopic:  filter.PubsubTopic(),
 					ContentTopic: filter.ContentTopic().String(),
 					LastRequest:  int(defaultPeriodFromNow),
 				}
-			} else if lastRequest != 0 {
-				topicData.LastRequest = int(lastRequest)
+			} else if options.ExactFrom != 0 {
+				topicData.LastRequest = int(options.ExactFrom)
 				capToDefaultSyncPeriod = false
 			}
 
@@ -448,6 +499,17 @@ func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint
 						return nil, err
 					}
 				}
+				// Only initialized, existing topics may be narrowed to an
+				// unreliable window. New/reset topics still need their default
+				// initial history regardless of the current window.
+				from = applyHistoryWindowFloor(
+					from,
+					topicExists && topicData.LastRequest > 0,
+					options.Window,
+				)
+				if int64(from) >= to.Unix() {
+					continue
+				}
 				batch = types2.StoreNodeBatch{From: time.Unix(int64(from), 0), To: to}
 			}
 
@@ -457,13 +519,21 @@ func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint
 			batches[pubsubTopic][batchID] = batch
 
 			// Set last request to the new `to`
-			topicData.LastRequest = int(to.Unix())
+			if topicData.LastRequest < int(to.Unix()) {
+				topicData.LastRequest = int(to.Unix())
+			}
 			syncedTopics = append(syncedTopics, topicData)
 		}
 	}
 
-	if m.config.messengerSignalsHandler != nil {
-		m.config.messengerSignalsHandler.HistoryRequestStarted(len(batches))
+	batchedPubsubTopics := 0
+	for _, topicBatches := range batches {
+		if len(topicBatches) > 0 {
+			batchedPubsubTopics++
+		}
+	}
+	if batchedPubsubTopics > 0 && m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.HistoryRequestStarted(batchedPubsubTopics)
 	}
 
 	for pubsubTopic := range batches {
@@ -479,13 +549,15 @@ func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint
 	}
 
 	m.logger.Debug("topics synced")
-	if m.config.messengerSignalsHandler != nil {
+	if batchedPubsubTopics > 0 && m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryRequestCompleted()
 	}
 
-	err = m.mailserversDatabase.AddTopics(syncedTopics)
-	if err != nil {
-		return nil, err
+	if len(syncedTopics) > 0 {
+		err = m.mailserversDatabase.AddTopics(syncedTopics)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	messagesToBeSaved := make([]*common.Message, 0, len(syncedTopics))
@@ -533,7 +605,7 @@ func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint
 }
 
 func (m *Messenger) syncFilters(filters types2.ChatFilters) (*MessengerResponse, error) {
-	return m.syncFiltersFrom(filters, 0)
+	return m.syncFiltersWithOptions(filters, syncFiltersOptions{})
 }
 
 // communityDescriptionChatIDs returns chat IDs for joined and spectated communities.
@@ -559,6 +631,9 @@ func (m *Messenger) fetchLatestCommunityDescriptions(filters []*types2.ChatFilte
 	}
 
 	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
+	if !from.Before(to) {
+		return
+	}
 	stopAfterFirstPage := func(int) (bool, uint64) {
 		return false, 0
 	}

@@ -126,6 +126,18 @@ func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestNoFiltersIsNoop() {
 	s.Require().Empty(*recorded, "no store request should be made when there are no filters")
 }
 
+func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestLatestDescriptionUsesRollingMonth() {
+	recorded := s.recordMailserverBatches()
+	filter := descriptionFilter("0xcommunity1", "/waku/2/pubsub-a", "0xcontenttopic1")
+	from, to := s.m.calculateMailserverTimeBounds(oneMonthDuration)
+
+	s.m.fetchLatestCommunityDescriptions([]*types2.ChatFilter{filter})
+
+	s.Require().Len(*recorded, 1)
+	s.Require().Equal(from, (*recorded)[0].batch.From)
+	s.Require().Equal(to, (*recorded)[0].batch.To)
+}
+
 // TestReusedFilterForgottenForNonMember verifies that a description filter
 // reused by a store-node request is forgotten for a community that is neither
 // joined nor spectated (so it does not leave a live subscription behind), and

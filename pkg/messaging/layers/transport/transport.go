@@ -778,7 +778,7 @@ func (t *Transport) ConnectionState() types.ConnectionState {
 // (#7568): fired periodically while connectivity is not reliable and once when
 // it recovers. Without a waku node (offline transport) it returns a nil
 // channel, which blocks forever — i.e. never signals.
-func (t *Transport) OnHistoryReconcileNeeded() <-chan struct{} {
+func (t *Transport) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	if t.waku == nil {
 		return nil
 	}
