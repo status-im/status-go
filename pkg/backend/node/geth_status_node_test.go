@@ -42,6 +42,7 @@ func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T) {
 	require.Error(t, n.Start(config))
 	require.Nil(t, n.timeSourceSrvc)
 	require.False(t, n.IsRunning())
+	require.Nil(t, n.RPCClient())
 	require.NotPanics(t, func() { require.Equal(t, ErrNoRunningNode, n.Stop()) })
 }
 

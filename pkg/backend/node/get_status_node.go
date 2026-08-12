@@ -94,8 +94,11 @@ type StatusNode struct {
 	rpcClient      *rpc.Client        // reference to an RPC client
 	networkManager *networks.Manager
 
-	services  []StatusService
-	rpcServer *gethrpc.Server
+	services []StatusService
+	// services that Start()ed successfully, in start order; only these are
+	// stopped on teardown
+	startedServices []StatusService
+	rpcServer       *gethrpc.Server
 
 	downloader *ipfs.Downloader
 
@@ -241,8 +244,12 @@ func (n *StatusNode) Start(config *params.NodeConfig) error {
 
 	if err := n.startWithDB(config); err != nil {
 		// startWithDB builds the node incrementally, so a failure leaves it
-		// partially constructed. Roll the flag back: callers gate teardown on
-		// IsRunning, and Stop assumes every field was assigned.
+		// partially constructed. Tear down whatever was already built, then
+		// roll the flag back: callers gate teardown on IsRunning, so a failed
+		// start would otherwise never be cleaned up.
+		if cleanupErr := n.teardown(); cleanupErr != nil {
+			n.logger.Error("cleaning up after failed start", zap.Error(cleanupErr))
+		}
 		n.running.Store(false)
 		return err
 	}
@@ -445,6 +452,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) (startErr error) {
 			text := fmt.Sprintf("failed to start service '%s'", name)
 			return errorspkg.Wrap(err, text)
 		}
+		n.startedServices = append(n.startedServices, service)
 	}
 
 	n.populateServiceRegistry()
@@ -586,6 +594,17 @@ func (n *StatusNode) Stop() error {
 		return ErrNoRunningNode
 	}
 
+	err := n.teardown()
+
+	n.logger.Debug("status node stopped")
+	return err
+}
+
+// teardown stops and releases everything startWithDB built. It is shared by
+// Stop and the failed-start path in Start, so every field is nil-guarded: a
+// failed start leaves the node only partially constructed.
+// Callers must hold n.mu.
+func (n *StatusNode) teardown() error {
 	var errs []error
 	if n.tokenManagerStartDone != nil {
 		<-n.tokenManagerStartDone
@@ -604,10 +623,14 @@ func (n *StatusNode) Stop() error {
 	// The recorder outlives the node: the next one starts in the foreground.
 	traffic.Default.SetBackground(false)
 
-	for _, service := range n.services {
+	// Services are not required to support Stop without a prior Start, so
+	// only the ones that started successfully are stopped.
+	for _, service := range n.startedServices {
 		err := service.Stop()
 		errs = append(errs, err)
 	}
+	n.startedServices = nil
+	n.services = nil
 
 	if n.localBackup != nil {
 		n.localBackup.Stop()
@@ -616,16 +639,27 @@ func (n *StatusNode) Stop() error {
 
 	n.accountsPublisher.Close()
 
-	n.rpcClient.Stop()
-	n.rpcClient = nil
+	if n.rpcClient != nil {
+		n.rpcClient.Stop()
+		n.rpcClient = nil
+	}
 	n.config = nil
 
 	if n.mediaServer != nil {
 		n.mediaServer.SetDataProviders(nil, nil, nil)
 	}
 
-	n.downloader.Stop()
-	n.downloader = nil
+	// Normally stopped through the wallet service; stop directly in case that
+	// service never started. Manager.Stop is idempotent.
+	if n.tokenManager != nil {
+		n.tokenManager.Stop()
+		n.tokenManager = nil
+	}
+
+	if n.downloader != nil {
+		n.downloader.Stop()
+		n.downloader = nil
+	}
 
 	n.rpcStatsSrvc = nil
 	n.accountsSrvc = nil
@@ -649,7 +683,6 @@ func (n *StatusNode) Stop() error {
 	n.preferencesSrvc = nil
 	n.storageStatsSrvc = nil
 
-	n.logger.Debug("status node stopped")
 	return errors.Join(errs...)
 }
 
