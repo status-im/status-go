@@ -602,6 +602,9 @@ func (m *Messenger) HandleCommunityEncryptionKeysRequest(ctx context.Context, st
 		return nil
 	}
 	signer := state.CurrentMessageState.PublicKey
+	if !community.HasMember(signer) {
+		return communities.ErrMemberNotFound
+	}
 	if !m.allowCommunityEncryptionKeysRequest(community.IDString(), crypto.PubkeyToHex(signer)) {
 		m.logger.Debug("ignoring rate-limited community encryption key request",
 			zap.String("communityID", community.IDString()),

@@ -5208,6 +5208,11 @@ func (m *Manager) determineChannelsForHRKeysRequest(c *Community, now int64) ([]
 			continue
 		}
 
+		if now < request.requestedAt {
+			channelsToRequest = append(channelsToRequest, channelID)
+			continue
+		}
+
 		nextRequestTime := request.requestedAt + encryptionKeyRequestBackoffDuration(request.requestedCount).Milliseconds()
 
 		if now >= nextRequestTime {
