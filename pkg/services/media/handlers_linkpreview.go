@@ -227,6 +227,13 @@ func getStatusLinkPreviewThumbnail(db *sql.DB, messageID string, URL string, ima
 }
 
 func (s *Server) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
+	db := s.appDatabase()
+	if db == nil {
+		s.GetLogger().Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	params := r.URL.Query()
 	parsed := ParseImageParams(s.GetLogger(), params)
 
@@ -245,7 +252,7 @@ func (s *Server) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r *http
 		return
 	}
 
-	thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(s.appDatabase(), parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
+	thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(db, parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
 	if err != nil {
 		http.Error(w, err.Error(), httpsStatusCode)
 		return
