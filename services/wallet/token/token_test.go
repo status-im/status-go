@@ -25,8 +25,11 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
+	communitytoken "github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/protobuf"
 	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
@@ -196,7 +199,99 @@ func TestCommunityTokens(t *testing.T) {
 	rst, err = manager.GetCustoms(true)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
-	require.Equal(t, *communityToken, *rst[0])
+	// Discovered community tokens are annotated with a best-effort privileges
+	// level: CommunityLevel when the community-tokens DB has no information.
+	expectedCommunityToken := *communityToken
+	communityLevel := int(communitytoken.CommunityLevel)
+	expectedCommunityToken.PrivilegesLevel = &communityLevel
+	require.Equal(t, expectedCommunityToken, *rst[0])
+}
+
+func TestCommunityTokensPrivilegesAndSoulbound(t *testing.T) {
+	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, appDb.Close()) }()
+	// community_tokens lives in the protocol migrations
+	require.NoError(t, protocolsqlite.Migrate(appDb))
+
+	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, walletDb.Close()) }()
+
+	manager := &Manager{
+		walletDB:          walletDb,
+		communityTokensDB: communitytokensdatabase.NewCommunityTokensDatabase(appDb),
+	}
+
+	addMintedToken := func(address string, tokenType protobuf.CommunityTokenType, transferable bool, level communitytoken.PrivilegesLevel) {
+		_, err := appDb.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply_str,
+			infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals, deployer, privileges_level)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			"community_id", address, tokenType, "name-"+address, "SYM", "desc", "1",
+			false, transferable, false, 777, communitytoken.Deployed, "", 0, "0xDEP", level)
+		require.NoError(t, err)
+	}
+
+	ownerAddress := common.Address{1}.Hex()
+	masterAddress := common.Address{2}.Hex()
+	assetAddress := common.Address{3}.Hex()
+	// the owner token is transferable by design (that is how community ownership moves)
+	addMintedToken(ownerAddress, protobuf.CommunityTokenType_ERC721, true, communitytoken.OwnerLevel)
+	// the TMaster token is non-transferable (soulbound)
+	addMintedToken(masterAddress, protobuf.CommunityTokenType_ERC721, false, communitytoken.MasterLevel)
+	// a regular community asset
+	addMintedToken(assetAddress, protobuf.CommunityTokenType_ERC20, true, communitytoken.CommunityLevel)
+
+	// A community token merely discovered on-chain: present in the wallet tokens
+	// table, absent from community_tokens — there is no metadata to annotate with.
+	discovered := &tokentypes.Token{
+		Token: &types.Token{
+			Address:  common.Address{4},
+			Name:     "Discovered",
+			Symbol:   "DIS",
+			Decimals: 12,
+			ChainID:  777,
+		},
+		CommunityData: &tokentypes.CommunityData{ID: "other_community"},
+	}
+	upsertCommunityToken(t, discovered, manager)
+
+	rst, err := manager.GetCustoms(true)
+	require.NoError(t, err)
+	require.Equal(t, 4, len(rst))
+
+	byAddress := make(map[common.Address]*tokentypes.Token)
+	for _, token := range rst {
+		byAddress[token.Address] = token
+	}
+
+	requireLevel := func(token *tokentypes.Token, level communitytoken.PrivilegesLevel) {
+		require.NotNil(t, token.PrivilegesLevel)
+		require.Equal(t, int(level), *token.PrivilegesLevel)
+	}
+
+	owner := byAddress[common.HexToAddress(ownerAddress)]
+	require.NotNil(t, owner)
+	requireLevel(owner, communitytoken.OwnerLevel)
+	require.False(t, owner.Soulbound)
+
+	master := byAddress[common.HexToAddress(masterAddress)]
+	require.NotNil(t, master)
+	requireLevel(master, communitytoken.MasterLevel)
+	require.True(t, master.Soulbound)
+
+	asset := byAddress[common.HexToAddress(assetAddress)]
+	require.NotNil(t, asset)
+	requireLevel(asset, communitytoken.CommunityLevel)
+	require.False(t, asset.Soulbound)
+
+	// Absent metadata: the community-tokens DB exists but has no row for the
+	// discovered token, so the privileges level stays unknown (nil) and the
+	// token is not marked soulbound.
+	discoveredResult := byAddress[discovered.Address]
+	require.NotNil(t, discoveredResult)
+	require.Nil(t, discoveredResult.PrivilegesLevel)
+	require.False(t, discoveredResult.Soulbound)
 }
 
 func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
