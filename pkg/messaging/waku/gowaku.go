@@ -999,63 +999,14 @@ func (w *Waku) runConnectionMonitoringLoop() {
 	defer sub.Unsubscribe()
 	paused := <-sub.C()
 	tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
-	var reconcileTimer *time.Timer
-	var reconcileTimerC <-chan time.Time
 	var pendingReconciliations []types.HistoryReconcileWindow
 
-	queueReconciliation := func(reliable bool) {
-		window := tracker.observe(reliable, time.Now(), historyReconcileMinInterval)
-		if window != nil {
-			w.logger.Debug("history reconciliation needed",
-				zap.Bool("reliable", reliable),
-				zap.Time("from", window.From),
-				zap.Time("to", window.To))
-			if len(pendingReconciliations) != 0 &&
-				!window.From.After(pendingReconciliations[len(pendingReconciliations)-1].To) {
-				pendingReconciliations[len(pendingReconciliations)-1].To = window.To
-			} else {
-				pendingReconciliations = append(pendingReconciliations, *window)
-			}
-		}
-
-		if tracker.reliable {
-			if reconcileTimer != nil && !reconcileTimer.Stop() {
-				select {
-				case <-reconcileTimer.C:
-				default:
-				}
-			}
-			reconcileTimerC = nil
-			return
-		}
-
-		delay := time.Until(tracker.lastReconcile.Add(historyReconcileMinInterval))
-		if delay < 0 {
-			delay = 0
-		}
-		if reconcileTimer == nil {
-			reconcileTimer = time.NewTimer(delay)
-		} else {
-			if !reconcileTimer.Stop() {
-				select {
-				case <-reconcileTimer.C:
-				default:
-				}
-			}
-			reconcileTimer.Reset(delay)
-		}
-		reconcileTimerC = reconcileTimer.C
-	}
-
 	observeConnectionState := func() {
-		queueReconciliation(w.checkForConnectionChanges() == types.ConnectionStateConnected)
+		observedAt := time.Now()
+		w.queueHistoryReconciliation(&tracker, &pendingReconciliations, w.checkForConnectionChanges() == types.ConnectionStateConnected, observedAt)
 	}
-	queueReconciliation(tracker.reliable)
-	defer func() {
-		if reconcileTimer != nil {
-			reconcileTimer.Stop()
-		}
-	}()
+	startupObservedAt := time.Now()
+	w.queueHistoryReconciliation(&tracker, &pendingReconciliations, tracker.reliable, startupObservedAt)
 	var tickerC <-chan time.Time
 	if !paused {
 		tickerC = ticker.C
@@ -1085,8 +1036,6 @@ func (w *Waku) runConnectionMonitoringLoop() {
 			}
 		case <-tickerC:
 			observeConnectionState()
-		case <-reconcileTimerC:
-			queueReconciliation(tracker.reliable)
 		case topicHealth := <-w.topicHealthStatusChan:
 			// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
 			// / SufficientlyHealthy); cache it so checkForConnectionChanges can

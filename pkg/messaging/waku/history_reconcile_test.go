@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -148,4 +150,21 @@ func TestReliablyConnected(t *testing.T) {
 		connState: types.ConnectionStateConnected,
 	}
 	require.True(t, edge.reliablyConnected())
+}
+
+func TestQueueHistoryReconciliationMergesOverlappingWindows(t *testing.T) {
+	start := time.Unix(3_000, 0)
+	tracker := newHistoryReconcileTracker(true, start)
+	w := &Waku{logger: zap.NewNop()}
+	var pending []types.HistoryReconcileWindow
+
+	w.queueHistoryReconciliation(&tracker, &pending, false, start.Add(time.Second))
+	require.Len(t, pending, 1)
+	require.Equal(t, start, pending[0].From)
+	require.Equal(t, start.Add(time.Second), pending[0].To)
+
+	w.queueHistoryReconciliation(&tracker, &pending, false, start.Add(historyReconcileMinInterval+2*time.Second))
+	require.Len(t, pending, 1)
+	require.Equal(t, start, pending[0].From)
+	require.Equal(t, start.Add(historyReconcileMinInterval+2*time.Second), pending[0].To)
 }

@@ -3,6 +3,8 @@ package wakuv2
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -49,6 +51,27 @@ func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInter
 		t.unreliableFrom = time.Time{}
 	}
 	return &window
+}
+
+// queueHistoryReconciliation records a reconciliation window, merging it with
+// the previous pending window when they overlap or touch.
+func (w *Waku) queueHistoryReconciliation(tracker *historyReconcileTracker, pending *[]types.HistoryReconcileWindow, reliable bool, now time.Time) {
+	window := tracker.observe(reliable, now, historyReconcileMinInterval)
+	if window == nil {
+		return
+	}
+
+	w.logger.Debug("history reconciliation needed",
+		zap.Bool("reliable", reliable),
+		zap.Time("from", window.From),
+		zap.Time("to", window.To))
+	if len(*pending) != 0 && !window.From.After((*pending)[len(*pending)-1].To) {
+		// Merge adjacent or overlapping windows so callers receive one
+		// continuous recovery range instead of a fragmented sequence.
+		(*pending)[len(*pending)-1].To = window.To
+	} else {
+		*pending = append(*pending, *window)
+	}
 }
 
 // OnHistoryReconcileNeeded returns unreliable delivery windows that should be
