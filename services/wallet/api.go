@@ -194,6 +194,12 @@ func (api *API) IsChainSupportedForSwapViaParaswap(ctx context.Context, chainID 
 	return api.s.router.IsChainSupportedForSwapViaParaswap(chainID)
 }
 
+// IsChainSupportedForSwapViaLiFi returns true if the chain is supported for swap via LI.FI, false otherwise.
+func (api *API) IsChainSupportedForSwapViaLiFi(ctx context.Context, chainID uint64) (bool, error) {
+	logutils.ZapLogger().Debug("call to check if chain is supported for swap via LI.FI")
+	return api.s.router.IsChainSupportedForSwapViaLiFi(chainID)
+}
+
 func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get discover token")
 	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)
@@ -269,6 +275,19 @@ func (api *API) GetCollectiblesByUniqueIDAsync(requestID int32, uniqueIDs []thir
 	)
 
 	api.s.collectibles.GetCollectiblesByUniqueIDAsync(requestID, uniqueIDs, dataType)
+	return nil
+}
+
+// SetMaxCollectibleAssetSize caps the size in bytes of a single collectible
+// asset the client is willing to be handed a URL for; zero or less lifts the
+// cap. Deliberately its own call rather than a parameter on the two fetches
+// above: those are hot, positional, and called from several places, so a client
+// and a backend that disagree about the cap should end up with the cap not
+// applied rather than with collectibles that do not load at all.
+func (api *API) SetMaxCollectibleAssetSize(size int64) error {
+	logutils.ZapLogger().Debug("wallet.api.SetMaxCollectibleAssetSize", zap.Int64("size", size))
+
+	api.s.collectibles.SetMaxAssetSize(size)
 	return nil
 }
 

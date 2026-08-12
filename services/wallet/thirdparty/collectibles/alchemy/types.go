@@ -125,9 +125,20 @@ type ContractList struct {
 }
 
 type Image struct {
-	ImageURL             string `json:"pngUrl"`
+	ImageURL string `json:"pngUrl"`
+	// ContentType describes the media behind CachedAnimationURL, which the
+	// provider populates for still assets too.
+	ContentType string `json:"contentType"`
+	// ThumbnailURL is Alchemy's own resized preview, small enough for a list
+	// element. Absent for some assets, in which case consumers fall back to
+	// ImageURL.
+	ThumbnailURL         string `json:"thumbnailUrl"`
 	CachedAnimationURL   string `json:"cachedUrl"`
 	OriginalAnimationURL string `json:"originalUrl"`
+	// Size is the size in bytes of the asset behind CachedAnimationURL. The
+	// provider says nothing about the size of pngUrl or thumbnailUrl, which are
+	// renders it derives on delivery.
+	Size int64 `json:"size"`
 }
 
 type Asset struct {
@@ -215,19 +226,42 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 	return ret
 }
 
+// animation returns the cached asset and its media type, but only when the asset
+// can actually move. Alchemy fills cachedUrl for still collectibles as well, so
+// passing it on unconditionally makes every still NFT look animated and costs
+// consumers a full-size download for nothing.
+//
+// The media type travels with the URL because the provider has already told us
+// what it is. Returning only the URL would send the consumer off to fetch the
+// headers of an asset we classified from this very field.
+// The size comes back with them for the same reason: image.size describes the
+// cached asset, so it is the animation's size whenever there is an animation.
+func (c *Asset) animation() (url string, mediaType string, size int64) {
+	if !thirdparty.IsAnimatedMediaType(c.Image.ContentType) {
+		return "", "", 0
+	}
+
+	return c.Image.CachedAnimationURL, c.Image.ContentType, c.Image.Size
+}
+
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	rawMetadata := c.Raw.RawMetadata.(RawMetadata)
 
+	animationURL, animationMediaType, animationSize := c.animation()
+
 	return thirdparty.CollectibleData{
-		ID:           id,
-		ContractType: alchemyToContractType(c.Contract.TokenType),
-		Provider:     AlchemyID,
-		Name:         c.Name,
-		Description:  c.Description,
-		ImageURL:     c.Image.ImageURL,
-		AnimationURL: c.Image.CachedAnimationURL,
-		Traits:       alchemyToCollectibleTraits(rawMetadata.Attributes),
-		TokenURI:     c.TokenURI,
+		ID:                 id,
+		ContractType:       alchemyToContractType(c.Contract.TokenType),
+		Provider:           AlchemyID,
+		Name:               c.Name,
+		Description:        c.Description,
+		ImageURL:           c.Image.ImageURL,
+		ThumbnailURL:       c.Image.ThumbnailURL,
+		AnimationURL:       animationURL,
+		AnimationMediaType: animationMediaType,
+		AnimationSize:      animationSize,
+		Traits:             alchemyToCollectibleTraits(rawMetadata.Attributes),
+		TokenURI:           c.TokenURI,
 	}
 }
 

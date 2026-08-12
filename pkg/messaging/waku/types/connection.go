@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 // ConnectionState mirrors the logos-delivery Messaging API's three-state
 // connection status (see logos-delivery waku/api/types.nim `ConnectionStatus`).
 // It lets status-go speak the same vocabulary as the Messaging API:
@@ -34,4 +36,12 @@ func (s ConnectionState) String() string {
 	default:
 		return "disconnected"
 	}
+}
+
+// HistoryReconcileWindow is a period during which live delivery could not be
+// trusted. Store reconciliation must not query beyond these bounds (apart from
+// the caller's small out-of-order tolerance).
+type HistoryReconcileWindow struct {
+	From time.Time
+	To   time.Time
 }

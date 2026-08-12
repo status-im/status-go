@@ -202,7 +202,7 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 				Address: d.RouteInputParams.AddrFrom,
 			},
 			timestamp:      d.Timestamp,
-			activityType:   getSentActivityType(d.Path.ProcessorName, d.IsApproval),
+			activityType:   getSentActivityType(d.Path, d.IsApproval),
 			activityStatus: getSentActivityStatus(d.Status, d.Timestamp, now, getFinalizationPeriod(chainID)),
 			amountOut:      d.Path.AmountIn,  // Path and Activity have inverse perspective for amountIn and amountOut
 			amountIn:       d.Path.AmountOut, // Path has the Tx perspective, Activity has the Account perspective
@@ -244,20 +244,35 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 	return ret, nil
 }
 
-func getSentActivityType(processorName string, isApproval bool) ac.Type {
+func getSentActivityType(path *routes.Path, isApproval bool) ac.Type {
 	if isApproval {
 		return ac.ApproveAT
 	}
 
-	switch processorName {
+	switch path.ProcessorName {
 	case pathProcessorCommon.ProcessorTransferName, pathProcessorCommon.ProcessorERC721Name, pathProcessorCommon.ProcessorERC1155Name:
 		return ac.SendAT
 	case pathProcessorCommon.ProcessorBridgeHopName:
 		return ac.BridgeAT
 	case pathProcessorCommon.ProcessorSwapParaswapName:
 		return ac.SwapAT
+	case pathProcessorCommon.ProcessorLiFiName:
+		// LI.FI serves both swaps and bridges through one processor; a cross-chain
+		// path is a bridge, a same-chain path is a swap.
+		if isCrossChainPath(path) {
+			return ac.BridgeAT
+		}
+		return ac.SwapAT
 	}
 	return ac.UnknownAT
+}
+
+// isCrossChainPath reports whether the path moves funds between two different chains.
+func isCrossChainPath(path *routes.Path) bool {
+	if path.FromChain == nil || path.ToChain == nil {
+		return false
+	}
+	return path.FromChain.ChainID != path.ToChain.ChainID
 }
 
 func getSentActivityStatus(status ac.TxStatus, timestamp int64, now int64, finalizationDuration int64) ac.Status {

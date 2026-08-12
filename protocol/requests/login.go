@@ -26,6 +26,10 @@ type Login struct {
 
 	KeycardWhisperPrivateKey string `json:"keycardWhisperPrivateKey"`
 
+	// WalletXPub is the extended public key at the wallet xpub path (m/44'/60'/0') of the profile keypair.
+	// It's used to backfill the keypair's xpub if it's not stored yet (old key pairs missing it).
+	WalletXPub string `json:"walletXPub"`
+
 	// Mnemonic allows to log in to an account when password is lost.
 	// This is needed for the "Lost keycard -> Start using without keycard" flow, when a keycard account database
 	// exists locally, but now the keycard is lost. In this case client is responsible for calling

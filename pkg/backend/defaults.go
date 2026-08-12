@@ -81,6 +81,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.SendPushNotifications = true
 	s.InstallationID = messaging.GenerateInstallationID()
 	s.UseMailservers = true
+	s.AutoApplyKeypairMigrations = true
 
 	s.PreviewPrivacy = true
 	s.Currency = "usd"
@@ -137,9 +138,8 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		Host:           "0.0.0.0",
 		AutoUpdate:     true,
 		// mobile may need to override the following options
-		LightClient:                            specifiedWakuV2Config.LightClient,
-		EnableStoreConfirmationForMessagesSent: specifiedWakuV2Config.EnableStoreConfirmationForMessagesSent,
-		Nameserver:                             specifiedWakuV2Config.Nameserver,
+		LightClient: specifiedWakuV2Config.LightClient,
+		Nameserver:  specifiedWakuV2Config.Nameserver,
 	}
 
 	if !params.IsFleetSupported(fleet) {
@@ -327,10 +327,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 
 	if request.WakuV2LightClient {
 		nodeConfig.WakuV2Config.LightClient = true
-	}
-
-	if request.WakuV2EnableStoreConfirmationForMessagesSent {
-		nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent = true
 	}
 
 	if request.WakuV2Nameserver != nil {

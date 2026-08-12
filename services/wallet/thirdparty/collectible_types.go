@@ -138,14 +138,23 @@ type CollectibleTrait struct {
 
 // Collectible info
 type CollectibleData struct {
-	ID                 CollectibleUniqueID   `json:"id"`
-	ContractType       w_common.ContractType `json:"contract_type"`
-	CommunityID        string                `json:"community_id"`
-	Provider           string                `json:"provider"`
-	Name               string                `json:"name"`
-	Description        string                `json:"description"`
-	Permalink          string                `json:"permalink"`
-	ImageURL           string                `json:"image_url"`
+	ID           CollectibleUniqueID   `json:"id"`
+	ContractType w_common.ContractType `json:"contract_type"`
+	CommunityID  string                `json:"community_id"`
+	Provider     string                `json:"provider"`
+	Name         string                `json:"name"`
+	Description  string                `json:"description"`
+	Permalink    string                `json:"permalink"`
+	ImageURL     string                `json:"image_url"`
+	// ThumbnailURL is the provider's own small preview, for list-sized renders.
+	// May be empty, in which case consumers fall back to ImageURL.
+	ThumbnailURL string `json:"thumbnail_url"`
+	// The size in bytes of the asset behind each URL, as the provider reported
+	// it. Zero means the provider did not say, which is common: Alchemy sizes
+	// the asset it cached but not the renders it derives on delivery.
+	ImageSize          int64 `json:"image_size"`
+	ThumbnailSize      int64 `json:"thumbnail_size"`
+	AnimationSize      int64 `json:"animation_size"`
 	ImagePayload       []byte
 	AnimationURL       string             `json:"animation_url"`
 	AnimationMediaType string             `json:"animation_media_type"`

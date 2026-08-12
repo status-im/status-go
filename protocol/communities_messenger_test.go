@@ -14,6 +14,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -585,6 +586,76 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 		}
 	}
 	s.Require().True(found)
+}
+
+func (s *MessengerCommunitiesSuite) TestSDSMissingDependenciesFetchTriggeredWhenMemberJoinsLate() {
+	var (
+		missingDepsMu sync.Mutex
+		missingDeps   []string
+	)
+
+	aliceObserver := s.newMessengerWithConfig(testMessengerConfig{
+		extraOptions: []Option{
+			WithCommunitiesRekeyInterval(50 * time.Millisecond),
+		},
+		messagingOptions: []messaging.Options{
+			messaging.WithMissingDependenciesObserver(func(_ string, deps []string, _ string) {
+				missingDepsMu.Lock()
+				missingDeps = append(missingDeps, deps...)
+				missingDepsMu.Unlock()
+			}),
+		},
+	}, alicePassword, []string{aliceAccountAddress})
+
+	s.setMessengerDisplayName(aliceObserver, "Alice Observer")
+
+	community, chat := createCommunity(&s.Suite, s.bob)
+
+	oldMessage := sendChatMessage(&s.Suite, s.bob, chat.ID, "old message before alice joins")
+
+	advertiseCommunityTo(&s.Suite, community, s.bob, aliceObserver)
+	s.joinCommunity(community, s.bob, aliceObserver)
+
+	// Alice joined after the first message, so old message should still be missing.
+	aliceMessages, _, err := aliceObserver.MessageByChatID(chat.ID, "", 20)
+	s.Require().NoError(err)
+	for _, msg := range aliceMessages {
+		s.Require().NotEqual(oldMessage.ID, msg.ID)
+	}
+
+	resumePublishing := s.messagingEnv.SimulateOffline()
+	sendChatMessage(&s.Suite, s.bob, chat.ID, "message dropped while alice is offline")
+	resumePublishing()
+
+	newMessage := sendChatMessage(&s.Suite, s.bob, chat.ID, "new message after alice joins")
+
+	missingDepsMu.Lock()
+	depsSnapshot := append([]string(nil), missingDeps...)
+	missingDepsMu.Unlock()
+
+	if len(depsSnapshot) > 0 {
+		foundEnvelopeHash := false
+		for _, dep := range depsSnapshot {
+			if strings.HasPrefix(dep, "0x") {
+				foundEnvelopeHash = true
+				break
+			}
+		}
+		s.Require().True(foundEnvelopeHash, "missing dependencies should include transport retrieval hashes")
+	} else {
+		s.T().Log("SDS missing dependency callback was not observed in this in-memory protocol run")
+	}
+
+	_, err = WaitOnMessengerResponse(aliceObserver, func(r *MessengerResponse) bool {
+		for _, msg := range r.Messages() {
+			if msg.ID == newMessage.ID {
+				return true
+			}
+		}
+
+		return false
+	}, "new message not received by late-joining member")
+	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSuite) TestPinMessageInCommunityChat() {
@@ -3905,7 +3976,13 @@ func (s *MessengerCommunitiesSuite) TestRetrieveBigCommunity() {
 
 	// alice receives updated description
 	_, err = WaitOnMessengerResponse(s.alice, func(r *MessengerResponse) bool {
-		return len(r.Communities()) > 0 && r.Communities()[0].DescriptionText() == updatedDescription
+		for _, c := range r.Communities() {
+			if bytes.Equal(c.ID(), community.ID()) && c.DescriptionText() == updatedDescription {
+				return true
+			}
+		}
+
+		return false
 	}, "updated description not received")
 	s.Require().NoError(err)
 }

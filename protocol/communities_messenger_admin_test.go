@@ -3,10 +3,12 @@ package protocol
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -88,6 +90,63 @@ func (s *AdminCommunityEventsSuite) TestAdminEditCommunityDescription() {
 func (s *AdminCommunityEventsSuite) TestAdminCreateEditDeleteChannels() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 	testCreateEditDeleteChannels(s, community)
+}
+
+func (s *AdminCommunityEventsSuite) TestChannelDeletionDeletesActivityCenterNotifications() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	channelID := createCommunityChannel(s, community, &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
+		Identity:    &protobuf.ChatIdentity{DisplayName: "channel with notification"},
+	})
+	chatID := community.ChatID(channelID)
+	now := uint64(time.Now().UnixMilli())
+
+	adminNotification := &ActivityCenterNotification{
+		ID:        types.HexBytes{0x01},
+		ChatID:    chatID,
+		Type:      ActivityCenterNotificationTypeMention,
+		Timestamp: now,
+		UpdatedAt: now,
+	}
+	_, err := s.eventSender.persistence.SaveActivityCenterNotification(adminNotification, true)
+	s.Require().NoError(err)
+
+	memberNotification := &ActivityCenterNotification{
+		ID:        types.HexBytes{0x02},
+		ChatID:    chatID,
+		Type:      ActivityCenterNotificationTypeMention,
+		Timestamp: now,
+		UpdatedAt: now,
+	}
+	_, err = s.alice.persistence.SaveActivityCenterNotification(memberNotification, true)
+	s.Require().NoError(err)
+
+	response, err := s.eventSender.DeleteCommunityChat(community.ID(), channelID)
+	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().Equal(adminNotification.ID, response.ActivityCenterNotifications()[0].ID)
+	s.Require().True(response.ActivityCenterNotifications()[0].Deleted)
+
+	memberResponse, err := WaitOnMessengerResponse(
+		s.alice,
+		func(response *MessengerResponse) bool {
+			for _, activityCenterNotification := range response.ActivityCenterNotifications() {
+				if activityCenterNotification.ID.String() == memberNotification.ID.String() {
+					return activityCenterNotification.Deleted
+				}
+			}
+			return false
+		},
+		"member did not receive deleted activity center notification",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(memberResponse.ActivityCenterNotifications(), 1)
+	s.Require().Equal(memberNotification.ID, memberResponse.ActivityCenterNotifications()[0].ID)
+	s.Require().True(memberResponse.ActivityCenterNotifications()[0].Deleted)
+
+	persistedNotification, err := s.alice.persistence.GetActivityCenterNotificationByID(memberNotification.ID)
+	s.Require().NoError(err)
+	s.Require().True(persistedNotification.Deleted)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminCreateEditDeleteBecomeMemberPermission() {

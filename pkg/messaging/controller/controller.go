@@ -86,7 +86,7 @@ func (c *Controller) Start() error {
 func (c *Controller) Stop() (rerr error) {
 	close(c.quit)
 
-	c.StopReliability()
+	c.stack.Reliability.Close()
 
 	err := c.stack.Encryption.Stop()
 	if err != nil {

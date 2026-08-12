@@ -48,6 +48,7 @@ import (
 	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -56,7 +57,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
+	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -105,8 +108,6 @@ type IMetricsHandler interface {
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerConnFailures(peerConnFailures map[string]int)
-	PushMessageCheckSuccess()
-	PushMessageCheckFailure()
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
@@ -174,6 +175,10 @@ type Waku struct {
 	// so it needs no lock of its own.
 	topicHealth   map[string]peermanager.TopicHealth
 	onlineChecker *onlinechecker.DefaultOnlineChecker
+	// historyReconcileNeeded carries unreliable delivery windows detected by
+	// the history-reconcile loop. Temporary until logos-delivery owns
+	// reconciliation end to end — see OnHistoryReconcileNeeded.
+	historyReconcileNeeded chan types.HistoryReconcileWindow
 	// stateMu guards state and stateInitialized. ConnectionChanged is invoked
 	// from the OS/mobile path while checkForConnectionChanges and
 	// handleNetworkChangeFromApp run on the internal poller goroutine, so all
@@ -249,6 +254,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		connectionNotifChan:         make(chan node.PeerConnection, 20),
 		connStatusSubscriptions:     make(map[string]*types.ConnStatusSubscription),
 		topicHealth:                 make(map[string]peermanager.TopicHealth),
+		historyReconcileNeeded:      make(chan types.HistoryReconcileWindow, 16),
 		ctx:                         ctx,
 		cancel:                      cancel,
 		wg:                          sync.WaitGroup{},
@@ -316,7 +322,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuFilterLightNode())
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
-		cfg.EnableStoreConfirmationForMessagesSent = false
 		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
 		opts = append(opts, node.WithShards(waku.defaultShardInfo.ShardIDs))
 	} else {
@@ -331,7 +336,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.cfg.MinPeersForRelay, relayOpts...))
 		opts = append(opts, node.WithMaxPeerConnections(maxRelayPeers))
 		cfg.EnablePeerExchangeClient = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
-		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
 	if !cfg.IsLightClient() {
@@ -868,51 +872,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer w.wg.Done()
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		sub := w.PauseBroadcaster.Subscribe()
-		defer sub.Unsubscribe()
-		paused := <-sub.C()
-		var tickerC <-chan time.Time
-		if !paused {
-			tickerC = ticker.C
-		}
-		for {
-			select {
-			case <-w.ctx.Done():
-				return
-			case pausedState, ok := <-sub.C():
-				if !ok {
-					return
-				}
-				paused = pausedState
-				if paused {
-					tickerC = nil
-				} else {
-					tickerC = ticker.C
-				}
-			case <-tickerC:
-				w.checkForConnectionChanges()
-			case topicHealth := <-w.topicHealthStatusChan:
-				// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
-				// / SufficientlyHealthy); cache it so checkForConnectionChanges can
-				// tell PartiallyConnected from Connected. Supersedes the old no-op
-				// (status-im/status-go#4628).
-				w.topicHealth[topicHealth.Topic] = topicHealth.Health
-				if !paused {
-					w.checkForConnectionChanges()
-				}
-			case <-w.connectionNotifChan:
-				if !paused {
-					w.checkForConnectionChanges()
-				}
-			}
-		}
-	}()
+	w.startConnectionMonitoringLoop()
 
 	if w.cfg.MetricsEnabled {
 		w.wg.Add(1)
@@ -1023,6 +983,76 @@ func (w *Waku) Start() error {
 	return nil
 }
 
+// startConnectionMonitoringLoop starts the connection-state observer and its
+// associated history reconciliation scheduler.
+func (w *Waku) startConnectionMonitoringLoop() {
+	w.wg.Add(1)
+	go w.runConnectionMonitoringLoop()
+}
+
+func (w *Waku) runConnectionMonitoringLoop() {
+	defer gocommon.LogOnPanic()
+	defer w.wg.Done()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	sub := w.PauseBroadcaster.Subscribe()
+	defer sub.Unsubscribe()
+	paused := <-sub.C()
+	tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
+	var pendingReconciliations []types.HistoryReconcileWindow
+
+	observeConnectionState := func() {
+		observedAt := time.Now()
+		w.queueHistoryReconciliation(&tracker, &pendingReconciliations, w.checkForConnectionChanges() == types.ConnectionStateConnected, observedAt)
+	}
+	startupObservedAt := time.Now()
+	w.queueHistoryReconciliation(&tracker, &pendingReconciliations, tracker.reliable, startupObservedAt)
+	var tickerC <-chan time.Time
+	if !paused {
+		tickerC = ticker.C
+	}
+	for {
+		var reconciliationOut chan<- types.HistoryReconcileWindow
+		var nextReconciliation types.HistoryReconcileWindow
+		if len(pendingReconciliations) != 0 {
+			reconciliationOut = w.historyReconcileNeeded
+			nextReconciliation = pendingReconciliations[0]
+		}
+		select {
+		case <-w.ctx.Done():
+			return
+		case reconciliationOut <- nextReconciliation:
+			pendingReconciliations = pendingReconciliations[1:]
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			paused = pausedState
+			if paused {
+				tickerC = nil
+			} else {
+				tickerC = ticker.C
+				observeConnectionState()
+			}
+		case <-tickerC:
+			observeConnectionState()
+		case topicHealth := <-w.topicHealthStatusChan:
+			// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
+			// / SufficientlyHealthy); cache it so checkForConnectionChanges can
+			// tell PartiallyConnected from Connected. Supersedes the old no-op
+			// (status-im/status-go#4628).
+			w.topicHealth[topicHealth.Topic] = topicHealth.Health
+			if !paused {
+				observeConnectionState()
+			}
+		case <-w.connectionNotifChan:
+			if !paused {
+				observeConnectionState()
+			}
+		}
+	}
+}
+
 // deriveConnectionState maps the node's current connectivity onto the three-state
 // ConnectionState, mirroring logos-delivery's health monitor
 // (node_health_monitor.nim calculateConnectionState):
@@ -1057,7 +1087,7 @@ func (w *Waku) ConnectionState() types.ConnectionState {
 	return w.connState
 }
 
-func (w *Waku) checkForConnectionChanges() {
+func (w *Waku) checkForConnectionChanges() types.ConnectionState {
 
 	state := w.deriveConnectionState()
 	isOnline := state.IsOnline()
@@ -1091,6 +1121,8 @@ func (w *Waku) checkForConnectionChanges() {
 	if w.shouldFireConnectionChanged(next) {
 		w.ConnectionChanged(next)
 	}
+
+	return state
 }
 
 func (w *Waku) reportPeerMetrics() {
@@ -1148,44 +1180,6 @@ func (w *Waku) startMessageSender() error {
 
 	if w.cfg.MetricsEnabled {
 		sender.WithMessageSentEmitter(w.node.Host())
-	}
-
-	if w.cfg.EnableStoreConfirmationForMessagesSent {
-		msgStoredChan := make(chan gethcommon.Hash, 1000)
-		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		// The store node is selected on demand by the StoreClient (the go-waku
-		// storenode cycle is gone); MessageSentCheck queries it by hash to confirm
-		// that published messages propagated.
-		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), storeClientPeerProvider{w.storeClient}, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
-		sender.WithMessageSentCheck(messageSentCheck)
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			defer w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case hash := <-msgStoredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeSent,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckSuccess()
-					}
-				case hash := <-msgExpiredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeExpired,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckFailure()
-					}
-				}
-			}
-		}()
 	}
 
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
@@ -1371,8 +1365,6 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	})
 }
 
-// Peers is retained only for the Python functional tests (see tests-functional);
-// it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
 }
@@ -1673,6 +1665,79 @@ func (w *Waku) StoreQuery(
 	processEnvelopes bool,
 ) error {
 	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	if w.storeClient == nil {
+		return peer.AddrInfo{}
+	}
+
+	return w.storeClient.nextStorenode()
+}
+
+func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error {
+	if len(messageHashes) == 0 {
+		return nil
+	}
+
+	parsedHashes := make([]pb.MessageHash, 0, len(messageHashes))
+	for _, messageHash := range messageHashes {
+		decodedHash, err := hexutil.Decode(messageHash)
+		if err != nil {
+			w.logger.Debug("invalid message hash for storenode fetch", zap.String("messageHash", messageHash), zap.Error(err))
+			continue
+		}
+		parsedHashes = append(parsedHashes, pb.ToMessageHash(decodedHash))
+	}
+
+	if len(parsedHashes) == 0 {
+		return nil
+	}
+
+	// Enrich the storenode AddrInfo with addresses from the peerstore
+	storenodeInfo := w.node.Host().Peerstore().PeerInfo(storenode.ID)
+	// Encapsulate the peer ID into the multiaddresses as expected by the missing API
+	encapsulatedAddrs := utils.EncapsulatePeerID(storenodeInfo.ID, storenodeInfo.Addrs...)
+	storenodeInfo.Addrs = encapsulatedAddrs
+
+	type hashRequestor interface {
+		GetMessagesByHash(ctx context.Context, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error)
+	}
+
+	requestor, ok := missing.NewDefaultStorenodeRequestor(w.node.Store()).(hashRequestor)
+	if !ok {
+		return errors.New("storenode requestor does not support fetching by hash")
+	}
+
+	result, err := requestor.GetMessagesByHash(ctx, storenodeInfo, uint64(len(parsedHashes)), parsedHashes)
+	if err != nil {
+		return err
+	}
+
+	if result == nil {
+		return nil
+	}
+
+	for {
+		messages := result.Messages()
+
+		for _, mkv := range messages {
+			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
+			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, true); err != nil {
+				return err
+			}
+		}
+
+		if result.IsComplete() {
+			break
+		}
+
+		if err := result.Next(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (w *Waku) Metrics() string {

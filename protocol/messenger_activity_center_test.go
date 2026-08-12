@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -456,6 +457,31 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificat
 	s.Require().True(response.ActivityCenterNotifications()[2].Read)
 
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
+}
+
+func (s *MessengerActivityCenterMessageSuite) TestMarkActivityCenterNotificationReadForDeletedChat() {
+	alice, _, mentionMessage, _, _ := s.prepareCommunityChannelWithMentionAndReply()
+	notificationResponse, err := alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Limit:         1,
+		ReadType:      ActivityCenterQueryParamsReadAll,
+		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeMention},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(notificationResponse.Notifications, 1)
+
+	err = alice.DeleteChat(mentionMessage.ChatId)
+	s.Require().NoError(err)
+
+	response, err := alice.MarkActivityCenterNotificationsRead(
+		context.Background(),
+		[]types.HexBytes{notificationResponse.Notifications[0].ID},
+		0,
+		true,
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().True(response.ActivityCenterNotifications()[0].Read)
+	s.Require().Empty(response.Chats())
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestAliceDoesNotReceiveCommunityNotificationsBeforeJoined() {

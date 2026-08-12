@@ -83,3 +83,22 @@ func (s *MessengerReplySuite) TestReceiveReply() {
 	// Verify that it's replied
 	s.Require().True(messageToCheck.Replied)
 }
+
+func (s *MessengerReplySuite) TestSendReplyToNonExistentMessage() {
+	alice := s.m
+
+	chatID := statusChatID
+	chat := CreatePublicChat(chatID, alice.getTimesource())
+
+	err := alice.SaveChat(chat)
+	s.Require().NoError(err)
+
+	_, err = alice.Join(chat)
+	s.Require().NoError(err)
+
+	// Reply to a message ID that was never sent or received
+	replyMessage := buildTestMessage(*chat)
+	replyMessage.ResponseTo = "non-existent-message-id"
+	_, err = alice.SendChatMessage(context.Background(), replyMessage)
+	s.Require().ErrorIs(err, ErrInvalidResponseTo)
+}

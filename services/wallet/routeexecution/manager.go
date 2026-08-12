@@ -16,8 +16,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -59,6 +57,8 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	go func() {
 		defer status_common.LogOnPanic()
 
+		logutils.ZapLogger().Info("BuildTransactionsFromRoute: started", zap.String("uuid", uuid))
+
 		m.router.StopSuggestedRoutesAsyncCalculation()
 
 		var err error
@@ -80,6 +80,10 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
 		if routeInputParams.Uuid != uuid {
 			// should never be here
+			logutils.ZapLogger().Error("BuildTransactionsFromRoute: cannot resolve route id",
+				zap.String("requestedUuid", uuid),
+				zap.String("activeRouteUuid", routeInputParams.Uuid),
+				zap.Bool("activeRouteMissing", route == nil))
 			err = ErrCannotResolveRouteId
 			return
 		}
@@ -115,6 +119,8 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 	go func() {
 		defer status_common.LogOnPanic()
 
+		logutils.ZapLogger().Info("SendRouterTransactionsWithSignatures: started", zap.String("uuid", sendInputParams.Uuid))
+
 		var (
 			err              error
 			routeInputParams requests.RouteInputParams
@@ -127,13 +133,12 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 
 		defer func() {
 			clearLocalData := true
-			if routeInputParams.SendType == sendtype.Swap {
-				// in case of swap don't clear local data if an approval is placed, but swap tx is not sent yet
-				if m.transactionManager.ApprovalRequiredForPath(pathProcessorCommon.ProcessorSwapParaswapName) &&
-					m.transactionManager.ApprovalPlacedForPath(pathProcessorCommon.ProcessorSwapParaswapName) &&
-					!m.transactionManager.TxPlacedForPath(pathProcessorCommon.ProcessorSwapParaswapName) {
-					clearLocalData = false
-				}
+			// Swap-classified paths (incl. LI.FI bridges) build their main tx only after
+			// the approval tx is mined, so keep the local route data until it is sent.
+			if m.transactionManager.ApprovalRequiredForSwap() &&
+				m.transactionManager.ApprovalPlacedForSwap() &&
+				!m.transactionManager.TxPlacedForSwap() {
+				clearLocalData = false
 			}
 
 			if clearLocalData {
@@ -153,8 +158,12 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			m.eventFeed.Send(event)
 		}()
 
-		_, routeInputParams = m.router.GetBestRouteAndAssociatedInputParams()
+		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
 		if routeInputParams.Uuid != sendInputParams.Uuid {
+			logutils.ZapLogger().Error("SendRouterTransactionsWithSignatures: cannot resolve route id",
+				zap.String("requestedUuid", sendInputParams.Uuid),
+				zap.String("activeRouteUuid", routeInputParams.Uuid),
+				zap.Bool("activeRouteMissing", route == nil))
 			err = ErrCannotResolveRouteId
 			return
 		}

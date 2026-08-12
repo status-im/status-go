@@ -99,6 +99,65 @@ func setupGethStatusBackend() (*StatusBackend, func() error, func() error, func(
 	return backend, stop1, stop2, stop3, err
 }
 
+func TestEnsureDBsOpenedReopensEstablishedDatabases(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, true)
+	backend := testContext.backend
+
+	require.NoError(t, backend.closeDBs())
+	require.NoError(t, backend.ensureDBsOpened(*testContext.multiAcc, testPassword))
+	t.Cleanup(func() {
+		require.NoError(t, backend.closeDBs())
+	})
+
+	require.NotNil(t, backend.appDB)
+	require.NotNil(t, backend.walletDB)
+	require.NoError(t, backend.appDB.Ping())
+	require.NoError(t, backend.walletDB.Ping())
+	require.Same(t, backend.appDB, backend.statusNode.GetAppDB())
+	require.Same(t, backend.walletDB, backend.statusNode.GetWalletDB())
+
+	accountsDB, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+	profileKeypair, err := accountsDB.GetProfileKeypair()
+	require.NoError(t, err)
+	require.Equal(t, testContext.profileKeypair.KeyUID, profileKeypair.KeyUID)
+}
+
+func TestEnsureDBsOpenedEstablishedDatabasesRejectsWrongPassword(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, true)
+	backend := testContext.backend
+
+	require.NoError(t, backend.closeDBs())
+	err := backend.ensureDBsOpened(*testContext.multiAcc, "wrong password")
+	require.Error(t, err)
+	require.Nil(t, backend.appDB)
+	require.Nil(t, backend.walletDB)
+}
+
+func TestEnsureDBsOpenedEstablishedDatabasesDoesNotRegisterDBsOnAccountsDBFailure(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, true)
+	backend := testContext.backend
+
+	require.NoError(t, backend.closeDBs())
+	backend.statusNode.SetAppDB(nil)
+	backend.statusNode.SetWalletDB(nil)
+
+	previousNewAccountsDB := newAccountsDB
+	newAccountsDB = func(*sql.DB) (*accounts.Database, error) {
+		return nil, fmt.Errorf("failed to create accounts db")
+	}
+	t.Cleanup(func() {
+		newAccountsDB = previousNewAccountsDB
+	})
+
+	err := backend.ensureDBsOpened(*testContext.multiAcc, testPassword)
+	require.EqualError(t, err, "failed to create accounts db")
+	require.Nil(t, backend.appDB)
+	require.Nil(t, backend.walletDB)
+	require.Nil(t, backend.statusNode.GetAppDB())
+	require.Nil(t, backend.statusNode.GetWalletDB())
+}
+
 func handleError(t *testing.T, err error) {
 	if err != nil {
 		t.Logf("deferred function error: '%s'", err)

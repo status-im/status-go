@@ -18,6 +18,7 @@ import (
 
 	datasync2 "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 )
 
 // pausedDuration is the tick interval handed to the mvds node while the host is
@@ -33,6 +34,18 @@ var errNotStarted = errors.New("reliability layer not started")
 //	messages: the original messages that were wrapped
 type MessageDispatcher func(publicKey *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) error
 
+// MissingDependenciesHandler is triggered when SDS reports missing dependencies
+// for an incoming message.
+type MissingDependenciesHandler func(messageID string, missingDeps []string, channelID string) error
+
+// RetrievalHintProvider returns a transport-level retrieval hint for a given
+// SDS message ID.
+type RetrievalHintProvider func(messageID string) []byte
+
+// MessageSentHandler is triggered when SDS confirms an outgoing message was
+// observed in an incoming message's bloom filter or causal history.
+type MessageSentHandler func(messageID string)
+
 type Reliability struct {
 	identity              *ecdsa.PrivateKey
 	mvdsPersistence       mvdsnode.Persistence
@@ -41,23 +54,163 @@ type Reliability struct {
 	logger                *zap.Logger
 
 	// mu guards lifecycle transitions (Start/Stop/SetPaused/buildNode) so they
-	// don't interleave. The hot path (Unwrap / WrapAndQueue) only does an atomic
-	// Load of `datasync` and never takes mu.
+	// don't interleave. The hot path (Unwrap / WrapAndQueue) never takes mu;
+	// datasync uses atomic loads and SDS uses sdsOpsMu.
 	mu       sync.Mutex
 	datasync atomic.Pointer[datasync2.DataSync]
 	dispatch MessageDispatcher
 	paused   bool
 	tick     time.Duration // outbound-loop interval the active node was built with
+
+	missingDepsHandlerMu sync.RWMutex
+	missingDepsHandler   MissingDependenciesHandler
+
+	retrievalHintProviderMu sync.RWMutex
+	retrievalHintProvider   RetrievalHintProvider
+
+	messageSentHandlerMu sync.RWMutex
+	messageSentHandler   MessageSentHandler
+
+	sdsManagerFactory sdsManagerFactoryFunc
+
+	// sdsOpsMu coordinates SDS manager calls with shutdown. SDS hot-path calls
+	// hold RLock for the full native call; Close holds Lock before Cleanup so
+	// Cleanup cannot race with in-flight SDS manager usage.
+	sdsOpsMu sync.RWMutex
 }
 
-func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, logger *zap.Logger) *Reliability {
+func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
+	return newReliabilityWithSDSFactory(datasyncPersistence, identity, missingDepsHandler, logger, sds.NewReliabilityManager)
+}
+
+func newReliabilityWithSDSFactory(
+	datasyncPersistence mvdsnode.Persistence,
+	identity *ecdsa.PrivateKey,
+	missingDepsHandler MissingDependenciesHandler,
+	logger *zap.Logger,
+	sdsManagerFactory sdsManagerFactoryFunc,
+) (*Reliability, error) {
+	if missingDepsHandler == nil {
+		return nil, errors.New("missingDepsHandler is required")
+	}
+	if sdsManagerFactory == nil {
+		return nil, errors.New("sdsManagerFactory is required")
+	}
 	logger = logger.Named("reliability")
-	return &Reliability{
+	r := &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
-		sdsManager:            newSdsReliabilityManager(logger.Named("sds")),
 		logger:                logger,
+		missingDepsHandler:    missingDepsHandler,
+		sdsManagerFactory:     sdsManagerFactory,
+	}
+
+	if err := r.buildSdsManager(); err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
+// buildSdsManager installs a fresh SDS reliability manager. Close() destroys the
+// previous one, so this must run again on every Start().
+func (r *Reliability) buildSdsManager() error {
+	manager, err := newSdsReliabilityManager(
+		r.sdsManagerFactory,
+		r.logger.Named("sds"),
+		r.handleSDSMessageSent,
+		r.handleMissingDependencies,
+		r.provideRetrievalHint,
+	)
+	if err != nil {
+		return err
+	}
+
+	r.sdsOpsMu.Lock()
+	r.sdsManager = manager
+	r.sdsOpsMu.Unlock()
+	return nil
+}
+
+// SetMissingDependenciesHandler configures how SDS missing dependencies should be handled.
+func (r *Reliability) SetMissingDependenciesHandler(handler MissingDependenciesHandler) {
+	r.missingDepsHandlerMu.Lock()
+	defer r.missingDepsHandlerMu.Unlock()
+	r.missingDepsHandler = handler
+}
+
+// SetRetrievalHintProvider configures how SDS retrieval hints are resolved.
+func (r *Reliability) SetRetrievalHintProvider(provider RetrievalHintProvider) {
+	r.retrievalHintProviderMu.Lock()
+	defer r.retrievalHintProviderMu.Unlock()
+	r.retrievalHintProvider = provider
+}
+
+// SetMessageSentHandler configures the handler for outgoing SDS delivery
+// confirmations.
+func (r *Reliability) SetMessageSentHandler(handler MessageSentHandler) {
+	r.messageSentHandlerMu.Lock()
+	defer r.messageSentHandlerMu.Unlock()
+	r.messageSentHandler = handler
+}
+
+func (r *Reliability) handleSDSMessageSent(messageID sds.MessageID, _ string) {
+	r.messageSentHandlerMu.RLock()
+	handler := r.messageSentHandler
+	r.messageSentHandlerMu.RUnlock()
+	if handler != nil {
+		handler(string(messageID))
+	}
+}
+
+func (r *Reliability) provideRetrievalHint(messageID sds.MessageID) []byte {
+	r.retrievalHintProviderMu.RLock()
+	provider := r.retrievalHintProvider
+	r.retrievalHintProviderMu.RUnlock()
+
+	if provider == nil {
+		return nil
+	}
+
+	return provider(string(messageID))
+}
+
+func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missingDeps []sds.HistoryEntry, channelID string) {
+	r.missingDepsHandlerMu.RLock()
+	handler := r.missingDepsHandler
+	r.missingDepsHandlerMu.RUnlock()
+
+	if handler == nil || len(missingDeps) == 0 {
+		return
+	}
+
+	missingDepsAsString := make([]string, 0, len(missingDeps))
+	for _, dep := range missingDeps {
+		if len(dep.RetrievalHint) == 0 {
+			continue
+		}
+
+		var hint protobuf.RetrievalHint
+		if err := proto.Unmarshal(dep.RetrievalHint, &hint); err != nil {
+			r.logger.Debug("failed to unmarshal retrieval hint",
+				zap.String("messageId", string(dep.MessageID)),
+				zap.Error(err))
+			continue
+		}
+
+		for _, envelopeHash := range hint.EnvelopeHashes {
+			if len(envelopeHash) > 0 {
+				missingDepsAsString = append(missingDepsAsString, string(envelopeHash))
+			}
+		}
+	}
+	if len(missingDepsAsString) == 0 {
+		return
+	}
+
+	if err := handler(string(messageID), missingDepsAsString, channelID); err != nil {
+		r.logger.Debug("failed to fetch missing dependencies from sds callback", zap.Error(err))
 	}
 }
 
@@ -65,6 +218,11 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.dispatch = dispatch
+	if r.sdsManager == nil {
+		if err := r.buildSdsManager(); err != nil {
+			return err
+		}
+	}
 	duration := datasync2.DatasyncTicker
 	if r.paused {
 		duration = pausedDuration
@@ -167,19 +325,35 @@ func (r *Reliability) SetPaused(paused bool) error {
 	return nil
 }
 
+// Stop idles the data-sync node. The SDS manager deliberately stays alive: its
+// bloom filter and causal history are what let us detect messages missed while
+// offline, so a connectivity drop must not discard them. Use Close for shutdown.
 func (r *Reliability) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.stopLocked()
+}
+
+func (r *Reliability) stopLocked() {
 	if old := r.datasync.Swap(nil); old != nil {
 		old.SetSendingEnabled(false)
 		old.Stop()
 	}
-	if r.sdsManager != nil {
-		err := r.sdsManager.Cleanup()
+}
+
+// Close stops the data-sync node and releases the SDS manager's native resources.
+func (r *Reliability) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stopLocked()
+	r.sdsOpsMu.Lock()
+	defer r.sdsOpsMu.Unlock()
+	if old := r.sdsManager; old != nil {
+		r.sdsManager = nil
+		err := old.Cleanup()
 		if err != nil {
 			r.logger.Error("failed to cleanup sds reliability manager", zap.Error(err))
 		}
-		r.sdsManager = nil
 	}
 }
 

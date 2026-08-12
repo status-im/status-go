@@ -53,6 +53,13 @@ func (f *TestMessagingEnvironment) SubscribePostEvents() chan *PostMessageSubscr
 	return f.waku.SubscribePostEvents()
 }
 
+// SetProcessMailserverBatchHook installs a hook that intercepts every store
+// (mailserver) batch request issued through this environment. Passing nil
+// restores the default behavior of forwarding to the underlying waku.
+func (f *TestMessagingEnvironment) SetProcessMailserverBatchHook(hook func(ctx context.Context, batch types.MailserverBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error) {
+	f.waku.processMailserverBatchHook = hook
+}
+
 func (f *TestMessagingEnvironment) SimulateOffline() func() {
 	f.waku.Waku.SkipPublishToTopic(true)
 	return func() {
@@ -67,6 +74,11 @@ func (f *TestMessagingEnvironment) SimulateOffline() func() {
 type testWakuWrapper struct {
 	*wakuv3.Waku
 	postSubscriptions []chan *PostMessageSubscription
+
+	// processMailserverBatchHook, when set, intercepts every store (mailserver)
+	// batch request instead of forwarding it to the underlying waku. Used by
+	// tests to observe store queries without a real store node.
+	processMailserverBatchHook func(ctx context.Context, batch types.MailserverBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error
 }
 
 // Send overrides the embedded Waku's Send to fan out post events to any
@@ -87,6 +99,19 @@ func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic s
 		}
 	}
 	return id, nil
+}
+
+func (tw *testWakuWrapper) StoreQuery(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	if tw.processMailserverBatchHook != nil {
+		return tw.processMailserverBatchHook(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+	}
+	return tw.Waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {

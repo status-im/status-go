@@ -21,6 +21,7 @@ class TestMessageReactions:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.light_client_7393
     @parametrize_waku_light_client
     async def test_one_to_one_message_reactions(self, sender, receiver, waku_light_client):
         """Test message reactions with different wakuV2LightClient configurations"""

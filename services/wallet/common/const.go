@@ -51,75 +51,79 @@ const (
 type ChainID uint64
 
 const (
-	UnknownChainID  uint64 = 0
-	EthereumMainnet uint64 = 1
-	EthereumSepolia uint64 = 11155111
-	OptimismMainnet uint64 = 10
-	OptimismSepolia uint64 = 11155420
-	ArbitrumMainnet uint64 = 42161
-	ArbitrumSepolia uint64 = 421614
-	BSCMainnet      uint64 = 56
-	BSCTestnet      uint64 = 97
-	AnvilMainnet    uint64 = 31337
-	BaseMainnet     uint64 = 8453
-	BaseSepolia     uint64 = 84532
-	LineaMainnet    uint64 = 59144
-	LineaSepolia    uint64 = 59141
-	UnichainMainnet uint64 = 130
-	UnichainSepolia uint64 = 1301
-	KatanaMainnet   uint64 = 747474
-	KatanaBokuto    uint64 = 737373
-	InkMainnet      uint64 = 57073
-	InkSepolia      uint64 = 763373
-	AbstractMainnet uint64 = 2741
-	AbstractTestnet uint64 = 11124
-	ZkSyncMainnet   uint64 = 324
-	ZkSyncSepolia   uint64 = 300
-	SoneiumMainnet  uint64 = 1868
-	SoneiumMinato   uint64 = 1946
-	ScrollMainnet   uint64 = 534352
-	ScrollSepolia   uint64 = 534351
-	BlastMainnet    uint64 = 81457
-	BlastSepolia    uint64 = 168587773
-	EthereumHoodi   uint64 = 560048
-	TestnetChainID  uint64 = 777333
+	UnknownChainID   uint64 = 0
+	EthereumMainnet  uint64 = 1
+	EthereumSepolia  uint64 = 11155111
+	OptimismMainnet  uint64 = 10
+	OptimismSepolia  uint64 = 11155420
+	ArbitrumMainnet  uint64 = 42161
+	ArbitrumSepolia  uint64 = 421614
+	BSCMainnet       uint64 = 56
+	BSCTestnet       uint64 = 97
+	AnvilMainnet     uint64 = 31337
+	BaseMainnet      uint64 = 8453
+	BaseSepolia      uint64 = 84532
+	LineaMainnet     uint64 = 59144
+	LineaSepolia     uint64 = 59141
+	UnichainMainnet  uint64 = 130
+	UnichainSepolia  uint64 = 1301
+	KatanaMainnet    uint64 = 747474
+	KatanaBokuto     uint64 = 737373
+	InkMainnet       uint64 = 57073
+	InkSepolia       uint64 = 763373
+	AbstractMainnet  uint64 = 2741
+	AbstractTestnet  uint64 = 11124
+	ZkSyncMainnet    uint64 = 324
+	ZkSyncSepolia    uint64 = 300
+	SoneiumMainnet   uint64 = 1868
+	SoneiumMinato    uint64 = 1946
+	ScrollMainnet    uint64 = 534352
+	ScrollSepolia    uint64 = 534351
+	BlastMainnet     uint64 = 81457
+	BlastSepolia     uint64 = 168587773
+	RobinhoodMainnet uint64 = 4663
+	RobinhoodTestnet uint64 = 46630
+	EthereumHoodi    uint64 = 560048
+	TestnetChainID   uint64 = 777333
 )
 
 var (
 	SupportedNetworks = map[uint64]bool{
-		EthereumMainnet: true,
-		OptimismMainnet: true,
-		ArbitrumMainnet: true,
-		BaseMainnet:     true,
-		BSCMainnet:      true,
-		LineaMainnet:    true,
-		UnichainMainnet: true,
-		KatanaMainnet:   true,
-		InkMainnet:      true,
-		AbstractMainnet: true,
-		ZkSyncMainnet:   true,
-		SoneiumMainnet:  true,
-		ScrollMainnet:   true,
-		BlastMainnet:    true,
+		EthereumMainnet:  true,
+		OptimismMainnet:  true,
+		ArbitrumMainnet:  true,
+		BaseMainnet:      true,
+		BSCMainnet:       true,
+		LineaMainnet:     true,
+		UnichainMainnet:  true,
+		KatanaMainnet:    true,
+		InkMainnet:       true,
+		AbstractMainnet:  true,
+		ZkSyncMainnet:    true,
+		SoneiumMainnet:   true,
+		ScrollMainnet:    true,
+		BlastMainnet:     true,
+		RobinhoodMainnet: true,
 	}
 
 	SupportedTestNetworks = map[uint64]bool{
-		EthereumHoodi:   true,
-		EthereumSepolia: true,
-		OptimismSepolia: true,
-		ArbitrumSepolia: true,
-		BaseSepolia:     true,
-		LineaSepolia:    true,
-		UnichainSepolia: true,
-		KatanaBokuto:    true,
-		InkSepolia:      true,
-		AbstractTestnet: true,
-		ZkSyncSepolia:   true,
-		SoneiumMinato:   true,
-		ScrollSepolia:   true,
-		BlastSepolia:    true,
-		BSCTestnet:      true,
-		AnvilMainnet:    true,
+		EthereumHoodi:    true,
+		EthereumSepolia:  true,
+		OptimismSepolia:  true,
+		ArbitrumSepolia:  true,
+		BaseSepolia:      true,
+		LineaSepolia:     true,
+		UnichainSepolia:  true,
+		KatanaBokuto:     true,
+		InkSepolia:       true,
+		AbstractTestnet:  true,
+		ZkSyncSepolia:    true,
+		SoneiumMinato:    true,
+		ScrollSepolia:    true,
+		BlastSepolia:     true,
+		RobinhoodTestnet: true,
+		BSCTestnet:       true,
+		AnvilMainnet:     true,
 	}
 )
 
@@ -161,11 +165,11 @@ func (c ChainID) IsMainnet() bool {
 	switch uint64(c) {
 	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet, BaseMainnet, BSCMainnet, LineaMainnet,
 		UnichainMainnet, KatanaMainnet, InkMainnet, AbstractMainnet, ZkSyncMainnet,
-		SoneiumMainnet, ScrollMainnet, BlastMainnet:
+		SoneiumMainnet, ScrollMainnet, BlastMainnet, RobinhoodMainnet:
 		return true
 	case EthereumHoodi, EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, LineaSepolia,
 		UnichainSepolia, KatanaBokuto, InkSepolia, AbstractTestnet, ZkSyncSepolia,
-		SoneiumMinato, ScrollSepolia, BlastSepolia,
+		SoneiumMinato, ScrollSepolia, BlastSepolia, RobinhoodTestnet,
 		BSCTestnet:
 		return false
 	case UnknownChainID:
@@ -203,6 +207,8 @@ func AllChainIDs() []ChainID {
 		ChainID(ScrollSepolia),
 		ChainID(BlastMainnet),
 		ChainID(BlastSepolia),
+		ChainID(RobinhoodMainnet),
+		ChainID(RobinhoodTestnet),
 		ChainID(BSCMainnet),
 		ChainID(BSCTestnet),
 		ChainID(TestnetChainID),
@@ -223,36 +229,38 @@ func IsSupportedChainID(chainID uint64) bool {
 }
 
 var AverageBlockDurationForChain = map[ChainID]time.Duration{
-	ChainID(UnknownChainID):  time.Duration(12000) * time.Millisecond,
-	ChainID(EthereumMainnet): time.Duration(12000) * time.Millisecond,
-	ChainID(EthereumHoodi):   time.Duration(12000) * time.Millisecond,
-	ChainID(EthereumSepolia): time.Duration(12000) * time.Millisecond,
-	ChainID(OptimismMainnet): time.Duration(2000) * time.Millisecond,
-	ChainID(OptimismSepolia): time.Duration(2000) * time.Millisecond,
-	ChainID(ArbitrumMainnet): time.Duration(250) * time.Millisecond,
-	ChainID(ArbitrumSepolia): time.Duration(250) * time.Millisecond,
-	ChainID(BaseMainnet):     time.Duration(2000) * time.Millisecond,
-	ChainID(BaseSepolia):     time.Duration(2000) * time.Millisecond,
-	ChainID(LineaMainnet):    time.Duration(2000) * time.Millisecond,
-	ChainID(LineaSepolia):    time.Duration(2000) * time.Millisecond,
-	ChainID(UnichainMainnet): time.Duration(2000) * time.Millisecond,
-	ChainID(UnichainSepolia): time.Duration(2000) * time.Millisecond,
-	ChainID(KatanaMainnet):   time.Duration(2000) * time.Millisecond,
-	ChainID(KatanaBokuto):    time.Duration(2000) * time.Millisecond,
-	ChainID(InkMainnet):      time.Duration(2000) * time.Millisecond,
-	ChainID(InkSepolia):      time.Duration(2000) * time.Millisecond,
-	ChainID(AbstractMainnet): time.Duration(2000) * time.Millisecond,
-	ChainID(AbstractTestnet): time.Duration(2000) * time.Millisecond,
-	ChainID(ZkSyncMainnet):   time.Duration(2000) * time.Millisecond,
-	ChainID(ZkSyncSepolia):   time.Duration(2000) * time.Millisecond,
-	ChainID(SoneiumMainnet):  time.Duration(2000) * time.Millisecond,
-	ChainID(SoneiumMinato):   time.Duration(2000) * time.Millisecond,
-	ChainID(ScrollMainnet):   time.Duration(2000) * time.Millisecond,
-	ChainID(ScrollSepolia):   time.Duration(2000) * time.Millisecond,
-	ChainID(BlastMainnet):    time.Duration(2000) * time.Millisecond,
-	ChainID(BlastSepolia):    time.Duration(2000) * time.Millisecond,
-	ChainID(BSCMainnet):      time.Duration(3000) * time.Millisecond,
-	ChainID(BSCTestnet):      time.Duration(3000) * time.Millisecond,
+	ChainID(UnknownChainID):   time.Duration(12000) * time.Millisecond,
+	ChainID(EthereumMainnet):  time.Duration(12000) * time.Millisecond,
+	ChainID(EthereumHoodi):    time.Duration(12000) * time.Millisecond,
+	ChainID(EthereumSepolia):  time.Duration(12000) * time.Millisecond,
+	ChainID(OptimismMainnet):  time.Duration(2000) * time.Millisecond,
+	ChainID(OptimismSepolia):  time.Duration(2000) * time.Millisecond,
+	ChainID(ArbitrumMainnet):  time.Duration(250) * time.Millisecond,
+	ChainID(ArbitrumSepolia):  time.Duration(250) * time.Millisecond,
+	ChainID(BaseMainnet):      time.Duration(2000) * time.Millisecond,
+	ChainID(BaseSepolia):      time.Duration(2000) * time.Millisecond,
+	ChainID(LineaMainnet):     time.Duration(2000) * time.Millisecond,
+	ChainID(LineaSepolia):     time.Duration(2000) * time.Millisecond,
+	ChainID(UnichainMainnet):  time.Duration(2000) * time.Millisecond,
+	ChainID(UnichainSepolia):  time.Duration(2000) * time.Millisecond,
+	ChainID(KatanaMainnet):    time.Duration(2000) * time.Millisecond,
+	ChainID(KatanaBokuto):     time.Duration(2000) * time.Millisecond,
+	ChainID(InkMainnet):       time.Duration(2000) * time.Millisecond,
+	ChainID(InkSepolia):       time.Duration(2000) * time.Millisecond,
+	ChainID(AbstractMainnet):  time.Duration(2000) * time.Millisecond,
+	ChainID(AbstractTestnet):  time.Duration(2000) * time.Millisecond,
+	ChainID(ZkSyncMainnet):    time.Duration(2000) * time.Millisecond,
+	ChainID(ZkSyncSepolia):    time.Duration(2000) * time.Millisecond,
+	ChainID(SoneiumMainnet):   time.Duration(2000) * time.Millisecond,
+	ChainID(SoneiumMinato):    time.Duration(2000) * time.Millisecond,
+	ChainID(ScrollMainnet):    time.Duration(2000) * time.Millisecond,
+	ChainID(ScrollSepolia):    time.Duration(2000) * time.Millisecond,
+	ChainID(BlastMainnet):     time.Duration(2000) * time.Millisecond,
+	ChainID(BlastSepolia):     time.Duration(2000) * time.Millisecond,
+	ChainID(RobinhoodMainnet): time.Duration(2000) * time.Millisecond,
+	ChainID(RobinhoodTestnet): time.Duration(2000) * time.Millisecond,
+	ChainID(BSCMainnet):       time.Duration(3000) * time.Millisecond,
+	ChainID(BSCTestnet):       time.Duration(3000) * time.Millisecond,
 }
 
 const (
@@ -270,33 +278,35 @@ const (
 
 // ETH
 var ethAddressesByChainID = map[uint64]common.Address{
-	EthereumMainnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	OptimismMainnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	ArbitrumMainnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	BaseMainnet:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	LineaMainnet:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	UnichainMainnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	KatanaMainnet:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	InkMainnet:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	AbstractMainnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	ZkSyncMainnet:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	SoneiumMainnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	ScrollMainnet:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	BlastMainnet:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	EthereumHoodi:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	EthereumSepolia: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	OptimismSepolia: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	ArbitrumSepolia: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	BaseSepolia:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	LineaSepolia:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	UnichainSepolia: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	KatanaBokuto:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	InkSepolia:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	AbstractTestnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	ZkSyncSepolia:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	SoneiumMinato:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	ScrollSepolia:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	BlastSepolia:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	EthereumMainnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	OptimismMainnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	ArbitrumMainnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	BaseMainnet:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	LineaMainnet:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	UnichainMainnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	KatanaMainnet:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	InkMainnet:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	AbstractMainnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	ZkSyncMainnet:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	SoneiumMainnet:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	ScrollMainnet:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	BlastMainnet:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	RobinhoodMainnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	EthereumHoodi:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	EthereumSepolia:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	OptimismSepolia:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	ArbitrumSepolia:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	BaseSepolia:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	LineaSepolia:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	UnichainSepolia:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	KatanaBokuto:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	InkSepolia:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	AbstractTestnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	ZkSyncSepolia:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	SoneiumMinato:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	ScrollSepolia:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	BlastSepolia:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
+	RobinhoodTestnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
 }
 
 // BNB

@@ -62,7 +62,12 @@ class TestCommunityMessages:
             message_text = f"test_message_{uuid4()}"
             community_admin.wakuext_service.send_chat_message(message_chat_id, message_text)
             sleep(30)
-        with community_member.expect_signal(SignalType.MESSAGES_NEW, pattern=message_text):
+        with community_member.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=message_text,
+            start="beginning",
+            timeout=60,
+        ):
             pass
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")

@@ -4,19 +4,23 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
+	"github.com/status-im/status-go/pkg/messaging/events"
 	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
@@ -36,12 +40,22 @@ type Core struct {
 
 	publisher *pubsub.Publisher
 
-	wg   sync.WaitGroup
-	quit chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	quit   chan struct{}
 
 	connectionState connection.State
 
 	wakumetrics *wakumetrics2.Client
+}
+
+type sdsEnvelopeHashesTracker interface {
+	TrackedEnvelopeHashes(identifier []byte) ([]string, error)
+}
+
+type sdsApplicationMessageIDTracker interface {
+	TakeApplicationMessageIDForSDS(sdsMessageID []byte) ([]byte, bool)
 }
 
 // Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
@@ -78,6 +92,7 @@ type CoreParams struct {
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
 	var err error
 	stack := &common.MessagingStack{}
+	var core *Core
 
 	stack.Transport, err = transport.NewTransport(
 		waku,
@@ -103,11 +118,22 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.tracer,
 	)
 
-	stack.Reliability = reliability.NewReliability(
+	missingDepsHandler := func(messageID string, missingDeps []string, channelID string) error {
+		if config.missingDepsObserver != nil {
+			config.missingDepsObserver(messageID, missingDeps, channelID)
+		}
+		return core.fetchMissingDependenciesAsync(messageID, missingDeps, channelID)
+	}
+
+	stack.Reliability, err = reliability.NewReliability(
 		config.persistence.MVDSStorage(),
 		params.Identity,
+		missingDepsHandler,
 		config.logger,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	publisher := pubsub.NewPublisher()
 
@@ -126,7 +152,9 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		timeSource = timesource.DefaultService()
 	}
 
-	return &Core{
+	ctx, cancel := context.WithCancel(context.Background())
+
+	core = &Core{
 		config:     *config,
 		identity:   params.Identity,
 		waku:       waku,
@@ -134,8 +162,82 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		stack:      stack,
 		controller: controller,
 		publisher:  publisher,
+		ctx:        ctx,
+		cancel:     cancel,
 		quit:       make(chan struct{}),
-	}, nil
+	}
+
+	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
+	stack.Reliability.SetMessageSentHandler(core.handleSDSMessageSent)
+
+	return core, nil
+}
+
+func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker, messageID string) []byte {
+	decodedMessageID, err := cryptotypes.DecodeHex(messageID)
+	if err != nil {
+		logger.Debug("failed to decode SDS message ID for retrieval hint",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	hashes, err := tracker.TrackedEnvelopeHashes(decodedMessageID)
+	if err != nil {
+		logger.Debug("no tracked envelope hash for SDS message ID",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	envelopeHashes := make([][]byte, len(hashes))
+	for i, hash := range hashes {
+		envelopeHashes[i] = []byte(hash)
+	}
+
+	hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{
+		EnvelopeHashes: envelopeHashes,
+	})
+	if err != nil {
+		logger.Debug("failed to marshal SDS retrieval hint",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	return hint
+}
+
+func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
+	return buildSDSRetrievalHint(c.logger, c.stack.Transport, messageID)
+}
+
+func (c *Core) handleSDSMessageSent(sdsMessageID string) {
+	publishSDSMessageDelivered(c.logger, c.stack.Transport, c.publisher, sdsMessageID)
+}
+
+func publishSDSMessageDelivered(
+	logger *zap.Logger,
+	tracker sdsApplicationMessageIDTracker,
+	publisher *pubsub.Publisher,
+	sdsMessageID string,
+) {
+	decodedSDSMessageID, err := cryptotypes.DecodeHex(sdsMessageID)
+	if err != nil {
+		logger.Debug("failed to decode SDS delivery confirmation", zap.String("messageID", sdsMessageID), zap.Error(err))
+		return
+	}
+
+	applicationMessageID, ok := tracker.TakeApplicationMessageIDForSDS(decodedSDSMessageID)
+	if !ok {
+		logger.Debug("ignoring delivery confirmation for untracked SDS message", zap.String("messageID", sdsMessageID))
+		return
+	}
+
+	pubsub.Publish(publisher, events.DeliveredMessage{MessageIDs: [][]byte{applicationMessageID}})
 }
 
 func NewCore(params CoreParams, options ...Options) (*Core, error) {
@@ -190,6 +292,8 @@ func (c *Core) start() error {
 
 func (c *Core) stop() error {
 	close(c.quit)
+	c.cancel()
+	defer c.wg.Wait()
 
 	err := c.controller.Stop()
 	if err != nil {
@@ -208,7 +312,59 @@ func (c *Core) stop() error {
 		return err
 	}
 
-	c.wg.Wait()
+	return nil
+}
+
+func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []string, channelID string) error {
+	if len(missingDeps) == 0 {
+		return nil
+	}
+
+	select {
+	case <-c.ctx.Done():
+		return nil
+	default:
+	}
+
+	c.wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer c.wg.Done()
+
+		fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
+		defer cancel()
+
+		alreadyProcessed, err := c.stack.Transport.AlreadyProcessed(missingDeps)
+		if err != nil {
+			c.logger.Debug("failed to check missing dependencies cache",
+				zap.String("messageID", messageID),
+				zap.String("channelID", channelID),
+				zap.Strings("missingDeps", missingDeps),
+				zap.Error(err),
+			)
+			return
+		}
+
+		missingDepsToFetch := make([]string, 0, len(missingDeps))
+		for _, missingDep := range missingDeps {
+			if !alreadyProcessed[missingDep] {
+				missingDepsToFetch = append(missingDepsToFetch, missingDep)
+			}
+		}
+		if len(missingDepsToFetch) == 0 {
+			return
+		}
+
+		err = c.stack.Transport.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
+		if err != nil {
+			c.logger.Debug("failed to fetch missing dependencies from storenode",
+				zap.String("messageID", messageID),
+				zap.String("channelID", channelID),
+				zap.Strings("missingDeps", missingDepsToFetch),
+				zap.Error(err),
+			)
+		}
+	}()
 
 	return nil
 }
@@ -223,7 +379,7 @@ type wakuParams struct {
 
 	// port / udpPort / nameserver are the only node settings a caller configures
 	// (zero/empty falls back to the waku defaults). Everything else — host,
-	// discovery limit, max message size, store-confirmation, etc. — is defaulted
+	// discovery limit, max message size, etc. — is defaulted
 	// by the waku layer or derived from the mode.
 	port       int
 	udpPort    int

@@ -166,9 +166,12 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 		}
 	}
 
+	// A broken SDS layer yields a payload that silently fails to decode further up,
+	// so fail the whole envelope instead: it must be retried, not marked processed.
 	err = r.processSDSLayer(responseMessage)
 	if err != nil {
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
+		return nil, err
 	}
 
 	messages, ackedMessageIDs, err := r.processReliabilityLayer(responseMessage, logger)
@@ -257,6 +260,11 @@ func (r *Processor) processSegmentationLayer(m *messagingtypes.Message) error {
 		m.SegmentationLayer.Completed = true
 		m.SegmentationLayer.Hashes = transportIDs
 	case segmentation.ErrIncomplete:
+		m.SegmentationLayer.Segmented = true
+		m.SegmentationLayer.Completed = false
+		err = nil
+	case segmentation.ErrAlreadyCompleted:
+		// A duplicate segment for an already reconstructed message should be ignored.
 		m.SegmentationLayer.Segmented = true
 		m.SegmentationLayer.Completed = false
 		err = nil

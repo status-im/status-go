@@ -82,6 +82,14 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 	return db, nil
 }
 
+func OpenDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
+	return sqlite.OpenDB(path, password, kdfIterationsNumber)
+}
+
+func MigrateDB(db *sql.DB) error {
+	return doMigration(db)
+}
+
 func migrateEnsUsernames(sqlTx *sql.Tx) error {
 
 	// 1. Check if ens_usernames table already exist

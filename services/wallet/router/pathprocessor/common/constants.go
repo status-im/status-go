@@ -10,6 +10,7 @@ const (
 	ProcessorTransferName                    = "Transfer"
 	ProcessorBridgeHopName                   = "Hop"
 	ProcessorSwapParaswapName                = "Paraswap"
+	ProcessorLiFiName                        = "LiFi"
 	ProcessorERC721Name                      = "ERC721Transfer"
 	ProcessorERC1155Name                     = "ERC1155Transfer"
 	ProcessorENSRegisterName                 = "ENSRegister"

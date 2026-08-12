@@ -946,6 +946,16 @@ class WakuextService(Service):
         response = self.rpc_request("deleteCommunityTokenPermission", params)
         return response
 
+    def promote_self_to_control_node(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("promoteSelfToControlNode", params)
+        return response
+
+    def register_received_ownership_notification(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("registerReceivedOwnershipNotification", params)
+        return response
+
     def sign_data(self, sign_params: list[dict]):
         params = [sign_params]
         response = self.rpc_request("signData", params)

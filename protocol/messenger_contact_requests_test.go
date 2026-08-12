@@ -1756,6 +1756,21 @@ func (s *MessengerContactRequestSuite) TestAcceptContactWithoutRequest() { //nol
 	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(outgoingMutualStateEventAcceptedDefaultText, contactRequestMsg.From))
 }
 
+func (s *MessengerContactRequestSuite) TestCannotSendContactRequestToSelf() {
+	request := &requests.SendContactRequest{
+		ID:      s.m.IdentityPublicKeyString(),
+		Message: "hello me",
+	}
+
+	resp, err := s.m.SendContactRequest(context.Background(), request)
+	s.Require().ErrorIs(err, ErrSendContactRequestToSelf)
+	s.Require().Nil(resp)
+
+	pendingRequests, _, err := s.m.PendingContactRequests("", 10)
+	s.Require().NoError(err)
+	s.Require().Len(pendingRequests, 0)
+}
+
 func (s *MessengerContactRequestSuite) TestSyncInstallationContactV2_IgnoresNonCanonicalSelfID() {
 	state := s.m.buildMessageState()
 

@@ -22,6 +22,7 @@ class TestSendingChatMessages:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.light_client_7393
     async def test_send_one_to_one_message(self, sender, receiver):
         # Generate unique message text BEFORE registering waiter for race-free waiting
         message_text = f"test_message_0_{uuid4()}"
@@ -52,6 +53,7 @@ class TestSendingChatMessages:
         actual_text = messages[0].get("text", "")
         assert actual_text == message_text
 
+    @pytest.mark.light_client_7393
     async def test_send_chat_message_community(self, sender, receiver):
         community_id = async_messenger.create_community(sender)
         community_chat_id = await async_messenger.join_community(member=receiver, admin=sender, community_id=community_id)
@@ -66,6 +68,7 @@ class TestSendingChatMessages:
         actual_text = messages[0].get("text", "")
         assert actual_text == text
 
+    @pytest.mark.light_client_7393
     async def test_send_chat_message_private_group(self, sender, receiver):
         await async_messenger.make_contacts(sender, receiver)
         private_group_id = await async_messenger.join_private_group(admin=sender, member=receiver)
@@ -78,6 +81,7 @@ class TestSendingChatMessages:
         actual_text = expected_message.get("text", "")
         assert actual_text == text
 
+    @pytest.mark.light_client_7393
     async def test_send_chat_messages_same_chat(self, sender, receiver):
         community_id = async_messenger.create_community(sender)
         community_chat_id = await async_messenger.join_community(member=receiver, admin=sender, community_id=community_id)
@@ -98,6 +102,7 @@ class TestSendingChatMessages:
         expected_texts.reverse()
         assert actual_texts == expected_texts
 
+    @pytest.mark.light_client_7393
     async def test_send_chat_messages_different_chats(self, sender, receiver):
         # Group
         await async_messenger.make_contacts(sender, receiver)
@@ -118,6 +123,7 @@ class TestSendingChatMessages:
         messages = response.get("messages", [])
         assert len(messages) == 2
 
+    @pytest.mark.light_client_7393
     async def test_send_group_message(self, sender, receiver):
         await async_messenger.make_contacts(sender, receiver)
         private_group_id = await async_messenger.join_private_group(admin=sender, member=receiver)
@@ -134,6 +140,7 @@ class TestSendingChatMessages:
     # Using delete_message is a workaround that might be considered an incorrect behaviour
     # TODO: create more realistic scenario where the message is intercepted in the network and not delivered,
     # use community messages to avoid 1-1 and group chats reliability mechanisms on protocol level
+    @pytest.mark.light_client_7393
     async def test_resend_one_to_one_message(self, sender, receiver):
         await async_messenger.make_contacts(sender, receiver)
 

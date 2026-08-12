@@ -22,6 +22,10 @@ import (
 
 const maxRequestsPerSecond = 3
 
+// ErrDownloaderStopped is returned by Get for requests that cannot be served
+// because the downloader is shutting down.
+var ErrDownloaderStopped = errors.New("ipfs downloader stopped")
+
 type taskResponse struct {
 	err      error
 	response []byte
@@ -44,7 +48,12 @@ type Downloader struct {
 	inputTaskChan   chan taskRequest
 	client          *http.Client
 
-	quit chan struct{}
+	// stopMu orders wg.Add against wg.Wait: Get takes it for reading before
+	// adding, Stop takes it for writing to close quit, so no Add can slip in
+	// once Stop has begun waiting.
+	stopMu   sync.RWMutex
+	stopOnce sync.Once
+	quit     chan struct{}
 }
 
 func NewDownloader(rootDir string) *Downloader {
@@ -66,50 +75,72 @@ func NewDownloader(rootDir string) *Downloader {
 			Timeout: time.Second * 5,
 		},
 
-		quit: make(chan struct{}, 1),
+		quit: make(chan struct{}),
 	}
 
-	go d.taskDispatcher()
-	go d.worker()
+	// Tracked on the same WaitGroup as Get callers so Stop cannot return while
+	// either goroutine is still touching the ipfs dir. wg.Done is deferred after
+	// the panic guard so it still runs before LogOnPanic re-raises.
+	d.wg.Add(2)
+	go func() {
+		defer common.LogOnPanic()
+		defer d.wg.Done()
+		d.taskDispatcher()
+	}()
+	go func() {
+		defer common.LogOnPanic()
+		defer d.wg.Done()
+		d.worker()
+	}()
 
 	return d
 }
 
 func (d *Downloader) Stop() {
-	close(d.quit)
+	d.stopOnce.Do(func() {
+		d.stopMu.Lock()
+		close(d.quit)
+		d.stopMu.Unlock()
+	})
 
 	d.cancel()
 
 	d.wg.Wait()
-
-	close(d.inputTaskChan)
-	close(d.rateLimiterChan)
+	// The task channels are deliberately left open: callers racing with Stop
+	// select on quit instead, and a closed channel would turn that race into a
+	// send-on-closed-channel panic.
 }
 
 func (d *Downloader) worker() {
-	defer common.LogOnPanic()
-	for request := range d.rateLimiterChan {
-		resp, err := d.download(request.cid, request.download)
-		request.doneChan <- taskResponse{
-			err:      err,
-			response: resp,
+	for {
+		select {
+		case <-d.quit:
+			return
+		case request := <-d.rateLimiterChan:
+			resp, err := d.download(request.cid, request.download)
+			// doneChan is buffered, so an abandoned request never blocks here.
+			request.doneChan <- taskResponse{
+				err:      err,
+				response: resp,
+			}
 		}
 	}
 }
 
 func (d *Downloader) taskDispatcher() {
-	defer common.LogOnPanic()
 	sub := d.Subscribe()
 	defer sub.Unsubscribe()
 	pt := common.NewPausableTicker(common.PausableTickerConfig{
 		Interval: time.Second / maxRequestsPerSecond,
 		OnTick: func() {
 			select {
-			case request, ok := <-d.inputTaskChan:
-				if !ok {
-					return
+			case request := <-d.inputTaskChan:
+				// Quit-aware: rateLimiterChan may be full with no worker left to
+				// drain it, which would park this goroutine for good.
+				select {
+				case d.rateLimiterChan <- request:
+				case <-d.quit:
 				}
-				d.rateLimiterChan <- request
 			default:
 			}
 		},
@@ -177,20 +208,48 @@ func (d *Downloader) Get(hash string, download bool) ([]byte, error) {
 
 	doneChan := make(chan taskResponse, 1)
 
+	// Register under the read lock so Stop cannot begin waiting between the
+	// quit check and the Add.
+	d.stopMu.RLock()
+	select {
+	case <-d.quit:
+		d.stopMu.RUnlock()
+		return nil, ErrDownloaderStopped
+	default:
+	}
 	d.wg.Add(1)
+	d.stopMu.RUnlock()
+	defer d.wg.Done()
 
-	d.inputTaskChan <- taskRequest{
+	// Both hand-offs must give up on quit: Stop waits on wg, so a request left
+	// queued here would deadlock shutdown.
+	select {
+	case d.inputTaskChan <- taskRequest{
 		cid:      cid,
 		download: download,
 		doneChan: doneChan,
+	}:
+	case <-d.quit:
+		return nil, ErrDownloaderStopped
 	}
 
-	done := <-doneChan
-	close(doneChan)
+	return d.awaitResult(doneChan)
+}
 
-	d.wg.Done()
-
-	return done.response, done.err
+func (d *Downloader) awaitResult(doneChan chan taskResponse) ([]byte, error) {
+	select {
+	case done := <-doneChan:
+		return done.response, done.err
+	case <-d.quit:
+		// select picks uniformly among ready cases, so re-check: a result the
+		// worker already delivered beats the shutdown error.
+		select {
+		case done := <-doneChan:
+			return done.response, done.err
+		default:
+			return nil, ErrDownloaderStopped
+		}
+	}
 }
 
 func (d *Downloader) exists(cid string) (bool, []byte, error) {

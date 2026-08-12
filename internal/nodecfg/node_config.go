@@ -143,20 +143,9 @@ func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 }
 
 func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`
-	UPDATE wakuv2_config
-	SET enable_store_confirmation_for_messages_sent = ?
-	WHERE synthetic_id = 'id'`,
-		c.WakuV2Config.EnableStoreConfirmationForMessagesSent,
-	)
-
-	if err != nil {
-		return err
-	}
-
 	// cluster_id is no longer carried on ClusterConfig; keep the column populated
 	// from the selected fleet so the DB schema is unchanged (no migration).
-	_, err = tx.Exec(`
+	_, err := tx.Exec(`
 	UPDATE cluster_config
 	SET cluster_id = ?
 	WHERE synthetic_id = 'id'`,
@@ -374,13 +363,8 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		}
 	}
 
-	err = tx.QueryRow(`
-	SELECT light_client,
-	       enable_store_confirmation_for_messages_sent
-	FROM wakuv2_config WHERE synthetic_id = 'id'
-	`).Scan(
+	err = tx.QueryRow(`SELECT light_client FROM wakuv2_config WHERE synthetic_id = 'id'`).Scan(
 		&nodecfg.WakuV2Config.LightClient,
-		&nodecfg.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -436,11 +420,6 @@ func GetNodeConfigFromDB(db *sql.DB) (*params.NodeConfig, error) {
 
 func SetLightClient(db *sql.DB, enabled bool) error {
 	_, err := db.Exec(`UPDATE wakuv2_config SET light_client = ?`, enabled)
-	return err
-}
-
-func SetStoreConfirmationForMessagesSent(db *sql.DB, enabled bool) error {
-	_, err := db.Exec(`UPDATE wakuv2_config SET enable_store_confirmation_for_messages_sent = ?`, enabled)
 	return err
 }
 

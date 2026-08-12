@@ -23,6 +23,12 @@ import (
 // active HTTP handlers to drain before force-closing remaining connections.
 const backgroundShutdownTimeout = 300 * time.Millisecond
 
+// teardownShutdownTimeout bounds the same drain at teardown. It is generous
+// enough for normal in-flight requests to finish, but a handler that never
+// returns must not be able to wedge Stop — and with it the logout path that
+// holds the backend mutex.
+const teardownShutdownTimeout = 3 * time.Second
+
 // tcpListenConfig sets SO_REUSEADDR so that after the previous listener is fully
 // closed, the kernel can allow binding the same cached ephemeral port again (e.g.
 // TIME_WAIT) without a long delay. It does not help if Stop returns before that
@@ -73,6 +79,12 @@ type Server struct {
 	// so Stop does not return while the previous listener may still be tearing down (avoids EADDRINUSE
 	// when rebinding the same cached ephemeral port).
 	serveWg sync.WaitGroup
+
+	// serveDone is closed when the current serve goroutine has fully exited.
+	// The dead-listener rebind path waits on the instance it captured — never
+	// on serveWg, which a concurrent Start could grow while the mutex is
+	// released, making the wait block on an unrelated healthy server.
+	serveDone chan struct{}
 
 	*timeoutManager
 }
@@ -246,12 +258,55 @@ func (s *Server) applyHandlers() {
 	s.server.Handler = mux
 }
 
+// listenerAlive verifies the bound listener actually accepts connections.
+// On iOS a process suspension can kill the listening socket without the accept
+// loop ever returning an error, leaving `running` true while every client
+// connect is refused (observed when the app is suspended on the login screen,
+// before the pausable-services bridge has anything to drive).
+//
+// A raw TCP dial is sufficient and safe with a TLS listener: crypto/tls only
+// handshakes on the first read/write of an accepted conn, and net/http runs
+// that in a per-connection goroutine — an immediate close surfaces (at most) a
+// per-conn handshake error, never an Accept error, so Serve keeps running.
+func (s *Server) listenerAlive() bool {
+	addr := s.GetListeningAddrPort()
+	if addr == "" {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
 func (s *Server) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.running.Load() {
-		return nil
+		if s.listenerAlive() {
+			return nil
+		}
+		s.logger.Warn("server marked running but listener is dead; rebinding")
+		currentServer := s.server
+		done := s.serveDone
+		s.running.Store(false)
+		_ = currentServer.Close()
+		// The serve goroutine's deferred cleanup takes s.mu — release it while
+		// waiting, and wait only on the captured instance, never on serveWg
+		// (a concurrent Start could grow it with a healthy new server).
+		s.mu.Unlock()
+		if done != nil {
+			<-done
+		}
+		s.mu.Lock()
+		// Re-validate after the unlocked window: a concurrent Start may have
+		// already rebound — in that case this call's work is done.
+		if s.running.Load() {
+			return nil
+		}
 	}
 
 	// Once Shutdown has been called on a server, it may not be reused;
@@ -266,9 +321,12 @@ func (s *Server) Start() error {
 	// Mark running synchronously to avoid pause/play races where ToBackground
 	// can run before serve() goroutine has a chance to set the state.
 	s.running.Store(true)
+	done := make(chan struct{})
+	s.serveDone = done
 	s.serveWg.Add(1)
 	go func() {
 		defer common.LogOnPanic()
+		defer close(done)
 		defer s.serveWg.Done()
 		s.serve(s.server, s.listener)
 	}()
@@ -276,15 +334,23 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Stop() error {
-	return s.stopWith(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), teardownShutdownTimeout)
+	defer cancel()
+
+	err := s.stopWith(ctx)
+	if shouldForceCloseOnShutdownError(err) {
+		s.logger.Warn("server graceful shutdown did not complete in time; forced close",
+			zap.Error(err), zap.Duration("timeout", teardownShutdownTimeout))
+		return nil
+	}
+	return err
 }
 
 // stopWith performs the graceful shutdown sequence bounded by ctx. If ctx
 // expires or is canceled before active connections drain, the server is
 // force-closed via Close so the caller isn't blocked by a slow or stuck
-// handler. Pass context.Background() for the unbounded behaviour expected at
-// teardown/shutdown; use a short deadline for lifecycle events like
-// pause/ToBackground.
+// handler. Callers always pass a deadline: a generous one at teardown, a short
+// one for lifecycle events like pause/ToBackground.
 func (s *Server) stopWith(ctx context.Context) error {
 	s.mu.Lock()
 	s.StopTimeout()

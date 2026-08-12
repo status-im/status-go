@@ -4,7 +4,7 @@ library 'status-jenkins-lib@v1.9.39'
 
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */
-  agent { label "${params.AGENT_LABEL} && go-1.24" }
+  agent { label "${params.AGENT_LABEL} && go-1.26" }
 
   parameters {
     string(
@@ -126,7 +126,7 @@ def assembePath(List<String> extraPaths) {
       'C:/Windows/system32/WindowsPowerShell/v1.0',
       'C:/Windows/system32',
       'C:/Windows',
-      'C:/ProgramData/scoop/apps/go/1.24.7/bin',
+      'C:/ProgramData/scoop/apps/go/1.26.5/bin',
       'C:/ProgramData/scoop/apps/nim/2.2.6/bin',
       'C:/ProgramData/scoop/apps/cmake/3.31.6/bin',
       'C:/ProgramData/scoop/apps/python/3.13.5',
@@ -154,7 +154,8 @@ def make(target) {
   if (env.PLATFORM.startsWith('windows')) {
     bat """
       call "C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
-      bash -c "make ${target} make=/bin/sh MINGW_PATH=C:/ProgramData/scoop/apps/msys2/current/mingw64"
+      REM Absolute path, because system32 precedes Git in PATH and also has a bash.exe once WSL is enabled.
+      "C:\\ProgramData\\scoop\\apps\\git\\current\\bin\\bash.exe" -c "make ${target} make=/bin/sh MINGW_PATH=C:/ProgramData/scoop/apps/msys2/current/mingw64"
     """
   } else { /* Use Nix for Linux/macOS. */
     nix.develop("make ${target}", pure: false)

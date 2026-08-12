@@ -19,6 +19,8 @@ type KeyStore interface {
 	ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (keystore.KeystoreAccount, error)
 	// AccountDecryptedKey returns decrypted key for account (provided that password is correct).
 	AccountDecryptedKey(address cryptoypes.Address, passphrase string) (keystore.KeystoreAccount, *ecdsa.PrivateKey, *extkeys.ExtendedKey, error)
+	// AccountDecryptedPrivateKey returns only the decrypted private key for an account.
+	AccountDecryptedPrivateKey(address cryptoypes.Address, passphrase string) (keystore.KeystoreAccount, *ecdsa.PrivateKey, error)
 	// Delete deletes the key matched by account.
 	// If the account contains no filename, the address must match a unique key.
 	Delete(address cryptoypes.Address, passphrase string) error

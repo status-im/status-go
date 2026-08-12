@@ -14,8 +14,6 @@ type Persistence interface {
 	GetProfileKeypair() (*types.Keypair, error)
 	// GetWalletRootAddress returns the root address of the wallet
 	GetWalletRootAddress() (cryptotypes.Address, error)
-	// GetPath returns the derivation path of the address
-	GetPath(address cryptotypes.Address) (string, error)
 	// GetKeypairByKeyUID returns a keypair by its keyUID
 	GetKeypairByKeyUID(keyUID string) (*types.Keypair, error)
 	// GetActiveKeypairs returns all active keypairs

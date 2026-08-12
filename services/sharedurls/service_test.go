@@ -199,6 +199,47 @@ func (s *ShareUrlsSuite) TestIsStatusSharedUrl() {
 	}
 }
 
+func (s *ShareUrlsSuite) TestShareAndParseMessageURL() {
+	chatID := "0xabcdef1234567890fedcba9876543210003cdcd5-e065-48f9-b166-b1a94ac75a11"
+	messageID := "0xmessage-id-123"
+
+	link, err := ShareMessageURL(chatID, messageID)
+	s.Require().NoError(err)
+	s.Require().True(IsStatusSharedURL(link))
+	s.Require().Equal("https://status.app/m/0xabcdef1234567890fedcba9876543210003cdcd5-e065-48f9-b166-b1a94ac75a11?message-id=0xmessage-id-123", link)
+
+	parsed, err := ParseMessageURL(link)
+	s.Require().NoError(err)
+	s.Require().Equal(chatID, parsed.ChatID)
+	s.Require().Equal(messageID, parsed.MessageID)
+	s.Require().Equal("0xabcdef1234567890fedcba9876543210", parsed.CommunityID)
+}
+
+func (s *ShareUrlsSuite) TestParseMessageURLInternalScheme() {
+	link := "status-app://m/0xabcdef1234567890fedcba9876543210003cdcd5-e065-48f9-b166-b1a94ac75a11?message-id=0xmessage-id-123"
+
+	parsed, err := ParseMessageURL(link)
+	s.Require().NoError(err)
+	s.Require().Equal("0xabcdef1234567890fedcba9876543210003cdcd5-e065-48f9-b166-b1a94ac75a11", parsed.ChatID)
+	s.Require().Equal("0xmessage-id-123", parsed.MessageID)
+	s.Require().Equal("0xabcdef1234567890fedcba9876543210", parsed.CommunityID)
+}
+
+func (s *ShareUrlsSuite) TestParseMessageURLMissingMessageID() {
+	_, err := ParseMessageURL("https://status.app/m/chat-only")
+	s.Require().ErrorContains(err, "messageID is required")
+}
+
+func (s *ShareUrlsSuite) TestParseMessageURLLegacyRawChatID() {
+	link := "https://status.app/m/0xabcdef1234567890fedcba9876543210003cdcd5-e065-48f9-b166-b1a94ac75a11?message-id=0xmessage-id-123"
+
+	parsed, err := ParseMessageURL(link)
+	s.Require().NoError(err)
+	s.Require().Equal("0xabcdef1234567890fedcba9876543210003cdcd5-e065-48f9-b166-b1a94ac75a11", parsed.ChatID)
+	s.Require().Equal("0xmessage-id-123", parsed.MessageID)
+	s.Require().Equal("0xabcdef1234567890fedcba9876543210", parsed.CommunityID)
+}
+
 func (s *ShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 	community := s.fakeCommunity()
 

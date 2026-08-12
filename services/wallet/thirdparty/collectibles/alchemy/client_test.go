@@ -86,7 +86,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Description:  "The enemy king sent a single message, written on a parchment stained by blood.\n“You are advised to submit without further delay, for if I bring my army into your land, I will destroy your hodlings, slay your people, and burn your city to ashes.”\nHodlers of ENJ sent a single word as reply:\n“If.”\nThe battle that followed does not come around too often, a battle that began every legend told about the warriors that gained eternal glory. \nThe battle that followed seemed like a lost one from the very beginning. \nThe enemy army was revealed at dawn, illuminated by the rising Sun.The ground shook as countless hordes marched towards a small band of men armed with shields, spears and swords.\nThe hodlers were outnumbered, one thousand to one. \nFear, doubt and uncertainty did not reach their hearts and minds - for they were born for this. \nEach hodler was bred for warfare, instructed in bloodshed, groomed to become a poet of death. \nA philosopher of war, blood and glory. \nEach man was forged into an invincible soldier that had a single driving force during each battle.\nStand your ground - at all costs. \nAs the swarm of enemies approached, the king yelled, asking his men: \n“Hodlers! What is your profession?”\n“HODL! HODL! HODL! HODL!!! HODL!!!!!” they replied, hitting spears against their shields. \nAn endless stream of arrows fell from the heavens only moments later, blocking out the Sun so they could fight in the shade. They emerged from the darkness without even a single scratch, protected by their legendary Enjin shields. \nWave after wave, their enemies rushed towards their doom, as they were met with cold tips of thrusting spears and sharp edges of crimson swords.\nAgainst all odds, the wall of men and steel held against the never-ending, shilling swarm. \nWhat was left of the enemy army retreated, fleeing in absolute panic and indisputable terror.\nBathed in blood, the ENJ hodlers were victorious.\nTheir story will be told for thousands of years, immortalized with divine blocks and chains.\n* * *\n“HODL” was minted in 2018 for our amazing community of epic Enjin HODLers. We are extremely grateful for the trust you've put in us and the products we're making - and the mission we're trying to accomplish, and hope you’ll love this token of our appreciation. ", // nolint: misspell
 				Permalink:    "",
 				ImageURL:     "https://res.cloudinary.com/alchemyapi/image/upload/convert-png/eth-mainnet/c5c93ffa8146ade7d3694c0f28463f0c",
-				AnimationURL: "https://nft-cdn.alchemy.com/eth-mainnet/c5c93ffa8146ade7d3694c0f28463f0c",
+				ThumbnailURL: "https://res.cloudinary.com/alchemyapi/image/upload/thumbnailv2/eth-mainnet/c5c93ffa8146ade7d3694c0f28463f0c",
 				Traits:       []thirdparty.CollectibleTrait{},
 				TokenURI:     "https://cdn.enjin.io/mint/meta/70000000000001b2.json",
 			},
@@ -128,7 +128,7 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 				Description:  "5,555 SimpsonPunks entered the Ethereum Blockchain🍩",
 				Permalink:    "",
 				ImageURL:     "https://res.cloudinary.com/alchemyapi/image/upload/convert-png/eth-mainnet/52accf48dc609088738b15808fe07e8c",
-				AnimationURL: "https://nft-cdn.alchemy.com/eth-mainnet/52accf48dc609088738b15808fe07e8c",
+				ThumbnailURL: "https://res.cloudinary.com/alchemyapi/image/upload/thumbnailv2/eth-mainnet/52accf48dc609088738b15808fe07e8c",
 				Traits: []thirdparty.CollectibleTrait{
 					{
 						TraitType: "layers",
@@ -367,4 +367,66 @@ func TestFetchOwnedAssetsRespectsContextCancellation(t *testing.T) {
 		ctx, w_common.ChainID(w_common.EthereumMainnet), testOwner, "", thirdparty.FetchNoLimit,
 	)
 	require.Error(t, err)
+}
+
+func TestAssetAnimation(t *testing.T) {
+	const cachedURL = "https://nft-cdn.alchemy.com/eth-mainnet/cached"
+
+	const cachedSize = int64(2850000)
+
+	testCases := []struct {
+		name              string
+		contentType       string
+		expectedURL       string
+		expectedMediaType string
+		expectedSize      int64
+	}{
+		{
+			name:              "carries the provider's content type for a video",
+			contentType:       "video/mp4",
+			expectedURL:       cachedURL,
+			expectedMediaType: "video/mp4",
+			expectedSize:      cachedSize,
+		},
+		{
+			name:              "carries the provider's content type for an animated image",
+			contentType:       "image/gif",
+			expectedURL:       cachedURL,
+			expectedMediaType: "image/gif",
+			expectedSize:      cachedSize,
+		},
+		{
+			// Alchemy fills cachedUrl for stills too, so the content type is the
+			// only thing keeping the full-size asset out of the animation slot.
+			name:              "reports no animation for a still image",
+			contentType:       "image/png",
+			expectedURL:       "",
+			expectedMediaType: "",
+			expectedSize:      0,
+		},
+		{
+			name:              "reports no animation when the content type is missing",
+			contentType:       "",
+			expectedURL:       "",
+			expectedMediaType: "",
+			expectedSize:      0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asset := Asset{Image: Image{
+				ContentType:        tc.contentType,
+				CachedAnimationURL: cachedURL,
+				Size:               cachedSize,
+			}}
+
+			url, mediaType, size := asset.animation()
+			assert.Equal(t, tc.expectedURL, url)
+			assert.Equal(t, tc.expectedMediaType, mediaType)
+			// image.size describes the cached asset, so it belongs to the
+			// animation slot only when the animation slot is filled.
+			assert.Equal(t, tc.expectedSize, size)
+		})
+	}
 }
