@@ -17,7 +17,9 @@ import (
 func TestStartFailureResetsRunning(t *testing.T) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
-	// No active networks: TokenManager creation fails, so startWithDB returns early.
+	// No active networks: token.NewTokenManager fails ("chains are not
+	// provided"), so startWithDB returns after the RPC client, downloader and
+	// media server were already built.
 	config.Networks = nil
 
 	n := New(nil, nil, testutils.MustCreateTestLogger())
@@ -34,4 +36,11 @@ func TestStartFailureResetsRunning(t *testing.T) {
 
 	require.Error(t, n.Start(config), "expected startup to fail with no active networks")
 	require.False(t, n.IsRunning(), "a failed Start must not leave the node marked running")
+
+	// A failed Start must also unwind what startWithDB built before failing,
+	// not just roll the flag back.
+	require.Nil(t, n.rpcClient, "a failed Start must stop and release the RPC client")
+	require.Nil(t, n.downloader, "a failed Start must stop and release the downloader")
+	require.Nil(t, n.config, "a failed Start must not leave a config on a node that never started")
+	require.ErrorIs(t, n.Stop(), ErrNoRunningNode, "Stop after a failed Start must report no running node")
 }
