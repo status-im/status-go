@@ -721,13 +721,12 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 		}
 	}
 
-	if keyActions.CommunityKeyAction.ActionType == communities.EncryptionKeyNone && len(keyActions.ChannelKeysActions) == 0 {
-		m.logger.Warn("no encryption keys to distribute",
-			zap.String("communityID", community.IDString()),
-			zap.String("member", pkStr))
+	err := m.communitiesKeyDistributor.Distribute(community, keyActions)
+	if err != nil {
+		m.logger.Error("failed to send community keys", zap.String("community ID", gocommon.TruncateWithDot(community.IDString())), zap.Error(err))
 	}
 
-	return m.communitiesKeyDistributor.Distribute(community, keyActions)
+	return nil
 }
 
 func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessageState, community *communities.Community, signer *ecdsa.PublicKey) error {
@@ -4993,17 +4992,9 @@ func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Commun
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST,
-		ResendType:          common.ResendTypeRawMessage,
 	}
 
 	_, err = m.SendMessageToControlNode(ctx, community, rawMessage)
-	if err != nil {
-		return err
-	}
-
-	if rawMessage.ResendType == common.ResendTypeRawMessage {
-		_, err = m.AddRawMessageToWatch(rawMessage)
-	}
 	return err
 }
 
