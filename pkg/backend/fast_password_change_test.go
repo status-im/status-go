@@ -113,6 +113,39 @@ func TestChangeDatabasePasswordMigratesToDEK(t *testing.T) {
 	require.True(t, ok)
 }
 
+// TestChangeDatabasePasswordWrongOldPasswordOnLegacyProfile verifies that a password change
+// attempted with a WRONG current password on a legacy (not yet migrated) profile is rejected
+// without leaving any trace behind.
+//
+// The migration wraps the fresh DEK with the *provided* old password before it re-encrypts
+// anything. With a wrong password that envelope can never be unwrapped by the real password,
+// so — unlike every other interrupted-migration state — login-time repair never gets a chance
+// to run: resolveProfileSecret fails before the databases are even opened and the profile is
+// locked out permanently.
+func TestChangeDatabasePasswordWrongOldPasswordOnLegacyProfile(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, false)
+	b := testContext.backend
+	keyUID := testContext.profileKeypair.KeyUID
+	_, _, keystoreDir := profilePaths(t, b, keyUID)
+
+	require.False(t, envelope.Exists(b.rootDataDir, keyUID))
+
+	require.Error(t, b.ChangeDatabasePassword(keyUID, "not-the-current-password", "brand-new-password", false))
+
+	// A rejected attempt must not leave a wrapped-DEK file behind.
+	require.False(t, envelope.Exists(b.rootDataDir, keyUID))
+
+	// The keystore is untouched.
+	require.NoError(t, keystorepkg.VerifyKeyStoreDirAtPath(keystoreDir, testPassword))
+
+	// And the profile still opens with the real password.
+	require.NoError(t, b.Logout())
+	b.clearProfileSecretCache()
+	require.NoError(t, b.ensureDBsOpened(*testContext.multiAcc, testPassword))
+	require.NoError(t, b.repairProfileEncryption(keyUID, testPassword, testContext.multiAcc.KDFIterations))
+	require.NoError(t, b.Logout())
+}
+
 // TestChangeDatabasePasswordRekey verifies that a deep rekey rotates the DEK and
 // re-encrypts the databases and keystore with it.
 func TestChangeDatabasePasswordRekey(t *testing.T) {
