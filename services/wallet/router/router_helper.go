@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -100,6 +101,35 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 		zap.Stringer("allowance", allowance),
 		zap.Stringer("amountIn", params.AmountIn))
 	return true, params.AmountIn, nil
+}
+
+// resolvePermitPlan asks the processor whether this swap can use an off-chain permit
+// instead of an approval tx. Any failure is logged and treated as "no permit": the permit
+// path is an optimisation, not a requirement for the route.
+func (r *Router) resolvePermitPlan(ctx context.Context, pathProcessor pathprocessor.PathProcessor,
+	params pathprocessor.ProcessorInputParams) *permit2.Plan {
+	resolver, ok := pathProcessor.(pathprocessor.PermitResolver)
+	if !ok {
+		return nil
+	}
+
+	plan, err := resolver.ResolvePermit(ctx, params)
+	if err != nil {
+		r.logger.Warn("resolvePermitPlan: falling back to the approval flow",
+			zap.String("processor", pathProcessor.Name()),
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.Error(err))
+		return nil
+	}
+
+	if plan != nil && plan.Details != nil {
+		r.logger.Debug("resolvePermitPlan: permit available",
+			zap.String("processor", pathProcessor.Name()),
+			zap.Uint64("chainId", params.FromChain.ChainID),
+			zap.String("permitType", plan.Details.Type.String()),
+			zap.Bool("approvalStillRequired", plan.NeedsApproval()))
+	}
+	return plan
 }
 
 func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, input []byte) (uint64, error) {

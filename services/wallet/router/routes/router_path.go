@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -49,6 +50,10 @@ type Path struct {
 
 	TxFee   *hexutil.Big // fee for the transaction (includes tx fee only, doesn't include approval fees, l1 fees, l1 approval fees, token fees or bonders fees, in base unit of the chain eg. WEI for ETH or BNB)
 	TxL1Fee *hexutil.Big // L1 fee for the transaction - used for for transactions placed on L2 chains (in base unit of the chain eg. WEI for ETH or BNB)
+
+	// PermitDetails is set when the swap can pull its tokens with an off-chain permit,
+	// collapsing approve+swap into one tx. Nil means the regular approve-then-swap flow.
+	PermitDetails *permit2.Details
 
 	ApprovalRequired        bool            // Is approval required for the transaction
 	ApprovalAmountRequired  *hexutil.Big    // Amount required for the approval transaction
@@ -305,6 +310,8 @@ func (p *Path) Copy() *Path {
 	if p.communityParams != nil {
 		newPath.communityParams = p.communityParams.Copy()
 	}
+
+	newPath.PermitDetails = p.PermitDetails.Copy()
 
 	return newPath
 }
