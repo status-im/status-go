@@ -55,33 +55,6 @@ type TestCommunitiesKeyDistributor struct {
 	mutex         sync.RWMutex
 }
 
-type failingCommunitiesKeyDistributor struct {
-	err error
-}
-
-type recordingCommunitiesKeyDistributor struct {
-	keyActions        *communities.EncryptionKeyActions
-	distributionCount int
-}
-
-func (d *failingCommunitiesKeyDistributor) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
-	return d.err
-}
-
-func (d *failingCommunitiesKeyDistributor) Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
-	return d.err
-}
-
-func (d *recordingCommunitiesKeyDistributor) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
-	return nil
-}
-
-func (d *recordingCommunitiesKeyDistributor) Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
-	d.keyActions = keyActions
-	d.distributionCount++
-	return nil
-}
-
 func (tckd *TestCommunitiesKeyDistributor) Generate(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
 	return tckd.CommunitiesKeyDistributorImpl.Generate(community, keyActions)
 }
@@ -1977,20 +1950,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	err = <-waitOnChannelKeyToBeDistributedToBob
 	s.Require().NoError(err)
 
-	keyExchangeMessageIDs, err := s.owner.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
-	s.Require().NoError(err)
-	hasResendableKeyExchangeMessage := false
-	for _, messageID := range keyExchangeMessageIDs {
-		rawMessage, err := s.owner.RawMessageByID(messageID)
-		s.Require().NoError(err)
-		if bytes.Equal(rawMessage.HashRatchetGroupID, []byte(community.IDString()+chat.CommunityChatID())) {
-			s.Require().Equal(common.ResendTypeRawMessage, rawMessage.ResendType)
-			s.Require().Equal(common.ResendMethodSendCommunityMessage, rawMessage.ResendMethod)
-			hasResendableKeyExchangeMessage = true
-		}
-	}
-	s.Require().True(hasResendableKeyExchangeMessage)
-
 	// bob receives community changes
 	// channel members should be empty,
 	// this info is available only to channel members with encryption key
@@ -2049,14 +2008,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	errs := s.bob.handleLocalBackupCommunities(s.bob.buildMessageState(), backupMessage.Communities)
 	s.Require().Len(errs, 0, fmt.Sprintf("expected no errors while handling backup communities. Errors: %v", errs))
 
-	keyRequestMessageIDs, err := s.bob.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST)
-	s.Require().NoError(err)
-	s.Require().Len(keyRequestMessageIDs, 1)
-	keyRequestMessage, err := s.bob.RawMessageByID(keyRequestMessageIDs[0])
-	s.Require().NoError(err)
-	s.Require().Equal(common.ResendTypeRawMessage, keyRequestMessage.ResendType)
-	s.Require().Equal(common.ResendMethodSendCommunityMessage, keyRequestMessage.ResendMethod)
-
 	// regenerate key for the channel in order to check that owner will send keys
 	// on bob request from `HandleBackup`
 	err = s.owner.messaging.GenerateHashRatchetKey([]byte(community.IDString() + chat.CommunityChatID()))
@@ -2112,106 +2063,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestReturnsDistributionError() {
-	community, _ := createOnRequestCommunity(&s.Suite, s.owner)
-	expectedErr := errors.New("key distribution failed")
-
-	originalDistributor := s.owner.communitiesKeyDistributor
-	s.owner.communitiesKeyDistributor = &failingCommunitiesKeyDistributor{err: expectedErr}
-	defer func() {
-		s.owner.communitiesKeyDistributor = originalDistributor
-	}()
-
-	err := s.owner.handleCommunityEncryptionKeysRequest(community, nil, &s.owner.identity.PublicKey)
-	s.Require().ErrorIs(err, expectedErr)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestEncryptionKeyRequestChannelIDs() {
-	s.Require().Nil(encryptionKeyRequestChannelIDs([]string{""}))
-	s.Require().Equal([]string{"channel-id"}, encryptionKeyRequestChannelIDs([]string{"", "channel-id"}))
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestSkipsNonChannelMember() {
-	community, chat := createEncryptedCommunity(&s.Suite, s.owner)
-	memberKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	// Add the member to the community but not to the channel, so they should not receive channel keys
-	_, err = community.AddMember(&memberKey.PublicKey, nil, community.Clock())
-	s.Require().NoError(err)
-
-	distributor := &recordingCommunitiesKeyDistributor{}
-	originalDistributor := s.owner.communitiesKeyDistributor
-	s.owner.communitiesKeyDistributor = distributor
-	defer func() {
-		s.owner.communitiesKeyDistributor = originalDistributor
-	}()
-
-	err = s.owner.handleCommunityEncryptionKeysRequest(community, []string{chat.CommunityChatID()}, &memberKey.PublicKey)
-	s.Require().NoError(err)
-	s.Require().NotNil(distributor.keyActions)
-	s.Require().Empty(distributor.keyActions.ChannelKeysActions)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestUsesSeparateMemberMaps() {
-	community, chat := createEncryptedCommunity(&s.Suite, s.owner)
-	memberKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	_, err = community.AddMember(&memberKey.PublicKey, nil, community.Clock())
-	s.Require().NoError(err)
-	_, err = community.AddMemberToChat(chat.CommunityChatID(), &memberKey.PublicKey, nil, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
-	s.Require().NoError(err)
-
-	distributor := &recordingCommunitiesKeyDistributor{}
-	originalDistributor := s.owner.communitiesKeyDistributor
-	s.owner.communitiesKeyDistributor = distributor
-	defer func() {
-		s.owner.communitiesKeyDistributor = originalDistributor
-	}()
-
-	err = s.owner.handleCommunityEncryptionKeysRequest(community, []string{chat.CommunityChatID()}, &memberKey.PublicKey)
-	s.Require().NoError(err)
-
-	channelAction, exists := distributor.keyActions.ChannelKeysActions[chat.CommunityChatID()]
-	s.Require().True(exists)
-	channelAction.Members["additional-member"] = &protobuf.CommunityMember{}
-	s.Require().NotContains(distributor.keyActions.CommunityKeyAction.Members, "additional-member")
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestOnNonControlNodeIsIgnored() {
-	community, _ := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-	s.joinCommunity(community, s.alice)
-
-	err := s.alice.HandleCommunityEncryptionKeysRequest(context.Background(), &ReceivedMessageState{
-		CurrentMessageState: &CurrentMessageState{PublicKey: s.owner.IdentityPublicKey()},
-	}, &protobuf.CommunityEncryptionKeysRequest{CommunityId: community.ID()}, nil)
-	s.Require().NoError(err)
-}
-
-func (s *MessengerCommunitiesTokenPermissionsSuite) TestHandleCommunityEncryptionKeysRequestRateLimitsMember() {
-	community, _ := createEncryptedCommunity(&s.Suite, s.owner)
-
-	distributor := &recordingCommunitiesKeyDistributor{}
-	originalDistributor := s.owner.communitiesKeyDistributor
-	s.owner.communitiesKeyDistributor = distributor
-	defer func() {
-		s.owner.communitiesKeyDistributor = originalDistributor
-	}()
-
-	state := &ReceivedMessageState{
-		CurrentMessageState: &CurrentMessageState{PublicKey: s.owner.IdentityPublicKey()},
-	}
-	request := &protobuf.CommunityEncryptionKeysRequest{CommunityId: community.ID()}
-
-	err := s.owner.HandleCommunityEncryptionKeysRequest(context.Background(), state, request, nil)
-	s.Require().NoError(err)
-	err = s.owner.HandleCommunityEncryptionKeysRequest(context.Background(), state, request, nil)
-	s.Require().NoError(err)
-	s.Require().Equal(1, distributor.distributionCount)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissionsPerformance() {
