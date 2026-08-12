@@ -689,6 +689,7 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 		return nil
 	}
 
+	name := "" // need it for display only, transfer itself needs just the contract address and token id
 	collectibleData, err := collectiblesManager.GetCacheCollectibleData(thirdparty.CollectibleUniqueID{
 		ContractID: thirdparty.ContractID{
 			ChainID: walletCommon.ChainID(chainID),
@@ -696,8 +697,8 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 		},
 		TokenID: &bigint.BigInt{Int: collectibleTokenID},
 	})
-	if err != nil {
-		return nil
+	if err == nil {
+		name = collectibleData.Name
 	}
 
 	return &tokentypes.Token{
@@ -705,7 +706,7 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 			Address:  contractAddress,
 			Decimals: 0,
 			ChainID:  chainID,
-			Name:     collectibleData.Name,
+			Name:     name,
 		},
 		CollectibleTokenID: (*hexutil.Big)(collectibleTokenID),
 	}

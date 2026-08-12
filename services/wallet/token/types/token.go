@@ -22,6 +22,9 @@ type Token struct {
 
 	CollectibleTokenID *hexutil.Big   `json:"collectibleTokenID,omitempty"`
 	CommunityData      *CommunityData `json:"communityData,omitempty"`
+
+	Soulbound       bool `json:"soulbound,omitempty"`
+	PrivilegesLevel *int `json:"privilegesLevel,omitempty"`
 }
 
 // TODO: think about removing CommunityData field and fetch it when needed, that way `tokenlists.Token` can be used directly.
