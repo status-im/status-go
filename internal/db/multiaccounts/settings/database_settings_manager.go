@@ -70,6 +70,7 @@ type DatabaseSettingsManager interface {
 	GifFavorites() (favorites json.RawMessage, err error)
 	ProfileMigrationNeeded() (result bool, err error)
 	AutoApplyKeypairMigrations() (result bool, err error)
+	SupportBotContactRequestState() (result int64, err error)
 	URLUnfurlingMode() (result int64, err error)
 	SubscribeToChanges() chan *SyncSettingField
 	MnemonicWasShown() error

@@ -49,6 +49,7 @@ var (
 		ShowCommunityAssetWhenSendingTokens: true,
 		ThirdpartyServicesEnabled:           true,
 		AutoApplyKeypairMigrations:          true,
+		SupportBotContactRequestState:       SupportBotContactRequestStatePendingNew,
 	}
 )
 
@@ -145,6 +146,17 @@ func TestDatabase_CreateSettingsPreservesAutoApplyKeypairMigrations(t *testing.T
 	enabled, err := db.AutoApplyKeypairMigrations()
 	require.NoError(t, err)
 	require.False(t, enabled)
+}
+
+func TestDatabase_SupportBotContactRequestState(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	state, err := db.SupportBotContactRequestState()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), state)
 }
 
 func TestSaveSetting(t *testing.T) {

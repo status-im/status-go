@@ -18,6 +18,12 @@ type SyncSettingProtobufFactoryInterface func(interface{}, uint64, string) (*com
 type SyncSettingProtobufFactoryStruct func(Settings, uint64, string) (*common.RawMessage, *protobuf.SyncSetting, error)
 type SyncSettingProtobufToValue func(setting *protobuf.SyncSetting) interface{}
 
+const (
+	SupportBotContactRequestStatePendingExisting int64 = 0
+	SupportBotContactRequestStatePendingNew      int64 = 1
+	SupportBotContactRequestStateDone            int64 = 2
+)
+
 // SyncProtobufFactory represents a collection of functionality to generate and parse *protobuf.SyncSetting
 type SyncProtobufFactory struct {
 	inactive          bool
@@ -215,6 +221,7 @@ type Settings struct {
 	AutoRefreshTokensEnabled            bool                          `json:"auto-refresh-tokens-enabled,omitempty"`
 	LastTokensUpdate                    time.Time                     `json:"last-tokens-update,omitempty"`
 	ThirdpartyServicesEnabled           bool                          `json:"thirdparty_services_enabled"`
+	SupportBotContactRequestState       int64                         `json:"support-bot-contact-request-state"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
