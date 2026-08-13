@@ -92,14 +92,19 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 	var err error
 	// Handle error at the end, if any
 	defer func() {
-		if err != nil {
-			pubsub.Publish(l.publisher, EventOwnedCollectiblesLoadError{
-				ChainID: l.chainID,
-				Account: l.account,
-				Error:   err,
-			})
+		if err == nil {
 			return
 		}
+		if ctx.Err() != nil || errors.Is(err, context.Canceled) {
+			// The load was cancelled (the loader is being stopped or restarted),
+			// not a failure — don't report an error for the client to surface.
+			return
+		}
+		pubsub.Publish(l.publisher, EventOwnedCollectiblesLoadError{
+			ChainID: l.chainID,
+			Account: l.account,
+			Error:   err,
+		})
 	}()
 
 	var lastFetchTimestamp int64

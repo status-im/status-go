@@ -185,9 +185,11 @@ func (pl *PeriodicalLoader) Load(ctx context.Context) error {
 		return err
 	}
 
-	if err != nil {
+	if err != nil && ctx.Err() == nil && !errors.Is(err, context.Canceled) {
 		pl.state.Store(LoaderStateError)
 	} else {
+		// Success, or the load was cancelled by a stop/restart — either way the
+		// pair is simply not loading anymore, which must not read as a failure.
 		pl.state.Store(LoaderStateIdle)
 	}
 
