@@ -138,8 +138,8 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 	mappedTokens := make(map[string][]string) // map[coingeckoId][]tokenKey
 	unmappedTokens := make([]string, 0)
 
-	// Coingecko doesn't provide prices for test tokens, so we need to map them to the mainnet tokens.
-	// We can do that only for test tokens that have a cross chain id.
+	// Coingecko doesn't list every token on every chain (and never lists testnet tokens), so tokens that
+	// aren't found directly are mapped to a mainnet sibling sharing the same cross chain id.
 	tokenKeysByCrossChainID := make(map[string][]string)
 	for _, token := range tokens {
 		// Skip tokens that don't have a cross chain id
@@ -156,12 +156,8 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 	for _, token := range tokens {
 		coingeckoToken, ok := coingeckoTokensByTokenKey[token.Key()]
 		if !ok {
-			if walletcommon.ChainID(token.ChainID).IsMainnet() {
-				unmappedTokens = append(unmappedTokens, token.Key())
-				continue
-			}
-
-			// Check by cross chain id if any of the test tokens have a coingecko token
+			// Check by cross chain id if any of the mainnet siblings have a coingecko token.
+			// This covers testnet tokens as well as mainnet tokens coingecko doesn't list on that some other chain (e.g. SNT is not listed on Base/Optimism).
 			crossChainID := token.CrossChainID
 			// Sepecial handling for status test token STT, cause even it's the same token belongs to different group and has different symbol SNT/STT.
 			if crossChainID == walletcommon.StatusTestTokenCrossChainID {
