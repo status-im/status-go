@@ -705,13 +705,13 @@ func TestLoginAccount(t *testing.T) {
 	}
 
 	c := make(chan interface{}, 10)
-	signal.SetMobileSignalHandler(func(data []byte) {
+	signal.SetHandler(func(data []byte) {
 		if strings.Contains(string(data), signal.EventLoggedIn) {
 			require.Contains(t, string(data), "status.staging")
 			c <- struct{}{}
 		}
 	})
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 	waitForLogin := func(chan interface{}) {
 		select {
 		case <-c:
@@ -1052,12 +1052,12 @@ func TestCreateWallet(t *testing.T) {
 	}
 
 	c := make(chan interface{}, 10)
-	signal.SetMobileSignalHandler(func(data []byte) {
+	signal.SetHandler(func(data []byte) {
 		if strings.Contains(string(data), "node.login") {
 			c <- struct{}{}
 		}
 	})
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	account, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
@@ -1112,12 +1112,12 @@ func TestSetFleet(t *testing.T) {
 	}
 
 	c := make(chan interface{}, 10)
-	signal.SetMobileSignalHandler(func(data []byte) {
+	signal.SetHandler(func(data []byte) {
 		if strings.Contains(string(data), "node.login") {
 			c <- struct{}{}
 		}
 	})
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	newAccount, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
@@ -1182,12 +1182,12 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		LogFilePath:        testContext.config.RootDataDir + "/log",
 	}
 	c := make(chan interface{}, 10)
-	signal.SetMobileSignalHandler(func(data []byte) {
+	signal.SetHandler(func(data []byte) {
 		if strings.Contains(string(data), "node.login") {
 			c <- struct{}{}
 		}
 	})
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	newAccount, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)

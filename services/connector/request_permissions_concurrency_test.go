@@ -33,7 +33,7 @@ func recvRequestIDOrFatal(t *testing.T, ch <-chan string) string {
 func setupRequestAccountsRequestIDChan(t *testing.T) <-chan string {
 	t.Helper()
 	requestIDCh := make(chan string, 1)
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt commands.EventType
 		if err := json.Unmarshal(s, &evt); err != nil || evt.Type != signal.EventConnectorSendRequestAccounts {
 			return
@@ -47,7 +47,7 @@ func setupRequestAccountsRequestIDChan(t *testing.T) <-chan string {
 		default:
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 	return requestIDCh
 }
 

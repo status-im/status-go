@@ -83,7 +83,7 @@ func TestRequestPermissions_AutoShareWhenNoDApp(t *testing.T) {
 			require.NoError(t, err)
 
 			var permissionGranted int
-			signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+			signal.SetHandler(signal.Handler(func(s []byte) {
 				var evt EventType
 				if err := json.Unmarshal(s, &evt); err != nil {
 					return
@@ -92,7 +92,7 @@ func TestRequestPermissions_AutoShareWhenNoDApp(t *testing.T) {
 					permissionGranted++
 				}
 			}))
-			t.Cleanup(signal.ResetMobileSignalHandler)
+			t.Cleanup(signal.ResetHandler)
 
 			out, err := cmd.Execute(context.Background(), req)
 			if tt.wantErr != nil {

@@ -33,7 +33,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	dAppPermissionRevoked := false
 	dAppPermissionGranted := false
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt commands.EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -76,7 +76,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	// Request accounts, now for real
 	request := "{\"method\": \"eth_requestAccounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
@@ -195,7 +195,7 @@ func TestRequestAccountsAfterPermissionsRevokeTest(t *testing.T) {
 	dAppPermissionRevoked := false
 	dAppPermissionGranted := false
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt commands.EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -218,7 +218,7 @@ func TestRequestAccountsAfterPermissionsRevokeTest(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	for range [10]int{} {
 		dAppPermissionRevoked = false

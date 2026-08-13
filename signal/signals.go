@@ -4,13 +4,12 @@ package signal
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdlib.h>
-extern bool StatusServiceSignalEvent(const char *jsonEvent);
+extern void SignalEvent(const char *jsonEvent);
 extern void SetEventCallback(void *cb);
 */
 import "C"
 import (
 	"encoding/json"
-	"sync"
 	"time"
 	"unsafe"
 
@@ -21,11 +20,11 @@ import (
 	"github.com/status-im/status-go/internal/logutils/requestlog"
 )
 
-// MobileSignalHandler is a simple callback function that gets called when any signal is received
-type MobileSignalHandler func([]byte)
+// Handler is a simple callback function that gets called when any signal is emitted.
+type Handler func([]byte)
 
 // storing the current signal handler here
-var mobileSignalHandler MobileSignalHandler
+var signalHandler Handler
 
 // All general log messages in this package should be routed through this logger.
 var logger = logutils.ZapLogger().Named("signal")
@@ -37,8 +36,8 @@ type Envelope struct {
 	Timestamp int64       `json:"timestamp"`
 }
 
-// NewEnvelope creates new envlope of given type and event payload.
-func NewEnvelope(typ string, event interface{}) *Envelope {
+// newEnvelope creates new envelope of given type and event payload.
+func newEnvelope(typ string, event interface{}) *Envelope {
 	return &Envelope{
 		Type:      typ,
 		Event:     event,
@@ -46,9 +45,9 @@ func NewEnvelope(typ string, event interface{}) *Envelope {
 	}
 }
 
-// send sends application signal (in JSON) upwards to application (via default notification handler)
+// send sends application signal (in JSON) upwards to application via go or C callback.
 func send(typ string, event interface{}) {
-	signal := NewEnvelope(typ, event)
+	signal := newEnvelope(typ, event)
 	data, err := json.Marshal(&signal)
 	if err != nil {
 		logger.Error("Marshalling signal envelope", zap.Error(err))
@@ -57,74 +56,27 @@ func send(typ string, event interface{}) {
 	callog.LogSignal(requestlog.GetRequestLogger(), typ, event)
 
 	// If a Go implementation of signal handler is set, let's use it.
-	if mobileSignalHandler != nil {
-		mobileSignalHandler(data)
+	if signalHandler != nil {
+		signalHandler(data)
 	} else {
 		// ...and fallback to C implementation otherwise.
 		str := C.CString(string(data))
-		C.StatusServiceSignalEvent(str)
+		C.SignalEvent(str)
 		C.free(unsafe.Pointer(str))
 	}
 }
 
-// NodeNotificationHandler defines a handler able to process incoming node events.
-// Events are encoded as JSON strings.
-type NodeNotificationHandler func(jsonEvent string)
-
-var notificationHandler NodeNotificationHandler = TriggerDefaultNodeNotificationHandler
-
-// notificationHandlerMutex guards notificationHandler for concurrent calls
-var notificationHandlerMutex sync.RWMutex
-
-// SetDefaultNodeNotificationHandler sets notification handler to invoke on Send
-func SetDefaultNodeNotificationHandler(fn NodeNotificationHandler) {
-	notificationHandlerMutex.Lock()
-	notificationHandler = fn
-	notificationHandlerMutex.Unlock()
+// SetHandler sets new handler for events.
+func SetHandler(handler Handler) {
+	signalHandler = handler
 }
 
-// ResetDefaultNodeNotificationHandler sets notification handler to default one
-func ResetDefaultNodeNotificationHandler() {
-	notificationHandlerMutex.Lock()
-	notificationHandler = TriggerDefaultNodeNotificationHandler
-	notificationHandlerMutex.Unlock()
+func ResetHandler() {
+	signalHandler = nil
 }
 
-// TriggerDefaultNodeNotificationHandler triggers default notification handler (helpful in tests)
-func TriggerDefaultNodeNotificationHandler(jsonEvent string) {
-	logger.Debug("Notification received", zap.String("event", jsonEvent))
-}
-
-// nolint: golint
-//
-//export NotifyNode
-func NotifyNode(jsonEvent *C.char) {
-	notificationHandlerMutex.RLock()
-	defer notificationHandlerMutex.RUnlock()
-	notificationHandler(C.GoString(jsonEvent))
-}
-
-// nolint: golint
-//
-//export TriggerTestSignal
-func TriggerTestSignal() {
-	str := C.CString(`{"answer": 42}`)
-	C.StatusServiceSignalEvent(str)
-	C.free(unsafe.Pointer(str))
-}
-
-// SetMobileSignalHandler sets new handler for geth events
-// this function uses pure go implementation
-func SetMobileSignalHandler(handler MobileSignalHandler) {
-	mobileSignalHandler = handler
-}
-
-func ResetMobileSignalHandler() {
-	mobileSignalHandler = nil
-}
-
-// SetSignalEventCallback set callback
-// this function uses C implementation (see `signals.c` file)
+// SetSignalEventCallback sets a C callback provided by client,
+// see `signals.c` file.
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	C.SetEventCallback(cb)
 }

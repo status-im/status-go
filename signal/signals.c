@@ -10,14 +10,10 @@
 typedef void (*callback)(const char *jsonEvent);
 callback gCallback = 0;
 
-bool StatusServiceSignalEvent(const char *jsonEvent) {
+void SignalEvent(const char *jsonEvent) {
 	if (gCallback) {
 		gCallback(jsonEvent);
-	} else {
-		NotifyNode((char *)jsonEvent); // re-send notification back to status node
 	}
-
-	return true;
 }
 
 void SetEventCallback(void *cb) {

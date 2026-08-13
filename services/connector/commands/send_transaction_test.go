@@ -124,7 +124,7 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	request, err := prepareSendTransactionRequest(testDAppData, accountAddress)
 	assert.NoError(t, err)
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -142,7 +142,7 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	mockedChainClient.EXPECT().PendingNonceAt(gomock.Any(), common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
@@ -182,7 +182,7 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 	request, err := prepareSendTransactionRequest(testDAppData, accountAddress)
 	assert.NoError(t, err)
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -199,7 +199,7 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	mockedChainClient.EXPECT().PendingNonceAt(gomock.Any(), common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
