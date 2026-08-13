@@ -1265,6 +1265,14 @@ func reEncryptionCrash(stage string) error {
 	return reEncryptionCrashHook(stage)
 }
 
+func verifyDBKey(path, key string, kdfIter int) error {
+	db, err := sqlite.OpenDB(path, key, kdfIter)
+	if err != nil {
+		return err
+	}
+	return db.Close()
+}
+
 // migrateProfileToDEK performs the one-time migration of a legacy profile to the DEK scheme, both databases and
 // the keystore are re-encrypted with a fresh random DEK, wrapped with newKEK.
 func (b *StatusBackend) migrateProfileToDEK(keyUID, oldKEK, newKEK string) (restart func(), err error) {
@@ -1282,6 +1290,20 @@ func (b *StatusBackend) migrateProfileToDEK(keyUID, oldKEK, newKEK string) (rest
 			return nil
 		}
 		return func() { b.restartNodeAfterReEncryption(acc, password) }
+	}
+
+	appDBPath, err := b.getAppDBPath(keyUID)
+	if err != nil {
+		return nil, err
+	}
+	walletDBPath, err := b.getWalletDBPath(keyUID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify oldKEK before starting the migration
+	if err := verifyDBKey(appDBPath, oldKEK, acc.KDFIterations); err != nil {
+		return nil, fmt.Errorf("old password verification failed: %w", err)
 	}
 
 	dek, err := envelope.Generate()
@@ -1317,17 +1339,6 @@ func (b *StatusBackend) migrateProfileToDEK(keyUID, oldKEK, newKEK string) (rest
 	}
 
 	// Export both databases before swapping either, so no revert-re-encryption is needed
-	appDBPath, err := b.getAppDBPath(keyUID)
-	if err != nil {
-		revertKeystoreAndEnvelope()
-		return nil, err
-	}
-	walletDBPath, err := b.getWalletDBPath(keyUID)
-	if err != nil {
-		revertKeystoreAndEnvelope()
-		return nil, err
-	}
-
 	appTmpPath, appCleanup, err := b.createTempDBFile("v4.db")
 	if err != nil {
 		revertKeystoreAndEnvelope()

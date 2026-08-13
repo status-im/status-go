@@ -113,6 +113,43 @@ func TestChangeDatabasePasswordMigratesToDEK(t *testing.T) {
 	require.True(t, ok)
 }
 
+// TestMigrationRejectsWrongOldPassword verifies that a migration attempt with a wrong old
+// password fails before anything is persisted: no envelope may be left behind (it would be
+// wrapped with an unknown KEK and make the profile unopenable with the real password).
+func TestMigrationRejectsWrongOldPassword(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, false)
+	b := testContext.backend
+	keyUID := testContext.profileKeypair.KeyUID
+	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
+
+	require.NoError(t, b.StartNode(testContext.config))
+	defer func() {
+		require.NoError(t, b.StopNode())
+	}()
+
+	require.False(t, envelope.Exists(b.rootDataDir, keyUID))
+
+	require.Error(t, b.ChangeDatabasePassword(keyUID, "wrong-password", "new-password", false))
+	b.UpdateRootDataDir(testContext.config.RootDataDir)
+
+	// Nothing was persisted: no envelope, databases and keystore still on the old password.
+	require.False(t, envelope.Exists(b.rootDataDir, keyUID))
+	kdfIter, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
+	require.NoError(t, err)
+	appDBPath, err := b.getAppDBPath(keyUID)
+	require.NoError(t, err)
+	requireDBOpensWith(t, appDBPath, testPassword, kdfIter)
+	ok, err := b.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// The profile is intact: migration with the correct password still works.
+	require.NoError(t, b.ChangeDatabasePassword(keyUID, testPassword, "new-password", false))
+	require.True(t, envelope.Exists(b.rootDataDir, keyUID))
+	_, _, err = envelope.Unwrap(b.rootDataDir, keyUID, "new-password")
+	require.NoError(t, err)
+}
+
 // TestChangeDatabasePasswordRekey verifies that a deep rekey rotates the DEK and
 // re-encrypts the databases and keystore with it.
 func TestChangeDatabasePasswordRekey(t *testing.T) {
