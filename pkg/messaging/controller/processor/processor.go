@@ -208,6 +208,11 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 			if err != nil {
 				continue
 			}
+			if r == nil {
+				// Not processed: the message is still incomplete (segmentation) or was
+				// re-queued waiting for its hash ratchet key — leave it in the queue.
+				continue
+			}
 
 			processedIds = append(processedIds, message.Hash)
 
