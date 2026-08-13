@@ -11,8 +11,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/internal/logutils/requestlog"
 	"github.com/status-im/status-go/pkg/sentry"
 )
 
@@ -204,11 +202,6 @@ func LogSignal(logger *zap.Logger, eventType string, event interface{}) {
 		zap.String("type", eventType),
 		dataField("event", event),
 	)
-}
-
-func LogRPCCall(params, method string, fn func() string) string {
-	defer Recover(logutils.ZapLogger())
-	return logRPCCall(requestlog.GetRequestLogger(), params, method, fn)
 }
 
 func logRPCCall(requestLogger *zap.Logger, params, method string, fn func() string) string {

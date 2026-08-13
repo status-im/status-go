@@ -28,66 +28,16 @@ type SingleShotCommand struct {
 	Runable  func(context.Context) error
 }
 
-func (c SingleShotCommand) Run(ctx context.Context) error {
-	timer := time.NewTimer(c.Interval)
-	if c.Init != nil {
-		err := c.Init(ctx)
-		if err != nil {
-			return err
-		}
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-			_ = c.Runable(ctx)
-		}
-	}
-}
-
 // FiniteCommand terminates when error is nil.
 type FiniteCommand struct {
 	Interval time.Duration
 	Runable  func(context.Context) error
 }
 
-func (c FiniteCommand) Run(ctx context.Context) error {
-	err := c.Runable(ctx)
-	if err == nil {
-		return nil
-	}
-	ticker := time.NewTicker(c.Interval)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			err := c.Runable(ctx)
-			if err == nil {
-				return nil
-			}
-		}
-	}
-}
-
 // InfiniteCommand runs until context is closed.
 type InfiniteCommand struct {
 	Interval time.Duration
 	Runable  func(context.Context) error
-}
-
-func (c InfiniteCommand) Run(ctx context.Context) error {
-	_ = c.Runable(ctx)
-	ticker := time.NewTicker(c.Interval)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			_ = c.Runable(ctx)
-		}
-	}
 }
 
 func NewGroup(parent context.Context) *Group {
@@ -151,10 +101,6 @@ type AtomicGroup struct {
 
 type AtomicGroupKey string
 
-func (d *AtomicGroup) SetName(name string) {
-	d.ctx = context.WithValue(d.ctx, AtomicGroupKey("name"), name)
-}
-
 func (d *AtomicGroup) Name() string {
 	val := d.ctx.Value(AtomicGroupKey("name"))
 	if val != nil {
@@ -199,16 +145,6 @@ func (d *AtomicGroup) Wait() {
 	}
 }
 
-func (d *AtomicGroup) WaitAsync() <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		defer common.LogOnPanic()
-		d.Wait()
-		close(ch)
-	}()
-	return ch
-}
-
 // Error stores an error that was reported by any of the downloader. Should be called after Wait.
 func (d *AtomicGroup) Error() error {
 	d.mu.Lock()
@@ -216,22 +152,8 @@ func (d *AtomicGroup) Error() error {
 	return d.error
 }
 
-func (d *AtomicGroup) Stop() {
-	d.cancel()
-}
-
 func (d *AtomicGroup) onFinish() {
 	d.wg.Done()
-}
-
-func NewQueuedAtomicGroup(parent context.Context, limit uint32) *QueuedAtomicGroup {
-	qag := &QueuedAtomicGroup{NewAtomicGroup(parent), limit, 0, []Command{}, sync.Mutex{}}
-	baseDoneFunc := qag.done // save original done function
-	qag.AtomicGroup.done = func() {
-		baseDoneFunc()
-		qag.onFinish()
-	}
-	return qag
 }
 
 type QueuedAtomicGroup struct {
@@ -242,45 +164,6 @@ type QueuedAtomicGroup struct {
 	mu          sync.Mutex
 }
 
-func (d *QueuedAtomicGroup) Add(cmd Command) {
-
-	d.mu.Lock()
-	if d.limit > 0 && d.count >= d.limit {
-		d.pendingCmds = append(d.pendingCmds, cmd)
-		d.mu.Unlock()
-		return
-	}
-
-	d.mu.Unlock()
-	d.run(cmd)
-}
-
-func (d *QueuedAtomicGroup) run(cmd Command) {
-	d.mu.Lock()
-	d.count++
-	d.mu.Unlock()
-	d.AtomicGroup.Add(cmd)
-}
-
-func (d *QueuedAtomicGroup) onFinish() {
-	d.mu.Lock()
-	d.count--
-
-	if d.count < d.limit && len(d.pendingCmds) > 0 {
-		cmd := d.pendingCmds[0]
-		d.pendingCmds = d.pendingCmds[1:]
-		d.mu.Unlock()
-		d.run(cmd)
-		return
-	}
-
-	d.mu.Unlock()
-}
-
-func NewErrorCounter(maxErrors int, msg string) *ErrorCounter {
-	return &ErrorCounter{maxErrors: maxErrors, msg: msg}
-}
-
 type ErrorCounter struct {
 	cnt       int
 	maxErrors int
@@ -288,70 +171,7 @@ type ErrorCounter struct {
 	msg       string
 }
 
-// Returns false in case of counter overflow
-func (ec *ErrorCounter) SetError(err error) bool {
-	logutils.ZapLogger().Debug("ErrorCounter setError",
-		zap.String("msg", ec.msg),
-		zap.Error(err),
-		zap.Int("cnt", ec.cnt),
-	)
-
-	ec.cnt++
-
-	// do not overwrite the first error
-	if ec.err == nil {
-		ec.err = err
-	}
-
-	if ec.cnt >= ec.maxErrors {
-		logutils.ZapLogger().Error("ErrorCounter overflow", zap.String("msg", ec.msg))
-		return false
-	}
-
-	return true
-}
-
-func (ec *ErrorCounter) Error() error {
-	return ec.err
-}
-
-func (ec *ErrorCounter) MaxErrors() int {
-	return ec.maxErrors
-}
-
 type FiniteCommandWithErrorCounter struct {
 	FiniteCommand
 	*ErrorCounter
-}
-
-func (c FiniteCommandWithErrorCounter) Run(ctx context.Context) error {
-	f := func(ctx context.Context) (quit bool, err error) {
-		err = c.Runable(ctx)
-		if err == nil {
-			return true, err
-		}
-
-		if c.ErrorCounter.SetError(err) {
-			return false, err
-		}
-		return true, err
-	}
-
-	quit, err := f(ctx)
-	if quit {
-		return err
-	}
-
-	ticker := time.NewTicker(c.Interval)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			quit, err := f(ctx)
-			if quit {
-				return err
-			}
-		}
-	}
 }

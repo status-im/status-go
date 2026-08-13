@@ -1,25 +1,12 @@
 package utils
 
 import (
-	"crypto/ecdsa"
-	"math/big"
 	"strings"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/internal/crypto"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 )
-
-func GetSigner(chainID uint64, from types2.Address, privateKey *ecdsa.PrivateKey) bind.SignerFn {
-	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
-		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
-		return ethTypes.SignTx(tx, s, privateKey)
-	}
-}
 
 func DeserializePublicKey(compressedKey string) (types2.HexBytes, error) {
 	rawKey, err := multiformat.DeserializePublicKey(compressedKey, "f")

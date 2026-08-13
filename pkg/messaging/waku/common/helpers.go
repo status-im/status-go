@@ -1,7 +1,6 @@
 package common
 
 import (
-	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
 	"fmt"
@@ -13,22 +12,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 )
-
-// IsPubKeyEqual checks that two public keys are equal
-func IsPubKeyEqual(a, b *ecdsa.PublicKey) bool {
-	if !ValidatePublicKey(a) {
-		return false
-	} else if !ValidatePublicKey(b) {
-		return false
-	}
-	// the curve is always the same, just compare the points
-	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
-}
-
-// ValidatePublicKey checks the format of the given public key.
-func ValidatePublicKey(k *ecdsa.PublicKey) bool {
-	return k != nil && k.X != nil && k.Y != nil && k.X.Sign() != 0 && k.Y.Sign() != 0
-}
 
 // ContainsOnlyZeros checks if the data contain only zeros.
 func ContainsOnlyZeros(data []byte) bool {

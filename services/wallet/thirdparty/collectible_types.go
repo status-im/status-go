@@ -203,14 +203,6 @@ func collectibleItemsToBalances(items []FullCollectibleData, owner common.Addres
 	return ret
 }
 
-func CollectibleBalancesToIDs(balances []CollectibleIDBalance) []CollectibleUniqueID {
-	ret := make([]CollectibleUniqueID, 0, len(balances))
-	for _, balance := range balances {
-		ret = append(ret, balance.ID)
-	}
-	return ret
-}
-
 func (c *FullCollectibleDataContainer) ToOwnershipContainer(owner common.Address) CollectibleOwnershipContainer {
 	return CollectibleOwnershipContainer{
 		Items:          collectibleItemsToBalances(c.Items, owner),

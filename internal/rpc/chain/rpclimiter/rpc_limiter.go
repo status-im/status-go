@@ -1,7 +1,6 @@
 package rpclimiter
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"sync"
@@ -67,41 +66,6 @@ func (s *InMemRequestsMapStorage) Set(data *LimitData) error {
 func (s *InMemRequestsMapStorage) Delete(tag string) error {
 	s.data.Delete(tag)
 	return nil
-}
-
-type LimitsDBStorage struct {
-	db *RPCLimiterDB
-}
-
-func NewLimitsDBStorage(db *sql.DB) *LimitsDBStorage {
-	return &LimitsDBStorage{
-		db: NewRPCLimiterDB(db),
-	}
-}
-
-func (s *LimitsDBStorage) Get(tag string) (*LimitData, error) {
-	return s.db.GetRPCLimit(tag)
-}
-
-func (s *LimitsDBStorage) Set(data *LimitData) error {
-	if data == nil {
-		return fmt.Errorf("data is nil")
-	}
-
-	limit, err := s.db.GetRPCLimit(data.Tag)
-	if err != nil && err != sql.ErrNoRows {
-		return err
-	}
-
-	if limit == nil {
-		return s.db.CreateRPCLimit(*data)
-	}
-
-	return s.db.UpdateRPCLimit(*data)
-}
-
-func (s *LimitsDBStorage) Delete(tag string) error {
-	return s.db.DeleteRPCLimit(tag)
 }
 
 type LimitData struct {

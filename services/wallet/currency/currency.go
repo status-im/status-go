@@ -38,10 +38,6 @@ func NewCurrency(marketManager *market.Manager, logger *zap.Logger) *Currency {
 	}
 }
 
-func IsCurrencyFiat(key string) bool {
-	return iso4217.Valid(strings.ToUpper(key))
-}
-
 func GetAllFiatCurrencySymbols() []string {
 	return iso4217.ValidCodes
 }

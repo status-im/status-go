@@ -10,10 +10,6 @@ func New() *Service {
 	return &Service{}
 }
 
-func NewService() *Service {
-	return &Service{}
-}
-
 func (s *Service) APIs() []rpc.API {
 	return []rpc.API{
 		{

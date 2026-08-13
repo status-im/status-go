@@ -17,10 +17,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 )
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 var jsonTransfers = `[{
     "asset": "ETH",
     "blockNum": "0x15f3d0f",

@@ -4721,26 +4721,6 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, er
 	return encodedMessage, nil
 }
 
-func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*contacts.Contact, error) {
-	if c, ok := m.allContacts.Load(msg.From); ok {
-		return c, nil
-	}
-
-	senderPubKey, err := msg.GetSenderPubKey()
-	if err != nil {
-		return nil, err
-	}
-	senderID := contacts.ContactIDFromPublicKey(senderPubKey)
-	c, err := contacts.BuildContact(senderID, senderPubKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO(samyoul) remove storing of an updated reference pointer?
-	m.allContacts.Store(msg.From, c)
-	return c, nil
-}
-
 func (m *Messenger) getSettings() (settings2.Settings, error) {
 	sDB, err := accounts.NewDB(m.database)
 	if err != nil {
@@ -4871,32 +4851,6 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 
 func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage, error) {
 	return m.persistence.GetDeleteForMeMessages()
-}
-
-func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
-	logger := m.logger.Named(name)
-	m.shutdownWaitGroup.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer m.shutdownWaitGroup.Done()
-		// Delay by a few minutes to minimize messenger's startup time
-		var interval time.Duration = 5 * time.Minute
-		for {
-			select {
-			case <-time.After(interval):
-				// Set the regular interval after the first execution
-				interval = 1 * time.Hour
-
-				err := cleanupFunc()
-				if err != nil {
-					logger.Error("failed to cleanup", zap.Error(err))
-				}
-
-			case <-m.quit:
-				return
-			}
-		}
-	}()
 }
 
 func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {

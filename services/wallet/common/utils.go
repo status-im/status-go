@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"math/big"
-	"reflect"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -21,43 +20,8 @@ func ShouldCancel(ctx context.Context) bool {
 	return false
 }
 
-func ArrayContainsElement[T comparable](el T, arr []T) bool {
-	for _, e := range arr {
-		if e == el {
-			return true
-		}
-	}
-	return false
-}
-
 func IsSingleChainOperation(fromChainID, toChainID uint64) bool {
 	return fromChainID == toChainID
-}
-
-// CopyMapGeneric creates a copy of any map, if the deepCopyValue function is provided, it will be used to copy values.
-func CopyMapGeneric(original interface{}, deepCopyValueFn func(interface{}) interface{}) interface{} {
-	originalVal := reflect.ValueOf(original)
-	if originalVal.Kind() != reflect.Map {
-		return nil
-	}
-
-	newMap := reflect.MakeMap(originalVal.Type())
-	for iter := originalVal.MapRange(); iter.Next(); {
-		if deepCopyValueFn != nil {
-			newMap.SetMapIndex(iter.Key(), reflect.ValueOf(deepCopyValueFn(iter.Value().Interface())))
-		} else {
-			newMap.SetMapIndex(iter.Key(), iter.Value())
-		}
-	}
-
-	return newMap.Interface()
-}
-
-func GweiToEth(val *big.Float) *big.Float {
-	if val == nil {
-		return nil
-	}
-	return new(big.Float).Quo(val, big.NewFloat(1000000000))
 }
 
 func WeiToGwei(val *big.Int) *big.Float {

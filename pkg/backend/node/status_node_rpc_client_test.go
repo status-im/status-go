@@ -1,13 +1,10 @@
 package node
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"os"
-
-	"go.uber.org/zap"
 
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/db/appdatabase"
@@ -15,14 +12,9 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/params"
 )
 
 type TestServiceAPI struct{}
-
-func (api *TestServiceAPI) SomeMethod(_ context.Context) (string, error) {
-	return "some method result", nil
-}
 
 func setupTestDBs() (appDB *sql.DB, walletDB *sql.DB, closeFn func() error, err error) {
 	appDB, err = testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
@@ -63,51 +55,6 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 		}
 		return os.Remove(tmpfile.Name())
 	}, nil
-}
-
-func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
-	appDB, walletDB, stop, err := setupTestDBs()
-	defer func() {
-		err = stop()
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	accsDB, err := accounts.NewDB(appDB)
-	if err != nil {
-		return nil, err
-	}
-
-	accountsManager, err := accsmanagement.NewAccountsManager(testutils.MustCreateTestLogger())
-	if err != nil {
-		return nil, err
-	}
-	accountsManager.SetPersistence(accsDB)
-
-	statusNode := New(nil, accountsManager, testutils.MustCreateTestLogger())
-
-	statusNode.appDB = appDB
-	statusNode.walletDB = walletDB
-
-	ma, stop2, err := setupTestMultiDB()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			statusNode.logger.Error("stopping multiaccount db", zap.Error(err))
-		}
-	}()
-	if err != nil {
-		return nil, err
-	}
-	statusNode.multiaccountsDB = ma
-
-	err = statusNode.Start(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return statusNode, nil
 }
 
 func createStatusNode() (*StatusNode, func() error, func() error, error) {

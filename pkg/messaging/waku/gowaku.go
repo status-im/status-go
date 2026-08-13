@@ -673,18 +673,6 @@ func (w *Waku) GetPubsubTopic(topic string) string {
 	return topic
 }
 
-func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
-	topic = w.GetPubsubTopic(topic)
-
-	if !w.node.Relay().IsSubscribed(topic) {
-		return nil
-	}
-
-	contentFilter := protocol.NewContentFilter(topic)
-
-	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
-}
-
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string) error {
 	if w.cfg.IsLightClient() {
 		return errors.New("only available for full nodes")

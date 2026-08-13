@@ -147,33 +147,6 @@ func CropCenter(img image.Image) (image.Image, error) {
 	return Crop(img, cropRect)
 }
 
-func ImageToBytes(imagePath string) ([]byte, error) {
-	// Open the image file
-	file, err := os.Open(imagePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	// Decode the image
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a new buffer to hold the image data
-	var imgBuffer bytes.Buffer
-
-	// Encode the image to the desired format and save it in the buffer
-	err = png.Encode(&imgBuffer, img)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the image data as a byte slice
-	return imgBuffer.Bytes(), nil
-}
-
 func ImageToBytesAndImage(imagePath string) ([]byte, image.Image, error) {
 	// Open the image file
 	file, err := os.Open(imagePath)
@@ -199,24 +172,6 @@ func ImageToBytesAndImage(imagePath string) ([]byte, image.Image, error) {
 
 	// Return the image data as a byte slice
 	return imgBuffer.Bytes(), img, nil
-}
-
-func AddPadding(img image.Image, padding int) *image.RGBA {
-	bounds := img.Bounds()
-	newBounds := image.Rect(bounds.Min.X-padding, bounds.Min.Y-padding, bounds.Max.X+padding, bounds.Max.Y+padding)
-	paddedImg := image.NewRGBA(newBounds)
-	draw.Draw(paddedImg, newBounds, &image.Uniform{C: color.White}, image.ZP, draw.Src)
-
-	return paddedImg
-}
-
-func EncodePNG(img *image.RGBA) ([]byte, error) {
-	resultImg := &bytes.Buffer{}
-	err := png.Encode(resultImg, img)
-	if err != nil {
-		return nil, err
-	}
-	return resultImg.Bytes(), nil
 }
 
 func CreateCircleWithPadding(img image.Image, padding int) *image.RGBA {
@@ -269,67 +224,4 @@ func RoundCrop(inputImage []byte) ([]byte, error) {
 		return nil, err
 	}
 	return outputImage.Bytes(), nil
-}
-
-func PlaceCircleInCenter(paddedImg, circle *image.RGBA) *image.RGBA {
-	bounds := circle.Bounds()
-	centerX := (paddedImg.Bounds().Min.X + paddedImg.Bounds().Max.X) / 2
-	centerY := (paddedImg.Bounds().Min.Y + paddedImg.Bounds().Max.Y) / 2
-	draw.Draw(paddedImg, bounds.Add(image.Pt(centerX-bounds.Dx()/2, centerY-bounds.Dy()/2)), circle, image.ZP, draw.Over)
-	return paddedImg
-}
-
-func ResizeImage(imgBytes []byte, width, height int) ([]byte, error) {
-	// Decode image bytes
-	img, _, err := image.Decode(bytes.NewReader(imgBytes))
-	if err != nil {
-		return nil, err
-	}
-	// Create a new image with the desired dimensions
-	newImg := image.NewNRGBA(image.Rect(0, 0, width, height))
-	xdraw.BiLinear.Scale(newImg, newImg.Bounds(), img, img.Bounds(), draw.Over, nil)
-	// Encode the new image to bytes
-	var newImgBytes bytes.Buffer
-	if err = png.Encode(&newImgBytes, newImg); err != nil {
-		return nil, err
-	}
-	return newImgBytes.Bytes(), nil
-}
-
-func SuperimposeLogoOnQRImage(imageBytes []byte, qrFilepath []byte) []byte {
-	// Read the two images from bytes
-	img1, _, err := image.Decode(bytes.NewReader(imageBytes))
-
-	if err != nil {
-		logutils.ZapLogger().Error("error decoding logo Image", zap.Error(err))
-		return nil
-	}
-
-	img2, _, err := image.Decode(bytes.NewReader(qrFilepath))
-
-	if err != nil {
-		logutils.ZapLogger().Error("error decoding QR Image", zap.Error(err))
-		return nil
-	}
-	// Create a new image with the dimensions of the first image
-	result := image.NewRGBA(img1.Bounds())
-	// Draw the first image on the new image
-	draw.Draw(result, img1.Bounds(), img1, image.ZP, draw.Src)
-	// Get the dimensions of the second image
-	img2Bounds := img2.Bounds()
-	// Calculate the x and y coordinates to center the second image
-	x := (img1.Bounds().Dx() - img2Bounds.Dx()) / 2
-	y := (img1.Bounds().Dy() - img2Bounds.Dy()) / 2
-	// Draw the second image on top of the first image at the calculated coordinates
-	draw.Draw(result, img2Bounds.Add(image.Pt(x, y)), img2, image.ZP, draw.Over)
-	// Encode the final image to a desired format
-	var b bytes.Buffer
-	err = png.Encode(&b, result)
-
-	if err != nil {
-		logutils.ZapLogger().Error("error encoding final result Image to Buffer", zap.Error(err))
-		return nil
-	}
-
-	return b.Bytes()
 }

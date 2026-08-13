@@ -81,13 +81,6 @@ func WithSQLitePersistence(db *sql.DB) Options {
 	}
 }
 
-// WithPersistence sets up the messaging persistence using the provided implementation.
-func WithPersistence(persistence Persistence) Options {
-	return func(c *config) {
-		c.persistence = persistence
-	}
-}
-
 func WithMissingDependenciesObserver(observer MissingDependenciesObserver) Options {
 	return func(c *config) {
 		c.missingDepsObserver = observer

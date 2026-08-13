@@ -47,7 +47,3 @@ func GetPayload[T any](e Event) (*T, error) {
 	}
 	return &payload, nil
 }
-
-func ExtractPayload[T any](e Event, payload *T) error {
-	return json.Unmarshal([]byte(e.Message), payload)
-}

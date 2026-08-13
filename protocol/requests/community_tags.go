@@ -51,20 +51,12 @@ func unique(slice []string) []string {
 	return uniqSlice
 }
 
-func TagByIndex(i uint32) string {
-	return tags[i]
-}
-
 func TagEmoji(tag string) string {
 	return tagsEmojis[tag]
 }
 
 func TagIndex(tag string) uint32 {
 	return tagsIndices[tag]
-}
-
-func AvailableTagsCount() int {
-	return len(tags)
 }
 
 func AvailableTagsEmojis() map[string]string {

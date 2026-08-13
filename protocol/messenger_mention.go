@@ -186,7 +186,6 @@ func NewChatMentionContext(chatID string) *ChatMentionContext {
 
 type mentionableUserGetter interface {
 	getMentionableUsers(chatID string) (map[string]*MentionableUser, error)
-	getMentionableUser(chatID string, pk string) (*MentionableUser, error)
 }
 
 type MentionManager struct {
@@ -213,18 +212,6 @@ func (m *MentionManager) getChatMentionContext(chatID string) *ChatMentionContex
 		m.mentionContexts[chatID] = ctx
 	}
 	return ctx
-}
-
-func (m *MentionManager) getMentionableUser(chatID string, pk string) (*MentionableUser, error) {
-	mentionableUsers, err := m.mentionableUserGetter.getMentionableUsers(chatID)
-	if err != nil {
-		return nil, err
-	}
-	user, ok := mentionableUsers[pk]
-	if !ok {
-		return nil, fmt.Errorf("user not found when getting mentionable user, pk: %s", gocommon.TruncateWithDot(pk))
-	}
-	return user, nil
 }
 
 func (m *MentionManager) getMentionableUsers(chatID string) (map[string]*MentionableUser, error) {

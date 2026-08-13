@@ -43,14 +43,6 @@ type Params struct {
 	CoingeckoDemoAPIKey security.SensitiveString
 }
 
-func NewClient() *Client {
-	return NewClientWithParams(Params{
-		URL:      baseURL,
-		User:     security.SensitiveString{},
-		Password: security.SensitiveString{},
-	})
-}
-
 func NewClientWithParams(params Params) *Client {
 	var creds *thirdparty.BasicCreds
 	if !params.User.Empty() {

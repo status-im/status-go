@@ -25,7 +25,6 @@ import (
 	testutils "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities/archive"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
@@ -1181,18 +1180,6 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 
 	s.Require().False(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
 	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 0)
-}
-
-func buildMessage(timestamp time.Time, topic types.ContentTopic, hash []byte) types.ReceivedMessage {
-	message := types.ReceivedMessage{
-		Sig:       []byte{1},
-		Timestamp: uint32(timestamp.Unix()),
-		Topic:     topic,
-		Payload:   []byte{1},
-		Padding:   []byte{1},
-		Hash:      hash,
-	}
-	return message
 }
 
 func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
