@@ -340,6 +340,95 @@ func (s *ProcessorSuite) TestHandleOutOfOrderHashRatchet() {
 	s.Require().Len(msgs, 0)
 }
 
+// A queued hash ratchet message can legitimately fail to complete on replay —
+// here, it is encrypted with a ratchet key that still hasn't arrived, so
+// processing it re-queues it and yields no response. That must not crash the
+// replay and must not lose the message.
+func (s *ProcessorSuite) TestQueuedHashRatchetMessageStillMissingItsKeySurvivesReplay() {
+	groupID := []byte("group-id")
+	otherGroupID := []byte("group-id-other")
+	senderKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	senderDatabase, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     encryptionmigrations.AssetNames(),
+			AssetFunc: encryptionmigrations.Asset,
+		},
+	}))
+	s.Require().NoError(err)
+
+	senderEncryptionProtocol := encryption.New(
+		encryption.NewSQLitePersistence(senderDatabase),
+		"installation-2",
+		s.logger,
+		trace.NewNoopTracer(),
+	)
+
+	ratchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+	keyID, err := ratchet.GetKeyID()
+	s.Require().NoError(err)
+
+	// A second ratchet whose key exchange is never delivered to the receiver.
+	otherRatchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(otherGroupID)
+	s.Require().NoError(err)
+	otherKeyID, err := otherRatchet.GetKeyID()
+	s.Require().NoError(err)
+
+	hashRatchetKeyExchangeMessage, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(context.Background(), senderKey, &s.processor.identity.PublicKey, groupID, []*encryption.HashRatchetKeyCompatibility{ratchet})
+	s.Require().NoError(err)
+	keyExchangePayload, err := proto.Marshal(hashRatchetKeyExchangeMessage.Message)
+	s.Require().NoError(err)
+
+	dataMessageSpec, err := senderEncryptionProtocol.BuildHashRatchetMessage(groupID, s.testPayload)
+	s.Require().NoError(err)
+	dataPayload, err := proto.Marshal(dataMessageSpec.Message)
+	s.Require().NoError(err)
+
+	strayMessageSpec, err := senderEncryptionProtocol.BuildHashRatchetMessage(otherGroupID, s.testPayload)
+	s.Require().NoError(err)
+	strayPayload, err := proto.Marshal(strayMessageSpec.Message)
+	s.Require().NoError(err)
+
+	// The data message arrives before its key and gets queued.
+	message := &types.ReceivedMessage{}
+	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	message.Hash = []byte{0x1}
+	message.Payload = dataPayload
+
+	_, err = s.processor.processMessage(message)
+	s.Require().NoError(err)
+
+	// A message for the other, still missing ratchet key sits in the same queue.
+	strayMessage := &types.ReceivedMessage{}
+	strayMessage.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	strayMessage.Hash = []byte{0x2}
+	strayMessage.Payload = strayPayload
+
+	err = s.processor.hashRatchetStorage.SaveMessage(groupID, keyID, strayMessage)
+	s.Require().NoError(err)
+
+	// The key arrives: the replay must decode the data message, not crash on the
+	// stray one, and re-queue the stray one under its own key.
+	message = &types.ReceivedMessage{}
+	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	message.Hash = []byte{0x3}
+	message.Payload = keyExchangePayload
+
+	response, err := s.processor.ProcessMessage(message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// The key exchange itself and the queued data message.
+	s.Require().Len(response.Messages, 2)
+
+	// The stray message is not lost: it waits for its own key.
+	msgs, err := s.processor.hashRatchetStorage.GetMessages(otherKeyID)
+	s.Require().NoError(err)
+	s.Require().Len(msgs, 1)
+}
+
 func (s *ProcessorSuite) TestHandleSegmentMessages() {
 	senderKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
