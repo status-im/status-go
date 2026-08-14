@@ -607,6 +607,100 @@ func TestControllerTriggerLoad(t *testing.T) {
 	controller.Stop()
 }
 
+// TestControllerTriggerLoadUnblocksOnCancelledLoad verifies that an on-demand
+// load waiting on an already running periodical load doesn't hang when that load
+// gets cancelled (the loader is stopped or restarted). The cancelled load
+// publishes neither a finished nor an error event, so the waiter has to be woken
+// up explicitly — a caller passing a context without a deadline would otherwise
+// wait forever.
+func TestControllerTriggerLoadUnblocksOnCancelledLoad(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	accountsProvider := mock_ownership.NewMockAccountsProvider(mockCtrl)
+	fakeAddress := types.HexToAddress("0x123")
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{fakeAddress}, nil).AnyTimes()
+
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_ownership.NewMockNetworksProvider(mockCtrl)
+	networksPublisher := pubsub.NewPublisher()
+
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{
+		{ChainID: 1, IsActive: true},
+	}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
+
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	// The fetch stays in flight until the load is cancelled, so that the
+	// on-demand load has a running load to wait on.
+	fetchStarted := make(chan struct{}, 10)
+	ownershipFetcher := mock_ownership.NewMockCollectibleOwnershipFetcher(mockCtrl)
+	ownershipFetcher.EXPECT().FetchCollectibleOwnershipByOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
+			fetchStarted <- struct{}{}
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).AnyTimes()
+
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
+	publisher := pubsub.NewPublisher()
+	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
+
+	controller := ownership.NewController(
+		ownership.NewOwnershipDB(walletDB),
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
+		ownershipFetcher,
+		publisher,
+		logger,
+	)
+
+	controller.StartWithLoaderParams(
+		ownership.PeriodicalLoaderParams{
+			StartDelay:   0 * time.Second,
+			LoadInterval: 10 * time.Second,
+			LoaderParams: ownership.LoaderParams{
+				LoadDelay:  0 * time.Second,
+				FetchLimit: 50,
+			},
+		},
+	)
+
+	select {
+	case <-fetchStarted:
+	case <-time.After(5 * time.Second):
+		controller.Stop()
+		t.Fatal("the periodical load never started fetching")
+	}
+
+	// The on-demand load finds the running load and waits for it to end.
+	triggerDone := make(chan error, 1)
+	go func() {
+		triggerDone <- controller.TriggerLoad(context.Background(), walletCommon.ChainID(1), common.Address(fakeAddress))
+	}()
+
+	// Give TriggerLoad time to subscribe and enter the wait.
+	time.Sleep(300 * time.Millisecond)
+
+	// Cancels the running load; the waiter must not be left hanging.
+	controller.Stop()
+
+	select {
+	case triggerErr := <-triggerDone:
+		require.ErrorIs(t, triggerErr, context.Canceled)
+	case <-time.After(3 * time.Second):
+		t.Fatal("TriggerLoad did not return after the load it was waiting on got cancelled")
+	}
+}
+
 func TestControllerAccountsEvents(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
