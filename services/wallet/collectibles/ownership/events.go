@@ -33,3 +33,11 @@ type EventOwnedCollectiblesLoadError struct {
 	Account common.Address
 	Error   error
 }
+
+// Published when a load ends because it was cancelled (loader stopped or
+// restarted). Internal: lets waiters on a running load unblock; not translated
+// into a client event.
+type EventOwnedCollectiblesLoadCancelled struct {
+	ChainID walletCommon.ChainID
+	Account common.Address
+}

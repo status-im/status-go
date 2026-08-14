@@ -607,6 +607,79 @@ func TestControllerTriggerLoad(t *testing.T) {
 	controller.Stop()
 }
 
+func TestControllerTriggerLoadUnsupportedChain(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	accountsProvider := mock_ownership.NewMockAccountsProvider(mockCtrl)
+	fakeAddress := types.HexToAddress("0x123")
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{fakeAddress}, nil).AnyTimes()
+
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_ownership.NewMockNetworksProvider(mockCtrl)
+	networksPublisher := pubsub.NewPublisher()
+
+	const unsupportedChainID = walletCommon.ChainID(56)
+
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{
+		{ChainID: uint64(unsupportedChainID), IsActive: true},
+	}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
+
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	// The fetcher must never be called for a chain the predicate rejects —
+	// neither by the periodical loaders nor by the on-demand TriggerLoad path.
+	ownershipFetcher := mock_ownership.NewMockCollectibleOwnershipFetcher(mockCtrl)
+	ownershipFetcher.EXPECT().FetchCollectibleOwnershipByOwner(
+		gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+	).Times(0)
+
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
+	publisher := pubsub.NewPublisher()
+	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
+
+	controller := ownership.NewController(
+		ownership.NewOwnershipDB(walletDB),
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
+		ownershipFetcher,
+		publisher,
+		logger,
+	)
+	controller.SetChainSupportedCheck(func(chainID walletCommon.ChainID) bool {
+		return chainID != unsupportedChainID
+	})
+
+	controller.StartWithLoaderParams(
+		ownership.PeriodicalLoaderParams{
+			StartDelay:   0 * time.Second,
+			LoadInterval: 10 * time.Second,
+			LoaderParams: ownership.LoaderParams{
+				LoadDelay:  0 * time.Second,
+				FetchLimit: 50,
+			},
+		},
+	)
+
+	// No loader is created for the unsupported chain
+	require.Equal(t, ownership.LoaderStateNotAvailable, controller.GetLoaderState(unsupportedChainID, common.Address(fakeAddress)))
+
+	// On-demand load is a successful no-op, without hitting the fetcher
+	err = controller.TriggerLoad(context.Background(), unsupportedChainID, common.Address(fakeAddress))
+	require.NoError(t, err)
+	require.Equal(t, ownership.LoaderStateNotAvailable, controller.GetLoaderState(unsupportedChainID, common.Address(fakeAddress)))
+
+	controller.Stop()
+}
+
 // TestControllerTriggerLoadUnblocksOnCancelledLoad verifies that an on-demand
 // load waiting on an already running periodical load doesn't hang when that load
 // gets cancelled (the loader is stopped or restarted). The cancelled load

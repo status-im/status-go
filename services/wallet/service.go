@@ -290,6 +290,9 @@ func NewService(
 		collectiblesPublisher,
 		logutils.ZapLogger().Named("CollectiblesOwnershipController"),
 	)
+	collectiblesOwnershipController.SetChainSupportedCheck(func(chainID common.ChainID) bool {
+		return !collectibles.IsUnsupportedCollectibleChain(uint64(chainID))
+	})
 	collectibles := collectibles.NewService(
 		db,
 		feed,
