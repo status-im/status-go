@@ -24,8 +24,9 @@ import (
 )
 
 const (
-	defaultMnemonicLength    = 12
-	walletAccountDefaultName = "Account 1"
+	defaultMnemonicLength     = 12
+	walletAccountDefaultName  = "Account 1"
+	walletAccountDefaultEmoji = "🛡️"
 
 	DefaultKeystoreRelativePath               = "keystore"
 	DefaultKeycardPairingDataFileRelativePath = "/keycard/pairings.json"
