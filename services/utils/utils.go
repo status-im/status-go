@@ -4,11 +4,11 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 )
 
-func DeserializePublicKey(compressedKey string) (types2.HexBytes, error) {
+func DeserializePublicKey(compressedKey string) (types.HexBytes, error) {
 	rawKey, err := multiformat.DeserializePublicKey(compressedKey, "f")
 	if err != nil {
 		return nil, err
@@ -25,12 +25,12 @@ func DeserializePublicKey(compressedKey string) (types2.HexBytes, error) {
 	return crypto.CompressPubkey(pubKey), nil
 }
 
-func SerializePublicKey(compressedKey types2.HexBytes) (string, error) {
+func SerializePublicKey(compressedKey types.HexBytes) (string, error) {
 	rawKey, err := crypto.DecompressPubkey(compressedKey)
 	if err != nil {
 		return "", err
 	}
-	pubKey := types2.EncodeHex(crypto.FromECDSAPub(rawKey))
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(rawKey))
 
 	secp256k1Code := "0xe701"
 	base58btc := "z"

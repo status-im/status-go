@@ -16,7 +16,7 @@ import (
 	mvdsproto "github.com/status-im/mvds/protobuf"
 	mvdsstate "github.com/status-im/mvds/state"
 
-	datasync2 "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 )
@@ -57,7 +57,7 @@ type Reliability struct {
 	// don't interleave. The hot path (Unwrap / WrapAndQueue) never takes mu;
 	// datasync uses atomic loads and SDS uses sdsOpsMu.
 	mu       sync.Mutex
-	datasync atomic.Pointer[datasync2.DataSync]
+	datasync atomic.Pointer[datasync.DataSync]
 	dispatch MessageDispatcher
 	paused   bool
 	tick     time.Duration // outbound-loop interval the active node was built with
@@ -223,7 +223,7 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 			return err
 		}
 	}
-	duration := datasync2.DatasyncTicker
+	duration := datasync.DatasyncTicker
 	if r.paused {
 		duration = pausedDuration
 	}
@@ -237,20 +237,20 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 // (SQLite) on construction, so the epoch counter survives a recreate; the
 // status-change channel is reused so peer-online events keep flowing.
 func (r *Reliability) buildNode(duration time.Duration) error {
-	transport := datasync2.NewNodeTransport()
+	transport := datasync.NewNodeTransport()
 	node, err := mvdsnode.NewPersistentNode(
 		r.mvdsPersistence,
 		transport,
 		datasyncpeer.PublicKeyToPeerID(r.identity.PublicKey),
 		mvdsnode.BATCH,
-		datasync2.CalculateSendTime,
+		datasync.CalculateSendTime,
 		r.mvdsStatusChangeEvent,
 		r.logger,
 	)
 	if err != nil {
 		return err
 	}
-	ds := datasync2.New(node, transport, true, r.logger)
+	ds := datasync.New(node, transport, true, r.logger)
 	ds.Init(r.mvdsDispatch, r.logger)
 	ds.Start(duration)
 	r.tick = duration
@@ -307,7 +307,7 @@ func (r *Reliability) SetPaused(paused bool) error {
 	old.SetSendingEnabled(false)
 	old.Stop()
 	stopDur := time.Since(start)
-	duration := datasync2.DatasyncTicker
+	duration := datasync.DatasyncTicker
 	if paused {
 		duration = pausedDuration
 	}
@@ -368,7 +368,7 @@ func (r *Reliability) WrapAndQueueMessageForDispatch(publicKey *ecdsa.PublicKey,
 	if ds == nil {
 		return mvdsstate.MessageID{}, errNotStarted
 	}
-	groupID := datasync2.ToOneToOneGroupID(&r.identity.PublicKey, publicKey)
+	groupID := datasync.ToOneToOneGroupID(&r.identity.PublicKey, publicKey)
 	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
 	exist, err := ds.IsPeerInGroup(groupID, peerID)
 	if err != nil {

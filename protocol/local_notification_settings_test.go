@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
-	testutils2 "github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 )
 
 func TestLocalNotificationSettingsSuite(t *testing.T) {
@@ -45,7 +45,7 @@ func (s *LocalNotificationSettingsSuite) TestOneToOneChatsTurnOff() {
 
 	// Sync until bob receives the message
 	var bobResponse *MessengerResponse
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err := alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -86,7 +86,7 @@ func (s *LocalNotificationSettingsSuite) TestOneToOneChatsSendAlerts() {
 
 	// Sync until bob receives the message
 	var bobResponse *MessengerResponse
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err := alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -145,7 +145,7 @@ func (s *LocalNotificationSettingsSuite) TestGroupChatsTurnOff() {
 	s.Require().NoError(err)
 
 	var bobResponse *MessengerResponse
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err := alice.RetrieveAll()
 		if err != nil {
 			return err

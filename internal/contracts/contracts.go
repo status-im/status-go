@@ -13,8 +13,6 @@ import (
 	"github.com/status-im/status-go/internal/contracts/stickers"
 	"github.com/status-im/status-go/internal/contracts/universalresolver"
 	"github.com/status-im/status-go/internal/rpc"
-
-	stickers2 "github.com/status-im/status-go/internal/contracts/stickers"
 )
 
 type ContractMakerIface interface {
@@ -78,7 +76,7 @@ func (c *ContractMaker) NewSNT(chainID uint64) (*snt.SNT, error) {
 }
 
 func (c *ContractMaker) NewStickerType(chainID uint64) (*stickers.StickerType, error) {
-	contractAddr, err := stickers2.StickerTypeContractAddress(chainID)
+	contractAddr, err := stickers.StickerTypeContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +93,7 @@ func (c *ContractMaker) NewStickerType(chainID uint64) (*stickers.StickerType, e
 }
 
 func (c *ContractMaker) NewStickerMarket(chainID uint64) (*stickers.StickerMarket, error) {
-	contractAddr, err := stickers2.StickerMarketContractAddress(chainID)
+	contractAddr, err := stickers.StickerMarketContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +110,7 @@ func (c *ContractMaker) NewStickerMarket(chainID uint64) (*stickers.StickerMarke
 }
 
 func (c *ContractMaker) NewStickerPack(chainID uint64) (*stickers.StickerPack, error) {
-	contractAddr, err := stickers2.StickerPackContractAddress(chainID)
+	contractAddr, err := stickers.StickerPackContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}

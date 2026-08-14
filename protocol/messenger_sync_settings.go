@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -25,8 +25,8 @@ func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForB
 	// Do not use the network clock, use the db value
 	_, chat := m.getLastClockWithRelatedChat()
 
-	for _, sf := range settings2.SettingFieldRegister {
-		if sf.CanSync(settings2.FromStruct) {
+	for _, sf := range settings.SettingFieldRegister {
+		if sf.CanSync(settings.FromStruct) {
 			// DisplayName is backed up via `protobuf.BackedUpProfile` message.
 			if prepareForBackup && sf.SyncProtobufFactory().SyncSettingProtobufType() == protobuf.SyncSetting_DISPLAY_NAME {
 				continue
@@ -90,7 +90,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 		for {
 			select {
 			case s := <-m.settings.GetSyncQueue():
-				if s.CanSync(settings2.FromInterface) {
+				if s.CanSync(settings.FromInterface) {
 					logger.Debug("setting for sync received from settings.SyncQueue")
 
 					clock, chat := m.getLastClockWithRelatedChat()
@@ -130,13 +130,13 @@ func (m *Messenger) startSettingsChangesLoop() {
 			select {
 			case s := <-channel:
 				switch s.GetReactName() {
-				case settings2.DisplayName.GetReactName():
+				case settings.DisplayName.GetReactName():
 					m.selfContact.DisplayName = s.Value.(string)
 					m.publishSelfContactSubscriptions(&SelfContactChangeEvent{DisplayNameChanged: true})
-				case settings2.PreferredName.GetReactName():
+				case settings.PreferredName.GetReactName():
 					m.selfContact.EnsName = s.Value.(string)
 					m.publishSelfContactSubscriptions(&SelfContactChangeEvent{PreferredNameChanged: true})
-				case settings2.Bio.GetReactName():
+				case settings.Bio.GetReactName():
 					m.selfContact.Bio = s.Value.(string)
 					m.publishSelfContactSubscriptions(&SelfContactChangeEvent{BioChanged: true})
 				}

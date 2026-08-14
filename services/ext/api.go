@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -903,7 +903,7 @@ func (api *PublicAPI) UnregisterFromPushNotifications(ctx context.Context) error
 }
 
 func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.SendPushNotifications, false)
+	err := api.service.accountsDB.SaveSettingField(settings.SendPushNotifications, false)
 	if err != nil {
 		return err
 	}
@@ -912,7 +912,7 @@ func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.SendPushNotifications, true)
+	err := api.service.accountsDB.SaveSettingField(settings.SendPushNotifications, true)
 	if err != nil {
 		return err
 	}
@@ -920,7 +920,7 @@ func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsFromContactsOnly, true)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsFromContactsOnly, true)
 	if err != nil {
 		return err
 	}
@@ -928,7 +928,7 @@ func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Contex
 }
 
 func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsFromContactsOnly, false)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsFromContactsOnly, false)
 	if err != nil {
 		return err
 	}
@@ -936,7 +936,7 @@ func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Conte
 }
 
 func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsBlockMentions, true)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsBlockMentions, true)
 	if err != nil {
 		return err
 	}
@@ -944,7 +944,7 @@ func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) 
 }
 
 func (api *PublicAPI) DisablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsBlockMentions, false)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsBlockMentions, false)
 	if err != nil {
 		return err
 	}
@@ -1102,8 +1102,8 @@ func (api *PublicAPI) PeerID() string {
 	return api.service.messaging.PeerID().String()
 }
 
-func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings2.ProfilePicturesShowToType) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.ProfilePicturesShowTo, showTo)
+func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {
+	err := api.service.accountsDB.SaveSettingField(settings.ProfilePicturesShowTo, showTo)
 	if err != nil {
 		return err
 	}

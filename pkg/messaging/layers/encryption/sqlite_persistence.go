@@ -8,9 +8,9 @@ import (
 
 	dr "github.com/status-im/doubleratchet"
 
-	crypto2 "github.com/status-im/status-go/internal/crypto"
-	multidevice2 "github.com/status-im/status-go/pkg/messaging/layers/encryption/multidevice"
-	sharedsecret2 "github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption/multidevice"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
 )
 
 // A safe max number of rows.
@@ -20,8 +20,8 @@ type SQLitePersistence struct {
 	DB                  *sql.DB
 	keysStorage         dr.KeysStorage
 	sessionStorage      dr.SessionStorage
-	sharedSecretStorage sharedsecret2.Persistence
-	multideviceStorage  multidevice2.Persistence
+	sharedSecretStorage sharedsecret.Persistence
+	multideviceStorage  multidevice.Persistence
 }
 
 var _ Persistence = (*SQLitePersistence)(nil)
@@ -31,8 +31,8 @@ func NewSQLitePersistence(db *sql.DB) *SQLitePersistence {
 		DB:                  db,
 		keysStorage:         newSQLiteKeysStorage(db),
 		sessionStorage:      newSQLiteSessionStorage(db),
-		sharedSecretStorage: sharedsecret2.NewSQLitePersistence(db),
-		multideviceStorage:  multidevice2.NewSQLitePersistence(db),
+		sharedSecretStorage: sharedsecret.NewSQLitePersistence(db),
+		multideviceStorage:  multidevice.NewSQLitePersistence(db),
 	}
 }
 
@@ -46,11 +46,11 @@ func (s *SQLitePersistence) SessionStorage() dr.SessionStorage {
 	return s.sessionStorage
 }
 
-func (s *SQLitePersistence) SharedSecretStorage() sharedsecret2.Persistence {
+func (s *SQLitePersistence) SharedSecretStorage() sharedsecret.Persistence {
 	return s.sharedSecretStorage
 }
 
-func (s *SQLitePersistence) MultideviceStorage() multidevice2.Persistence {
+func (s *SQLitePersistence) MultideviceStorage() multidevice.Persistence {
 	return s.multideviceStorage
 }
 
@@ -162,7 +162,7 @@ func (s *SQLitePersistence) AddPublicBundle(b *Bundle) error {
 }
 
 // GetAnyPrivateBundle retrieves any bundle from the database containing a private key
-func (s *SQLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installations []*multidevice2.Installation) (*BundleContainer, error) {
+func (s *SQLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installations []*multidevice.Installation) (*BundleContainer, error) {
 
 	versions := make(map[string]uint32)
 	/* #nosec */
@@ -282,14 +282,14 @@ func (s *SQLitePersistence) MarkBundleExpired(identity []byte) error {
 }
 
 // GetPublicBundle retrieves an existing Bundle for the specified public key from the database
-func (s *SQLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, installations []*multidevice2.Installation) (*Bundle, error) {
+func (s *SQLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, installations []*multidevice.Installation) (*Bundle, error) {
 
 	if len(installations) == 0 {
 		return nil, nil
 	}
 
 	versions := make(map[string]uint32)
-	identity := crypto2.CompressPubkey(publicKey)
+	identity := crypto.CompressPubkey(publicKey)
 
 	/* #nosec */
 	statement := `SELECT signed_pre_key,installation_id, version
@@ -712,7 +712,7 @@ func (s *sqliteSessionStorage) Load(id []byte) (*dr.State, error) {
 		state.Step = step
 		state.KeysCount = keysCount
 
-		state.DHs = crypto2.DHPair{
+		state.DHs = crypto.DHPair{
 			PrvKey: dhsPrivate,
 			PubKey: dhsPublic,
 		}

@@ -15,13 +15,12 @@ import (
 
 	communitytokens "github.com/status-im/status-go/internal/contracts/community-tokens"
 	communitytokendeployer "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
-	crypto2 "github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
 
-	communitytokendeployer2 "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/internal/errors"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
@@ -61,10 +60,10 @@ func (s *CommunityDeployOwnerTokenProcessor) CalculateFees(params ProcessorInput
 }
 
 func decodeSignature(sig []byte) (r [32]byte, s [32]byte, v uint8, err error) {
-	if len(sig) != crypto2.SignatureLength {
+	if len(sig) != crypto.SignatureLength {
 		err = &errors.ErrorResponse{
 			Code:    ErrIncorrectSignatureFormat.Code,
-			Details: fmt.Sprintf(ErrIncorrectSignatureFormat.Details, len(sig), crypto2.SignatureLength),
+			Details: fmt.Sprintf(ErrIncorrectSignatureFormat.Details, len(sig), crypto.SignatureLength),
 		}
 		return [32]byte{}, [32]byte{}, 0, err
 	}
@@ -79,23 +78,23 @@ func convert33BytesPubKeyToEthAddress(pubKey string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-	communityPubKey, err := crypto2.DecompressPubkey(decoded)
+	communityPubKey, err := crypto.DecompressPubkey(decoded)
 	if err != nil {
 		return common.Address{}, err
 	}
-	return common.Address(crypto2.PubkeyToAddress(*communityPubKey)), nil
+	return common.Address(crypto.PubkeyToAddress(*communityPubKey)), nil
 }
 
-func prepareDeploymentSignatureStruct(signature string, communityID string, addressFrom common.Address) (communitytokendeployer2.CommunityTokenDeployerDeploymentSignature, error) {
+func prepareDeploymentSignatureStruct(signature string, communityID string, addressFrom common.Address) (communitytokendeployer.CommunityTokenDeployerDeploymentSignature, error) {
 	r, s, v, err := decodeSignature(common.FromHex(signature))
 	if err != nil {
-		return communitytokendeployer2.CommunityTokenDeployerDeploymentSignature{}, err
+		return communitytokendeployer.CommunityTokenDeployerDeploymentSignature{}, err
 	}
 	communityEthAddress, err := convert33BytesPubKeyToEthAddress(communityID)
 	if err != nil {
-		return communitytokendeployer2.CommunityTokenDeployerDeploymentSignature{}, err
+		return communitytokendeployer.CommunityTokenDeployerDeploymentSignature{}, err
 	}
-	communitySignature := communitytokendeployer2.CommunityTokenDeployerDeploymentSignature{
+	communitySignature := communitytokendeployer.CommunityTokenDeployerDeploymentSignature{
 		V:        v,
 		R:        r,
 		S:        s,
@@ -106,18 +105,18 @@ func prepareDeploymentSignatureStruct(signature string, communityID string, addr
 }
 
 func (s *CommunityDeployOwnerTokenProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	deployerABI, err := abi.JSON(strings.NewReader(communitytokendeployer2.CommunityTokenDeployerABI))
+	deployerABI, err := abi.JSON(strings.NewReader(communitytokendeployer.CommunityTokenDeployerABI))
 	if err != nil {
 		return []byte{}, err
 	}
 
-	ownerTokenConfig := communitytokendeployer2.CommunityTokenDeployerTokenConfig{
+	ownerTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
 		Name:    params.CommunityParams.OwnerTokenParameters.Name,
 		Symbol:  params.CommunityParams.OwnerTokenParameters.Symbol,
 		BaseURI: params.CommunityParams.OwnerTokenParameters.TokenURI,
 	}
 
-	masterTokenConfig := communitytokendeployer2.CommunityTokenDeployerTokenConfig{
+	masterTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
 		Name:    params.CommunityParams.MasterTokenParameters.Name,
 		Symbol:  params.CommunityParams.MasterTokenParameters.Symbol,
 		BaseURI: params.CommunityParams.MasterTokenParameters.TokenURI,

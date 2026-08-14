@@ -15,7 +15,7 @@ import (
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
-	rpc2 "github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/multistandardbalance"
@@ -119,7 +119,7 @@ func NewService(
 	db *sql.DB,
 	accountsDB *accounts.Database,
 	appDB *sql.DB,
-	rpcClient *rpc2.Client,
+	rpcClient *rpc.Client,
 	accountsPublisher *pubsub.Publisher,
 	gethManager *accsmanagement.AccountsManager,
 	transactor *transactions.Transactor,
@@ -310,7 +310,7 @@ func NewService(
 
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
 
-	alchemyEthClientGetter := rpc2.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
+	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
 	alchemyFetcherDb := activityfetcher_alchemy.NewPersistence(db)
 	alchemyFetcherClient := activityfetcher_alchemy.NewClient(alchemyEthClientGetter)
 	alchemyFetcherManager := alchemymanager.NewManager(alchemyFetcherClient, alchemyFetcherDb)
@@ -356,7 +356,7 @@ func NewService(
 }
 
 func buildPathProcessors(
-	rpcClient *rpc2.Client,
+	rpcClient *rpc.Client,
 	transactor *transactions.Transactor,
 	tokenManager *token.Manager,
 	ensResolver *ensresolver.EnsResolver,
@@ -424,7 +424,7 @@ func buildPathProcessors(
 type Service struct {
 	db                             *sql.DB
 	accountsDB                     *accounts.Database
-	rpcClient                      *rpc2.Client
+	rpcClient                      *rpc.Client
 	tokenManager                   *token.Manager
 	communityManager               *community.Manager
 	savedAddressesManager          *SavedAddressesManager
@@ -576,7 +576,7 @@ func (s *Service) FeatureFlags() *protocolCommon.FeatureFlags {
 	return s.featureFlags
 }
 
-func (s *Service) GetRPCClient() *rpc2.Client {
+func (s *Service) GetRPCClient() *rpc.Client {
 	return s.rpcClient
 }
 

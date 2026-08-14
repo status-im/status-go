@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	sqlite2 "github.com/status-im/status-go/internal/db/sqlite"
+	"github.com/status-im/status-go/internal/db/sqlite"
 )
 
 type Persistence struct {
@@ -42,7 +42,7 @@ func (p *Persistence) SaveTransfers(tt []Transfer, chainID uint64, address commo
 	return saveTransfers(tx, tt, chainID, address)
 }
 
-func saveTransfers(creator sqlite2.StatementCreator, transfers []Transfer, chainID uint64, address common.Address) error {
+func saveTransfers(creator sqlite.StatementCreator, transfers []Transfer, chainID uint64, address common.Address) error {
 	id := uuid.New().String()
 
 	for _, transfer := range transfers {
@@ -54,10 +54,10 @@ func saveTransfers(creator sqlite2.StatementCreator, transfers []Transfer, chain
 	return nil
 }
 
-func saveTransfer(creator sqlite2.StatementCreator, id string, transfer Transfer, chainID uint64, address common.Address) error {
+func saveTransfer(creator sqlite.StatementCreator, id string, transfer Transfer, chainID uint64, address common.Address) error {
 	q := sq.Insert("fetched_alchemy_transfers").
 		Columns("transfer", "chain_id", "address").
-		Values(sqlite2.ToJSONBlob(transfer), chainID, address)
+		Values(sqlite.ToJSONBlob(transfer), chainID, address)
 
 	query, args, err := q.ToSql()
 	if err != nil {
@@ -108,7 +108,7 @@ func rowsToTransfers(rows *sql.Rows) ([]Transfer, error) {
 	var transfers []Transfer
 	for rows.Next() {
 		var transfer Transfer
-		var transferJSON = sqlite2.ToJSONBlob(&transfer)
+		var transferJSON = sqlite.ToJSONBlob(&transfer)
 		err := rows.Scan(transferJSON)
 		fmt.Println("Scanned json:", transferJSON)
 		if err != nil {
@@ -143,7 +143,7 @@ func (p *Persistence) GetLastFetchedBlockAndTimestamp(ctx context.Context, chain
 
 	var lastFetchedTimestamp time.Time
 	var lastFetchedBlock rpc.BlockNumber
-	var lastFetchedBlockJSON = sqlite2.ToJSONBlob(&lastFetchedBlock)
+	var lastFetchedBlockJSON = sqlite.ToJSONBlob(&lastFetchedBlock)
 	err = stmt.QueryRow(args...).Scan(lastFetchedBlockJSON, &lastFetchedTimestamp)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -10,11 +10,11 @@ import (
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
 
 	"github.com/status-im/status-go/internal/db/sqlite"
-	common2 "github.com/status-im/status-go/pkg/messaging/common"
+	"github.com/status-im/status-go/pkg/messaging/common"
 	messagesendermigrations "github.com/status-im/status-go/pkg/messaging/common/migrations"
-	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
-	segmentation2 "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
+	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
 	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
 	transportmigrations "github.com/status-im/status-go/pkg/messaging/layers/transport/migrations"
@@ -132,22 +132,22 @@ func (p *sqlitePersistence) TransportStorage() transport.Persistence {
 	return &sqliteTransportPersistence{db: p.db}
 }
 
-func (p *sqlitePersistence) SegmentationStorage() segmentation2.Persistence {
-	return segmentation2.NewSQLitePersistence(p.db)
+func (p *sqlitePersistence) SegmentationStorage() segmentation.Persistence {
+	return segmentation.NewSQLitePersistence(p.db)
 }
 
 func (p *sqlitePersistence) MVDSStorage() mvdsnode.Persistence {
 	return mvdsnode.NewSQLitePersistence(p.db)
 }
 
-func (p *sqlitePersistence) EncryptionStorage() encryption2.Persistence {
-	return encryption2.NewSQLitePersistence(p.db)
+func (p *sqlitePersistence) EncryptionStorage() encryption.Persistence {
+	return encryption.NewSQLitePersistence(p.db)
 }
 
-func (p *sqlitePersistence) MessageConfirmationStorage() common2.MessageConfirmationPersistence {
-	return common2.NewSQLiteMessageConfirmationPersistence(p.db)
+func (p *sqlitePersistence) MessageConfirmationStorage() common.MessageConfirmationPersistence {
+	return common.NewSQLiteMessageConfirmationPersistence(p.db)
 }
 
-func (p *sqlitePersistence) HashRatchetStorage() common2.HashRatchetPersistence {
-	return common2.NewSQLiteHashRatchetPersistence(p.db)
+func (p *sqlitePersistence) HashRatchetStorage() common.HashRatchetPersistence {
+	return common.NewSQLiteHashRatchetPersistence(p.db)
 }

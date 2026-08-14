@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 )
@@ -15,7 +15,7 @@ func TestDisconnectWCSessionDeletesDApp(t *testing.T) {
 	db, close := createWalletDB(t)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	wcDAppData := signal.ConnectorDApp{
 		URL:      "https://wc-test-dapp.com",
 		Name:     "WC Test DApp",
@@ -73,7 +73,7 @@ func TestDisconnectWCSessionWithMultipleSessions(t *testing.T) {
 	db, close := createWalletDB(t)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	wcDAppData := signal.ConnectorDApp{
 		URL:      "https://wc-test-dapp.com",
 		Name:     "WC Test DApp",
@@ -131,7 +131,7 @@ func TestDisconnectWCSessionHandlesNonWCDApp(t *testing.T) {
 	t.Cleanup(close)
 
 	// Create a non-WC DApp (browser connector)
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	bcDAppData := signal.ConnectorDApp{
 		URL:      "https://bc-test-dapp.com",
 		Name:     "BC Test DApp",

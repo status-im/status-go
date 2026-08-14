@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 )
 
@@ -23,7 +23,7 @@ func TestService_StartPurgesStaleEphemeralDAppsOnce(t *testing.T) {
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
 		URL: "https://stale.com", Name: "Stale", IconURL: "",
 		ClientID:      ephemeralBrowserClientID(),
-		SharedAccount: types2.Address{}, ChainID: 0x1,
+		SharedAccount: types.Address{}, ChainID: 0x1,
 	}))
 
 	require.NoError(t, state.service.Start())
@@ -43,7 +43,7 @@ func TestService_StopPurgesEphemeralDApps(t *testing.T) {
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
 		URL: "https://incognito-dapp2.com", Name: "Incognito DApp 2", IconURL: "",
 		ClientID:      ephemeralBrowserClientID(),
-		SharedAccount: types2.Address{}, ChainID: 0x1,
+		SharedAccount: types.Address{}, ChainID: 0x1,
 	}))
 
 	require.NoError(t, state.service.Stop())
@@ -171,7 +171,7 @@ func TestService_PauseResumePreservesEphemeralDApps(t *testing.T) {
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
 		URL: "https://pause-incognito.com", Name: "Pause Test", IconURL: "",
 		ClientID:      ephemeralBrowserClientID(),
-		SharedAccount: types2.Address{}, ChainID: 0x1,
+		SharedAccount: types.Address{}, ChainID: 0x1,
 	}))
 
 	require.NoError(t, state.service.Pause())

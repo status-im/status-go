@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 )
@@ -56,7 +56,7 @@ func TestRevokePermissionsSucceeded(t *testing.T) {
 	state, close := setupCommand(t, Method_RevokePermissions)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
 	dAppPermissionRevoked := false
 
 	signal.SetHandler(signal.Handler(func(s []byte) {
@@ -92,7 +92,7 @@ func TestRevokePermissionsDeletesWCSessions(t *testing.T) {
 	state, close := setupCommand(t, Method_RevokePermissions)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
 	wcDAppData := signal.ConnectorDApp{
 		URL:      "https://wc-test-dapp.com",
 		Name:     "WC Test DApp",
@@ -166,7 +166,7 @@ func TestRevokePermissions_TargetedEthAccounts_KeepsDApp_NoRevokedSignal(t *test
 			state, close := setupCommand(t, Method_RevokePermissions)
 			t.Cleanup(close)
 
-			sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+			sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
 			revoked := trackRevokedSignal(t)
 
 			err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
@@ -208,7 +208,7 @@ func TestRevokePermissions_MultiElementParams_RemovesAllCapabilities(t *testing.
 	state, close := setupCommand(t, Method_RevokePermissions)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
 	revoked := trackRevokedSignal(t)
 
 	err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
@@ -242,7 +242,7 @@ func TestRevokePermissions_InvalidParamsType(t *testing.T) {
 	state, close := setupCommand(t, Method_RevokePermissions)
 	t.Cleanup(close)
 
-	sharedAccount := types2.BytesToAddress(types2.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
+	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcf"))
 	err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)
 	err = persistence.InsertPermission(state.walletDb, testDAppData.URL, testDAppData.ClientID, "eth_accounts", []persistence.Caveat{}, time.Now().Unix())

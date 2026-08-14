@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol"
@@ -44,9 +44,9 @@ func NewService(
 		publisher:   publisher,
 		logger:      logger,
 	}
-	db.SetSettingsNotifier(func(setting settings2.SettingField, val interface{}) {
+	db.SetSettingsNotifier(func(setting settings.SettingField, val interface{}) {
 		if s.publisher != nil {
-			pubsub.Publish(s.publisher, settings2.EventSettingChanged{
+			pubsub.Publish(s.publisher, settings.EventSettingChanged{
 				Setting: setting,
 				Value:   val,
 			})
@@ -112,7 +112,7 @@ func (s *Service) GetKeypairByKeyUID(keyUID string) (*accsmanagementtypes.Keypai
 	return s.db.GetKeypairByKeyUID(keyUID)
 }
 
-func (s *Service) GetSettings() (settings2.Settings, error) {
+func (s *Service) GetSettings() (settings.Settings, error) {
 	return s.db.GetSettings()
 }
 
@@ -121,7 +121,7 @@ func (s *Service) GetBackupPath() (string, error) {
 }
 
 func (s *Service) SetBackupPath(path string) error {
-	return s.db.SaveSettingField(settings2.BackupPath, path)
+	return s.db.SaveSettingField(settings.BackupPath, path)
 }
 
 func (s *Service) GetMessenger() *protocol.Messenger {
@@ -144,8 +144,8 @@ func (s *Service) prepareSyncSettingsMessages(currentClock uint64, prepareForBac
 		return
 	}
 
-	for _, sf := range settings2.SettingFieldRegister {
-		if !sf.CanSync(settings2.FromStruct) {
+	for _, sf := range settings.SettingFieldRegister {
+		if !sf.CanSync(settings.FromStruct) {
 			continue
 		}
 
@@ -207,7 +207,7 @@ func (s *Service) handleBackedUpSettings(message *protobuf.SyncSetting) error {
 
 	if settingField != nil && s.account != nil {
 		if message.GetType() == protobuf.SyncSetting_PREFERRED_NAME && message.GetValueString() != "" {
-			displayNameClock, err := s.db.GetSettingLastSynced(settings2.DisplayName)
+			displayNameClock, err := s.db.GetSettingLastSynced(settings.DisplayName)
 			if err != nil {
 				s.logger.Warn("failed to get last synced clock for display name", zap.Error(err))
 				return nil

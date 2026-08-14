@@ -8,13 +8,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 )
 
-var concurrencyTestAccountAddress = types2.BytesToAddress(types2.FromHex("0x0000000000000000000000000000000000000001"))
+var concurrencyTestAccountAddress = types.BytesToAddress(types.FromHex("0x0000000000000000000000000000000000000001"))
 
 func recvRequestIDOrFatal(t *testing.T, ch <-chan string) string {
 	t.Helper()

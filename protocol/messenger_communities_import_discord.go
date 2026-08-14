@@ -15,7 +15,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
-	types3 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/images"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -190,7 +190,7 @@ func (m *Messenger) createPinMessageFromDiscordMessage(message *common.Message, 
 	}
 
 	pinMessageToSave := &common.PinMessage{
-		ID:               types3.EncodeHex(types2.MessageID(&community.PrivateKey().PublicKey, wrappedPayload)),
+		ID:               types.EncodeHex(types2.MessageID(&community.PrivateKey().PublicKey, wrappedPayload)),
 		PinMessage:       &pinMessage,
 		LocalChatID:      channelID,
 		From:             message.From,
@@ -289,7 +289,7 @@ func (m *Messenger) processDiscordMessages(discordChannel *discord.ExportedData,
 		messageToSave := &common.Message{
 			ID:               community.IDString() + discordMessage.Id,
 			WhisperTimestamp: clockAndTimestamp,
-			From:             types3.EncodeHex(crypto.FromECDSAPub(&communityPubKey)),
+			From:             types.EncodeHex(crypto.FromECDSAPub(&communityPubKey)),
 			Seen:             true,
 			LocalChatID:      channel.ID,
 			SigPubKey:        &communityPubKey,
@@ -388,7 +388,7 @@ func (m *Messenger) cleanUpImport(communityID string) {
 }
 
 func (m *Messenger) cleanUpImportChannel(communityID string, channelID string) {
-	_, err := m.DeleteCommunityChat(types3.HexBytes(communityID), channelID)
+	_, err := m.DeleteCommunityChat(types.HexBytes(communityID), channelID)
 	if err != nil {
 		m.logger.Error("clean up failed, couldn't delete community chat", zap.Error(err))
 		return
@@ -1347,7 +1347,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				messageToSave := &common.Message{
 					ID:               communityID + discordMessage.Id,
 					WhisperTimestamp: clockAndTimestamp,
-					From:             types3.EncodeHex(crypto.FromECDSAPub(&communityPubKey)),
+					From:             types.EncodeHex(crypto.FromECDSAPub(&communityPubKey)),
 					Seen:             true,
 					LocalChatID:      processedChannelIds[channel.Channel.ID],
 					SigPubKey:        &communityPubKey,
@@ -1394,7 +1394,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 						}
 
 						pinMessageToSave := common.PinMessage{
-							ID:               types3.EncodeHex(types2.MessageID(&communityPubKey, wrappedPayload)),
+							ID:               types.EncodeHex(types2.MessageID(&communityPubKey, wrappedPayload)),
 							PinMessage:       &pinMessage,
 							LocalChatID:      processedChannelIds[channel.Channel.ID],
 							From:             messageToSave.From,

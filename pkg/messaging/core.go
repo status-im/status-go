@@ -18,14 +18,14 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
 	"github.com/status-im/status-go/pkg/messaging/events"
-	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
-	wakumetrics2 "github.com/status-im/status-go/pkg/messaging/wakumetrics"
+	"github.com/status-im/status-go/pkg/messaging/wakumetrics"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -47,7 +47,7 @@ type Core struct {
 
 	connectionState connection.State
 
-	wakumetrics *wakumetrics2.Client
+	wakumetrics *wakumetrics.Client
 }
 
 type sdsEnvelopeHashesTracker interface {
@@ -111,7 +111,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.logger,
 	)
 
-	stack.Encryption = encryption2.New(
+	stack.Encryption = encryption.New(
 		config.persistence.EncryptionStorage(),
 		params.InstallationID,
 		config.logger,
@@ -301,7 +301,7 @@ func (c *Core) stop() error {
 	}
 
 	if c.metricsEnabled {
-		err := wakumetrics2.UnregisterMetrics()
+		err := wakumetrics.UnregisterMetrics()
 		if err != nil {
 			return err
 		}
@@ -424,11 +424,11 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 
 func (c *Core) startWakuMetrics() error {
 	if c.wakumetrics == nil {
-		options := []wakumetrics2.TelemetryClientOption{
-			wakumetrics2.WithPeerID(c.waku.PeerID().String()),
+		options := []wakumetrics.TelemetryClientOption{
+			wakumetrics.WithPeerID(c.waku.PeerID().String()),
 		}
 
-		wakuMetricsHandler, err := wakumetrics2.NewClient(options...)
+		wakuMetricsHandler, err := wakumetrics.NewClient(options...)
 		if err != nil {
 			return err
 		}
@@ -473,7 +473,7 @@ func (c *Core) generateHashRatchetKey(groupID []byte) error {
 
 func (c *Core) encryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []byte, uint32, error) {
 	encryptedPayload, ratchet, newSeqNo, err := c.stack.Encryption.EncryptWithHashRatchet(groupID, payload)
-	if err == encryption2.ErrNoEncryptionKey {
+	if err == encryption.ErrNoEncryptionKey {
 		_, err := c.stack.Encryption.GenerateHashRatchetKey(groupID)
 		if err != nil {
 			return nil, nil, 0, err
@@ -504,7 +504,7 @@ func (c *Core) buildHashRatchetMessage(groupID []byte, payload []byte) ([]byte, 
 }
 
 func (c *Core) decryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, data []byte) ([]byte, error) {
-	var encryptionMessage encryption2.ProtocolMessage
+	var encryptionMessage encryption.ProtocolMessage
 	err := proto.Unmarshal(data, &encryptionMessage)
 	if err != nil {
 		return nil, err
