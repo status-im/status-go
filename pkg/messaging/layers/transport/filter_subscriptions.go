@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -48,7 +48,7 @@ func newFilterSubscriptions(api MessagingAPI, logger *zap.Logger) *FilterSubscri
 func pairOf(filter *Filter) types.TopicSubscription {
 	pubsubTopic := filter.PubsubTopic
 	if pubsubTopic == "" {
-		pubsubTopic = wakuv2.DefaultShardPubsubTopic()
+		pubsubTopic = waku.DefaultShardPubsubTopic()
 	}
 	return types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: filter.ContentTopic}
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/pkg/messaging/types"
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 )
 
 var (
@@ -145,8 +145,8 @@ func TestClient_PushErrorSendingEnvelope(t *testing.T) {
 	}
 	envelope := v2protocol.NewEnvelope(msg, 0, "")
 
-	errorSendingEnvelope := wakuv2.ErrorSendingEnvelope{
-		SentEnvelope: wakuv2.SentEnvelope{
+	errorSendingEnvelope := waku.ErrorSendingEnvelope{
+		SentEnvelope: waku.SentEnvelope{
 			Envelope:      envelope,
 			PublishMethod: publish.LightPush,
 		},

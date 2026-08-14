@@ -23,7 +23,7 @@ import (
 	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/messaging/wakumetrics"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -61,16 +61,16 @@ type sdsApplicationMessageIDTracker interface {
 // Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
 // from the waku layer so callers configure the messaging API without importing
 // the transport package directly.
-type Mode = wakuv2.Mode
+type Mode = waku.Mode
 
 const (
-	ModeCore = wakuv2.ModeCore
-	ModeEdge = wakuv2.ModeEdge
+	ModeCore = waku.ModeCore
+	ModeEdge = waku.ModeEdge
 )
 
 // ModeFromLightClient maps the legacy WakuV2Config.LightClient boolean onto a Mode.
 func ModeFromLightClient(lightClient bool) Mode {
-	return wakuv2.ModeFromLightClient(lightClient)
+	return waku.ModeFromLightClient(lightClient)
 }
 
 type CoreParams struct {
@@ -375,7 +375,7 @@ type wakuParams struct {
 	// fleet + mode fully determine the peer configuration and the Core/Edge
 	// policy; the waku node builds the rest of its config from them.
 	fleet string
-	mode  wakuv2.Mode
+	mode  waku.Mode
 
 	// port / udpPort / nameserver are the only node settings a caller configures
 	// (zero/empty falls back to the waku defaults). Everything else — host,
@@ -392,10 +392,10 @@ type wakuParams struct {
 	logger *zap.Logger
 }
 
-func newWaku(params wakuParams) (*wakuv2.Waku, error) {
-	cfg := &wakuv2.Config{
+func newWaku(params wakuParams) (*waku.Waku, error) {
+	cfg := &waku.Config{
 		// Fleet + Mode drive peer resolution and the peer-exchange/discv5/
-		// light-client policy inside the waku node (see wakuv2.setDefaults). The
+		// light-client policy inside the waku node (see waku.setDefaults). The
 		// host, discovery limit, max message size and default shard topic are
 		// filled by the waku layer's setDefaults.
 		Fleet:      params.fleet,
@@ -409,7 +409,7 @@ func newWaku(params wakuParams) (*wakuv2.Waku, error) {
 		MetricsEnabled:      params.metricsEnabled,
 	}
 
-	waku, err := wakuv2.New(
+	waku, err := waku.New(
 		params.nodeKey,
 		cfg,
 		params.logger,
@@ -439,7 +439,7 @@ func (c *Core) startWakuMetrics() error {
 		}
 
 		// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-		c.waku.(*wakuv2.Waku).SetMetricsHandler(wakuMetricsHandler)
+		c.waku.(*waku.Waku).SetMetricsHandler(wakuMetricsHandler)
 
 		c.wakumetrics = wakuMetricsHandler
 	}
@@ -449,7 +449,7 @@ func (c *Core) startWakuMetrics() error {
 
 func (c *Core) metrics() string {
 	// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-	return c.waku.(*wakuv2.Waku).Metrics()
+	return c.waku.(*waku.Waku).Metrics()
 }
 
 func (c *Core) generateHashRatchetKey(groupID []byte) error {
