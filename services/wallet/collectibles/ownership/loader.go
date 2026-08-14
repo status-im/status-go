@@ -20,6 +20,12 @@ import (
 
 var ErrLoadAlreadyInProgress = errors.New("load already in progress")
 
+// Hands out an identity to every Loader, so that the events of a load can be
+// told apart from those of a load of another Loader serving the same
+// chain+account (a restart replaces the Loader while the old one is still
+// unwinding).
+var lastLoaderID atomic.Uint64
+
 type CollectibleOwnershipFetcher interface {
 	FetchCollectibleOwnershipByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error)
 }
@@ -49,6 +55,7 @@ func DefaultLoaderParams() LoaderParams {
 }
 
 type Loader struct {
+	id        uint64
 	chainID   walletCommon.ChainID
 	account   common.Address
 	fetcher   CollectibleOwnershipFetcher
@@ -63,6 +70,7 @@ type Loader struct {
 
 func NewLoader(chainID walletCommon.ChainID, account common.Address, fetcher CollectibleOwnershipFetcher, storage CollectibleOwnershipStorage, publisher *pubsub.Publisher, params LoaderParams, logger *zap.Logger) *Loader {
 	return &Loader{
+		id:        lastLoaderID.Add(1),
 		chainID:   chainID,
 		account:   account,
 		fetcher:   fetcher,
@@ -101,15 +109,17 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 			// Deadline expiry is a real failure and is still reported.
 			// Waiters on this load still need to unblock, though.
 			pubsub.Publish(l.publisher, EventOwnedCollectiblesLoadCancelled{
-				ChainID: l.chainID,
-				Account: l.account,
+				ChainID:  l.chainID,
+				Account:  l.account,
+				LoaderID: l.id,
 			})
 			return
 		}
 		pubsub.Publish(l.publisher, EventOwnedCollectiblesLoadError{
-			ChainID: l.chainID,
-			Account: l.account,
-			Error:   err,
+			ChainID:  l.chainID,
+			Account:  l.account,
+			LoaderID: l.id,
+			Error:    err,
 		})
 	}()
 
@@ -140,8 +150,9 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 	l.notifyStateChanged(LoaderStateUpdating)
 
 	pubsub.Publish(l.publisher, EventOwnedCollectiblesLoadStarted{
-		ChainID: l.chainID,
-		Account: l.account,
+		ChainID:  l.chainID,
+		Account:  l.account,
+		LoaderID: l.id,
 	})
 
 	// Start fetching collectibles in chunks
@@ -198,6 +209,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 			partialEvent := EventOwnedCollectiblesLoadPartial{
 				ChainID:          l.chainID,
 				Account:          l.account,
+				LoaderID:         l.id,
 				PartialOwnership: accumulatedOwnership,
 			}
 
@@ -230,6 +242,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 	finishedEvent := EventOwnedCollectiblesLoadFinished{
 		ChainID:      l.chainID,
 		Account:      l.account,
+		LoaderID:     l.id,
 		NewOwnership: accumulatedOwnership,
 	}
 

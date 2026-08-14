@@ -473,6 +473,13 @@ func (c *Controller) loadWithPeriodicalLoaderIfFound(ctx context.Context, chainI
 
 	found = true
 
+	// Events are matched on the loader that published them: this loader can be
+	// replaced (by a restart) while its load is running, and the replaced
+	// loader's load can end at any time afterwards. Matching on chainID+account
+	// alone would let the end of a load this caller has nothing to do with
+	// report back as the end of the load it is waiting for.
+	loaderID := loader.loaderID()
+
 	finishedCh, finishedUnsubFn := pubsub.Subscribe[EventOwnedCollectiblesLoadFinished](c.collectiblesPublisher, 10)
 	defer finishedUnsubFn()
 
@@ -499,14 +506,14 @@ func (c *Controller) loadWithPeriodicalLoaderIfFound(ctx context.Context, chainI
 			if !ok {
 				return
 			}
-			if finishedEvent.ChainID == chainID && finishedEvent.Account == account {
+			if finishedEvent.LoaderID == loaderID {
 				return
 			}
 		case errEvent, ok := <-errCh:
 			if !ok {
 				return
 			}
-			if errEvent.ChainID == chainID && errEvent.Account == account {
+			if errEvent.LoaderID == loaderID {
 				err = errEvent.Error
 				return
 			}
@@ -514,7 +521,7 @@ func (c *Controller) loadWithPeriodicalLoaderIfFound(ctx context.Context, chainI
 			if !ok {
 				return
 			}
-			if cancelledEvent.ChainID == chainID && cancelledEvent.Account == account {
+			if cancelledEvent.LoaderID == loaderID {
 				err = context.Canceled
 				return
 			}
