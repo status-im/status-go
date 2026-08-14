@@ -4,7 +4,6 @@ package types
 
 import (
 	"encoding/hex"
-	"fmt"
 	"reflect"
 )
 
@@ -39,27 +38,6 @@ func (b *HexBytes) UnmarshalJSON(input []byte) error {
 		return errNonString(bytesT)
 	}
 	return wrapTypeError(b.UnmarshalText(input[1:len(input)-1]), bytesT)
-}
-
-// UnmarshalFixedUnprefixedText decodes the input as a string with optional 0x prefix. The
-// length of out determines the required input length. This function is commonly used to
-// implement the UnmarshalText method for fixed-size types.
-func UnmarshalFixedUnprefixedText(typname string, input, out []byte) error {
-	raw, err := checkText(input, false)
-	if err != nil {
-		return err
-	}
-	if len(raw)/2 != len(out) {
-		return fmt.Errorf("hex string has length %d, want %d for %s", len(raw), len(out)*2, typname)
-	}
-	// Pre-verify syntax before modifying out.
-	for _, b := range raw {
-		if decodeNibble(b) == badNibble {
-			return ErrSyntax
-		}
-	}
-	_, err = hex.Decode(out, raw)
-	return err
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.

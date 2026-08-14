@@ -18,7 +18,3 @@ func WakuMessageTimestamp(key string, value *int64) zap.Field {
 func UnixTimeMs(key string, t time.Time) zap.Field {
 	return zap.String(key, fmt.Sprintf("%d", t.UnixMilli()))
 }
-
-func UnixTimeNano(key string, t time.Time) zap.Field {
-	return zap.String(key, fmt.Sprintf("%d", t.UnixNano()))
-}

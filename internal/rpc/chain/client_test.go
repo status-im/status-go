@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math/big"
-	"reflect"
 	"runtime"
 	"strconv"
 	"testing"
@@ -84,14 +83,6 @@ func TestClient_Fallbacks(t *testing.T) {
 	ethClients[2].EXPECT().EthGetBlockByHashWithTxHashes(ctx, hash).Return(nil, errors.New("some other other error")).Times(1)
 	_, err = client.EthGetBlockByHashWithTxHashes(ctx, hash)
 	require.Error(t, err)
-}
-
-// Helper function to get a comparable value for function pointers
-func getFuncPtr(f func(uint64, string)) uintptr {
-	if f == nil {
-		return 0
-	}
-	return reflect.ValueOf(f).Pointer()
 }
 
 // TestClientWithFallback_CloseStopsOperations tests that closing the client

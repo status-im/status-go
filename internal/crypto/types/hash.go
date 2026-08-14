@@ -38,10 +38,6 @@ func FromHex(s string) []byte {
 	return Hex2Bytes(s)
 }
 
-// HexToHash sets byte representation of s to hash.
-// If b is larger than len(h), b will be cropped from the left.
-func HexToHash(s string) Hash { return BytesToHash(FromHex(s)) }
-
 // Hex converts a hash to a hex string.
 func (h *Hash) Hex() string { return encode(h[:]) }
 

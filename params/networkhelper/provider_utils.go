@@ -39,18 +39,6 @@ func MergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders
 	return mergedProviders
 }
 
-// ToggleUserProviders enables or disables all user-defined providers and disables other types.
-func ToggleUserProviders(providers []params.RpcProvider, enabled bool) []params.RpcProvider {
-	for i := range providers {
-		if providers[i].Type == params.UserProviderType {
-			providers[i].Enabled = enabled
-		} else {
-			providers[i].Enabled = !enabled
-		}
-	}
-	return providers
-}
-
 // GetEmbeddedProviders returns the embedded providers from the list.
 func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
 	embeddedProviders := make([]params.RpcProvider, 0, len(providers))
@@ -71,16 +59,6 @@ func GetUserProviders(providers []params.RpcProvider) []params.RpcProvider {
 		}
 	}
 	return userProviders
-}
-
-// ReplaceUserProviders replaces user-defined providers with new ones, retaining the rest of the providers.
-func ReplaceUserProviders(currentProviders, newUserProviders []params.RpcProvider) []params.RpcProvider {
-	// Extract embedded providers from the current list
-	embeddedProviders := GetEmbeddedProviders(currentProviders)
-	userProviders := GetUserProviders(newUserProviders)
-
-	// Combine new user providers with the existing embedded providers
-	return append(userProviders, embeddedProviders...)
 }
 
 // ReplaceEmbeddedProviders replaces embedded providers with new ones, retaining user-defined providers.

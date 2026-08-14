@@ -117,18 +117,6 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	require.NoError(t, w.Stop())
 }
 
-func parseNodes(rec []string) []*enode.Node {
-	var ns []*enode.Node
-	for _, r := range rec {
-		var n enode.Node
-		if err := n.UnmarshalText([]byte(r)); err != nil {
-			panic(err)
-		}
-		ns = append(ns, &n)
-	}
-	return ns
-}
-
 type mapResolver map[string]string
 
 func (mr mapResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {

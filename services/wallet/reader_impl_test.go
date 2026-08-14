@@ -3,7 +3,6 @@ package wallet
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -55,54 +54,6 @@ var (
 // This matcher is used to compare the expected and actual map[common.Address][]tokenTypes.StorageToken in parameters to SaveTokens
 type mapTokenWithBalanceMatcher struct {
 	expected []interface{}
-}
-
-func (m mapTokenWithBalanceMatcher) Matches(x interface{}) bool {
-	actual, ok := x.(map[common.Address][]tokenTypes.StorageToken)
-	if !ok {
-		return false
-	}
-
-	if len(m.expected) != len(actual) {
-		return false
-	}
-
-	expected := m.expected[0].(map[common.Address][]tokenTypes.StorageToken)
-
-	for address, expectedTokens := range expected {
-		actualTokens, ok := actual[address]
-		if !ok {
-			return false
-		}
-
-		if len(expectedTokens) != len(actualTokens) {
-			return false
-		}
-
-		for i, expectedToken := range expectedTokens {
-			actualToken := actualTokens[i]
-
-			if expectedToken.TokenAddress != actualToken.TokenAddress ||
-				expectedToken.TokenChainID != actualToken.TokenChainID ||
-				expectedToken.RawBalance != actualToken.RawBalance ||
-				expectedToken.Balance.Cmp(actualToken.Balance) != 0 ||
-				expectedToken.HasError != actualToken.HasError {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
-func (m *mapTokenWithBalanceMatcher) String() string {
-	return fmt.Sprintf("%v", m.expected)
-}
-
-func newMapTokenWithBalanceMatcher(expected []interface{}) gomock.Matcher {
-	return &mapTokenWithBalanceMatcher{
-		expected: expected,
-	}
 }
 
 func setupReader(t *testing.T) (*Reader, *mock_token.MockManagerInterface, *mock_tokenbalances.MockStorage, *gomock.Controller) {

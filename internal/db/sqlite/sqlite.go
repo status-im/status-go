@@ -284,33 +284,6 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKey string, onStart func(), onEnd func()) error {
-	if onStart != nil {
-		onStart()
-	}
-
-	if onEnd != nil {
-		defer onEnd()
-	}
-
-	if kdfIterationsNumber <= 0 {
-		kdfIterationsNumber = dbsetup.ReducedKDFIterationsNumber
-	}
-
-	db, err := openDB(path, key, kdfIterationsNumber, V4CipherPageSize)
-
-	if err != nil {
-		return err
-	}
-
-	resetKeyString := fmt.Sprintf("PRAGMA rekey = '%s'", newKey)
-	if _, err = db.Exec(resetKeyString); err != nil {
-		return errors.New("failed to set rekey pragma")
-	}
-
-	return nil
-}
-
 // MigrateV3ToV4 migrates database from v3 to v4 format with encryption.
 func MigrateV3ToV4(v3Path string, v4Path string, key string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
 

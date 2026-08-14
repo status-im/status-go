@@ -240,13 +240,6 @@ func (m *Messenger) processPrivateGroupChat(chat *Chat) ([]*ecdsa.PublicKey, err
 	return publicKeys, nil
 }
 
-func (m *Messenger) processDeprecatedChats() error {
-	// Timeline and profile chats are deprecated.
-	// This code can be removed after some reasonable time.
-
-	return nil
-}
-
 func (m *Messenger) processContacts(wg *sync.WaitGroup, publicKeysCh chan<- []*ecdsa.PublicKey, errCh chan<- error) {
 	defer gocommon.LogOnPanic()
 	defer wg.Done()

@@ -39,10 +39,6 @@ func PackApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Ad
 	return erc20ABI.Pack("approve", approvalContractAddress, amountIn)
 }
 
-func FullDomainName(username string) string {
-	return username + "." + StatusDomain
-}
-
 func ExtractCoordinates(pubkey string) ([32]byte, [32]byte) {
 	x, _ := hex.DecodeString(pubkey[4:68])
 	y, _ := hex.DecodeString(pubkey[68:132])

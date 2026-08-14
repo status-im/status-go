@@ -21,17 +21,3 @@ func Migrate(db *sql.DB, customSteps []*sqlite.PostStep) error {
 		},
 	), options)
 }
-
-// MigrateTo is used for testing purposes
-func MigrateTo(db *sql.DB, customSteps []*sqlite.PostStep, untilVersion uint) error {
-	options := sqlite.MigrateOptions{
-		CustomSteps:  customSteps,
-		UntilVersion: &untilVersion,
-	}
-	return sqlite.Migrate(db, bindata.Resource(
-		AssetNames(),
-		func(name string) ([]byte, error) {
-			return Asset(name)
-		},
-	), options)
-}

@@ -21,10 +21,6 @@ type Signature struct {
 
 type ByID []Signature
 
-func (s ByID) Len() int           { return len(s) }
-func (s ByID) Less(i, j int) bool { return s[i].ID > s[j].ID }
-func (s ByID) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
 type SignatureList struct {
 	Count   int         `json:"count"`
 	Results []Signature `json:"results"`

@@ -414,10 +414,6 @@ func getBiggestContent(contents []Content, contentType string, includeOriginal b
 	return ret
 }
 
-func getBiggestContentURL(contents []Content, contentType string, includeOriginal bool) string {
-	return getBiggestContent(contents, contentType, includeOriginal).URL
-}
-
 // getAnimation returns content that actually moves, or the zero Content. An
 // image is only offered as animation when its mime type can carry one: handing
 // back a still original here means every consumer that reads "animation"

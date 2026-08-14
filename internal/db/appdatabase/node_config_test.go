@@ -143,15 +143,6 @@ func randomStringSlice() []string {
 	return result
 }
 
-func randomCustomNodes() map[string]string {
-	result := make(map[string]string)
-	m := randomInt(7)
-	for i := 0; i < m; i++ {
-		result[randomString()] = randomString()
-	}
-	return result
-}
-
 func TestConfigValidate(t *testing.T) {
 	// GIVEN
 	db := setupTestDB(t)
