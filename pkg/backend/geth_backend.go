@@ -1529,6 +1529,7 @@ func (b *StatusBackend) prepareWalletAccount(request *requests.CreateAccount) *a
 	return &accsmanagementtypes.AccountCreationDetails{
 		Path:    common.PathDefaultWalletAccount,
 		Name:    walletAccountDefaultName,
+		Emoji:   walletAccountDefaultEmoji,
 		ColorID: request.CustomizationColor,
 	}
 }
@@ -1566,6 +1567,7 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 		KeyUID:             keypair.KeyUID,
 		Address:            types.HexToAddress(walletDerivedAccount.Address),
 		ColorID:            multiacccommon.CustomizationColor(request.CustomizationColor),
+		Emoji:              walletAccountDefaultEmoji,
 		Wallet:             true,
 		Path:               common.PathDefaultWalletAccount,
 		Name:               walletAccountDefaultName,
