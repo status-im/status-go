@@ -7,14 +7,20 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
+// LoaderID identifies the Loader that published the event. A (ChainID, Account)
+// pair doesn't identify a load: a loader restart replaces the loader for the
+// pair while the replaced one is still unwinding, so events from both can reach
+// the same subscriber. Waiters interested in one specific load must match on it.
 type EventOwnedCollectiblesLoadStarted struct {
-	ChainID walletCommon.ChainID
-	Account common.Address
+	ChainID  walletCommon.ChainID
+	Account  common.Address
+	LoaderID uint64
 }
 
 type EventOwnedCollectiblesLoadPartial struct {
 	ChainID          walletCommon.ChainID
 	Account          common.Address
+	LoaderID         uint64
 	Added            []thirdparty.CollectibleUniqueID
 	PartialOwnership []thirdparty.CollectibleIDBalance
 }
@@ -22,6 +28,7 @@ type EventOwnedCollectiblesLoadPartial struct {
 type EventOwnedCollectiblesLoadFinished struct {
 	ChainID      walletCommon.ChainID
 	Account      common.Address
+	LoaderID     uint64
 	Added        []thirdparty.CollectibleUniqueID
 	Updated      []thirdparty.CollectibleUniqueID
 	Removed      []thirdparty.CollectibleUniqueID
@@ -29,15 +36,17 @@ type EventOwnedCollectiblesLoadFinished struct {
 }
 
 type EventOwnedCollectiblesLoadError struct {
-	ChainID walletCommon.ChainID
-	Account common.Address
-	Error   error
+	ChainID  walletCommon.ChainID
+	Account  common.Address
+	LoaderID uint64
+	Error    error
 }
 
 // Published when a load ends because it was cancelled (loader stopped or
 // restarted). Internal: lets waiters on a running load unblock; not translated
 // into a client event.
 type EventOwnedCollectiblesLoadCancelled struct {
-	ChainID walletCommon.ChainID
-	Account common.Address
+	ChainID  walletCommon.ChainID
+	Account  common.Address
+	LoaderID uint64
 }

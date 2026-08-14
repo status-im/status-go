@@ -150,6 +150,13 @@ func (pl *PeriodicalLoader) Stop() {
 	}
 }
 
+// Identifies the loads run by this PeriodicalLoader in the published events.
+// A restart builds a new PeriodicalLoader (and Loader) for the same
+// chain+account, so this is what tells their loads apart.
+func (pl *PeriodicalLoader) loaderID() uint64 {
+	return pl.loader.id
+}
+
 func (pl *PeriodicalLoader) GetState() LoaderState {
 	return pl.state.Load().(LoaderState)
 }
