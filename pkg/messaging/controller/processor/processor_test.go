@@ -33,7 +33,7 @@ import (
 	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
 	transportmigrations "github.com/status-im/status-go/pkg/messaging/layers/transport/migrations"
 	"github.com/status-im/status-go/pkg/messaging/types"
-	wakuv "github.com/status-im/status-go/pkg/messaging/waku"
+	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
 )
 
 func TestProcessorSuite(t *testing.T) {
@@ -111,8 +111,8 @@ func (s *ProcessorSuite) SetupTest() {
 
 	stack := &common.MessagingStack{}
 
-	wakuConfig := wakuv.DefaultConfig
-	shh, err := wakuv.New(
+	wakuConfig := wakuv2.DefaultConfig
+	shh, err := wakuv2.New(
 		nil,
 		&wakuConfig,
 		s.logger,

@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
-	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
+	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -48,7 +48,7 @@ func TestReceivePushPath(t *testing.T) {
 	logger := testutils.MustCreateTestLogger()
 	defer func() { _ = logger.Sync() }()
 
-	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil)
+	waku, err := wakuv2.New(nil, &wakuv2.DefaultConfig, logger, nil)
 	require.NoError(t, err)
 
 	identity, err := crypto.GenerateKey()
@@ -74,7 +74,7 @@ func TestReceivePushPath(t *testing.T) {
 	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
 		Hash:         hash,
 		ContentTopic: filter.ContentTopic.ContentTopic(),
-		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
 		Payload:      encoded,
 		Version:      1,
 		Timestamp:    time.Now().UnixNano(),
@@ -99,7 +99,7 @@ func TestReceivePushPath(t *testing.T) {
 	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
 		Hash:         []byte{0x01},
 		ContentTopic: "/waku/2/unknown/proto",
-		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
 		Payload:      encoded,
 		Version:      1,
 		Timestamp:    time.Now().UnixNano(),
@@ -119,7 +119,7 @@ func TestReceivePushPath(t *testing.T) {
 	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
 		Hash:         []byte{0x02},
 		ContentTopic: filter.ContentTopic.ContentTopic(),
-		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
 		Payload:      badPayload,
 		Version:      1,
 		Timestamp:    time.Now().UnixNano(),
@@ -143,7 +143,7 @@ func TestReceiveVersionZeroDecodesAsV1(t *testing.T) {
 	logger := testutils.MustCreateTestLogger()
 	defer func() { _ = logger.Sync() }()
 
-	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil)
+	waku, err := wakuv2.New(nil, &wakuv2.DefaultConfig, logger, nil)
 	require.NoError(t, err)
 
 	identity, err := crypto.GenerateKey()
@@ -167,7 +167,7 @@ func TestReceiveVersionZeroDecodesAsV1(t *testing.T) {
 	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
 		Hash:         []byte{0xde, 0xad},
 		ContentTopic: filter.ContentTopic.ContentTopic(),
-		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
 		Payload:      encoded,
 		Version:      0,
 		Timestamp:    time.Now().UnixNano(),
@@ -197,7 +197,7 @@ func TestReceiveSharedKeyFanOut(t *testing.T) {
 	logger := testutils.MustCreateTestLogger()
 	defer func() { _ = logger.Sync() }()
 
-	waku, err := wakuv3.New(nil, &wakuv3.DefaultConfig, logger, nil)
+	waku, err := wakuv2.New(nil, &wakuv2.DefaultConfig, logger, nil)
 	require.NoError(t, err)
 
 	identity, err := crypto.GenerateKey()
@@ -224,7 +224,7 @@ func TestReceiveSharedKeyFanOut(t *testing.T) {
 			ChatID:       chatID,
 			FilterID:     filterID,
 			ContentTopic: contentTopic,
-			PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
 			Listen:       true,
 		}
 	}
@@ -242,7 +242,7 @@ func TestReceiveSharedKeyFanOut(t *testing.T) {
 	tr.handleReceivedMessage(&wakutypes.ReceivedMessage{
 		Hash:         []byte{0xfa, 0x07},
 		ContentTopic: contentTopic.ContentTopic(),
-		PubsubTopic:  wakuv3.DefaultShardPubsubTopic(),
+		PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),
 		Payload:      encoded,
 		Version:      1,
 		Timestamp:    time.Now().UnixNano(),

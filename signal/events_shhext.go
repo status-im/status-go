@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/internal/crypto/types"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 const (
@@ -45,17 +45,17 @@ const (
 
 // EnvelopeSignal includes hash of the envelope.
 type EnvelopeSignal struct {
-	IDs     []hexutil.Bytes `json:"ids"`
-	Hash    types.Hash      `json:"hash"`
-	Message string          `json:"message"`
+	IDs     []hexutil.Bytes  `json:"ids"`
+	Hash    cryptotypes.Hash `json:"hash"`
+	Message string           `json:"message"`
 }
 
 // MailServerResponseSignal holds the data received in the response from the mailserver.
 type MailServerResponseSignal struct {
-	RequestID        types.Hash `json:"requestID"`
-	LastEnvelopeHash types.Hash `json:"lastEnvelopeHash"`
-	Cursor           string     `json:"cursor"`
-	ErrorMsg         string     `json:"errorMessage"`
+	RequestID        cryptotypes.Hash `json:"requestID"`
+	LastEnvelopeHash cryptotypes.Hash `json:"lastEnvelopeHash"`
+	Cursor           string           `json:"cursor"`
+	ErrorMsg         string           `json:"errorMessage"`
 }
 
 type HistoryMessagesSignal struct {
@@ -84,7 +84,7 @@ type Filter struct {
 	// Identity is the public key of the other recipient for non-public chats
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
-	Topic types2.ContentTopic `json:"topic"`
+	Topic messagingtypes.ContentTopic `json:"topic"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -126,7 +126,7 @@ func SendUpdateAvailable(available bool, latestVersion string, url string) {
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
-func SendMailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
+func SendMailServerRequestCompleted(requestID cryptotypes.Hash, lastEnvelopeHash cryptotypes.Hash, cursor []byte, err error) {
 	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()
@@ -141,7 +141,7 @@ func SendMailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types
 }
 
 // SendMailServerRequestExpired triggered when mail server request expires
-func SendMailServerRequestExpired(hash types.Hash) {
+func SendMailServerRequestExpired(hash cryptotypes.Hash) {
 	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
 }
 

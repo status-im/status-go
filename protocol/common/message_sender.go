@@ -12,11 +12,11 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingevents "github.com/status-im/status-go/pkg/messaging/events"
-	"github.com/status-im/status-go/pkg/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -28,7 +28,7 @@ func encodeCommunityID(communityID []byte) string {
 	if len(communityID) == 0 {
 		return ""
 	}
-	return types2.EncodeHex(communityID)
+	return cryptotypes.EncodeHex(communityID)
 }
 
 type MessageSender struct {
@@ -73,8 +73,8 @@ func EnsureMessageIDIntegrity(messageID string, rawMessage *RawMessage) error {
 	return nil
 }
 
-func setMessageID(messageID types2.HexBytes, rawMessage *RawMessage) error {
-	messageIDString := types2.EncodeHex(messageID)
+func setMessageID(messageID cryptotypes.HexBytes, rawMessage *RawMessage) error {
+	messageIDString := cryptotypes.EncodeHex(messageID)
 
 	err := EnsureMessageIDIntegrity(messageIDString, rawMessage)
 	if err != nil {
@@ -161,7 +161,7 @@ func (s *MessageSender) SendPublic(
 		}
 	}
 
-	messageID := types.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	messageID := messagingtypes.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	if err = setMessageID(messageID, &rawMessage); err != nil {
 		return nil, err
 	}
@@ -179,9 +179,9 @@ func (s *MessageSender) SendPublic(
 	// notify before dispatching
 	s.notifyOnScheduledMessage(nil, &rawMessage)
 
-	var hashRatchetParams *types.SendPublicHashRatchetParams
+	var hashRatchetParams *messagingtypes.SendPublicHashRatchetParams
 	if len(rawMessage.HashRatchetGroupID) != 0 {
-		hashRatchetParams = &types.SendPublicHashRatchetParams{
+		hashRatchetParams = &messagingtypes.SendPublicHashRatchetParams{
 			Encrypt:   false,
 			GroupID:   rawMessage.HashRatchetGroupID,
 			KeyExType: rawMessage.CommunityKeyExMsgType,
@@ -189,7 +189,7 @@ func (s *MessageSender) SendPublic(
 		}
 	}
 
-	err = s.messaging.SendPublic(ctx, types.SendPublicParams{
+	err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 		Sender:              &rawMessage.Sender.PublicKey,
 		Payload:             wrappedMessage,
 		PubsubTopic:         rawMessage.PubsubTopic,
@@ -245,7 +245,7 @@ func (s *MessageSender) sendPrivate(
 		}
 	}
 
-	messageID := types.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	messageID := messagingtypes.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	if err = setMessageID(messageID, rawMessage); err != nil {
 		return nil, err
 	}
@@ -266,14 +266,14 @@ func (s *MessageSender) sendPrivate(
 	}
 
 	var hashRatchetGroupID []byte
-	if rawMessage.CommunityKeyExMsgType == types.KeyExMsgReuse {
+	if rawMessage.CommunityKeyExMsgType == messagingtypes.KeyExMsgReuse {
 		hashRatchetGroupID = rawMessage.HashRatchetGroupID
 	}
 
 	for _, recipient := range rawMessage.Recipients {
 		s.notifyOnScheduledMessage(recipient, rawMessage)
 
-		err = s.messaging.SendPrivate(ctx, types.SendPrivateParams{
+		err = s.messaging.SendPrivate(ctx, messagingtypes.SendPrivateParams{
 			Sender:              rawMessage.Sender,
 			Recipient:           recipient,
 			Payload:             wrappedMessage,
@@ -351,7 +351,7 @@ func (s *MessageSender) SendCommunity(
 		return nil, err
 	}
 
-	messageID := types.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	messageID := messagingtypes.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	err = setMessageID(messageID, rawMessage)
 	if err != nil {
 		return nil, err
@@ -359,7 +359,7 @@ func (s *MessageSender) SendCommunity(
 
 	logger := s.logger.Named("sendCommunity").With(
 		zap.Stringer("messageID", messageID),
-		zap.String("communityID", types2.EncodeHex(rawMessage.CommunityID)),
+		zap.String("communityID", cryptotypes.EncodeHex(rawMessage.CommunityID)),
 		zap.String("sender", crypto.PubkeyToHex(&rawMessage.Sender.PublicKey)),
 	)
 
@@ -373,11 +373,11 @@ func (s *MessageSender) SendCommunity(
 	s.notifyOnScheduledMessage(nil, rawMessage)
 
 	// We want to fill up old keys to a given users
-	if rawMessage.CommunityKeyExMsgType == types.KeyExMsgReuse {
+	if rawMessage.CommunityKeyExMsgType == messagingtypes.KeyExMsgReuse {
 		return messageID, s.messaging.SendPrivateHashRatchetKeys(ctx, rawMessage.Recipients, rawMessage.HashRatchetGroupID)
 	}
 
-	hashRatchetParams := &types.SendPublicHashRatchetParams{
+	hashRatchetParams := &messagingtypes.SendPublicHashRatchetParams{
 		Encrypt:   false,
 		GroupID:   rawMessage.HashRatchetGroupID,
 		KeyExType: rawMessage.CommunityKeyExMsgType,
@@ -392,7 +392,7 @@ func (s *MessageSender) SendCommunity(
 
 		hashRatchetParams.Encrypt = true
 
-		err = s.messaging.SendPublic(ctx, types.SendPublicParams{
+		err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 			Sender:       &rawMessage.Sender.PublicKey,
 			Payload:      wrappedMessage,
 			PubsubTopic:  rawMessage.PubsubTopic,
@@ -408,7 +408,7 @@ func (s *MessageSender) SendCommunity(
 			return nil, errors.Wrap(err, "failed to decompress pubkey")
 		}
 
-		err = s.messaging.SendPublic(ctx, types.SendPublicParams{
+		err = s.messaging.SendPublic(ctx, messagingtypes.SendPublicParams{
 			Sender:             &rawMessage.Sender.PublicKey,
 			Payload:            wrappedMessage,
 			PubsubTopic:        rawMessage.PubsubTopic,
@@ -450,7 +450,7 @@ func (s *MessageSender) SendPairInstallation(
 	ctx, span := s.tracer.Start(ctx, "MessageSender.SendPairInstallation")
 	defer span.End()
 
-	s.logger.Debug("sending private message", zap.String("recipient", types2.EncodeHex(crypto.FromECDSAPub(recipient))))
+	s.logger.Debug("sending private message", zap.String("recipient", cryptotypes.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = s.identity
@@ -461,7 +461,7 @@ func (s *MessageSender) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	messageID := types.MessageID(&s.identity.PublicKey, wrappedMessage)
+	messageID := messagingtypes.MessageID(&s.identity.PublicKey, wrappedMessage)
 	err = setMessageID(messageID, &rawMessage)
 	if err != nil {
 		return nil, err
@@ -469,7 +469,7 @@ func (s *MessageSender) SendPairInstallation(
 
 	s.notifyOnScheduledMessage(recipient, &rawMessage)
 
-	err = s.messaging.SendPrivate(ctx, types.SendPrivateParams{
+	err = s.messaging.SendPrivate(ctx, messagingtypes.SendPrivateParams{
 		Sender:     s.identity,
 		Recipient:  recipient,
 		Payload:    wrappedMessage,

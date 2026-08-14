@@ -14,10 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/internal/contracts/erc721"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -42,7 +42,7 @@ func TestERC721Handler_Comprehensive(t *testing.T) {
 	// Test GetContractAddress
 	contractAddr := common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
 	params := ProcessorInputParams{
-		FromToken: &tokentypes.Token{Token: &types.Token{Address: contractAddr}},
+		FromToken: &tokentypes.Token{Token: &wsdktypes.Token{Address: contractAddr}},
 	}
 	address, err := handler.GetContractAddress(params)
 	require.NoError(t, err)
@@ -60,17 +60,17 @@ func TestERC721Handler_WithMocks(t *testing.T) {
 	handler := NewERC721Handler(nil, mockTransactor)
 
 	testTx := ethTypes.NewTransaction(1, common.HexToAddress("0xabcd"), big.NewInt(0), 21000, big.NewInt(1000000000), []byte{})
-	contractAddress := types2.Address(common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"))
+	contractAddress := cryptotypes.Address(common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"))
 
 	// Test BuildTransactionV2
 	buildArgs := &wallettypes.SendTxArgs{
 		FromChainID: walletCommon.EthereumMainnet,
-		From:        types2.HexToAddress("0x1234567890123456789012345678901234567890"),
+		From:        cryptotypes.HexToAddress("0x1234567890123456789012345678901234567890"),
 		To:          &contractAddress,
 		Gas:         (*hexutil.Uint64)(new(uint64)),
 		GasPrice:    (*hexutil.Big)(big.NewInt(1000000000)),
 		Value:       (*hexutil.Big)(big.NewInt(0)),
-		Data:        types2.HexBytes("test_data"),
+		Data:        cryptotypes.HexBytes("test_data"),
 	}
 
 	mockTransactor.EXPECT().ValidateAndBuildTransaction(walletCommon.EthereumMainnet, *buildArgs, int64(-1)).Return(testTx, uint64(1), nil)
@@ -108,7 +108,7 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 
 			params := ProcessorInputParams{
 				FromToken: &tokentypes.Token{
-					Token:              &types.Token{Address: contractAddr},
+					Token:              &wsdktypes.Token{Address: contractAddr},
 					CollectibleTokenID: &collectibleTokenID,
 				},
 				FromAddr: fromAddr,
@@ -148,7 +148,7 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoTokenSet)
 
 	_, err = handler.packTxInputDataInternally(ProcessorInputParams{
-		FromToken: &tokentypes.Token{Token: &types.Token{Address: contractAddr}},
+		FromToken: &tokentypes.Token{Token: &wsdktypes.Token{Address: contractAddr}},
 		FromAddr:  fromAddr,
 		ToAddr:    toAddr,
 	}, erc721FunctionNameSafeTransferFrom)
@@ -160,7 +160,7 @@ func TestERC721Handler_PackTxInputDataInternally(t *testing.T) {
 	collectibleTokenID := hexutil.Big(*parsed)
 	validParams := ProcessorInputParams{
 		FromToken: &tokentypes.Token{
-			Token:              &types.Token{Address: contractAddr},
+			Token:              &wsdktypes.Token{Address: contractAddr},
 			CollectibleTokenID: &collectibleTokenID,
 		},
 		FromAddr: fromAddr,
@@ -180,7 +180,7 @@ func TestERC721Handler_Integration(t *testing.T) {
 	collectibleTokenID := hexutil.Big(*parsed)
 	params := ProcessorInputParams{
 		FromChain: &params.Network{ChainID: walletCommon.EthereumMainnet},
-		FromToken: &tokentypes.Token{Token: &types.Token{
+		FromToken: &tokentypes.Token{Token: &wsdktypes.Token{
 			Address: contractAddr,
 		}},
 		ToToken: nil,

@@ -10,11 +10,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/messaging"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	contacts2 "github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -216,7 +216,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 		zap.String("receiver", receiver.IdentityPublicKeyString()))
 
 	// Accept contact request, receiver side
-	resp, err := receiver.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
+	resp, err := receiver.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: cryptotypes.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
 
 	// Check updated contact request message and mutual state update
@@ -323,7 +323,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	s.Require().True(chat.Active)
 
 	// Receiver's side chat should be also active after the accepting the CR
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	myID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	chat, ok = receiver.allChats.Load(myID)
 	s.Require().True(ok)
 	s.Require().NotNil(chat)
@@ -347,7 +347,7 @@ func (s *MessengerContactRequestSuite) createContactRequest(contactPublicKey str
 
 func (s *MessengerContactRequestSuite) declineContactRequest(contactRequest *common.Message, theirMessenger *Messenger) {
 	// Dismiss contact request, receiver side
-	resp, err := theirMessenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
+	resp, err := theirMessenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: cryptotypes.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
 
 	// Check the contact state is correctly set
@@ -377,7 +377,7 @@ func (s *MessengerContactRequestSuite) declineContactRequest(contactRequest *com
 }
 
 func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, theirMessenger *Messenger) {
-	resp, err := s.m.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(contactID)})
+	resp, err := s.m.RetractContactRequest(&requests.RetractContactRequest{ID: cryptotypes.Hex2Bytes(contactID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Contacts, 1)
@@ -394,7 +394,7 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED)
 	s.Require().NotNil(mutualStateUpdate)
 
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	myID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	s.Require().Equal(mutualStateUpdate.From, myID)
 	s.Require().Equal(mutualStateUpdate.ChatId, contactID)
 	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(outgoingMutualStateEventRemovedDefaultText, contactID))
@@ -460,7 +460,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -475,7 +475,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -492,7 +492,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 
 	s.Require().NoError(theirMessenger.settings.SaveSettingField(settings.MutualContactEnabled, true))
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -511,7 +511,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 func (s *MessengerContactRequestSuite) TestAcceptCRRemoveAndRepeat() {
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	for i := 0; i < 5; i++ {
 		messageText := fmt.Sprintf("hello %d", i)
@@ -535,7 +535,7 @@ func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequest
 	alice := s.m
 
 	bob := s.newMessenger()
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to Bob
 	request := &requests.SendContactRequest{
@@ -656,7 +656,7 @@ func (s *MessengerContactRequestSuite) TestAliceSeesOnlyOneAcceptFromBob() {
 
 	bob := s.newMessenger()
 
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to Bob
 	request := &requests.SendContactRequest{
@@ -672,7 +672,7 @@ func (s *MessengerContactRequestSuite) TestAliceSeesOnlyOneAcceptFromBob() {
 	s.acceptContactRequest(contactRequest, alice, bob)
 
 	// Accept contact request again
-	secondAcceptResp, err := bob.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
+	secondAcceptResp, err := bob.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: cryptotypes.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
 	s.Require().NotNil(secondAcceptResp)
 
@@ -714,7 +714,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -755,7 +755,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -764,8 +764,8 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	contactRequest := s.receiveContactRequest(messageText, theirMessenger)
 
 	// Accept latest contact request, receiver side
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	resp, err := theirMessenger.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	myID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	resp, err := theirMessenger.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: cryptotypes.Hex2Bytes(myID)})
 	s.Require().NoError(err)
 
 	// Make sure the message is updated
@@ -847,7 +847,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContactW
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -858,8 +858,8 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContactW
 	err := theirMessenger.persistence.DeleteMessage(contactRequest.ID)
 	s.Require().NoError(err)
 
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	resp, err := theirMessenger.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	myID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	resp, err := theirMessenger.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: cryptotypes.Hex2Bytes(myID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -874,7 +874,7 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -883,8 +883,8 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 	contactRequest := s.receiveContactRequest(messageText, theirMessenger)
 
 	// Dismiss latest contact request, receiver side
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	resp, err := theirMessenger.DismissLatestContactRequestForContact(context.Background(), &requests.DismissLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	myID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	resp, err := theirMessenger.DismissLatestContactRequestForContact(context.Background(), &requests.DismissLatestContactRequestForContact{ID: cryptotypes.Hex2Bytes(myID)})
 	s.Require().NoError(err)
 
 	// Make sure the message is updated
@@ -904,7 +904,7 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -915,8 +915,8 @@ func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact
 	err := theirMessenger.persistence.DeleteMessage(contactRequest.ID)
 	s.Require().NoError(err)
 
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	resp, err := theirMessenger.DismissLatestContactRequestForContact(context.Background(), &requests.DismissLatestContactRequestForContact{ID: types.Hex2Bytes(myID)})
+	myID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	resp, err := theirMessenger.DismissLatestContactRequestForContact(context.Background(), &requests.DismissLatestContactRequestForContact{ID: cryptotypes.Hex2Bytes(myID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -939,7 +939,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	bob := s.newMessenger()
 
 	// Alice sends a contact request to bob
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -999,7 +999,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 
 	bob := s.newMessenger()
 
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to bob
 	request := &requests.SendContactRequest{
@@ -1063,7 +1063,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 
 	bob := s.newMessenger()
 
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to bob
 	request := &requests.SendContactRequest{
@@ -1131,7 +1131,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 
 	bob := s.newMessenger()
 
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to bob
 	request := &requests.SendContactRequest{
@@ -1147,7 +1147,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice removes Bob from contacts
-	_, err := alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
+	_, err := alice1.RetractContactRequest(&requests.RetractContactRequest{ID: cryptotypes.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 
 	// Adds bob again to her device
@@ -1178,7 +1178,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 
 	bob := s.newMessenger()
 
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to bob
 	request := &requests.SendContactRequest{
@@ -1194,7 +1194,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice removes Bob from contacts
-	_, err := alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
+	_, err := alice1.RetractContactRequest(&requests.RetractContactRequest{ID: cryptotypes.Hex2Bytes(bob.myHexIdentity())})
 	s.Require().NoError(err)
 
 	// Adds bob again to her device
@@ -1227,7 +1227,7 @@ func (s *MessengerContactRequestSuite) TestAliceResendsContactRequestAfterRemovi
 
 	theirMessenger := s.newMessenger()
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	// Alice sends a contact request to Bob
 	request := &requests.SendContactRequest{
@@ -1280,7 +1280,7 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 
 	bob := s.newMessenger()
 
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to bob
 	requestFromAlice := &requests.SendContactRequest{
@@ -1297,7 +1297,7 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 
 	messageTextBob := "hello, Alice!"
 
-	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	aliceID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
 
 	// Bob sends a contact request to Alice
 	requestFromBob := &requests.SendContactRequest{
@@ -1356,7 +1356,7 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 func (s *MessengerContactRequestSuite) TestBuildContact() {
 	contactKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&contactKey.PublicKey))
+	contactID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&contactKey.PublicKey))
 
 	contact, err := s.m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	s.Require().NoError(err)
@@ -1393,11 +1393,11 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 		PublicKey: &contactKey.PublicKey,
 		MessageID: "0xa",
 		StatusMessage: &common.StatusMessage{
-			Message: types2.Message{
-				TransportLayer: types2.TransportLayer{
-					Message: &types2.ReceivedMessage{Timestamp: 1},
+			Message: messagingtypes.Message{
+				TransportLayer: messagingtypes.TransportLayer{
+					Message: &messagingtypes.ReceivedMessage{Timestamp: 1},
 				},
-				EncryptionLayer: types2.EncryptionLayer{},
+				EncryptionLayer: messagingtypes.EncryptionLayer{},
 			},
 			ApplicationLayer: common.ApplicationLayer{
 				ID: []byte("test-id"),
@@ -1442,8 +1442,8 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 
 	bob1 := s.newMessenger()
 
-	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob1.identity.PublicKey))
+	aliceID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob1.identity.PublicKey))
 
 	// Alice sends a contact request to bob
 	requestFromAlice := &requests.SendContactRequest{
@@ -1471,7 +1471,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 	s.Require().NoError(err)
 
 	// Accept latest CR for a contact
-	resp, err := bob2.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(aliceID)})
+	resp, err := bob2.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: cryptotypes.Hex2Bytes(aliceID)})
 	s.Require().NoError(err)
 	s.Require().Len(resp.Contacts, 1)
 
@@ -1516,8 +1516,8 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 	alice1 := s.m
 	bob := s.newMessenger()
 
-	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
-	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	aliceID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
+	bobID := cryptotypes.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
 	// Alice sends a contact request to bob
 	requestFromAlice := &requests.SendContactRequest{
@@ -1543,7 +1543,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 	s.Require().NoError(err)
 
 	// Accept latest CR for a contact
-	resp, err := bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(aliceID)})
+	resp, err := bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: cryptotypes.Hex2Bytes(aliceID)})
 	s.Require().NoError(err)
 
 	// Make sure the message is updated
@@ -1737,7 +1737,7 @@ func (s *MessengerContactRequestSuite) TestAcceptContactWithoutRequest() { //nol
 
 	contactRequest, err := s.m.createDefaultContactRequest(s.m.selfContact, s.m.getTimesource().GetCurrentTime())
 	s.Require().NoError(err)
-	resp, err := theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
+	resp, err := theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: cryptotypes.Hex2Bytes(contactRequest.ID), ContactID: contactRequest.From})
 	s.Require().NoError(err)
 	// Check updated contact request message and mutual state update
 	s.Require().NotNil(resp)

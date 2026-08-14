@@ -24,13 +24,13 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -1319,7 +1319,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	// Alice deletes activity center notification
 	var updatedAt uint64 = 99
-	_, err = s.alice.MarkActivityCenterNotificationsDeleted(ctx, []types.HexBytes{notification.ID}, updatedAt, true)
+	_, err = s.alice.MarkActivityCenterNotificationsDeleted(ctx, []cryptotypes.HexBytes{notification.ID}, updatedAt, true)
 	s.Require().NoError(err)
 
 	// Check activity center notification for Bob after deleting
@@ -1433,7 +1433,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	// Bob deletes activity center notification
 	updatedAt++
-	_, err = s.bob.MarkActivityCenterNotificationsDeleted(ctx, []types.HexBytes{notification.ID}, updatedAt, true)
+	_, err = s.bob.MarkActivityCenterNotificationsDeleted(ctx, []cryptotypes.HexBytes{notification.ID}, updatedAt, true)
 	s.Require().NoError(err)
 
 	// Check activity center notification for Bob after deleting
@@ -2267,7 +2267,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	// Alice shares community with Bob
 	response, err = s.owner.ShareCommunity(&requests.ShareCommunity{
 		CommunityID:   community.ID(),
-		Users:         []types.HexBytes{crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+		Users:         []cryptotypes.HexBytes{crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
 		InviteMessage: inputMessageText,
 	})
 
@@ -2471,7 +2471,7 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 	s.Len(tcs, 0, "Must have 0 communities")
 
 	// Pair devices
-	metadata := &types2.InstallationMetadata{
+	metadata := &messagingtypes.InstallationMetadata{
 		Name:       "other-device",
 		DeviceType: "other-device-type",
 	}
@@ -2780,7 +2780,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_EncryptionKeys() {
 // makes a request to join a community
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	// Set Alice's installation metadata
-	aim := &types2.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -3006,7 +3006,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	// Set Alice's installation metadata
-	aim := &types2.InstallationMetadata{
+	aim := &messagingtypes.InstallationMetadata{
 		Name:       "alice's-device",
 		DeviceType: "alice's-device-type",
 	}
@@ -3749,12 +3749,12 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	)
 	s.Require().NoError(err)
 
-	message := &types2.ReceivedMessage{}
+	message := &messagingtypes.ReceivedMessage{}
 	message.Sig = crypto.FromECDSAPub(&s.owner.identity.PublicKey)
 	message.Payload = wrappedPayload
 
 	filter := s.alice.messaging.ChatFilterByChatID(community.UniversalChatID())
-	importedMessages := make(map[types2.ChatFilter][]*types2.ReceivedMessage, 0)
+	importedMessages := make(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
 

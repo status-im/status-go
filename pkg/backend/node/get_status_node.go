@@ -30,7 +30,7 @@ import (
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
-	rpc2 "github.com/status-im/status-go/pkg/backend/node/rpc"
+	noderpc "github.com/status-im/status-go/pkg/backend/node/rpc"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -609,7 +609,7 @@ func (n *StatusNode) Resume() error {
 }
 
 func (n *StatusNode) CallInProcessRPC(inputJSON string) string {
-	codec := rpc2.NewSingleRequestCodec(inputJSON)
+	codec := noderpc.NewSingleRequestCodec(inputJSON)
 	n.rpcServer.ServeCodec(codec.GethCodec(), 0)
 	return codec.Output()
 }

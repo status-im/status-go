@@ -11,9 +11,9 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
-	"github.com/status-im/status-go/internal/accounts-management/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc/chain"
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
@@ -220,7 +220,7 @@ func (s *TransactorSuite) TestGasValues() {
 	}
 }
 
-func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *types.SelectedExtKey) {
+func (s *TransactorSuite) setupBuildTransactionMocks(args wallettypes.SendTxArgs, account *accsmanagementtypes.SelectedExtKey) {
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&testNonce, nil)
 
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
@@ -237,9 +237,9 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	address2 := fakeAddress()
 
 	key, _ := gethcrypto.GenerateKey()
-	selectedAccount := &types.SelectedExtKey{
+	selectedAccount := &accsmanagementtypes.SelectedExtKey{
 		Address:    *address1,
-		AccountKey: &types.Key{PrivateKey: key},
+		AccountKey: &accsmanagementtypes.Key{PrivateKey: key},
 	}
 
 	chainID := s.nodeConfig.NetworkID
@@ -331,8 +331,8 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 	})
 }
 
-func fakeAddress() *types2.Address {
-	var address types2.Address
+func fakeAddress() *cryptotypes.Address {
+	var address cryptotypes.Address
 	gofakeit.Slice(&address)
 	return &address
 }
@@ -341,8 +341,8 @@ func (s *TransactorSuite) TestArgsValidation() {
 	args := wallettypes.SendTxArgs{
 		From:  *fakeAddress(),
 		To:    fakeAddress(),
-		Data:  types2.HexBytes([]byte{0x01, 0x02}),
-		Input: types2.HexBytes([]byte{0x02, 0x01}),
+		Data:  cryptotypes.HexBytes([]byte{0x01, 0x02}),
+		Input: cryptotypes.HexBytes([]byte{0x02, 0x01}),
 	}
 	s.False(args.Valid())
 	selectedAccount := generator.NewAccount(nil, nil)
