@@ -2,6 +2,7 @@ package ownership
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -85,6 +86,14 @@ func (fakeStorage) Update(_ walletCommon.ChainID, _ common.Address, _ []thirdpar
 
 func newTestLoader(t *testing.T, fetcher CollectibleOwnershipFetcher, storage CollectibleOwnershipStorage, params PeriodicalLoaderParams) *PeriodicalLoader {
 	t.Helper()
+	pl, _ := newTestLoaderWithPublisher(t, fetcher, storage, params)
+	return pl
+}
+
+// newTestLoaderWithPublisher also returns the publisher the loader emits its
+// events on, for tests that need to observe them.
+func newTestLoaderWithPublisher(t *testing.T, fetcher CollectibleOwnershipFetcher, storage CollectibleOwnershipStorage, params PeriodicalLoaderParams) (*PeriodicalLoader, *pubsub.Publisher) {
+	t.Helper()
 	logger := zaptest.NewLogger(t)
 	publisher := pubsub.NewPublisher()
 	return NewPeriodicalLoader(
@@ -95,7 +104,7 @@ func newTestLoader(t *testing.T, fetcher CollectibleOwnershipFetcher, storage Co
 		publisher,
 		params,
 		logger,
-	)
+	), publisher
 }
 
 // TestPeriodicalLoaderStartStop verifies that Start followed by Stop cleanly
@@ -219,6 +228,117 @@ func TestLoadDelayReportedAsDelayed(t *testing.T) {
 	}, 1*time.Second, 10*time.Millisecond)
 
 	require.Equal(t, 0, fetcher.CallCount(), "no fetch should have been triggered during the load delay")
+
+	pl.Stop()
+	waitForLoadToEnd(t, pl)
+}
+
+// requireNoLoadError fails if a load error event is published within the given
+// observation window.
+func requireNoLoadError(t *testing.T, errCh chan EventOwnedCollectiblesLoadError, window time.Duration) {
+	t.Helper()
+	select {
+	case event := <-errCh:
+		require.FailNowf(t, "a cancelled load must not be reported as an error",
+			"unexpected load error event published: %v", event.Error)
+	case <-time.After(window):
+	}
+}
+
+// TestCancelledLoadDuringDelayIsNotReportedAsError verifies that stopping the
+// loader while a load is still waiting out LoadDelay ends that load silently:
+// the pair simply isn't loading anymore, which must not reach the client as a
+// failed load.
+func TestCancelledLoadDuringDelayIsNotReportedAsError(t *testing.T) {
+	fetcher := newFakeFetcher()
+	params := PeriodicalLoaderParams{
+		LoadInterval: 1 * time.Minute,
+		LoaderParams: LoaderParams{
+			LoadDelay:  5 * time.Second,
+			FetchLimit: 50,
+		},
+	}
+	pl, publisher := newTestLoaderWithPublisher(t, fetcher, fakeStorage{}, params)
+
+	errCh, unsubFn := pubsub.Subscribe[EventOwnedCollectiblesLoadError](publisher, 10)
+	defer unsubFn()
+
+	pl.Start(false, false)
+
+	require.Eventually(t, func() bool {
+		return pl.GetState() == LoaderStateDelayed
+	}, 1*time.Second, 10*time.Millisecond)
+
+	// Stop while the load is still being debounced.
+	pl.Stop()
+
+	requireNoLoadError(t, errCh, 500*time.Millisecond)
+	require.Equal(t, LoaderStateIdle, pl.GetState(), "a cancelled load must settle as idle, not as an error")
+	require.Equal(t, 0, fetcher.CallCount(), "no fetch should have been triggered during the load delay")
+}
+
+// TestCancelledLoadDuringFetchIsNotReportedAsError verifies the same for a load
+// that is already fetching when the loader is stopped.
+func TestCancelledLoadDuringFetchIsNotReportedAsError(t *testing.T) {
+	fetcher := newFakeFetcher()
+	params := PeriodicalLoaderParams{
+		LoadInterval: 1 * time.Minute,
+		LoaderParams: LoaderParams{FetchLimit: 50},
+	}
+	pl, publisher := newTestLoaderWithPublisher(t, fetcher, fakeStorage{}, params)
+
+	errCh, unsubFn := pubsub.Subscribe[EventOwnedCollectiblesLoadError](publisher, 10)
+	defer unsubFn()
+
+	pl.Start(false, false)
+
+	select {
+	case <-fetcher.entered:
+	case <-time.After(5 * time.Second):
+		pl.Stop()
+		t.Fatal("timed out waiting for the fetch to start")
+	}
+
+	// Stop while the fetch is in flight.
+	pl.Stop()
+	fetcher.waitForReturn(t)
+
+	requireNoLoadError(t, errCh, 500*time.Millisecond)
+	require.Equal(t, LoaderStateIdle, pl.GetState(), "a cancelled load must settle as idle, not as an error")
+}
+
+// TestLoaderStateChangesForwardedToCaller verifies that a caller-supplied
+// OnStateChanged callback still receives the load's state transitions. The
+// PeriodicalLoader wraps that callback to track the state itself, and must chain
+// to the caller's one instead of dropping it.
+func TestLoaderStateChangesForwardedToCaller(t *testing.T) {
+	fetcher := newFakeFetcher()
+
+	var mu sync.Mutex
+	var observedStates []LoaderState
+
+	params := PeriodicalLoaderParams{
+		LoadInterval: 1 * time.Minute,
+		LoaderParams: LoaderParams{
+			LoadDelay:  100 * time.Millisecond,
+			FetchLimit: 50,
+			OnStateChanged: func(state LoaderState) {
+				mu.Lock()
+				defer mu.Unlock()
+				observedStates = append(observedStates, state)
+			},
+		},
+	}
+	pl := newTestLoader(t, fetcher, fakeStorage{}, params)
+
+	pl.Start(false, false)
+
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Contains(observedStates, LoaderStateDelayed) &&
+			slices.Contains(observedStates, LoaderStateUpdating)
+	}, 3*time.Second, 10*time.Millisecond, "the caller's OnStateChanged callback never saw the load progress")
 
 	pl.Stop()
 	waitForLoadToEnd(t, pl)
