@@ -74,8 +74,12 @@ func NewPeriodicalLoader(
 	// Let the Loader drive the delayed/updating states, so that a load that is still being
 	// debounced isn't reported as updating
 	loaderParams := params.LoaderParams
+	callerOnStateChanged := loaderParams.OnStateChanged
 	loaderParams.OnStateChanged = func(state LoaderState) {
 		ret.state.Store(state)
+		if callerOnStateChanged != nil {
+			callerOnStateChanged(state)
+		}
 	}
 	ret.loader = NewLoader(chainID, account, fetcher, storage, publisher, loaderParams, logger)
 
@@ -185,9 +189,12 @@ func (pl *PeriodicalLoader) Load(ctx context.Context) error {
 		return err
 	}
 
-	if err != nil {
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(ctx.Err(), context.Canceled) {
 		pl.state.Store(LoaderStateError)
 	} else {
+		// Success, or the load was cancelled by a stop/restart — either way the
+		// pair is simply not loading anymore, which must not read as a failure.
+		// Deadline expiry is not a cancellation and still reads as an error.
 		pl.state.Store(LoaderStateIdle)
 	}
 

@@ -61,6 +61,11 @@ type Controller struct {
 
 	networksProvider NetworksProvider
 
+	// Optional. When set, no loader is created for chains it rejects: their
+	// state stays LoaderStateNotAvailable instead of erroring on every load
+	// attempt against a chain no provider serves.
+	chainSupported func(walletCommon.ChainID) bool
+
 	walletEventsWatcher *walletevent.Watcher
 
 	collectiblesPublisher *pubsub.Publisher
@@ -100,6 +105,12 @@ func NewController(
 		collectiblesPublisher:         collectiblesPublisher,
 		logger:                        logger.Named("OwnershipController"),
 	}
+}
+
+// SetChainSupportedCheck installs the predicate deciding which chains get an
+// ownership loader. Call before Start.
+func (c *Controller) SetChainSupportedCheck(check func(walletCommon.ChainID) bool) {
+	c.chainSupported = check
 }
 
 func (c *Controller) StartWithLoaderParams(params PeriodicalLoaderParams) {
@@ -404,6 +415,14 @@ func (c *Controller) TriggerLoad(ctx context.Context, chainID walletCommon.Chain
 		zap.Stringer("chainID", chainID),
 	)
 
+	if c.chainSupported != nil && !c.chainSupported(chainID) {
+		// No collectibles provider serves this chain; loading would only error.
+		c.logger.Debug("skipping on-demand load for unsupported chain",
+			zap.Stringer("chainID", chainID),
+		)
+		return nil
+	}
+
 	found, err := c.loadWithPeriodicalLoaderIfFound(ctx, chainID, account)
 	if err != nil {
 		return err
@@ -460,6 +479,11 @@ func (c *Controller) loadWithPeriodicalLoaderIfFound(ctx context.Context, chainI
 	errCh, errUnsubFn := pubsub.Subscribe[EventOwnedCollectiblesLoadError](c.collectiblesPublisher, 10)
 	defer errUnsubFn()
 
+	// A load cancelled by a loader stop/restart publishes neither finished nor
+	// error — without this subscription the waiter would hang until ctx expires.
+	cancelledCh, cancelledUnsubFn := pubsub.Subscribe[EventOwnedCollectiblesLoadCancelled](c.collectiblesPublisher, 10)
+	defer cancelledUnsubFn()
+
 	go func() {
 		defer gocommon.LogOnPanic()
 		// Trigger load in case it's not already in progress
@@ -484,6 +508,14 @@ func (c *Controller) loadWithPeriodicalLoaderIfFound(ctx context.Context, chainI
 			}
 			if errEvent.ChainID == chainID && errEvent.Account == account {
 				err = errEvent.Error
+				return
+			}
+		case cancelledEvent, ok := <-cancelledCh:
+			if !ok {
+				return
+			}
+			if cancelledEvent.ChainID == chainID && cancelledEvent.Account == account {
+				err = context.Canceled
 				return
 			}
 		}
@@ -514,7 +546,11 @@ func (c *Controller) checkPeriodicalLoaders() {
 	newLoaderKeys := make(map[loaderKey]struct{})
 	for _, address := range newAddresses {
 		for _, network := range newNetworks {
-			newLoaderKeys[loaderKey{address: common.Address(address), chainID: walletCommon.ChainID(network.ChainID)}] = struct{}{}
+			chainID := walletCommon.ChainID(network.ChainID)
+			if c.chainSupported != nil && !c.chainSupported(chainID) {
+				continue
+			}
+			newLoaderKeys[loaderKey{address: common.Address(address), chainID: chainID}] = struct{}{}
 		}
 	}
 
