@@ -1100,12 +1100,6 @@ func (db *Database) AddressExists(address types.Address) (exists bool, err error
 	return exists, err
 }
 
-// GetPath returns true if account with given address was recently key and doesn't have a key yet
-func (db *Database) GetPath(address types.Address) (path string, err error) {
-	err = db.db.QueryRow("SELECT path FROM keypairs_accounts WHERE address = ? AND removed = 0", address).Scan(&path)
-	return path, err
-}
-
 // NOTE: This should not be used to retrieve `Networks`.
 // NetworkManager should be used instead, otherwise RPCURL will be empty
 func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {

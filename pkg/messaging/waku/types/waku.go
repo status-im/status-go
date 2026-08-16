@@ -17,8 +17,8 @@ import (
 )
 
 type ConnStatus struct {
-	IsOnline bool      `json:"isOnline"`
-	Peers    PeerStats `json:"peers"`
+	IsOnline bool            `json:"isOnline"`
+	State    ConnectionState `json:"state"`
 }
 
 type PeerStats map[peer.ID]WakuV2Peer
@@ -102,11 +102,18 @@ type Waku interface {
 	// Resume re-arms goroutines suspended by Pause. Idempotent.
 	Resume() error
 
-	// Peers is retained only for the Python functional tests (see tests-functional);
-	// it is not used by status-app.
 	Peers() PeerStats
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
+
+	// ConnectionState returns the node's current three-state connection status
+	// (Disconnected / PartiallyConnected / Connected). Online detection derives
+	// from it via ConnectionState.IsOnline().
+	ConnectionState() ConnectionState
+
+	// OnHistoryReconcileNeeded returns the unreliable delivery windows that
+	// should be reconciled with store nodes (#7568).
+	OnHistoryReconcileNeeded() <-chan HistoryReconcileWindow
 
 	SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) Subscription
 
@@ -115,17 +122,11 @@ type Waku interface {
 	// ConnectionChanged is called whenever the client knows its connection status has changed
 	ConnectionChanged(connection.State)
 
-	// ClearEnvelopesCache clears waku envelopes cache
-	ClearEnvelopesCache()
-
 	// ConfirmMessageDelivered updates a message has been delivered in waku
 	ConfirmMessageDelivered(hash []common.Hash)
 
 	// PeerID returns node's PeerID
 	PeerID() peer.ID
-
-	// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
-	SetStorenodes(nodes []peer.AddrInfo)
 
 	// StoreQuery retrieves historic messages for a single batch, selecting the
 	// store node internally (no peer argument). See waku.StoreClient.

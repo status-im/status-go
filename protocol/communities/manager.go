@@ -235,12 +235,6 @@ func WithMessageSigner(signer MessageSigner) ManagerOption {
 	}
 }
 
-func WithPermissionChecker(permissionChecker PermissionChecker) ManagerOption {
-	return func(opts *managerOptions) {
-		opts.permissionChecker = permissionChecker
-	}
-}
-
 func WithCollectiblesManager(collectiblesManager CollectiblesManager) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.collectiblesManager = collectiblesManager
@@ -419,6 +413,7 @@ func (m *Manager) SetMediaServerProperties() {
 type Subscription struct {
 	archivetypes.HistoryArchiveSignals
 	Community                            *Community
+	CommunityTokensMetadataLoaded        *Community
 	CommunityEventsMessage               *CommunityEventsMessage
 	AcceptedRequestsToJoin               []types3.HexBytes
 	RejectedRequestsToJoin               []types3.HexBytes
@@ -4481,8 +4476,10 @@ func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 }
 
 func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
+	m.quitWg.Add(1)
 	go func() {
 		defer utils.LogOnPanic()
+		defer m.quitWg.Done()
 
 		select {
 		case <-m.quit:
@@ -4492,16 +4489,25 @@ func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
 
 		community, err := m.GetByIDString(communityID)
 		if err != nil {
+			m.logger.Error("failed to get community for tokens metadata handling",
+				zap.String("communityID", communityID), zap.Error(err))
 			return
 		}
 
 		err = m.handleCommunityTokensMetadata(community)
 		if err != nil {
+			m.logger.Error("failed to handle community tokens metadata",
+				zap.String("communityID", communityID), zap.Error(err))
 			return
 		}
 
-		m.publish(&Subscription{Community: community})
+		select {
+		case <-m.quit:
+			return
+		default:
+		}
 
+		m.publish(&Subscription{CommunityTokensMetadataLoaded: community})
 	}()
 }
 

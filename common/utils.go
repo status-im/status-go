@@ -80,19 +80,6 @@ func ValidateDisplayName(displayName *string) error {
 	return nil
 }
 
-// implementation referenced from https://github.com/embarklabs/embark/blob/master/packages/plugins/ens/src/index.js
-func IsENSName(displayName string) bool {
-	if len(displayName) == 0 {
-		return false
-	}
-
-	if strings.HasSuffix(displayName, ".eth") {
-		return true
-	}
-
-	return false
-}
-
 func IsNil(i interface{}) bool {
 	if i == nil {
 		return true

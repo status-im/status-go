@@ -44,11 +44,23 @@ class TestOneToOneMessages:
     def test_one_to_one_message_with_node_pause_30_seconds(self, sender, receiver):
         with messenger.node_pause(receiver):
             message_text = f"test_message_{uuid4()}"
-            sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
+            response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, message_text)
+            message_id = response.get("messages", [])[0].get("id", "")
+            assert message_id, "Sender did not get a message id back"
             sleep(30)
-        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=message_text):
+        with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=message_text,
+            start="beginning",
+            timeout=60,
+        ):
             pass
-        with sender.expect_signal(SignalType.MESSAGE_DELIVERED):
+        with sender.expect_signal(
+            SignalType.MESSAGE_DELIVERED,
+            pattern=message_id,
+            start="beginning",
+            timeout=60,
+        ):
             pass
 
     @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")

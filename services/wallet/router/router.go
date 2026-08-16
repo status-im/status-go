@@ -30,6 +30,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
@@ -81,6 +82,7 @@ type Router struct {
 	scheduler            *async.Scheduler
 
 	paraswapClientFactory func(chainID uint64) paraswap.ClientInterface
+	lifiClientFactory     func(chainID uint64) lifi.ClientInterface
 
 	activeBalanceMap sync.Map // map[string]*big.Int
 
@@ -122,6 +124,9 @@ func NewRouter(
 		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
 			return paraswap.NewClientV5(chainID, pathprocessor.ParaswapPartnerID, walletCommon.ZeroAddress(), 0)
 		},
+		lifiClientFactory: func(chainID uint64) lifi.ClientInterface {
+			return lifi.NewClient(chainID, lifi.Integrator, "")
+		},
 		logger: logger,
 	}
 }
@@ -146,12 +151,30 @@ func (r *Router) GetBestRouteAndAssociatedInputParams() (routes.Route, requests.
 	r.activeRoutesMutex.Lock()
 	defer r.activeRoutesMutex.Unlock()
 	if r.activeRoutes == nil {
+		lastUuid := ""
+		r.lastInputParamsMutex.Lock()
+		if r.lastInputParams != nil {
+			lastUuid = r.lastInputParams.Uuid
+		}
+		r.lastInputParamsMutex.Unlock()
+		r.logger.Warn("GetBestRouteAndAssociatedInputParams: no active route (cleared or last calculation failed/was canceled)",
+			zap.String("lastInputParamsUuid", lastUuid))
 		return nil, requests.RouteInputParams{}
 	}
 
 	r.lastInputParamsMutex.Lock()
 	defer r.lastInputParamsMutex.Unlock()
+	if r.lastInputParams == nil {
+		r.logger.Warn("GetBestRouteAndAssociatedInputParams: active route present but input params are missing",
+			zap.String("activeRoutesUuid", r.activeRoutes.Uuid))
+		return nil, requests.RouteInputParams{}
+	}
 	ip := *r.lastInputParams
+
+	r.logger.Debug("GetBestRouteAndAssociatedInputParams: returning active route",
+		zap.String("activeRoutesUuid", r.activeRoutes.Uuid),
+		zap.String("inputParamsUuid", ip.Uuid),
+		zap.Int("paths", len(r.activeRoutes.Route)))
 
 	return r.activeRoutes.Route.Copy(), ip
 }
@@ -498,9 +521,13 @@ func (r *Router) SuggestedRoutesAsync(input *requests.RouteInputParams) {
 
 func (r *Router) clearActiveRoute() {
 	r.activeRoutesMutex.Lock()
+	clearedUuid := ""
+	if r.activeRoutes != nil {
+		clearedUuid = r.activeRoutes.Uuid
+	}
 	r.activeRoutes = nil
 	r.activeRoutesMutex.Unlock()
-	r.logger.Debug("clearActiveRoute: active route cleared")
+	r.logger.Info("clearActiveRoute: active route cleared", zap.String("clearedUuid", clearedUuid))
 }
 
 func (r *Router) markRouteCanceled(value bool) {
@@ -559,6 +586,21 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		r.activeRoutesMutex.Lock()
 		r.activeRoutes = suggestedRoutes
 		r.activeRoutesMutex.Unlock()
+		if suggestedRoutes == nil {
+			r.routeCanceledMutex.Lock()
+			canceled := r.routeCanceled
+			r.routeCanceledMutex.Unlock()
+			// leaves the router without an active route; a subsequent send for an
+			// earlier uuid will fail with ErrCannotResolveRouteId
+			r.logger.Warn("SuggestedRoutes: finished without active route",
+				zap.String("uuid", input.Uuid),
+				zap.Bool("canceled", canceled),
+				zap.Error(err))
+		} else {
+			r.logger.Info("SuggestedRoutes: active route stored",
+				zap.String("uuid", suggestedRoutes.Uuid),
+				zap.Int("paths", len(suggestedRoutes.Route)))
+		}
 		r.routeCanceledMutex.Lock()
 		if suggestedRoutes != nil && err == nil && !r.routeCanceled {
 			// subscribe for updates
@@ -1000,8 +1042,9 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 			continue
 		}
 
-		// if we're doing a single chain operation, we can skip bridge processors
-		if walletCommon.IsSingleChainOperation(input.FromChainID, input.ToChainID) && walletCommon.IsProcessorBridge(pProcessor.Name()) {
+		// on a single-chain operation, skip bridge-only processors (LI.FI is also a swap)
+		if walletCommon.IsSingleChainOperation(input.FromChainID, input.ToChainID) &&
+			walletCommon.IsProcessorBridge(pProcessor.Name()) && !walletCommon.IsProcessorSwap(pProcessor.Name()) {
 			r.logger.Debug("resolveRoute: skipping bridge processor for single-chain op",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pProcessor.Name()),
@@ -1235,6 +1278,14 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		ApprovalContractAddress: &contractAddress,
 		ApprovalPackedData:      approvalPackedData,
 		ApprovalGasAmount:       approvalGasLimit,
+	}
+
+	// processors that route through an underlying tool/exchange (e.g. LI.FI -> "1inch")
+	// can surface it here; others simply leave path.Tool empty
+	if tp, ok := pathProcessor.(interface {
+		GetProviderTool(pathprocessor.ProcessorInputParams) string
+	}); ok {
+		path.Tool = tp.GetProviderTool(processorInputParams)
 	}
 
 	tokenBalance, ok := r.activeBalanceMap.Load(makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol))

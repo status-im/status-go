@@ -39,6 +39,15 @@ func readKeystoreFileAndDecryptedKey(path string, auth string) (*types.Key, erro
 	return geth.DecryptKey(keyjson, auth)
 }
 
+func readKeystoreFileAndDecryptedPrivateKey(path string, auth string) (*types.Key, error) {
+	keyjson, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return geth.DecryptPrivateKey(keyjson, auth)
+}
+
 func encryptKeyAndStoreToKeystoreFile(ethKey *types.Key, path string, scryptN int, scryptP int, passphrase string) error {
 	key := &types.Key{
 		ID:              ethKey.ID,

@@ -45,8 +45,7 @@ func (f *fakeRequestor) calls() []*storepb.StoreQueryRequest {
 // sets, so OnEnvelope is never invoked; it exists only to construct a pager.
 type recordingProcessor struct{}
 
-func (p *recordingProcessor) OnEnvelope(*protocol.Envelope, bool) error    { return nil }
-func (p *recordingProcessor) OnRequestFailed([]byte, peer.AddrInfo, error) {}
+func (p *recordingProcessor) OnEnvelope(*protocol.Envelope, bool) error { return nil }
 
 func newPager(r storeRequestor) *storePager {
 	return newStorePager(r, &recordingProcessor{}, zap.NewNop())

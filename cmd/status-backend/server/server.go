@@ -27,6 +27,15 @@ func init() {
 		threadsCount, _ := runtime.ThreadCreateProfile([]runtime.StackRecord{})
 		return threadsCount
 	}))
+	// numGoroutine may already be published by github.com/anacrolix/envpprof
+	// when the torrent history-archive backend is compiled in (use_torrent).
+	// Publish it ourselves only when that dependency isn't linked, so the
+	// metric is always available at /debug/vars regardless of build tags.
+	if expvar.Get("numGoroutine") == nil {
+		expvar.Publish("numGoroutine", expvar.Func(func() any {
+			return runtime.NumGoroutine()
+		}))
+	}
 }
 
 type Server struct {
@@ -68,7 +77,7 @@ func (s *Server) Port() (int, error) {
 }
 
 func (s *Server) Setup() {
-	signal.SetMobileSignalHandler(s.signalHandler)
+	signal.SetHandler(s.signalHandler)
 }
 
 func (s *Server) signalHandler(data []byte) {

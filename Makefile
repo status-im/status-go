@@ -96,6 +96,8 @@ else ifeq ($(detected_OS),Linux)
 endif
 export GOPATH ?= $(HOME)/go
 
+export GOPROXY ?= https://proxy.golang.org|direct
+
 GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
@@ -105,7 +107,12 @@ BUILD_TAGS ?= gowaku_no_rln
 # `nim-sds` variables
 
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
-NIM_SDS_VERSION ?= v0.2.5
+# v0.3.3 lives on the release/v0.3 branch: it carries the SDS retrieval-hint
+# provider required by the sds-go-bindings pin in go.mod, on the CamelCase FFI
+# ABI, with the causalHistory wire format kept backward-compatible with released
+# (v0.2.x) nodes. master/release-v0.4 moved to the snake_case CBOR ABI, which
+# these bindings do not link against, so we track release/v0.3.
+NIM_SDS_VERSION ?= v0.3.3
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
 # to guarantee a clean checkout on every build.
@@ -182,7 +189,7 @@ ifeq ($(LOGOS_STORAGE_BUILD_FROM_SOURCE),true)
 		cd "$(LOGOS_STORAGE_SOURCE_DIR)" && git fetch --tags; \
 	fi
 	cd "$(LOGOS_STORAGE_SOURCE_DIR)" && \
-		git switch --force --detach "$(LOGOS_STORAGE_VERSION)" && \
+		git switch --no-recurse-submodules --force --detach "$(LOGOS_STORAGE_VERSION)" && \
 		git clean -fdx && \
 		git submodule update --init --recursive --force
 endif
@@ -243,7 +250,7 @@ networkid ?= StatusChain
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
-DOCKER_TEST_IMAGE = golang:1.13
+DOCKER_TEST_IMAGE = golang:1.26.5-trixie
 
 GO_CMD_PATHS := $(filter-out library, $(wildcard cmd/*))
 GO_CMD_NAMES := $(notdir $(GO_CMD_PATHS))
@@ -331,7 +338,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
 	fi
 	cd "$(NIM_SDS_SOURCE_DIR)" && \
-		git switch --force --detach "$(NIM_SDS_VERSION)" && \
+		git switch --no-recurse-submodules --force --detach "$(NIM_SDS_VERSION)" && \
 		git clean -fdx && \
 		git submodule update --init --recursive --force
 endif
@@ -452,7 +459,7 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
+		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
 	@file build/bin/libstatus.so

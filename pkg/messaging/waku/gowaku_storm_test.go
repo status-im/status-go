@@ -111,7 +111,7 @@ func TestShouldFireConnectionChanged(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, err := New(nil, nil, nil, nil, nil, nil)
+			w, err := New(nil, nil, nil, nil)
 			require.NoError(t, err)
 			if tc.prevInitialized {
 				w.stateMu.Lock()

@@ -607,6 +607,389 @@ func TestControllerTriggerLoad(t *testing.T) {
 	controller.Stop()
 }
 
+func TestControllerTriggerLoadUnsupportedChain(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	accountsProvider := mock_ownership.NewMockAccountsProvider(mockCtrl)
+	fakeAddress := types.HexToAddress("0x123")
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{fakeAddress}, nil).AnyTimes()
+
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_ownership.NewMockNetworksProvider(mockCtrl)
+	networksPublisher := pubsub.NewPublisher()
+
+	const unsupportedChainID = walletCommon.ChainID(56)
+
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{
+		{ChainID: uint64(unsupportedChainID), IsActive: true},
+	}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
+
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	// The fetcher must never be called for a chain the predicate rejects —
+	// neither by the periodical loaders nor by the on-demand TriggerLoad path.
+	ownershipFetcher := mock_ownership.NewMockCollectibleOwnershipFetcher(mockCtrl)
+	ownershipFetcher.EXPECT().FetchCollectibleOwnershipByOwner(
+		gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+	).Times(0)
+
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
+	publisher := pubsub.NewPublisher()
+	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
+
+	controller := ownership.NewController(
+		ownership.NewOwnershipDB(walletDB),
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
+		ownershipFetcher,
+		publisher,
+		logger,
+	)
+	controller.SetChainSupportedCheck(func(chainID walletCommon.ChainID) bool {
+		return chainID != unsupportedChainID
+	})
+
+	controller.StartWithLoaderParams(
+		ownership.PeriodicalLoaderParams{
+			StartDelay:   0 * time.Second,
+			LoadInterval: 10 * time.Second,
+			LoaderParams: ownership.LoaderParams{
+				LoadDelay:  0 * time.Second,
+				FetchLimit: 50,
+			},
+		},
+	)
+
+	// No loader is created for the unsupported chain
+	require.Equal(t, ownership.LoaderStateNotAvailable, controller.GetLoaderState(unsupportedChainID, common.Address(fakeAddress)))
+
+	// On-demand load is a successful no-op, without hitting the fetcher
+	err = controller.TriggerLoad(context.Background(), unsupportedChainID, common.Address(fakeAddress))
+	require.NoError(t, err)
+	require.Equal(t, ownership.LoaderStateNotAvailable, controller.GetLoaderState(unsupportedChainID, common.Address(fakeAddress)))
+
+	controller.Stop()
+}
+
+// TestControllerTriggerLoadUnblocksOnCancelledLoad verifies that an on-demand
+// load waiting on an already running periodical load doesn't hang when that load
+// gets cancelled (the loader is stopped or restarted). The cancelled load
+// publishes neither a finished nor an error event, so the waiter has to be woken
+// up explicitly — a caller passing a context without a deadline would otherwise
+// wait forever.
+func TestControllerTriggerLoadUnblocksOnCancelledLoad(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	accountsProvider := mock_ownership.NewMockAccountsProvider(mockCtrl)
+	fakeAddress := types.HexToAddress("0x123")
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{fakeAddress}, nil).AnyTimes()
+
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_ownership.NewMockNetworksProvider(mockCtrl)
+	networksPublisher := pubsub.NewPublisher()
+
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{
+		{ChainID: 1, IsActive: true},
+	}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
+
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	// The fetch stays in flight until the load is cancelled, so that the
+	// on-demand load has a running load to wait on.
+	fetchStarted := make(chan struct{}, 10)
+	ownershipFetcher := mock_ownership.NewMockCollectibleOwnershipFetcher(mockCtrl)
+	ownershipFetcher.EXPECT().FetchCollectibleOwnershipByOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
+			fetchStarted <- struct{}{}
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).AnyTimes()
+
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
+	publisher := pubsub.NewPublisher()
+	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
+
+	controller := ownership.NewController(
+		ownership.NewOwnershipDB(walletDB),
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
+		ownershipFetcher,
+		publisher,
+		logger,
+	)
+
+	controller.StartWithLoaderParams(
+		ownership.PeriodicalLoaderParams{
+			StartDelay:   0 * time.Second,
+			LoadInterval: 10 * time.Second,
+			LoaderParams: ownership.LoaderParams{
+				LoadDelay:  0 * time.Second,
+				FetchLimit: 50,
+			},
+		},
+	)
+
+	select {
+	case <-fetchStarted:
+	case <-time.After(5 * time.Second):
+		controller.Stop()
+		t.Fatal("the periodical load never started fetching")
+	}
+
+	// The on-demand load finds the running load and waits for it to end.
+	triggerDone := make(chan error, 1)
+	go func() {
+		triggerDone <- controller.TriggerLoad(context.Background(), walletCommon.ChainID(1), common.Address(fakeAddress))
+	}()
+
+	// Give TriggerLoad time to subscribe and enter the wait.
+	time.Sleep(300 * time.Millisecond)
+
+	// Cancels the running load; the waiter must not be left hanging.
+	controller.Stop()
+
+	select {
+	case triggerErr := <-triggerDone:
+		require.ErrorIs(t, triggerErr, context.Canceled)
+	case <-time.After(3 * time.Second):
+		t.Fatal("TriggerLoad did not return after the load it was waiting on got cancelled")
+	}
+}
+
+// parkedFetch is a single in-flight fetch the test holds parked until it
+// decides that the load owning it may unwind.
+type parkedFetch struct {
+	release  chan struct{}
+	released bool
+}
+
+// Release lets the parked fetch return. Safe to call more than once, so that a
+// cleanup can release whatever the test body left parked.
+func (p *parkedFetch) Release() {
+	if p.released {
+		return
+	}
+	p.released = true
+	close(p.release)
+}
+
+func waitForParkedFetch(t *testing.T, fetches <-chan *parkedFetch, what string) *parkedFetch {
+	t.Helper()
+	select {
+	case fetch := <-fetches:
+		return fetch
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
+		return nil
+	}
+}
+
+// TestControllerTriggerLoadIgnoresStaleCancellation verifies that an on-demand
+// load waiting on the load of the current loader is not woken up by the
+// cancellation of a load belonging to a loader that has already been replaced.
+//
+// A loader restart (a detected balance change here) cancels the running load and
+// installs a replacement loader. The cancelled load unwinds asynchronously, so
+// its cancellation can be published long after the restart — possibly while a
+// waiter is already blocked on the replacement's load. Load events identify a
+// load only by (ChainID, Account), so such a stale event looks exactly like the
+// end of the load the waiter cares about, and TriggerLoad reports
+// context.Canceled for a request that is in fact still running.
+func TestControllerTriggerLoadIgnoresStaleCancellation(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	chainID := walletCommon.ChainID(1)
+	fakeAddress := types.HexToAddress("0x123")
+	account := common.Address(fakeAddress)
+
+	accountsProvider := mock_ownership.NewMockAccountsProvider(mockCtrl)
+	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{fakeAddress}, nil).AnyTimes()
+
+	accountsPublisher := pubsub.NewPublisher()
+	networksProvider := mock_ownership.NewMockNetworksProvider(mockCtrl)
+	networksPublisher := pubsub.NewPublisher()
+
+	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{
+		{ChainID: uint64(chainID), IsActive: true},
+	}, nil).AnyTimes()
+	networksProvider.EXPECT().GetPublisher().Return(networksPublisher).AnyTimes()
+
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	ownershipDB := ownership.NewOwnershipDB(walletDB)
+
+	// Record a previous successful load, so that a detected balance change is a
+	// reason to refetch (and therefore to restart the loader) instead of being
+	// ignored for an account whose ownership was never fetched.
+	_, _, _, err = ownershipDB.Update(chainID, account, []thirdparty.CollectibleIDBalance{}, time.Now().Unix()-100)
+	require.NoError(t, err)
+
+	emptyCollectiblesContainer := &thirdparty.CollectibleOwnershipContainer{
+		Items:          []thirdparty.CollectibleIDBalance{},
+		NextCursor:     "",
+		PreviousCursor: "",
+		Provider:       "mockProvider",
+	}
+
+	// Every fetch parks until the test releases it, no matter what happens to its
+	// context in the meantime: the test alone decides when each load unwinds,
+	// which is what makes the ordering of the events deterministic.
+	parkedFetches := make(chan *parkedFetch, 10)
+	ownershipFetcher := mock_ownership.NewMockCollectibleOwnershipFetcher(mockCtrl)
+	ownershipFetcher.EXPECT().FetchCollectibleOwnershipByOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
+			fetch := &parkedFetch{release: make(chan struct{})}
+			parkedFetches <- fetch
+			<-fetch.release
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return emptyCollectiblesContainer, nil
+		}).AnyTimes()
+
+	multistandardBalancePublisher := pubsub.NewPublisher()
+	transferDetectorPublisher := pubsub.NewPublisher()
+	blockChainStateProvider := mock_ownership.NewMockBlockChainStateProvider(mockCtrl)
+	publisher := pubsub.NewPublisher()
+	logger := zaptest.NewLogger(t).WithOptions(zap.AddCallerSkip(1))
+
+	controller := ownership.NewController(
+		ownershipDB,
+		accountsProvider,
+		accountsPublisher,
+		networksProvider,
+		multistandardBalancePublisher,
+		transferDetectorPublisher,
+		blockChainStateProvider,
+		ownershipFetcher,
+		publisher,
+		logger,
+	)
+
+	// The cancellation of the replaced loader's load is what the test needs to
+	// observe, to be sure the stale event really was published before asserting
+	// that the waiter ignored it. The end of the on-demand load is observed to
+	// let every load quiesce before the test returns.
+	cancelledCh, cancelledUnsub := pubsub.Subscribe[ownership.EventOwnedCollectiblesLoadCancelled](publisher, 10)
+	defer cancelledUnsub()
+
+	finishedCh, finishedUnsub := pubsub.Subscribe[ownership.EventOwnedCollectiblesLoadFinished](publisher, 10)
+	defer finishedUnsub()
+
+	// The start delay only applies to loads triggered by a detected change, so
+	// the initial load starts fetching right away while the loader the restart
+	// installs stays idle until the on-demand load drives it.
+	controller.StartWithLoaderParams(
+		ownership.PeriodicalLoaderParams{
+			StartDelay:   1 * time.Hour,
+			LoadInterval: 1 * time.Hour,
+			LoaderParams: ownership.LoaderParams{
+				LoadDelay:  0 * time.Second,
+				FetchLimit: 50,
+			},
+		},
+	)
+	defer controller.Stop()
+
+	// The periodical load of the first loader is now parked mid-fetch.
+	firstLoadFetch := waitForParkedFetch(t, parkedFetches, "the periodical load to start fetching")
+	defer firstLoadFetch.Release()
+
+	// A detected balance change restarts the loader: the load above gets its
+	// context cancelled, but it can't notice while it is parked in the fetch.
+	pubsub.Publish(multistandardBalancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key: multistandardbalance.BalancesKey{
+			ChainID: uint64(chainID),
+			Account: account,
+		},
+		ResultType:     multistandardfetcher.ResultTypeERC721,
+		BalanceChanged: true,
+		OldState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix() - 1000,
+		},
+		NewState: multistandardbalance.State{
+			FetchedAt: time.Now().Unix(),
+		},
+	})
+
+	// The replacement loader is in place once the pair reports the delayed state:
+	// the replaced loader was fetching, and only the replacement waits out the
+	// start delay.
+	require.Eventually(t, func() bool {
+		return controller.GetLoaderState(chainID, account) == ownership.LoaderStateDelayed
+	}, 5*time.Second, 10*time.Millisecond, "the loader was never restarted")
+
+	// The on-demand load drives the replacement loader and waits for its load.
+	triggerDone := make(chan error, 1)
+	go func() {
+		triggerDone <- controller.TriggerLoad(context.Background(), chainID, account)
+	}()
+
+	// The only thing that can start a new fetch here is the on-demand load, so a
+	// second parked fetch proves that TriggerLoad already subscribed to the load
+	// events and is waiting on the load it just started.
+	secondLoadFetch := waitForParkedFetch(t, parkedFetches, "the on-demand load to start fetching")
+	defer secondLoadFetch.Release()
+
+	// Let the replaced loader's load unwind and publish its cancellation, late.
+	firstLoadFetch.Release()
+	select {
+	case <-cancelledCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the replaced loader's load never published its cancellation")
+	}
+
+	// The waiter must ignore it: the load it is waiting on is still running.
+	wokenByStaleEvent := false
+	select {
+	case triggerErr := <-triggerDone:
+		wokenByStaleEvent = true
+		t.Errorf("TriggerLoad returned (%v) on the cancellation of an already replaced loader's load, while the load it was waiting on is still running", triggerErr)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	// The load the waiter really is waiting on now finishes successfully.
+	secondLoadFetch.Release()
+	select {
+	case <-finishedCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the on-demand load never finished")
+	}
+
+	if wokenByStaleEvent {
+		// The waiter is long gone, there's nothing left to wait for. Returning
+		// only once the load it abandoned ended keeps the failure clean.
+		return
+	}
+
+	select {
+	case triggerErr := <-triggerDone:
+		require.NoError(t, triggerErr)
+	case <-time.After(5 * time.Second):
+		t.Fatal("TriggerLoad did not return after the load it was waiting on finished")
+	}
+}
+
 func TestControllerAccountsEvents(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

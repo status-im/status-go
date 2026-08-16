@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -148,10 +147,14 @@ type Messenger struct {
 		wait chan struct{}
 		once sync.Once
 	}
-	historicSyncMu            sync.Mutex
-	historicSyncInFlight      bool
-	lastHistoricSyncRequestAt time.Time
-	ratchetNotFoundDelay      time.Duration
+	historicSyncMu           sync.Mutex
+	historicSyncInFlight     bool
+	historicSyncQueueMu      sync.Mutex
+	historicSyncQueue        []historicSyncRequest
+	historicSyncWorkerActive atomic.Bool
+	// historicSyncTrigger wakes the worker after pending work is added.
+	historicSyncTrigger  chan struct{}
+	ratchetNotFoundDelay time.Duration
 
 	connectionState       connection.State
 	contractMaker         *contracts.ContractMaker
@@ -434,6 +437,7 @@ func NewMessenger(
 		mailserversDatabase:   c.mailserversDatabase,
 		account:               c.account,
 		quit:                  make(chan struct{}),
+		historicSyncTrigger:   make(chan struct{}, 1),
 		ctx:                   ctx,
 		cancel:                cancel,
 		importingCommunities:  make(map[string]bool),
@@ -553,7 +557,11 @@ func (m *Messenger) processSentMessage(id string) error {
 }
 
 func (m *Messenger) SetPaused(paused bool) {
-	m.paused.Store(paused)
+	now := m.historicSyncNow()
+	wasPaused := m.paused.Swap(paused)
+	if paused && !wasPaused {
+		m.advanceHistoryCursors(now)
+	}
 	if m.ensVerifier != nil {
 		m.ensVerifier.SetPaused(paused)
 	}
@@ -578,8 +586,8 @@ func (m *Messenger) SetPaused(paused bool) {
 		if m.httpServer != nil {
 			m.httpServer.ToForeground()
 		}
-		if m.started {
-			m.asyncRequestAllHistoricMessages()
+		if wasPaused {
+			m.notifyHistoricSyncWorker()
 		}
 	} else if m.httpServer != nil {
 		m.httpServer.ToBackground()
@@ -601,6 +609,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.started = true
 
 	m.sender.Start()
+	m.watchReliabilityDeliveryEvents()
 
 	err := m.InitFilters()
 	if err != nil {
@@ -644,6 +653,9 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.schedulePublishGrantsForControlledCommunities()
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
+	m.startHistoricSyncWorker()
+	m.startHistoryReconciliationLoop()
+	m.startHistoryCursorMonitor()
 	m.watchChatsToUnmute()
 	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
@@ -664,13 +676,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	response.StoreNodes, err = m.AllMailservers()
-	if err != nil {
-		return nil, err
-	}
-
-	m.messaging.SetStorenodes(response.StoreNodes)
-
 	if m.config.enablePinnedBootstrap {
 		go func() {
 			defer gocommon.LogOnPanic()
@@ -681,10 +686,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}()
 	}
 
-	// Storenodes are now configured: request any history missed while offline.
-	// This is the cycle-free replacement for the storenode-availability signal
-	// (OnStorenodeAvailable) that previously triggered the sync, and it avoids
-	// racing SetStorenodes against the network-online trigger.
+	// Request any history missed while offline. The storenodes are resolved from
+	// the fleet inside the waku node at startup, so they are already configured
+	// by now. This is the cycle-free replacement for the storenode-availability
+	// signal (OnStorenodeAvailable) that previously triggered the sync.
 	m.asyncRequestAllHistoricMessages()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
@@ -822,12 +827,6 @@ func (m *Messenger) handleConnectionChange(online bool) {
 			m.logger.Error("could not publish on contact code", zap.Error(err))
 		}
 		m.shouldPublishContactCode = false
-	}
-
-	// Start fetching messages from store nodes.
-	// Skip when backgrounded: the sync will run when the app returns to foreground.
-	if online && !m.isPaused() {
-		m.asyncRequestAllHistoricMessages()
 	}
 
 	// Update ENS verifier
@@ -1337,21 +1336,36 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
 func (m *Messenger) watchConnectionChange() {
 	state := m.Online()
-	// lastCheck, sleepDetention and keepAlive helps us recognizing when computer was offline because of sleep, lid closed, etc.
-	lastCheck := time.Now().Unix()
-	sleepDetentionInSecs := int64(20)
-	keepAlivePeriod := 15 * time.Second // must be lower than sleepDetentionInSecs
+	// lastCheck, sleepDetention and keepAlive help recognize system sleep, a gap
+	// that Waku cannot observe while the process is suspended.
+	lastCheck := time.Now()
+	lastHistoryCheck := m.historicSyncNow()
+	sleepDetention := 20 * time.Second
+	keepAlivePeriod := 15 * time.Second // must be lower than sleepDetention
 
 	processNewState := func(newState bool) {
-		now := time.Now().Unix()
-		force := now-lastCheck > sleepDetentionInSecs
+		now := time.Now()
+		historyNow := m.historicSyncNow()
+		previousCheck := lastHistoryCheck
+		force := now.Sub(lastCheck) > sleepDetention
 		lastCheck = now
+		lastHistoryCheck = historyNow
 		if !force && state == newState {
 			return
 		}
+		wasOnline := state
 		state = newState
 		m.logger.Debug("connection changed", zap.Bool("online", state), zap.Bool("force", force))
 		m.handleConnectionChange(state)
+		if !m.isPaused() && newState {
+			switch {
+			case wasOnline && force && previousCheck.Before(historyNow):
+				// The process did not observe connectivity during this interval
+				// (typically system sleep), so treat it as unreliable.
+				m.asyncRequestHistoricMessages(types2.HistoryReconcileWindow{From: previousCheck, To: historyNow})
+			}
+			m.notifyHistoricSyncWorker()
+		}
 	}
 
 	subscribedConnectionStatus := func(subscription types2.ConnectionStatusSubscription) {
@@ -1360,9 +1374,15 @@ func (m *Messenger) watchConnectionChange() {
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
+		// Sentinel outside the valid enum range so the first event always emits.
+		lastConnState := types2.ConnectionState(-1)
 		for {
 			select {
 			case status := <-subscription.C():
+				if status.State != lastConnState {
+					lastConnState = status.State
+					signal.SendConnectionStatusChange(status)
+				}
 				processNewState(status.IsOnline)
 			case <-ticker.C:
 				if m.isPaused() {
@@ -1603,6 +1623,9 @@ func (m *Messenger) Shutdown() (err error) {
 	default:
 	}
 
+	if !m.isPaused() {
+		m.advanceHistoryCursors(m.historicSyncNow())
+	}
 	close(m.quit)
 	m.cancel()
 
@@ -2022,6 +2045,16 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 
 // sendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
+	if len(message.ResponseTo) != 0 {
+		exists, err := m.persistence.MessagesExist([]string{message.ResponseTo})
+		if err != nil {
+			return nil, err
+		}
+		if !exists[message.ResponseTo] {
+			return nil, ErrInvalidResponseTo
+		}
+	}
+
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
 		return nil, err
@@ -3456,9 +3489,16 @@ func (m *Messenger) processStatusMessage(
 }
 
 func (m *Messenger) markDeliveredMessages(acks []cryptotypes.HexBytes) {
+	messageIDs := make([]string, 0, len(acks))
 	for _, ack := range acks {
-		messageID := ack.String()
-		m.logger.Debug("got datasync acknowledge for message", zap.String("ack", hex.EncodeToString(ack)), zap.String("messageID", messageID))
+		messageIDs = append(messageIDs, ack.String())
+	}
+	m.markDeliveredMessageIDs(messageIDs)
+}
+
+func (m *Messenger) markDeliveredMessageIDs(messageIDs []string) {
+	for _, messageID := range messageIDs {
+		m.logger.Debug("marking outgoing message delivered", zap.String("messageID", messageID))
 
 		err := m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
 		if err != nil {
@@ -4069,7 +4109,9 @@ func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, u
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	m.allChats.Store(chatID, chat)
+	if chat != nil {
+		m.allChats.Store(chatID, chat)
+	}
 	return count, countWithMentions, chat, nil
 }
 
@@ -4679,26 +4721,6 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, er
 	return encodedMessage, nil
 }
 
-func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*contacts.Contact, error) {
-	if c, ok := m.allContacts.Load(msg.From); ok {
-		return c, nil
-	}
-
-	senderPubKey, err := msg.GetSenderPubKey()
-	if err != nil {
-		return nil, err
-	}
-	senderID := contacts.ContactIDFromPublicKey(senderPubKey)
-	c, err := contacts.BuildContact(senderID, senderPubKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO(samyoul) remove storing of an updated reference pointer?
-	m.allContacts.Store(msg.From, c)
-	return c, nil
-}
-
 func (m *Messenger) getSettings() (settings2.Settings, error) {
 	sDB, err := accounts.NewDB(m.database)
 	if err != nil {
@@ -4829,32 +4851,6 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 
 func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage, error) {
 	return m.persistence.GetDeleteForMeMessages()
-}
-
-func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
-	logger := m.logger.Named(name)
-	m.shutdownWaitGroup.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer m.shutdownWaitGroup.Done()
-		// Delay by a few minutes to minimize messenger's startup time
-		var interval time.Duration = 5 * time.Minute
-		for {
-			select {
-			case <-time.After(interval):
-				// Set the regular interval after the first execution
-				interval = 1 * time.Hour
-
-				err := cleanupFunc()
-				if err != nil {
-					logger.Error("failed to cleanup", zap.Error(err))
-				}
-
-			case <-m.quit:
-				return
-			}
-		}
-	}()
 }
 
 func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string) (string, error) {

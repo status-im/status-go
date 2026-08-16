@@ -770,10 +770,6 @@ func (m *MockMentionableUserGetter) getMentionableUsers(chatID string) (map[stri
 	return m.mentionableUserMap, nil
 }
 
-func (m *MockMentionableUserGetter) getMentionableUser(chatID string, pk string) (*MentionableUser, error) {
-	return m.mentionableUserMap[pk], nil
-}
-
 func TestMentionSuggestionCases(t *testing.T) {
 	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 

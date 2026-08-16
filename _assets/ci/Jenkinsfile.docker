@@ -46,7 +46,7 @@ pipeline {
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
     PATH     = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* Makefile parameters */
-    DOCKER_IMAGE_NAME = 'statusteam/status-go'
+    DOCKER_IMAGE_NAME = 'harbor.status.im/status-im/status-go'
     DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${git.commit()}"
     SENTRY_PRODUCTION = '1'
   }
@@ -61,16 +61,10 @@ pipeline {
       image = docker.image("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_CUSTOM_TAG}")
     } } } }
 
-    stage('Push') { steps { dir(env.REPO) { script {
-      withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
-        image.push("v${utils.getVersion()}-${git.commit()}")
-      }
-    } } } }
-
     stage('Deploy') {
       when { expression { params.RELEASE == true } }
       steps { dir(env.REPO) { script {
-        withDockerRegistry([credentialsId: "dockerhub-statusteam-auto", url: ""]) {
+        withDockerRegistry([credentialsId: 'harbor-status-go-robot', url: 'https://harbor.status.im']) {
           image.push(env.RELEASE_IMAGE_TAG)
         }
     } } } }

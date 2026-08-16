@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"go.uber.org/zap"
 
@@ -165,16 +164,16 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptot
 	}
 
 	if acc.Type != types.AccountTypeWatch {
-		if password == "" {
-			return ErrNoPasswordProvided
-		}
-
 		kp, err := m.persistence.GetKeypairByKeyUID(acc.KeyUID)
 		if err != nil {
 			return err
 		}
 
 		if !kp.MigratedToColdWallet() {
+			if password == "" {
+				return ErrNoPasswordProvided
+			}
+
 			err = m.deleteAccountFromKeystoreIfExists(address, password)
 			if err != nil {
 				return err
@@ -199,16 +198,16 @@ func (m *AccountsManager) deleteKeystoreFileForAccountInternally(address cryptot
 // if the keypair is already migrated to keycard, it does nothing
 // trying to delete a non-existent keystore file does not result in an error
 func (m *AccountsManager) deleteKeystoreFilesForKeypairInternally(keypair *types.Keypair, password string) (err error) {
-	if password == "" {
-		return ErrNoPasswordProvided
-	}
-
 	if keypair == nil {
 		return ErrKeypairIsNil
 	}
 
 	if keypair.MigratedToColdWallet() {
 		return nil
+	}
+
+	if password == "" {
+		return ErrNoPasswordProvided
 	}
 
 	if m.persistence == nil {
@@ -325,23 +324,17 @@ func (m *AccountsManager) generatePartialAccountKey(address cryptotypes.Address,
 		return nil, ErrPersistenceMissing
 	}
 
-	rootAddress, err := m.persistence.GetWalletRootAddress()
-	if err != nil {
-		return nil, err
-	}
-
 	acc, err := m.persistence.GetAccountByAddress(address)
 	if err != nil {
 		return nil, err
 	}
 
-	dbPath, err := m.persistence.GetPath(acc.Address)
+	kp, err := m.persistence.GetKeypairByKeyUID(acc.KeyUID)
 	if err != nil {
 		return nil, err
 	}
-	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
 
-	return m.deriveChildAccountForPathAndStore(rootAddress, path, password)
+	return m.deriveChildAccountForPathAndStore(cryptotypes.HexToAddress(kp.DerivedFrom), acc.Path, password)
 }
 
 func (m *AccountsManager) deriveChildAccountForPath(deriveFrom cryptotypes.Address, path string, password string) (*generator.Account, error) {

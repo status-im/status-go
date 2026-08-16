@@ -1,10 +1,16 @@
 package accountsmanagement
 
 import (
+	goerrors "errors"
+	"fmt"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/internal/accounts-management/common"
+	accsmanagementerrors "github.com/status-im/status-go/internal/accounts-management/errors"
 	generator "github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	"github.com/status-im/status-go/internal/accounts-management/types"
 	types2 "github.com/status-im/status-go/internal/crypto/types"
 	multiaccscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
@@ -93,10 +99,12 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 		return
 	}
 
-	// store accounts to keystore
-	err = m.storeKeystoreFilesForAccounts(masterAccount, derivedAccounts, password)
-	if err != nil {
-		return
+	// store accounts to keystore, unless the keypair lives on a cold wallet device
+	if coldWallet == types.ColdWalletTypeNone {
+		err = m.storeKeystoreFilesForAccounts(masterAccount, derivedAccounts, password)
+		if err != nil {
+			return
+		}
 	}
 
 	// set the chat account if it's a profile keypair
@@ -411,6 +419,96 @@ func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password str
 	return
 }
 
+// validateAccountAgainstKeypairXPub checks that the account's address matches the address derived from the keypair's xpub
+func validateAccountAgainstKeypairXPub(kp *types.Keypair, acc *types.Account) error {
+	prefix := common.PathWalletXPub + "/"
+	if !strings.HasPrefix(acc.Path, prefix) {
+		return ErrCannotDeriveAccountFromXPub.WithContext("path", acc.Path)
+	}
+	relativePath := strings.TrimPrefix(acc.Path, prefix)
+	if strings.Contains(relativePath, "'") {
+		return ErrCannotDeriveAccountFromXPub.WithContext("path", acc.Path)
+	}
+
+	derived, err := generator.DeriveAccountsPublicInfoFromExtendedPublicKeyForPaths(kp.XPub, []string{relativePath})
+	if err != nil {
+		return err
+	}
+	info, ok := derived[relativePath]
+	if !ok {
+		return ErrCannotDeriveAccountFromXPub.WithContext("path", acc.Path)
+	}
+	if types2.HexToAddress(info.Address) != acc.Address {
+		return ErrAccountMismatch.
+			WithContext("address", acc.Address.Hex()).
+			WithContext("derived address", info.Address)
+	}
+	return nil
+}
+
+// deriveKeypairXPubInternally derives the xpub for the passed master address using the provided password. Caller must hold m.mu.
+func (m *AccountsManager) deriveKeypairXPubInternally(deriveFrom types2.Address, password string) (string, error) {
+	childAccount, err := m.deriveChildAccountForPath(deriveFrom, common.PathWalletXPub, password)
+	if err != nil {
+		return "", err
+	}
+	xpub := childAccount.ExtendedPublicKey()
+	if xpub == "" {
+		return "", ErrCannotDeriveAccountFromXPub.WithContext("path", common.PathWalletXPub)
+	}
+	return xpub, nil
+}
+
+// backfillKeypairXPubInternally stores the keypair's xpub if it's missing, deriving it from the master keystore file
+// using the provided password. Caller must hold m.mu.
+func (m *AccountsManager) backfillKeypairXPubInternally(kp *types.Keypair, password string) error {
+	if kp.XPub != "" || kp.MigratedToColdWallet() || kp.Type == types.KeypairTypeKey || password == "" {
+		return nil
+	}
+	xpub, err := m.deriveKeypairXPubInternally(types2.HexToAddress(kp.DerivedFrom), password)
+	if err != nil {
+		var accountsErr *accsmanagementerrors.AccountsError
+		if goerrors.As(err, &accountsErr) &&
+			(accountsErr.Is(keystore.ErrKeystoreFileMissing) || accountsErr.Is(keystore.ErrIncorrectPasswordProvided)) {
+			m.logger.Info("skipping keypair xpub backfill, master keystore file not usable on this device",
+				zap.String("keyUID", kp.KeyUID), zap.Error(err))
+			return nil
+		}
+		return err
+	}
+	err = m.persistence.UpdateKeypairXPub(kp.KeyUID, xpub, kp.ColdWallet, kp.Clock)
+	if err != nil {
+		return err
+	}
+	kp.XPub = xpub
+	m.logger.Info("backfilled keypair xpub", zap.String("keyUID", kp.KeyUID))
+	return nil
+}
+
+func (m *AccountsManager) BackfillKeypairsXPub(password string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.persistence == nil {
+		return ErrPersistenceMissing
+	}
+
+	keypairs, err := m.persistence.GetActiveKeypairs()
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for _, kp := range keypairs {
+		err = m.backfillKeypairXPubInternally(kp, password)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("keypair %s: %w", kp.KeyUID, err))
+		}
+	}
+
+	return goerrors.Join(errs...)
+}
+
 func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, password string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -428,29 +526,33 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 		return ErrCannotAddAccountsToKeypairImportedViaPrivateKey
 	}
 
-	if !kp.MigratedToColdWallet() {
+	for _, acc := range accounts {
+		if acc.KeyUID != keyUID {
+			return ErrAccountMismatch.
+				WithContext("keyuid", acc.KeyUID).
+				WithContext("expected keyuid", keyUID)
+		}
+
+		if kp.Type == types.KeypairTypeProfile {
+			if acc.Chat {
+				return ErrCannotAddDefaultChatAccount
+			}
+			if acc.Wallet {
+				return ErrCannotAddDefaultWalletAccount
+			}
+		}
+
+		for _, kpAcc := range kp.Accounts {
+			if acc.Address == kpAcc.Address {
+				return ErrAccountAlreadyAdded
+			}
+		}
+	}
+
+	deriveFromKeystore := password != "" && !kp.MigratedToColdWallet()
+
+	if deriveFromKeystore {
 		for _, acc := range accounts {
-			if acc.KeyUID != keyUID {
-				return ErrAccountMismatch.
-					WithContext("keyuid", acc.KeyUID).
-					WithContext("expected keyuid", keyUID)
-			}
-
-			if kp.Type == types.KeypairTypeProfile {
-				if acc.Chat {
-					return ErrCannotAddDefaultChatAccount
-				}
-				if acc.Wallet {
-					return ErrCannotAddDefaultWalletAccount
-				}
-			}
-
-			for _, kpAcc := range kp.Accounts {
-				if acc.Address == kpAcc.Address {
-					return ErrAccountAlreadyAdded
-				}
-			}
-
 			childAccount, err := m.deriveChildAccountForPath(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return err
@@ -462,6 +564,25 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 					WithContext("derived address", childAccount.Address().Hex())
 			}
 		}
+	} else {
+		if kp.XPub == "" && !kp.MigratedToColdWallet() {
+			return ErrNoPasswordProvidedAndNoXPubStored.WithContext("keyuid", keyUID)
+		}
+		// Cold-wallet keypairs migrated before the xpub was tracked have no xpub stored, in that
+		// case there is nothing the address can be validated against (matches previous behaviour).
+		if kp.XPub != "" {
+			for _, acc := range accounts {
+				err = validateAccountAgainstKeypairXPub(kp, acc)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if !kp.MigratedToColdWallet() {
+			for _, acc := range accounts {
+				acc.Operable = types.AccountPartiallyOperable
+			}
+		}
 	}
 
 	err = m.persistence.SaveOrUpdateAccounts(accounts, true)
@@ -469,12 +590,18 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 		return err
 	}
 
-	if !kp.MigratedToColdWallet() {
+	if deriveFromKeystore {
 		for _, acc := range accounts {
 			_, err := m.deriveChildAccountForPathAndStore(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return err
 			}
+		}
+
+		err = m.backfillKeypairXPubInternally(kp, password)
+		if err != nil {
+			m.logger.Warn("failed to backfill keypair xpub", zap.String("keyUID", kp.KeyUID), zap.Error(err))
+			return err
 		}
 	}
 
@@ -547,7 +674,16 @@ func (m *AccountsManager) MigrateKeypairToColdWallet(keyUID string, password str
 		return err
 	}
 
-	if !kpDb.MigratedToColdWallet() && password != "" {
+	if !kpDb.MigratedToColdWallet() {
+		if password == "" {
+			return ErrNoPasswordProvided
+		}
+
+		err = m.backfillKeypairXPubInternally(kpDb, password)
+		if err != nil {
+			return err
+		}
+
 		err = m.deleteKeystoreFilesForKeypairInternally(kpDb, password)
 		if err != nil {
 			return err
@@ -594,11 +730,9 @@ func (m *AccountsManager) DeleteAccount(address types2.Address, password string,
 	return
 }
 
+// DeleteKeypair removes a keypair and its keystore files. The password is required unless the
+// keypair is migrated to a cold wallet (no keystore files exist for it).
 func (m *AccountsManager) DeleteKeypair(keyUID string, password string, clock uint64) (keypair *types.Keypair, err error) {
-	if password == "" {
-		return nil, ErrNoPasswordProvided
-	}
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

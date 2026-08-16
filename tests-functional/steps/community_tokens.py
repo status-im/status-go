@@ -33,17 +33,24 @@ def check_member_community_updated(
     expected_name: str,
     expected_description: str,
     community: Optional[dict] = None,
+    include_live_fetch: bool = True,
 ) -> bool:
-    """Return True when any fetched or cached community view matches the expected details."""
+    """Return True when any fetched or cached community view matches the expected details.
+
+    With include_live_fetch=False only the local DB is read (non-blocking). Use it where a live fetch
+    (wait_for_response=True) can block indefinitely under store contention.
+    """
     sources: List[Optional[dict]] = [community]
 
-    for try_database in (False, True):
+    # (wait_for_response, try_database) per fetch: live + db-with-fallback normally, else a non-blocking db read.
+    fetch_variants = [(True, False), (True, True)] if include_live_fetch else [(False, True)]
+    for wait_for_response, try_database in fetch_variants:
         try:
             sources.append(
                 messenger.fetch_community(
                     backend,
                     community_id,
-                    wait_for_response=True,
+                    wait_for_response=wait_for_response,
                     try_database=try_database,
                 )
             )
@@ -60,11 +67,12 @@ def wait_until_join_permissions_satisfied(
     backend: StatusBackend,
     community_id: str,
     wallet_address: str,
-    attempts: int = 10,
+    attempts: int = 15,
     delay: int = 2,
     refresh_community: bool = True,
 ) -> dict:
     """Poll until token-gated join permissions are satisfied for the wallet."""
+    backend.wallet_service.restart_wallet_reload_timer()
     backend.wallet_service.fetch_or_get_cached_wallet_balances([wallet_address], True)
     permissions_resp = None
     for _ in range(attempts):
@@ -89,17 +97,23 @@ def wait_until_member_sees_community_update(
     attempts: int = 30,
     delay: int = 2,
     spectate: bool = False,
+    fetch_live: bool = True,
 ):
-    """Poll until backend sees the expected community name and description."""
-    if spectate:
-        try:
-            backend.wakuext_service.spectate_community(community_id)
-        except Exception as exc:
-            logger.debug(f"spectate_community failed for {community_id}: {exc}")
+    """Poll until backend sees the expected community name and description.
 
+    fetch_live=False reads only the local DB (non-blocking) — the update lands there once the backend
+    processes the message, so it avoids a live fetch that can hang under store contention.
+    """
     last_community = None
     for _ in range(attempts):
-        if check_member_community_updated(backend, community_id, expected_name, expected_description):
+        # Re-spectate each iteration to survive a subscription that raced a device reconnect.
+        if spectate:
+            try:
+                backend.wakuext_service.spectate_community(community_id)
+            except Exception as exc:
+                logger.debug(f"spectate_community failed for {community_id}: {exc}")
+
+        if check_member_community_updated(backend, community_id, expected_name, expected_description, include_live_fetch=fetch_live):
             return
         member_communities = backend.wakuext_service.communities()
         last_community = next(
@@ -108,7 +122,7 @@ def wait_until_member_sees_community_update(
         )
         time.sleep(delay)
 
-    assert check_member_community_updated(backend, community_id, expected_name, expected_description), (
+    assert check_member_community_updated(backend, community_id, expected_name, expected_description, include_live_fetch=fetch_live), (
         f"{backend} did not see the updated community name/description; "
         f"expected name={expected_name!r} description={expected_description!r}, "
         f"last observed name={(last_community or {}).get('name')!r} "

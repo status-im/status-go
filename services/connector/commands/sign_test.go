@@ -94,7 +94,7 @@ func TestPersonalSignWithSignalAccepted(t *testing.T) {
 	request, err := preparePersonalSignRequest(testDAppData, challenge, address)
 	assert.NoError(t, err)
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -114,7 +114,7 @@ func TestPersonalSignWithSignalAccepted(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	response, err := state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
@@ -133,7 +133,7 @@ func TestPersonalSignWithSignalRejected(t *testing.T) {
 	request, err := preparePersonalSignRequest(testDAppData, challenge, address)
 	assert.NoError(t, err)
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -150,7 +150,7 @@ func TestPersonalSignWithSignalRejected(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrSignRejectedByUser, err)
@@ -170,7 +170,7 @@ func TestTypedDataV4SignRequestWithSignalAccepted(t *testing.T) {
 	request, err := prepareTypedDataV4SignRequest(testDAppData, challenge, address)
 	assert.NoError(t, err)
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -190,7 +190,7 @@ func TestTypedDataV4SignRequestWithSignalAccepted(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	response, err := state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
@@ -209,7 +209,7 @@ func TestTypedDataV4SignRequestWithSignalRejected(t *testing.T) {
 	request, err := preparePersonalSignRequest(testDAppData, challenge, address)
 	assert.NoError(t, err)
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -226,7 +226,7 @@ func TestTypedDataV4SignRequestWithSignalRejected(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrSignRejectedByUser, err)
@@ -247,7 +247,7 @@ func TestUnsupportedSignMethod(t *testing.T) {
 	request.Method = "eth_signTypedData"
 	fakedSignature := "0x051"
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -267,7 +267,7 @@ func TestUnsupportedSignMethod(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	response, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrInvalidMethod, err)

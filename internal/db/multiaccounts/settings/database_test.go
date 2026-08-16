@@ -49,6 +49,7 @@ var (
 		DisplayAssetsBelowBalance:           false,
 		ShowCommunityAssetWhenSendingTokens: true,
 		ThirdpartyServicesEnabled:           true,
+		AutoApplyKeypairMigrations:          true,
 	}
 )
 
@@ -132,6 +133,19 @@ func TestCreateSettings(t *testing.T) {
 	s, err := db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, settings, s)
+}
+
+func TestDatabase_CreateSettingsPreservesAutoApplyKeypairMigrations(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	s := settings
+	s.AutoApplyKeypairMigrations = false
+	require.NoError(t, db.CreateSettings(s, config))
+
+	enabled, err := db.AutoApplyKeypairMigrations()
+	require.NoError(t, err)
+	require.False(t, enabled)
 }
 
 func TestSaveSetting(t *testing.T) {

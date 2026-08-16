@@ -412,6 +412,25 @@ func (s *ManagerTestSuite) TestSetChatAccountForExistingProfile() {
 	s.Require().NotNil(selectedChatAccount)
 	s.Equal(genAcc.PrivateKeyHex(), selectedChatAccount.PrivateKeyHex())
 	s.Equal(genAcc.Address(), selectedChatAccount.Address())
+	s.Nil(selectedChatAccount.ExtendedKey())
+}
+
+func (s *ManagerTestSuite) TestSetChatAccountWithProfileKeypairSkipsPersistenceLookup() {
+	profileKeypair := s.createAndStoreProfileKeypair()
+	s.accManager.setChatAccountAndProfileKeyUID(nil, "")
+
+	s.Require().NoError(s.accManager.SetChatAccountWithProfileKeypair(
+		s.chatAddress,
+		s.password,
+		nil,
+		profileKeypair,
+	))
+
+	selectedChatAccount, err := s.accManager.SelectedChatAccount()
+	s.Require().NoError(err)
+	s.Equal(s.chatAddress, selectedChatAccount.Address())
+	s.Nil(selectedChatAccount.ExtendedKey())
+	s.Equal(profileKeypair.KeyUID, s.accManager.profileKeyUID)
 }
 
 func (s *ManagerTestSuite) TestLogout() {
@@ -537,6 +556,30 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 	}
 }
 
+func (s *ManagerTestSuite) TestReEncryptKeyStoreDirSkipsFilesystemMetadataFiles() {
+	keypair := s.createAndStoreProfileKeypair()
+
+	dsStorePath := filepath.Join(s.getKeyDir(), ".DS_Store")
+	s.Require().NoError(os.WriteFile(dsStorePath, []byte{0x00, 0x00, 0x00, 0x01}, 0600))
+
+	err := s.accManager.ReEncryptKeyStoreDir(testPassword, newTestPassword)
+	s.Require().NoError(err)
+
+	_, err = os.Stat(dsStorePath)
+	s.Require().True(os.IsNotExist(err))
+
+	accountsToCheck := []string{keypair.DerivedFrom}
+	for _, acc := range keypair.Accounts {
+		accountsToCheck = append(accountsToCheck, acc.Address.Hex())
+	}
+
+	for _, acc := range accountsToCheck {
+		account, err := s.accManager.LoadAccount(types2.HexToAddress(acc), newTestPassword)
+		s.Require().NoError(err)
+		s.Require().NotNil(account)
+	}
+}
+
 func (s *ManagerTestSuite) TestDeleteAccount() {
 	keypair := s.createAndStoreProfileKeypair()
 
@@ -593,6 +636,110 @@ func (s *ManagerTestSuite) TestDeleteKeypair() {
 
 	files, _ := os.ReadDir(s.getKeyDir())
 	s.Equal(0, len(files))
+}
+
+func (s *ManagerTestSuite) TestDeleteAccountOfColdWalletKeypairWithoutPassword() {
+	acc := s.deriveTestAccountAtPath(common.PathDefaultWalletAccount)
+	keypair := &types.Keypair{
+		KeyUID:     s.masterAccount.KeyUID(),
+		Type:       types.KeypairTypeSeed,
+		ColdWallet: types.ColdWalletTypeStatusKeycard,
+		Accounts:   []*types.Account{acc},
+	}
+
+	s.persistence.EXPECT().GetAccountByAddress(acc.Address).Return(acc, nil).Times(2)
+	s.persistence.EXPECT().GetKeypairByKeyUID(acc.KeyUID).Return(keypair, nil).Times(1)
+	s.persistence.EXPECT().RemoveAccount(acc.Address, uint64(0)).Return(nil).Times(1)
+
+	deletedAcc, err := s.accManager.DeleteAccount(acc.Address, "", 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(deletedAcc)
+	s.Require().Equal(acc.Address, deletedAcc.Address)
+}
+
+func (s *ManagerTestSuite) TestDeleteColdWalletKeypairWithoutPassword() {
+	keypair := &types.Keypair{
+		KeyUID:     s.masterAccount.KeyUID(),
+		Type:       types.KeypairTypeSeed,
+		ColdWallet: types.ColdWalletTypeStatusKeycard,
+	}
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
+	s.persistence.EXPECT().RemoveKeypair(keypair.KeyUID, uint64(0)).Return(nil).Times(1)
+
+	deletedKp, err := s.accManager.DeleteKeypair(keypair.KeyUID, "", 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(deletedKp)
+	s.Require().Equal(keypair.KeyUID, deletedKp.KeyUID)
+}
+
+func (s *ManagerTestSuite) TestDeleteRegularKeypairWithoutPasswordRejected() {
+	keypair := &types.Keypair{
+		KeyUID: s.masterAccount.KeyUID(),
+		Type:   types.KeypairTypeSeed,
+	}
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
+
+	_, err := s.accManager.DeleteKeypair(keypair.KeyUID, "", 0)
+	s.Require().Error(err)
+	s.Require().True(errors.Is(err, ErrNoPasswordProvided))
+}
+
+// Regression: CreateKeypairFromMnemonicAndStore documents that accounts are
+// stored to the keystore only when the keypair is not a cold wallet / keycard,
+// but the implementation always calls storeKeystoreFilesForAccounts.
+func (s *ManagerTestSuite) TestCreateKeypairFromMnemonicAndStoreDoesNotWriteKeystoreWhenCold() {
+	s.persistence.EXPECT().GetKeypairByKeyUID(s.masterAccount.KeyUID()).Return(
+		nil, types.ErrDbKeypairNotFound,
+	).Times(1)
+
+	s.persistence.EXPECT().GetPositionForNextNewAccount().Return(int64(0), nil).Times(1)
+
+	s.persistence.EXPECT().SaveOrUpdateKeypair(gomock.Any()).DoAndReturn(
+		func(kp *types.Keypair) error {
+			s.Require().Equal(types.ColdWalletTypeStatusKeycard, kp.ColdWallet)
+			return nil
+		},
+	).Times(1)
+
+	s.persistence.EXPECT().GetProfileKeypair().Return(
+		&types.Keypair{
+			KeyUID: s.masterAccount.KeyUID(),
+		},
+		nil,
+	).Times(1)
+
+	walletAccount := &types.AccountCreationDetails{
+		Path: common.PathDefaultWalletAccount,
+	}
+
+	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(
+		s.mnemonic, s.password, "kp-name", types.ColdWalletTypeStatusKeycard, walletAccount, true, 0)
+	s.Require().NoError(err)
+	s.Require().NotNil(keypair)
+	s.Require().Equal(types.ColdWalletTypeStatusKeycard, keypair.ColdWallet)
+
+	files, err := os.ReadDir(s.getKeyDir())
+	s.Require().NoError(err)
+	s.Require().Empty(files, "cold wallet keypair must not persist private keys in the local keystore")
+}
+
+// Regression: MigrateKeypairToColdWallet must refuse an empty password instead of
+// silently flipping cold_wallet while leaving keystore files on disk.
+func (s *ManagerTestSuite) TestMigrateKeypairToColdWalletRequiresPassword() {
+	keypair := s.createAndStoreProfileKeypair()
+	keypair.Type = types.KeypairTypeSeed
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
+
+	err := s.accManager.MigrateKeypairToColdWallet(keypair.KeyUID, "", types.ColdWalletTypeStatusKeycard, 1)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, ErrNoPasswordProvided)
+
+	files, err := os.ReadDir(s.getKeyDir())
+	s.Require().NoError(err)
+	s.Require().Len(files, 3, "keystore files must remain until a password-backed wipe runs")
 }
 
 func (s *ManagerTestSuite) TestCleanKeystoreFiles() {

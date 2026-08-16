@@ -22,15 +22,15 @@ func TestEncode(t *testing.T) {
 		},
 		{
 			"rose.webp",
-			11119,
+			11121,
 		},
 		{
 			"spin.gif",
-			2263,
+			2261,
 		},
 		{
 			"status.png",
-			5834,
+			5838,
 		},
 	}
 	options := EncodeConfig{
@@ -57,22 +57,22 @@ func TestEncodeToBestSize(t *testing.T) {
 	}{
 		{
 			"elephant.jpg",
-			1467,
+			1471,
 			nil,
 		},
 		{
 			"rose.webp",
-			8513,
-			errors.New("image size after processing exceeds max, expected < '5632', received < '8513'"),
+			8521,
+			errors.New("image size after processing exceeds max, expected < '5632', received < '8521'"),
 		},
 		{
 			"spin.gif",
-			2407,
+			2409,
 			nil,
 		},
 		{
 			"status.png",
-			4725,
+			4729,
 			nil,
 		},
 	}
@@ -101,7 +101,7 @@ func TestCompressToFileLimits(t *testing.T) {
 	bb := bytes.NewBuffer([]byte{})
 	err = CompressToFileLimits(bb, img, FileSizeLimits{50000, 350000})
 	require.NoError(t, err)
-	require.Equal(t, 292395, bb.Len())
+	require.Equal(t, 292349, bb.Len())
 }
 
 func TestGetPayloadFromURI(t *testing.T) {

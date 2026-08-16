@@ -2132,12 +2132,6 @@ github.com/rs/dnscache v0.0.0-20210201191234-295bba877686/go.mod h1:qe5TWALJ8/a1
 github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
 github.com/rs/zerolog v1.13.0/go.mod h1:YbFCdg8HfsridGWAh22vktObvhZbQsZXe4/zB0OKkWU=
 github.com/rs/zerolog v1.15.0/go.mod h1:xYTKnLHcpfU2225ny5qZjxnj9NvkumZYjJHlAThCjNc=
-github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 h1:H3hCXwP92pH/hSgNrCLtjxvsKJ50sq26nICbZuoR1tQ=
-github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315/go.mod h1:ZbKa3zlLnhGF1dAeJtMSoNtM5LgFQnqzq8eYH3uYYkU=
-github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d h1:A926QrjwToaPS7giC4UOBjHhdukq9l1Y15r3qkXYwCY=
-github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d/go.mod h1:Cpq811GTlHevuU6BZxk3ObOdK8AY5gHu9QGmDak0DT4=
-github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a h1:yVNJFSzkEG8smsvd9udiQcMJA0MIsFvlG7ba314cu+s=
-github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a/go.mod h1:TPq+fcJOdGrkpZpXF4UVmFjYxH0gGqnxdgZ+OzAmvJk=
 github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
 github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk=
@@ -2182,7 +2176,6 @@ github.com/shirou/gopsutil v3.21.11+incompatible h1:+1+c1VGhc88SSonWP6foOcLhvnKl
 github.com/shirou/gopsutil v3.21.11+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24/go.mod h1:M+9NzErvs504Cn4c5DxATwIqPbtswREoFCre64PpcG4=
 github.com/shopspring/decimal v0.0.0-20200227202807-02e2044944cc/go.mod h1:DKyhrW/HYNuLGql+MJL6WCR6knT2jwCFRcu2hWCYk4o=
-github.com/shopspring/decimal v1.2.0 h1:abSATXmQEYyShuxI4/vyW3tV1MrKAJzCZ/0zLUXYbsQ=
 github.com/shopspring/decimal v1.2.0/go.mod h1:DKyhrW/HYNuLGql+MJL6WCR6knT2jwCFRcu2hWCYk4o=
 github.com/shurcooL/component v0.0.0-20170202220835-f88ec8f54cc4/go.mod h1:XhFIlyj5a1fBNx5aJTbKoIq0mNaPvOagO+HjB3EtxrY=
 github.com/shurcooL/events v0.0.0-20181021180414-410e4ca65f48/go.mod h1:5u70Mqkb5O5cxEA8nxTsgrgLehJeAw6Oc4Ab1c/P1HM=
@@ -2286,8 +2279,8 @@ github.com/status-im/go-generate-fast v0.0.0-20250916164518-c78009bcfa9e h1:GV7a
 github.com/status-im/go-generate-fast v0.0.0-20250916164518-c78009bcfa9e/go.mod h1:iktiTcPdK+nuL47hn+7UL12uIkgJYyOAh99jdA6ruGw=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3 h1:/73h1w1hUfb3wVyTlNrUIwahZxatgesCHa6lwO57C2M=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
-github.com/status-im/go-wallet-sdk v0.0.0-20260612221124-9c7a9c043068 h1:P309M2KZxV+IcnRLJMkmPZm6nlQFV7i4tC1V7EtJ6Rg=
-github.com/status-im/go-wallet-sdk v0.0.0-20260612221124-9c7a9c043068/go.mod h1:E4E1D0mflc2pcjsutZpvMYSjI+a231uBHQf8UjdT1Ug=
+github.com/status-im/go-wallet-sdk v0.0.0-20260728092705-f70963a74b0e h1:EV0EVv9S/F1lRPcDhbw42X2m918FmPwO2GbWZhg1G/Y=
+github.com/status-im/go-wallet-sdk v0.0.0-20260728092705-f70963a74b0e/go.mod h1:E4E1D0mflc2pcjsutZpvMYSjI+a231uBHQf8UjdT1Ug=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4/go.mod h1:hmpnZzkzSZJbFYWAUkrPV8I36x7mdYiPhPqnALP4fKA=
 github.com/status-im/goroutine-defer-guard v0.3.1 h1:cZhcJ3gO6OgMYBOfEaAAUZaZgKZeSzMlGNEjMyejuRo=
@@ -2416,8 +2409,8 @@ github.com/waku-org/go-libp2p-pubsub v0.13.1-gowaku h1:ovXh1m76i0yPWXt95Z9ZRyEk0
 github.com/waku-org/go-libp2p-pubsub v0.13.1-gowaku/go.mod h1:MKPU5vMI8RRFyTP0HfdsF9cLmL1nHAeJm44AxJGJx44=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 h1:R4YYx2QamhBRl/moIxkDCNW+OP7AHbyWLBygDc/xIMo=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0/go.mod h1:EhZP9fee0DYjKH/IOQvoNSy1tSHp2iZadsHGphcAJgY=
-github.com/waku-org/go-waku v0.10.2 h1:Rjy9UhdXaeLSwcm8unMUiFM3HdLxyJvdtleREEMeyrg=
-github.com/waku-org/go-waku v0.10.2/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
+github.com/waku-org/go-waku v0.10.3 h1:6BpsnM+kwfGNCJo3KrSqe7+zLTK3Tw9xLZrxJJbfHmQ=
+github.com/waku-org/go-waku v0.10.3/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 h1:jisj+OCI6QydLtFq3Pyhu49wl9ytPN7oAHjMfepHDrA=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59/go.mod h1:1PdBdPzyTaKt3VnpAHk3zj+r9dXPFOr3IHZP9nFle6E=
 github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b h1:KgZVhsLkxsj5gb/FfndSCQu6VYwALrCOgYI3poR95yE=
@@ -2426,8 +2419,8 @@ github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 h1:Sd7
 github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065/go.mod h1:7cSGUoGVIla1IpnChrLbkVjkYgdOcr7rcifEfh4ReR4=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:4HSdWMFMufpRo3ECTX6BrvA+VzKhXZf7mS0rTa5cCWU=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
-github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904 h1:V6nJsnNpSl822Z013bYzh9lXnTfwBdQHptIOd3AVwXc=
-github.com/waku-org/sds-go-bindings v0.0.0-20251222164514-d5b47a911904/go.mod h1:GW6bN8Ski1GCOb2f5JbKKstH70wlPen1h8f1nzSDfSI=
+github.com/waku-org/sds-go-bindings v0.3.1 h1:u4k0XHxGnjLIwJsgtelSBA5GmN4YMiDfzpk2wfpexf4=
+github.com/waku-org/sds-go-bindings v0.3.1/go.mod h1:GW6bN8Ski1GCOb2f5JbKKstH70wlPen1h8f1nzSDfSI=
 github.com/wealdtech/go-ens/v3 v3.6.0 h1:EAByZlHRQ3vxqzzwNi0GvEq1AjVozfWO4DMldHcoVg8=
 github.com/wealdtech/go-ens/v3 v3.6.0/go.mod h1:hcmMr9qPoEgVSEXU2Bwzrn/9NczTWZ1rE53jIlqUpzw=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=

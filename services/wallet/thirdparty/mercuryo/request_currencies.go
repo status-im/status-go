@@ -1,7 +1,6 @@
 package mercuryo
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,15 +35,6 @@ type CryptoCurrency struct {
 	Symbol   string `json:"currency"`
 	Network  string `json:"network"`
 	Contract string `json:"contract"`
-}
-
-func (c *Client) FetchCurrencies(ctx context.Context) ([]CryptoCurrency, error) {
-	response, err := c.httpClient.DoGetRequest(ctx, currenciesURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return handleCurrenciesResponse(response)
 }
 
 func handleCurrenciesResponse(response []byte) ([]CryptoCurrency, error) {

@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -29,6 +30,7 @@ const incomingMutualStateEventAcceptedDefaultText = "@%s accepted your contact r
 const incomingMutualStateEventRemovedDefaultText = "@%s removed you as a contact"
 
 var ErrGetLatestContactRequestForContactInvalidID = errors.New("get-latest-contact-request-for-contact: invalid id")
+var ErrSendContactRequestToSelf = errors.New("send-contact-request: cannot send contact request to self")
 
 type SelfContactChangeEvent struct {
 	DisplayNameChanged   bool
@@ -274,6 +276,9 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 	chatID, err := request.HexID()
 	if err != nil {
 		return nil, err
+	}
+	if strings.EqualFold(chatID, m.myHexIdentity()) {
+		return nil, ErrSendContactRequestToSelf
 	}
 
 	var ensName, nickname, displayName string

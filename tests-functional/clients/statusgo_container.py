@@ -359,7 +359,7 @@ class StatusPortsMappings:
         return {f"{m.container_port}/tcp": ("::", None) for m in self._published()}
 
     def ipv4_ports(self):
-        return {f"{m.container_port}/tcp": None for m in self._published()}
+        return {f"{m.container_port}/tcp": ("127.0.0.1", None) for m in self._published()}
 
     def ports(self, ipv6: bool):
         return self.ipv6_ports() if ipv6 else self.ipv4_ports()
@@ -417,6 +417,10 @@ class StatusBackendContainer(StatusGoContainer):
 
         super().__init__(entrypoint, self.ports.ports(ipv6), privileged, container_name_suffix=f"-status-backend-{uuid.uuid4().hex[:8]}", image=image)
 
+        # Docker 28 reassigns published host ports when a second network is attached; join bridge before resolving.
+        if kwargs.get("bridge_network", False):
+            self.connect_to_bridge_network()
+
         try:
             self.ports.resolve_host_ports(self.container)
         except Exception:
@@ -431,9 +435,6 @@ class StatusBackendContainer(StatusGoContainer):
 
         self.url = f"http://{_localhost(ipv6)}:{self.ports.backend.host_port}"
         self.connector_ws_url = f"ws://{_localhost(ipv6)}:{self.ports.connector.host_port}" if self.ports.connector else ""
-
-        if kwargs.get("bridge_network", False):
-            self.connect_to_bridge_network()
 
     def _change_ip(self, new_ipv4=None, new_ipv6=None):
         if not self.container:

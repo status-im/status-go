@@ -10,7 +10,6 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/sqlite"
 )
 
@@ -44,15 +43,6 @@ func SetupTestMemorySQLDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, error) {
 	}
 
 	return db, nil
-}
-
-func SetupTestMemorySQLAccountsDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, error) {
-	db, err := multiaccounts.InitializeDB(dbsetup.InMemoryPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return db.DB(), nil
 }
 
 type TestDBInitializer struct {

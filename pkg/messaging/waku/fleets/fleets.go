@@ -175,13 +175,6 @@ var registry = Map{
 	},
 }
 
-// Register adds or overrides a fleet definition in the registry. It lets local
-// dev / interop harnesses register an ephemeral network as a named fleet before
-// starting, so everything downstream is uniformly fleet-by-name.
-func Register(name string, info Info) {
-	registry[name] = info
-}
-
 // Supported returns the registry of known fleets. It is populated to clients' UI settings.
 func Supported() Map {
 	return registry

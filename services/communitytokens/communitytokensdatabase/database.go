@@ -47,7 +47,7 @@ func (db *Database) GetTokenPrivilegesLevel(chainID uint64, contractAddress stri
 }
 
 func (db *Database) GetTokens() ([]*token.CommunityToken, error) {
-	rows, err := db.db.Query(`SELECT community_id, address, name, symbol, chain_id, decimals, type FROM community_tokens`)
+	rows, err := db.db.Query(`SELECT community_id, address, name, symbol, chain_id, decimals, type, transferable, privileges_level FROM community_tokens`)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,8 @@ func (db *Database) GetTokens() ([]*token.CommunityToken, error) {
 	var result []*token.CommunityToken
 	for rows.Next() {
 		token := token.CommunityToken{}
-		err := rows.Scan(&token.CommunityID, &token.Address, &token.Name, &token.Symbol, &token.ChainID, &token.Decimals, &token.TokenType)
+		err := rows.Scan(&token.CommunityID, &token.Address, &token.Name, &token.Symbol, &token.ChainID, &token.Decimals,
+			&token.TokenType, &token.Transferable, &token.PrivilegesLevel)
 		if err != nil {
 			return nil, err
 		}

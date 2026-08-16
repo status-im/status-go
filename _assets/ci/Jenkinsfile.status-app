@@ -1,0 +1,132 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.39'
+
+/**
+ * status-app companion build.
+ */
+
+def isPRBuild = utils.isPRBuild()
+
+pipeline {
+  agent {
+    docker {
+      label 'linuxcontainer'
+      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
+      args '--volume=/nix:/nix --volume=/etc/nix:/etc/nix'
+    }
+  }
+
+  parameters {
+    string(
+      name: 'STATUS_APP_BRANCH',
+      defaultValue: params.STATUS_APP_BRANCH ?: 'master',
+      description: 'Name of the status-app branch to build.'
+    )
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    timeout(time: 240, unit: 'MINUTES')
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
+    disableRestartFromStage()
+    buildDiscarder(logRotator(
+      numToKeepStr:          '10',
+      daysToKeepStr:         '30',
+      artifactNumToKeepStr:  '1',
+      artifactDaysToKeepStr: '30',
+    ))
+  }
+
+  environment {
+    /* GIT_COMMIT is the status-go commit being tested. status-app's
+     * platform jobs use this to override vendor/status-go. */
+    STATUS_GO_REF = "${env.GIT_COMMIT}"
+    /* Hack-fix for params not being set in env on first job run. */
+    STATUS_APP_BRANCH = "${params.STATUS_APP_BRANCH}"
+  }
+
+  stages {
+    stage('status-app') {
+      parallel {
+        stage('Linux/x86_64') {
+          stages {
+            stage('Package') {
+              steps { script {
+                linux_x86_64 = triggerJob('linux', 'x86_64')
+              } }
+            }
+            stage('E2E') {
+              steps { script {
+                triggerE2E('linux', 'x86_64', linux_x86_64.fullProjectName)
+              } }
+            }
+          }
+        }
+        stage('Windows/x86_64') {
+          stages {
+            stage('Package') {
+              steps { script {
+                windows_x86_64 = triggerJob('windows', 'x86_64')
+              } }
+            }
+            stage('E2E') {
+              steps { script {
+                triggerE2E('windows', 'x86_64', windows_x86_64.fullProjectName)
+              } }
+            }
+          }
+        }
+        stage('MacOS/aarch64') {
+          steps { script {
+            triggerJob('macos', 'aarch64')
+          } }
+        }
+        stage('iOS/aarch64') {
+          steps { script {
+            triggerJob('ios', 'aarch64')
+          } }
+        }
+        stage('Android/arm64') {
+          steps { script {
+            triggerJob('android', 'arm64')
+          } }
+        }
+      }
+    }
+  }
+
+  post {
+    success { script { github.notifyPR(true)  } }
+    failure { script { github.notifyPR(false) } }
+    cleanup {
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
+  }
+}
+
+def triggerJob(String platform, String arch) {
+  return build(
+    job:        "status-app/systems/${platform}/${arch}/package",
+    parameters: jenkins.mapToParams([
+      BRANCH:        env.STATUS_APP_BRANCH,
+      STATUS_GO_REF: env.STATUS_GO_REF,
+    ]),
+    wait:       true,
+    propagate:  true,
+  )
+}
+
+def triggerE2E(String platform, String arch, String buildSource) {
+  return build(
+    job:        "status-app/systems/${platform}/${arch}/tests-e2e",
+    parameters: jenkins.mapToParams([
+      BRANCH:          env.STATUS_APP_BRANCH,
+      BUILD_SOURCE:    buildSource,
+      TEST_SCOPE_FLAG: '-m=critical',
+    ]),
+    wait:       true,
+    propagate:  true,
+  )
+}

@@ -115,23 +115,9 @@ func NewKeystoreFilesSenderServerConfig() *KeystoreFilesSenderServerConfig {
 	}
 }
 
-func NewSenderClientConfig() *SenderClientConfig {
-	return &SenderClientConfig{
-		SenderConfig: new(SenderConfig),
-		ClientConfig: new(ClientConfig),
-	}
-}
-
 func NewReceiverClientConfig() *ReceiverClientConfig {
 	return &ReceiverClientConfig{
 		ReceiverConfig: new(ReceiverConfig),
-		ClientConfig:   new(ClientConfig),
-	}
-}
-
-func NewKeystoreFilesReceiverClientConfig() *KeystoreFilesReceiverClientConfig {
-	return &KeystoreFilesReceiverClientConfig{
-		ReceiverConfig: new(KeystoreFilesReceiverConfig),
 		ClientConfig:   new(ClientConfig),
 	}
 }

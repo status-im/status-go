@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync/atomic"
 
 	sqlcipher "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 
@@ -29,6 +30,8 @@ const (
 	V3CipherPageSize = 1024
 	sqlMainDatabase  = "main"
 )
+
+var sqlcipherDriverID uint64
 
 // DecryptDB completely removes the encryption from the db
 func DecryptDB(oldPath string, newPath string, key string, kdfIterationsNumber int) error {
@@ -165,7 +168,7 @@ func buildSqlcipherDSN(path string) (string, error) {
 }
 
 func openDB(path string, key string, kdfIterationsNumber int, cipherPageSize int) (*sql.DB, error) {
-	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", len(sql.Drivers()))
+	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", atomic.AddUint64(&sqlcipherDriverID, 1))
 	sql.Register(driverName, &sqlcipher.SQLiteDriver{
 		ConnectHook: func(conn *sqlcipher.SQLiteConn) error {
 			if _, err := conn.Exec("PRAGMA foreign_keys=ON", []driver.Value{}); err != nil {
@@ -279,33 +282,6 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 	}
 
 	return db, nil
-}
-
-func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKey string, onStart func(), onEnd func()) error {
-	if onStart != nil {
-		onStart()
-	}
-
-	if onEnd != nil {
-		defer onEnd()
-	}
-
-	if kdfIterationsNumber <= 0 {
-		kdfIterationsNumber = dbsetup.ReducedKDFIterationsNumber
-	}
-
-	db, err := openDB(path, key, kdfIterationsNumber, V4CipherPageSize)
-
-	if err != nil {
-		return err
-	}
-
-	resetKeyString := fmt.Sprintf("PRAGMA rekey = '%s'", newKey)
-	if _, err = db.Exec(resetKeyString); err != nil {
-		return errors.New("failed to set rekey pragma")
-	}
-
-	return nil
 }
 
 // MigrateV3ToV4 migrates database from v3 to v4 format with encryption.

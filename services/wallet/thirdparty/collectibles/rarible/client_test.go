@@ -55,13 +55,15 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 						Int: expectedTokenID0,
 					},
 				},
-				ContractType: w_common.ContractTypeUnknown,
-				Provider:     "rarible",
-				Name:         "Rariversary #002",
-				Description:  "Today marks your Second Rariversary! Can you believe it’s already been two years? Time flies when you’re having fun! Thank you for everything you contribute!",
-				Permalink:    "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729416",
-				ImageURL:     "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s1000",
-				AnimationURL: "https://ipfs.raribleuserdata.com/ipfs/bafybeibpqyrvdkw7ypajsmsvjiz2mhytv7fyyfa6n35tfui7e473dxnyom/image.png",
+				ContractType:  w_common.ContractTypeUnknown,
+				Provider:      "rarible",
+				Name:          "Rariversary #002",
+				Description:   "Today marks your Second Rariversary! Can you believe it’s already been two years? Time flies when you’re having fun! Thank you for everything you contribute!",
+				Permalink:     "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729416",
+				ImageURL:      "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s1000",
+				ThumbnailURL:  "https://lh3.googleusercontent.com/03DCIWuHtWUG5zIPAkdBjPAucg-BNu-917hsY1LRyEtG9pMcYSwIv5n_jZoK4bvMjNbw9MEC3AZA29kje83fCf2XwG6WegOv0JU=s250",
+				ImageSize:     1216435,
+				ThumbnailSize: 96841,
 				Traits: []thirdparty.CollectibleTrait{
 					{
 						TraitType: "Theme",
@@ -90,13 +92,15 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 						Int: expectedTokenID1,
 					},
 				},
-				ContractType: w_common.ContractTypeUnknown,
-				Provider:     "rarible",
-				Name:         "Rariversary #003",
-				Description:  "Today marks your Third Rariversary! Can you believe it’s already been three years? Time flies when you’re having fun! We’ve loved working with you these years and can’t wait to see what the next few years bring. Thank you for everything you contribute!",
-				Permalink:    "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729414",
-				ImageURL:     "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s1000",
-				AnimationURL: "https://ipfs.raribleuserdata.com/ipfs/bafybeicsr36faeleunc5pzkqyf57pwm66vir4xhdkvv6cnkkznoyewqt7u/image.png",
+				ContractType:  w_common.ContractTypeUnknown,
+				Provider:      "rarible",
+				Name:          "Rariversary #003",
+				Description:   "Today marks your Third Rariversary! Can you believe it’s already been three years? Time flies when you’re having fun! We’ve loved working with you these years and can’t wait to see what the next few years bring. Thank you for everything you contribute!",
+				Permalink:     "https://rarible.com/token/0xb66a603f4cfe17e3d27b87a8bfcad319856518b8:32292934596187112148346015918544186536963932779440027682601542850818403729414",
+				ImageURL:      "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s1000",
+				ThumbnailURL:  "https://lh3.googleusercontent.com/SimzYIBjaTFt3BTBXFGOOvAqfw_etV0Pbe2pen-IvwF7L8DOysNca7qBdj3Dt5n_HWsse5vDLD7FZ7o5XdEivRvBtUybI1mXZEBQ=s250",
+				ImageSize:     988277,
+				ThumbnailSize: 68280,
 				Traits: []thirdparty.CollectibleTrait{
 					{
 						TraitType: "Theme",
@@ -123,4 +127,159 @@ func TestUnmarshallOwnedCollectibles(t *testing.T) {
 	collectiblesData := raribleToCollectiblesData(container.Collectibles, true)
 
 	assert.Equal(t, expectedCollectiblesData, collectiblesData)
+}
+
+func TestGetThumbnailURL(t *testing.T) {
+	preview := Content{Type: "IMAGE", URL: "preview", Representation: "PREVIEW"}
+	portrait := Content{Type: "IMAGE", URL: "portrait", Representation: "PORTRAIT"}
+	big := Content{Type: "IMAGE", URL: "big", Representation: "BIG"}
+	original := Content{Type: "IMAGE", URL: "original", Representation: "ORIGINAL"}
+	video := Content{Type: "VIDEO", URL: "video", Representation: "PREVIEW"}
+
+	testCases := []struct {
+		name     string
+		contents []Content
+		expected string
+	}{
+		{
+			name:     "prefers the preview over every larger representation",
+			contents: []Content{original, big, portrait, preview},
+			expected: "preview",
+		},
+		{
+			name:     "falls back to the portrait when there is no preview",
+			contents: []Content{original, big, portrait},
+			expected: "portrait",
+		},
+		{
+			name:     "stays empty rather than offering the original as a thumbnail",
+			contents: []Content{original},
+			expected: "",
+		},
+		{
+			name:     "stays empty rather than offering the big representation",
+			contents: []Content{original, big},
+			expected: "",
+		},
+		{
+			name:     "ignores video content",
+			contents: []Content{video, original},
+			expected: "",
+		},
+		{
+			name:     "handles an item with no content at all",
+			contents: []Content{},
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, getThumbnailURL(tc.contents))
+		})
+	}
+}
+
+func TestGetAnimation(t *testing.T) {
+	video := Content{Type: "VIDEO", URL: "video", Representation: "ORIGINAL", MimeType: "video/mp4"}
+	videoNoMime := Content{Type: "VIDEO", URL: "video", Representation: "ORIGINAL"}
+	gif := Content{Type: "IMAGE", URL: "gif", Representation: "ORIGINAL", MimeType: "image/gif"}
+	still := Content{Type: "IMAGE", URL: "still", Representation: "ORIGINAL", MimeType: "image/png"}
+	stillNoMime := Content{Type: "IMAGE", URL: "still", Representation: "ORIGINAL"}
+
+	testCases := []struct {
+		name              string
+		contents          []Content
+		expectedURL       string
+		expectedMediaType string
+	}{
+		{
+			name:              "carries the mime type of the video it picked",
+			contents:          []Content{still, video},
+			expectedURL:       "video",
+			expectedMediaType: "video/mp4",
+		},
+		{
+			name:              "carries the mime type of an animated image",
+			contents:          []Content{still, gif},
+			expectedURL:       "gif",
+			expectedMediaType: "image/gif",
+		},
+		{
+			name:              "prefers video over an animated image",
+			contents:          []Content{gif, video},
+			expectedURL:       "video",
+			expectedMediaType: "video/mp4",
+		},
+		{
+			name:              "reports no animation for a still image",
+			contents:          []Content{still},
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+		{
+			name:              "reports no animation when the mime type is unknown",
+			contents:          []Content{stillNoMime},
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+		{
+			// The consumer falls back to resolving the media type itself, so the
+			// video is still offered rather than dropped.
+			name:              "offers a video whose mime type the provider omitted",
+			contents:          []Content{videoNoMime},
+			expectedURL:       "video",
+			expectedMediaType: "",
+		},
+		{
+			name:              "handles an item with no content at all",
+			contents:          []Content{},
+			expectedURL:       "",
+			expectedMediaType: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			animation := getAnimation(tc.contents)
+			assert.Equal(t, tc.expectedURL, animation.URL)
+			assert.Equal(t, tc.expectedMediaType, animation.MimeType)
+		})
+	}
+}
+
+// Rarible reports a size per representation, so whichever one a pick lands on
+// has to bring its own size along - the picks are what the size cap reads.
+func TestCollectibleDataCarriesSizePerRepresentation(t *testing.T) {
+	preview := Content{Type: "IMAGE", URL: "preview", Representation: "PREVIEW", MimeType: "image/png", Size: 9000}
+	big := Content{Type: "IMAGE", URL: "big", Representation: "BIG", MimeType: "image/png", Size: 43000}
+	animation := Content{Type: "VIDEO", URL: "animation", Representation: "ORIGINAL", MimeType: "video/mp4", Size: 2850000}
+
+	collectible := Collectible{}
+	collectible.Metadata.Contents = []Content{preview, big, animation}
+
+	data := collectible.toCollectibleData(thirdparty.CollectibleUniqueID{})
+
+	assert.Equal(t, "big", data.ImageURL)
+	assert.Equal(t, int64(43000), data.ImageSize)
+	assert.Equal(t, "preview", data.ThumbnailURL)
+	assert.Equal(t, int64(9000), data.ThumbnailSize)
+	assert.Equal(t, "animation", data.AnimationURL)
+	assert.Equal(t, int64(2850000), data.AnimationSize)
+}
+
+// A representation Rarible did not size must not read as "zero bytes", which is
+// how an absent size is spelled everywhere downstream.
+func TestCollectibleDataLeavesAnUnreportedSizeAtZero(t *testing.T) {
+	image := Content{Type: "IMAGE", URL: "image", Representation: "BIG", MimeType: "image/png"}
+
+	collectible := Collectible{}
+	collectible.Metadata.Contents = []Content{image}
+
+	data := collectible.toCollectibleData(thirdparty.CollectibleUniqueID{})
+
+	assert.Equal(t, "image", data.ImageURL)
+	assert.Zero(t, data.ImageSize)
+	assert.Empty(t, data.ThumbnailURL)
+	assert.Zero(t, data.ThumbnailSize)
 }

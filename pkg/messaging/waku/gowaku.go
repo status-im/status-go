@@ -48,6 +48,7 @@ import (
 	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -56,7 +57,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
+	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -74,10 +77,10 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
-	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -105,8 +108,6 @@ type IMetricsHandler interface {
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerConnFailures(peerConnFailures map[string]int)
-	PushMessageCheckSuccess()
-	PushMessageCheckFailure()
 	PushPeerCountByShard(peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(dialFailure common.DialError)
@@ -141,8 +142,8 @@ type Waku struct {
 	subscriptionsMu sync.Mutex
 	subscriptions   map[types.TopicSubscription]string
 
-	envelopeCache *ttlcache.Cache[gethcommon.Hash, bool] // [Hash of envelope -> Processed] cache
-	poolMu        sync.RWMutex                           // Mutex to sync the message and expiration pools
+	envelopeCache *ttlcache.Cache[gethcommon.Hash, struct{}] // short-lived set of seen envelope hashes; feeds hit/miss metrics and self-send suppression only. De-duplication is owned by the transport's persistent processed-message cache (status-im/status-go#7464).
+	poolMu        sync.RWMutex                               // Mutex to sync the message and expiration pools
 
 	bandwidthCounter *metrics.BandwidthCounter
 
@@ -165,7 +166,19 @@ type Waku struct {
 	connectionNotifChan     chan node.PeerConnection
 	connStatusSubscriptions map[string]*types.ConnStatusSubscription
 	connStatusMu            sync.Mutex
-	onlineChecker           *onlinechecker.DefaultOnlineChecker
+	// connState is the latest derived three-state connection status, guarded by
+	// connStatusMu. ConnectionState() reads it; checkForConnectionChanges writes it.
+	connState types.ConnectionState
+	// topicHealth caches the most recent per-pubsub-topic mesh health reported by
+	// go-waku on topicHealthStatusChan. Accessed only from the connection poller
+	// goroutine (the topicHealthStatusChan/ticker/connectionNotifChan select loop),
+	// so it needs no lock of its own.
+	topicHealth   map[string]peermanager.TopicHealth
+	onlineChecker *onlinechecker.DefaultOnlineChecker
+	// historyReconcileNeeded carries unreliable delivery windows detected by
+	// the history-reconcile loop. Temporary until logos-delivery owns
+	// reconciliation end to end — see OnHistoryReconcileNeeded.
+	historyReconcileNeeded chan types.HistoryReconcileWindow
 	// stateMu guards state and stateInitialized. ConnectionChanged is invoked
 	// from the OS/mobile path while checkForConnectionChanges and
 	// handleNetworkChangeFromApp run on the internal poller goroutine, so all
@@ -189,9 +202,6 @@ type Waku struct {
 	// goingOnline is channel that notifies when connectivity has changed from offline to online
 	goingOnline chan struct{}
 
-	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
-	onPeerStats                     func(types.ConnStatus)
-
 	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
@@ -203,8 +213,8 @@ func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
 	w.metricsHandler = client
 }
 
-func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
-	cache := ttlcache.New(ttlcache.WithTTL[gethcommon.Hash, bool](cacheTTL))
+func newTTLCache() *ttlcache.Cache[gethcommon.Hash, struct{}] {
+	cache := ttlcache.New(ttlcache.WithTTL[gethcommon.Hash, struct{}](cacheTTL))
 	go func() {
 		defer gocommon.LogOnPanic()
 		cache.Start()
@@ -213,7 +223,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, bool] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesource.Provider, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesource.Provider) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -236,25 +246,25 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	ctx, cancel := context.WithCancel(context.Background())
 
 	waku := &Waku{
-		cfg:                             cfg,
-		subscriptions:                   make(map[types.TopicSubscription]string),
-		envelopeCache:                   newTTLCache(),
-		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
-		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
-		connectionNotifChan:             make(chan node.PeerConnection, 20),
-		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
-		ctx:                             ctx,
-		cancel:                          cancel,
-		wg:                              sync.WaitGroup{},
-		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
-		dnsAddressCacheLock:             &sync.RWMutex{},
-		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
-		timesource:                      ts,
-		logger:                          logger,
-		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
-		onPeerStats:                     onPeerStats,
-		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
-		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+		cfg:                         cfg,
+		subscriptions:               make(map[types.TopicSubscription]string),
+		envelopeCache:               newTTLCache(),
+		msgQueue:                    make(chan *common.ReceivedMessage, messageQueueLimit),
+		topicHealthStatusChan:       make(chan peermanager.TopicHealthStatus, 100),
+		connectionNotifChan:         make(chan node.PeerConnection, 20),
+		connStatusSubscriptions:     make(map[string]*types.ConnStatusSubscription),
+		topicHealth:                 make(map[string]peermanager.TopicHealth),
+		historyReconcileNeeded:      make(chan types.HistoryReconcileWindow, 16),
+		ctx:                         ctx,
+		cancel:                      cancel,
+		wg:                          sync.WaitGroup{},
+		dnsAddressCache:             make(map[string][]dnsdisc.DiscoveredNode),
+		dnsAddressCacheLock:         &sync.RWMutex{},
+		dnsDiscAsyncRetrievedSignal: make(chan struct{}),
+		timesource:                  ts,
+		logger:                      logger,
+		onlineChecker:               onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
+		sendQueue:                   publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
@@ -308,11 +318,10 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		shards = append(shards, shardInfo)
 	}
 	waku.defaultShardInfo = shards[0]
-	if cfg.LightClient {
+	if cfg.IsLightClient() {
 		opts = append(opts, node.WithWakuFilterLightNode())
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
-		cfg.EnableStoreConfirmationForMessagesSent = false
 		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
 		opts = append(opts, node.WithShards(waku.defaultShardInfo.ShardIDs))
 	} else {
@@ -327,10 +336,9 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuRelayAndMinPeers(waku.cfg.MinPeersForRelay, relayOpts...))
 		opts = append(opts, node.WithMaxPeerConnections(maxRelayPeers))
 		cfg.EnablePeerExchangeClient = true //Enabling this until discv5 issues are resolved. This will enable more peers to be connected for relay mesh.
-		cfg.EnableStoreConfirmationForMessagesSent = true
 	}
 
-	if !cfg.LightClient {
+	if !cfg.IsLightClient() {
 		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
 	}
@@ -665,20 +673,8 @@ func (w *Waku) GetPubsubTopic(topic string) string {
 	return topic
 }
 
-func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
-	topic = w.GetPubsubTopic(topic)
-
-	if !w.node.Relay().IsSubscribed(topic) {
-		return nil
-	}
-
-	contentFilter := protocol.NewContentFilter(topic)
-
-	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
-}
-
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string) error {
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		return errors.New("only available for full nodes")
 	}
 
@@ -779,7 +775,7 @@ func (w *Waku) Subscribe(ctx context.Context, pubsubTopic string, contentTopics 
 		if err != nil {
 			return err
 		}
-		if w.cfg.LightClient && w.filterManager != nil {
+		if w.cfg.IsLightClient() && w.filterManager != nil {
 			topics := [][]byte{types.TopicTypeToByteArray(contentTopic)}
 			cf := protocol.NewContentFilter(w.GetPubsubTopic(pubsubTopic), common.NewTopicSetFromBytes(topics).ContentTopics()...)
 			w.filterManager.SubscribeFilter(id, cf)
@@ -804,7 +800,7 @@ func (w *Waku) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopic
 		}
 
 		w.logger.Debug("cleaning up wire subscription", zap.String("id", id))
-		if w.cfg.LightClient && w.filterManager != nil {
+		if w.cfg.IsLightClient() && w.filterManager != nil {
 			w.filterManager.UnsubscribeFilter(id)
 		}
 		delete(w.subscriptions, sub)
@@ -849,6 +845,9 @@ func (w *Waku) Start() error {
 	selector := newStoreSelector()
 	pager := newStorePager(wakuStoreRequestor{store: w.node.Store()}, NewHistoryProcessorWrapper(w), w.logger)
 	w.storeClient = NewStoreClient(selector, pager, w.GetPubsubTopic, w.logger)
+	// The store nodes belong to the fleet, so the waku node resolves them itself
+	// instead of having a higher layer push them in.
+	w.storeClient.SetStorenodes(w.fleetStorenodes())
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
@@ -861,44 +860,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer w.wg.Done()
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		sub := w.PauseBroadcaster.Subscribe()
-		defer sub.Unsubscribe()
-		paused := <-sub.C()
-		var tickerC <-chan time.Time
-		if !paused {
-			tickerC = ticker.C
-		}
-		for {
-			select {
-			case <-w.ctx.Done():
-				return
-			case pausedState, ok := <-sub.C():
-				if !ok {
-					return
-				}
-				paused = pausedState
-				if paused {
-					tickerC = nil
-				} else {
-					tickerC = ticker.C
-				}
-			case <-tickerC:
-				w.checkForConnectionChanges()
-			case <-w.topicHealthStatusChan:
-				// TODO: https://github.com/status-im/status-go/issues/4628
-			case <-w.connectionNotifChan:
-				if !paused {
-					w.checkForConnectionChanges()
-				}
-			}
-		}
-	}()
+	w.startConnectionMonitoringLoop()
 
 	if w.cfg.MetricsEnabled {
 		w.wg.Add(1)
@@ -930,7 +892,7 @@ func (w *Waku) Start() error {
 			}
 
 			publishMethod := "relay"
-			if w.cfg.LightClient {
+			if w.cfg.IsLightClient() {
 				publishMethod = "lightpush"
 			}
 
@@ -965,7 +927,7 @@ func (w *Waku) Start() error {
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
 
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
 		w.filterManager = filterapi.NewFilterManager(
@@ -1009,20 +971,124 @@ func (w *Waku) Start() error {
 	return nil
 }
 
-func (w *Waku) checkForConnectionChanges() {
+// startConnectionMonitoringLoop starts the connection-state observer and its
+// associated history reconciliation scheduler.
+func (w *Waku) startConnectionMonitoringLoop() {
+	w.wg.Add(1)
+	go w.runConnectionMonitoringLoop()
+}
 
-	isOnline := len(w.node.Host().Network().Peers()) > 0
+func (w *Waku) runConnectionMonitoringLoop() {
+	defer gocommon.LogOnPanic()
+	defer w.wg.Done()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	sub := w.PauseBroadcaster.Subscribe()
+	defer sub.Unsubscribe()
+	paused := <-sub.C()
+	tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
+	var pendingReconciliations []types.HistoryReconcileWindow
+
+	observeConnectionState := func() {
+		observedAt := time.Now()
+		w.queueHistoryReconciliation(&tracker, &pendingReconciliations, w.checkForConnectionChanges() == types.ConnectionStateConnected, observedAt)
+	}
+	startupObservedAt := time.Now()
+	w.queueHistoryReconciliation(&tracker, &pendingReconciliations, tracker.reliable, startupObservedAt)
+	var tickerC <-chan time.Time
+	if !paused {
+		tickerC = ticker.C
+	}
+	for {
+		var reconciliationOut chan<- types.HistoryReconcileWindow
+		var nextReconciliation types.HistoryReconcileWindow
+		if len(pendingReconciliations) != 0 {
+			reconciliationOut = w.historyReconcileNeeded
+			nextReconciliation = pendingReconciliations[0]
+		}
+		select {
+		case <-w.ctx.Done():
+			return
+		case reconciliationOut <- nextReconciliation:
+			pendingReconciliations = pendingReconciliations[1:]
+		case pausedState, ok := <-sub.C():
+			if !ok {
+				return
+			}
+			paused = pausedState
+			if paused {
+				tickerC = nil
+			} else {
+				tickerC = ticker.C
+				observeConnectionState()
+			}
+		case <-tickerC:
+			observeConnectionState()
+		case topicHealth := <-w.topicHealthStatusChan:
+			// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
+			// / SufficientlyHealthy); cache it so checkForConnectionChanges can
+			// tell PartiallyConnected from Connected. Supersedes the old no-op
+			// (status-im/status-go#4628).
+			w.topicHealth[topicHealth.Topic] = topicHealth.Health
+			if !paused {
+				observeConnectionState()
+			}
+		case <-w.connectionNotifChan:
+			if !paused {
+				observeConnectionState()
+			}
+		}
+	}
+}
+
+// deriveConnectionState maps the node's current connectivity onto the three-state
+// ConnectionState, mirroring logos-delivery's health monitor
+// (node_health_monitor.nim calculateConnectionState):
+//
+//   - no peers                     -> Disconnected
+//   - relay mesh SufficientlyHealthy on every default shard -> Connected
+//   - peers, but a degraded mesh   -> PartiallyConnected
+//
+// Light (Edge) nodes have no relay mesh, so per-shard mesh health is not
+// meaningful for them; any connectivity is reported as Connected until
+// per-protocol (filter/lightpush/store) health is exposed. Runs on the
+// connection poller goroutine, so topicHealth is read without a lock.
+func (w *Waku) deriveConnectionState() types.ConnectionState {
+	if len(w.node.Host().Network().Peers()) == 0 {
+		return types.ConnectionStateDisconnected
+	}
+	if w.cfg.IsLightClient() {
+		return types.ConnectionStateConnected
+	}
+	for _, topic := range w.cfg.DefaultShardedPubsubTopics {
+		if w.topicHealth[topic] < peermanager.SufficientlyHealthy {
+			return types.ConnectionStatePartiallyConnected
+		}
+	}
+	return types.ConnectionStateConnected
+}
+
+// ConnectionState returns the latest derived three-state connection status.
+func (w *Waku) ConnectionState() types.ConnectionState {
+	w.connStatusMu.Lock()
+	defer w.connStatusMu.Unlock()
+	return w.connState
+}
+
+func (w *Waku) checkForConnectionChanges() types.ConnectionState {
+
+	state := w.deriveConnectionState()
+	isOnline := state.IsOnline()
 
 	w.connStatusMu.Lock()
 
+	w.connState = state
 	latestConnStatus := types.ConnStatus{
 		IsOnline: isOnline,
-		Peers:    FormatPeerStats(w.node),
+		State:    state,
 	}
 
-	w.logger.Debug("peer stats",
-		zap.Int("peersCount", len(latestConnStatus.Peers)),
-		zap.Any("stats", latestConnStatus))
+	w.logger.Debug("connection status", zap.Bool("isOnline", isOnline), zap.Stringer("state", state))
 	for k, subs := range w.connStatusSubscriptions {
 		if !subs.Send(latestConnStatus) {
 			delete(w.connStatusSubscriptions, k)
@@ -1031,10 +1097,6 @@ func (w *Waku) checkForConnectionChanges() {
 
 	w.connStatusMu.Unlock()
 
-	if w.onPeerStats != nil {
-		w.onPeerStats(latestConnStatus)
-	}
-
 	// Build the proposed next state. checkForConnectionChanges never originates
 	// a Type change (the comment below acknowledges this), and it has no OS
 	// visibility to learn about Expensive — both flow through the explicit
@@ -1042,11 +1104,13 @@ func (w *Waku) checkForConnectionChanges() {
 	prevState, _ := w.snapshotState()
 	next := connection.State{
 		Type:    prevState.Type, //setting state type as previous one since there won't be a change here
-		Offline: !latestConnStatus.IsOnline,
+		Offline: !isOnline,
 	}
 	if w.shouldFireConnectionChanged(next) {
 		w.ConnectionChanged(next)
 	}
+
+	return state
 }
 
 func (w *Waku) reportPeerMetrics() {
@@ -1092,7 +1156,7 @@ func (w *Waku) reportPeerMetrics() {
 
 func (w *Waku) startMessageSender() error {
 	publishMethod := publish.Relay
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		publishMethod = publish.LightPush
 	}
 
@@ -1104,44 +1168,6 @@ func (w *Waku) startMessageSender() error {
 
 	if w.cfg.MetricsEnabled {
 		sender.WithMessageSentEmitter(w.node.Host())
-	}
-
-	if w.cfg.EnableStoreConfirmationForMessagesSent {
-		msgStoredChan := make(chan gethcommon.Hash, 1000)
-		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		// The store node is selected on demand by the StoreClient (the go-waku
-		// storenode cycle is gone); MessageSentCheck queries it by hash to confirm
-		// that published messages propagated.
-		messageSentCheck := NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), storeClientPeerProvider{w.storeClient}, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
-		sender.WithMessageSentCheck(messageSentCheck)
-
-		w.wg.Add(1)
-		go func() {
-			defer gocommon.LogOnPanic()
-			defer w.wg.Done()
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case hash := <-msgStoredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeSent,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckSuccess()
-					}
-				case hash := <-msgExpiredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeExpired,
-					})
-					if w.metricsHandler != nil {
-						w.metricsHandler.PushMessageCheckFailure()
-					}
-				}
-			}
-		}()
 	}
 
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
@@ -1164,7 +1190,7 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		return nil
 	}
 
@@ -1256,8 +1282,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 // addEnvelope adds an envelope to the envelope map, used for sending
 func (w *Waku) addEnvelope(envelope *common.ReceivedMessage) {
 	w.poolMu.Lock()
-	// Add the envelope to the cache with Processed set to false
-	w.envelopeCache.Set(envelope.Hash(), false, ttlcache.DefaultTTL)
+	w.envelopeCache.Set(envelope.Hash(), struct{}{}, ttlcache.DefaultTTL)
 	w.poolMu.Unlock()
 }
 
@@ -1266,14 +1291,7 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 
 	w.poolMu.Lock()
 	alreadyCached := w.envelopeCache.Has(recvMessage.Hash())
-	envelopeProcessed := false
 	w.poolMu.Unlock()
-
-	if !alreadyCached {
-		w.addEnvelope(recvMessage)
-	} else {
-		envelopeProcessed = w.envelopeCache.Get(recvMessage.Hash()).Value()
-	}
 
 	logger := w.logger.With(zap.String("envelopeHash", recvMessage.Hash().Hex()))
 
@@ -1281,19 +1299,21 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 		logger.Debug("w envelope already cached")
 		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
+		w.addEnvelope(recvMessage)
 		logger.Debug("cached w envelope")
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
 		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
 	}
 
-	if !envelopeProcessed {
-		if processImmediately {
-			logger.Debug("immediately processing envelope")
-			w.processMessage(recvMessage)
-		} else {
-			logger.Debug("posting event")
-			w.postEvent(recvMessage) // notify the local node about the new message
-		}
+	// De-duplication is owned by the transport's persistent processed-message
+	// cache (status-im/status-go#7464), so every received envelope is forwarded
+	// regardless of the in-memory cache above.
+	if processImmediately {
+		logger.Debug("immediately processing envelope")
+		w.processMessage(recvMessage)
+	} else {
+		logger.Debug("posting event")
+		w.postEvent(recvMessage) // notify the local node about the new message
 	}
 
 	return true, nil
@@ -1333,32 +1353,6 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 	})
 }
 
-// HasEnvelope returns true if the envelope with the given hash is present in the cache.
-func (w *Waku) HasEnvelope(hash cryptotypes.Hash) bool {
-	w.poolMu.RLock()
-	defer w.poolMu.RUnlock()
-
-	return w.envelopeCache.Has(gethcommon.Hash(hash))
-}
-
-// isEnvelopeCached checks if envelope with specific hash has already been received and cached.
-func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
-	w.poolMu.Lock()
-	defer w.poolMu.Unlock()
-
-	return w.envelopeCache.Has(hash)
-}
-
-func (w *Waku) ClearEnvelopesCache() {
-	w.poolMu.Lock()
-	defer w.poolMu.Unlock()
-
-	w.envelopeCache.Stop()
-	w.envelopeCache = newTTLCache()
-}
-
-// Peers is retained only for the Python functional tests (see tests-functional);
-// it is not used by status-app.
 func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
 }
@@ -1382,7 +1376,7 @@ func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 		isNetworkSwitchEvent(prevState, state, prevInitialized) {
 		w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
 		w.node.DisconnectAllPeers()
-		if w.cfg.LightClient {
+		if w.cfg.IsLightClient() {
 			w.filterManager.NetworkChange()
 		}
 	}
@@ -1417,7 +1411,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	}
 	isOnline := !state.Offline
 
-	if w.cfg.LightClient {
+	if w.cfg.IsLightClient() {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
 		go func() {
 			defer gocommon.LogOnPanic()
@@ -1628,9 +1622,25 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	return p
 }
 
-// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
-func (w *Waku) SetStorenodes(nodes []peer.AddrInfo) {
-	w.storeClient.SetStorenodes(nodes)
+// fleetStorenodes resolves the configured fleet's store nodes into dialable peer
+// addresses. Nodes whose addressing info can't be resolved are skipped.
+func (w *Waku) fleetStorenodes() []peer.AddrInfo {
+	storeNodes := fleets.StoreNodes(w.cfg.Fleet)
+	addrInfos := make([]peer.AddrInfo, 0, len(storeNodes))
+	for _, node := range storeNodes {
+		info, err := node.PeerInfo()
+		if err != nil {
+			w.logger.Warn("skipping storenode with unresolvable peer info",
+				zap.String("id", node.ID), zap.String("name", node.Name), zap.Error(err))
+			continue
+		}
+		addrInfos = append(addrInfos, info)
+	}
+	if len(addrInfos) == 0 && len(storeNodes) > 0 {
+		w.logger.Warn("no usable storenodes after resolving peer info; history queries will fail",
+			zap.Int("configured", len(storeNodes)))
+	}
+	return addrInfos
 }
 
 // StoreQuery retrieves historic messages for a single batch via the StoreClient
@@ -1643,6 +1653,79 @@ func (w *Waku) StoreQuery(
 	processEnvelopes bool,
 ) error {
 	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	if w.storeClient == nil {
+		return peer.AddrInfo{}
+	}
+
+	return w.storeClient.nextStorenode()
+}
+
+func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error {
+	if len(messageHashes) == 0 {
+		return nil
+	}
+
+	parsedHashes := make([]pb.MessageHash, 0, len(messageHashes))
+	for _, messageHash := range messageHashes {
+		decodedHash, err := hexutil.Decode(messageHash)
+		if err != nil {
+			w.logger.Debug("invalid message hash for storenode fetch", zap.String("messageHash", messageHash), zap.Error(err))
+			continue
+		}
+		parsedHashes = append(parsedHashes, pb.ToMessageHash(decodedHash))
+	}
+
+	if len(parsedHashes) == 0 {
+		return nil
+	}
+
+	// Enrich the storenode AddrInfo with addresses from the peerstore
+	storenodeInfo := w.node.Host().Peerstore().PeerInfo(storenode.ID)
+	// Encapsulate the peer ID into the multiaddresses as expected by the missing API
+	encapsulatedAddrs := utils.EncapsulatePeerID(storenodeInfo.ID, storenodeInfo.Addrs...)
+	storenodeInfo.Addrs = encapsulatedAddrs
+
+	type hashRequestor interface {
+		GetMessagesByHash(ctx context.Context, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error)
+	}
+
+	requestor, ok := missing.NewDefaultStorenodeRequestor(w.node.Store()).(hashRequestor)
+	if !ok {
+		return errors.New("storenode requestor does not support fetching by hash")
+	}
+
+	result, err := requestor.GetMessagesByHash(ctx, storenodeInfo, uint64(len(parsedHashes)), parsedHashes)
+	if err != nil {
+		return err
+	}
+
+	if result == nil {
+		return nil
+	}
+
+	for {
+		messages := result.Messages()
+
+		for _, mkv := range messages {
+			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
+			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, true); err != nil {
+				return err
+			}
+		}
+
+		if result.IsComplete() {
+			break
+		}
+
+		if err := result.Next(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (w *Waku) Metrics() string {

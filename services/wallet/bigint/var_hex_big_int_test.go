@@ -65,7 +65,9 @@ func TestVarHexBigInt_UnmarshalJSON_ValidCases(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, result.Int)
-			require.Equal(t, tt.expected, result.Int, "expected %s, got %s", tt.expected.String(), result.Int.String())
+			// Compare values instead of internal representation: since Go 1.26
+			// a zero big.Int may hold an empty (non-nil) abs slice.
+			require.Equal(t, 0, tt.expected.Cmp(result.Int), "expected %s, got %s", tt.expected.String(), result.Int.String())
 		})
 	}
 }

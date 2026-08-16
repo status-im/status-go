@@ -3,7 +3,6 @@ package wallet
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -29,6 +28,7 @@ import (
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/tokenbalances"
 	mock_tokenbalances "github.com/status-im/status-go/services/wallet/tokenbalances/mock/storage"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 var (
@@ -54,54 +54,6 @@ var (
 // This matcher is used to compare the expected and actual map[common.Address][]tokenTypes.StorageToken in parameters to SaveTokens
 type mapTokenWithBalanceMatcher struct {
 	expected []interface{}
-}
-
-func (m mapTokenWithBalanceMatcher) Matches(x interface{}) bool {
-	actual, ok := x.(map[common.Address][]tokenTypes.StorageToken)
-	if !ok {
-		return false
-	}
-
-	if len(m.expected) != len(actual) {
-		return false
-	}
-
-	expected := m.expected[0].(map[common.Address][]tokenTypes.StorageToken)
-
-	for address, expectedTokens := range expected {
-		actualTokens, ok := actual[address]
-		if !ok {
-			return false
-		}
-
-		if len(expectedTokens) != len(actualTokens) {
-			return false
-		}
-
-		for i, expectedToken := range expectedTokens {
-			actualToken := actualTokens[i]
-
-			if expectedToken.TokenAddress != actualToken.TokenAddress ||
-				expectedToken.TokenChainID != actualToken.TokenChainID ||
-				expectedToken.RawBalance != actualToken.RawBalance ||
-				expectedToken.Balance.Cmp(actualToken.Balance) != 0 ||
-				expectedToken.HasError != actualToken.HasError {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
-func (m *mapTokenWithBalanceMatcher) String() string {
-	return fmt.Sprintf("%v", m.expected)
-}
-
-func newMapTokenWithBalanceMatcher(expected []interface{}) gomock.Matcher {
-	return &mapTokenWithBalanceMatcher{
-		expected: expected,
-	}
 }
 
 func setupReader(t *testing.T) (*Reader, *mock_token.MockManagerInterface, *mock_tokenbalances.MockStorage, *gomock.Controller) {
@@ -589,4 +541,167 @@ func TestReader_SkipsUICacheRefreshWhenFetchUnchangedAndAlreadyFetched(t *testin
 	})
 
 	time.Sleep(100 * time.Millisecond)
+}
+
+func TestReader_WarmBalanceRefreshStaysDebounced(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	walletFeed := &event.Feed{}
+	reader := NewReader(tokenManager, nil, walletFeed, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	events := make(chan walletevent.Event, 10)
+	sub := walletFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	).AnyTimes()
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).Return(nil).AnyTimes()
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+
+	// Warm profile (e.g. a mobile resume): refreshes coalesce through the
+	// debounce — Start must not arm an immediate announcement.
+	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
+	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
+
+	select {
+	case <-events:
+		t.Fatal("warm refreshes must coalesce through the debounce, not emit immediately")
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+func TestReader_NeverFetchedCompletionEmitsReloadImmediately(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	walletFeed := &event.Feed{}
+	reader := NewReader(tokenManager, nil, walletFeed, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	events := make(chan walletevent.Event, 10)
+	sub := walletFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	).AnyTimes()
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).Return(nil).AnyTimes()
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+
+	// A warm refresh does not announce immediately (no Start-armed edge).
+	reader.refreshBalanceCache(context.TODO(), []uint64{chainID}, []common.Address{account})
+	select {
+	case <-events:
+		t.Fatal("warm refresh must not announce immediately")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	// A completion for a never-fetched (chain, account) pair is the first data a
+	// cold UI can show for it — the reload must go out immediately, not after
+	// the debounce.
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            multistandardbalance.BalancesKey{ChainID: chainID, Account: account},
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: false,
+		OldState:       multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case ev := <-events:
+		require.Equal(t, EventWalletTickReload, ev.Type)
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("expected an immediate reload for a never-fetched pair's first completion")
+	}
+}
+
+func TestReader_ColdReloadEdgeDoesNotSurviveRestart(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	walletFeed := &event.Feed{}
+	reader := NewReader(tokenManager, nil, walletFeed, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+	key := multistandardbalance.BalancesKey{ChainID: chainID, Account: account}
+
+	// Cold session: a never-fetched completion arms the immediate reload, but the
+	// refresh it belongs to fails before announcing anything.
+	refreshAttempted := make(chan struct{})
+	tokenManager.EXPECT().GetCachedBalances().DoAndReturn(func() (map[common.Address][]tokenTypes.StorageToken, error) {
+		close(refreshAttempted)
+		return nil, errors.New("cached balances unavailable")
+	})
+
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            key,
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: false,
+		OldState:       multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case <-refreshAttempted:
+	case <-time.After(time.Second):
+		t.Fatal("expected a UI cache refresh attempt for the first completion")
+	}
+
+	reader.Stop()
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	events := make(chan walletevent.Event, 10)
+	sub := walletFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
+	).AnyTimes()
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).Return(nil).AnyTimes()
+
+	// Warm session (e.g. a mobile resume): a routine balance change must stay
+	// debounced - the previous session's edge must not announce it immediately.
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            key,
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: true,
+		OldState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case ev := <-events:
+		t.Fatalf("a cold reload edge must not survive Stop/Start, got %q immediately", ev.Type)
+	case <-time.After(300 * time.Millisecond):
+	}
 }

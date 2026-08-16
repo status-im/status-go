@@ -4,26 +4,26 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/pkg/messaging/adapters"
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
+	"github.com/status-im/status-go/pkg/messaging/events"
 	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
-	"github.com/status-im/status-go/pkg/messaging/types"
 	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
-	wakuv2common "github.com/status-im/status-go/pkg/messaging/waku/common"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	wakumetrics2 "github.com/status-im/status-go/pkg/messaging/wakumetrics"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -40,21 +40,51 @@ type Core struct {
 
 	publisher *pubsub.Publisher
 
-	wg   sync.WaitGroup
-	quit chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	quit   chan struct{}
 
 	connectionState connection.State
 
 	wakumetrics *wakumetrics2.Client
 }
 
+type sdsEnvelopeHashesTracker interface {
+	TrackedEnvelopeHashes(identifier []byte) ([]string, error)
+}
+
+type sdsApplicationMessageIDTracker interface {
+	TakeApplicationMessageIDForSDS(sdsMessageID []byte) ([]byte, bool)
+}
+
+// Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
+// from the waku layer so callers configure the messaging API without importing
+// the transport package directly.
+type Mode = wakuv3.Mode
+
+const (
+	ModeCore = wakuv3.ModeCore
+	ModeEdge = wakuv3.ModeEdge
+)
+
+// ModeFromLightClient maps the legacy WakuV2Config.LightClient boolean onto a Mode.
+func ModeFromLightClient(lightClient bool) Mode {
+	return wakuv3.ModeFromLightClient(lightClient)
+}
+
 type CoreParams struct {
 	Identity       *ecdsa.PrivateKey
 	InstallationID string
 
-	NodeKey       *ecdsa.PrivateKey
-	WakuConfig    params.WakuV2Config
-	ClusterConfig params.ClusterConfig
+	NodeKey    *ecdsa.PrivateKey
+	WakuConfig params.WakuV2Config
+
+	// Fleet is the network preset the waku node resolves its peers from; Mode
+	// selects Core (full/relay) vs Edge (light). Together they give the
+	// messaging API its Start(fleet, mode)-shaped configuration.
+	Fleet string
+	Mode  Mode
 
 	TimeSource timesource.Provider
 }
@@ -62,6 +92,7 @@ type CoreParams struct {
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
 	var err error
 	stack := &common.MessagingStack{}
+	var core *Core
 
 	stack.Transport, err = transport.NewTransport(
 		waku,
@@ -87,11 +118,22 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.tracer,
 	)
 
-	stack.Reliability = reliability.NewReliability(
+	missingDepsHandler := func(messageID string, missingDeps []string, channelID string) error {
+		if config.missingDepsObserver != nil {
+			config.missingDepsObserver(messageID, missingDeps, channelID)
+		}
+		return core.fetchMissingDependenciesAsync(messageID, missingDeps, channelID)
+	}
+
+	stack.Reliability, err = reliability.NewReliability(
 		config.persistence.MVDSStorage(),
 		params.Identity,
+		missingDepsHandler,
 		config.logger,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	publisher := pubsub.NewPublisher()
 
@@ -110,7 +152,9 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		timeSource = timesource.DefaultService()
 	}
 
-	return &Core{
+	ctx, cancel := context.WithCancel(context.Background())
+
+	core = &Core{
 		config:     *config,
 		identity:   params.Identity,
 		waku:       waku,
@@ -118,8 +162,82 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		stack:      stack,
 		controller: controller,
 		publisher:  publisher,
+		ctx:        ctx,
+		cancel:     cancel,
 		quit:       make(chan struct{}),
-	}, nil
+	}
+
+	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
+	stack.Reliability.SetMessageSentHandler(core.handleSDSMessageSent)
+
+	return core, nil
+}
+
+func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker, messageID string) []byte {
+	decodedMessageID, err := cryptotypes.DecodeHex(messageID)
+	if err != nil {
+		logger.Debug("failed to decode SDS message ID for retrieval hint",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	hashes, err := tracker.TrackedEnvelopeHashes(decodedMessageID)
+	if err != nil {
+		logger.Debug("no tracked envelope hash for SDS message ID",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	envelopeHashes := make([][]byte, len(hashes))
+	for i, hash := range hashes {
+		envelopeHashes[i] = []byte(hash)
+	}
+
+	hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{
+		EnvelopeHashes: envelopeHashes,
+	})
+	if err != nil {
+		logger.Debug("failed to marshal SDS retrieval hint",
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	return hint
+}
+
+func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
+	return buildSDSRetrievalHint(c.logger, c.stack.Transport, messageID)
+}
+
+func (c *Core) handleSDSMessageSent(sdsMessageID string) {
+	publishSDSMessageDelivered(c.logger, c.stack.Transport, c.publisher, sdsMessageID)
+}
+
+func publishSDSMessageDelivered(
+	logger *zap.Logger,
+	tracker sdsApplicationMessageIDTracker,
+	publisher *pubsub.Publisher,
+	sdsMessageID string,
+) {
+	decodedSDSMessageID, err := cryptotypes.DecodeHex(sdsMessageID)
+	if err != nil {
+		logger.Debug("failed to decode SDS delivery confirmation", zap.String("messageID", sdsMessageID), zap.Error(err))
+		return
+	}
+
+	applicationMessageID, ok := tracker.TakeApplicationMessageIDForSDS(decodedSDSMessageID)
+	if !ok {
+		logger.Debug("ignoring delivery confirmation for untracked SDS message", zap.String("messageID", sdsMessageID))
+		return
+	}
+
+	pubsub.Publish(publisher, events.DeliveredMessage{MessageIDs: [][]byte{applicationMessageID}})
 }
 
 func NewCore(params CoreParams, options ...Options) (*Core, error) {
@@ -130,20 +248,15 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 	}
 
 	waku, err := newWaku(wakuParams{
-		identity:                        params.Identity,
-		nodeKey:                         params.NodeKey,
-		wakuConfig:                      params.WakuConfig,
-		clusterConfig:                   params.ClusterConfig,
-		metricsEnabled:                  config.metricsEnabled,
-		onHistoricMessagesRequestFailed: config.onHistoricMessagesRequestFailed,
-		onPeerStats: func(status wakutypes.ConnStatus) {
-			config.onPeerStats(types.ConnStatus{
-				IsOnline: status.IsOnline,
-				Peers:    adapters.FromWakuPeerStats(status.Peers),
-			})
-		},
-		timeSource: params.TimeSource,
-		logger:     config.logger,
+		nodeKey:        params.NodeKey,
+		fleet:          params.Fleet,
+		mode:           params.Mode,
+		port:           params.WakuConfig.Port,
+		udpPort:        params.WakuConfig.UDPPort,
+		nameserver:     params.WakuConfig.Nameserver,
+		metricsEnabled: config.metricsEnabled,
+		timeSource:     params.TimeSource,
+		logger:         config.logger,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create waku instance")
@@ -179,6 +292,8 @@ func (c *Core) start() error {
 
 func (c *Core) stop() error {
 	close(c.quit)
+	c.cancel()
+	defer c.wg.Wait()
 
 	err := c.controller.Stop()
 	if err != nil {
@@ -197,21 +312,80 @@ func (c *Core) stop() error {
 		return err
 	}
 
-	c.wg.Wait()
+	return nil
+}
+
+func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []string, channelID string) error {
+	if len(missingDeps) == 0 {
+		return nil
+	}
+
+	select {
+	case <-c.ctx.Done():
+		return nil
+	default:
+	}
+
+	c.wg.Add(1)
+	go func() {
+		defer gocommon.LogOnPanic()
+		defer c.wg.Done()
+
+		fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
+		defer cancel()
+
+		alreadyProcessed, err := c.stack.Transport.AlreadyProcessed(missingDeps)
+		if err != nil {
+			c.logger.Debug("failed to check missing dependencies cache",
+				zap.String("messageID", messageID),
+				zap.String("channelID", channelID),
+				zap.Strings("missingDeps", missingDeps),
+				zap.Error(err),
+			)
+			return
+		}
+
+		missingDepsToFetch := make([]string, 0, len(missingDeps))
+		for _, missingDep := range missingDeps {
+			if !alreadyProcessed[missingDep] {
+				missingDepsToFetch = append(missingDepsToFetch, missingDep)
+			}
+		}
+		if len(missingDepsToFetch) == 0 {
+			return
+		}
+
+		err = c.stack.Transport.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
+		if err != nil {
+			c.logger.Debug("failed to fetch missing dependencies from storenode",
+				zap.String("messageID", messageID),
+				zap.String("channelID", channelID),
+				zap.Strings("missingDeps", missingDepsToFetch),
+				zap.Error(err),
+			)
+		}
+	}()
 
 	return nil
 }
 
 type wakuParams struct {
-	identity *ecdsa.PrivateKey
-	nodeKey  *ecdsa.PrivateKey
+	nodeKey *ecdsa.PrivateKey
 
-	wakuConfig     params.WakuV2Config
-	clusterConfig  params.ClusterConfig
+	// fleet + mode fully determine the peer configuration and the Core/Edge
+	// policy; the waku node builds the rest of its config from them.
+	fleet string
+	mode  wakuv3.Mode
+
+	// port / udpPort / nameserver are the only node settings a caller configures
+	// (zero/empty falls back to the waku defaults). Everything else — host,
+	// discovery limit, max message size, etc. — is defaulted
+	// by the waku layer or derived from the mode.
+	port       int
+	udpPort    int
+	nameserver string
+
 	metricsEnabled bool
-
-	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
-	onPeerStats                     func(wakutypes.ConnStatus)
 
 	timeSource timesource.Provider
 
@@ -220,36 +394,19 @@ type wakuParams struct {
 
 func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 	cfg := &wakuv3.Config{
-		MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
-		Host:                                   params.wakuConfig.Host,
-		Port:                                   params.wakuConfig.Port,
-		LightClient:                            params.wakuConfig.LightClient,
-		WakuNodes:                              params.clusterConfig.WakuNodes,
-		DiscoveryLimit:                         params.wakuConfig.DiscoveryLimit,
-		DiscV5BootstrapNodes:                   params.clusterConfig.DiscV5BootstrapNodes,
-		Nameserver:                             params.wakuConfig.Nameserver,
-		UDPPort:                                params.wakuConfig.UDPPort,
-		AutoUpdate:                             params.wakuConfig.AutoUpdate,
-		DefaultShardPubsubTopic:                wakuv3.DefaultShardPubsubTopic(),
-		ClusterID:                              params.clusterConfig.ClusterID,
-		EnableStoreConfirmationForMessagesSent: params.wakuConfig.EnableStoreConfirmationForMessagesSent,
-		UseThrottledPublish:                    true,
-		MetricsEnabled:                         params.metricsEnabled,
-	}
-
-	// Configure peer exchange and discv5 settings based on node type
-	if cfg.LightClient {
-		cfg.EnablePeerExchangeServer = false
-		cfg.EnablePeerExchangeClient = true
-		cfg.EnableDiscV5 = false
-	} else {
-		cfg.EnablePeerExchangeServer = true
-		cfg.EnablePeerExchangeClient = false
-		cfg.EnableDiscV5 = true
-	}
-
-	if params.wakuConfig.MaxMessageSize > 0 {
-		cfg.MaxMessageSize = params.wakuConfig.MaxMessageSize
+		// Fleet + Mode drive peer resolution and the peer-exchange/discv5/
+		// light-client policy inside the waku node (see wakuv2.setDefaults). The
+		// host, discovery limit, max message size and default shard topic are
+		// filled by the waku layer's setDefaults.
+		Fleet:      params.fleet,
+		Mode:       params.mode,
+		Port:       params.port,
+		UDPPort:    params.udpPort,
+		Nameserver: params.nameserver,
+		// Status nodes advertise the ip/port observed by their peers.
+		AutoUpdate:          true,
+		UseThrottledPublish: true,
+		MetricsEnabled:      params.metricsEnabled,
 	}
 
 	waku, err := wakuv3.New(
@@ -257,8 +414,6 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 		cfg,
 		params.logger,
 		params.timeSource,
-		params.onHistoricMessagesRequestFailed,
-		params.onPeerStats,
 	)
 	if err != nil {
 		return nil, err

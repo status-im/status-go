@@ -4,8 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/internal/crypto/types"
@@ -26,15 +24,6 @@ const (
 	// EventMailServerRequestExpired is triggered when request TTL ends
 	EventMailServerRequestExpired = "mailserver.request.expired"
 
-	// EventEnodeDiscovered is tiggered when enode has been discovered.
-	EventEnodeDiscovered = "enode.discovered"
-
-	// EventDecryptMessageFailed is triggered when we receive a message from a bundle we don't have
-	EventDecryptMessageFailed = "messages.decrypt.failed"
-
-	// EventBundleAdded is triggered when we receive a bundle
-	EventBundleAdded = "bundles.added"
-
 	// EventNewMessages is triggered when we receive new messages
 	EventNewMessages = "messages.new"
 
@@ -46,9 +35,6 @@ const (
 
 	// EventHistoryRequestCompleted is triggered after processing all storenode requests
 	EventHistoryRequestCompleted = "history.request.completed"
-
-	// EventHistoryRequestFailed is triggered when requesting history messages fails
-	EventHistoryRequestFailed = "history.request.failed"
 
 	// EventBackupPerformed is triggered when a backup has been performed
 	EventBackupPerformed = "backup.performed"
@@ -84,17 +70,6 @@ type UpdateAvailableSignal struct {
 	Available bool   `json:"available"`
 	Version   string `json:"version"`
 	URL       string `json:"url"`
-}
-
-// DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
-type DecryptMessageFailedSignal struct {
-	Sender string `json:"sender"`
-}
-
-// BundleAddedSignal holds the identity and installation id of the user
-type BundleAddedSignal struct {
-	Identity       string `json:"identity"`
-	InstallationID string `json:"installationID"`
 }
 
 type Filter struct {
@@ -142,10 +117,6 @@ func SendHistoricMessagesRequestStarted(numBatches int) {
 	send(EventHistoryRequestStarted, HistoryMessagesSignal{NumBatches: numBatches})
 }
 
-func SendHistoricMessagesRequestFailed(requestID []byte, peerInfo peer.AddrInfo, err error) {
-	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: hex.EncodeToString(requestID), PeerID: peerInfo.ID.String(), ErrorMsg: err.Error()})
-}
-
 func SendHistoricMessagesRequestCompleted() {
 	send(EventHistoryRequestCompleted, HistoryMessagesSignal{})
 }
@@ -172,29 +143,6 @@ func SendMailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types
 // SendMailServerRequestExpired triggered when mail server request expires
 func SendMailServerRequestExpired(hash types.Hash) {
 	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
-}
-
-// EnodeDiscoveredSignal includes enode address and topic
-type EnodeDiscoveredSignal struct {
-	Enode string `json:"enode"`
-	Topic string `json:"topic"`
-}
-
-// SendEnodeDiscovered tiggered when an enode is discovered.
-// finds a new enode.
-func SendEnodeDiscovered(enode, topic string) {
-	send(EventEnodeDiscovered, EnodeDiscoveredSignal{
-		Enode: enode,
-		Topic: topic,
-	})
-}
-
-func SendDecryptMessageFailed(sender string) {
-	send(EventDecryptMessageFailed, DecryptMessageFailedSignal{sender})
-}
-
-func SendBundleAdded(identity string, installationID string) {
-	send(EventBundleAdded, BundleAddedSignal{Identity: identity, InstallationID: installationID})
 }
 
 func SendNewMessages(obj json.Marshaler) {

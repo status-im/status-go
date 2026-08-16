@@ -362,7 +362,6 @@ type Persistence interface {
     AddressExists(address cryptotypes.Address) (bool, error)
     GetProfileKeypair() (*types.Keypair, error)
     GetWalletRootAddress() (cryptotypes.Address, error)
-    GetPath(address cryptotypes.Address) (string, error)
     GetKeypairByKeyUID(keyUID string) (*types.Keypair, error)
     GetActiveKeypairs() ([]*types.Keypair, error)
     GetAllKeypairs() ([]*types.Keypair, error)

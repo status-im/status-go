@@ -52,6 +52,7 @@ class TestContactRequests:
         assert len(sent_request_messages) == 1, f"Expected one message with contentType {MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_SENT.value}"
         assert sent_request_messages[0].get("text") == f"You sent a contact request to @{receiver.public_key}"
 
+    @pytest.mark.light_client_7393
     async def test_accept_contact_request(self, sender, receiver):
         message_id = await async_messenger.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.accept_contact_request(message_id, sender.public_key)
@@ -71,6 +72,7 @@ class TestContactRequests:
         ), f"Expected one message with contentType {MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED.value}"
         assert accept_request_messages[0].get("text") == f"You accepted @{sender.public_key}'s contact request"
 
+    @pytest.mark.light_client_7393
     async def test_decline_contact_request(self, sender, receiver):
         message_id = await async_messenger.send_contact_request_and_wait(sender, receiver)
         # Send without contact ID first and expect an error
@@ -87,6 +89,7 @@ class TestContactRequests:
         assert len(contact_request_messages) == 1, f"Expected one message with contentType {MessageContentType.CONTACT_REQUEST.value}"
         assert contact_request_messages[0].get("text") == "contact_request"
 
+    @pytest.mark.light_client_7393
     async def test_accept_latest_contact_request_for_contact(self, sender, receiver):
         await async_messenger.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.accept_latest_contact_request_for_contact(sender.public_key)
@@ -106,6 +109,7 @@ class TestContactRequests:
         ), f"Expected one message with contentType {MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED.value}"
         assert accept_request_messages[0].get("text") == f"You accepted @{sender.public_key}'s contact request"
 
+    @pytest.mark.light_client_7393
     async def test_dismiss_latest_contact_request_for_contact(self, sender, receiver):
         await async_messenger.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.dismiss_latest_contact_request_for_contact(sender.public_key)
@@ -119,6 +123,7 @@ class TestContactRequests:
         assert len(contact_request_messages) == 1, f"Expected one message with contentType {MessageContentType.CONTACT_REQUEST.value}"
         assert contact_request_messages[0].get("text") == "contact_request"
 
+    @pytest.mark.light_client_7393
     async def test_get_latest_contact_request_for_contact(self, sender, receiver):
         await async_messenger.send_contact_request_and_wait(sender, receiver)
         response = receiver.wakuext_service.get_latest_contact_request_for_contact(sender.public_key)
@@ -128,6 +133,7 @@ class TestContactRequests:
         assert len(contact_request_message) == 1, f"Expected one message with contentType {MessageContentType.CONTACT_REQUEST.value}"
         assert contact_request_message[0].get("text") == "contact_request"
 
+    @pytest.mark.light_client_7393
     async def test_retract_contact_request(self, sender, receiver):
         await async_messenger.send_contact_request_and_wait(sender, receiver)
         response = sender.wakuext_service.retract_contact_request(receiver.public_key)
@@ -142,6 +148,7 @@ class TestContactRequests:
         ), f"Expected one message with contentType {MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED.value}"
         assert retract_request_messages[0].get("text") == f"You removed @{receiver.public_key} as a contact"
 
+    @pytest.mark.light_client_7393
     async def test_remove_contact(self, sender, receiver):
         message_id = await async_messenger.send_contact_request_and_wait(sender, receiver)
         await async_messenger.accept_contact_request_and_wait(message_id, sender=sender, receiver=receiver)
@@ -157,6 +164,7 @@ class TestContactRequests:
         ), f"Expected one message with contentType {MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED.value}"
         assert retract_request_messages[0].get("text") == f"You removed @{receiver.public_key} as a contact"
 
+    @pytest.mark.light_client_7393
     async def test_set_contact_local_nickname(self, sender, receiver):
         message_id = await async_messenger.send_contact_request_and_wait(sender, receiver)
         await async_messenger.accept_contact_request_and_wait(message_id, sender=sender, receiver=receiver)

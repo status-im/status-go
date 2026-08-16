@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -50,7 +51,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/signal"
 )
 
 const infinityString = "∞"
@@ -84,6 +84,10 @@ type Service struct {
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
+
+	connectionStateMu      sync.Mutex
+	lastConnectionState    connection.State
+	hasLastConnectionState bool
 
 	logger *zap.Logger
 }
@@ -186,15 +190,14 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 			Identity:       params.Identity,
 			NodeKey:        nodeKey,
 			WakuConfig:     s.config.WakuV2Config,
-			ClusterConfig:  s.config.ClusterConfig,
+			Fleet:          s.config.ClusterConfig.Fleet,
+			Mode:           messaging2.ModeFromLightClient(s.config.WakuV2Config.LightClient),
 			InstallationID: s.config.ShhextConfig.InstallationID,
 			TimeSource:     params.TimeSource,
 		},
 		messaging2.WithSQLitePersistence(params.AppDB),
 		messaging2.WithLogger(s.logger),
 		messaging2.WithEnvelopeEventsConfig(envelopeEventsConfig),
-		messaging2.WithHistoricMessagesRequestFailedHandler(signal.SendHistoricMessagesRequestFailed),
-		messaging2.WithPeerStatsHandler(signal.SendPeerStats),
 		messaging2.WithMetrics(params.MetricsEnabled),
 		messaging2.WithTracer(tracer),
 	)
@@ -249,6 +252,18 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Android can report connectivity before login; apply the latest known state
+	// now that messenger exists so expensive/offline gates are correct from start.
+	s.connectionStateMu.Lock()
+	hasLastState := s.hasLastConnectionState
+	lastState := s.lastConnectionState
+	messenger := s.messenger
+	s.connectionStateMu.Unlock()
+	if hasLastState && messenger != nil {
+		messenger.ConnectionChanged(lastState)
+	}
+
 	s.MarkStarted()
 	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
 
@@ -485,6 +500,25 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 
 	permission := fetchCommunityCollectiblePermission(community, id)
 
+	fillCollectibleMetadata(collectible, community, tokenMetadata, communityToken, permission)
+
+	return nil
+}
+
+// fillCollectibleMetadata enriches collectible from the community description
+// token metadata. communityToken may be nil: the community_tokens table is
+// populated by a separate sync path and can lag behind the community
+// description (e.g. right after a profile sync on a fresh device).
+func fillCollectibleMetadata(
+	collectible *thirdparty.FullCollectibleData,
+	community *communities.Community,
+	tokenMetadata *protobuf.CommunityTokenMetadata,
+	communityToken *communitiestoken.CommunityToken,
+	permission *communities.CommunityTokenPermission,
+) {
+	id := collectible.CollectibleData.ID
+	communityID := collectible.CollectibleData.CommunityID
+
 	privilegesLevel := communitiestoken.CommunityLevel
 	if permission != nil {
 		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
@@ -498,7 +532,9 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
 	collectible.CollectibleData.ImagePayload = imagePayload
 	collectible.CollectibleData.Traits = getCollectibleCommunityTraits(communityToken)
-	collectible.CollectibleData.Soulbound = !communityToken.Transferable
+	if communityToken != nil {
+		collectible.CollectibleData.Soulbound = !communityToken.Transferable
+	}
 
 	if collectible.CollectionData == nil {
 		collectible.CollectionData = &thirdparty.CollectionData{
@@ -516,8 +552,6 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 	collectible.CollectibleCommunityInfo = &thirdparty.CollectibleCommunityInfo{
 		PrivilegesLevel: privilegesLevel,
 	}
-
-	return nil
 }
 
 func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermission_Type) communitiestoken.PrivilegesLevel {
@@ -785,7 +819,13 @@ func obtainNodeKey(nodeConfig *params.NodeConfig) (*ecdsa.PrivateKey, error) {
 }
 
 func (s *Service) ConnectionChanged(state connection.State) {
-	if s.messenger != nil {
-		s.messenger.ConnectionChanged(state)
+	s.connectionStateMu.Lock()
+	s.lastConnectionState = state
+	s.hasLastConnectionState = true
+	messenger := s.messenger
+	s.connectionStateMu.Unlock()
+
+	if messenger != nil {
+		messenger.ConnectionChanged(state)
 	}
 }

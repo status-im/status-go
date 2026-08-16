@@ -26,11 +26,3 @@ type Key struct {
 	// before having multi-account support.
 	SubAccountIndex uint32
 }
-
-// NewKey creates a new Key instance
-func NewKey(privateKey *ecdsa.PrivateKey, extendedKey *extkeys.ExtendedKey) *Key {
-	return &Key{
-		PrivateKey:  privateKey,
-		ExtendedKey: extendedKey,
-	}
-}

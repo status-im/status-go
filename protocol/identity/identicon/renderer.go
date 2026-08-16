@@ -66,8 +66,3 @@ func GenerateBase64(id string) (string, error) {
 	i := generate(id)
 	return renderBase64(i)
 }
-
-func Generate(id string) ([]byte, error) {
-	i := generate(id)
-	return render(i)
-}

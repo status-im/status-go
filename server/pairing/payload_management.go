@@ -5,7 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/status-im/status-go/common"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
@@ -84,14 +83,11 @@ func (ppm *AccountPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	}
 
 	// historically it so happened that on a mobile device a password without 0x is used, and on a desktop with it,
-	// so with local pairing we have a conflict that needs to be resolved
+	// so with local pairing we have a conflict that needs to be resolved, now, since we use the same codebase for both platforms,
+	// we don't need to trim the prefix anymore.
 	if ppm.multiaccount != nil && ppm.multiaccount.KeycardPairing != "" {
-		if common.IsMobilePlatform() {
-			pb.Password = strings.TrimPrefix(pb.Password, "0x")
-		} else {
-			if !strings.HasPrefix(pb.Password, "0x") {
-				pb.Password = "0x" + pb.Password
-			}
+		if !strings.HasPrefix(pb.Password, "0x") {
+			pb.Password = "0x" + pb.Password
 		}
 	}
 	ppm.password = pb.Password
@@ -179,6 +175,7 @@ func (rmm *RawMessagePayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 		}
 	}
 	if syncRawMessage.SettingsJsonBytes != nil {
+		rmm.payload.setting.AutoApplyKeypairMigrations = true
 		err = json.Unmarshal(syncRawMessage.SettingsJsonBytes, rmm.payload.setting)
 		if err != nil {
 			return err

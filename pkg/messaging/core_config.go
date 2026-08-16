@@ -5,8 +5,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	types2 "github.com/status-im/status-go/pkg/messaging/types"
@@ -14,13 +12,12 @@ import (
 )
 
 type config struct {
-	logger                          *zap.Logger
-	tracer                          trace.Tracer
-	envelopesMonitorConfig          *transport.EnvelopesMonitorConfig
-	metricsEnabled                  bool
-	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
-	onPeerStats                     func(types2.ConnStatus)
-	persistence                     Persistence
+	logger                 *zap.Logger
+	tracer                 trace.Tracer
+	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
+	metricsEnabled         bool
+	persistence            Persistence
+	missingDepsObserver    MissingDependenciesObserver
 }
 
 func newConfig(options ...Options) *config {
@@ -32,9 +29,7 @@ func newConfig(options ...Options) *config {
 				return false
 			},
 		},
-		metricsEnabled:                  false,
-		onHistoricMessagesRequestFailed: func([]byte, peer.AddrInfo, error) {},
-		onPeerStats:                     func(types2.ConnStatus) {},
+		metricsEnabled: false,
 	}
 
 	for _, option := range options {
@@ -45,6 +40,10 @@ func newConfig(options ...Options) *config {
 }
 
 type Options func(*config)
+
+// MissingDependenciesObserver allows tests to observe SDS missing dependency
+// events before the core triggers background fetching.
+type MissingDependenciesObserver func(messageID string, missingDeps []string, channelID string)
 
 func WithLogger(logger *zap.Logger) Options {
 	return func(c *config) {
@@ -74,18 +73,6 @@ func WithMetrics(enabled bool) Options {
 	}
 }
 
-func WithHistoricMessagesRequestFailedHandler(onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)) Options {
-	return func(c *config) {
-		c.onHistoricMessagesRequestFailed = onHistoricMessagesRequestFailed
-	}
-}
-
-func WithPeerStatsHandler(onPeerStats func(types2.ConnStatus)) Options {
-	return func(c *config) {
-		c.onPeerStats = onPeerStats
-	}
-}
-
 // WithSQLitePersistence sets up the messaging persistence using internal SQLite implementation.
 // Migrations must be applied beforehand. See SQLiteMigrate.
 func WithSQLitePersistence(db *sql.DB) Options {
@@ -94,9 +81,8 @@ func WithSQLitePersistence(db *sql.DB) Options {
 	}
 }
 
-// WithPersistence sets up the messaging persistence using the provided implementation.
-func WithPersistence(persistence Persistence) Options {
+func WithMissingDependenciesObserver(observer MissingDependenciesObserver) Options {
 	return func(c *config) {
-		c.persistence = persistence
+		c.missingDepsObserver = observer
 	}
 }

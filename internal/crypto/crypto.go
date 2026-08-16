@@ -25,11 +25,6 @@ const (
 	aesNonceLength = 12
 )
 
-// SetProvider sets the default crypto provider
-func SetProvider(provider CryptoProvider) {
-	defaultProvider = provider
-}
-
 func S256() elliptic.Curve {
 	return defaultProvider.S256()
 }
@@ -68,10 +63,6 @@ func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
 
 func TextHash(data []byte) []byte {
 	return defaultProvider.TextHash(data)
-}
-
-func TextAndHash(data []byte) ([]byte, string) {
-	return defaultProvider.TextAndHash(data)
 }
 
 func Keccak256Hash(data ...[]byte) (h types.Hash) {
@@ -170,41 +161,6 @@ func MustDecodePubkeyString(pubkey string) *ecdsa.PublicKey {
 	return pk
 }
 
-func VerifySignatures(signaturePairs [][3]string) error {
-	for _, signaturePair := range signaturePairs {
-		content := Keccak256([]byte(signaturePair[0]))
-
-		signature, err := hex.DecodeString(signaturePair[1])
-		if err != nil {
-			return err
-		}
-
-		publicKeyBytes, err := hex.DecodeString(signaturePair[2])
-		if err != nil {
-			return err
-		}
-
-		publicKey, err := UnmarshalPubkey(publicKeyBytes)
-		if err != nil {
-			return err
-		}
-
-		recoveredKey, err := SigToPub(
-			content,
-			signature,
-		)
-		if err != nil {
-			return err
-		}
-
-		if PubkeyToAddress(*recoveredKey) != PubkeyToAddress(*publicKey) {
-			return errors.New("identity key and signature mismatch")
-		}
-	}
-
-	return nil
-}
-
 func ExtractSignatures(signaturePairs [][2]string) ([]string, error) {
 	response := make([]string, len(signaturePairs))
 	for i, signaturePair := range signaturePairs {
@@ -233,33 +189,6 @@ func ExtractSignatures(signaturePairs [][2]string) ([]string, error) {
 func ExtractSignature(data, signature []byte) (*ecdsa.PublicKey, error) {
 	dataHash := Keccak256(data)
 	return SigToPub(dataHash, signature)
-}
-
-func EcRecover(data types.HexBytes, sig types.HexBytes) (types.Address, error) {
-	// Returns the address for the Account that was used to create the signature.
-	//
-	// Note, this function is compatible with eth_sign and personal_sign. As such it recovers
-	// the address of:
-	// hash = keccak256("\x19${byteVersion}Ethereum Signed Message:\n${message length}${message}")
-	// addr = ecrecover(hash, signature)
-	//
-	// Note, the signature must conform to the secp256k1 curve R, S and V values, where
-	// the V value must be be 27 or 28 for legacy reasons.
-	//
-	// https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_ecRecover
-	if len(sig) != 65 {
-		return types.Address{}, fmt.Errorf("signature must be 65 bytes long")
-	}
-	if sig[64] != 27 && sig[64] != 28 {
-		return types.Address{}, fmt.Errorf("invalid Ethereum signature (V is not 27 or 28)")
-	}
-	sig[64] -= 27 // Transform yellow paper V from 27/28 to 0/1
-	hash := TextHash(data)
-	rpk, err := SigToPub(hash, sig)
-	if err != nil {
-		return types.Address{}, err
-	}
-	return PubkeyToAddress(*rpk), nil
 }
 
 func GenerateSharedKey(myIdentityKey *ecdsa.PrivateKey, theirEphemeralKey *ecdsa.PublicKey) ([]byte, error) {

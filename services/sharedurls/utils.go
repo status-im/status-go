@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/andybalholm/brotli"
@@ -11,6 +12,130 @@ import (
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
+
+const statusInternalBaseShareURL = "status-app://"
+const messagePath = "m/"
+const sharedURLMessagePrefix = baseShareURL + "/" + messagePath
+const sharedURLMessagePrefixHTTP = "http://status.app/" + messagePath
+const sharedURLMessagePrefixInternal = statusInternalBaseShareURL + messagePath
+const messageIDQueryParam = "message-id"
+
+func ShareMessageURL(chatID string, messageID string) (string, error) {
+	if strings.TrimSpace(chatID) == "" {
+		return "", fmt.Errorf("chatID is required")
+	}
+
+	if strings.TrimSpace(messageID) == "" {
+		return "", fmt.Errorf("messageID is required")
+	}
+
+	return fmt.Sprintf("%s%s?%s=%s",
+		sharedURLMessagePrefix,
+		url.PathEscape(chatID),
+		messageIDQueryParam,
+		url.QueryEscape(messageID),
+	), nil
+}
+
+func decodeMessageChatID(chatIDPathPart string) (string, error) {
+	chatID, unescapeErr := url.PathUnescape(chatIDPathPart)
+	if unescapeErr != nil {
+		return "", unescapeErr
+	}
+
+	if chatID == "" {
+		return "", fmt.Errorf("chatID is required")
+	}
+
+	return chatID, nil
+}
+
+func extractDeepLinkValueUntilSeparator(value string) string {
+	if value == "" {
+		return ""
+	}
+
+	endIdx := len(value)
+	for _, separator := range []string{"?", "#", "&"} {
+		idx := strings.Index(value, separator)
+		if idx != -1 && idx < endIdx {
+			endIdx = idx
+		}
+	}
+
+	return value[:endIdx]
+}
+
+func extractQueryParamFromLink(link string, paramName string) (string, error) {
+	parsedLink, err := url.Parse(link)
+	if err != nil {
+		return "", err
+	}
+
+	queryValues, err := url.ParseQuery(parsedLink.RawQuery)
+	if err != nil {
+		return "", err
+	}
+
+	return queryValues.Get(paramName), nil
+}
+
+func deriveCommunityIDFromChatID(chatID string) string {
+	if len(chatID) <= 36 {
+		return ""
+	}
+
+	channelID := chatID[len(chatID)-36:]
+	if !channelRegExp.MatchString(channelID) {
+		return ""
+	}
+
+	return chatID[:len(chatID)-36]
+}
+
+func ParseMessageURL(rawURL string) (*MessageURLData, error) {
+	trimmedURL := strings.TrimSpace(rawURL)
+	if trimmedURL == "" {
+		return nil, fmt.Errorf("not a status message url")
+	}
+
+	pathRemainder := ""
+	switch {
+	case strings.HasPrefix(trimmedURL, sharedURLMessagePrefix):
+		pathRemainder = strings.TrimPrefix(trimmedURL, sharedURLMessagePrefix)
+	case strings.HasPrefix(trimmedURL, sharedURLMessagePrefixHTTP):
+		pathRemainder = strings.TrimPrefix(trimmedURL, sharedURLMessagePrefixHTTP)
+	case strings.HasPrefix(trimmedURL, sharedURLMessagePrefixInternal):
+		pathRemainder = strings.TrimPrefix(trimmedURL, sharedURLMessagePrefixInternal)
+	default:
+		return nil, fmt.Errorf("not a status message url")
+	}
+
+	chatIDPathPart := extractDeepLinkValueUntilSeparator(pathRemainder)
+	if chatIDPathPart == "" {
+		return nil, fmt.Errorf("chatID is required")
+	}
+
+	chatID, err := decodeMessageChatID(chatIDPathPart)
+	if err != nil {
+		return nil, err
+	}
+
+	messageID, err := extractQueryParamFromLink(trimmedURL, messageIDQueryParam)
+	if err != nil {
+		return nil, err
+	}
+
+	if messageID == "" {
+		return nil, fmt.Errorf("messageID is required")
+	}
+
+	return &MessageURLData{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		CommunityID: deriveCommunityIDFromChatID(chatID),
+	}, nil
+}
 
 func parseUserURLWithData(data string, chatKey string) (*URLDataResponse, error) {
 	if data == "" {
@@ -53,7 +178,10 @@ func IsStatusSharedURL(url string) bool {
 		strings.HasPrefix(url, sharedURLUserPrefixWithData) ||
 		strings.HasPrefix(url, sharedURLCommunityPrefix) ||
 		strings.HasPrefix(url, sharedURLCommunityPrefixWithData) ||
-		strings.HasPrefix(url, sharedURLChannelPrefixWithData)
+		strings.HasPrefix(url, sharedURLMessagePrefix) ||
+		strings.HasPrefix(url, sharedURLChannelPrefixWithData) ||
+		strings.HasPrefix(url, sharedURLMessagePrefixHTTP) ||
+		strings.HasPrefix(url, sharedURLMessagePrefixInternal)
 }
 
 func splitSharedURLData(data string) (string, string, error) {

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import uuid4
@@ -115,6 +116,7 @@ def backend_factory(request):
 
         # Create backend
         backend = StatusBackend(privileged=privileged, ipv6=ipv6, **kwargs)
+        backend.name = name
         created_backends.append(backend)
         logging.debug(f"✅ [SETUP] {name.capitalize()} backend created")
 
@@ -125,11 +127,26 @@ def backend_factory(request):
     # Cleanup all created backends concurrently
     logging.debug(f"🧹 [TEARDOWN] Cleaning up {len(created_backends)} backends for {cls_name or 'test'}")
 
+    def _log_sufix(b):
+        backend_name = re.sub(r"[^A-Za-z0-9_.-]", "-", getattr(b, "name", "") or "backend")
+        return f"{test_name}_{backend_name}"
+
     tasks = [
-        (f"backend-{len(created_backends) - i}", lambda b=backend: b.shutdown(log_sufix=test_name))
+        (f"{getattr(backend, 'name', '') or 'backend'}-{len(created_backends) - i}", lambda b=backend: b.shutdown(log_sufix=_log_sufix(b)))
         for i, backend in enumerate(reversed(created_backends))
     ]
     _parallel_teardown(tasks)
+
+
+def pytest_collection_modifyitems(config, items):
+    # Skip only the light-client leg of tests marked known-flaky under #7393, keeping the full-node
+    # (wakuV2LightClient_False) leg. Remove this hook and the marker when the issue is closed.
+    skip_flaky = pytest.mark.skip(
+        reason="known-flaky light-client test, tracked in https://github.com/status-im/status-go/issues/7393 (remove when the issue is closed)"
+    )
+    for item in items:
+        if item.get_closest_marker("light_client_7393") and "wakuV2LightClient_False" not in item.nodeid:
+            item.add_marker(skip_flaky)
 
 
 @pytest.fixture(scope="function", autouse=False)

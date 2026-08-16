@@ -63,7 +63,7 @@ func TestSwitchEthereumChainSuccess(t *testing.T) {
 	chainId := fmt.Sprintf(`0x%s`, walletCommon.ChainID(walletCommon.EthereumMainnet).String())
 	chainIdSwitched := false
 
-	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+	signal.SetHandler(signal.Handler(func(s []byte) {
 		var evt EventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
@@ -79,7 +79,7 @@ func TestSwitchEthereumChainSuccess(t *testing.T) {
 			chainIdSwitched = true
 		}
 	}))
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	params := make([]interface{}, 1)
 	params[0] = map[string]interface{}{

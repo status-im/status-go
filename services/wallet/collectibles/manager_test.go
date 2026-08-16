@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -150,4 +153,69 @@ func TestManager_FetchAllAssetsByOwner(t *testing.T) {
 	circuitName := getCircuitName(mockProvider1, chainID)
 	assert.True(t, circuitbreaker.CircuitExists(circuitName))
 	assert.False(t, circuitbreaker.IsCircuitOpen(circuitName))
+}
+
+func TestManager_FillAnimationMediatype(t *testing.T) {
+	var requests atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.Header().Set("Content-Type", "video/webm")
+	}))
+	defer server.Close()
+
+	unreachable := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	unreachableURL := unreachable.URL
+	unreachable.Close()
+
+	manager := &Manager{httpClient: server.Client()}
+
+	assetWith := func(url string, mediaType string) *thirdparty.FullCollectibleData {
+		return &thirdparty.FullCollectibleData{
+			CollectibleData: thirdparty.CollectibleData{
+				AnimationURL:       url,
+				AnimationMediaType: mediaType,
+			},
+		}
+	}
+
+	t.Run("keeps what the provider reported without asking the network", func(t *testing.T) {
+		requests.Store(0)
+		asset := assetWith(server.URL, "video/mp4")
+
+		manager.fillAnimationMediatype(context.Background(), asset)
+
+		assert.Equal(t, "video/mp4", asset.CollectibleData.AnimationMediaType)
+		assert.Equal(t, server.URL, asset.CollectibleData.AnimationURL)
+		assert.Zero(t, requests.Load())
+	})
+
+	t.Run("resolves a media type the provider did not report", func(t *testing.T) {
+		requests.Store(0)
+		asset := assetWith(server.URL, "")
+
+		manager.fillAnimationMediatype(context.Background(), asset)
+
+		assert.Equal(t, "video/webm", asset.CollectibleData.AnimationMediaType)
+		assert.Equal(t, server.URL, asset.CollectibleData.AnimationURL)
+		assert.Equal(t, int32(1), requests.Load())
+	})
+
+	t.Run("asks nothing when there is no animation", func(t *testing.T) {
+		requests.Store(0)
+		asset := assetWith("", "")
+
+		manager.fillAnimationMediatype(context.Background(), asset)
+
+		assert.Zero(t, requests.Load())
+	})
+
+	t.Run("drops an animation whose media type cannot be resolved", func(t *testing.T) {
+		asset := assetWith(unreachableURL, "")
+
+		manager.fillAnimationMediatype(context.Background(), asset)
+
+		assert.Empty(t, asset.CollectibleData.AnimationURL)
+		assert.Empty(t, asset.CollectibleData.AnimationMediaType)
+	})
 }

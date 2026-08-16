@@ -20,6 +20,12 @@ func (t EventType) IsInternal() bool {
 	return strings.HasPrefix(string(t), InternalEventTypePrefix)
 }
 
+// EventTokenListsUpdated is published on the wallet feed when the token lists
+// finish loading/refreshing, so in-process consumers (e.g. the balance
+// controller) can react without waiting for a periodic re-fetch. Internal:
+// clients learn about token lists via signal.TokenListsUpdated instead.
+const EventTokenListsUpdated = EventType(InternalEventTypePrefix + "token-lists-updated")
+
 // Event is a type for transfer events.
 type Event struct {
 	Type        EventType        `json:"type"`
@@ -40,8 +46,4 @@ func GetPayload[T any](e Event) (*T, error) {
 		return nil, err
 	}
 	return &payload, nil
-}
-
-func ExtractPayload[T any](e Event, payload *T) error {
-	return json.Unmarshal([]byte(e.Message), payload)
 }

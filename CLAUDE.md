@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 (desktop & mobile) — its primary and main client. It bundles a messaging stack, an embedded Ethereum/wallet
 layer, and the Status app business logic. The app links it as a **C-binding library** (built from `mobile/`;
 despite the directory name, gomobile is no longer used — it's historical naming). Module path:
-`github.com/status-im/status-go` (Go 1.24, CGO-heavy).
+`github.com/status-im/status-go` (Go 1.26, CGO-heavy).
 
 The API is exposed to the app only through these C-bindings (plus a separate HTTP server for media). The
 `cmd/status-backend` HTTP server exposes the same API over JSON, but exists primarily to drive the

@@ -27,6 +27,7 @@ var (
 	newBlockCheckIntervalSoneium      = 2 * time.Second
 	newBlockCheckIntervalScroll       = 1 * time.Second
 	newBlockCheckIntervalBlast        = 2 * time.Second
+	newBlockCheckIntervalRobinhood    = 1 * time.Second
 	newBlockCheckIntervalBSC          = 3 * time.Second
 	newBlockCheckIntervalAnvilMainnet = 2 * time.Second
 
@@ -112,6 +113,9 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 	case walletCommon.BlastMainnet,
 		walletCommon.BlastSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalBlast)
+	case walletCommon.RobinhoodMainnet,
+		walletCommon.RobinhoodTestnet:
+		ticker = time.NewTicker(newBlockCheckIntervalRobinhood)
 	case walletCommon.BSCMainnet,
 		walletCommon.BSCTestnet:
 		ticker = time.NewTicker(newBlockCheckIntervalBSC)

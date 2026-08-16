@@ -128,12 +128,8 @@ func (s *Service) HandleFeedItem(feedItem *gofeed.Item) (*protocol.MessengerResp
 	if feedItem.Image != nil {
 		imageURL = feedItem.Image.URL
 	}
-	newsLink := ""
-	newsLinkLabel := ""
-	if feedItem.Custom != nil {
-		newsLink = feedItem.Custom["newsLink"]
-		newsLinkLabel = feedItem.Custom["newsLinkLabel"]
-	}
+	newsLink := getCustomField(feedItem, "newsLink")
+	newsLinkLabel := getCustomField(feedItem, "newsLinkLabel")
 
 	id, err := uuid.NewRandom()
 	if err != nil {
@@ -168,6 +164,30 @@ func (s *Service) HandleFeedItem(feedItem *gofeed.Item) (*protocol.MessengerResp
 	}
 
 	return response, nil
+}
+
+func getCustomField(feedItem *gofeed.Item, key string) string {
+	if feedItem == nil {
+		return ""
+	}
+
+	if feedItem.Custom != nil {
+		if value := feedItem.Custom[key]; value != "" {
+			return value
+		}
+
+		if value := feedItem.Custom["status:"+key]; value != "" {
+			return value
+		}
+	}
+
+	if statusExtensions, ok := feedItem.Extensions["status"]; ok {
+		if extensions := statusExtensions[key]; len(extensions) > 0 {
+			return extensions[0].Value
+		}
+	}
+
+	return ""
 }
 
 func (s *Service) HandleFeedItemAndSend(feedItem *gofeed.Item) error {

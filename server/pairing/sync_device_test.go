@@ -121,6 +121,21 @@ func containsKeystoreFile(directory, key string) bool {
 	return false
 }
 
+func countKeystoreFiles(directory, key string) int {
+	files, err := os.ReadDir(directory)
+	if err != nil {
+		return 0
+	}
+
+	count := 0
+	for _, file := range files {
+		if strings.Contains(file.Name(), strings.ToLower(key)) {
+			count++
+		}
+	}
+	return count
+}
+
 func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	ctx := context.TODO()
 
@@ -246,6 +261,106 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 		require.NoError(s.T(), err)
 		accInfo := genAcc.ToIdentifiedAccountInfo()
 		require.Equal(s.T(), acc.Address.String(), accInfo.Address)
+	}
+}
+
+func (s *SyncDeviceSuite) TestTransferringKeystoreFilesSkipsAlreadyStoredKeystores() {
+	ctx := context.TODO()
+
+	serverTmpDir := filepath.Join(s.tmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, serverTmpDir)
+
+	clientTmpDir := filepath.Join(s.tmpdir, "client")
+	clientBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, clientTmpDir)
+	defer func() {
+		require.NoError(s.T(), clientBackend.Logout())
+		require.NoError(s.T(), serverBackend.Logout())
+	}()
+
+	serverBackend.Messenger().SetLocalPairing(true)
+	clientBackend.Messenger().SetLocalPairing(true)
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+
+	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
+
+	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	walletAccounts := &accsmanagementtypes.AccountCreationDetails{
+		Path:    accsmanagementcommon.PathDefaultWalletAccount,
+		Name:    "Default Wallet Account",
+		Emoji:   "💰",
+		ColorID: "primary",
+	}
+	serverSeedPhraseKp, err := serverAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
+	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
+
+	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	clientSeedPhraseKp, err := clientAccountsAPI.AddKeypairViaSeedPhrase(ctx, seedKeypairMnemonic, s.password, "Seed Phrase Keypair", accsmanagementtypes.ColdWalletTypeNone, walletAccounts)
+	require.NoError(s.T(), err, "saving seed phrase keypair on client with keystore files created")
+
+	// unlike TestTransferringKeystoreFiles, the client's keystore files are deliberately kept, each account has exactly one file before the transfer
+	clientKeystorePath := filepath.Join(clientTmpDir, backend.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
+	require.Equal(s.T(), 1, countKeystoreFiles(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		require.Equal(s.T(), 1, countKeystoreFiles(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// prepare sender
+	serverKeystorePath := filepath.Join(serverTmpDir, backend.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
+	var config = KeystoreFilesSenderServerConfig{
+		SenderConfig: &KeystoreFilesSenderConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   serverKeystorePath,
+				LoggedInKeyUID: serverActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToExport: []string{serverSeedPhraseKp.KeyUID},
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(s.T(), err)
+	cs, err := StartUpKeystoreFilesSenderServer(serverBackend, string(configBytes))
+	require.NoError(s.T(), err)
+
+	// prepare receiver
+	clientPayloadSourceConfig := KeystoreFilesReceiverClientConfig{
+		ReceiverConfig: &KeystoreFilesReceiverConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   clientKeystorePath,
+				LoggedInKeyUID: clientActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToImport: []string{serverSeedPhraseKp.KeyUID},
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	err = StartUpKeystoreFilesReceivingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	require.NoError(s.T(), err)
+
+	// still exactly one keystore file per account, the transferred duplicates were skipped
+	require.Equal(s.T(), 1, countKeystoreFiles(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		require.Equal(s.T(), 1, countKeystoreFiles(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// and the kept keystore files still load correctly
+	accountsManager := clientBackend.AccountsManager()
+	err = accountsManager.ReloadKeystore()
+	require.NoError(s.T(), err)
+
+	genAcc, err := accountsManager.LoadAccount(types.HexToAddress(clientSeedPhraseKp.DerivedFrom), s.password)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, genAcc.ToIdentifiedAccountInfo().KeyUID)
+
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		genAcc, err = accountsManager.LoadAccount(acc.Address, s.password)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), acc.Address.String(), genAcc.ToIdentifiedAccountInfo().Address)
 	}
 }
 

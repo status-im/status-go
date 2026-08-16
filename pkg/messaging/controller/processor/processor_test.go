@@ -1,14 +1,16 @@
 package processor
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang/protobuf/proto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
@@ -17,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/testutils"
 	common "github.com/status-im/status-go/pkg/messaging/common"
@@ -24,6 +27,7 @@ import (
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	segmentation "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
 	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
@@ -42,6 +46,33 @@ type ProcessorSuite struct {
 	processor   *Processor
 	testPayload []byte
 	logger      *zap.Logger
+}
+
+func (s *ProcessorSuite) newStandaloneReliability() *reliability.Reliability {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer(nil))
+	s.Require().NoError(err)
+
+	s.T().Cleanup(func() {
+		s.Require().NoError(db.Close())
+	})
+
+	err = mvdsmigrations.Migrate(db)
+	s.Require().NoError(err)
+
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	r, err := reliability.NewReliability(
+		mvdsnode.NewSQLitePersistence(db),
+		identity,
+		func(string, []string, string) error { return nil },
+		s.logger,
+	)
+	s.Require().NoError(err)
+
+	s.T().Cleanup(r.Close)
+
+	return r
 }
 
 func (s *ProcessorSuite) SetupTest() {
@@ -86,8 +117,6 @@ func (s *ProcessorSuite) SetupTest() {
 		&wakuConfig,
 		s.logger,
 		nil,
-		func([]byte, peer.AddrInfo, error) {},
-		nil,
 	)
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
@@ -114,14 +143,18 @@ func (s *ProcessorSuite) SetupTest() {
 		trace.NewNoopTracer(),
 	)
 
-	stack.Reliability = reliability.NewReliability(
+	stack.Reliability, err = reliability.NewReliability(
 		mvdsnode.NewSQLitePersistence(db),
 		identity,
+		func(string, []string, string) error { return nil },
 		s.logger,
 	)
+	s.Require().NoError(err)
 
 	err = stack.Reliability.Start(func(*ecdsa.PublicKey, []byte, [][]byte) error { return nil })
 	s.Require().NoError(err)
+
+	s.T().Cleanup(stack.Reliability.Close)
 
 	s.processor = NewProcessor(
 		identity,
@@ -307,6 +340,95 @@ func (s *ProcessorSuite) TestHandleOutOfOrderHashRatchet() {
 	s.Require().Len(msgs, 0)
 }
 
+// A queued hash ratchet message can legitimately fail to complete on replay —
+// here, it is encrypted with a ratchet key that still hasn't arrived, so
+// processing it re-queues it and yields no response. That must not crash the
+// replay and must not lose the message.
+func (s *ProcessorSuite) TestQueuedHashRatchetMessageStillMissingItsKeySurvivesReplay() {
+	groupID := []byte("group-id")
+	otherGroupID := []byte("group-id-other")
+	senderKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	senderDatabase, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{
+			Names:     encryptionmigrations.AssetNames(),
+			AssetFunc: encryptionmigrations.Asset,
+		},
+	}))
+	s.Require().NoError(err)
+
+	senderEncryptionProtocol := encryption.New(
+		encryption.NewSQLitePersistence(senderDatabase),
+		"installation-2",
+		s.logger,
+		trace.NewNoopTracer(),
+	)
+
+	ratchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+	keyID, err := ratchet.GetKeyID()
+	s.Require().NoError(err)
+
+	// A second ratchet whose key exchange is never delivered to the receiver.
+	otherRatchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(otherGroupID)
+	s.Require().NoError(err)
+	otherKeyID, err := otherRatchet.GetKeyID()
+	s.Require().NoError(err)
+
+	hashRatchetKeyExchangeMessage, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(context.Background(), senderKey, &s.processor.identity.PublicKey, groupID, []*encryption.HashRatchetKeyCompatibility{ratchet})
+	s.Require().NoError(err)
+	keyExchangePayload, err := proto.Marshal(hashRatchetKeyExchangeMessage.Message)
+	s.Require().NoError(err)
+
+	dataMessageSpec, err := senderEncryptionProtocol.BuildHashRatchetMessage(groupID, s.testPayload)
+	s.Require().NoError(err)
+	dataPayload, err := proto.Marshal(dataMessageSpec.Message)
+	s.Require().NoError(err)
+
+	strayMessageSpec, err := senderEncryptionProtocol.BuildHashRatchetMessage(otherGroupID, s.testPayload)
+	s.Require().NoError(err)
+	strayPayload, err := proto.Marshal(strayMessageSpec.Message)
+	s.Require().NoError(err)
+
+	// The data message arrives before its key and gets queued.
+	message := &types.ReceivedMessage{}
+	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	message.Hash = []byte{0x1}
+	message.Payload = dataPayload
+
+	_, err = s.processor.processMessage(message)
+	s.Require().NoError(err)
+
+	// A message for the other, still missing ratchet key sits in the same queue.
+	strayMessage := &types.ReceivedMessage{}
+	strayMessage.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	strayMessage.Hash = []byte{0x2}
+	strayMessage.Payload = strayPayload
+
+	err = s.processor.hashRatchetStorage.SaveMessage(groupID, keyID, strayMessage)
+	s.Require().NoError(err)
+
+	// The key arrives: the replay must decode the data message, not crash on the
+	// stray one, and re-queue the stray one under its own key.
+	message = &types.ReceivedMessage{}
+	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	message.Hash = []byte{0x3}
+	message.Payload = keyExchangePayload
+
+	response, err := s.processor.ProcessMessage(message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// The key exchange itself and the queued data message.
+	s.Require().Len(response.Messages, 2)
+
+	// The stray message is not lost: it waits for its own key.
+	msgs, err := s.processor.hashRatchetStorage.GetMessages(otherKeyID)
+	s.Require().NoError(err)
+	s.Require().Len(msgs, 1)
+}
+
 func (s *ProcessorSuite) TestHandleSegmentMessages() {
 	senderKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -334,9 +456,10 @@ func (s *ProcessorSuite) TestHandleSegmentMessages() {
 	s.Require().Equal(&senderKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(s.testPayload, decodedMessages[0].EncryptionLayer.Payload)
 
-	// Receiving another segment after the message has been reassembled is considered an error
-	_, err = s.processor.ProcessMessage(message)
-	s.Require().ErrorIs(err, segmentation.ErrAlreadyCompleted)
+	// Receiving another segment after reassembly should be ignored as a duplicate.
+	response, err = s.processor.ProcessMessage(message)
+	s.Require().NoError(err)
+	s.Require().Nil(response)
 }
 
 func (s *ProcessorSuite) TestGetEphemeralKey() {
@@ -358,9 +481,9 @@ func (s *ProcessorSuite) TestGetEphemeralKey() {
 
 func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	payload := []byte("hello")
-	communityID := []byte("community123")
+	sdsChannelID := "community123channel-1"
 
-	wrappedPayload, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, communityID)
+	wrappedPayload, _, err := s.processor.stack.Reliability.WrapPayloadForSDS(payload, sdsChannelID)
 	s.Require().NoError(err)
 	s.Require().True(len(wrappedPayload) > 0)
 
@@ -383,4 +506,110 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	err = s.processor.processSDSLayer(&receivedMsg2)
 	s.Require().NoError(err)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
+}
+
+func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPayloads() {
+	senderReliability := s.newStandaloneReliability()
+	receiverReliability := s.newStandaloneReliability()
+
+	channelID := "community123general"
+	oldPayload := []byte("old-community-message")
+	newPayload := []byte("new-community-message")
+
+	expectedOldMessageID := cryptotypes.EncodeHex(crypto.Keccak256(oldPayload))
+	expectedNewMessageID := cryptotypes.EncodeHex(crypto.Keccak256(newPayload))
+	expectedOldHint := "store-hash-" + expectedOldMessageID
+
+	senderReliability.SetRetrievalHintProvider(func(messageID string) []byte {
+		hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{
+			EnvelopeHashes: [][]byte{[]byte("store-hash-" + messageID)},
+		})
+		s.Require().NoError(err)
+		return hint
+	})
+
+	type missingDepsCall struct {
+		messageID string
+		deps      []string
+		channelID string
+	}
+
+	var (
+		callsMu sync.Mutex
+		calls   []missingDepsCall
+	)
+
+	receiverReliability.SetMissingDependenciesHandler(func(messageID string, missingDeps []string, missingDepsChannelID string) error {
+		callsMu.Lock()
+		calls = append(calls, missingDepsCall{
+			messageID: messageID,
+			deps:      append([]string(nil), missingDeps...),
+			channelID: missingDepsChannelID,
+		})
+		callsMu.Unlock()
+		return nil
+	})
+
+	wrappedOldPayload, _, err := senderReliability.WrapPayloadForSDS(oldPayload, channelID)
+	s.Require().NoError(err)
+	wrappedNewPayload, _, err := senderReliability.WrapPayloadForSDS(newPayload, channelID)
+	s.Require().NoError(err)
+
+	originalReliability := s.processor.stack.Reliability
+	s.processor.stack.Reliability = receiverReliability
+	defer func() {
+		s.processor.stack.Reliability = originalReliability
+	}()
+
+	newMessageFirst := types.Message{
+		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+	}
+	err = s.processor.processSDSLayer(&newMessageFirst)
+	s.Require().NoError(err)
+
+	err = testutils.RetryWithBackOff(func() error {
+		callsMu.Lock()
+		defer callsMu.Unlock()
+
+		if len(calls) == 0 {
+			return errors.New("missing dependencies callback not triggered")
+		}
+
+		return nil
+	})
+	s.Require().NoError(err)
+
+	callsMu.Lock()
+	firstCall := calls[0]
+	callsMu.Unlock()
+
+	s.Require().Equal(expectedNewMessageID, firstCall.messageID)
+	s.Require().Equal(channelID, firstCall.channelID)
+	s.Require().Contains(firstCall.deps, expectedOldHint)
+
+	recovered := map[string]bool{}
+	if bytes.Equal(newMessageFirst.EncryptionLayer.Payload, newPayload) {
+		recovered["new"] = true
+	}
+
+	oldMessage := types.Message{
+		EncryptionLayer: types.EncryptionLayer{Payload: wrappedOldPayload},
+	}
+	err = s.processor.processSDSLayer(&oldMessage)
+	s.Require().NoError(err)
+	if bytes.Equal(oldMessage.EncryptionLayer.Payload, oldPayload) {
+		recovered["old"] = true
+	}
+
+	newMessageReplay := types.Message{
+		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+	}
+	err = s.processor.processSDSLayer(&newMessageReplay)
+	s.Require().NoError(err)
+	if bytes.Equal(newMessageReplay.EncryptionLayer.Payload, newPayload) {
+		recovered["new"] = true
+	}
+
+	s.Require().True(recovered["old"], "old payload should be recoverable after dependency handling")
+	s.Require().True(recovered["new"], "new payload should be recoverable after dependency handling")
 }

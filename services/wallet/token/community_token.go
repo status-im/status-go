@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/contracts/community-tokens/assets"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/protocol/communities/token"
+	communitytoken "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -82,11 +82,11 @@ func (tm *Manager) GetCommunityTokenType(chainID uint64, tokenContractAddress st
 	return protobuf.CommunityTokenType_UNKNOWN_TOKEN_TYPE, nil
 }
 
-func (tm *Manager) GetCommunityTokenPrivilegesLevel(chainID uint64, tokenContractAddress string) (token.PrivilegesLevel, error) {
+func (tm *Manager) GetCommunityTokenPrivilegesLevel(chainID uint64, tokenContractAddress string) (communitytoken.PrivilegesLevel, error) {
 	if tm.communityTokensDB != nil {
 		return tm.communityTokensDB.GetTokenPrivilegesLevel(chainID, tokenContractAddress)
 	}
-	return token.CommunityLevel, nil
+	return communitytoken.CommunityLevel, nil
 }
 
 func (tm *Manager) getDiscoveredTokens(onlyCommunityCustoms bool) ([]*tokentypes.Token, error) {
@@ -117,6 +117,11 @@ func (tm *Manager) getDiscoveredTokens(onlyCommunityCustoms bool) ([]*tokentypes
 				ID: communityIDDB.String,
 			}
 
+			if lvl, err := tm.GetCommunityTokenPrivilegesLevel(token.ChainID, token.Address.Hex()); err == nil {
+				privilegesLevel := int(lvl)
+				token.PrivilegesLevel = &privilegesLevel
+			}
+
 			if tm.communityTokenImageBuilder != nil {
 				token.LogoURI = tm.communityTokenImageBuilder.MakeCommunityTokenImagesURL(token.CommunityData.ID, token.ChainID, token.Symbol)
 			}
@@ -143,6 +148,7 @@ func (tm *Manager) GetCustoms(onlyCommunityCustoms bool) ([]*tokentypes.Token, e
 		}
 
 		for _, communityToken := range communityTokens {
+			privilegesLevel := int(communityToken.PrivilegesLevel)
 			token := &tokentypes.Token{
 				Token: &types.Token{
 					Address:  common.HexToAddress(communityToken.Address),
@@ -155,6 +161,8 @@ func (tm *Manager) GetCustoms(onlyCommunityCustoms bool) ([]*tokentypes.Token, e
 				CommunityData: &tokentypes.CommunityData{
 					ID: communityToken.CommunityID,
 				},
+				Soulbound:       !communityToken.Transferable,
+				PrivilegesLevel: &privilegesLevel,
 			}
 
 			if tm.communityTokenImageBuilder != nil {

@@ -251,7 +251,11 @@ type Content struct {
 	Type           string `json:"@type"`
 	URL            string `json:"url"`
 	Representation string `json:"representation"`
+	MimeType       string `json:"mimeType"`
 	Available      bool   `json:"available"`
+	// Size is the size in bytes of this representation. Rarible reports it per
+	// representation, so every URL we pick from here comes with its own.
+	Size int64 `json:"size"`
 }
 
 type ContractOwnershipContainer struct {
@@ -391,7 +395,7 @@ func isNewContentBigger(current string, new string, includeOriginal bool) bool {
 	return newValue > currentValue
 }
 
-func getBiggestContentURL(contents []Content, contentType string, includeOriginal bool) string {
+func getBiggestContent(contents []Content, contentType string, includeOriginal bool) Content {
 	ret := Content{
 		Type:           "",
 		URL:            "",
@@ -407,52 +411,93 @@ func getBiggestContentURL(contents []Content, contentType string, includeOrigina
 		}
 	}
 
-	return ret.URL
+	return ret
 }
 
-func getAnimationURL(contents []Content) string {
-	// Try to get the biggest content of type "VIDEO"
-	ret := getBiggestContentURL(contents, "VIDEO", true)
+// getAnimation returns content that actually moves, or the zero Content. An
+// image is only offered as animation when its mime type can carry one: handing
+// back a still original here means every consumer that reads "animation"
+// downloads the full-size asset for nothing.
+//
+// The whole Content is returned rather than its URL because the mime type comes
+// with it, and a consumer that has to ask the network what it was just handed
+// pays a round trip per collectible for an answer already in this response.
+func getAnimation(contents []Content) Content {
+	if ret := getBiggestContent(contents, "VIDEO", true); ret.URL != "" {
+		return ret
+	}
 
-	// If empty, try to get the biggest content of type "IMAGE", including the "ORIGINAL" representation
-	if ret == "" {
-		ret = getBiggestContentURL(contents, "IMAGE", true)
+	animated := make([]Content, 0, len(contents))
+	for _, content := range contents {
+		if thirdparty.IsAnimatedMediaType(content.MimeType) {
+			animated = append(animated, content)
+		}
+	}
+
+	return getBiggestContent(animated, "IMAGE", true)
+}
+
+// Representations small enough to serve as a list thumbnail, smallest first.
+var thumbnailRepresentations = []string{"PREVIEW", "PORTRAIT"}
+
+// getThumbnailURL returns the provider's own small preview, or an empty string
+// when Rarible does not offer one for this item. BIG and ORIGINAL deliberately
+// do not qualify: they are the full-size asset, and an empty thumbnail tells
+// the client to fall back to the image URL rather than pretending a preview
+// exists.
+func getThumbnail(contents []Content) Content {
+	for _, representation := range thumbnailRepresentations {
+		for _, content := range contents {
+			if content.Type == "IMAGE" && content.Representation == representation {
+				return content
+			}
+		}
+	}
+
+	return Content{}
+}
+
+func getThumbnailURL(contents []Content) string {
+	return getThumbnail(contents).URL
+}
+
+func getImage(contents []Content) Content {
+	// Get the biggest content of type "IMAGE", excluding the "ORIGINAL" representation
+	ret := getBiggestContent(contents, "IMAGE", false)
+
+	// If empty, allow the "ORIGINAL" representation
+	if ret.URL == "" {
+		ret = getBiggestContent(contents, "IMAGE", true)
 	}
 
 	return ret
 }
 
 func getImageURL(contents []Content) string {
-	// Get the biggest content of type "IMAGE", excluding the "ORIGINAL" representation
-	ret := getBiggestContentURL(contents, "IMAGE", false)
-
-	// If empty, allow the "ORIGINAL" representation
-	if ret == "" {
-		ret = getBiggestContentURL(contents, "IMAGE", true)
-	}
-
-	return ret
+	return getImage(contents).URL
 }
 
 func (c *Collectible) toCollectibleData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
-	imageURL := getImageURL(c.Metadata.Contents)
-	animationURL := getAnimationURL(c.Metadata.Contents)
-
-	if animationURL == "" {
-		animationURL = imageURL
-	}
+	animation := getAnimation(c.Metadata.Contents)
+	image := getImage(c.Metadata.Contents)
+	thumbnail := getThumbnail(c.Metadata.Contents)
 
 	return thirdparty.CollectibleData{
-		ID:           id,
-		ContractType: walletCommon.ContractTypeUnknown, // Rarible doesn't provide the contract type with the collectible
-		Provider:     RaribleID,
-		Name:         c.Metadata.Name,
-		Description:  c.Metadata.Description,
-		Permalink:    c.Metadata.ExternalURI,
-		ImageURL:     imageURL,
-		AnimationURL: animationURL,
-		Traits:       raribleToCollectibleTraits(c.Metadata.Attributes),
-		TokenURI:     c.Metadata.OriginalMetaURI,
+		ID:                 id,
+		ContractType:       walletCommon.ContractTypeUnknown, // Rarible doesn't provide the contract type with the collectible
+		Provider:           RaribleID,
+		Name:               c.Metadata.Name,
+		Description:        c.Metadata.Description,
+		Permalink:          c.Metadata.ExternalURI,
+		ImageURL:           image.URL,
+		ImageSize:          image.Size,
+		ThumbnailURL:       thumbnail.URL,
+		ThumbnailSize:      thumbnail.Size,
+		AnimationURL:       animation.URL,
+		AnimationMediaType: animation.MimeType,
+		AnimationSize:      animation.Size,
+		Traits:             raribleToCollectibleTraits(c.Metadata.Attributes),
+		TokenURI:           c.Metadata.OriginalMetaURI,
 	}
 }
 

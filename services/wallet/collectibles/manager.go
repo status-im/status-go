@@ -448,7 +448,7 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueID
 }
 
 func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID, asyncFetch bool) error {
-	missingIDs, err := o.collectiblesDataDB.GetIDsNotInDB(uniqueIDs)
+	missingIDs, err := o.collectiblesDataDB.GetIDsNeedingFetch(uniqueIDs)
 	if err != nil {
 		return err
 	}
@@ -676,120 +676,28 @@ func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
 // If asyncFetch is true, community collectibles metadata will be fetched async and an EventCollectiblesDataUpdated will be sent when the data is ready.
 // If asyncFetch is false, it will wait for all community collectibles' metadata to be retrieved before returning.
 // Returns the IDs of successfully processed collectibles and the list of full collectible data.
+// processFullCollectibleData completes freshly fetched assets, caches them, and
+// returns the IDs it managed to process together with the resulting data read
+// back from the cache.
 func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData, asyncFetch bool) ([]thirdparty.CollectibleUniqueID, []thirdparty.FullCollectibleData, error) {
-	fullyFetchedAssets := make(map[string]*thirdparty.FullCollectibleData)
-	communityCollectibles := make(map[string][]*thirdparty.FullCollectibleData)
 	allIDs := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
-	processedIDs := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
-
-	// Start with all assets, remove if any of the fetch steps fail
-	for idx := range assets {
-		asset := &assets[idx]
-		id := asset.CollectibleData.ID
-		fullyFetchedAssets[id.HashKey()] = asset
-		allIDs = append(allIDs, id)
-	}
-
-	// If original data contained ownership, store it
-	ownershipMap := make(map[string][]thirdparty.AccountBalance)
 	for _, asset := range assets {
-		if len(asset.Ownership) > 0 {
-			ownershipMap[asset.CollectibleData.ID.HashKey()] = asset.Ownership
-		}
+		allIDs = append(allIDs, asset.CollectibleData.ID)
+	}
+	ownership := ownershipByID(assets)
+
+	providerAssets, communityAssets := o.splitCommunityCollectibles(ctx, assets)
+
+	processedIDs := o.fetchCommunityCollectibles(ctx, communityAssets, asyncFetch)
+
+	for _, asset := range providerAssets {
+		o.fillAnimationMediatype(ctx, asset)
+		processedIDs = append(processedIDs, asset.CollectibleData.ID)
 	}
 
-	// Detect community collectibles
-	for _, asset := range fullyFetchedAssets {
-		// Only check community ownership if metadata is empty
-		if isMetadataEmpty(asset.CollectibleData) {
-			// Get TokenURI if not given by provider
-			err := o.fillTokenURI(ctx, asset)
-			if err != nil {
-				logutils.ZapLogger().Error("fillTokenURI failed", zap.Error(err))
-				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
-				continue
-			}
-
-			// Get CommunityID if obtainable from TokenURI
-			err = o.fillCommunityID(asset)
-			if err != nil {
-				logutils.ZapLogger().Error("fillCommunityID failed", zap.Error(err))
-				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
-				continue
-			}
-
-			// Get metadata from community if community collectible
-			communityID := asset.CollectibleData.CommunityID
-			if communityID != "" {
-				if _, ok := communityCollectibles[communityID]; !ok {
-					communityCollectibles[communityID] = make([]*thirdparty.FullCollectibleData, 0)
-				}
-				communityCollectibles[communityID] = append(communityCollectibles[communityID], asset)
-
-				// Community collectibles are handled separately, remove from list
-				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
-			}
-		}
-	}
-
-	// Community collectibles are grouped by community ID
-	for communityID, communityAssets := range communityCollectibles {
-		if asyncFetch {
-			o.fetchCommunityAssetsAsync(ctx, communityID, communityAssets)
-		} else {
-			err := o.fetchCommunityAssets(communityID, communityAssets)
-			if err != nil {
-				logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
-				continue
-			}
-			for _, asset := range communityAssets {
-				processedIDs = append(processedIDs, asset.CollectibleData.ID)
-			}
-		}
-	}
-
-	for _, asset := range fullyFetchedAssets {
-		err := o.fillAnimationMediatype(ctx, asset)
-		if err != nil {
-			logutils.ZapLogger().Error("fillAnimationMediatype failed", zap.Error(err))
-			delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
-			continue
-		}
-	}
-
-	// Save successfully fetched data to DB
-	collectiblesData := make([]thirdparty.CollectibleData, 0, len(assets))
-	collectionsData := make([]thirdparty.CollectionData, 0, len(assets))
-	missingCollectionIDs := make([]thirdparty.ContractID, 0)
-
-	for _, asset := range fullyFetchedAssets {
-		id := asset.CollectibleData.ID
-		processedIDs = append(processedIDs, id)
-
-		collectiblesData = append(collectiblesData, asset.CollectibleData)
-		if asset.CollectionData != nil {
-			collectionsData = append(collectionsData, *asset.CollectionData)
-		} else {
-			missingCollectionIDs = append(missingCollectionIDs, id.ContractID)
-		}
-	}
-
-	err := o.collectiblesDataDB.SetData(collectiblesData, true)
+	err := o.persistCollectibles(ctx, providerAssets)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	err = o.collectionsDataDB.SetData(collectionsData, true)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(missingCollectionIDs) > 0 {
-		// Calling this ensures collection data is fetched and cached (if not already available)
-		_, err := o.FetchCollectionsDataByContractID(ctx, missingCollectionIDs)
-		if err != nil {
-			return nil, nil, err
-		}
 	}
 
 	// Return latest up to date data from DB
@@ -797,16 +705,145 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 	if err != nil {
 		return nil, nil, err
 	}
+	restoreOwnership(items, ownership)
 
-	// Restore original ownership, if available
-	for i := range items {
-		item := &items[i]
-		if originalOwnership, ok := ownershipMap[item.CollectibleData.ID.HashKey()]; ok {
-			item.Ownership = originalOwnership
+	return processedIDs, items, nil
+}
+
+// ownershipByID snapshots the ownership a provider sent alongside the assets.
+// The collectible cache does not store it, so what is read back after persisting
+// has to be filled in from here.
+func ownershipByID(assets []thirdparty.FullCollectibleData) map[string][]thirdparty.AccountBalance {
+	ret := make(map[string][]thirdparty.AccountBalance)
+
+	for _, asset := range assets {
+		if len(asset.Ownership) > 0 {
+			ret[asset.CollectibleData.ID.HashKey()] = asset.Ownership
 		}
 	}
 
-	return processedIDs, items, nil
+	return ret
+}
+
+func restoreOwnership(items []thirdparty.FullCollectibleData, ownership map[string][]thirdparty.AccountBalance) {
+	for i := range items {
+		item := &items[i]
+		if original, ok := ownership[item.CollectibleData.ID.HashKey()]; ok {
+			item.Ownership = original
+		}
+	}
+}
+
+// splitCommunityCollectibles separates the assets whose metadata has to come from
+// a community, grouped by the community that owns it, from those a provider has
+// already described. Only an asset a provider left empty can be a community
+// collectible, and answering that needs the token URI, so the two lookups the
+// question rests on happen here.
+//
+// An asset those lookups fail for lands in neither group: there is nothing to
+// cache for it, and caching it empty would mark it as known and stop anything
+// from asking again.
+func (o *Manager) splitCommunityCollectibles(ctx context.Context, assets []thirdparty.FullCollectibleData) ([]*thirdparty.FullCollectibleData, map[string][]*thirdparty.FullCollectibleData) {
+	providerAssets := make([]*thirdparty.FullCollectibleData, 0, len(assets))
+	communityAssets := make(map[string][]*thirdparty.FullCollectibleData)
+
+	for idx := range assets {
+		asset := &assets[idx]
+
+		if !isMetadataEmpty(asset.CollectibleData) {
+			providerAssets = append(providerAssets, asset)
+			continue
+		}
+
+		// Get TokenURI if not given by provider
+		err := o.fillTokenURI(ctx, asset)
+		if err != nil {
+			logutils.ZapLogger().Error("fillTokenURI failed", zap.Error(err))
+			continue
+		}
+
+		// Get CommunityID if obtainable from TokenURI
+		err = o.fillCommunityID(asset)
+		if err != nil {
+			logutils.ZapLogger().Error("fillCommunityID failed", zap.Error(err))
+			continue
+		}
+
+		communityID := asset.CollectibleData.CommunityID
+		if communityID == "" {
+			providerAssets = append(providerAssets, asset)
+			continue
+		}
+
+		communityAssets[communityID] = append(communityAssets[communityID], asset)
+	}
+
+	return providerAssets, communityAssets
+}
+
+// fetchCommunityCollectibles resolves community metadata and returns the IDs it
+// completed. An asynchronous fetch reports none: its data reaches the cache
+// later, and callers learn about it from the event it emits when it lands.
+func (o *Manager) fetchCommunityCollectibles(ctx context.Context, communityAssets map[string][]*thirdparty.FullCollectibleData, asyncFetch bool) []thirdparty.CollectibleUniqueID {
+	processedIDs := make([]thirdparty.CollectibleUniqueID, 0)
+
+	for communityID, assets := range communityAssets {
+		if asyncFetch {
+			o.fetchCommunityAssetsAsync(ctx, communityID, assets)
+			continue
+		}
+
+		err := o.fetchCommunityAssets(communityID, assets)
+		if err != nil {
+			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+			continue
+		}
+
+		for _, asset := range assets {
+			processedIDs = append(processedIDs, asset.CollectibleData.ID)
+		}
+	}
+
+	return processedIDs
+}
+
+// persistCollectibles caches the assets and makes sure every one of them has
+// collection data behind it. A provider that returned no collection for a
+// contract leaves it to be fetched separately, so that a cached collectible
+// always resolves to a collection.
+func (o *Manager) persistCollectibles(ctx context.Context, assets []*thirdparty.FullCollectibleData) error {
+	collectiblesData := make([]thirdparty.CollectibleData, 0, len(assets))
+	collectionsData := make([]thirdparty.CollectionData, 0, len(assets))
+	missingCollectionIDs := make([]thirdparty.ContractID, 0)
+
+	for _, asset := range assets {
+		collectiblesData = append(collectiblesData, asset.CollectibleData)
+		if asset.CollectionData != nil {
+			collectionsData = append(collectionsData, *asset.CollectionData)
+		} else {
+			missingCollectionIDs = append(missingCollectionIDs, asset.CollectibleData.ID.ContractID)
+		}
+	}
+
+	err := o.collectiblesDataDB.SetData(collectiblesData, true)
+	if err != nil {
+		return err
+	}
+
+	err = o.collectionsDataDB.SetData(collectionsData, true)
+	if err != nil {
+		return err
+	}
+
+	if len(missingCollectionIDs) > 0 {
+		// Calling this ensures collection data is fetched and cached (if not already available)
+		_, err := o.FetchCollectionsDataByContractID(ctx, missingCollectionIDs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (o *Manager) fillTokenURI(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
@@ -907,15 +944,27 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 	}()
 }
 
-func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
-	if len(asset.CollectibleData.AnimationURL) > 0 {
-		contentType, err := o.doContentTypeRequest(ctx, asset.CollectibleData.AnimationURL)
-		if err != nil {
-			asset.CollectibleData.AnimationURL = ""
-		}
-		asset.CollectibleData.AnimationMediaType = contentType
+// fillAnimationMediatype resolves the media type of an animation the provider
+// did not describe. Both providers do describe it - Alchemy in image.contentType,
+// Rarible in the content's mimeType - and they classify the asset from that same
+// field before offering it as an animation at all, so asking the network again
+// for what we were just told costs one serial round trip per collectible and
+// answers nothing new.
+//
+// The request stays as a fallback because a provider is free to hand back an
+// animation with no media type, and because it doubles as a reachability check:
+// an animation we cannot fetch the headers of is dropped rather than handed to
+// the client to fail on.
+func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.FullCollectibleData) {
+	if len(asset.CollectibleData.AnimationURL) == 0 || len(asset.CollectibleData.AnimationMediaType) > 0 {
+		return
 	}
-	return nil
+
+	contentType, err := o.doContentTypeRequest(ctx, asset.CollectibleData.AnimationURL)
+	if err != nil {
+		asset.CollectibleData.AnimationURL = ""
+	}
+	asset.CollectibleData.AnimationMediaType = contentType
 }
 
 func (o *Manager) processCollectionData(_ context.Context, collections []thirdparty.CollectionData) error {

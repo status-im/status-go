@@ -862,6 +862,7 @@ def add_packet_loss(node, packet_loss=2):
 @contextmanager
 def node_pause(node):
     logging.info("Entering context manager: node_pause")
+    node.wait_for_online(timeout=30)
     node.container_pause()
     try:
         yield

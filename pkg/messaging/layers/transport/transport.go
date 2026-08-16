@@ -8,6 +8,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -673,6 +674,51 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 	}
 }
 
+// TrackWithSDSAlias tracks an application message for publish confirmation and
+// associates its SDS ID solely for SDS retrieval hints and delivery callbacks.
+func (t *Transport) TrackWithSDSAlias(applicationMessageID, sdsMessageID []byte, hashes [][]byte, newMessages []*types.NewMessage) {
+	if t.envelopesMonitor == nil {
+		return
+	}
+	t.Track(applicationMessageID, hashes, newMessages)
+	t.envelopesMonitor.AddSDSAlias(applicationMessageID, sdsMessageID)
+}
+
+// TakeApplicationMessageIDForSDS resolves and consumes an outgoing SDS ID's
+// application message ID after its delivery confirmation.
+func (t *Transport) TakeApplicationMessageIDForSDS(sdsMessageID []byte) ([]byte, bool) {
+	if t.envelopesMonitor == nil {
+		return nil, false
+	}
+	return t.envelopesMonitor.TakeApplicationMessageIDForSDS(sdsMessageID)
+}
+
+// TrackedEnvelopeHashes returns all tracked envelope hashes for a given message
+// identifier. A single message maps to multiple envelopes when it is split by
+// the segmentation layer. The returned hashes are hex-encoded (0x-prefixed).
+func (t *Transport) TrackedEnvelopeHashes(identifier []byte) ([]string, error) {
+	if t.envelopesMonitor == nil {
+		return nil, errors.New("envelopes monitor not initialized")
+	}
+
+	key := types2.HexBytes(identifier).String()
+
+	t.envelopesMonitor.mu.Lock()
+	defer t.envelopesMonitor.mu.Unlock()
+
+	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[key]
+	if !ok || len(hashes) == 0 {
+		return nil, errors.New("no tracked envelope hash found")
+	}
+
+	result := make([]string, len(hashes))
+	for i, hash := range hashes {
+		result[i] = hash.String()
+	}
+
+	return result, nil
+}
+
 func (t *Transport) MaxMessageSize() uint32 {
 	return t.waku.MaxMessageSize()
 }
@@ -723,8 +769,22 @@ func (t *Transport) PeerCount() int {
 	return len(t.waku.Peers())
 }
 
-// Peers is retained only for the Python functional tests (see tests-functional);
-// it is not used by status-app.
+// ConnectionState returns the waku node's current three-state connection status.
+func (t *Transport) ConnectionState() types.ConnectionState {
+	return t.waku.ConnectionState()
+}
+
+// OnHistoryReconcileNeeded returns the waku node's history-reconcile signal
+// (#7568): fired periodically while connectivity is not reliable and once when
+// it recovers. Without a waku node (offline transport) it returns a nil
+// channel, which blocks forever — i.e. never signals.
+func (t *Transport) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
+	if t.waku == nil {
+		return nil
+	}
+	return t.waku.OnHistoryReconcileNeeded()
+}
+
 func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
@@ -734,6 +794,10 @@ func (t *Transport) Peers() types.PeerStats {
 func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
 	t.logger.Debug("confirming message processed", zap.Any("ids", ids), zap.Any("timestamp", timestamp))
 	return t.cache.Add(ids, timestamp)
+}
+
+func (t *Transport) AlreadyProcessed(ids []string) (map[string]bool, error) {
+	return t.cache.Hits(ids)
 }
 
 // CleanMessagesProcessed clears the messages that are older than timestamp
@@ -751,7 +815,6 @@ func (t *Transport) SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) erro
 
 func (t *Transport) ClearProcessedMessageIDsCache() error {
 	t.logger.Debug("clearing processed messages cache")
-	t.waku.ClearEnvelopesCache()
 	return t.cache.Clear()
 }
 
@@ -804,7 +867,43 @@ func (t *Transport) Query(
 	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
-// SetStorenodes sets the storenodes the StoreClient may query. Called once at startup.
-func (t *Transport) SetStorenodes(nodes []peer.AddrInfo) {
-	t.waku.SetStorenodes(nodes)
+func (t *Transport) FetchMessagesByHashes(ctx context.Context, messageHashes []string) error {
+	if len(messageHashes) == 0 {
+		return nil
+	}
+
+	type activeStorenodeProvider interface {
+		GetActiveStorenode() peer.AddrInfo
+	}
+
+	provider, ok := t.waku.(activeStorenodeProvider)
+	if !ok {
+		return errors.New("waku backend does not expose an active storenode")
+	}
+
+	storenode := provider.GetActiveStorenode()
+	if storenode.ID == "" {
+		return errors.New("no active storenode")
+	}
+
+	type hashFetcher interface {
+		FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error
+	}
+
+	fetcher, ok := t.waku.(hashFetcher)
+	if !ok {
+		return errors.New("waku backend does not support hash-based message fetch")
+	}
+
+	return fetcher.FetchMessagesByHashes(ctx, storenode, messageHashes)
+}
+
+func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
+	type storenodeConfigProviderSetter interface {
+		SetStorenodeConfigProvider(history.StorenodeConfigProvider)
+	}
+
+	if setter, ok := t.waku.(storenodeConfigProviderSetter); ok {
+		setter.SetStorenodeConfigProvider(c)
+	}
 }

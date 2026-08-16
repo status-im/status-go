@@ -1,20 +1,22 @@
 package protocol
 
 type StoreNodeRequestConfig struct {
-	WaitForResponse   bool
-	StopWhenDataFound bool
-	InitialPageSize   uint64
-	FurtherPageSize   uint64
+	WaitForResponse                  bool
+	StopWhenDataFound                bool
+	RequireNewerCommunityDescription bool
+	InitialPageSize                  uint64
+	FurtherPageSize                  uint64
 }
 
 type StoreNodeRequestOption func(*StoreNodeRequestConfig)
 
 func defaultStoreNodeRequestConfig() StoreNodeRequestConfig {
 	return StoreNodeRequestConfig{
-		WaitForResponse:   true,
-		StopWhenDataFound: true,
-		InitialPageSize:   initialStoreNodeRequestPageSize,
-		FurtherPageSize:   defaultStoreNodeRequestPageSize,
+		WaitForResponse:                  true,
+		StopWhenDataFound:                true,
+		RequireNewerCommunityDescription: true,
+		InitialPageSize:                  initialStoreNodeRequestPageSize,
+		FurtherPageSize:                  defaultStoreNodeRequestPageSize,
 	}
 }
 
@@ -34,20 +36,8 @@ func WithWaitForResponseOption(waitForResponse bool) StoreNodeRequestOption {
 	}
 }
 
-func WithStopWhenDataFound(stopWhenDataFound bool) StoreNodeRequestOption {
+func WithRequireNewerCommunityDescription(requireNewer bool) StoreNodeRequestOption {
 	return func(c *StoreNodeRequestConfig) {
-		c.StopWhenDataFound = stopWhenDataFound
-	}
-}
-
-func WithInitialPageSize(initialPageSize uint64) StoreNodeRequestOption {
-	return func(c *StoreNodeRequestConfig) {
-		c.InitialPageSize = initialPageSize
-	}
-}
-
-func WithFurtherPageSize(furtherPageSize uint64) StoreNodeRequestOption {
-	return func(c *StoreNodeRequestConfig) {
-		c.FurtherPageSize = furtherPageSize
+		c.RequireNewerCommunityDescription = requireNewer
 	}
 }

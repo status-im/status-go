@@ -8,7 +8,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/parsers"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
@@ -35,7 +34,7 @@ func (gt *GeckoToken) keys() []string {
 		if len(contractAddress) != walletcommon.HexAddressLength {
 			continue
 		}
-		chainID, ok := parsers.DefaultCoinGeckoChainsMapper[platform]
+		chainID, ok := walletcommon.CoinGeckoPlatformChainMapper[platform]
 		if !ok {
 			continue
 		}

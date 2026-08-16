@@ -68,6 +68,11 @@ func loadKeys(keys map[string][]byte, keyStorePath string) error {
 			return nil
 		}
 
+		// skip filesystem metadata files (e.g. .DS_Store created by macOS Finder) and other hidden files
+		if strings.HasPrefix(dirEntry.Name(), ".") {
+			return nil
+		}
+
 		rawKeyFile, err := ioutil.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("invalid account key file: %v", err)

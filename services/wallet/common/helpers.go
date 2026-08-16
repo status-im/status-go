@@ -16,11 +16,14 @@ import (
 )
 
 func IsProcessorBridge(name string) bool {
-	return name == pathProcessorCommon.ProcessorBridgeHopName
+	// LI.FI does both swaps and bridges through a single processor.
+	return name == pathProcessorCommon.ProcessorBridgeHopName ||
+		name == pathProcessorCommon.ProcessorLiFiName
 }
 
 func IsProcessorSwap(name string) bool {
-	return name == pathProcessorCommon.ProcessorSwapParaswapName
+	return name == pathProcessorCommon.ProcessorSwapParaswapName ||
+		name == pathProcessorCommon.ProcessorLiFiName
 }
 
 func PackApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Address) ([]byte, error) {
@@ -34,10 +37,6 @@ func PackApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Ad
 	}
 
 	return erc20ABI.Pack("approve", approvalContractAddress, amountIn)
-}
-
-func FullDomainName(username string) string {
-	return username + "." + StatusDomain
 }
 
 func ExtractCoordinates(pubkey string) ([32]byte, [32]byte) {

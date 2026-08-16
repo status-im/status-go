@@ -599,6 +599,17 @@ func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
 	return api.service.StartMessenger()
 }
 
+func (api *PublicAPI) ConnectionStatus() types2.ConnectionStatus {
+	if api.service == nil || api.service.messaging == nil {
+		return types2.ConnectionStatus{
+			IsOnline: false,
+			State:    types2.ConnectionStateDisconnected,
+		}
+	}
+
+	return api.service.messaging.ConnectionStatus()
+}
+
 func (api *PublicAPI) SetUserStatus(ctx context.Context, status int, customText string) error {
 	return api.service.messenger.SetUserStatus(ctx, status, customText)
 }
@@ -1045,11 +1056,13 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages(false)
+	return api.service.messenger.RequestAllHistoricMessages()
 }
 
+// RequestAllHistoricMessagesWithRetries is kept as an API-compatible alias:
+// retry and failover happen inside the store client on every request.
 func (api *PublicAPI) RequestAllHistoricMessagesWithRetries() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages(true)
+	return api.service.messenger.RequestAllHistoricMessages()
 }
 
 // Echo is a method for testing purposes.
@@ -1080,10 +1093,6 @@ func (api *PublicAPI) EnableLogosStorageCommunityHistoryArchiveProtocol(override
 func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
-
-// Peers and PeerID are retained only for the Python functional tests
-// (tests-functional): Peers backs the wait_for_online / test_discovery checks
-// and PeerID backs node identification. They are not used by status-app.
 
 func (api *PublicAPI) Peers() types2.PeerStats {
 	return api.service.messenger.Peers()
@@ -1336,10 +1345,6 @@ func (api *PublicAPI) FetchMessages(request *requests.FetchMessages) error {
 
 func (api *PublicAPI) SetLightClient(request *requests.SetLightClient) error {
 	return api.service.messenger.SetLightClient(request)
-}
-
-func (api *PublicAPI) SetStoreConfirmationForMessagesSent(request *requests.SetStoreConfirmationForMessagesSent) error {
-	return api.service.messenger.SetStoreConfirmationForMessagesSent(request)
 }
 
 // Deprecated: Use SetLogLevel from status.go instead. BTW, mobile don't use this anymore.

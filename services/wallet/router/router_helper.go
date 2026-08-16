@@ -689,6 +689,7 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 		return nil
 	}
 
+	name := "" // need it for display only, transfer itself needs just the contract address and token id
 	collectibleData, err := collectiblesManager.GetCacheCollectibleData(thirdparty.CollectibleUniqueID{
 		ContractID: thirdparty.ContractID{
 			ChainID: walletCommon.ChainID(chainID),
@@ -696,8 +697,8 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 		},
 		TokenID: &bigint.BigInt{Int: collectibleTokenID},
 	})
-	if err != nil {
-		return nil
+	if err == nil {
+		name = collectibleData.Name
 	}
 
 	return &tokentypes.Token{
@@ -705,7 +706,7 @@ func findToken(sendType sendtype.SendType, tokenManager TokenManager, collectibl
 			Address:  contractAddress,
 			Decimals: 0,
 			ChainID:  chainID,
-			Name:     collectibleData.Name,
+			Name:     name,
 		},
 		CollectibleTokenID: (*hexutil.Big)(collectibleTokenID),
 	}
@@ -746,6 +747,17 @@ func (r *Router) TokenAvailableForBridgingViaHop(chainID uint64, address common.
 func (r *Router) IsChainSupportedForSwapViaParaswap(chainID uint64) (bool, error) {
 	paraswapClient := r.paraswapClientFactory(chainID)
 	tokens, err := paraswapClient.FetchTokensList(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	return len(tokens) > 0, nil
+}
+
+// IsChainSupportedForSwapViaLiFi returns true if the chain is supported for swap via LI.FI, false otherwise.
+func (r *Router) IsChainSupportedForSwapViaLiFi(chainID uint64) (bool, error) {
+	lifiClient := r.lifiClientFactory(chainID)
+	tokens, err := lifiClient.FetchTokensList(context.Background())
 	if err != nil {
 		return false, err
 	}

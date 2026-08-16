@@ -125,6 +125,9 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 	if org == nil {
 		return nil
 	}
+	if !org.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
 
 	m.logger.Debug("publishing community",
 		zap.String("communityID", org.IDString()),
@@ -407,15 +410,18 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				if !more {
 					return
 				}
-				if sub.Community != nil {
-					if sub.Community == nil {
-						continue
-					}
+				if sub.Community != nil && sub.Community.IsControlNode() {
 					// NOTE: because we use a pointer here, there's a race condition where the community would be updated before it's compared to the previous one.
 					// This results in keys not being propagated as the copy would not see any changes
 					communityCopy := sub.Community.CreateDeepCopy()
 
 					publishOrgAndDistributeEncryptionKeys(communityCopy)
+				}
+				if sub.CommunityTokensMetadataLoaded != nil && m.config.messengerSignalsHandler != nil {
+					communityCopy := sub.CommunityTokensMetadataLoaded.CreateDeepCopy()
+					response := &MessengerResponse{}
+					response.AddCommunity(communityCopy)
+					m.config.messengerSignalsHandler.MessengerResponse(response)
 				}
 
 				if sub.CommunityEventsMessage != nil {
@@ -1172,9 +1178,6 @@ func (m *Messenger) SpectateCommunity(communityID types3.HexBytes) (*MessengerRe
 	response.AddCommunitySettings(settings)
 
 	response.AddCommunity(community)
-
-	// sync community
-	m.asyncRequestAllHistoricMessages()
 
 	return response, nil
 }
@@ -2446,6 +2449,17 @@ func (m *Messenger) DeleteCommunityChat(communityID types3.HexBytes, chatID stri
 	if err != nil {
 		return nil, err
 	}
+	activityCenterChatID := chatID
+	if !strings.HasPrefix(activityCenterChatID, community.IDString()) {
+		activityCenterChatID = community.ChatID(activityCenterChatID)
+	}
+	activityCenterResponse, err := m.deleteActivityCenterNotificationsByChatID(context.TODO(), activityCenterChatID)
+	if err != nil {
+		return nil, err
+	}
+	if err = response.Merge(activityCenterResponse); err != nil {
+		return nil, err
+	}
 	err = m.deleteChat(chatID)
 	if err != nil {
 		return nil, err
@@ -3160,10 +3174,18 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 
 	for id := range communityResponse.Changes.ChatsRemoved {
 		chatID := community.ChatID(id)
+		activityCenterResponse, err := m.deleteActivityCenterNotificationsByChatID(context.TODO(), chatID)
+		if err != nil {
+			return err
+		}
+		if err = state.Response.Merge(activityCenterResponse); err != nil {
+			return err
+		}
+
 		_, ok := state.AllChats.Load(chatID)
 		if ok {
 			state.AllChats.Delete(chatID)
-			err := m.DeleteChat(chatID)
+			err = m.DeleteChat(chatID)
 			if err != nil {
 				m.logger.Error("couldn't delete chat", zap.Error(err))
 			}

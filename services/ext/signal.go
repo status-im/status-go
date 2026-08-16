@@ -35,14 +35,6 @@ func (h EnvelopeSignalHandler) MailServerRequestExpired(hash types.Hash) {
 // PublisherSignalHandler sends signals on protocol events
 type PublisherSignalHandler struct{}
 
-func (h PublisherSignalHandler) DecryptMessageFailed(pubKey string) {
-	signal.SendDecryptMessageFailed(pubKey)
-}
-
-func (h PublisherSignalHandler) BundleAdded(identity string, installationID string) {
-	signal.SendBundleAdded(identity, installationID)
-}
-
 func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse) {
 	signal.SendNewMessages(response)
 }

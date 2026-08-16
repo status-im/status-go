@@ -132,6 +132,8 @@ type StatusNode struct {
 
 	localBackup *backup.Controller
 
+	tokenManagerStartDone chan struct{}
+
 	serviceRegistry *ServiceRegistry
 }
 
@@ -319,10 +321,32 @@ func (n *StatusNode) LoadLocalBackup(filePath string) error {
 }
 
 func (n *StatusNode) SetMediaServerOptions(address *string, enableTLS *bool, advertizeHost string, advertizePort int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
 	n.mediaServerAddress = address
 	n.mediaServerEnableTLS = enableTLS
 	n.mediaServerAdvertizeHost = advertizeHost
 	n.mediaServerAdvertizePort = advertizePort
+
+	if n.mediaServer != nil {
+		if err := n.startMediaServer(); err != nil {
+			n.logger.Error("failed to restart media server with updated options", zap.Error(err))
+		}
+	}
+}
+
+func (n *StatusNode) StopMediaServer() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.mediaServer == nil {
+		return nil
+	}
+
+	err := n.mediaServer.Stop()
+	n.mediaServer = nil
+	return err
 }
 
 func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
@@ -341,9 +365,14 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 	}
 	n.mediaServer.SetDataProviders(n.appDB, n.walletDB, n.downloader)
 
-	if err := n.createAndStartTokenManager(); err != nil {
+	if err := n.createTokenManager(); err != nil {
 		return err
 	}
+	if err := n.tokenManager.Start(context.Background()); err != nil {
+		return errorspkg.Wrap(err, "failed to start token manager")
+	}
+	n.tokenManagerStartDone = make(chan struct{})
+	close(n.tokenManagerStartDone)
 
 	if err := n.initServices(config, n.mediaServer); err != nil {
 		return err
@@ -416,7 +445,7 @@ func (n *StatusNode) populateServiceRegistry() {
 	}
 }
 
-func (n *StatusNode) createAndStartTokenManager() error {
+func (n *StatusNode) createTokenManager() error {
 	const (
 		defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
 		defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
@@ -453,7 +482,28 @@ func (n *StatusNode) createAndStartTokenManager() error {
 		}
 	}
 
-	return n.tokenManager.Start(context.Background())
+	return nil
+}
+
+func (n *StatusNode) StartTokenManager() {
+	n.mu.Lock()
+	if !n.running.Load() || n.tokenManager == nil || n.tokenManagerStartDone != nil {
+		n.mu.Unlock()
+		return
+	}
+
+	tokenManager := n.tokenManager
+	done := make(chan struct{})
+	n.tokenManagerStartDone = done
+	n.mu.Unlock()
+
+	go func() {
+		defer common.LogOnPanic()
+		defer close(done)
+		if err := tokenManager.Start(context.Background()); err != nil {
+			n.logger.Error("failed to start token manager", zap.Error(err))
+		}
+	}()
 }
 
 func (n *StatusNode) setupRPCClient() (err error) {
@@ -482,6 +532,11 @@ func (n *StatusNode) Stop() error {
 	}
 
 	var errs []error
+	if n.tokenManagerStartDone != nil {
+		<-n.tokenManagerStartDone
+		n.tokenManagerStartDone = nil
+		n.tokenManager.Stop()
+	}
 	n.timeSourceSrvc.Stop()
 
 	for _, service := range n.services {
@@ -500,7 +555,9 @@ func (n *StatusNode) Stop() error {
 	n.rpcClient = nil
 	n.config = nil
 
-	n.mediaServer.SetDataProviders(nil, nil, nil)
+	if n.mediaServer != nil {
+		n.mediaServer.SetDataProviders(nil, nil, nil)
+	}
 
 	n.downloader.Stop()
 	n.downloader = nil

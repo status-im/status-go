@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -250,15 +251,17 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint
 }
 
 func (tm *Manager) Start(ctx context.Context) error {
-	tm.stopCh = make(chan struct{})
-	tm.startAccountsWatcher()
-	tm.startNetworksWatcher()
+	stopCh := make(chan struct{})
+	tm.stopCh = stopCh
+	tm.startAccountsWatcher(stopCh)
+	tm.startNetworksWatcher(stopCh)
 
-	tm.notifyCh = make(chan struct{})
-	return tm.startTokenListsNotifier(ctx)
+	notifyCh := make(chan struct{}, 1)
+	tm.notifyCh = notifyCh
+	return tm.startTokenListsNotifier(ctx, stopCh, notifyCh)
 }
 
-func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
+func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan struct{}, notifyCh chan struct{}) error {
 	thirdpartyServicesEnabled, err := tm.settings.ThirdpartyServicesEnabled()
 	if err != nil {
 		logutils.ZapLogger().Error("failed to get if thirdparty services are enabled", zap.Error(err))
@@ -272,7 +275,7 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
 
 	autoRefresh := thirdpartyServicesEnabled && autoRefreshEnabled
 
-	err = tm.tokensManager.Start(ctx, autoRefresh, tm.notifyCh)
+	err = tm.tokensManager.Start(ctx, autoRefresh, notifyCh)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to start token lists notifier", zap.Error(err))
 		return err
@@ -282,18 +285,27 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
 		defer gocommon.LogOnPanic()
 		for {
 			select {
-			case <-tm.stopCh:
+			case <-stopCh:
 				err := tm.tokensManager.Stop()
 				if err != nil {
 					logutils.ZapLogger().Error("failed to stop token lists notifier", zap.Error(err))
 				}
 				return
-			case <-tm.notifyCh:
+			case <-notifyCh:
 				err := tm.setLastTokenListsRefreshTime(time.Now().UTC())
 				if err != nil {
 					logutils.ZapLogger().Error("failed to set last tokens update", zap.Error(err))
 				}
 				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
+				if tm.walletFeed != nil {
+					// Send from a separate goroutine: Feed.Send blocks until every
+					// subscriber has consumed the value, and a stalled notifier loop
+					// would miss stopCh and drop follow-up notifications.
+					go func() {
+						defer gocommon.LogOnPanic()
+						tm.walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+					}()
+				}
 			}
 		}
 	}()
@@ -301,7 +313,7 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context) error {
 	return nil
 }
 
-func (tm *Manager) startAccountsWatcher() {
+func (tm *Manager) startAccountsWatcher(stopCh <-chan struct{}) {
 	if tm.accountsPublisher == nil || tm.accountsDB == nil {
 		return
 	}
@@ -312,7 +324,7 @@ func (tm *Manager) startAccountsWatcher() {
 		defer unsubFn()
 		for {
 			select {
-			case <-tm.stopCh:
+			case <-stopCh:
 				return
 			case event, ok := <-ch:
 				if !ok {
@@ -324,7 +336,7 @@ func (tm *Manager) startAccountsWatcher() {
 	}()
 }
 
-func (tm *Manager) startNetworksWatcher() {
+func (tm *Manager) startNetworksWatcher(stopCh <-chan struct{}) {
 	if tm.networkManager == nil {
 		return
 	}
@@ -336,7 +348,7 @@ func (tm *Manager) startNetworksWatcher() {
 		defer unsubFn()
 		for {
 			select {
-			case <-tm.stopCh:
+			case <-stopCh:
 				return
 			case _, ok := <-ch:
 				if !ok {
