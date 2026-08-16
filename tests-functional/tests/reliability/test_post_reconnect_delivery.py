@@ -57,12 +57,6 @@ class TestPostReconnectDelivery:
                 last_exc = exc
         raise last_exc
 
-    @pytest.mark.xfail(
-        reason="https://github.com/status-im/status-go/issues/7688: after the first "
-        "offline->online change the SDS manager is not rebuilt, so community messages "
-        "sent after a reconnect cannot be decoded. Remove this marker when #7688 is fixed.",
-        strict=True,
-    )
     def test_community_message_after_reconnect(self, community_admin, community_member):
         community_id = messenger.create_community(community_admin)
         chat_id = messenger.join_community(member=community_member, admin=community_admin, community_id=community_id)
