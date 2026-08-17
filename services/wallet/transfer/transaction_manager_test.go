@@ -18,7 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
@@ -28,7 +28,7 @@ type dummyAccountsStorage struct {
 	account *accsmanagementtypes.Account
 }
 
-func (d *dummyAccountsStorage) GetAccountByAddress(address types2.Address) (*accsmanagementtypes.Account, error) {
+func (d *dummyAccountsStorage) GetAccountByAddress(address types.Address) (*accsmanagementtypes.Account, error) {
 	if address != d.account.Address {
 		return nil, fmt.Errorf("address not found")
 	}
@@ -42,12 +42,12 @@ func (d *dummyAccountsStorage) GetKeypairByKeyUID(keyUID string) (*accsmanagemen
 	return d.keypair, nil
 }
 
-func (d *dummyAccountsStorage) AddressExists(address types2.Address) (bool, error) {
+func (d *dummyAccountsStorage) AddressExists(address types.Address) (bool, error) {
 	return d.account.Address == address, nil
 }
 
-func (d *dummyAccountsStorage) GetWalletAddresses() ([]types2.Address, error) {
-	return []types2.Address{d.account.Address}, nil
+func (d *dummyAccountsStorage) GetWalletAddresses() ([]types.Address, error) {
+	return []types.Address{d.account.Address}, nil
 }
 
 type dummySigner struct{}
@@ -75,7 +75,7 @@ func setupAccountsStorage() *dummyAccountsStorage {
 		},
 		account: &accsmanagementtypes.Account{
 			KeyUID:  "keyUid",
-			Address: types2.Address{1},
+			Address: types.Address{1},
 		},
 	}
 }
@@ -83,7 +83,7 @@ func setupAccountsStorage() *dummyAccountsStorage {
 func TestSignMessage(t *testing.T) {
 	tm, _ := setupTestSuite(t)
 
-	message := (types2.HexBytes)(make([]byte, 32))
+	message := (types.HexBytes)(make([]byte, 32))
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
@@ -95,7 +95,7 @@ func TestSignMessage(t *testing.T) {
 func TestSignMessage_InvalidAccount(t *testing.T) {
 	tm, _ := setupTestSuite(t)
 
-	message := (types2.HexBytes)(make([]byte, 32))
+	message := (types.HexBytes)(make([]byte, 32))
 
 	signature, err := tm.SignMessage(message, nil)
 	require.Error(t, err)
@@ -105,7 +105,7 @@ func TestSignMessage_InvalidAccount(t *testing.T) {
 func TestSignMessage_InvalidMessage(t *testing.T) {
 	tm, _ := setupTestSuite(t)
 
-	message := types2.HexBytes{}
+	message := types.HexBytes{}
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
@@ -121,8 +121,8 @@ func TestBuildTransaction(t *testing.T) {
 	nonce := uint64(1)
 	gas := uint64(21000)
 	sendArgs := wallettypes.SendTxArgs{
-		From:                 types2.Address{1},
-		To:                   &types2.Address{2},
+		From:                 types.Address{1},
+		To:                   &types.Address{2},
 		Value:                (*hexutil.Big)(big.NewInt(123)),
 		Nonce:                (*hexutil.Uint64)(&nonce),
 		Gas:                  (*hexutil.Uint64)(&gas),
@@ -162,8 +162,8 @@ func TestBuildTransaction_AccountNotFound(t *testing.T) {
 	nonce := uint64(1)
 	gas := uint64(21000)
 	sendArgs := wallettypes.SendTxArgs{
-		From:                 types2.Address{2},
-		To:                   &types2.Address{2},
+		From:                 types.Address{2},
+		To:                   &types.Address{2},
 		Value:                (*hexutil.Big)(big.NewInt(123)),
 		Nonce:                (*hexutil.Uint64)(&nonce),
 		Gas:                  (*hexutil.Uint64)(&gas),
@@ -181,8 +181,8 @@ func TestBuildTransaction_InvalidSendTxArgs(t *testing.T) {
 
 	chainID := uint64(1)
 	sendArgs := wallettypes.SendTxArgs{
-		From: types2.Address{1},
-		To:   &types2.Address{2},
+		From: types.Address{1},
+		To:   &types.Address{2},
 	}
 
 	expectedErr := fmt.Errorf("invalid SendTxArgs")
@@ -199,8 +199,8 @@ func TestBuildRawTransaction(t *testing.T) {
 	nonce := uint64(1)
 	gas := uint64(21000)
 	sendArgs := wallettypes.SendTxArgs{
-		From:                 types2.Address{1},
-		To:                   &types2.Address{2},
+		From:                 types.Address{1},
+		To:                   &types.Address{2},
 		Value:                (*hexutil.Big)(big.NewInt(123)),
 		Nonce:                (*hexutil.Uint64)(&nonce),
 		Gas:                  (*hexutil.Uint64)(&gas),
@@ -222,6 +222,6 @@ func TestBuildRawTransaction(t *testing.T) {
 
 	require.Equal(t, chainID, response.ChainID)
 	require.Equal(t, sendArgs, response.TxArgs)
-	require.Equal(t, types2.EncodeHex(expectedData), response.RawTx)
+	require.Equal(t, types.EncodeHex(expectedData), response.RawTx)
 	require.Equal(t, expectedHash, response.TxHash)
 }

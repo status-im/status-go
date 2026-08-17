@@ -18,14 +18,14 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
 	"github.com/status-im/status-go/pkg/messaging/events"
-	encryption2 "github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
-	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
-	wakumetrics2 "github.com/status-im/status-go/pkg/messaging/wakumetrics"
+	"github.com/status-im/status-go/pkg/messaging/wakumetrics"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -47,7 +47,7 @@ type Core struct {
 
 	connectionState connection.State
 
-	wakumetrics *wakumetrics2.Client
+	wakumetrics *wakumetrics.Client
 }
 
 type sdsEnvelopeHashesTracker interface {
@@ -61,16 +61,16 @@ type sdsApplicationMessageIDTracker interface {
 // Mode selects Core (full/relay) vs Edge (light) operation. It is re-exported
 // from the waku layer so callers configure the messaging API without importing
 // the transport package directly.
-type Mode = wakuv3.Mode
+type Mode = waku.Mode
 
 const (
-	ModeCore = wakuv3.ModeCore
-	ModeEdge = wakuv3.ModeEdge
+	ModeCore = waku.ModeCore
+	ModeEdge = waku.ModeEdge
 )
 
 // ModeFromLightClient maps the legacy WakuV2Config.LightClient boolean onto a Mode.
 func ModeFromLightClient(lightClient bool) Mode {
-	return wakuv3.ModeFromLightClient(lightClient)
+	return waku.ModeFromLightClient(lightClient)
 }
 
 type CoreParams struct {
@@ -111,7 +111,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.logger,
 	)
 
-	stack.Encryption = encryption2.New(
+	stack.Encryption = encryption.New(
 		config.persistence.EncryptionStorage(),
 		params.InstallationID,
 		config.logger,
@@ -301,7 +301,7 @@ func (c *Core) stop() error {
 	}
 
 	if c.metricsEnabled {
-		err := wakumetrics2.UnregisterMetrics()
+		err := wakumetrics.UnregisterMetrics()
 		if err != nil {
 			return err
 		}
@@ -375,7 +375,7 @@ type wakuParams struct {
 	// fleet + mode fully determine the peer configuration and the Core/Edge
 	// policy; the waku node builds the rest of its config from them.
 	fleet string
-	mode  wakuv3.Mode
+	mode  waku.Mode
 
 	// port / udpPort / nameserver are the only node settings a caller configures
 	// (zero/empty falls back to the waku defaults). Everything else — host,
@@ -392,10 +392,10 @@ type wakuParams struct {
 	logger *zap.Logger
 }
 
-func newWaku(params wakuParams) (*wakuv3.Waku, error) {
-	cfg := &wakuv3.Config{
+func newWaku(params wakuParams) (*waku.Waku, error) {
+	cfg := &waku.Config{
 		// Fleet + Mode drive peer resolution and the peer-exchange/discv5/
-		// light-client policy inside the waku node (see wakuv2.setDefaults). The
+		// light-client policy inside the waku node (see waku.setDefaults). The
 		// host, discovery limit, max message size and default shard topic are
 		// filled by the waku layer's setDefaults.
 		Fleet:      params.fleet,
@@ -409,7 +409,7 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 		MetricsEnabled:      params.metricsEnabled,
 	}
 
-	waku, err := wakuv3.New(
+	waku, err := waku.New(
 		params.nodeKey,
 		cfg,
 		params.logger,
@@ -424,11 +424,11 @@ func newWaku(params wakuParams) (*wakuv3.Waku, error) {
 
 func (c *Core) startWakuMetrics() error {
 	if c.wakumetrics == nil {
-		options := []wakumetrics2.TelemetryClientOption{
-			wakumetrics2.WithPeerID(c.waku.PeerID().String()),
+		options := []wakumetrics.TelemetryClientOption{
+			wakumetrics.WithPeerID(c.waku.PeerID().String()),
 		}
 
-		wakuMetricsHandler, err := wakumetrics2.NewClient(options...)
+		wakuMetricsHandler, err := wakumetrics.NewClient(options...)
 		if err != nil {
 			return err
 		}
@@ -439,7 +439,7 @@ func (c *Core) startWakuMetrics() error {
 		}
 
 		// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-		c.waku.(*wakuv3.Waku).SetMetricsHandler(wakuMetricsHandler)
+		c.waku.(*waku.Waku).SetMetricsHandler(wakuMetricsHandler)
 
 		c.wakumetrics = wakuMetricsHandler
 	}
@@ -449,7 +449,7 @@ func (c *Core) startWakuMetrics() error {
 
 func (c *Core) metrics() string {
 	// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-	return c.waku.(*wakuv3.Waku).Metrics()
+	return c.waku.(*waku.Waku).Metrics()
 }
 
 func (c *Core) generateHashRatchetKey(groupID []byte) error {
@@ -473,7 +473,7 @@ func (c *Core) generateHashRatchetKey(groupID []byte) error {
 
 func (c *Core) encryptWithHashRatchet(groupID []byte, payload []byte) ([]byte, []byte, uint32, error) {
 	encryptedPayload, ratchet, newSeqNo, err := c.stack.Encryption.EncryptWithHashRatchet(groupID, payload)
-	if err == encryption2.ErrNoEncryptionKey {
+	if err == encryption.ErrNoEncryptionKey {
 		_, err := c.stack.Encryption.GenerateHashRatchetKey(groupID)
 		if err != nil {
 			return nil, nil, 0, err
@@ -504,7 +504,7 @@ func (c *Core) buildHashRatchetMessage(groupID []byte, payload []byte) ([]byte, 
 }
 
 func (c *Core) decryptMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, data []byte) ([]byte, error) {
-	var encryptionMessage encryption2.ProtocolMessage
+	var encryptionMessage encryption.ProtocolMessage
 	err := proto.Unmarshal(data, &encryptionMessage)
 	if err != nil {
 		return nil, err

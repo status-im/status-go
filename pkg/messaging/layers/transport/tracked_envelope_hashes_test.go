@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	types3 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -18,7 +18,7 @@ func TestTrackedEnvelopeHashes_ReturnsAllHashes(t *testing.T) {
 	tr := &Transport{envelopesMonitor: monitor}
 
 	id := []byte("message-id")
-	hashes := []types3.Hash{{0x01}, {0x02}, {0x03}}
+	hashes := []types.Hash{{0x01}, {0x02}, {0x03}}
 	err := monitor.Add([][]byte{id}, hashes, []*wakutypes.NewMessage{{}, {}, {}})
 	require.NoError(t, err)
 

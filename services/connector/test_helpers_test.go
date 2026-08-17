@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/rpc/network"
 	network_testutil "github.com/status-im/status-go/internal/rpc/network/testutil"
@@ -61,11 +61,11 @@ func setupTests(t *testing.T) (state testState) {
 		NetworkID: 10,
 	}
 	networks := json.RawMessage("{}")
-	settingsObj := settings2.Settings{
+	settingsObj := settings.Settings{
 		Networks: &networks,
 	}
 
-	settDb, err := settings2.MakeNewDB(state.db)
+	settDb, err := settings.MakeNewDB(state.db)
 	require.NoError(t, err)
 	err = settDb.CreateSettings(settingsObj, config)
 	require.NoError(t, err)

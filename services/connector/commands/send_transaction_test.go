@@ -13,19 +13,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
 
-func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types2.Address) (RPCRequest, error) {
+func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types.Address) (RPCRequest, error) {
 	sendArgs := wallettypes.SendTxArgs{
 		From:  from,
-		To:    &types2.Address{0x02},
+		To:    &types.Address{0x02},
 		Value: &hexutil.Big{},
-		Data:  types2.HexBytes("0x0"),
+		Data:  types.HexBytes("0x0"),
 	}
 
 	sendArgsJSON, err := json.Marshal(sendArgs)
@@ -49,7 +49,7 @@ func TestFailToSendTransactionWithoutPermittedDApp(t *testing.T) {
 	t.Cleanup(close)
 
 	// Don't save dApp in the database
-	request, err := prepareSendTransactionRequest(testDAppData, types2.Address{0x1})
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x1})
 	assert.NoError(t, err)
 
 	_, err = state.cmd.Execute(state.ctx, request)
@@ -60,10 +60,10 @@ func TestFailToSendTransactionWithWrongAddress(t *testing.T) {
 	state, close := setupCommand(t, Method_EthSendTransaction)
 	t.Cleanup(close)
 
-	err := PersistDAppData(state.walletDb, testDAppData, types2.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(state.walletDb, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendTransactionRequest(testDAppData, types2.Address{0x02})
+	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x02})
 	assert.NoError(t, err)
 
 	_, err = state.cmd.Execute(state.ctx, request)
@@ -74,7 +74,7 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	state, close := setupCommand(t, Method_EthSendTransaction)
 	t.Cleanup(close)
 
-	accountAddress := types2.Address{0x01}
+	accountAddress := types.Address{0x01}
 	err := PersistDAppData(state.walletDb, testDAppData, accountAddress, uint64(0x1))
 	assert.NoError(t, err)
 
@@ -115,9 +115,9 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	state, close := setupCommand(t, Method_EthSendTransaction)
 	t.Cleanup(close)
 
-	fakedTransactionHash := types2.Hash{0x051}
+	fakedTransactionHash := types.Hash{0x051}
 
-	accountAddress := types2.Address{0x01}
+	accountAddress := types.Address{0x01}
 	err := PersistDAppData(state.walletDb, testDAppData, accountAddress, uint64(0x1))
 	assert.NoError(t, err)
 
@@ -175,7 +175,7 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 	state, close := setupCommand(t, Method_EthSendTransaction)
 	t.Cleanup(close)
 
-	accountAddress := types2.Address{0x01}
+	accountAddress := types.Address{0x01}
 	err := PersistDAppData(state.walletDb, testDAppData, accountAddress, uint64(0x1))
 	assert.NoError(t, err)
 

@@ -1,4 +1,4 @@
-package wakuv2
+package waku
 
 func (w *Waku) PausableName() string { return "waku" }
 

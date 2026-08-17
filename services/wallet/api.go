@@ -21,7 +21,7 @@ import (
 	abi_spec "github.com/status-im/status-go/internal/abi-spec"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc/network"
@@ -129,11 +129,11 @@ func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []
 }
 
 type DerivedAddress struct {
-	Address        types2.Address  `json:"address"`
-	PublicKey      types2.HexBytes `json:"public-key,omitempty"`
-	Path           string          `json:"path"`
-	HasActivity    bool            `json:"hasActivity"`
-	AlreadyCreated bool            `json:"alreadyCreated"`
+	Address        types.Address  `json:"address"`
+	PublicKey      types.HexBytes `json:"public-key,omitempty"`
+	Path           string         `json:"path"`
+	HasActivity    bool           `json:"hasActivity"`
+	AlreadyCreated bool           `json:"alreadyCreated"`
 }
 
 func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdparty.DataParsed, error) {
@@ -475,7 +475,7 @@ func (api *API) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
-	acc, err := api.s.gethManager.LoadAccount(types2.HexToAddress(derivedFrom), password)
+	acc, err := api.s.gethManager.LoadAccount(types.HexToAddress(derivedFrom), password)
 	if err != nil {
 		return nil, err
 	}
@@ -512,8 +512,8 @@ func (api *API) getDerivedAddresses(account *generator.Account, paths []string) 
 		accountInfo := childAccount.ToAccountInfo()
 
 		derivedAddress := &DerivedAddress{
-			Address:   types2.HexToAddress(accountInfo.Address),
-			PublicKey: types2.Hex2Bytes(accountInfo.PublicKey),
+			Address:   types.HexToAddress(accountInfo.Address),
+			PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
 			Path:      accPath,
 		}
 
@@ -530,7 +530,7 @@ func (api *API) getDerivedAddresses(account *generator.Account, paths []string) 
 	return derivedAddresses, nil
 }
 
-func (api *API) AddressExists(ctx context.Context, address types2.Address) (bool, error) {
+func (api *API) AddressExists(ctx context.Context, address types.Address) (bool, error) {
 	return api.s.accountsDB.AddressExists(address)
 }
 
@@ -544,7 +544,7 @@ func (api *API) AddressDetails(ctx context.Context, addrDetails *requests.Addres
 	}
 
 	result := &DerivedAddress{
-		Address: types2.HexToAddress(addrDetails.Address),
+		Address: types.HexToAddress(addrDetails.Address),
 	}
 	addressExists, err := api.s.accountsDB.AddressExists(result.Address)
 	if err != nil {
@@ -591,7 +591,7 @@ func (api *API) AddressDetails(ctx context.Context, addrDetails *requests.Addres
 // GetAddressDetails returns details for the passed address (response doesn't include derivation path)
 func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address string) (*DerivedAddress, error) {
 	result := &DerivedAddress{
-		Address: types2.HexToAddress(address),
+		Address: types.HexToAddress(address),
 	}
 	addressExists, err := api.s.accountsDB.AddressExists(result.Address)
 	if err != nil {
@@ -609,7 +609,7 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 	return result, nil
 }
 
-func (api *API) SignMessage(ctx context.Context, message types2.HexBytes, address types2.Address, password string) (string, error) {
+func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address types.Address, password string) (string, error) {
 	logutils.ZapLogger().Debug("[WalletAPI::SignMessage]", zap.Stringer("message", message), zap.Stringer("address", address))
 
 	selectedAccount, err := api.s.gethManager.LoadAccount(address, password)
@@ -648,7 +648,7 @@ func (api *API) BuildRawTransaction(ctx context.Context, chainID uint64, sendTxA
 }
 
 func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64, txType pendingtxtracker.PendingTrxType,
-	sendTxArgsJSON string, signature string) (hash types2.Hash, err error) {
+	sendTxArgsJSON string, signature string) (hash types.Hash, err error) {
 	logutils.ZapLogger().Debug("[WalletAPI::SendTransactionWithSignature]",
 		zap.Uint64("chainID", chainID),
 		zap.String("txType", string(txType)),
@@ -779,7 +779,7 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 
 // HashMessageEIP191 is used for hashing dApps requests for "personal_sign" and "eth_sign"
 // in a safe manner following the EIP-191 version 0x45 for signing on the client side.
-func (api *API) HashMessageEIP191(ctx context.Context, message types2.HexBytes) types2.Hash {
+func (api *API) HashMessageEIP191(ctx context.Context, message types.HexBytes) types.Hash {
 	logutils.ZapLogger().Debug("wallet.api.HashMessageEIP191", zap.Int("len(data)", len(message)))
 	safeMsg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(message), string(message))
 	return crypto.Keccak256Hash([]byte(safeMsg))
@@ -788,30 +788,30 @@ func (api *API) HashMessageEIP191(ctx context.Context, message types2.HexBytes) 
 // SignTypedDataV4 dApps use it to execute "eth_signTypedData_v4" requests
 // the formatted typed data will be prefixed with \x19\x01 based on the EIP-712
 // @deprecated
-func (api *API) SignTypedDataV4(typedJson string, address string, password string) (types2.HexBytes, error) {
+func (api *API) SignTypedDataV4(typedJson string, address string, password string) (types.HexBytes, error) {
 	logutils.ZapLogger().Debug("wallet.api.SignTypedDataV4",
 		zap.Int("len(typedJson)", len(typedJson)),
 		zap.String("address", address),
 		zap.Int("len(password)", len(password)),
 	)
 
-	account, err := api.s.gethManager.GetVerifiedWalletAccount(types2.HexToAddress(address), password)
+	account, err := api.s.gethManager.GetVerifiedWalletAccount(types.HexToAddress(address), password)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
 	var typed signercore.TypedData
 	err = json.Unmarshal([]byte(typedJson), &typed)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
 
 	// This is not used down the line but required by the typeddata.SignTypedDataV4 function call
 	chain := new(big.Int).SetUint64(api.s.config.NetworkID)
 	sig, err := typeddata.SignTypedDataV4(typed, account.PrivateKey(), chain)
 	if err != nil {
-		return types2.HexBytes{}, err
+		return types.HexBytes{}, err
 	}
-	return types2.HexBytes(sig), err
+	return types.HexBytes(sig), err
 }
 
 func (api *API) RestartWalletReloadTimer(ctx context.Context) error {

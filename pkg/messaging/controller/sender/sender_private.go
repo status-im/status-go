@@ -11,15 +11,15 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-func (s *Sender) SendPrivate(ctx context.Context, params types2.SendPrivateParams) error {
-	messageID := types2.MessageID(&params.Sender.PublicKey, params.Payload)
+func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPrivateParams) error {
+	messageID := messagingtypes.MessageID(&params.Sender.PublicKey, params.Payload)
 
 	logger := s.logger.Named("sendPrivate").With(
 		zap.Stringer("messageID", messageID),
@@ -84,7 +84,7 @@ func (s *Sender) SendPrivate(ctx context.Context, params types2.SendPrivateParam
 	}
 
 	logger.Debug("sent-message",
-		zap.Strings("hashes", types.EncodeHexes(hashes)),
+		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
 	)
 
 	s.stack.Transport.Track(messageID, hashes, wakuMessages)
@@ -112,12 +112,12 @@ func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*e
 	for i, spec := range keyExMessageSpecs {
 		logger := s.logger.Named("sendPrivateHashRatchetKeys").With(
 			zap.String("recipient", crypto.PubkeyToHex(recipients[i])),
-			zap.Stringer("groupID", types.HexBytes(groupID)),
+			zap.Stringer("groupID", cryptotypes.HexBytes(groupID)),
 		)
 
 		ctx, span := s.tracer.Start(ctx, "Sender.SendPrivateHashRatchetKeys",
 			oteltrace.WithAttributes(
-				otelattribute.String("groupID", types.ToHex(groupID)),
+				otelattribute.String("groupID", cryptotypes.ToHex(groupID)),
 				otelattribute.String("recipient", crypto.PubkeyToHex(recipients[i])),
 			),
 		)
@@ -138,7 +138,7 @@ func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*e
 		}
 
 		logger.Debug("sent-message",
-			zap.Strings("hashes", types.EncodeHexes(hashes)),
+			zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
 		)
 	}
 

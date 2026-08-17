@@ -14,7 +14,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
-	testutils2 "github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -93,7 +93,7 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer() (*Messenger
 
 	serverConfig := &pushnotificationserver.Config{
 		Enabled:   true,
-		Logger:    testutils2.MustCreateTestLogger(),
+		Logger:    testutils.MustCreateTestLogger(),
 		Identity:  privateKey,
 		GorushURL: s.gorushMockURL,
 	}
@@ -132,7 +132,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -171,7 +171,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -225,7 +225,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	s.Require().NoError(bob2.PublishIdentityImage())
 
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -276,7 +276,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	s.Require().Len(retrievedNotificationInfo, 2)
 
 	var sentNotification *pushnotificationclient.SentNotification
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -330,7 +330,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	s.Require().NoError(err)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -374,7 +374,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	s.Require().NoError(err)
 
 	var info []*pushnotificationclient.PushNotificationInfo
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -408,7 +408,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	s.Require().Len(retrievedNotificationInfo, 1)
 
 	var sentNotification *pushnotificationclient.SentNotification
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -475,7 +475,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().NoError(err)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -517,7 +517,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// We check that alice retrieves the info from the messenger
 	var info []*pushnotificationclient.PushNotificationInfo
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -555,7 +555,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// Re-registration should be triggered, pull from messenger and bob to check we are correctly registered
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -587,7 +587,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -624,7 +624,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().Len(retrievedNotificationInfo, 1)
 
 	var sentNotification *pushnotificationclient.SentNotification
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -663,7 +663,7 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -723,7 +723,7 @@ func (s *MessengerPushNotificationSuite) TestContactCodeAdvertisementStoresPushI
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		if _, err := messenger.RetrieveAll(); err != nil {
 			return err
 		}
@@ -798,7 +798,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -841,7 +841,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	s.Require().NoError(err)
 
 	var bobInfo []*pushnotificationclient.PushNotificationInfo
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -877,7 +877,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	s.Require().Len(retrievedNotificationInfo, 1)
 
 	var sentNotification *pushnotificationclient.SentNotification
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -915,7 +915,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -975,7 +975,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.NoError(err)
 
 	// Pull message and make sure org is received
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		response, err = alice.RetrieveAll()
 		if err != nil {
 			return err
@@ -1003,7 +1003,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.Require().Equal(requestToJoin1.PublicKey, crypto.PubkeyToHex(&alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
 
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -1044,7 +1044,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -1083,7 +1083,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -1137,7 +1137,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	s.Require().NoError(bob2.PublishIdentityImage())
 
 	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -1188,7 +1188,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationPairedDevice
 	s.Require().Len(retrievedNotificationInfo, 2)
 
 	var sentNotification *pushnotificationclient.SentNotification
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -1241,7 +1241,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -1304,7 +1304,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 	s.Require().NoError(err)
 
 	var bobInfo []*pushnotificationclient.PushNotificationInfo
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err
@@ -1340,7 +1340,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationReply() {
 	s.Require().Len(retrievedNotificationInfo, 1)
 
 	var sentNotification *pushnotificationclient.SentNotification
-	err = testutils2.RetryWithBackOff(func() error {
+	err = testutils.RetryWithBackOff(func() error {
 		_, err = messenger.RetrieveAll()
 		if err != nil {
 			return err

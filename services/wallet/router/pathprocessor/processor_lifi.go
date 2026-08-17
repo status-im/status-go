@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -181,7 +181,7 @@ func (s *LiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, er
 	if err != nil {
 		return []byte{}, err
 	}
-	return types2.Hex2Bytes(quote.TransactionRequest.Data), nil
+	return types.Hex2Bytes(quote.TransactionRequest.Data), nil
 }
 
 func (s *LiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
@@ -280,13 +280,13 @@ func (s *LiFiProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, las
 	}
 
 	sendArgs.FromChainID = txReq.ChainID
-	toAddr := types2.HexToAddress(txReq.To)
-	sendArgs.From = types2.HexToAddress(txReq.From)
+	toAddr := types.HexToAddress(txReq.To)
+	sendArgs.From = types.HexToAddress(txReq.From)
 	sendArgs.To = &toAddr
 	sendArgs.Value = (*hexutil.Big)(value)
 	sendArgs.Gas = (*hexutil.Uint64)(&gas)
 	sendArgs.GasPrice = (*hexutil.Big)(gasPrice)
-	sendArgs.Data = types2.Hex2Bytes(txReq.Data)
+	sendArgs.Data = types.Hex2Bytes(txReq.Data)
 
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }

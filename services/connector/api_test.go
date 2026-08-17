@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
@@ -203,7 +203,7 @@ func TestDeleteEphemeralDApps(t *testing.T) {
 		Name:          "Normal",
 		IconURL:       "",
 		ClientID:      "status-desktop/dapp-browser",
-		SharedAccount: types2.HexToAddress("0x1111"),
+		SharedAccount: types.HexToAddress("0x1111"),
 		ChainID:       0x1,
 	}
 	ephemeral := persistence.DApp{
@@ -211,7 +211,7 @@ func TestDeleteEphemeralDApps(t *testing.T) {
 		Name:          "Ephemeral",
 		IconURL:       "",
 		ClientID:      "status-desktop/dapp-browser" + persistence.EphemeralClientIDSuffix,
-		SharedAccount: types2.HexToAddress("0x2222"),
+		SharedAccount: types.HexToAddress("0x2222"),
 		ChainID:       0x1,
 	}
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &normal))
@@ -250,7 +250,7 @@ func TestGetWCActiveSessions(t *testing.T) {
 	dappURL := "https://wc-test-dapp.com"
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
 		URL: dappURL, Name: "WC Test", IconURL: "", ClientID: persistence.WCClientID,
-		SharedAccount: types2.Address{}, ChainID: 0x1,
+		SharedAccount: types.Address{}, ChainID: 0x1,
 	}))
 	require.NoError(t, persistence.UpsertWCSession(state.walletDb, "topic1", `{"session":"data"}`, 9999999999, "pairing1", dappURL, "symkey", 100))
 
@@ -272,7 +272,7 @@ func TestDisconnectWCSession(t *testing.T) {
 	dappURL := "https://wc-disconnect-test.com"
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
 		URL: dappURL, Name: "WC Disconnect Test", IconURL: "", ClientID: persistence.WCClientID,
-		SharedAccount: types2.Address{}, ChainID: 0x1,
+		SharedAccount: types.Address{}, ChainID: 0x1,
 	}))
 	require.NoError(t, persistence.UpsertWCSession(state.walletDb, "topic-disconnect", `{"session":"data"}`, 9999999999, "pairing1", dappURL, "symkey", 100))
 
@@ -310,7 +310,7 @@ func TestUpdateWCSessionChains_InvalidSessionJSON(t *testing.T) {
 	dappURL := "https://wc-update-test.com"
 	require.NoError(t, persistence.UpsertDApp(state.walletDb, &persistence.DApp{
 		URL: dappURL, Name: "WC Update Test", IconURL: "", ClientID: persistence.WCClientID,
-		SharedAccount: types2.Address{}, ChainID: 0x1,
+		SharedAccount: types.Address{}, ChainID: 0x1,
 	}))
 	// Store invalid JSON as session data
 	require.NoError(t, persistence.UpsertWCSession(state.walletDb, "topic-update-invalid", `not-valid-json`, 9999999999, "pairing1", dappURL, "symkey", 100))
@@ -444,7 +444,7 @@ func TestNewAPI_WithRestoredSessions(t *testing.T) {
 	dappURL := "https://wc-restore-test.com"
 	require.NoError(t, persistence.UpsertDApp(walletDb, &persistence.DApp{
 		URL: dappURL, Name: "WC Restore Test", IconURL: "", ClientID: persistence.WCClientID,
-		SharedAccount: types2.Address{}, ChainID: 0x1,
+		SharedAccount: types.Address{}, ChainID: 0x1,
 	}))
 	require.NoError(t, persistence.UpsertWCSession(walletDb, "restore-topic-1", `{"session":"data"}`, 9999999999, "pairing1", dappURL, "symkey1", 100))
 

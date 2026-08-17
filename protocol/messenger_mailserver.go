@@ -12,8 +12,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/crypto/types"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"
@@ -89,7 +89,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	return true, nil
 }
 
-func (m *Messenger) scheduleSyncFilters(filters types2.ChatFilters) (bool, error) {
+func (m *Messenger) scheduleSyncFilters(filters messagingtypes.ChatFilters) (bool, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		m.logger.Error("failed to get shouldSync", zap.Error(err))
@@ -126,12 +126,12 @@ func (m *Messenger) calculateMailserverTimeBounds(duration time.Duration) (time.
 	return from, to
 }
 
-func (m *Messenger) filtersForChat(chatID string) (types2.ChatFilters, error) {
+func (m *Messenger) filtersForChat(chatID string) (messagingtypes.ChatFilters, error) {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
-	var filters []*types2.ChatFilter
+	var filters []*messagingtypes.ChatFilter
 
 	if chat.OneToOne() {
 		// We sync our own topic and any eventual negotiated
@@ -152,19 +152,19 @@ func (m *Messenger) filtersForChat(chatID string) (types2.ChatFilters, error) {
 		if filter == nil {
 			return nil, ErrNoFiltersForChat
 		}
-		filters = []*types2.ChatFilter{filter}
+		filters = []*messagingtypes.ChatFilter{filter}
 	}
 
 	return filters, nil
 }
 
-func (m *Messenger) topicsForChat(chatID string) (string, []types2.ContentTopic, error) {
+func (m *Messenger) topicsForChat(chatID string) (string, []messagingtypes.ContentTopic, error) {
 	filters, err := m.filtersForChat(chatID)
 	if err != nil {
 		return "", nil, err
 	}
 
-	var contentTopics []types2.ContentTopic
+	var contentTopics []messagingtypes.ContentTopic
 
 	for _, filter := range filters {
 		contentTopics = append(contentTopics, filter.ContentTopic())
@@ -202,7 +202,7 @@ func (m *Messenger) capToDefaultSyncPeriod(period uint32) (uint32, error) {
 	return period - tolerance, nil
 }
 
-func (m *Messenger) updateFiltersPriority(filters types2.ChatFilters) error {
+func (m *Messenger) updateFiltersPriority(filters messagingtypes.ChatFilters) error {
 	for _, filter := range filters {
 		chatID := filter.ChatID()
 		chat := m.Chat(chatID)
@@ -217,7 +217,7 @@ func (m *Messenger) updateFiltersPriority(filters types2.ChatFilters) error {
 	return nil
 }
 
-func (m *Messenger) resetFiltersPriority(filters types2.ChatFilters) error {
+func (m *Messenger) resetFiltersPriority(filters messagingtypes.ChatFilters) error {
 	for _, filter := range filters {
 		err := m.messaging.UpdateFilterPriority(filter.ChatID(), 0)
 		if err != nil {
@@ -244,7 +244,7 @@ func (m *Messenger) runAutomaticHistoricSync(request historicSyncRequest) (bool,
 		return false, nil
 	}
 	_, executed, err := m.requestAllHistoricMessagesWithOptions(false, syncFiltersOptions{
-		Window: &types2.HistoryReconcileWindow{From: request.From, To: request.To},
+		Window: &messagingtypes.HistoryReconcileWindow{From: request.From, To: request.To},
 	})
 	return executed, err
 }
@@ -333,10 +333,10 @@ type syncFiltersOptions struct {
 	ExactFrom uint32
 	// Window bounds automatic reconciliation. A zero From means cursor-based
 	// catch-up with only a fixed upper bound (used at startup).
-	Window *types2.HistoryReconcileWindow
+	Window *messagingtypes.HistoryReconcileWindow
 }
 
-func applyHistoryWindowFloor(from uint32, initialized bool, window *types2.HistoryReconcileWindow) uint32 {
+func applyHistoryWindowFloor(from uint32, initialized bool, window *messagingtypes.HistoryReconcileWindow) uint32 {
 	if !initialized || window == nil || window.From.IsZero() {
 		return from
 	}
@@ -354,11 +354,11 @@ func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
 
-func (m *Messenger) syncFiltersFrom(filters types2.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
+func (m *Messenger) syncFiltersFrom(filters messagingtypes.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
 	return m.syncFiltersWithOptions(filters, syncFiltersOptions{ExactFrom: lastRequest})
 }
 
-func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options syncFiltersOptions) (*MessengerResponse, error) {
+func (m *Messenger) syncFiltersWithOptions(filters messagingtypes.ChatFilters, options syncFiltersOptions) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -378,7 +378,7 @@ func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options s
 		topicsData[fmt.Sprintf("%s-%s", topic.PubsubTopic, topic.ContentTopic)] = topic
 	}
 
-	batches := make(map[string]map[int]types2.StoreNodeBatch)
+	batches := make(map[string]map[int]messagingtypes.StoreNodeBatch)
 
 	to := m.calculateMailserverTo()
 	if options.Window != nil && !options.Window.To.IsZero() {
@@ -409,7 +409,7 @@ func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options s
 		return nil, err
 	}
 
-	contentTopicsPerPubsubTopic := make(map[string]map[string]*types2.ChatFilter, len(filters))
+	contentTopicsPerPubsubTopic := make(map[string]map[string]*messagingtypes.ChatFilter, len(filters))
 	for _, filter := range filters {
 		if !filter.IsListening() || filter.IsEphemeral() {
 			continue
@@ -417,7 +417,7 @@ func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options s
 
 		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic()]
 		if !ok {
-			contentTopics = make(map[string]*types2.ChatFilter)
+			contentTopics = make(map[string]*messagingtypes.ChatFilter)
 		}
 		contentTopics[filter.ContentTopic().String()] = filter
 		contentTopicsPerPubsubTopic[filter.PubsubTopic()] = contentTopics
@@ -427,11 +427,11 @@ func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options s
 	if err != nil {
 		return nil, err
 	}
-	var communityDescriptionFilters []*types2.ChatFilter
+	var communityDescriptionFilters []*messagingtypes.ChatFilter
 
 	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
 		if _, ok := batches[pubsubTopic]; !ok {
-			batches[pubsubTopic] = make(map[int]types2.StoreNodeBatch)
+			batches[pubsubTopic] = make(map[int]messagingtypes.StoreNodeBatch)
 		}
 
 		for _, filter := range contentTopics {
@@ -510,7 +510,7 @@ func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options s
 				if int64(from) >= to.Unix() {
 					continue
 				}
-				batch = types2.StoreNodeBatch{From: time.Unix(int64(from), 0), To: to}
+				batch = messagingtypes.StoreNodeBatch{From: time.Unix(int64(from), 0), To: to}
 			}
 
 			batch.ChatIDs = append(batch.ChatIDs, chatID)
@@ -604,7 +604,7 @@ func (m *Messenger) syncFiltersWithOptions(filters types2.ChatFilters, options s
 	return response, nil
 }
 
-func (m *Messenger) syncFilters(filters types2.ChatFilters) (*MessengerResponse, error) {
+func (m *Messenger) syncFilters(filters messagingtypes.ChatFilters) (*MessengerResponse, error) {
 	return m.syncFiltersWithOptions(filters, syncFiltersOptions{})
 }
 
@@ -625,7 +625,7 @@ func (m *Messenger) communityDescriptionChatIDs() (map[string]struct{}, error) {
 // fetchLatestCommunityDescriptions gets the latest description for each
 // community filter and stops after the first page of results.
 // This avoids downloading many older copies.
-func (m *Messenger) fetchLatestCommunityDescriptions(filters []*types2.ChatFilter) {
+func (m *Messenger) fetchLatestCommunityDescriptions(filters []*messagingtypes.ChatFilter) {
 	if len(filters) == 0 {
 		return
 	}
@@ -639,11 +639,11 @@ func (m *Messenger) fetchLatestCommunityDescriptions(filters []*types2.ChatFilte
 	}
 
 	for _, filter := range filters {
-		batch := types2.StoreNodeBatch{
+		batch := messagingtypes.StoreNodeBatch{
 			From:        from,
 			To:          to,
 			PubsubTopic: filter.PubsubTopic(),
-			Topics:      []types2.ContentTopic{filter.ContentTopic()},
+			Topics:      []messagingtypes.ContentTopic{filter.ContentTopic()},
 			ChatIDs:     []string{filter.ChatID()},
 		}
 		err := m.processMailserverBatchWithOptions(batch, 1, stopAfterFirstPage, false)
@@ -685,7 +685,7 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 		WhisperTimestamp: timestamp,
 		LocalChatID:      chat.ID,
 		Seen:             true,
-		ID:               types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s-%d-%d", chat.ID, chat.SyncedTo, from)))),
+		ID:               cryptotypes.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s-%d-%d", chat.ID, chat.SyncedTo, from)))),
 	}
 
 	return message, m.persistence.SaveMessages([]*common.Message{message})
@@ -706,7 +706,7 @@ func (m *Messenger) ConnectionChanged(state connection.State) {
 // processMailserverBatch queries the store for a single batch, applying the
 // mobile-network gate. The store node is selected internally by the StoreClient
 // (no peer argument).
-func (m *Messenger) processMailserverBatch(batch types2.StoreNodeBatch) error {
+func (m *Messenger) processMailserverBatch(batch messagingtypes.StoreNodeBatch) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -718,7 +718,7 @@ func (m *Messenger) processMailserverBatch(batch types2.StoreNodeBatch) error {
 	return m.messaging.Query(m.ctx, batch, defaultStoreNodeRequestPageSize, nil, false)
 }
 
-func (m *Messenger) processMailserverBatchWithOptions(batch types2.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
+func (m *Messenger) processMailserverBatchWithOptions(batch messagingtypes.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return err
@@ -754,7 +754,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		return 0, err
 	}
 
-	batch := types2.StoreNodeBatch{
+	batch := messagingtypes.StoreNodeBatch{
 		ChatIDs:     []string{chatID},
 		To:          time.Unix(int64(chat.SyncedFrom), 0),
 		From:        time.Unix(int64(chat.SyncedFrom-defaultSyncPeriod), 0),
@@ -819,7 +819,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		}
 	}
 
-	batch := types2.StoreNodeBatch{
+	batch := messagingtypes.StoreNodeBatch{
 		ChatIDs:     []string{chatID},
 		To:          time.Unix(int64(highestTo), 0),
 		From:        time.Unix(int64(lowestFrom), 0),
@@ -852,7 +852,7 @@ func (m *Messenger) ToggleUseMailservers(value bool) error {
 	return nil
 }
 
-func (m *Messenger) RemoveFilters(filters []*types2.ChatFilter) error {
+func (m *Messenger) RemoveFilters(filters []*messagingtypes.ChatFilter) error {
 	return m.messaging.RemoveFilters(filters)
 }
 
@@ -878,7 +878,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 		return uint32(from.Unix()), nil
 	}
 
-	batch := types2.StoreNodeBatch{
+	batch := messagingtypes.StoreNodeBatch{
 		ChatIDs:     []string{chatID},
 		From:        from,
 		To:          to,

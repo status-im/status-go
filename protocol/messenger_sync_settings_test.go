@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto/types"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/services/stickers"
@@ -66,7 +66,7 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 	s.MessengerBaseTestSuite.setupMessaging()
 
 	networks := json.RawMessage("{}")
-	settings := settings2.Settings{
+	settings := settings.Settings{
 		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
 		CurrentNetwork:            "mainnet_rpc",
 		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
@@ -87,7 +87,7 @@ func (s *MessengerSyncSettingsSuite) SetupTest() {
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		URLUnfurlingMode:          settings2.URLUnfurlingAlwaysAsk,
+		URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
 		PreferredName:             &pf,
 		Currency:                  "eth",
 	}
@@ -121,7 +121,7 @@ func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	s.Require().NoError(err)
 }
 
-func (s *MessengerSyncSettingsSuite) syncSettingAndCheck(m1 *Messenger, m2 *Messenger, settingField settings2.SettingField, settingValue interface{}) settings2.Settings {
+func (s *MessengerSyncSettingsSuite) syncSettingAndCheck(m1 *Messenger, m2 *Messenger, settingField settings.SettingField, settingValue interface{}) settings.Settings {
 	err := m1.settings.SaveSettingField(settingField, settingValue)
 	s.Require().NoError(err)
 
@@ -152,25 +152,25 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)
-	s.Require().Exactly(settings2.ProfilePicturesShowToContactsOnly, as.ProfilePicturesShowTo)
-	s.Require().Exactly(settings2.ProfilePicturesVisibilityContactsOnly, as.ProfilePicturesVisibility)
-	s.Require().Exactly(settings2.URLUnfurlingAlwaysAsk, as.URLUnfurlingMode)
+	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, as.ProfilePicturesShowTo)
+	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, as.ProfilePicturesVisibility)
+	s.Require().Exactly(settings.URLUnfurlingAlwaysAsk, as.URLUnfurlingMode)
 
 	// Check alice 2 settings values
 	aos, err := s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
-	s.Require().Exactly(settings2.ProfilePicturesShowToContactsOnly, aos.ProfilePicturesShowTo)
-	s.Require().Exactly(settings2.ProfilePicturesVisibilityContactsOnly, aos.ProfilePicturesVisibility)
-	s.Require().Exactly(settings2.URLUnfurlingAlwaysAsk, as.URLUnfurlingMode)
+	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, aos.ProfilePicturesShowTo)
+	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, aos.ProfilePicturesVisibility)
+	s.Require().Exactly(settings.URLUnfurlingAlwaysAsk, as.URLUnfurlingMode)
 
-	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings2.ProfilePicturesVisibility, settings2.ProfilePicturesVisibilityEveryone)
-	s.Require().Equal(settings2.ProfilePicturesVisibilityEveryone, aos.ProfilePicturesVisibility)
+	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings.ProfilePicturesVisibility, settings.ProfilePicturesVisibilityEveryone)
+	s.Require().Equal(settings.ProfilePicturesVisibilityEveryone, aos.ProfilePicturesVisibility)
 
-	as = s.syncSettingAndCheck(s.alice2, s.alice, settings2.ProfilePicturesShowTo, settings2.ProfilePicturesShowToEveryone)
-	s.Require().Exactly(settings2.ProfilePicturesShowToEveryone, as.ProfilePicturesShowTo)
+	as = s.syncSettingAndCheck(s.alice2, s.alice, settings.ProfilePicturesShowTo, settings.ProfilePicturesShowToEveryone)
+	s.Require().Exactly(settings.ProfilePicturesShowToEveryone, as.ProfilePicturesShowTo)
 
-	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings2.URLUnfurlingMode, settings2.URLUnfurlingDisableAll)
-	s.Require().Exactly(settings2.URLUnfurlingDisableAll, aos.URLUnfurlingMode)
+	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
+	s.Require().Exactly(settings.URLUnfurlingDisableAll, aos.URLUnfurlingMode)
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
@@ -198,7 +198,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	err = json.Unmarshal(rawSticker, &stickerPacks)
 	s.Require().NoError(err)
 
-	err = s.alice.settings.SaveSettingField(settings2.StickersPacksInstalled, stickerPacks)
+	err = s.alice.settings.SaveSettingField(settings.StickersPacksInstalled, stickerPacks)
 	s.Require().NoError(err)
 
 	as, err = s.alice.settings.GetSettings()
@@ -244,7 +244,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
 	PairDevices(&s.Suite, s.alice2, s.alice)
 
 	// Update Alice's PreferredName
-	err = s.alice.settings.SaveSettingField(settings2.PreferredName, pf2)
+	err = s.alice.settings.SaveSettingField(settings.PreferredName, pf2)
 	s.Require().NoError(err)
 
 	apn, err := s.alice.settings.GetPreferredUsername()

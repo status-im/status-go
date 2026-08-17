@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
-	contacts2 "github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
 
@@ -25,7 +25,7 @@ type MessengerVerificationRequests struct {
 func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger) {
 	messageText := "hello!"
 
-	contactID := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	request := &requests.SendContactRequest{
 		ID:      contactID,
 		Message: messageText,
@@ -44,9 +44,9 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	s.Require().Len(contactRequests, 0)
 
 	// Make sure contact is added on the sender side
-	contacts := s.m.AddedContacts()
-	s.Require().Len(contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateSent, contacts[0].ContactRequestLocalState)
+	addedContacts := s.m.AddedContacts()
+	s.Require().Len(addedContacts, 1)
+	s.Require().Equal(contacts.ContactRequestStateSent, addedContacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -68,7 +68,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -77,7 +77,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
 
 	// Accept contact request, receiver side
-	resp, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types2.Hex2Bytes(contactRequests[0].ID), ContactID: contactRequests[0].From})
+	resp, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequests[0].ID), ContactID: contactRequests[0].From})
 	s.Require().NoError(err)
 
 	// Make sure the message is updated
@@ -94,8 +94,8 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	s.Require().True(resp.Contacts[0].Mutual())
 
 	// Make sure the sender is added to our contacts
-	contacts = theirMessenger.AddedContacts()
-	s.Require().Len(contacts, 1)
+	addedContacts = theirMessenger.AddedContacts()
+	s.Require().Len(addedContacts, 1)
 
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := theirMessenger.MutualContacts()
@@ -134,7 +134,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 
 	s.mutualContact(theirMessenger)
 
-	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	challenge := "challenge"
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
@@ -239,7 +239,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, false)
 
 	// Mark as tusted
-	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types2.FromHex(verificationRequestID)})
+	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -253,7 +253,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(resp.Contacts[0].ID, theirPk)
-	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts2.VerificationStatusVERIFIED)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts.VerificationStatusVERIFIED)
 }
 
 func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
@@ -261,7 +261,7 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 
 	s.mutualContact(theirMessenger)
 
-	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	challenge := "challenge"
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
@@ -350,7 +350,7 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	s.Require().Empty(resp.ActivityCenterNotifications()[0].ReplyMessage.OutgoingStatus)
 	s.Require().Equal("hello back", resp.ActivityCenterNotifications()[0].ReplyMessage.Text)
 
-	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types2.FromHex(verificationRequestID)})
+	resp, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -371,7 +371,7 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 
 	s.mutualContact(theirMessenger)
 
-	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	challenge := "challenge"
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
@@ -475,7 +475,7 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 	s.Require().Empty(resp.ActivityCenterNotifications()[0].ReplyMessage.OutgoingStatus)
 	s.Require().Equal("hello back", resp.ActivityCenterNotifications()[0].ReplyMessage.Text)
 
-	resp, err = s.m.VerifiedUntrustworthy(context.Background(), &requests.VerifiedUntrustworthy{ID: types2.FromHex(verificationRequestID)})
+	resp, err = s.m.VerifiedUntrustworthy(context.Background(), &requests.VerifiedUntrustworthy{ID: types.FromHex(verificationRequestID)})
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
@@ -497,7 +497,7 @@ func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 
 	s.mutualContact(theirMessenger)
 
-	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	challenge := "challenge"
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
@@ -531,7 +531,7 @@ func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 	s.Require().NoError(err)
 
 	// Mark as trusted
-	_, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types2.FromHex(verificationRequestID)})
+	_, err = s.m.VerifiedTrusted(context.Background(), &requests.VerifiedTrusted{ID: types.FromHex(verificationRequestID)})
 	s.Require().NoError(err)
 
 	// WHEN
@@ -545,7 +545,7 @@ func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 
 	contact, _ := s.m.allContacts.Load(theirPk)
 	s.Require().NotNil(contact)
-	s.Require().Equal(contacts2.VerificationStatusUNVERIFIED, contact.VerificationStatus)
+	s.Require().Equal(contacts.VerificationStatusUNVERIFIED, contact.VerificationStatus)
 	s.Require().Equal(verification.TrustStatusUNKNOWN, contact.TrustStatus)
 }
 
@@ -554,7 +554,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 
 	s.mutualContact(theirMessenger)
 
-	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	challenge := "challenge"
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
@@ -591,7 +591,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStatePending)
 
 	// Make sure it's stored and retrieved correctly
-	notification, err := theirMessenger.ActivityCenterNotification(types2.FromHex(verificationRequestID))
+	notification, err := theirMessenger.ActivityCenterNotification(types.FromHex(verificationRequestID))
 
 	s.Require().NoError(err)
 	s.Require().NotNil(notification)
@@ -624,7 +624,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateDeclined)
 
 	// Make sure it's stored and retrieved correctly
-	notification, err = theirMessenger.ActivityCenterNotification(types2.FromHex(verificationRequestID))
+	notification, err = theirMessenger.ActivityCenterNotification(types.FromHex(verificationRequestID))
 
 	s.Require().NoError(err)
 	s.Require().NotNil(notification)
@@ -651,7 +651,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(resp.Contacts[0].ID, theirPk)
-	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts2.VerificationStatusUNVERIFIED)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts.VerificationStatusUNVERIFIED)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
@@ -667,7 +667,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 
 	s.mutualContact(theirMessenger)
 
-	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	challenge := "challenge"
 
 	resp, err := s.m.SendContactVerificationRequest(context.Background(), theirPk, challenge)
@@ -729,7 +729,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(resp.Contacts[0].ID, theirPk)
-	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts2.VerificationStatusUNVERIFIED)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts.VerificationStatusUNVERIFIED)
 
 	// Check canceled state on the receiver's side
 	resp, err = WaitOnMessengerResponse(
@@ -761,7 +761,7 @@ func (s *MessengerVerificationRequests) TestTrustStatus() {
 
 	s.mutualContact(theirMessenger)
 
-	theirPk := types2.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	theirPk := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	// Test Mark as Trusted
 	err := s.m.MarkAsTrusted(context.Background(), theirPk)

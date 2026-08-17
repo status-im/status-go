@@ -1,4 +1,4 @@
-package wakuv2
+package waku
 
 import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"

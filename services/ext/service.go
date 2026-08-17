@@ -23,7 +23,7 @@ import (
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/images"
@@ -31,7 +31,7 @@ import (
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
-	messaging2 "github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -69,14 +69,14 @@ func isPinnedBootstrapDisabledByEnv() bool {
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(types2.Hash, types2.Hash, []byte, error)
-	MailServerRequestExpired(types2.Hash)
+	MailServerRequestCompleted(types.Hash, types.Hash, []byte, error)
+	MailServerRequestExpired(types.Hash)
 }
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
 	gocommon.PauseBroadcaster
-	messaging       *messaging2.API
+	messaging       *messaging.API
 	messenger       *protocol.Messenger
 	cancelMessenger chan struct{}
 	rpcClient       *rpc.Client
@@ -185,21 +185,21 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		tracer = trace.NewTracer(otel.Tracer(name))
 	}
 
-	messaging, err := messaging2.NewCore(
-		messaging2.CoreParams{
+	messaging, err := messaging.NewCore(
+		messaging.CoreParams{
 			Identity:       params.Identity,
 			NodeKey:        nodeKey,
 			WakuConfig:     s.config.WakuV2Config,
 			Fleet:          s.config.ClusterConfig.Fleet,
-			Mode:           messaging2.ModeFromLightClient(s.config.WakuV2Config.LightClient),
+			Mode:           messaging.ModeFromLightClient(s.config.WakuV2Config.LightClient),
 			InstallationID: s.config.ShhextConfig.InstallationID,
 			TimeSource:     params.TimeSource,
 		},
-		messaging2.WithSQLitePersistence(params.AppDB),
-		messaging2.WithLogger(s.logger),
-		messaging2.WithEnvelopeEventsConfig(envelopeEventsConfig),
-		messaging2.WithMetrics(params.MetricsEnabled),
-		messaging2.WithTracer(tracer),
+		messaging.WithSQLitePersistence(params.AppDB),
+		messaging.WithLogger(s.logger),
+		messaging.WithEnvelopeEventsConfig(envelopeEventsConfig),
+		messaging.WithMetrics(params.MetricsEnabled),
+		messaging.WithTracer(tracer),
 	)
 	if err != nil {
 		return err
@@ -432,7 +432,7 @@ func tokenURIToCommunityID(tokenURI string) string {
 		return ""
 	}
 
-	communityID := types2.EncodeHex(crypto.CompressPubkey(pubKey))
+	communityID := types.EncodeHex(crypto.CompressPubkey(pubKey))
 
 	return communityID
 }

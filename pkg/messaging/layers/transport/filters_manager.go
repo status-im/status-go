@@ -12,7 +12,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	wakucommon "github.com/status-im/status-go/pkg/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -101,7 +101,7 @@ func (f *FiltersManager) WatchersByTopic(pubsubTopic, contentTopic string) []*Fi
 		}
 		filterPubsubTopic := filter.PubsubTopic
 		if filterPubsubTopic == "" {
-			filterPubsubTopic = wakuv2.DefaultShardPubsubTopic()
+			filterPubsubTopic = waku.DefaultShardPubsubTopic()
 		}
 		if filterPubsubTopic == pubsubTopic {
 			res = append(res, filter)
@@ -202,8 +202,8 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		}
 
 		topics := make([]string, 0)
-		topics = append(topics, wakuv2.DefaultShardPubsubTopic())
-		topics = append(topics, wakuv2.DefaultNonProtectedPubsubTopic())
+		topics = append(topics, waku.DefaultShardPubsubTopic())
+		topics = append(topics, waku.DefaultNonProtectedPubsubTopic())
 
 		for _, pubsubTopic := range topics {
 			pk := &cf.PrivKey.PublicKey

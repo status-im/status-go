@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/pkg/messaging"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	"github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -73,11 +73,11 @@ func (s *MessengerFetchLatestCommunityDescriptionsSuite) recordMailserverBatches
 	return recorded
 }
 
-func descriptionFilter(chatID, pubsubTopic, contentTopic string) *types2.ChatFilter {
-	return types2.NewChatFilter(&types2.ChatFilterConfig{
+func descriptionFilter(chatID, pubsubTopic, contentTopic string) *types.ChatFilter {
+	return types.NewChatFilter(&types.ChatFilterConfig{
 		ChatID:       chatID,
 		PubsubTopic:  pubsubTopic,
-		ContentTopic: types2.StringToContentTopic(contentTopic),
+		ContentTopic: types.StringToContentTopic(contentTopic),
 		Listen:       true,
 	})
 }
@@ -88,7 +88,7 @@ func descriptionFilter(chatID, pubsubTopic, contentTopic string) *types2.ChatFil
 func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestFetchesOnlyNewestPagePerFilter() {
 	recorded := s.recordMailserverBatches()
 
-	filters := []*types2.ChatFilter{
+	filters := []*types.ChatFilter{
 		descriptionFilter("0xcommunity1", "/waku/2/pubsub-a", "0xcontenttopic1"),
 		descriptionFilter("0xcommunity2", "/waku/2/pubsub-b", "0xcontenttopic2"),
 	}
@@ -131,7 +131,7 @@ func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestLatestDescriptionUs
 	filter := descriptionFilter("0xcommunity1", "/waku/2/pubsub-a", "0xcontenttopic1")
 	from, to := s.m.calculateMailserverTimeBounds(oneMonthDuration)
 
-	s.m.fetchLatestCommunityDescriptions([]*types2.ChatFilter{filter})
+	s.m.fetchLatestCommunityDescriptions([]*types.ChatFilter{filter})
 
 	s.Require().Len(*recorded, 1)
 	s.Require().Equal(from, (*recorded)[0].batch.From)

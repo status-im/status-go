@@ -3,14 +3,14 @@ package transport
 import (
 	"context"
 
-	wakuv2 "github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // MessagingAPI is the transport-layer requirement for sending messages and
 // reading received envelopes from the underlying messaging backend.
 //
-// Currently satisfied by *wakuv2.Waku. The logos-delivery Messaging API will
+// Currently satisfied by *waku.Waku. The logos-delivery Messaging API will
 // satisfy it next, after which the waku adapter is retired (pm#380).
 type MessagingAPI interface {
 	// Send publishes a pre-encoded payload on the messaging network. The
@@ -44,4 +44,4 @@ type MessagingAPI interface {
 }
 
 // Compile-time assertion: the waku adapter satisfies MessagingAPI.
-var _ MessagingAPI = (*wakuv2.Waku)(nil)
+var _ MessagingAPI = (*waku.Waku)(nil)

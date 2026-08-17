@@ -1,4 +1,4 @@
-package wakuv2
+package waku
 
 import (
 	"errors"

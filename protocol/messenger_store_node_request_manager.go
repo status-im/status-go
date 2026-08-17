@@ -9,8 +9,8 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/crypto/types"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/protocol/communities"
@@ -48,7 +48,7 @@ type StoreNodeRequestManager struct {
 	// activeRequestsLock should be locked each time activeRequests is being accessed or changed.
 	activeRequestsLock sync.RWMutex
 
-	onPerformingBatch func(types2.StoreNodeBatch)
+	onPerformingBatch func(messagingtypes.StoreNodeBatch)
 }
 
 func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
@@ -74,7 +74,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 		zap.Any("config", cfg))
 
 	fetch := func() (*communities.Community, StoreNodeRequestStats, error) {
-		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, types2.DefaultShard(), cfg)
+		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, messagingtypes.DefaultShard(), cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
 		}
@@ -125,7 +125,7 @@ func (m *StoreNodeRequestManager) FetchContact(ctx context.Context, contactID st
 // subscribeToRequest checks if a request for given community/contact is already in progress, creates and installs
 // a new one if not found, and returns a subscription to the result of the found/started request.
 // The subscription can then be used to get the result of the request, this could be either a community/contact or an error.
-func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, requestType storeNodeRequestType, dataID string, shard *types2.Shard, cfg StoreNodeRequestConfig) (storeNodeResponseSubscription, error) {
+func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, requestType storeNodeRequestType, dataID string, shard *messagingtypes.Shard, cfg StoreNodeRequestConfig) (storeNodeResponseSubscription, error) {
 	// It's important to unlock only after getting the subscription channel.
 	// We also lock `activeRequestsLock` during finalizing the requests. This ensures that the subscription
 	// created in this function will get the result even if the requests proceeds faster than this function ends.
@@ -142,7 +142,7 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 	if !requestFound {
 		// Create corresponding filter
 		var err error
-		var filter *types2.ChatFilter
+		var filter *messagingtypes.ChatFilter
 		filterShouldForget := false
 
 		filter, filterShouldForget, err = m.getFilter(requestType, dataID, shard)
@@ -184,7 +184,7 @@ func (m *StoreNodeRequestManager) newStoreNodeRequest(ctx context.Context) *stor
 // always temporary. A reused filter is kept only for joined/spectated
 // communities (they keep a live description subscription); for any other
 // community it is a snapshot and must not outlive the request.
-func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *types2.Shard) (*types2.ChatFilter, bool, error) {
+func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *messagingtypes.Shard) (*messagingtypes.ChatFilter, bool, error) {
 	// First check if such filter already exists.
 	filter := m.messenger.messaging.ChatFilterByChatID(dataID)
 	if filter != nil {
@@ -195,7 +195,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	case storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
-		filters, err := m.messenger.messaging.InitPublicChats(types2.ChatsToInitialize{{
+		filters, err := m.messenger.messaging.InitPublicChats(messagingtypes.ChatsToInitialize{{
 			ChatID:      dataID,
 			PubsubTopic: shard.PubsubTopic(),
 		}})
@@ -212,7 +212,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 
 		filter = filters[0]
 	case storeNodeContactRequest:
-		publicKeyBytes, err := types.DecodeHex(dataID)
+		publicKeyBytes, err := cryptotypes.DecodeHex(dataID)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to decode contact id: %w", err)
 		}
@@ -247,7 +247,7 @@ func (m *StoreNodeRequestManager) reusedFilterShouldForget(requestType storeNode
 	if requestType != storeNodeCommunityRequest {
 		return false
 	}
-	communityID, err := types.DecodeHex(dataID)
+	communityID, err := cryptotypes.DecodeHex(dataID)
 	if err != nil {
 		return false
 	}
@@ -262,8 +262,8 @@ func (m *StoreNodeRequestManager) reusedFilterShouldForget(requestType storeNode
 }
 
 // forgetFilter uninstalls the given filter
-func (m *StoreNodeRequestManager) forgetFilter(filter *types2.ChatFilter) {
-	err := m.messenger.messaging.RemoveFilters(types2.ChatFilters{filter})
+func (m *StoreNodeRequestManager) forgetFilter(filter *messagingtypes.ChatFilter) {
+	err := m.messenger.messaging.RemoveFilters(messagingtypes.ChatFilters{filter})
 	if err != nil {
 		m.logger.Warn("failed to remove filter", zap.Error(err))
 	}
@@ -284,12 +284,12 @@ type storeNodeRequest struct {
 
 	// request parameters
 	pubsubTopic      string
-	contentTopic     types2.ContentTopic
+	contentTopic     messagingtypes.ContentTopic
 	minimumDataClock uint64
 	config           StoreNodeRequestConfig
 
 	// request corresponding metadata to be used in finalize
-	filterToForget *types2.ChatFilter
+	filterToForget *messagingtypes.ChatFilter
 
 	// internal fields
 	manager       *StoreNodeRequestManager
@@ -365,7 +365,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 	// Try to get community from database
 	switch r.requestID.RequestType {
 	case storeNodeCommunityRequest:
-		communityID, err := types.DecodeHex(r.requestID.DataID)
+		communityID, err := cryptotypes.DecodeHex(r.requestID.DataID)
 		if err != nil {
 			logger.Error("failed to decode community ID",
 				zap.String("communityID", r.requestID.DataID),
@@ -480,11 +480,11 @@ func (r *storeNodeRequest) routine() {
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
-	batch := types2.StoreNodeBatch{
+	batch := messagingtypes.StoreNodeBatch{
 		From:        from,
 		To:          to,
 		PubsubTopic: r.pubsubTopic,
-		Topics:      []types2.ContentTopic{r.contentTopic},
+		Topics:      []messagingtypes.ContentTopic{r.contentTopic},
 	}
 	r.manager.logger.Info("perform store node request", zap.Any("batch", batch))
 	if r.manager.onPerformingBatch != nil {

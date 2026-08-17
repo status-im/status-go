@@ -8,11 +8,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/personal"
@@ -179,7 +179,7 @@ func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*contacts
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats types2.ChatFilters) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats messagingtypes.ChatFilters) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 
@@ -199,12 +199,12 @@ func (api *PublicAPI) DeleteInstallation(installationID string) error {
 }
 
 // GetOurInstallations returns all the installations available given an identity
-func (api *PublicAPI) GetOurInstallations() []*types2.Installation {
+func (api *PublicAPI) GetOurInstallations() []*messagingtypes.Installation {
 	return api.service.messenger.Installations()
 }
 
 // SetInstallationMetadata sets the metadata for our own installation
-func (api *PublicAPI) SetInstallationMetadata(installationID string, data *types2.InstallationMetadata) error {
+func (api *PublicAPI) SetInstallationMetadata(installationID string, data *messagingtypes.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
@@ -247,17 +247,17 @@ func (api *PublicAPI) CuratedCommunities(parent context.Context) (*communities.K
 
 // SpectateCommunity spectates community with the given ID
 // Meaning user is only a spectator, not a member
-func (api *PublicAPI) SpectateCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) SpectateCommunity(parent context.Context, communityID cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SpectateCommunity(communityID)
 }
 
 // JoinCommunity joins a community with the given ID
-func (api *PublicAPI) JoinCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) JoinCommunity(parent context.Context, communityID cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.JoinCommunity(parent, communityID, false)
 }
 
 // LeaveCommunity leaves a commuity with the given ID
-func (api *PublicAPI) LeaveCommunity(ctx context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) LeaveCommunity(ctx context.Context, communityID cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.LeaveCommunity(communityID)
 }
 
@@ -272,12 +272,12 @@ func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.
 }
 
 // RemovePrivateKey removes the private key of the community with given ID
-func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) RemovePrivateKey(id cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemovePrivateKey(id)
 }
 
 // ExportCommunity exports the private key of the community with given ID
-func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error) {
+func (api *PublicAPI) ExportCommunity(id cryptotypes.HexBytes) (cryptotypes.HexBytes, error) {
 	key, err := api.service.messenger.ExportCommunity(id)
 	if err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, h
 }
 
 // Get community members contact list for provided wallet addresses
-func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
+func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID cryptotypes.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	return api.service.messenger.GetCommunityMembersForWalletAddresses(communityID, chainID)
 }
 
@@ -317,17 +317,17 @@ func (api *PublicAPI) SlowdownArchivesImport(ctx context.Context) {
 }
 
 // CreateCommunityChat creates a community chat in the given community
-func (api *PublicAPI) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) CreateCommunityChat(communityID cryptotypes.HexBytes, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunityChat(communityID, c)
 }
 
 // EditCommunityChat edits a community chat in the given community
-func (api *PublicAPI) EditCommunityChat(communityID types.HexBytes, chatID string, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) EditCommunityChat(communityID cryptotypes.HexBytes, chatID string, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.EditCommunityChat(communityID, chatID, c)
 }
 
 // DeleteCommunityChat deletes a community chat in the given community
-func (api *PublicAPI) DeleteCommunityChat(communityID types.HexBytes, chatID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) DeleteCommunityChat(communityID cryptotypes.HexBytes, chatID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityChat(communityID, chatID)
 }
 
@@ -342,7 +342,7 @@ func (api *PublicAPI) ShareImageMessage(request *requests.ShareImageMessage) (*p
 }
 
 // RemoveUserFromCommunity removes the user with pk from the community with ID
-func (api *PublicAPI) RemoveUserFromCommunity(communityID types.HexBytes, userPublicKey string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) RemoveUserFromCommunity(communityID cryptotypes.HexBytes, userPublicKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RemoveUserFromCommunity(communityID, userPublicKey)
 }
 
@@ -386,7 +386,7 @@ func (api *PublicAPI) EditCommunityTokenPermission(request *requests.EditCommuni
 	return api.service.messenger.EditCommunityTokenPermission(request)
 }
 
-func (api *PublicAPI) LatestRequestToJoinForCommunity(id types.HexBytes) (*communities.RequestToJoin, error) {
+func (api *PublicAPI) LatestRequestToJoinForCommunity(id cryptotypes.HexBytes) (*communities.RequestToJoin, error) {
 	return api.service.messenger.LatestRequestToJoinForCommunity(id)
 }
 
@@ -401,17 +401,17 @@ func (api *PublicAPI) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, 
 }
 
 // PendingRequestsToJoinForCommunity returns the pending requests to join for a given community
-func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (api *PublicAPI) PendingRequestsToJoinForCommunity(id cryptotypes.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.PendingRequestsToJoinForCommunity(id)
 }
 
 // DeclinedRequestsToJoinForCommunity returns the declined requests to join for a given community
-func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id cryptotypes.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.DeclinedRequestsToJoinForCommunity(id)
 }
 
 // CanceledRequestsToJoinForCommunity returns the declined requests to join for a given community
-func (api *PublicAPI) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+func (api *PublicAPI) CanceledRequestsToJoinForCommunity(id cryptotypes.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.CanceledRequestsToJoinForCommunity(id)
 }
 
@@ -423,14 +423,14 @@ func (api *PublicAPI) AllNonApprovedCommunitiesRequestsToJoin() ([]*communities.
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (api *PublicAPI) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
+func (api *PublicAPI) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID cryptotypes.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return api.service.messenger.GenerateJoiningCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
 }
 
 // Generates a single hash for each address that needs to be revealed to a community.
 // Each hash needs to be signed.
 // The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
-func (api *PublicAPI) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
+func (api *PublicAPI) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID cryptotypes.HexBytes, addressesToReveal []string) ([]personal.SignParams, error) {
 	return api.service.messenger.GenerateEditCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
 }
 
@@ -467,12 +467,12 @@ func (api *PublicAPI) EditSharedAddressesForCommunity(request *requests.EditShar
 }
 
 // GetRevealedAccounts gets the revealed addresses for a member in a community
-func (api *PublicAPI) GetRevealedAccounts(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
+func (api *PublicAPI) GetRevealedAccounts(communityID cryptotypes.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
 	return api.service.messenger.GetRevealedAccounts(communityID, memberPk)
 }
 
 // GetRevealedAccountsForAllMembers gets the revealed addresses for all the members of a community
-func (api *PublicAPI) GetRevealedAccountsForAllMembers(communityID types.HexBytes) (map[string][]*protobuf.RevealedAccount, error) {
+func (api *PublicAPI) GetRevealedAccountsForAllMembers(communityID cryptotypes.HexBytes) (map[string][]*protobuf.RevealedAccount, error) {
 	return api.service.messenger.GetRevealedAccountsForAllMembers(communityID)
 }
 
@@ -506,7 +506,7 @@ func (api *PublicAPI) DeleteCommunityCategory(request *requests.DeleteCommunityC
 	return api.service.messenger.DeleteCommunityCategory(request)
 }
 
-func (api *PublicAPI) PromoteSelfToControlNode(communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) PromoteSelfToControlNode(communityID cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.PromoteSelfToControlNode(communityID)
 }
 
@@ -599,11 +599,11 @@ func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
 	return api.service.StartMessenger()
 }
 
-func (api *PublicAPI) ConnectionStatus() types2.ConnectionStatus {
+func (api *PublicAPI) ConnectionStatus() messagingtypes.ConnectionStatus {
 	if api.service == nil || api.service.messaging == nil {
-		return types2.ConnectionStatus{
+		return messagingtypes.ConnectionStatus{
 			IsOnline: false,
-			State:    types2.ConnectionStateDisconnected,
+			State:    messagingtypes.ConnectionStateDisconnected,
 		}
 	}
 
@@ -862,11 +862,11 @@ func (api *PublicAPI) UpdateBookmark(ctx context.Context, oldURL string, bookmar
 	return api.service.messenger.UpdateBookmark(ctx, oldURL, bookmark)
 }
 
-func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string) (types.HexBytes, error) {
+func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string) (cryptotypes.HexBytes, error) {
 	return api.service.messenger.SignMessage(message)
 }
 
-func (api *PublicAPI) CreateCommunityTokenDeploymentSignature(ctx context.Context, chainID uint64, addressFrom string, communityID string) (types.HexBytes, error) {
+func (api *PublicAPI) CreateCommunityTokenDeploymentSignature(ctx context.Context, chainID uint64, addressFrom string, communityID string) (cryptotypes.HexBytes, error) {
 	return api.service.messenger.CreateCommunityTokenDeploymentSignature(ctx, chainID, addressFrom, communityID)
 }
 
@@ -903,7 +903,7 @@ func (api *PublicAPI) UnregisterFromPushNotifications(ctx context.Context) error
 }
 
 func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.SendPushNotifications, false)
+	err := api.service.accountsDB.SaveSettingField(settings.SendPushNotifications, false)
 	if err != nil {
 		return err
 	}
@@ -912,7 +912,7 @@ func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.SendPushNotifications, true)
+	err := api.service.accountsDB.SaveSettingField(settings.SendPushNotifications, true)
 	if err != nil {
 		return err
 	}
@@ -920,7 +920,7 @@ func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
 }
 
 func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsFromContactsOnly, true)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsFromContactsOnly, true)
 	if err != nil {
 		return err
 	}
@@ -928,7 +928,7 @@ func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Contex
 }
 
 func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsFromContactsOnly, false)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsFromContactsOnly, false)
 	if err != nil {
 		return err
 	}
@@ -936,7 +936,7 @@ func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Conte
 }
 
 func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsBlockMentions, true)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsBlockMentions, true)
 	if err != nil {
 		return err
 	}
@@ -944,14 +944,14 @@ func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) 
 }
 
 func (api *PublicAPI) DisablePushNotificationsBlockMentions(ctx context.Context) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.PushNotificationsBlockMentions, false)
+	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsBlockMentions, false)
 	if err != nil {
 		return err
 	}
 	return api.service.messenger.DisablePushNotificationsBlockMentions()
 }
 
-func (api *PublicAPI) AddPushNotificationsServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
+func (api *PublicAPI) AddPushNotificationsServer(ctx context.Context, publicKeyBytes cryptotypes.HexBytes) error {
 	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
 		return err
@@ -961,7 +961,7 @@ func (api *PublicAPI) AddPushNotificationsServer(ctx context.Context, publicKeyB
 	return api.service.messenger.AddPushNotificationsServer(ctx, publicKey, pushnotificationclient.ServerTypeCustom)
 }
 
-func (api *PublicAPI) RemovePushNotificationServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
+func (api *PublicAPI) RemovePushNotificationServer(ctx context.Context, publicKeyBytes cryptotypes.HexBytes) error {
 	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
 		return err
@@ -1027,28 +1027,28 @@ func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context
 	return api.service.messenger.MarkAllActivityCenterNotificationsRead(ctx)
 }
 
-func (api *PublicAPI) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) MarkActivityCenterNotificationsRead(ctx context.Context, ids []cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkActivityCenterNotificationsRead(ctx, ids, 0, true)
 }
 
-func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ctx context.Context, ids []cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	m := api.service.messenger
 	updatedAt := m.GetCurrentTimeInMillis()
 	return m.MarkActivityCenterNotificationsUnread(ctx, ids, updatedAt, true)
 }
 
-func (api *PublicAPI) AcceptActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) AcceptActivityCenterNotifications(ctx context.Context, ids []cryptotypes.HexBytes) (*protocol.MessengerResponse, error) {
 	m := api.service.messenger
 	updatedAt := m.GetCurrentTimeInMillis()
 	return api.service.messenger.AcceptActivityCenterNotifications(ctx, ids, updatedAt, true)
 }
 
-func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
+func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, ids []cryptotypes.HexBytes) error {
 	_, err := api.service.messenger.DismissActivityCenterNotifications(ctx, ids, 0, true)
 	return err
 }
 
-func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
+func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids []cryptotypes.HexBytes) error {
 	m := api.service.messenger
 	updatedAt := m.GetCurrentTimeInMillis()
 	_, err := m.MarkActivityCenterNotificationsDeleted(ctx, ids, updatedAt, true)
@@ -1094,7 +1094,7 @@ func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
 }
 
-func (api *PublicAPI) Peers() types2.PeerStats {
+func (api *PublicAPI) Peers() messagingtypes.PeerStats {
 	return api.service.messenger.Peers()
 }
 
@@ -1102,8 +1102,8 @@ func (api *PublicAPI) PeerID() string {
 	return api.service.messaging.PeerID().String()
 }
 
-func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings2.ProfilePicturesShowToType) error {
-	err := api.service.accountsDB.SaveSettingField(settings2.ProfilePicturesShowTo, showTo)
+func (api *PublicAPI) ChangeIdentityImageShowTo(showTo settings.ProfilePicturesShowToType) error {
+	err := api.service.accountsDB.SaveSettingField(settings.ProfilePicturesShowTo, showTo)
 	if err != nil {
 		return err
 	}
@@ -1251,7 +1251,7 @@ func (api *PublicAPI) ChatMentionToInputField(chatID, text string) (*protocol.Ch
 	return api.service.messenger.GetMentionsManager().ToInputField(chatID, text)
 }
 
-func (api *PublicAPI) GetCheckChannelPermissionResponses(parent context.Context, communityID types.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {
+func (api *PublicAPI) GetCheckChannelPermissionResponses(parent context.Context, communityID cryptotypes.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {
 	return api.service.messenger.GetCommunityCheckChannelPermissionResponses(communityID)
 }
 
@@ -1401,15 +1401,15 @@ func (api *PublicAPI) Debug() (logosstorage.LogosStorageDebugInfo, error) {
 	return api.service.messenger.Debug()
 }
 
-func (api *PublicAPI) HasCommunityArchive(communityID types.HexBytes) bool {
+func (api *PublicAPI) HasCommunityArchive(communityID cryptotypes.HexBytes) bool {
 	return api.service.messenger.IsSeedingHistoryArchive(communityID)
 }
 
-func (api *PublicAPI) GetDownloadedMessageArchiveIDs(communityID types.HexBytes) ([]string, error) {
+func (api *PublicAPI) GetDownloadedMessageArchiveIDs(communityID cryptotypes.HexBytes) ([]string, error) {
 	return api.service.messenger.GetDownloadedMessageArchiveIDs(communityID)
 }
 
-func (api *PublicAPI) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
+func (api *PublicAPI) GetMessageArchiveIDsToImport(communityID cryptotypes.HexBytes) ([]string, error) {
 	return api.service.messenger.GetMessageArchiveIDsToImport(communityID)
 }
 

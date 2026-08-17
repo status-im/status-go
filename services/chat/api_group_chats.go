@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -33,7 +33,7 @@ type StartGroupChatResponse struct {
 	Messages []*common.Message   `json:"messages,omitempty"`
 }
 
-func (api *API) CreateOneToOneChat(ctx context.Context, communityID types2.HexBytes, ID types2.HexBytes, ensName string) (*CreateOneToOneChatResponse, error) {
+func (api *API) CreateOneToOneChat(ctx context.Context, communityID types.HexBytes, ID types.HexBytes, ensName string) (*CreateOneToOneChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -56,7 +56,7 @@ func (api *API) CreateOneToOneChat(ctx context.Context, communityID types2.HexBy
 	}, nil
 }
 
-func (api *API) CreateGroupChat(ctx context.Context, communityID types2.HexBytes, name string, members []string) (*GroupChatResponse, error) {
+func (api *API) CreateGroupChat(ctx context.Context, communityID types.HexBytes, name string, members []string) (*GroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -66,7 +66,7 @@ func (api *API) CreateGroupChat(ctx context.Context, communityID types2.HexBytes
 	})
 }
 
-func (api *API) CreateGroupChatFromInvitation(communityID types2.HexBytes, name string, chatID string, adminPK string) (*GroupChatResponse, error) {
+func (api *API) CreateGroupChatFromInvitation(communityID types.HexBytes, name string, chatID string, adminPK string) (*GroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -76,7 +76,7 @@ func (api *API) CreateGroupChatFromInvitation(communityID types2.HexBytes, name 
 	})
 }
 
-func (api *API) LeaveChat(ctx context.Context, communityID types2.HexBytes, chatID string, remove bool) (*GroupChatResponse, error) {
+func (api *API) LeaveChat(ctx context.Context, communityID types.HexBytes, chatID string, remove bool) (*GroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -86,7 +86,7 @@ func (api *API) LeaveChat(ctx context.Context, communityID types2.HexBytes, chat
 	})
 }
 
-func (api *API) AddMembers(ctx context.Context, communityID types2.HexBytes, chatID string, members []string) (*GroupChatResponseWithInvitations, error) {
+func (api *API) AddMembers(ctx context.Context, communityID types.HexBytes, chatID string, members []string) (*GroupChatResponseWithInvitations, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -96,7 +96,7 @@ func (api *API) AddMembers(ctx context.Context, communityID types2.HexBytes, cha
 	})
 }
 
-func (api *API) RemoveMember(ctx context.Context, communityID types2.HexBytes, chatID string, member string) (*GroupChatResponse, error) {
+func (api *API) RemoveMember(ctx context.Context, communityID types.HexBytes, chatID string, member string) (*GroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -106,7 +106,7 @@ func (api *API) RemoveMember(ctx context.Context, communityID types2.HexBytes, c
 	})
 }
 
-func (api *API) MakeAdmin(ctx context.Context, communityID types2.HexBytes, chatID string, member string) (*GroupChatResponse, error) {
+func (api *API) MakeAdmin(ctx context.Context, communityID types.HexBytes, chatID string, member string) (*GroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -116,7 +116,7 @@ func (api *API) MakeAdmin(ctx context.Context, communityID types2.HexBytes, chat
 	})
 }
 
-func (api *API) RenameChat(ctx context.Context, communityID types2.HexBytes, chatID string, name string) (*GroupChatResponse, error) {
+func (api *API) RenameChat(ctx context.Context, communityID types.HexBytes, chatID string, name string) (*GroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -126,7 +126,7 @@ func (api *API) RenameChat(ctx context.Context, communityID types2.HexBytes, cha
 	})
 }
 
-func (api *API) SendGroupChatInvitationRequest(ctx context.Context, communityID types2.HexBytes, chatID string, adminPK string, message string) (*GroupChatResponseWithInvitations, error) {
+func (api *API) SendGroupChatInvitationRequest(ctx context.Context, communityID types.HexBytes, chatID string, adminPK string, message string) (*GroupChatResponseWithInvitations, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -148,7 +148,7 @@ func (api *API) SendGroupChatInvitationRejection(ctx context.Context, invitation
 	return response.Invitations, nil
 }
 
-func (api *API) StartGroupChat(ctx context.Context, communityID types2.HexBytes, name string, members []string) (*StartGroupChatResponse, error) {
+func (api *API) StartGroupChat(ctx context.Context, communityID types.HexBytes, name string, members []string) (*StartGroupChatResponse, error) {
 	if len(communityID) != 0 {
 		return nil, ErrCommunitiesNotSupported
 	}
@@ -161,7 +161,7 @@ func (api *API) StartGroupChat(ctx context.Context, communityID types2.HexBytes,
 			return nil, err
 		}
 		response, err = api.s.messenger.CreateOneToOneChat(&requests.CreateOneToOneChat{
-			ID: types2.HexBytes(crypto.FromECDSAPub(memberPk)),
+			ID: types.HexBytes(crypto.FromECDSAPub(memberPk)),
 		})
 		if err != nil {
 			return nil, err
@@ -205,7 +205,7 @@ func (api *API) toGroupChatResponseWithInvitations(pubKey string, response *prot
 }
 
 func (api *API) execAndGetGroupChatResponse(fn func() (*protocol.MessengerResponse, error)) (*GroupChatResponse, error) {
-	pubKey := types2.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
 	response, err := fn()
 	if err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func (api *API) execAndGetGroupChatResponse(fn func() (*protocol.MessengerRespon
 }
 
 func (api *API) execAndGetGroupChatResponseWithInvitations(fn func() (*protocol.MessengerResponse, error)) (*GroupChatResponseWithInvitations, error) {
-	pubKey := types2.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
 
 	response, err := fn()
 	if err != nil {

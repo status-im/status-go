@@ -5,7 +5,7 @@ import (
 
 	dr "github.com/status-im/doubleratchet"
 
-	multidevice2 "github.com/status-im/status-go/pkg/messaging/layers/encryption/multidevice"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption/multidevice"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
 )
 
@@ -34,14 +34,14 @@ type Persistence interface {
 	KeysStorage() dr.KeysStorage
 	SessionStorage() dr.SessionStorage
 	SharedSecretStorage() sharedsecret.Persistence
-	MultideviceStorage() multidevice2.Persistence
+	MultideviceStorage() multidevice.Persistence
 
 	AddPrivateBundle(bc *BundleContainer) error
 	AddPublicBundle(b *Bundle) error
-	GetAnyPrivateBundle(myIdentityKey []byte, installations []*multidevice2.Installation) (*BundleContainer, error)
+	GetAnyPrivateBundle(myIdentityKey []byte, installations []*multidevice.Installation) (*BundleContainer, error)
 	GetPrivateKeyBundle(bundleID []byte) ([]byte, error)
 	MarkBundleExpired(identity []byte) error
-	GetPublicBundle(publicKey *ecdsa.PublicKey, installations []*multidevice2.Installation) (*Bundle, error)
+	GetPublicBundle(publicKey *ecdsa.PublicKey, installations []*multidevice.Installation) (*Bundle, error)
 	AddRatchetInfo(key []byte, identity []byte, bundleID []byte, ephemeralKey []byte, installationID string) error
 	GetRatchetInfo(bundleID []byte, theirIdentity []byte, installationID string) (*RatchetInfo, error)
 	GetAnyRatchetInfo(identity []byte, installationID string) (*RatchetInfo, error)

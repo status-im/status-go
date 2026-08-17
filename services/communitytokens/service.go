@@ -18,7 +18,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
@@ -278,7 +278,7 @@ func (s *Service) handleSetSignerPubKey(status string, toAddress common.Address,
 	}
 
 	if status == ac.Success {
-		_, err := s.Messenger.PromoteSelfToControlNode(types2.FromHex(communityToken.CommunityID))
+		_, err := s.Messenger.PromoteSelfToControlNode(types.FromHex(communityToken.CommunityID))
 		if err != nil {
 			return nil, err
 		}
@@ -375,7 +375,7 @@ func (s *Service) GetSignerPubKey(ctx context.Context, chainID uint64, contractA
 		return "", err
 	}
 
-	return types2.ToHex(signerPubKey), nil
+	return types.ToHex(signerPubKey), nil
 }
 
 func (s *Service) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
@@ -637,7 +637,7 @@ func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chai
 }
 
 func (s *Service) publishTokenActionToPrivilegedMembers(communityID string, chainID uint64, contractAddress string, actionType protobuf.CommunityTokenAction_ActionType) error {
-	decodedCommunityID, err := types2.DecodeHex(communityID)
+	decodedCommunityID, err := types.DecodeHex(communityID)
 	if err != nil {
 		return err
 	}

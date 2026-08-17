@@ -17,9 +17,9 @@ import (
 	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	mock_persistence "github.com/status-im/status-go/internal/accounts-management/mock"
-	"github.com/status-im/status-go/internal/accounts-management/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/testutils"
 )
 
@@ -126,7 +126,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			accManager.setKeystore(nil)
 		}
 
-		ok, err := accManager.VerifyAccountPassword(types2.HexToAddress(testCase.address), testCase.password)
+		ok, err := accManager.VerifyAccountPassword(cryptotypes.HexToAddress(testCase.address), testCase.password)
 		if testCase.expectedError != nil && err != nil {
 			if !errors.Is(err, testCase.expectedError) {
 				var accountsErr *customerrors.AccountsError
@@ -193,17 +193,17 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	require.Equal(t, ErrNoAccountSelected, err)
 
 	persistence.EXPECT().GetProfileKeypair().Return(
-		&types.Keypair{
+		&accsmanagementtypes.Keypair{
 			KeyUID: account3.KeyUID,
 		},
 		nil,
 	).Times(1)
 
 	// Set the chat account, this will create a new keystore
-	err = accManager.SetChatAccount(types2.HexToAddress(account3.ChatAddress), account3.Password, nil)
+	err = accManager.SetChatAccount(cryptotypes.HexToAddress(account3.ChatAddress), account3.Password, nil)
 	require.NoError(t, err)
 
-	address := types2.HexToAddress(account3.ChatAddress)
+	address := cryptotypes.HexToAddress(account3.ChatAddress)
 	ok, err := accManager.VerifyAccountPassword(address, account3.Password)
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -223,9 +223,9 @@ type ManagerTestSuite struct {
 
 type testAccount struct {
 	password      string
-	walletAddress types2.Address
+	walletAddress cryptotypes.Address
 	walletPubKey  string
-	chatAddress   types2.Address
+	chatAddress   cryptotypes.Address
 	chatPubKey    string
 	mnemonic      string
 	masterAccount *generator.Account
@@ -270,9 +270,9 @@ func (s *ManagerTestSuite) getKeyDir() string {
 	return fmt.Sprintf("%s/keystore/%s", s.rootDataDir, s.masterAccount.KeyUID())
 }
 
-func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
+func (s *ManagerTestSuite) createAndStoreProfileKeypair() *accsmanagementtypes.Keypair {
 	s.persistence.EXPECT().GetKeypairByKeyUID(s.masterAccount.KeyUID()).Return(
-		nil, types.ErrDbKeypairNotFound,
+		nil, accsmanagementtypes.ErrDbKeypairNotFound,
 	).Times(1)
 
 	s.persistence.EXPECT().GetPositionForNextNewAccount().Return(int64(0), nil).Times(1)
@@ -280,17 +280,17 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 	s.persistence.EXPECT().SaveOrUpdateKeypair(gomock.Any()).Return(nil).Times(1)
 
 	s.persistence.EXPECT().GetProfileKeypair().Return(
-		&types.Keypair{
+		&accsmanagementtypes.Keypair{
 			KeyUID: s.masterAccount.KeyUID(),
 		},
 		nil,
 	).Times(1)
 
-	walletAccount := &types.AccountCreationDetails{
+	walletAccount := &accsmanagementtypes.AccountCreationDetails{
 		Path: common.PathDefaultWalletAccount,
 	}
 
-	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(s.mnemonic, s.password, "kp-name", types.ColdWalletTypeNone, walletAccount, true, 0)
+	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(s.mnemonic, s.password, "kp-name", accsmanagementtypes.ColdWalletTypeNone, walletAccount, true, 0)
 	s.Require().NoError(err)
 	s.Require().NotEmpty(s.mnemonic)
 	s.Require().NotNil(keypair)
@@ -304,26 +304,26 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *types.Keypair {
 		if kpAcc.Chat {
 			chatAccountOk = kpAcc.Path == common.PathEIP1581Chat &&
 				kpAcc.Address == s.chatAddress &&
-				bytes.Equal(kpAcc.PublicKey, types2.Hex2Bytes(s.chatPubKey)) &&
+				bytes.Equal(kpAcc.PublicKey, cryptotypes.Hex2Bytes(s.chatPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
 				!kpAcc.Removed &&
 				kpAcc.Clock == 0 &&
 				!kpAcc.Wallet &&
 				kpAcc.AddressWasNotShown &&
 				kpAcc.Position == -1 &&
-				kpAcc.Operable == types.AccountFullyOperable
+				kpAcc.Operable == accsmanagementtypes.AccountFullyOperable
 		}
 		if kpAcc.Wallet {
 			walletAccountOk = kpAcc.Path == common.PathDefaultWalletAccount &&
 				kpAcc.Address == s.walletAddress &&
-				bytes.Equal(kpAcc.PublicKey, types2.Hex2Bytes(s.walletPubKey)) &&
+				bytes.Equal(kpAcc.PublicKey, cryptotypes.Hex2Bytes(s.walletPubKey)) &&
 				kpAcc.KeyUID == keypair.KeyUID &&
 				!kpAcc.Removed &&
 				kpAcc.Clock == 0 &&
 				!kpAcc.Chat &&
 				kpAcc.AddressWasNotShown &&
 				kpAcc.Position == 0 &&
-				kpAcc.Operable == types.AccountFullyOperable
+				kpAcc.Operable == accsmanagementtypes.AccountFullyOperable
 		}
 	}
 	s.Require().True(chatAccountOk)
@@ -341,19 +341,19 @@ func (s *ManagerTestSuite) TestSetChatAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongAddress() {
-	s.testSetChatAccount(types2.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrKeystoreFileMissing)
+	s.testSetChatAccount(cryptotypes.HexToAddress("0x0000000000000000000000000000000000000001"), s.testAccount.password, keystore.ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestSetChatAccountWrongPassword() {
 	s.testSetChatAccount(s.testAccount.chatAddress, "wrong", keystore.ErrIncorrectPasswordProvided)
 }
 
-func (s *ManagerTestSuite) testSetChatAccount(chat types2.Address, password string, expErr error) {
+func (s *ManagerTestSuite) testSetChatAccount(chat cryptotypes.Address, password string, expErr error) {
 	s.createAndStoreProfileKeypair()
 	s.accManager.setChatAccountAndProfileKeyUID(nil, "") // clear the chat account set by `createAndStoreProfileKeypair`
 
 	s.persistence.EXPECT().GetProfileKeypair().Return(
-		&types.Keypair{
+		&accsmanagementtypes.Keypair{
 			KeyUID: s.masterAccount.KeyUID(),
 		},
 		nil,
@@ -400,7 +400,7 @@ func (s *ManagerTestSuite) TestSetChatAccountForExistingProfile() {
 	s.Require().NoError(err)
 
 	s.persistence.EXPECT().GetProfileKeypair().Return(
-		&types.Keypair{
+		&accsmanagementtypes.Keypair{
 			KeyUID: s.masterAccount.KeyUID(),
 		},
 		nil,
@@ -444,7 +444,7 @@ func (s *ManagerTestSuite) TestLogout() {
 // TestAccounts tests cases for (*Manager).Accounts.
 func (s *ManagerTestSuite) TestAccounts() {
 	s.persistence.EXPECT().GetProfileKeypair().Return(
-		&types.Keypair{
+		&accsmanagementtypes.Keypair{
 			KeyUID: s.masterAccount.KeyUID(),
 		},
 		nil,
@@ -476,7 +476,7 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NoError(err)
 	s.Len(accs, 3)
 
-	checkAccount := func(address types2.Address) bool {
+	checkAccount := func(address cryptotypes.Address) bool {
 		return address == s.chatAddress || address == s.walletAddress || address == s.masterAccount.Address()
 	}
 	s.True(checkAccount(accs[0]))
@@ -489,14 +489,14 @@ func (s *ManagerTestSuite) TestAddressToAccountSuccess() {
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongAddress() {
-	s.testAddressToAccount(types2.HexToAddress("0x0001"), s.password, keystore.ErrKeystoreFileMissing)
+	s.testAddressToAccount(cryptotypes.HexToAddress("0x0001"), s.password, keystore.ErrKeystoreFileMissing)
 }
 
 func (s *ManagerTestSuite) TestAddressToAccountWrongPassword() {
 	s.testAddressToAccount(s.walletAddress, "wrong", keystore.ErrIncorrectPasswordProvided)
 }
 
-func (s *ManagerTestSuite) testAddressToAccount(wallet types2.Address, password string, expErr error) {
+func (s *ManagerTestSuite) testAddressToAccount(wallet cryptotypes.Address, password string, expErr error) {
 	s.createAndStoreProfileKeypair()
 
 	key, err := s.accManager.LoadAccount(wallet, password)
@@ -546,11 +546,11 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDir() {
 	}
 
 	for _, acc := range accountsToCheck {
-		account, err := s.accManager.LoadAccount(types2.HexToAddress(acc), testPassword)
+		account, err := s.accManager.LoadAccount(cryptotypes.HexToAddress(acc), testPassword)
 		s.Require().Error(err)
 		s.Require().Nil(account)
 
-		account, err = s.accManager.LoadAccount(types2.HexToAddress(acc), newTestPassword)
+		account, err = s.accManager.LoadAccount(cryptotypes.HexToAddress(acc), newTestPassword)
 		s.Require().NoError(err)
 		s.Require().NotNil(account)
 	}
@@ -574,7 +574,7 @@ func (s *ManagerTestSuite) TestReEncryptKeyStoreDirSkipsFilesystemMetadataFiles(
 	}
 
 	for _, acc := range accountsToCheck {
-		account, err := s.accManager.LoadAccount(types2.HexToAddress(acc), newTestPassword)
+		account, err := s.accManager.LoadAccount(cryptotypes.HexToAddress(acc), newTestPassword)
 		s.Require().NoError(err)
 		s.Require().NotNil(account)
 	}
@@ -620,7 +620,7 @@ func (s *ManagerTestSuite) TestDeleteAccount() {
 func (s *ManagerTestSuite) TestDeleteKeypair() {
 	keypair := s.createAndStoreProfileKeypair()
 
-	keypair.Type = types.KeypairTypeSeed
+	keypair.Type = accsmanagementtypes.KeypairTypeSeed
 
 	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(
 		keypair,
@@ -640,11 +640,11 @@ func (s *ManagerTestSuite) TestDeleteKeypair() {
 
 func (s *ManagerTestSuite) TestDeleteAccountOfColdWalletKeypairWithoutPassword() {
 	acc := s.deriveTestAccountAtPath(common.PathDefaultWalletAccount)
-	keypair := &types.Keypair{
+	keypair := &accsmanagementtypes.Keypair{
 		KeyUID:     s.masterAccount.KeyUID(),
-		Type:       types.KeypairTypeSeed,
-		ColdWallet: types.ColdWalletTypeStatusKeycard,
-		Accounts:   []*types.Account{acc},
+		Type:       accsmanagementtypes.KeypairTypeSeed,
+		ColdWallet: accsmanagementtypes.ColdWalletTypeStatusKeycard,
+		Accounts:   []*accsmanagementtypes.Account{acc},
 	}
 
 	s.persistence.EXPECT().GetAccountByAddress(acc.Address).Return(acc, nil).Times(2)
@@ -658,10 +658,10 @@ func (s *ManagerTestSuite) TestDeleteAccountOfColdWalletKeypairWithoutPassword()
 }
 
 func (s *ManagerTestSuite) TestDeleteColdWalletKeypairWithoutPassword() {
-	keypair := &types.Keypair{
+	keypair := &accsmanagementtypes.Keypair{
 		KeyUID:     s.masterAccount.KeyUID(),
-		Type:       types.KeypairTypeSeed,
-		ColdWallet: types.ColdWalletTypeStatusKeycard,
+		Type:       accsmanagementtypes.KeypairTypeSeed,
+		ColdWallet: accsmanagementtypes.ColdWalletTypeStatusKeycard,
 	}
 
 	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
@@ -674,9 +674,9 @@ func (s *ManagerTestSuite) TestDeleteColdWalletKeypairWithoutPassword() {
 }
 
 func (s *ManagerTestSuite) TestDeleteRegularKeypairWithoutPasswordRejected() {
-	keypair := &types.Keypair{
+	keypair := &accsmanagementtypes.Keypair{
 		KeyUID: s.masterAccount.KeyUID(),
-		Type:   types.KeypairTypeSeed,
+		Type:   accsmanagementtypes.KeypairTypeSeed,
 	}
 
 	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
@@ -691,34 +691,34 @@ func (s *ManagerTestSuite) TestDeleteRegularKeypairWithoutPasswordRejected() {
 // but the implementation always calls storeKeystoreFilesForAccounts.
 func (s *ManagerTestSuite) TestCreateKeypairFromMnemonicAndStoreDoesNotWriteKeystoreWhenCold() {
 	s.persistence.EXPECT().GetKeypairByKeyUID(s.masterAccount.KeyUID()).Return(
-		nil, types.ErrDbKeypairNotFound,
+		nil, accsmanagementtypes.ErrDbKeypairNotFound,
 	).Times(1)
 
 	s.persistence.EXPECT().GetPositionForNextNewAccount().Return(int64(0), nil).Times(1)
 
 	s.persistence.EXPECT().SaveOrUpdateKeypair(gomock.Any()).DoAndReturn(
-		func(kp *types.Keypair) error {
-			s.Require().Equal(types.ColdWalletTypeStatusKeycard, kp.ColdWallet)
+		func(kp *accsmanagementtypes.Keypair) error {
+			s.Require().Equal(accsmanagementtypes.ColdWalletTypeStatusKeycard, kp.ColdWallet)
 			return nil
 		},
 	).Times(1)
 
 	s.persistence.EXPECT().GetProfileKeypair().Return(
-		&types.Keypair{
+		&accsmanagementtypes.Keypair{
 			KeyUID: s.masterAccount.KeyUID(),
 		},
 		nil,
 	).Times(1)
 
-	walletAccount := &types.AccountCreationDetails{
+	walletAccount := &accsmanagementtypes.AccountCreationDetails{
 		Path: common.PathDefaultWalletAccount,
 	}
 
 	keypair, err := s.accManager.CreateKeypairFromMnemonicAndStore(
-		s.mnemonic, s.password, "kp-name", types.ColdWalletTypeStatusKeycard, walletAccount, true, 0)
+		s.mnemonic, s.password, "kp-name", accsmanagementtypes.ColdWalletTypeStatusKeycard, walletAccount, true, 0)
 	s.Require().NoError(err)
 	s.Require().NotNil(keypair)
-	s.Require().Equal(types.ColdWalletTypeStatusKeycard, keypair.ColdWallet)
+	s.Require().Equal(accsmanagementtypes.ColdWalletTypeStatusKeycard, keypair.ColdWallet)
 
 	files, err := os.ReadDir(s.getKeyDir())
 	s.Require().NoError(err)
@@ -729,11 +729,11 @@ func (s *ManagerTestSuite) TestCreateKeypairFromMnemonicAndStoreDoesNotWriteKeys
 // silently flipping cold_wallet while leaving keystore files on disk.
 func (s *ManagerTestSuite) TestMigrateKeypairToColdWalletRequiresPassword() {
 	keypair := s.createAndStoreProfileKeypair()
-	keypair.Type = types.KeypairTypeSeed
+	keypair.Type = accsmanagementtypes.KeypairTypeSeed
 
 	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
 
-	err := s.accManager.MigrateKeypairToColdWallet(keypair.KeyUID, "", types.ColdWalletTypeStatusKeycard, 1)
+	err := s.accManager.MigrateKeypairToColdWallet(keypair.KeyUID, "", accsmanagementtypes.ColdWalletTypeStatusKeycard, 1)
 	s.Require().Error(err)
 	s.Require().ErrorIs(err, ErrNoPasswordProvided)
 
@@ -788,11 +788,11 @@ func (s *ManagerTestSuite) TestCleanKeystoreFiles() {
 			files, _ := os.ReadDir(s.getKeyDir())
 			s.Equal(3, len(files))
 
-			keypair.Type = types.KeypairTypeSeed
+			keypair.Type = accsmanagementtypes.KeypairTypeSeed
 			keypair.Removed = testCase.keypairRemoved
 
 			if testCase.keypairMigratedToKeycard {
-				keypair.ColdWallet = types.ColdWalletTypeStatusKeycard
+				keypair.ColdWallet = accsmanagementtypes.ColdWalletTypeStatusKeycard
 			}
 
 			if testCase.oneAccountRemoved {
@@ -805,7 +805,7 @@ func (s *ManagerTestSuite) TestCleanKeystoreFiles() {
 			}
 
 			s.persistence.EXPECT().GetAllKeypairs().Return(
-				[]*types.Keypair{keypair},
+				[]*accsmanagementtypes.Keypair{keypair},
 				nil,
 			).Times(1)
 

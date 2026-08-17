@@ -19,14 +19,14 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/rpc/network"
 	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	messaging2 "github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -43,10 +43,10 @@ type testMessengerConfig struct {
 	unhandledMessagesTracker *unhandledMessagesTracker
 	messagesOrderController  *MessagesOrderController
 
-	appSettings      *settings2.Settings
+	appSettings      *settings.Settings
 	nodeConfig       *params.NodeConfig
 	extraOptions     []Option
-	messagingOptions []messaging2.Options
+	messagingOptions []messaging.Options
 }
 
 func (tmc *testMessengerConfig) complete(t *testing.T) error {
@@ -80,7 +80,7 @@ func (tmc *testMessengerConfig) complete(t *testing.T) error {
 	return nil
 }
 
-func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+func newTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete(t)
 	if err != nil {
 		return nil, err
@@ -146,15 +146,15 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 
 	installationID := uuid.New().String()
 
-	messagingCoreOptions := []messaging2.Options{
-		messaging2.WithLogger(config.logger.Named("messaging")),
-		messaging2.WithTracer(trace.NewTracer(otel.Tracer("messaging_" + config.name))),
-		messaging2.WithSQLitePersistence(appDb),
+	messagingCoreOptions := []messaging.Options{
+		messaging.WithLogger(config.logger.Named("messaging")),
+		messaging.WithTracer(trace.NewTracer(otel.Tracer("messaging_" + config.name))),
+		messaging.WithSQLitePersistence(appDb),
 	}
 	messagingCoreOptions = append(messagingCoreOptions, config.messagingOptions...)
 
 	messaging, err := messagingEnv.NewTestCore(
-		messaging2.CoreParams{
+		messaging.CoreParams{
 			Identity:       config.privateKey,
 			InstallationID: installationID,
 			TimeSource:     &testTimeSource{},
@@ -234,7 +234,7 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnviro
 	return m, nil
 }
 
-func newRunningTestMessenger(t *testing.T, messagingEnv *messaging2.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
+func newRunningTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
 	m, err := newTestMessenger(t, messagingEnv, config)
 	require.NoError(t, err)
 
@@ -278,12 +278,12 @@ func (u *unhandledMessagesTracker) addMessage(msg *common.StatusMessage, err err
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
 }
 
-func newTestSettings() *settings2.Settings {
-	return &settings2.Settings{
+func newTestSettings() *settings.Settings {
+	return &settings.Settings{
 		DisplayName:                DefaultProfileDisplayName,
 		ProfilePicturesShowTo:      1,
 		ProfilePicturesVisibility:  1,
-		URLUnfurlingMode:           settings2.URLUnfurlingAlwaysAsk,
+		URLUnfurlingMode:           settings.URLUnfurlingAlwaysAsk,
 		AutoApplyKeypairMigrations: true,
 	}
 }

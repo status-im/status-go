@@ -8,7 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
-	wakuv3 "github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -68,11 +68,11 @@ func (f *TestMessagingEnvironment) SimulateOffline() func() {
 }
 
 // Wraps waku to provide ability to subscribe to post events. It embeds the
-// concrete *wakuv3.Waku (not the types.Waku interface) so that the messaging
+// concrete *waku.Waku (not the types.Waku interface) so that the messaging
 // API methods that live on the backend — Send / Subscribe / Unsubscribe /
 // envelope events, i.e. transport.MessagingAPI — are promoted too.
 type testWakuWrapper struct {
-	*wakuv3.Waku
+	*waku.Waku
 	postSubscriptions []chan *PostMessageSubscription
 
 	// processMailserverBatchHook, when set, intercepts every store (mailserver)
@@ -145,9 +145,9 @@ func (ts *testTimeSource) Now() time.Time {
 }
 
 func newTestWakuWrapper() (*testWakuWrapper, error) {
-	w, err := wakuv3.New(
+	w, err := waku.New(
 		nil,
-		&wakuv3.DefaultConfig,
+		&waku.DefaultConfig,
 		zap.NewNop(),
 		&testTimeSource{},
 	)

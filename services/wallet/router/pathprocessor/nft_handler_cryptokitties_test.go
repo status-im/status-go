@@ -14,10 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/internal/contracts/cryptokitties"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -62,7 +62,7 @@ func TestCryptoKittiesHandler_Comprehensive(t *testing.T) {
 
 		params := ProcessorInputParams{
 			FromToken: &tokentypes.Token{
-				Token:              &types.Token{Symbol: "CK"},
+				Token:              &wsdktypes.Token{Symbol: "CK"},
 				CollectibleTokenID: &hb,
 			},
 			ToAddr: toAddr,
@@ -85,7 +85,7 @@ func TestCryptoKittiesHandler_Comprehensive(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoTokenSet)
 
 	_, err = handler.PackTxInputData(ProcessorInputParams{
-		FromToken: &tokentypes.Token{Token: &types.Token{Symbol: "CK"}},
+		FromToken: &tokentypes.Token{Token: &wsdktypes.Token{Symbol: "CK"}},
 		ToAddr:    toAddr,
 	})
 	assert.ErrorIs(t, err, ErrNoTokenSet)
@@ -104,17 +104,17 @@ func TestCryptoKittiesHandler_WithMocks(t *testing.T) {
 	// Test BuildTransactionV2
 	buildArgs := &wallettypes.SendTxArgs{
 		FromChainID: walletCommon.EthereumMainnet,
-		From:        types2.HexToAddress("0x1234567890123456789012345678901234567890"),
-		To:          &types2.Address{},
+		From:        cryptotypes.HexToAddress("0x1234567890123456789012345678901234567890"),
+		To:          &cryptotypes.Address{},
 		Gas:         (*hexutil.Uint64)(new(uint64)),
 		GasPrice:    (*hexutil.Big)(big.NewInt(1000000000)),
 		Value:       (*hexutil.Big)(big.NewInt(0)),
-		Data:        types2.HexBytes("test_data"),
+		Data:        cryptotypes.HexBytes("test_data"),
 	}
 
 	mockTransactor.EXPECT().ValidateAndBuildTransaction(walletCommon.EthereumMainnet, gomock.Any(), int64(-1)).DoAndReturn(
 		func(chainID uint64, args wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-			expectedAddress := types2.Address(CryptoKittiesContractID.Address)
+			expectedAddress := cryptotypes.Address(CryptoKittiesContractID.Address)
 			assert.Equal(t, &expectedAddress, args.To)
 			return testTx, uint64(1), nil
 		})

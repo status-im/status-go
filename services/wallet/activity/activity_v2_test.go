@@ -18,7 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
@@ -100,17 +100,17 @@ func createEthereumTransaction(toAddr eth.Address, value *big.Int) *ethTypes.Tra
 
 // createTransactionData creates wallet transaction data for testing
 func createTransactionData(fromAddr eth.Address, toAddr eth.Address, value *big.Int, txHash eth.Hash, tx *ethTypes.Transaction) *wallettypes.TransactionData {
-	toAddress := types2.Address(toAddr)
+	toAddress := types.Address(toAddr)
 	return &wallettypes.TransactionData{
 		TxArgs: &wallettypes.SendTxArgs{
-			From:  types2.Address(fromAddr),
+			From:  types.Address(fromAddr),
 			To:    &toAddress,
 			Value: (*hexutil.Big)(value),
 		},
 		Tx:         tx,
-		HashToSign: types2.Hash(txHash),
+		HashToSign: types.Hash(txHash),
 		Signature:  []byte("test_signature"),
-		SentHash:   types2.Hash(txHash),
+		SentHash:   types.Hash(txHash),
 	}
 }
 

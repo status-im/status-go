@@ -9,11 +9,11 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	maErrors "github.com/status-im/status-go/internal/db/multiaccounts/errors"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -30,9 +30,9 @@ var (
 func MapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accsmanagementtypes.AccountOperable,
 	accType accsmanagementtypes.AccountType) *accsmanagementtypes.Account {
 	return &accsmanagementtypes.Account{
-		Address:               types2.BytesToAddress(message.Address),
+		Address:               types.BytesToAddress(message.Address),
 		KeyUID:                message.KeyUid,
-		PublicKey:             types2.HexBytes(message.PublicKey),
+		PublicKey:             types.HexBytes(message.PublicKey),
 		Type:                  accType,
 		Path:                  message.Path,
 		Name:                  message.Name,
@@ -57,7 +57,7 @@ func HandleSyncWatchOnlyAccount(accountsDB *accounts.Database, message *protobuf
 
 	accountOperability := accsmanagementtypes.AccountFullyOperable
 
-	accAddress := types2.BytesToAddress(message.Address)
+	accAddress := types.BytesToAddress(message.Address)
 	dbAccount, err := accountsDB.GetAccountByAddress(accAddress)
 	if err != nil && err != accounts.ErrDbAccountNotFound {
 		return nil, err
@@ -106,8 +106,8 @@ func HandleSyncWatchOnlyAccount(accountsDB *accounts.Database, message *protobuf
 }
 
 // extractSyncSetting parses incoming *protobuf.SyncSetting and stores the setting data if needed
-func ExtractAndSaveSyncSetting(accountsDB *accounts.Database, logger *zap.Logger, syncSetting *protobuf.SyncSetting) (*settings2.SyncSettingField, error) {
-	sf, err := settings2.GetFieldFromProtobufType(syncSetting.Type)
+func ExtractAndSaveSyncSetting(accountsDB *accounts.Database, logger *zap.Logger, syncSetting *protobuf.SyncSetting) (*settings.SyncSettingField, error) {
+	sf, err := settings.GetFieldFromProtobufType(syncSetting.Type)
 	if err != nil {
 		logger.Error(
 			"extractSyncSetting - settings.GetFieldFromProtobufType",
@@ -142,5 +142,5 @@ func ExtractAndSaveSyncSetting(accountsDB *accounts.Database, logger *zap.Logger
 		value = json.RawMessage(v)
 	}
 
-	return &settings2.SyncSettingField{SettingField: sf, Value: value}, nil
+	return &settings.SyncSettingField{SettingField: sf, Value: value}, nil
 }

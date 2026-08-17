@@ -14,8 +14,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/crypto"
-	types3 "github.com/status-im/status-go/internal/crypto/types"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -183,7 +183,7 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 	return p.saveCommunity(record)
 }
 
-func (p *Persistence) DeleteCommunityEvents(id types3.HexBytes) error {
+func (p *Persistence) DeleteCommunityEvents(id cryptotypes.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_events WHERE id = ?;`, id)
 	return err
 }
@@ -205,7 +205,7 @@ func (p *Persistence) SaveCommunityEvents(community *Community) error {
 	return p.saveCommunityEvents(record)
 }
 
-func (p *Persistence) DeleteCommunity(id types3.HexBytes) error {
+func (p *Persistence) DeleteCommunity(id cryptotypes.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_communities WHERE id = ?;
 						 DELETE FROM communities_events WHERE id = ?;`, id, id)
 	return err
@@ -275,7 +275,7 @@ func (p *Persistence) JoinedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Com
 	return p.queryCommunities(memberIdentity, query)
 }
 
-func (p *Persistence) UpdateLastOpenedAt(communityID types3.HexBytes, timestamp int64) error {
+func (p *Persistence) UpdateLastOpenedAt(communityID cryptotypes.HexBytes, timestamp int64) error {
 	_, err := p.db.Exec(`UPDATE communities_communities SET last_opened_at = ? WHERE id = ?`, timestamp, communityID)
 	return err
 }
@@ -418,7 +418,7 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 	return err
 }
 
-func (p *Persistence) SaveRequestToJoinRevealedAddresses(requestID types3.HexBytes, revealedAccounts []*protobuf.RevealedAccount) (err error) {
+func (p *Persistence) SaveRequestToJoinRevealedAddresses(requestID cryptotypes.HexBytes, revealedAccounts []*protobuf.RevealedAccount) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
@@ -843,7 +843,7 @@ func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 	return request, nil
 }
 
-func (p *Persistence) GetNumberOfPendingRequestsToJoin(communityID types3.HexBytes) (int, error) {
+func (p *Persistence) GetNumberOfPendingRequestsToJoin(communityID cryptotypes.HexBytes) (int, error) {
 	var count int
 	err := p.db.QueryRow(`SELECT count(1) FROM communities_requests_to_join WHERE community_id = ? AND state = ?`, communityID, RequestToJoinStatePending).Scan(&count)
 	if err != nil {
@@ -852,7 +852,7 @@ func (p *Persistence) GetNumberOfPendingRequestsToJoin(communityID types3.HexByt
 	return count, nil
 }
 
-func (p *Persistence) GetRequestToJoinClockByPkAndCommunityID(pk string, communityID types3.HexBytes) (uint64, error) {
+func (p *Persistence) GetRequestToJoinClockByPkAndCommunityID(pk string, communityID cryptotypes.HexBytes) (uint64, error) {
 	var clock uint64
 
 	err := p.db.QueryRow(`
@@ -892,7 +892,7 @@ func (p *Persistence) SetPrivateKey(id []byte, privKey *ecdsa.PrivateKey) error 
 	return err
 }
 
-func (p *Persistence) SaveWakuMessages(messages []*types2.ReceivedMessage) (err error) {
+func (p *Persistence) SaveWakuMessages(messages []*messagingtypes.ReceivedMessage) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
@@ -918,7 +918,7 @@ func (p *Persistence) SaveWakuMessages(messages []*types2.ReceivedMessage) (err 
 			msg.Topic.String(),
 			msg.Payload,
 			msg.Padding,
-			types3.Bytes2Hex(msg.Hash),
+			cryptotypes.Bytes2Hex(msg.Hash),
 			msg.ThirdPartyID,
 		)
 		if err != nil {
@@ -928,20 +928,20 @@ func (p *Persistence) SaveWakuMessages(messages []*types2.ReceivedMessage) (err 
 	return
 }
 
-func (p *Persistence) SaveWakuMessage(message *types2.ReceivedMessage) error {
+func (p *Persistence) SaveWakuMessage(message *messagingtypes.ReceivedMessage) error {
 	_, err := p.db.Exec(`INSERT OR REPLACE INTO waku_messages (sig, timestamp, topic, payload, padding, hash, third_party_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		message.Sig,
 		message.Timestamp,
 		message.Topic.String(),
 		message.Payload,
 		message.Padding,
-		types3.Bytes2Hex(message.Hash),
+		cryptotypes.Bytes2Hex(message.Hash),
 		message.ThirdPartyID,
 	)
 	return err
 }
 
-func wakuMessageTimestampQuery(topics []types2.ContentTopic) string {
+func wakuMessageTimestampQuery(topics []messagingtypes.ContentTopic) string {
 	query := " FROM waku_messages WHERE "
 	for i, topic := range topics {
 		query += `topic = "` + topic.String() + `"`
@@ -952,7 +952,7 @@ func wakuMessageTimestampQuery(topics []types2.ContentTopic) string {
 	return query
 }
 
-func (p *Persistence) GetOldestWakuMessageTimestamp(topics []types2.ContentTopic) (uint64, error) {
+func (p *Persistence) GetOldestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
 	var timestamp sql.NullInt64
 	query := "SELECT MIN(timestamp)"
 	query += wakuMessageTimestampQuery(topics)
@@ -960,7 +960,7 @@ func (p *Persistence) GetOldestWakuMessageTimestamp(topics []types2.ContentTopic
 	return uint64(timestamp.Int64), err
 }
 
-func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types2.ContentTopic) (uint64, error) {
+func (p *Persistence) GetLatestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
 	var timestamp sql.NullInt64
 	query := "SELECT MAX(timestamp)"
 	query += wakuMessageTimestampQuery(topics)
@@ -968,7 +968,7 @@ func (p *Persistence) GetLatestWakuMessageTimestamp(topics []types2.ContentTopic
 	return uint64(timestamp.Int64), err
 }
 
-func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types2.ContentTopic, from uint64, to uint64) ([]types2.ReceivedMessage, error) {
+func (p *Persistence) GetWakuMessagesByFilterTopic(topics []messagingtypes.ContentTopic, from uint64, to uint64) ([]messagingtypes.ReceivedMessage, error) {
 
 	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND (" //nolint: gosec
 
@@ -985,30 +985,30 @@ func (p *Persistence) GetWakuMessagesByFilterTopic(topics []types2.ContentTopic,
 		return nil, err
 	}
 	defer rows.Close()
-	messages := []types2.ReceivedMessage{}
+	messages := []messagingtypes.ReceivedMessage{}
 
 	for rows.Next() {
-		msg := types2.ReceivedMessage{}
+		msg := messagingtypes.ReceivedMessage{}
 		var topicStr string
 		var hashStr string
 		err := rows.Scan(&msg.Sig, &msg.Timestamp, &topicStr, &msg.Payload, &msg.Padding, &hashStr, &msg.ThirdPartyID)
 		if err != nil {
 			return nil, err
 		}
-		msg.Topic = types2.StringToContentTopic(topicStr)
-		msg.Hash = types3.Hex2Bytes(hashStr)
+		msg.Topic = messagingtypes.StringToContentTopic(topicStr)
+		msg.Hash = cryptotypes.Hex2Bytes(hashStr)
 		messages = append(messages, msg)
 	}
 
 	return messages, nil
 }
 
-func (p *Persistence) HasCommunityArchiveInfo(communityID types3.HexBytes) (exists bool, err error) {
+func (p *Persistence) HasCommunityArchiveInfo(communityID cryptotypes.HexBytes) (exists bool, err error) {
 	err = p.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM communities_archive_info WHERE community_id = ?)`, communityID.String()).Scan(&exists)
 	return exists, err
 }
 
-func (p *Persistence) GetLastSeenArchiveLink(communityID types3.HexBytes) (string, error) {
+func (p *Persistence) GetLastSeenArchiveLink(communityID cryptotypes.HexBytes) (string, error) {
 	var archiveLink string
 	err := p.db.QueryRow(`SELECT last_archive_link FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&archiveLink)
 	if err == sql.ErrNoRows {
@@ -1017,7 +1017,7 @@ func (p *Persistence) GetLastSeenArchiveLink(communityID types3.HexBytes) (strin
 	return archiveLink, err
 }
 
-func (p *Persistence) GetArchiveLinkMessageClock(communityID types3.HexBytes) (uint64, error) {
+func (p *Persistence) GetArchiveLinkMessageClock(communityID cryptotypes.HexBytes) (uint64, error) {
 	var archiveLinkClock uint64
 	err := p.db.QueryRow(`SELECT archive_link_clock FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&archiveLinkClock)
 	if err == sql.ErrNoRows {
@@ -1026,7 +1026,7 @@ func (p *Persistence) GetArchiveLinkMessageClock(communityID types3.HexBytes) (u
 	return archiveLinkClock, err
 }
 
-func (p *Persistence) SaveCommunityArchiveInfo(communityID types3.HexBytes, archiveLinkClock uint64, lastArchiveEndDate uint64) error {
+func (p *Persistence) SaveCommunityArchiveInfo(communityID cryptotypes.HexBytes, archiveLinkClock uint64, lastArchiveEndDate uint64) error {
 	_, err := p.db.Exec(`
 		INSERT INTO communities_archive_info (
 			community_id, archive_link_clock, last_message_archive_end_date
@@ -1041,7 +1041,7 @@ func (p *Persistence) SaveCommunityArchiveInfo(communityID types3.HexBytes, arch
 	return err
 }
 
-func (p *Persistence) UpdateArchiveLinkMessageClock(communityID types3.HexBytes, archiveLinkClock uint64) error {
+func (p *Persistence) UpdateArchiveLinkMessageClock(communityID cryptotypes.HexBytes, archiveLinkClock uint64) error {
 	_, err := p.db.Exec(`
 		INSERT INTO communities_archive_info (community_id, archive_link_clock)
 		VALUES (?, ?)
@@ -1053,7 +1053,7 @@ func (p *Persistence) UpdateArchiveLinkMessageClock(communityID types3.HexBytes,
 	return err
 }
 
-func (p *Persistence) UpdateLastSeenArchiveLink(communityID types3.HexBytes, archiveLink string) error {
+func (p *Persistence) UpdateLastSeenArchiveLink(communityID cryptotypes.HexBytes, archiveLink string) error {
 	_, err := p.db.Exec(`
 		INSERT INTO communities_archive_info (community_id, last_archive_link)
 		VALUES (?, ?)
@@ -1065,7 +1065,7 @@ func (p *Persistence) UpdateLastSeenArchiveLink(communityID types3.HexBytes, arc
 	return err
 }
 
-func (p *Persistence) SaveLastMessageArchiveEndDate(communityID types3.HexBytes, endDate uint64) error {
+func (p *Persistence) SaveLastMessageArchiveEndDate(communityID cryptotypes.HexBytes, endDate uint64) error {
 	_, err := p.db.Exec(`
 		INSERT INTO communities_archive_info (community_id, last_message_archive_end_date) VALUES (?, ?)
 		ON CONFLICT(community_id) DO UPDATE SET
@@ -1076,7 +1076,7 @@ func (p *Persistence) SaveLastMessageArchiveEndDate(communityID types3.HexBytes,
 	return err
 }
 
-func (p *Persistence) UpdateLastMessageArchiveEndDate(communityID types3.HexBytes, endDate uint64) error {
+func (p *Persistence) UpdateLastMessageArchiveEndDate(communityID cryptotypes.HexBytes, endDate uint64) error {
 	_, err := p.db.Exec(`
 		INSERT INTO communities_archive_info (community_id, last_message_archive_end_date)
 		VALUES (?, ?)
@@ -1088,7 +1088,7 @@ func (p *Persistence) UpdateLastMessageArchiveEndDate(communityID types3.HexByte
 	return err
 }
 
-func (p *Persistence) GetLastMessageArchiveEndDate(communityID types3.HexBytes) (uint64, error) {
+func (p *Persistence) GetLastMessageArchiveEndDate(communityID cryptotypes.HexBytes) (uint64, error) {
 
 	var lastMessageArchiveEndDate uint64
 	err := p.db.QueryRow(`SELECT last_message_archive_end_date FROM communities_archive_info WHERE community_id = ?`, communityID.String()).Scan(&lastMessageArchiveEndDate)
@@ -1100,7 +1100,7 @@ func (p *Persistence) GetLastMessageArchiveEndDate(communityID types3.HexBytes) 
 	return lastMessageArchiveEndDate, nil
 }
 
-func (p *Persistence) GetMessageArchiveIDsToImport(communityID types3.HexBytes) ([]string, error) {
+func (p *Persistence) GetMessageArchiveIDsToImport(communityID cryptotypes.HexBytes) ([]string, error) {
 	rows, err := p.db.Query("SELECT hash FROM community_message_archive_hashes WHERE community_id = ? AND NOT(imported)", communityID.String())
 	if err != nil {
 		return nil, err
@@ -1118,7 +1118,7 @@ func (p *Persistence) GetMessageArchiveIDsToImport(communityID types3.HexBytes) 
 	return ids, err
 }
 
-func (p *Persistence) GetDownloadedMessageArchiveIDs(communityID types3.HexBytes) ([]string, error) {
+func (p *Persistence) GetDownloadedMessageArchiveIDs(communityID cryptotypes.HexBytes) ([]string, error) {
 	rows, err := p.db.Query("SELECT hash FROM community_message_archive_hashes WHERE community_id = ?", communityID.String())
 	if err != nil {
 		return nil, err
@@ -1136,12 +1136,12 @@ func (p *Persistence) GetDownloadedMessageArchiveIDs(communityID types3.HexBytes
 	return ids, err
 }
 
-func (p *Persistence) SetMessageArchiveIDImported(communityID types3.HexBytes, hash string, imported bool) error {
+func (p *Persistence) SetMessageArchiveIDImported(communityID cryptotypes.HexBytes, hash string, imported bool) error {
 	_, err := p.db.Exec(`UPDATE community_message_archive_hashes SET imported = ? WHERE hash = ? AND community_id = ?`, imported, hash, communityID.String())
 	return err
 }
 
-func (p *Persistence) HasMessageArchiveID(communityID types3.HexBytes, hash string) (exists bool, err error) {
+func (p *Persistence) HasMessageArchiveID(communityID cryptotypes.HexBytes, hash string) (exists bool, err error) {
 	err = p.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM community_message_archive_hashes WHERE community_id = ? AND hash = ?)`,
 		communityID.String(),
 		hash,
@@ -1149,7 +1149,7 @@ func (p *Persistence) HasMessageArchiveID(communityID types3.HexBytes, hash stri
 	return exists, err
 }
 
-func (p *Persistence) SaveMessageArchiveID(communityID types3.HexBytes, hash string) error {
+func (p *Persistence) SaveMessageArchiveID(communityID cryptotypes.HexBytes, hash string) error {
 	_, err := p.db.Exec(`INSERT INTO community_message_archive_hashes (community_id, hash) VALUES (?, ?)`,
 		communityID.String(),
 		hash,
@@ -1176,7 +1176,7 @@ func (p *Persistence) GetCommunitiesSettings() ([]CommunitySettings, error) {
 	return communitiesSettings, err
 }
 
-func (p *Persistence) CommunitySettingsExist(communityID types3.HexBytes) (bool, error) {
+func (p *Persistence) CommunitySettingsExist(communityID cryptotypes.HexBytes) (bool, error) {
 	var count int
 	err := p.db.QueryRow(`SELECT count(1) FROM communities_settings WHERE community_id = ?`, communityID.String()).Scan(&count)
 	if err != nil {
@@ -1185,7 +1185,7 @@ func (p *Persistence) CommunitySettingsExist(communityID types3.HexBytes) (bool,
 	return count > 0, nil
 }
 
-func (p *Persistence) GetCommunitySettingsByID(communityID types3.HexBytes) (*CommunitySettings, error) {
+func (p *Persistence) GetCommunitySettingsByID(communityID cryptotypes.HexBytes) (*CommunitySettings, error) {
 	settings := CommunitySettings{}
 	err := p.db.QueryRow(`SELECT community_id, message_archive_seeding_enabled, message_archive_fetching_enabled, clock FROM communities_settings WHERE community_id = ?`, communityID.String()).Scan(&settings.CommunityID, &settings.HistoryArchiveSupportEnabled, &settings.HistoryArchiveSupportEnabled, &settings.Clock)
 	if err == sql.ErrNoRows {
@@ -1196,7 +1196,7 @@ func (p *Persistence) GetCommunitySettingsByID(communityID types3.HexBytes) (*Co
 	return &settings, nil
 }
 
-func (p *Persistence) DeleteCommunitySettings(communityID types3.HexBytes) error {
+func (p *Persistence) DeleteCommunitySettings(communityID cryptotypes.HexBytes) error {
 	_, err := p.db.Exec("DELETE FROM communities_settings WHERE community_id = ?", communityID.String())
 	return err
 }
@@ -1230,7 +1230,7 @@ func (p *Persistence) UpdateCommunitySettings(communitySettings CommunitySetting
 	return err
 }
 
-func (p *Persistence) GetCommunityChatIDs(communityID types3.HexBytes) ([]string, error) {
+func (p *Persistence) GetCommunityChatIDs(communityID cryptotypes.HexBytes) ([]string, error) {
 	rows, err := p.db.Query(`SELECT id FROM chats WHERE community_id = ?`, communityID.String())
 	if err != nil {
 		return nil, err
@@ -1479,7 +1479,7 @@ func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityI
 			return nil, err
 		}
 
-		if types3.EncodeHex(prevRequest.ID) == types3.EncodeHex(request.ID) {
+		if cryptotypes.EncodeHex(prevRequest.ID) == cryptotypes.EncodeHex(request.ID) {
 			if revealedAccount != nil {
 				prevRequest.RevealedAccounts = append(prevRequest.RevealedAccounts, revealedAccount)
 			}
@@ -1573,14 +1573,14 @@ func (p *Persistence) getCommunitiesToValidate() (map[string][]communityToValida
 		if err != nil {
 			return nil, err
 		}
-		communitiesToValidate[types3.EncodeHex(communityToValidate.id)] = append(communitiesToValidate[types3.EncodeHex(communityToValidate.id)], communityToValidate)
+		communitiesToValidate[cryptotypes.EncodeHex(communityToValidate.id)] = append(communitiesToValidate[cryptotypes.EncodeHex(communityToValidate.id)], communityToValidate)
 	}
 
 	return communitiesToValidate, nil
 
 }
 
-func (p *Persistence) getCommunityToValidateByID(communityID types3.HexBytes) ([]communityToValidate, error) {
+func (p *Persistence) getCommunityToValidateByID(communityID cryptotypes.HexBytes) ([]communityToValidate, error) {
 	communityToValidateArray := []communityToValidate{}
 	rows, err := p.db.Query(`SELECT id, clock, payload, signer FROM communities_validate_signer WHERE id = ? AND validate_at <= ? ORDER BY clock DESC`, communityID, time.Now().UnixNano())
 
@@ -1614,7 +1614,7 @@ func (p *Persistence) DeleteCommunityToValidate(communityID []byte, clock uint64
 	return err
 }
 
-func (p *Persistence) GetSyncControlNode(communityID types3.HexBytes) (*protobuf.SyncCommunityControlNode, error) {
+func (p *Persistence) GetSyncControlNode(communityID cryptotypes.HexBytes) (*protobuf.SyncCommunityControlNode, error) {
 	result := &protobuf.SyncCommunityControlNode{}
 
 	err := p.db.QueryRow(`
@@ -1633,7 +1633,7 @@ func (p *Persistence) GetSyncControlNode(communityID types3.HexBytes) (*protobuf
 	return result, nil
 }
 
-func (p *Persistence) SaveSyncControlNode(communityID types3.HexBytes, clock uint64, installationID string) error {
+func (p *Persistence) SaveSyncControlNode(communityID cryptotypes.HexBytes, clock uint64, installationID string) error {
 	_, err := p.db.Exec(
 		`INSERT INTO communities_control_node (
 			community_id,
@@ -1795,7 +1795,7 @@ func (p *Persistence) AllNonApprovedCommunitiesRequestsToJoin() ([]*RequestToJoi
 	return nonApprovedRequestsToJoin, nil
 }
 
-func (p *Persistence) GetAppliedCommunityEvents(communityID types3.HexBytes) (map[string]uint64, error) {
+func (p *Persistence) GetAppliedCommunityEvents(communityID cryptotypes.HexBytes) (map[string]uint64, error) {
 	rows, err := p.db.Query(`SELECT event_type_id, clock FROM applied_community_events WHERE community_id = ?`, communityID.String())
 	if err != nil {
 		return nil, err
@@ -1818,7 +1818,7 @@ func (p *Persistence) GetAppliedCommunityEvents(communityID types3.HexBytes) (ma
 	return result, nil
 }
 
-func (p *Persistence) UpsertAppliedCommunityEvents(communityID types3.HexBytes, processedEvents map[string]uint64) error {
+func (p *Persistence) UpsertAppliedCommunityEvents(communityID cryptotypes.HexBytes, processedEvents map[string]uint64) error {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -1858,7 +1858,7 @@ func (p *Persistence) UpsertAppliedCommunityEvents(communityID types3.HexBytes, 
 	return err
 }
 
-func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*types2.HashRatchetInfo) error {
+func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*messagingtypes.HashRatchetInfo) error {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -2106,7 +2106,7 @@ func (p *Persistence) GetEncryptionKeyRequests(communityID []byte, channelIDs ma
 	return result, nil
 }
 
-func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types3.HexBytes, channelIDs []string, requestedAt int64) error {
+func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID cryptotypes.HexBytes, channelIDs []string, requestedAt int64) error {
 	tx, err := p.db.Begin()
 	if err != nil {
 		return err

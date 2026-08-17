@@ -33,11 +33,11 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
-	settings2 "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
-	messaging2 "github.com/status-im/status-go/pkg/messaging"
-	types2 "github.com/status-im/status-go/pkg/messaging/types"
+	"github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -96,7 +96,7 @@ type Messenger struct {
 	config                    *config
 	identity                  *ecdsa.PrivateKey
 	signer                    communities.MessageSigner
-	messaging                 *messaging2.API
+	messaging                 *messaging.API
 	sender                    *common.MessageSender
 	persistence               *sqlitePersistence
 	ensVerifier               *ens.Verifier
@@ -179,11 +179,11 @@ type Messenger struct {
 	unhandledMessagesTracker func(*common.StatusMessage, error)
 
 	// enables control over chat messages iteration
-	retrievedMessagesIteratorFactory func(map[types2.ChatFilter][]*types2.ReceivedMessage) MessagesIterator
+	retrievedMessagesIteratorFactory func(map[types.ChatFilter][]*types.ReceivedMessage) MessagesIterator
 }
 
 type EnvelopeEventsInterceptor struct {
-	EnvelopeEventsHandler types2.EnvelopeEventsHandler
+	EnvelopeEventsHandler types.EnvelopeEventsHandler
 	Messenger             *Messenger
 }
 
@@ -268,7 +268,7 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash crypt
 
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	messaging *messaging2.API,
+	messaging *messaging.API,
 	installationID string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -795,7 +795,7 @@ func (m *Messenger) cleanTopics() error {
 	if m.mailserversDatabase == nil {
 		return nil
 	}
-	var filters types2.ChatFilters
+	var filters types.ChatFilters
 	for _, f := range m.messaging.ChatFilters() {
 		if f.IsListening() && !f.IsEphemeral() {
 			filters = append(filters, f)
@@ -902,12 +902,12 @@ func (m *Messenger) publishContactCode() error {
 		return err
 	}
 
-	contactCodeTopic := messaging2.ContactCodeTopic(&m.identity.PublicKey)
+	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
 	rawMessage := common.RawMessage{
 		LocalChatID: contactCodeTopic,
 		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT,
 		Payload:     payload,
-		Priority:    &types2.LowPriority,
+		Priority:    &types.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -937,7 +937,7 @@ func (m *Messenger) publishContactCode() error {
 // contactCodeAdvertisement attaches a protobuf.ChatIdentity to the given protobuf.ContactCodeAdvertisement,
 // if the `shouldPublish` conditions are met
 func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
-	contactCodeTopic := messaging2.ContactCodeTopic(&m.identity.PublicKey)
+	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
 	shouldPublish, err := m.shouldPublishChatIdentity(contactCodeTopic)
 	if err != nil {
 		return err
@@ -1014,7 +1014,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		LocalChatID: chat.ID,
 		MessageType: protobuf.ApplicationMetadataMessage_CHAT_IDENTITY,
 		Payload:     payload,
-		Priority:    &types2.LowPriority,
+		Priority:    &types.LowPriority,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -1186,7 +1186,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 		return err
 	}
 
-	if s.ProfilePicturesShowTo == settings2.ProfilePicturesShowToNone {
+	if s.ProfilePicturesShowTo == settings.ProfilePicturesShowToNone {
 		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
 		return nil
 	}
@@ -1226,7 +1226,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 		return fmt.Errorf("unknown ChatIdentity context '%s'", context)
 	}
 
-	if s.ProfilePicturesShowTo == settings2.ProfilePicturesShowToContactsOnly {
+	if s.ProfilePicturesShowTo == settings.ProfilePicturesShowToContactsOnly {
 		err := EncryptIdentityImagesWithContactPubKeys(ci.Images, m)
 		if err != nil {
 			return err
@@ -1237,7 +1237,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 }
 
 // handleInstallations adds the installations in the installations map
-func (m *Messenger) handleInstallations(installations []*types2.Installation) {
+func (m *Messenger) handleInstallations(installations []*types.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contacts.ContactIDFromPublicKey(&m.identity.PublicKey) {
 			if _, ok := m.allInstallations.Load(installation.ID); !ok {
@@ -1249,7 +1249,7 @@ func (m *Messenger) handleInstallations(installations []*types2.Installation) {
 }
 
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
-func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *types2.EncryptionSubscriptions) {
+func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *types.EncryptionSubscriptions) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer gocommon.LogOnPanic()
@@ -1362,20 +1362,20 @@ func (m *Messenger) watchConnectionChange() {
 			case wasOnline && force && previousCheck.Before(historyNow):
 				// The process did not observe connectivity during this interval
 				// (typically system sleep), so treat it as unreliable.
-				m.asyncRequestHistoricMessages(types2.HistoryReconcileWindow{From: previousCheck, To: historyNow})
+				m.asyncRequestHistoricMessages(types.HistoryReconcileWindow{From: previousCheck, To: historyNow})
 			}
 			m.notifyHistoricSyncWorker()
 		}
 	}
 
-	subscribedConnectionStatus := func(subscription types2.ConnectionStatusSubscription) {
+	subscribedConnectionStatus := func(subscription types.ConnectionStatusSubscription) {
 		defer gocommon.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
 		// Sentinel outside the valid enum range so the first event always emits.
-		lastConnState := types2.ConnectionState(-1)
+		lastConnState := types.ConnectionState(-1)
 		for {
 			select {
 			case status := <-subscription.C():
@@ -1787,7 +1787,7 @@ func (m *Messenger) hasPairedDevices() bool {
 	}
 
 	var count int
-	m.allInstallations.Range(func(installationID string, installation *types2.Installation) (shouldContinue bool) {
+	m.allInstallations.Range(func(installationID string, installation *types.Installation) (shouldContinue bool) {
 		if installation.Enabled {
 			count++
 		}
@@ -3124,7 +3124,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 	}
 }
 
-func (m *Messenger) outputToCSV(timestamp uint32, messageID cryptotypes.HexBytes, from string, topic types2.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
+func (m *Messenger) outputToCSV(timestamp uint32, messageID cryptotypes.HexBytes, from string, topic types.ContentTopic, chatID string, msgType protobuf.ApplicationMetadataMessage_Type, parsedMessage interface{}) {
 	if !m.outputCSV {
 		return
 	}
@@ -3156,7 +3156,7 @@ func (m *Messenger) shouldSkipDuplicate(messageType protobuf.ApplicationMetadata
 	return true
 }
 
-func (m *Messenger) handleImportedMessages(messagesToHandle map[types2.ChatFilter][]*types2.ReceivedMessage) error {
+func (m *Messenger) handleImportedMessages(messagesToHandle map[types.ChatFilter][]*types.ReceivedMessage) error {
 
 	messageState := m.buildMessageState()
 
@@ -3310,7 +3310,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types2.ChatFilte
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilter][]*types2.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilter][]*types.ReceivedMessage, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()
@@ -3362,7 +3362,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types2.ChatFilt
 				continue
 			}
 
-			m.messaging.MetricsPushReceivedMessages(types2.ReceivedMessages{
+			m.messaging.MetricsPushReceivedMessages(types.ReceivedMessages{
 				Filter:     filter,
 				SHHMessage: shhMessage,
 				Messages:   handleMessagesResponse.Messages,
@@ -3400,7 +3400,7 @@ func (m *Messenger) processStatusMessage(
 	hash []byte,
 	messageState *ReceivedMessageState,
 	msg *common.StatusMessage,
-	filter types2.ChatFilter,
+	filter types.ChatFilter,
 	fromArchive bool,
 	logger *zap.Logger) error {
 	messageID := cryptotypes.EncodeHex(msg.ApplicationLayer.ID)
@@ -4721,10 +4721,10 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, er
 	return encodedMessage, nil
 }
 
-func (m *Messenger) getSettings() (settings2.Settings, error) {
+func (m *Messenger) getSettings() (settings.Settings, error) {
 	sDB, err := accounts.NewDB(m.database)
 	if err != nil {
-		return settings2.Settings{}, err
+		return settings.Settings{}, err
 	}
 	return sDB.GetSettings()
 }
@@ -4857,7 +4857,7 @@ func (m *Messenger) FindStatusMessageIDForBridgeMessageID(bridgeMessageID string
 	return m.persistence.FindStatusMessageIDForBridgeMessageID(bridgeMessageID)
 }
 
-func (m *Messenger) Messaging() *messaging2.API {
+func (m *Messenger) Messaging() *messaging.API {
 	return m.messaging
 }
 

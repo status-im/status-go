@@ -3,7 +3,7 @@ package protocol
 import (
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/services/personal"
 )
@@ -14,28 +14,28 @@ func NewSignerStub() *SignerStub {
 	return &SignerStub{}
 }
 
-func (s *SignerStub) Recover(rpcParams personal.RecoverParams) (addr types2.Address, err error) {
-	sig := types2.HexBytes(rpcParams.Signature)
+func (s *SignerStub) Recover(rpcParams personal.RecoverParams) (addr types.Address, err error) {
+	sig := types.HexBytes(rpcParams.Signature)
 	if len(sig) != 65 {
-		return types2.Address{}, personal.ErrInvalidSignatureLength
+		return types.Address{}, personal.ErrInvalidSignatureLength
 	}
 	if sig[64] != 27 && sig[64] != 28 {
-		return types2.Address{}, personal.ErrInvalidSignatureV
+		return types.Address{}, personal.ErrInvalidSignatureV
 	}
 	sig[64] -= 27 // Transform yellow paper V from 27/28 to 0/1
-	hash := crypto.TextHash(types2.HexBytes(rpcParams.Message))
+	hash := crypto.TextHash(types.HexBytes(rpcParams.Message))
 	rpk, err := crypto.SigToPub(hash, sig)
 	if err != nil {
-		return types2.Address{}, err
+		return types.Address{}, err
 	}
 	return crypto.PubkeyToAddress(*rpk), nil
 }
 
-func (s *SignerStub) CanRecover(rpcParams personal.RecoverParams, revealedAddress types2.Address) (bool, error) {
+func (s *SignerStub) CanRecover(rpcParams personal.RecoverParams, revealedAddress types.Address) (bool, error) {
 	return true, nil
 }
 
-func (s *SignerStub) Sign(rpcParams personal.SignParams, verifiedAccount *generator.Account) (result types2.HexBytes, err error) {
+func (s *SignerStub) Sign(rpcParams personal.SignParams, verifiedAccount *generator.Account) (result types.HexBytes, err error) {
 	bytesArray := []byte(rpcParams.Address)
 	bytesArray = append(bytesArray, []byte(rpcParams.Password)...)
 	bytesArray = common.Shake256(bytesArray)

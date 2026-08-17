@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -14,8 +14,8 @@ import (
 type SendDetails struct {
 	Uuid                string                `json:"uuid"`
 	SendType            int                   `json:"sendType"`
-	FromAddress         types2.Address        `json:"fromAddress"`
-	ToAddress           types2.Address        `json:"toAddress"`
+	FromAddress         types.Address         `json:"fromAddress"`
+	ToAddress           types.Address         `json:"toAddress"`
 	FromChain           uint64                `json:"fromChain"` // this chain should be used only if en error occurred while sending a transaction
 	ToChain             uint64                `json:"toChain"`   // this chain should be used only if en error occurred while sending a transaction
 	FromTokenKey        string                `json:"fromToken"`
@@ -34,11 +34,11 @@ type SendDetails struct {
 }
 
 type SigningDetails struct {
-	Address       types2.Address `json:"address"`
-	AddressPath   string         `json:"addressPath"`
-	KeyUid        string         `json:"keyUid"`
-	SignOnKeycard bool           `json:"signOnKeycard"`
-	Hashes        []types2.Hash  `json:"hashes"`
+	Address       types.Address `json:"address"`
+	AddressPath   string        `json:"addressPath"`
+	KeyUid        string        `json:"keyUid"`
+	SignOnKeycard bool          `json:"signOnKeycard"`
+	Hashes        []types.Hash  `json:"hashes"`
 }
 
 type RouterTransactionsForSigning struct {
@@ -47,17 +47,17 @@ type RouterTransactionsForSigning struct {
 }
 
 type RouterSentTransaction struct {
-	FromAddress  types2.Address `json:"fromAddress"`
-	ToAddress    types2.Address `json:"toAddress"`
-	FromChain    uint64         `json:"fromChain"`
-	ToChain      uint64         `json:"toChain"`
-	FromTokenKey string         `json:"fromTokenKey"`
-	ToTokenKey   string         `json:"toTokenKey"`
-	Amount       string         `json:"amount"`    // amount sent
-	AmountIn     string         `json:"amountIn"`  // amount that is "data" of tx (important for erc20 tokens)
-	AmountOut    string         `json:"amountOut"` // amount that will be received
-	Hash         types2.Hash    `json:"hash"`
-	ApprovalTx   bool           `json:"approvalTx"`
+	FromAddress  types.Address `json:"fromAddress"`
+	ToAddress    types.Address `json:"toAddress"`
+	FromChain    uint64        `json:"fromChain"`
+	ToChain      uint64        `json:"toChain"`
+	FromTokenKey string        `json:"fromTokenKey"`
+	ToTokenKey   string        `json:"toTokenKey"`
+	Amount       string        `json:"amount"`    // amount sent
+	AmountIn     string        `json:"amountIn"`  // amount that is "data" of tx (important for erc20 tokens)
+	AmountOut    string        `json:"amountOut"` // amount that will be received
+	Hash         types.Hash    `json:"hash"`
+	ApprovalTx   bool          `json:"approvalTx"`
 }
 
 type RouterSentTransactions struct {
@@ -65,8 +65,8 @@ type RouterSentTransactions struct {
 	SentTransactions []*RouterSentTransaction `json:"sentTransactions"`
 }
 
-func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types2.Hash, approvalTx bool) *RouterSentTransaction {
-	addr := types2.Address{}
+func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash, approvalTx bool) *RouterSentTransaction {
+	addr := types.Address{}
 	if sendArgs.To != nil {
 		addr = *sendArgs.To
 	}
@@ -104,8 +104,8 @@ func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types2.Hash
 
 func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams, fromChain uint64, toChain uint64) {
 	sd.SendType = int(inputParams.SendType)
-	sd.FromAddress = types2.Address(inputParams.AddrFrom)
-	sd.ToAddress = types2.Address(inputParams.AddrTo)
+	sd.FromAddress = types.Address(inputParams.AddrFrom)
+	sd.ToAddress = types.Address(inputParams.AddrTo)
 	sd.FromTokenKey = inputParams.TokenKey
 	sd.ToTokenKey = inputParams.ToTokenKey
 	if inputParams.AmountIn != nil {

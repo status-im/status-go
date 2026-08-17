@@ -11,8 +11,8 @@ import (
 	accsmanagementerrors "github.com/status-im/status-go/internal/accounts-management/errors"
 	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
-	"github.com/status-im/status-go/internal/accounts-management/types"
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	multiaccscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 )
 
@@ -21,7 +21,7 @@ import (
 // If it's a profile keypair, it also sets the chat account.
 // Passed `walletAccount` is used to generate address using its path and set other details accordingly.
 func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, password string, keypairName string,
-	coldWallet types.ColdWalletType, walletAccount *types.AccountCreationDetails, profile bool, clock uint64) (keypair *types.Keypair, err error) {
+	coldWallet accsmanagementtypes.ColdWalletType, walletAccount *accsmanagementtypes.AccountCreationDetails, profile bool, clock uint64) (keypair *accsmanagementtypes.Keypair, err error) {
 
 	if walletAccount == nil {
 		err = ErrKeypairDoesNotHaveWalletAccount
@@ -59,7 +59,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 
 	dbKeypair, err := m.persistence.GetKeypairByKeyUID(masterAccount.KeyUID())
 	if err != nil {
-		if err != types.ErrDbKeypairNotFound {
+		if err != accsmanagementtypes.ErrDbKeypairNotFound {
 			return
 		}
 	}
@@ -68,10 +68,10 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 		return
 	}
 
-	keypairType := types.KeypairTypeSeed
+	keypairType := accsmanagementtypes.KeypairTypeSeed
 	// make sure the keystore is created for the profile keypair
 	if profile {
-		keypairType = types.KeypairTypeProfile
+		keypairType = accsmanagementtypes.KeypairTypeProfile
 
 		var keystore KeyStore
 		keystore, err = m.createKeystore(masterAccount.KeyUID())
@@ -100,7 +100,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 	}
 
 	// store accounts to keystore, unless the keypair lives on a cold wallet device
-	if coldWallet == types.ColdWalletTypeNone {
+	if coldWallet == accsmanagementtypes.ColdWalletTypeNone {
 		err = m.storeKeystoreFilesForAccounts(masterAccount, derivedAccounts, password)
 		if err != nil {
 			return
@@ -120,7 +120,7 @@ func (m *AccountsManager) CreateKeypairFromMnemonicAndStore(mnemonic string, pas
 }
 
 func (m *AccountsManager) AddKeypairStoredToColdWallet(keyUID string, masterAddress string, name string, walletXPub string,
-	coldWallet types.ColdWalletType, walletAccounts []*types.Account, clock uint64) (keypair *types.Keypair, err error) {
+	coldWallet accsmanagementtypes.ColdWalletType, walletAccounts []*accsmanagementtypes.Account, clock uint64) (keypair *accsmanagementtypes.Keypair, err error) {
 
 	if len(walletAccounts) == 0 {
 		err = ErrKeypairMustHaveAtLeastOneWalletAccount
@@ -143,10 +143,10 @@ func (m *AccountsManager) AddKeypairStoredToColdWallet(keyUID string, masterAddr
 		return nil, ErrPersistenceMissing
 	}
 
-	var dbKeypair *types.Keypair
+	var dbKeypair *accsmanagementtypes.Keypair
 	dbKeypair, err = m.persistence.GetKeypairByKeyUID(keyUID)
 	if err != nil {
-		if err != types.ErrDbKeypairNotFound {
+		if err != accsmanagementtypes.ErrDbKeypairNotFound {
 			return
 		}
 	}
@@ -162,15 +162,15 @@ func (m *AccountsManager) AddKeypairStoredToColdWallet(keyUID string, masterAddr
 
 	for _, walletAccount := range walletAccounts {
 		walletAccount.Position = position
-		walletAccount.Operable = types.AccountFullyOperable
+		walletAccount.Operable = accsmanagementtypes.AccountFullyOperable
 		position++
 	}
 
 	// prepare keypair
-	keypair = &types.Keypair{
+	keypair = &accsmanagementtypes.Keypair{
 		Name:                    name,
 		KeyUID:                  keyUID,
-		Type:                    types.KeypairTypeSeed,
+		Type:                    accsmanagementtypes.KeypairTypeSeed,
 		DerivedFrom:             masterAddress,
 		LastUsedDerivationIndex: 0,
 		Clock:                   clock,
@@ -186,10 +186,10 @@ func (m *AccountsManager) AddKeypairStoredToColdWallet(keyUID string, masterAddr
 }
 
 func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAccounts map[string]*generator.Account, keypairName string,
-	walletAccount *types.AccountCreationDetails, keypairType types.KeypairType, profile bool, walletXPub string, coldWallet types.ColdWalletType,
-	clock uint64) (*types.Keypair, error) {
+	walletAccount *accsmanagementtypes.AccountCreationDetails, keypairType accsmanagementtypes.KeypairType, profile bool, walletXPub string, coldWallet accsmanagementtypes.ColdWalletType,
+	clock uint64) (*accsmanagementtypes.Keypair, error) {
 	// set up keypair
-	keypair := &types.Keypair{
+	keypair := &accsmanagementtypes.Keypair{
 		Name:                    keypairName,
 		KeyUID:                  account.KeyUID(),
 		Type:                    keypairType,
@@ -203,15 +203,15 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 	// add chat account
 	chatDerivedAccount, ok := derivedAccounts[common.PathEIP1581Chat]
 	if ok {
-		keypair.Accounts = append(keypair.Accounts, &types.Account{
-			PublicKey:          types2.Hex2Bytes(chatDerivedAccount.PublicKeyHex()),
+		keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
+			PublicKey:          cryptotypes.Hex2Bytes(chatDerivedAccount.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            chatDerivedAccount.Address(),
 			Chat:               profile,
 			Path:               common.PathEIP1581Chat,
 			AddressWasNotShown: true,
 			Position:           -1,
-			Operable:           types.AccountFullyOperable,
+			Operable:           accsmanagementtypes.AccountFullyOperable,
 		})
 	}
 
@@ -223,8 +223,8 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 	// add wallet accounts
 	walletDerivedAccount, ok := derivedAccounts[walletAccount.Path]
 	if ok {
-		keypair.Accounts = append(keypair.Accounts, &types.Account{
-			PublicKey:          types2.Hex2Bytes(walletDerivedAccount.PublicKeyHex()),
+		keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
+			PublicKey:          cryptotypes.Hex2Bytes(walletDerivedAccount.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            walletDerivedAccount.Address(),
 			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
@@ -234,15 +234,15 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 			Name:               walletAccount.Name,
 			AddressWasNotShown: true,
 			Position:           position,
-			Operable:           types.AccountFullyOperable,
+			Operable:           accsmanagementtypes.AccountFullyOperable,
 		})
 	}
 
-	if keypairType == types.KeypairTypeKey {
+	if keypairType == accsmanagementtypes.KeypairTypeKey {
 		keypair.DerivedFrom = ""
 
-		keypair.Accounts = append(keypair.Accounts, &types.Account{
-			PublicKey:          types2.Hex2Bytes(account.PublicKeyHex()),
+		keypair.Accounts = append(keypair.Accounts, &accsmanagementtypes.Account{
+			PublicKey:          cryptotypes.Hex2Bytes(account.PublicKeyHex()),
 			KeyUID:             keypair.KeyUID,
 			Address:            account.Address(),
 			ColorID:            multiaccscommon.CustomizationColor(walletAccount.ColorID),
@@ -251,7 +251,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 			Name:               walletAccount.Name,
 			AddressWasNotShown: true,
 			Position:           position,
-			Operable:           types.AccountFullyOperable,
+			Operable:           accsmanagementtypes.AccountFullyOperable,
 		})
 	}
 
@@ -260,7 +260,7 @@ func (m *AccountsManager) prepareKeypair(account *generator.Account, derivedAcco
 
 // CreateKeypairFromPrivateKeyAndStore creates a keypair with a single master account.
 func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string, password string, keypairName string,
-	walletAccount *types.AccountCreationDetails, clock uint64) (keypair *types.Keypair, err error) {
+	walletAccount *accsmanagementtypes.AccountCreationDetails, clock uint64) (keypair *accsmanagementtypes.Keypair, err error) {
 	if walletAccount == nil {
 		err = ErrKeypairDoesNotHaveWalletAccount
 		return
@@ -286,7 +286,7 @@ func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string,
 
 	dbKeypair, err := m.persistence.GetKeypairByKeyUID(masterAccount.KeyUID())
 	if err != nil {
-		if err != types.ErrDbKeypairNotFound {
+		if err != accsmanagementtypes.ErrDbKeypairNotFound {
 			return
 		}
 	}
@@ -296,8 +296,8 @@ func (m *AccountsManager) CreateKeypairFromPrivateKeyAndStore(privateKey string,
 	}
 
 	// prepare keypair
-	keypair, err = m.prepareKeypair(masterAccount, nil, keypairName, walletAccount, types.KeypairTypeKey, false, "",
-		types.ColdWalletTypeNone, clock)
+	keypair, err = m.prepareKeypair(masterAccount, nil, keypairName, walletAccount, accsmanagementtypes.KeypairTypeKey, false, "",
+		accsmanagementtypes.ColdWalletTypeNone, clock)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func (m *AccountsManager) MakePrivateKeyKeypairFullyOperable(privateKey string, 
 	return kp.KeyUID, m.persistence.MarkKeypairFullyOperable(kp.KeyUID, clock, true)
 }
 
-func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password string) (addresses []types2.Address, err error) {
+func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password string) (addresses []cryptotypes.Address, err error) {
 	if password == "" {
 		return nil, ErrNoPasswordProvided
 	}
@@ -402,10 +402,10 @@ func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password str
 		}
 
 		for _, acc := range kp.Accounts {
-			if acc.Operable != types.AccountPartiallyOperable {
+			if acc.Operable != accsmanagementtypes.AccountPartiallyOperable {
 				continue
 			}
-			_, err = m.deriveChildAccountForPathAndStore(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
+			_, err = m.deriveChildAccountForPathAndStore(cryptotypes.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return
 			}
@@ -420,7 +420,7 @@ func (m *AccountsManager) MakePartiallyOperableAccoutsFullyOperable(password str
 }
 
 // validateAccountAgainstKeypairXPub checks that the account's address matches the address derived from the keypair's xpub
-func validateAccountAgainstKeypairXPub(kp *types.Keypair, acc *types.Account) error {
+func validateAccountAgainstKeypairXPub(kp *accsmanagementtypes.Keypair, acc *accsmanagementtypes.Account) error {
 	prefix := common.PathWalletXPub + "/"
 	if !strings.HasPrefix(acc.Path, prefix) {
 		return ErrCannotDeriveAccountFromXPub.WithContext("path", acc.Path)
@@ -438,7 +438,7 @@ func validateAccountAgainstKeypairXPub(kp *types.Keypair, acc *types.Account) er
 	if !ok {
 		return ErrCannotDeriveAccountFromXPub.WithContext("path", acc.Path)
 	}
-	if types2.HexToAddress(info.Address) != acc.Address {
+	if cryptotypes.HexToAddress(info.Address) != acc.Address {
 		return ErrAccountMismatch.
 			WithContext("address", acc.Address.Hex()).
 			WithContext("derived address", info.Address)
@@ -447,7 +447,7 @@ func validateAccountAgainstKeypairXPub(kp *types.Keypair, acc *types.Account) er
 }
 
 // deriveKeypairXPubInternally derives the xpub for the passed master address using the provided password. Caller must hold m.mu.
-func (m *AccountsManager) deriveKeypairXPubInternally(deriveFrom types2.Address, password string) (string, error) {
+func (m *AccountsManager) deriveKeypairXPubInternally(deriveFrom cryptotypes.Address, password string) (string, error) {
 	childAccount, err := m.deriveChildAccountForPath(deriveFrom, common.PathWalletXPub, password)
 	if err != nil {
 		return "", err
@@ -461,11 +461,11 @@ func (m *AccountsManager) deriveKeypairXPubInternally(deriveFrom types2.Address,
 
 // backfillKeypairXPubInternally stores the keypair's xpub if it's missing, deriving it from the master keystore file
 // using the provided password. Caller must hold m.mu.
-func (m *AccountsManager) backfillKeypairXPubInternally(kp *types.Keypair, password string) error {
-	if kp.XPub != "" || kp.MigratedToColdWallet() || kp.Type == types.KeypairTypeKey || password == "" {
+func (m *AccountsManager) backfillKeypairXPubInternally(kp *accsmanagementtypes.Keypair, password string) error {
+	if kp.XPub != "" || kp.MigratedToColdWallet() || kp.Type == accsmanagementtypes.KeypairTypeKey || password == "" {
 		return nil
 	}
-	xpub, err := m.deriveKeypairXPubInternally(types2.HexToAddress(kp.DerivedFrom), password)
+	xpub, err := m.deriveKeypairXPubInternally(cryptotypes.HexToAddress(kp.DerivedFrom), password)
 	if err != nil {
 		var accountsErr *accsmanagementerrors.AccountsError
 		if goerrors.As(err, &accountsErr) &&
@@ -509,7 +509,7 @@ func (m *AccountsManager) BackfillKeypairsXPub(password string) error {
 	return goerrors.Join(errs...)
 }
 
-func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, password string) error {
+func (m *AccountsManager) AddAccounts(keyUID string, accounts []*accsmanagementtypes.Account, password string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -522,7 +522,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 		return err
 	}
 
-	if kp.Type == types.KeypairTypeKey {
+	if kp.Type == accsmanagementtypes.KeypairTypeKey {
 		return ErrCannotAddAccountsToKeypairImportedViaPrivateKey
 	}
 
@@ -533,7 +533,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 				WithContext("expected keyuid", keyUID)
 		}
 
-		if kp.Type == types.KeypairTypeProfile {
+		if kp.Type == accsmanagementtypes.KeypairTypeProfile {
 			if acc.Chat {
 				return ErrCannotAddDefaultChatAccount
 			}
@@ -553,7 +553,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 
 	if deriveFromKeystore {
 		for _, acc := range accounts {
-			childAccount, err := m.deriveChildAccountForPath(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
+			childAccount, err := m.deriveChildAccountForPath(cryptotypes.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return err
 			}
@@ -580,7 +580,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 		}
 		if !kp.MigratedToColdWallet() {
 			for _, acc := range accounts {
-				acc.Operable = types.AccountPartiallyOperable
+				acc.Operable = accsmanagementtypes.AccountPartiallyOperable
 			}
 		}
 	}
@@ -592,7 +592,7 @@ func (m *AccountsManager) AddAccounts(keyUID string, accounts []*types.Account, 
 
 	if deriveFromKeystore {
 		for _, acc := range accounts {
-			_, err := m.deriveChildAccountForPathAndStore(types2.HexToAddress(kp.DerivedFrom), acc.Path, password)
+			_, err := m.deriveChildAccountForPathAndStore(cryptotypes.HexToAddress(kp.DerivedFrom), acc.Path, password)
 			if err != nil {
 				return err
 			}
@@ -632,14 +632,14 @@ func (m *AccountsManager) MigrateColdWalletKeypairToApp(mnemonic string, passwor
 		return "", ErrKeypairIsNotColdWallet
 	}
 
-	if kp.Type != types.KeypairTypeProfile {
+	if kp.Type != accsmanagementtypes.KeypairTypeProfile {
 		profileKeypair, err := m.persistence.GetProfileKeypair()
 		if err != nil {
 			return "", err
 		}
 
 		if !profileKeypair.MigratedToColdWallet() {
-			_, err = m.loadAccountInternally(types2.HexToAddress(profileKeypair.DerivedFrom), password)
+			_, err = m.loadAccountInternally(cryptotypes.HexToAddress(profileKeypair.DerivedFrom), password)
 			if err != nil {
 				return "", ErrWrongPasswordProvided(err)
 			}
@@ -656,12 +656,12 @@ func (m *AccountsManager) MigrateColdWalletKeypairToApp(mnemonic string, passwor
 		return "", err
 	}
 
-	return kp.KeyUID, m.persistence.UpdateKeypairXPub(kp.KeyUID, "", types.ColdWalletTypeNone, clock)
+	return kp.KeyUID, m.persistence.UpdateKeypairXPub(kp.KeyUID, "", accsmanagementtypes.ColdWalletTypeNone, clock)
 }
 
 // MigrateKeypairToColdWallet sets ColdWallet field of the keypair to the provided coldWallet type.
 // In case of migration to cold wallet, corresponding keystore files need to be deleted if the keypair being migrated is not already migrated.
-func (m *AccountsManager) MigrateKeypairToColdWallet(keyUID string, password string, coldWallet types.ColdWalletType, clock uint64) error {
+func (m *AccountsManager) MigrateKeypairToColdWallet(keyUID string, password string, coldWallet accsmanagementtypes.ColdWalletType, clock uint64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -698,7 +698,7 @@ func (m *AccountsManager) MigrateKeypairToColdWallet(keyUID string, password str
 	return m.persistence.UpdateKeypairXPub(keyUID, "", coldWallet, clock)
 }
 
-func (m *AccountsManager) DeleteAccount(address types2.Address, password string, clock uint64) (account *types.Account, err error) {
+func (m *AccountsManager) DeleteAccount(address cryptotypes.Address, password string, clock uint64) (account *accsmanagementtypes.Account, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -732,7 +732,7 @@ func (m *AccountsManager) DeleteAccount(address types2.Address, password string,
 
 // DeleteKeypair removes a keypair and its keystore files. The password is required unless the
 // keypair is migrated to a cold wallet (no keystore files exist for it).
-func (m *AccountsManager) DeleteKeypair(keyUID string, password string, clock uint64) (keypair *types.Keypair, err error) {
+func (m *AccountsManager) DeleteKeypair(keyUID string, password string, clock uint64) (keypair *accsmanagementtypes.Keypair, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -745,7 +745,7 @@ func (m *AccountsManager) DeleteKeypair(keyUID string, password string, clock ui
 		return
 	}
 
-	if keypair.Type == types.KeypairTypeProfile {
+	if keypair.Type == accsmanagementtypes.KeypairTypeProfile {
 		err = ErrCannotRemoveProfileKeypair
 		return
 	}

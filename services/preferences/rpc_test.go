@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 
-	rpc2 "github.com/status-im/status-go/pkg/backend/node/rpc"
+	noderpc "github.com/status-im/status-go/pkg/backend/node/rpc"
 )
 
 func TestPreferencesRPCMethods(t *testing.T) {
@@ -21,7 +21,7 @@ func TestPreferencesRPCMethods(t *testing.T) {
 	call := func(method string, params string) string {
 		t.Helper()
 		input := `{"jsonrpc":"2.0","id":1,"method":"` + method + `","params":` + params + `}`
-		codec := rpc2.NewSingleRequestCodec(input)
+		codec := noderpc.NewSingleRequestCodec(input)
 		server.ServeCodec(codec.GethCodec(), 0)
 		return codec.Output()
 	}
@@ -47,7 +47,7 @@ func TestPreferencesListCategoriesRPC(t *testing.T) {
 	call := func(method string, params string) string {
 		t.Helper()
 		input := `{"jsonrpc":"2.0","id":1,"method":"` + method + `","params":` + params + `}`
-		codec := rpc2.NewSingleRequestCodec(input)
+		codec := noderpc.NewSingleRequestCodec(input)
 		server.ServeCodec(codec.GethCodec(), 0)
 		return codec.Output()
 	}

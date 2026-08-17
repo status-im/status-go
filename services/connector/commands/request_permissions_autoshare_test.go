@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	types2 "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/crypto/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
@@ -16,10 +16,10 @@ import (
 
 type overrideRequestShareHandler struct {
 	*ClientSideHandler
-	shareFn func(dApp signal.ConnectorDApp) (types2.Address, uint64, error)
+	shareFn func(dApp signal.ConnectorDApp) (types.Address, uint64, error)
 }
 
-func (o *overrideRequestShareHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types2.Address, uint64, error) {
+func (o *overrideRequestShareHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error) {
 	if o.shareFn != nil {
 		return o.shareFn(dApp)
 	}
@@ -28,13 +28,13 @@ func (o *overrideRequestShareHandler) RequestShareAccountForDApp(dApp signal.Con
 
 func TestRequestPermissions_AutoShareWhenNoDApp(t *testing.T) {
 	rejectErr := errors.New("user dismissed share")
-	acc := types2.BytesToAddress(types2.FromHex("0x00000000000000000000000000000000000000a1"))
+	acc := types.BytesToAddress(types.FromHex("0x00000000000000000000000000000000000000a1"))
 
 	tests := []struct {
 		name             string
 		autoURL          string
 		clientID         string
-		shareFn          func(dApp signal.ConnectorDApp) (types2.Address, uint64, error)
+		shareFn          func(dApp signal.ConnectorDApp) (types.Address, uint64, error)
 		wantGrantSignals int
 		wantDApp         bool
 		wantErr          error
@@ -43,7 +43,7 @@ func TestRequestPermissions_AutoShareWhenNoDApp(t *testing.T) {
 			name:     "accept creates dapp and emits one grant",
 			autoURL:  "https://perm-autoshare-no-pending.test",
 			clientID: "status-desktop/dapp-browser",
-			shareFn: func(dApp signal.ConnectorDApp) (types2.Address, uint64, error) {
+			shareFn: func(dApp signal.ConnectorDApp) (types.Address, uint64, error) {
 				require.Equal(t, "https://perm-autoshare-no-pending.test", dApp.URL)
 				return acc, walletCommon.EthereumMainnet, nil
 			},
@@ -54,8 +54,8 @@ func TestRequestPermissions_AutoShareWhenNoDApp(t *testing.T) {
 			name:     "reject propagates error and leaves no dapp",
 			autoURL:  "https://perm-autoshare-reject.test",
 			clientID: "c1",
-			shareFn: func(dApp signal.ConnectorDApp) (types2.Address, uint64, error) {
-				return types2.Address{}, 0, rejectErr
+			shareFn: func(dApp signal.ConnectorDApp) (types.Address, uint64, error) {
+				return types.Address{}, 0, rejectErr
 			},
 			wantGrantSignals: 0,
 			wantDApp:         false,
