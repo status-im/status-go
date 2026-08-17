@@ -28,4 +28,7 @@ type ClientInterface interface {
 	SetChainID(chainID uint64)
 	FetchQuote(ctx context.Context, params QuoteParams) (Quote, error)
 	FetchTokensList(ctx context.Context) ([]Token, error)
+	// GetChainInfo returns the per-chain contract addresses (Permit2, Permit2Proxy,
+	// diamond), fetching and caching the chain list on first use.
+	GetChainInfo(ctx context.Context, chainID uint64) (*ChainInfo, error)
 }

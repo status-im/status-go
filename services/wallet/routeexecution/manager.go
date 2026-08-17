@@ -54,17 +54,55 @@ func (m *Manager) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requ
 }
 
 func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
+	m.buildTransactions(buildPhase{name: "BuildTransactionsFromRoute", uuid: uuid, opensSend: true})
+}
+
+// SetPermitSignaturesAndBuildTransactions attaches the permit signatures the client just
+// produced, then builds the transactions whose calldata embeds them.
+//
+// It's a separate step because the permit signature goes into the transaction it
+// authorises, so the tx hash can't be computed before the permit is signed. Emits the
+// same SignRouterTransactions signal as BuildTransactionsFromRoute.
+func (m *Manager) SetPermitSignaturesAndBuildTransactions(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
+	m.buildTransactions(buildPhase{
+		name: "SetPermitSignaturesAndBuildTransactions",
+		uuid: sendInputParams.Uuid,
+		prepare: func() error {
+			_, err := m.transactionManager.AddPermitSignatures(sendInputParams.Signatures)
+			return err
+		},
+	})
+}
+
+// buildPhase describes one pass of building the route's transactions for signing. A send
+// runs one or two of them: the second only exists when a permit has to be signed before
+// the transaction carrying it can be built.
+type buildPhase struct {
+	name string
+	uuid string
+	// opensSend marks the phase that begins the send: it stops route recalculation and
+	// tells the client the send started.
+	opensSend bool
+	// prepare runs once the route is resolved and before the transactions are built.
+	prepare func() error
+}
+
+// buildTransactions resolves the active route, builds the transactions the client has to
+// sign and reports them through the SignRouterTransactions signal.
+func (m *Manager) buildTransactions(phase buildPhase) {
 	go func() {
 		defer status_common.LogOnPanic()
 
-		logutils.ZapLogger().Info("BuildTransactionsFromRoute: started", zap.String("uuid", uuid))
+		logutils.ZapLogger().Info(phase.name+": started", zap.String("uuid", phase.uuid))
 
-		m.router.StopSuggestedRoutesAsyncCalculation()
+		if phase.opensSend {
+			m.router.StopSuggestedRoutesAsyncCalculation()
+		}
 
 		var err error
 		response := &responses.RouterTransactionsForSigning{
 			SendDetails: &responses.SendDetails{
-				Uuid: uuid,
+				Uuid: phase.uuid,
 			},
 		}
 
@@ -78,14 +116,20 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 		}()
 
 		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
-		if routeInputParams.Uuid != uuid {
+		if routeInputParams.Uuid != phase.uuid {
 			// should never be here
-			logutils.ZapLogger().Error("BuildTransactionsFromRoute: cannot resolve route id",
-				zap.String("requestedUuid", uuid),
+			logutils.ZapLogger().Error(phase.name+": cannot resolve route id",
+				zap.String("requestedUuid", phase.uuid),
 				zap.String("activeRouteUuid", routeInputParams.Uuid),
 				zap.Bool("activeRouteMissing", route == nil))
 			err = ErrCannotResolveRouteId
 			return
+		}
+
+		if phase.prepare != nil {
+			if err = phase.prepare(); err != nil {
+				return
+			}
 		}
 
 		tokenFrom, _ := m.tokenManager.GetTokenByKey(routeInputParams.TokenKey)
@@ -100,8 +144,10 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 
 		response.SendDetails.UpdateFields(routeInputParams, routeInputParams.FromChainID, routeInputParams.ToChainID)
 
-		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
-		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
+		if phase.opensSend {
+			// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
+			signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
+		}
 
 		var fromChainID, toChainID uint64
 		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(

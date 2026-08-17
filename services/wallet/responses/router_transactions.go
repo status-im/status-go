@@ -33,12 +33,45 @@ type SendDetails struct {
 	CommunityParams *requests.CommunityRouteInputParams `json:"communityParams"`
 }
 
+// HashKind says what a hash handed to the client authorises. Without it a permit digest
+// is indistinguishable from a tx hash.
+type HashKind string
+
+const (
+	// HashKindTx is the signing hash of a transaction the backend has built.
+	HashKindTx HashKind = "tx"
+	// HashKindPermit is an EIP-712 digest authorising a token transfer without an
+	// approval tx. TypedData carries the payload the client must display.
+	HashKindPermit HashKind = "permit"
+)
+
+// HashToSign is a hash the client is asked to sign, with the context needed to show the
+// user what they are agreeing to.
+type HashToSign struct {
+	Hash types2.Hash `json:"hash"`
+	Kind HashKind    `json:"kind"`
+	// TypedData is the EIP-712 payload as JSON, set only for HashKindPermit. Clients
+	// render it instead of the bare hash.
+	TypedData *string `json:"typedData,omitempty"`
+}
+
 type SigningDetails struct {
 	Address       types2.Address `json:"address"`
 	AddressPath   string         `json:"addressPath"`
 	KeyUid        string         `json:"keyUid"`
 	SignOnKeycard bool           `json:"signOnKeycard"`
-	Hashes        []types2.Hash  `json:"hashes"`
+	Hashes        []HashToSign   `json:"hashes"`
+}
+
+// AddTxHash records a transaction hash for signing.
+func (d *SigningDetails) AddTxHash(hash types2.Hash) {
+	d.Hashes = append(d.Hashes, HashToSign{Hash: hash, Kind: HashKindTx})
+}
+
+// AddPermitHash records a permit digest for signing, with the typed data the client
+// needs to describe it to the user.
+func (d *SigningDetails) AddPermitHash(hash types2.Hash, typedData string) {
+	d.Hashes = append(d.Hashes, HashToSign{Hash: hash, Kind: HashKindPermit, TypedData: &typedData})
 }
 
 type RouterTransactionsForSigning struct {

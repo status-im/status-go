@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
@@ -55,9 +56,27 @@ func TestCopyPath(t *testing.T) {
 		RequiredTokenBalance:    big.NewInt(100),
 		RequiredNativeBalance:   big.NewInt(100),
 		SubtractFees:            true,
+		PermitDetails: &permit2.Details{
+			Type:     permit2.TypePermit2,
+			ChainID:  1,
+			Owner:    common.HexToAddress("0x456"),
+			Token:    common.HexToAddress("0x789"),
+			Amount:   big.NewInt(100),
+			Spender:  common.HexToAddress("0xabc"),
+			Permit2:  common.HexToAddress("0xdef"),
+			Nonce:    big.NewInt(1),
+			Deadline: big.NewInt(2),
+		},
 	}
 
 	newPath := path.Copy()
 
 	assert.True(t, reflect.DeepEqual(path, newPath))
+
+	// The permit is mutated in place when its signature arrives, so the copy must not
+	// share it with the original.
+	newPath.PermitDetails.Amount.SetInt64(1)
+	newPath.PermitDetails.Nonce.SetInt64(99)
+	assert.Equal(t, int64(100), path.PermitDetails.Amount.Int64())
+	assert.Equal(t, int64(1), path.PermitDetails.Nonce.Int64())
 }

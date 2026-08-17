@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/transactions"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -62,6 +64,7 @@ func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallet
 		if desc.RouterPath.PathIdentity() == path.PathIdentity() {
 			if walletCommon.IsProcessorSwap(desc.RouterPath.ProcessorName) {
 				// since the path is re-evaluated for swap after approval tx is placed we need to use the latest path
+				carryOverPermitSignature(desc.RouterPath, path)
 				desc.RouterPath = path
 			}
 			return desc
@@ -74,6 +77,28 @@ func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallet
 	tm.routerTransactions = append(tm.routerTransactions, newDetails)
 
 	return newDetails
+}
+
+// carryOverPermitSignature moves an already-collected permit signature onto the
+// re-evaluated path. Route lookups hand back deep copies, so the path seen in the second
+// signing phase isn't the object the signature was attached to and the user would be asked
+// to sign the same permit again. Only carried over when both digests match, a differing
+// one means the old signature is void.
+func carryOverPermitSignature(from, to *routes.Path) {
+	if from.PermitDetails == nil || to.PermitDetails == nil || len(from.PermitDetails.Signature) == 0 {
+		return
+	}
+
+	fromDigest, err := from.PermitDetails.Digest()
+	if err != nil {
+		return
+	}
+	toDigest, err := to.PermitDetails.Digest()
+	if err != nil || fromDigest != toDigest {
+		return
+	}
+
+	to.PermitDetails.Signature = from.PermitDetails.Signature
 }
 
 func buildApprovalTxForPath(transactor transactions.TransactorIface, path *routes.Path, addressFrom common.Address,
@@ -149,6 +174,10 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 		FromChainID:        path.FromChain.ChainID,
 		ToChainID:          path.ToChain.ChainID,
 		SlippagePercentage: processorInputParams.SlippagePercentage,
+
+		// Carries the signed permit to the processor, which wraps the swap calldata in the
+		// matching Permit2Proxy call.
+		PermitDetails: path.PermitDetails,
 	}
 
 	if !path.FromChain.EIP1559Enabled {
@@ -245,7 +274,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 			if err != nil {
 				return nil, path.FromChain.ChainID, path.ToChain.ChainID, err
 			}
-			response.Hashes = append(response.Hashes, txDetails.ApprovalTxData.HashToSign)
+			response.AddTxHash(txDetails.ApprovalTxData.HashToSign)
 
 			// if approval is needed for swap, we cannot build the swap tx before the approval tx is mined
 			if walletCommon.IsProcessorSwap(path.ProcessorName) {
@@ -253,43 +282,118 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 			}
 		}
 
+		// The permit signature goes into the calldata, so the tx hash doesn't exist until
+		// it's signed. Ask for the digest now and build the tx in the second phase.
+		if path.PermitDetails != nil && len(path.PermitDetails.Signature) == 0 {
+			digest, permitErr := path.PermitDetails.Digest()
+			if permitErr != nil {
+				return nil, path.FromChain.ChainID, path.ToChain.ChainID, permitErr
+			}
+			typedData, permitErr := marshalPermitTypedData(path.PermitDetails)
+			if permitErr != nil {
+				return nil, path.FromChain.ChainID, path.ToChain.ChainID, permitErr
+			}
+			response.AddPermitHash(types2.Hash(digest), typedData)
+			continue
+		}
+
 		// build tx for the path
 		txDetails.TxData, err = buildTxForPath(path, pathProcessors, usedNonces, signer, processorInputParams)
 		if err != nil {
 			return nil, path.FromChain.ChainID, path.ToChain.ChainID, err
 		}
-		response.Hashes = append(response.Hashes, txDetails.TxData.HashToSign)
+		response.AddTxHash(txDetails.TxData.HashToSign)
 	}
 
 	return response, 0, 0, nil
 }
 
-func getSignatureForTxHash(txHash string, signatures map[string]requests.SignatureDetails) ([]byte, error) {
-	sigDetails, ok := signatures[txHash]
-	if !ok {
-		err := &errors.ErrorResponse{
-			Code:    ErrMissingSignatureForTx.Code,
-			Details: fmt.Sprintf(ErrMissingSignatureForTx.Details, txHash),
+// marshalPermitTypedData renders the EIP-712 payload the client shows the user before
+// they sign.
+func marshalPermitTypedData(details *permit2.Details) (string, error) {
+	typedData, err := details.TypedData()
+	if err != nil {
+		return "", err
+	}
+	encoded, err := json.Marshal(typedData)
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
+}
+
+// AddPermitSignatures attaches client-provided permit signatures to the paths waiting on
+// them, matched by digest. Returns the number of paths that got one.
+func (tm *TransactionManager) AddPermitSignatures(signatures map[string]requests.SignatureDetails) (int, error) {
+	if len(tm.routerTransactions) == 0 {
+		return 0, ErrNoTrsansactionsBeingBuilt
+	}
+
+	applied := 0
+	for _, desc := range tm.routerTransactions {
+		details := desc.RouterPath.PermitDetails
+		if details == nil || len(details.Signature) > 0 {
+			continue
 		}
+
+		digest, err := details.Digest()
+		if err != nil {
+			return applied, err
+		}
+
+		signature, err := signatureFor(types2.Hash(digest).String(), signatures, recoveryOffsetEIP712)
+		if err != nil {
+			return applied, err
+		}
+		details.Signature = signature
+		applied++
+	}
+
+	return applied, nil
+}
+
+// recoveryOffset is the convention the consumer of a signature expects for its recovery
+// byte. Transactions carry the raw parity the signer applies EIP-155 to; EIP-712 permits
+// (Permit2 and ERC20Permit) expect the 27/28 form.
+type recoveryOffset byte
+
+const (
+	recoveryOffsetRaw    recoveryOffset = 0
+	recoveryOffsetEIP712 recoveryOffset = 27
+)
+
+// signatureFor assembles the 65-byte signature the client produced for the given key, a
+// transaction hash or a permit digest. r and s are right-aligned in their 32-byte halves.
+func signatureFor(key string, signatures map[string]requests.SignatureDetails, offset recoveryOffset) ([]byte, error) {
+	sigDetails, ok := signatures[key]
+	if !ok {
+		return nil, &errors.ErrorResponse{
+			Code:    ErrMissingSignatureForTx.Code,
+			Details: fmt.Sprintf(ErrMissingSignatureForTx.Details, key),
+		}
+	}
+	if err := sigDetails.Validate(); err != nil {
 		return nil, err
 	}
 
-	err := sigDetails.Validate()
+	// Validate only checks string lengths, so malformed hex reaches this point: a partial
+	// decode would be padded into a well-formed but wrong signature.
+	rBytes, err := hex.DecodeString(sigDetails.R)
+	if err != nil {
+		return nil, err
+	}
+	sBytes, err := hex.DecodeString(sigDetails.S)
 	if err != nil {
 		return nil, err
 	}
 
-	rBytes, _ := hex.DecodeString(sigDetails.R)
-	sBytes, _ := hex.DecodeString(sigDetails.S)
-	vByte := byte(0)
-	if sigDetails.V == "01" {
-		vByte = 1
-	}
-
 	signature := make([]byte, crypto2.SignatureLength)
 	copy(signature[32-len(rBytes):32], rBytes)
-	copy(signature[64-len(rBytes):64], sBytes)
-	signature[64] = vByte
+	copy(signature[64-len(sBytes):64], sBytes)
+	signature[64] = byte(offset)
+	if sigDetails.V == "01" {
+		signature[64]++
+	}
 
 	return signature, nil
 }
@@ -297,7 +401,7 @@ func getSignatureForTxHash(txHash string, signatures map[string]requests.Signatu
 func validateAndAddSignature(txData *wallettypes.TransactionData, signatures map[string]requests.SignatureDetails) error {
 	if txData != nil && !txData.IsTxPlaced() {
 		var err error
-		txData.Signature, err = getSignatureForTxHash(txData.HashToSign.String(), signatures)
+		txData.Signature, err = signatureFor(txData.HashToSign.String(), signatures, recoveryOffsetRaw)
 		if err != nil {
 			return err
 		}

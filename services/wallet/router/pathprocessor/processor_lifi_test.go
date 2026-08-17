@@ -1,6 +1,7 @@
 package pathprocessor
 
 import (
+	"context"
 	"errors"
 	"math/big"
 	"testing"
@@ -12,9 +13,11 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/permit2"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/lifi"
 	mock_lifi "github.com/status-im/status-go/services/wallet/thirdparty/lifi/mock"
@@ -187,5 +190,114 @@ func TestLiFiErrors(t *testing.T) {
 		client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(lifi.Quote{}, errors.New(tc.clientError))
 		_, err := processor.GetContractAddress(testInputParams)
 		require.Equal(t, tc.processorError.Error(), err.Error())
+	}
+}
+
+// The permit path hands the Permit2 singleton an unlimited approval, so a /chains response
+// naming anything but the pinned deployment must fall back to approve-then-swap.
+func TestLiFiResolvePermit_OnlyTrustsPinnedDeployment(t *testing.T) {
+	pinned, ok := permit2.DeploymentForChain(walletCommon.EthereumMainnet)
+	require.True(t, ok)
+
+	attacker := common.HexToAddress("0xdEAD000000000000000000000000000000000bad")
+	erc20 := tokentypes.Token{Token: &types.Token{
+		Symbol:  walletCommon.UsdcSymbol,
+		Address: common.HexToAddress("0x465"),
+		ChainID: walletCommon.EthereumMainnet,
+	}}
+
+	testCases := []struct {
+		name        string
+		chainID     uint64
+		chainInfo   *lifi.ChainInfo
+		wantResolve bool
+	}{
+		{
+			name:        "pinned deployment",
+			chainID:     walletCommon.EthereumMainnet,
+			chainInfo:   &lifi.ChainInfo{ID: 1, Permit2: pinned.Permit2, Permit2Proxy: pinned.Proxy},
+			wantResolve: true,
+		},
+		{
+			name:      "attacker-supplied permit2",
+			chainID:   walletCommon.EthereumMainnet,
+			chainInfo: &lifi.ChainInfo{ID: 1, Permit2: attacker, Permit2Proxy: pinned.Proxy},
+		},
+		{
+			name:      "attacker-supplied proxy",
+			chainID:   walletCommon.EthereumMainnet,
+			chainInfo: &lifi.ChainInfo{ID: 1, Permit2: pinned.Permit2, Permit2Proxy: attacker},
+		},
+		{
+			name:      "addresses absent",
+			chainID:   walletCommon.EthereumMainnet,
+			chainInfo: &lifi.ChainInfo{ID: 1},
+		},
+		{
+			// The chain has no pinned deployment, so LI.FI is never even consulted.
+			name:    "chain not enabled",
+			chainID: walletCommon.ZkSyncMainnet,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			client := mock_lifi.NewMockClientInterface(ctrl)
+			if tc.chainInfo != nil {
+				client.EXPECT().GetChainInfo(gomock.Any(), tc.chainID).Return(tc.chainInfo, nil)
+			}
+
+			// A getter that always fails: reaching the resolver surfaces as an error,
+			// which is how the trusted case proves it got past the gate.
+			ethClientGetter := mock_rpcclient.NewMockEthClientGetter(ctrl)
+			ethClientGetter.EXPECT().EthClient(gomock.Any()).Return(nil, errors.New("no client")).AnyTimes()
+
+			processor := NewLiFiProcessor(ethClientGetter, nil, nil)
+			processor.lifiClient = client
+
+			token := erc20
+			token.ChainID = tc.chainID
+
+			plan, err := processor.ResolvePermit(context.Background(), ProcessorInputParams{
+				FromAddr:  common.HexToAddress("0x111"),
+				FromChain: &params.Network{ChainID: tc.chainID},
+				FromToken: &token,
+				AmountIn:  big.NewInt(1000),
+			})
+
+			if tc.wantResolve {
+				require.Error(t, err, "a trusted chain must reach the resolver")
+				return
+			}
+			require.NoError(t, err)
+			require.Nil(t, plan)
+		})
+	}
+}
+
+// Native tokens have nothing to permit, and the tests mode has no chain to probe.
+func TestLiFiResolvePermit_SkipsNativeAndTestsMode(t *testing.T) {
+	fromToken, _ := testLiFiTokens() // native
+	erc20 := tokentypes.Token{Token: &types.Token{
+		Address: common.HexToAddress("0x465"),
+		ChainID: walletCommon.EthereumMainnet,
+	}}
+
+	for _, tc := range []struct {
+		name   string
+		params ProcessorInputParams
+	}{
+		{"nil token", ProcessorInputParams{}},
+		{"native token", ProcessorInputParams{FromToken: &fromToken}},
+		{"tests mode", ProcessorInputParams{FromToken: &erc20, TestsMode: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, err := NewLiFiProcessor(nil, nil, nil).ResolvePermit(context.Background(), tc.params)
+			require.NoError(t, err)
+			require.Nil(t, plan)
+		})
 	}
 }
