@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
-	contacts2 "github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -78,13 +78,13 @@ func (s *MessengerContactRequestSuite) sendContactRequestWithState(request *requ
 	}
 
 	// Make sure contact is added on the sender side
-	contacts := messenger.AddedContacts()
-	s.Require().Len(contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateSent, contacts[0].ContactRequestLocalState)
-	s.Require().NotNil(contacts[0].DisplayName)
+	addedContacts := messenger.AddedContacts()
+	s.Require().Len(addedContacts, 1)
+	s.Require().Equal(contacts.ContactRequestStateSent, addedContacts[0].ContactRequestLocalState)
+	s.Require().NotNil(addedContacts[0].DisplayName)
 
 	// Check contact's primary name matches notification's name
-	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contacts[0].PrimaryName())
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, addedContacts[0].PrimaryName())
 
 	return resp
 }
@@ -149,7 +149,7 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
 	contact := resp.Contacts[0]
-	s.Require().Equal(contacts2.ContactRequestStateReceived, contact.ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateReceived, contact.ContactRequestRemoteState)
 
 	// Check contact's primary name matches notification's name
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contact.PrimaryName())
@@ -253,8 +253,8 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	s.Require().True(resp.Chats()[0].Active)
 
 	// Make sure the sender is added to our contacts
-	contacts := receiver.AddedContacts()
-	s.Require().Len(contacts, 1)
+	addedContacts := receiver.AddedContacts()
+	s.Require().Len(addedContacts, 1)
 
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := receiver.MutualContacts()
@@ -331,9 +331,9 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 }
 
 func (s *MessengerContactRequestSuite) checkMutualContact(messenger *Messenger, contactPublicKey string) {
-	contacts := messenger.AddedContacts()
-	s.Require().Len(contacts, 1)
-	contact := contacts[0]
+	addedContacts := messenger.AddedContacts()
+	s.Require().Len(addedContacts, 1)
+	contact := addedContacts[0]
 	s.Require().Equal(contactPublicKey, contact.ID)
 	s.Require().True(contact.Mutual())
 }
@@ -352,7 +352,7 @@ func (s *MessengerContactRequestSuite) declineContactRequest(contactRequest *com
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateDismissed, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateDismissed, resp.Contacts[0].ContactRequestLocalState)
 
 	// Make sure the message is updated
 	s.Require().NotNil(resp)
@@ -372,8 +372,8 @@ func (s *MessengerContactRequestSuite) declineContactRequest(contactRequest *com
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, resp.Contacts[0].PrimaryName())
 
 	// Make sure the sender is not added to our contacts
-	contacts := theirMessenger.AddedContacts()
-	s.Require().Len(contacts, 0)
+	addedContacts := theirMessenger.AddedContacts()
+	s.Require().Len(addedContacts, 0)
 }
 
 func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, theirMessenger *Messenger) {
@@ -386,8 +386,8 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
-	s.Require().Equal(contacts2.ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Check outgoing mutual state message
 	s.Require().Len(resp.Messages(), 1)
@@ -415,8 +415,8 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 
 	s.Require().False(resp.Contacts[0].Added())
 	s.Require().False(resp.Contacts[0].HasAddedUs())
-	s.Require().Equal(contacts2.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
-	s.Require().Equal(contacts2.ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Check pending notification
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -433,7 +433,7 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(incomingMutualStateEventRemovedDefaultText, myID))
 }
 
-func (s *MessengerContactRequestSuite) syncInstallationContactV2FromContact(contact *contacts2.Contact) protobuf.SyncInstallationContactV2 {
+func (s *MessengerContactRequestSuite) syncInstallationContactV2FromContact(contact *contacts.Contact) protobuf.SyncInstallationContactV2 {
 	return protobuf.SyncInstallationContactV2{
 		LastUpdatedLocally:        contact.LastUpdatedLocally,
 		LastUpdated:               contact.LastUpdated,
@@ -794,8 +794,8 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	s.Require().True(resp.Contacts[0].Mutual())
 
 	// Make sure the sender is added to our contacts
-	contacts := theirMessenger.AddedContacts()
-	s.Require().Len(contacts, 1)
+	addedContacts := theirMessenger.AddedContacts()
+	s.Require().Len(addedContacts, 1)
 
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := theirMessenger.MutualContacts()
@@ -981,8 +981,8 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	s.Require().Len(resp.Contacts, 1)
 
 	// Check the contact state is correctly set
-	s.Require().Equal(contacts2.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
-	s.Require().Equal(contacts2.ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 }
 
 // The scenario tested is as follow:
@@ -1113,8 +1113,8 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 	s.Require().Len(resp.Contacts, 1)
 
 	// Check the contact state is correctly set
-	s.Require().Equal(contacts2.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
-	s.Require().Equal(contacts2.ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 }
 
 // The scenario tested is as follow:
@@ -1384,7 +1384,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	contactKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	contact, err := contacts2.BuildContactFromPublicKey(&contactKey.PublicKey)
+	contact, err := contacts.BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
 
 	state := s.m.buildMessageState()
@@ -1411,9 +1411,9 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	err = s.m.HandleChatMessage(context.Background(), state, &message, nil, false)
 	s.Require().NoError(err)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
-	contacts := s.m.Contacts()
-	s.Require().Len(contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateReceived, contacts[0].ContactRequestRemoteState)
+	allContacts := s.m.Contacts()
+	s.Require().Len(allContacts, 1)
+	s.Require().Equal(contacts.ContactRequestStateReceived, allContacts[0].ContactRequestRemoteState)
 
 	retract := protobuf.RetractContactRequest{
 		Clock: 2,
@@ -1422,9 +1422,9 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	s.Require().NoError(err)
 
 	// Nothing should have changed
-	contacts = s.m.Contacts()
-	s.Require().Len(contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateReceived, contacts[0].ContactRequestRemoteState)
+	allContacts = s.m.Contacts()
+	s.Require().Len(allContacts, 1)
+	s.Require().Equal(contacts.ContactRequestStateReceived, allContacts[0].ContactRequestRemoteState)
 }
 
 // The scenario tested is as follow:
@@ -1495,8 +1495,8 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 	s.Require().True(resp.Contacts[0].Mutual())
 
 	// Make sure the sender is added to our contacts
-	contacts := bob2.AddedContacts()
-	s.Require().Len(contacts, 1)
+	addedContacts := bob2.AddedContacts()
+	s.Require().Len(addedContacts, 1)
 
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := bob2.MutualContacts()
@@ -1566,8 +1566,8 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 	s.Require().True(resp.Contacts[0].Mutual())
 
 	// Make sure the sender is added to our contacts
-	contacts := bob.AddedContacts()
-	s.Require().Len(contacts, 1)
+	addedContacts := bob.AddedContacts()
+	s.Require().Len(addedContacts, 1)
 
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := bob.MutualContacts()
@@ -1630,8 +1630,8 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().Len(resp.Contacts, 1)
 	respContact := resp.Contacts[0]
 	s.Require().Equal(respContact.ID, alice1.IdentityPublicKeyString())
-	s.Require().Equal(contacts2.ContactRequestStateNone, respContact.ContactRequestLocalState)
-	s.Require().Equal(contacts2.ContactRequestStateNone, respContact.ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateNone, respContact.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateNone, respContact.ContactRequestRemoteState)
 
 	// Check response messages
 	s.Require().Len(resp.Messages(), 1)
@@ -1657,8 +1657,8 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().True(respContact.Removed)
 	s.Require().Equal(bobPublicKey, respContact.ID)
 	s.Require().Equal(bobDisplayName, respContact.DisplayName)
-	s.Require().Equal(contacts2.ContactRequestStateDismissed, respContact.ContactRequestLocalState)
-	s.Require().Equal(contacts2.ContactRequestStateReceived, respContact.ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateDismissed, respContact.ContactRequestLocalState)
+	s.Require().Equal(contacts.ContactRequestStateReceived, respContact.ContactRequestRemoteState)
 
 	// Check chats list
 	s.Require().Len(alice2.Chats(), 2)
@@ -1688,8 +1688,8 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 	s.Require().Equal(bobPublicKey, respContact.ID)
 	s.Require().False(respContact.Blocked)
 	s.Require().True(respContact.Removed)
-	s.Require().Equal(respContact.ContactRequestLocalState, contacts2.ContactRequestStateNone)
-	s.Require().Equal(respContact.ContactRequestRemoteState, contacts2.ContactRequestStateNone)
+	s.Require().Equal(respContact.ContactRequestLocalState, contacts.ContactRequestStateNone)
+	s.Require().Equal(respContact.ContactRequestRemoteState, contacts.ContactRequestStateNone)
 
 	// Check chats list
 	s.Require().Len(alice2.Chats(), 2)
@@ -1783,9 +1783,9 @@ func (s *MessengerContactRequestSuite) TestSyncInstallationContactV2_IgnoresNonC
 	sync := &protobuf.SyncInstallationContactV2{
 		Id:                        nonCanonicalSelfID,
 		Added:                     true,
-		ContactRequestLocalState:  int64(contacts2.ContactRequestStateSent),
+		ContactRequestLocalState:  int64(contacts.ContactRequestStateSent),
 		ContactRequestLocalClock:  1,
-		ContactRequestRemoteState: int64(contacts2.ContactRequestStateNone),
+		ContactRequestRemoteState: int64(contacts.ContactRequestStateNone),
 		ContactRequestRemoteClock: 0,
 		LastUpdated:               1,
 		LastUpdatedLocally:        1,

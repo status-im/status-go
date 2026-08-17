@@ -9,7 +9,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/communities"
-	contacts2 "github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
 )
@@ -25,9 +25,9 @@ type CommunitySet struct {
 }
 
 func (m *Messenger) backupContacts() []*protobuf.Backup {
-	var contacts []*protobuf.SyncInstallationContactV2
-	myID := contacts2.ContactIDFromPublicKey(&m.identity.PublicKey)
-	m.allContacts.Range(func(contactID string, contact *contacts2.Contact) (shouldContinue bool) {
+	var syncContacts []*protobuf.SyncInstallationContactV2
+	myID := contacts.ContactIDFromPublicKey(&m.identity.PublicKey)
+	m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
 		syncContact := m.buildSyncContactMessage(contact)
 		if syncContact == nil {
 			return true
@@ -37,21 +37,21 @@ func (m *Messenger) backupContacts() []*protobuf.Backup {
 		if contact.ID == myID {
 			return true
 		}
-		canonicalID, err := contacts2.ContactIDFromPublicKeyString(contact.ID)
+		canonicalID, err := contacts.ContactIDFromPublicKeyString(contact.ID)
 		if err == nil && canonicalID == myID {
 			return true
 		}
 
-		contacts = append(contacts, syncContact)
+		syncContacts = append(syncContacts, syncContact)
 
 		return true
 	})
 
 	var backupMessages []*protobuf.Backup
-	for i := 0; i < len(contacts); i += BackupContactsPerBatch {
-		j := min(i+BackupContactsPerBatch, len(contacts))
+	for i := 0; i < len(syncContacts); i += BackupContactsPerBatch {
+		j := min(i+BackupContactsPerBatch, len(syncContacts))
 
-		contactsToAdd := contacts[i:j]
+		contactsToAdd := syncContacts[i:j]
 
 		backupMessage := &protobuf.Backup{
 			Contacts: contactsToAdd,

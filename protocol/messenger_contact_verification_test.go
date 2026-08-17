@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/protocol/common"
-	contacts2 "github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/verification"
 
@@ -44,9 +44,9 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	s.Require().Len(contactRequests, 0)
 
 	// Make sure contact is added on the sender side
-	contacts := s.m.AddedContacts()
-	s.Require().Len(contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateSent, contacts[0].ContactRequestLocalState)
+	addedContacts := s.m.AddedContacts()
+	s.Require().Len(addedContacts, 1)
+	s.Require().Equal(contacts.ContactRequestStateSent, addedContacts[0].ContactRequestLocalState)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
@@ -68,7 +68,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(contacts2.ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+	s.Require().Equal(contacts.ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
 
 	// Make sure it's the pending contact requests
 	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
@@ -94,8 +94,8 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	s.Require().True(resp.Contacts[0].Mutual())
 
 	// Make sure the sender is added to our contacts
-	contacts = theirMessenger.AddedContacts()
-	s.Require().Len(contacts, 1)
+	addedContacts = theirMessenger.AddedContacts()
+	s.Require().Len(addedContacts, 1)
 
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := theirMessenger.MutualContacts()
@@ -253,7 +253,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(resp.Contacts[0].ID, theirPk)
-	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts2.VerificationStatusVERIFIED)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts.VerificationStatusVERIFIED)
 }
 
 func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
@@ -545,7 +545,7 @@ func (s *MessengerVerificationRequests) TestRemoveTrustVerificationStatus() {
 
 	contact, _ := s.m.allContacts.Load(theirPk)
 	s.Require().NotNil(contact)
-	s.Require().Equal(contacts2.VerificationStatusUNVERIFIED, contact.VerificationStatus)
+	s.Require().Equal(contacts.VerificationStatusUNVERIFIED, contact.VerificationStatus)
 	s.Require().Equal(verification.TrustStatusUNKNOWN, contact.TrustStatus)
 }
 
@@ -651,7 +651,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(resp.Contacts[0].ID, theirPk)
-	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts2.VerificationStatusUNVERIFIED)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts.VerificationStatusUNVERIFIED)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), verificationRequestID)
@@ -729,7 +729,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(resp.Contacts[0].ID, theirPk)
-	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts2.VerificationStatusUNVERIFIED)
+	s.Require().Equal(resp.Contacts[0].VerificationStatus, contacts.VerificationStatusUNVERIFIED)
 
 	// Check canceled state on the receiver's side
 	resp, err = WaitOnMessengerResponse(
