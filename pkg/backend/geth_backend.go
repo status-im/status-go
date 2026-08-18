@@ -756,6 +756,10 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 
 	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
+	if request.LogFilePath != "" {
+		defaultCfg.LogDir = request.LogFilePath
+	}
+
 	err = b.UpdateNodeConfigFleet(acc, request.Password, defaultCfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to update node config fleet")
@@ -2589,6 +2593,19 @@ func (b *StatusBackend) SetProfileLogEnabled(enabled bool) error {
 		return err
 	}
 	b.config.LogEnabled = enabled
+
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+}
+
+func (b *StatusBackend) SetProfileLogMaxBackups(count uint) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	err := nodecfg.SetMaxLogBackups(b.appDB, count)
+	if err != nil {
+		return err
+	}
+	b.config.LogMaxBackups = int(count)
 
 	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }

@@ -138,6 +138,11 @@ func TestRestoreAccountAndLoginMalformedJSONReturnsErrorEnvelope(t *testing.T) {
 	require.NotEmpty(t, response.Error, "malformed request JSON should surface an unmarshal error in the envelope, not start a restore")
 }
 
+func TestSetProfileLogMaxBackupsMalformedJSONReturnsErrorEnvelope(t *testing.T) {
+	response := parseAPIResponse(t, SetProfileLogMaxBackups(`{"maxLogBackups": not-json}`))
+	require.NotEmpty(t, response.Error, "malformed request JSON should surface an unmarshal error in the envelope, not touch the backend")
+}
+
 func TestRestoreAccountAndLoginKeycardRequestRejectsMnemonicSet(t *testing.T) {
 	requestJSON := `{"mnemonic":"some seed words","keycard":{"keyUID":"0x1","whisperPrivateKey":"0xabc"}}`
 	response := parseAPIResponse(t, restoreAccountAndLogin(requestJSON))

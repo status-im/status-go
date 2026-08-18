@@ -3,6 +3,7 @@ package logutils
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +13,12 @@ import (
 
 // processStartTime represents the start time of this process
 var processStartTime = time.Now()
+
+// sessionArchiveTimeFormat must equal lumberjack's backupTimeFormat, different naming conventions will be invisible to lumberjack's cleanup.
+const sessionArchiveTimeFormat = "2006-01-02T15-04-05.000"
+
+// legacySessionArchiveRegex matches legacy archives whose "Z" suffix lumberjack cannot parse.
+var legacySessionArchiveRegex = regexp.MustCompile(`^(.+)-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})Z$`)
 
 // FileOptions are all options supported by internal rotation module.
 type FileOptions struct {
@@ -47,9 +54,44 @@ func rotateLogFileForNewSession(path string) error {
 	if !info.ModTime().Before(processStartTime) {
 		return nil
 	}
-	ts := info.ModTime().UTC().Format("2006-01-02T15-04-05Z")
+	ts := info.ModTime().UTC().Format(sessionArchiveTimeFormat)
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
 	archived := base + "-" + ts + ext
 	return os.Rename(path, archived)
+}
+
+// renameLegacySessionArchives renames legacy session archives created with the "...Z" timestamp suffix to sessionArchiveTimeFormat
+// so lumberjack counts them against MaxBackups and eventually prunes them.
+func renameLegacySessionArchives(path string) error {
+	dir := filepath.Dir(path)
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(filepath.Base(path), ext)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var firstErr error
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ext {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ext)
+		m := legacySessionArchiveRegex.FindStringSubmatch(name)
+		if m == nil || m[1] != base {
+			continue
+		}
+		newPath := filepath.Join(dir, m[1]+"-"+m[2]+".000"+ext)
+		if _, err := os.Stat(newPath); err == nil {
+			// Target exists (another legacy archive already claimed this second).
+			continue
+		}
+		if err := os.Rename(filepath.Join(dir, entry.Name()), newPath); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }

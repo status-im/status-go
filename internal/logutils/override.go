@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const DefaultLogMaxBackups = 10
+
 type LogSettings struct {
 	Enabled         bool   `json:"Enabled"`
 	Level           string `json:"Level"`
@@ -52,11 +54,17 @@ func overrideCoreWithConfig(filteringCore *namespaceFilteringCore, settings LogS
 		if settings.MaxBackups == 0 {
 			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it
 			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
-			settings.MaxBackups = 1
+			settings.MaxBackups = DefaultLogMaxBackups
 		}
 
 		if err := rotateLogFileForNewSession(settings.File); err != nil {
 			ZapLogger().Warn("failed to rotate log file for new session",
+				zap.String("file", settings.File),
+				zap.Error(err))
+		}
+
+		if err := renameLegacySessionArchives(settings.File); err != nil {
+			ZapLogger().Warn("failed to rename legacy session log archives",
 				zap.String("file", settings.File),
 				zap.Error(err))
 		}
