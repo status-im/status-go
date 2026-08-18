@@ -740,15 +740,30 @@ func TestLoginAccount(t *testing.T) {
 	require.NotEmpty(t, accounts[0].KeyUID)
 	require.Equal(t, acc.KeyUID, accounts[0].KeyUID)
 
+	migratedLogDir := testContext.config.RootDataDir + "/logs-after-login"
 	loginAccountRequest := &requests.Login{
 		KeyUID:           accounts[0].KeyUID,
 		Password:         testPassword,
 		WakuV2Nameserver: nameserver,
+		LogFilePath:      migratedLogDir,
 	}
 	err = testContext.backend.LoginAccount(loginAccountRequest)
 	require.NoError(t, err)
 	waitForLogin(c)
 	require.Equal(t, nameserver, testContext.backend.config.WakuV2Config.Nameserver)
+
+	// A non-empty LogFilePath overrides and persists the profile's log directory
+	require.Equal(t, migratedLogDir, testContext.backend.config.LogDir)
+	persistedConfig, err := testContext.backend.GetNodeConfig()
+	require.NoError(t, err)
+	require.Equal(t, migratedLogDir, persistedConfig.LogDir)
+
+	// The max-backups setter updates the DB and the live config in one call
+	require.NoError(t, testContext.backend.SetProfileLogMaxBackups(7))
+	require.Equal(t, 7, testContext.backend.config.LogMaxBackups)
+	persistedConfig, err = testContext.backend.GetNodeConfig()
+	require.NoError(t, err)
+	require.Equal(t, 7, persistedConfig.LogMaxBackups)
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {

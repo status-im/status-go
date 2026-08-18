@@ -46,6 +46,9 @@ type Login struct {
 	APIConfig              *APIConfig `json:"apiConfig"`
 	StatusProxyEnabled     bool       `json:"statusProxyEnabled"`
 	WalletConnectProjectID string     `json:"walletConnectProjectID"`
+
+	// LogFilePath is a directory where log files are stored (mirrors CreateAccount.LogFilePath).
+	LogFilePath string `json:"logFilePath"`
 }
 
 func (c *Login) Validate() error {

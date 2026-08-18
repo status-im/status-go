@@ -1837,6 +1837,19 @@ func setProfileLogEnabled(requestJSON string) string {
 	return makeJSONResponse(statusBackend.SetProfileLogEnabled(request.Enabled))
 }
 
+func SetProfileLogMaxBackups(requestJSON string) string {
+	return callWithResponse(setProfileLogMaxBackups, requestJSON)
+}
+
+func setProfileLogMaxBackups(requestJSON string) string {
+	var request requests.SetMaxLogBackups
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(statusBackend.SetProfileLogMaxBackups(request.MaxLogBackups))
+}
+
 func SetPreLoginLogEnabled(requestJSON string) string {
 	return callWithResponse(setPreLoginLogEnabled, requestJSON)
 }
