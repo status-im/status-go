@@ -189,7 +189,10 @@ type Waku struct {
 	// "ConnectionChange received with Offline=false"
 	stateInitialized bool
 
-	storeClient *StoreClient
+	// storeClientMu synchronizes startup publication with store requests that
+	// may run concurrently before Start completes.
+	storeClientMu sync.RWMutex
+	storeClient   *StoreClient
 
 	logger *zap.Logger
 
@@ -844,10 +847,13 @@ func (w *Waku) Start() error {
 
 	selector := newStoreSelector()
 	pager := newStorePager(wakuStoreRequestor{store: w.node.Store()}, NewHistoryProcessorWrapper(w), w.logger)
-	w.storeClient = NewStoreClient(selector, pager, w.GetPubsubTopic, w.logger)
+	storeClient := NewStoreClient(selector, pager, w.GetPubsubTopic, w.logger)
 	// The store nodes belong to the fleet, so the waku node resolves them itself
 	// instead of having a higher layer push them in.
-	w.storeClient.SetStorenodes(w.fleetStorenodes())
+	storeClient.SetStorenodes(w.fleetStorenodes())
+	w.storeClientMu.Lock()
+	w.storeClient = storeClient
+	w.storeClientMu.Unlock()
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
@@ -1643,6 +1649,12 @@ func (w *Waku) fleetStorenodes() []peer.AddrInfo {
 	return addrInfos
 }
 
+func (w *Waku) currentStoreClient() *StoreClient {
+	w.storeClientMu.RLock()
+	defer w.storeClientMu.RUnlock()
+	return w.storeClient
+}
+
 // StoreQuery retrieves historic messages for a single batch via the StoreClient
 // facade, which selects the store node itself (no peer argument).
 func (w *Waku) StoreQuery(
@@ -1652,15 +1664,22 @@ func (w *Waku) StoreQuery(
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return w.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+	// storeClient is only populated once Start has run; callers can race it
+	// (e.g. a queued historic sync firing before/around startup) — see #7620.
+	storeClient := w.currentStoreClient()
+	if storeClient == nil {
+		return ErrNoStorenodesReachable
+	}
+	return storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (w *Waku) GetActiveStorenode() peer.AddrInfo {
-	if w.storeClient == nil {
+	storeClient := w.currentStoreClient()
+	if storeClient == nil {
 		return peer.AddrInfo{}
 	}
 
-	return w.storeClient.nextStorenode()
+	return storeClient.nextStorenode()
 }
 
 func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error {

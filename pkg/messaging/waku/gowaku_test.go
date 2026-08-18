@@ -84,6 +84,22 @@ func TestWakuLifecycleState(t *testing.T) {
 	require.Equal(t, gocommon.ServiceStateStopped, w.PausableState())
 }
 
+// Regression test for #7620: storeClient is only populated by Start, so a
+// query racing/preceding it must return an error instead of a nil-pointer panic.
+func TestStoreQueryBeforeStartReturnsError(t *testing.T) {
+	w, err := New(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		w.cancel()
+		w.envelopeCache.Stop()
+		w.wg.Wait()
+	})
+
+	err = w.StoreQuery(context.Background(), batch(), 10, nil, false)
+	require.ErrorIs(t, err, ErrNoStorenodesReachable)
+}
+
 func TestHandlePeerAddress(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
