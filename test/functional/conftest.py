@@ -25,7 +25,7 @@ def pytest_addoption(parser):
         "--docker_project_name",
         action="store",
         help="",
-        default="tests-functional",
+        default="test/functional",
     )
     parser.addoption(
         "--docker-image",

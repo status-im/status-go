@@ -24,7 +24,7 @@ echo -e "${GRN}Creating benchmark directory${RST}"
 mkdir -p "benchmarks/${benchmark_dir}"
 
 echo -e "${GRN}Copying benchmark results${RST}"
-cp -r "${GIT_ROOT}/tests-functional/.results/benchmarks"/* "benchmarks/${benchmark_dir}/"
+cp -r "${GIT_ROOT}/test/functional/.results/benchmarks"/* "benchmarks/${benchmark_dir}/"
 
 echo -e "${GRN}Creating virtual environment${RST}"
 python3 -m venv .venv

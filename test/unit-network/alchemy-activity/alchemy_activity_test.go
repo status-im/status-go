@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
-	t_common "github.com/status-im/status-go/tests-unit-network/common"
+	t_common "github.com/status-im/status-go/test/unit-network/common"
 )
 
 func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {

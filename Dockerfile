@@ -81,7 +81,7 @@ RUN mkdir -p /static/configs
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/status-backend /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/push-notification-server /usr/local/bin/
-COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
+COPY --from=builder /go/src/github.com/status-im/status-go/test/functional/waku_configs/* /static/configs/
 COPY --from=builder /tmp/status-runtime-libs/ /usr/local/lib/
 
 ENV LD_LIBRARY_PATH=/usr/local/lib/

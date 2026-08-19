@@ -21,10 +21,10 @@ jobs:
       matrix:
         config:
           - name: ipv4
-            docker_compose_file: tests-functional/docker-compose.test.reliability.ipv4.yml
+            docker_compose_file: test/functional/docker-compose.test.reliability.ipv4.yml
             use_ipv6: "No"
           - name: ipv6
-            docker_compose_file: tests-functional/docker-compose.test.reliability.ipv6.yml
+            docker_compose_file: test/functional/docker-compose.test.reliability.ipv6.yml
             use_ipv6: "Yes"
     steps:
 
@@ -37,19 +37,19 @@ jobs:
         python-version: '3.12'
         cache: 'pip'
 
-    - name: Set up virtual environment in /tests-functional/
+    - name: Set up virtual environment in /test/functional/
       run: |
-        python -m venv tests-functional/.venv
-        echo "tests-functional/.venv/bin" >> $GITHUB_PATH  # Add virtualenv to PATH for subsequent steps
+        python -m venv test/functional/.venv
+        echo "test/functional/.venv/bin" >> $GITHUB_PATH  # Add virtualenv to PATH for subsequent steps
 
     - name: Install dependencies based on requirements.txt
-      run: pip install -r tests-functional/requirements.txt
+      run: pip install -r test/functional/requirements.txt
 
     - name: Build status-backend
       run: docker build . --tag "statusgo-local" --build-arg "cache_id=${GITHUB_RUN_ID}"
 
     - name: Run environment
-      run: docker compose -f tests-functional/docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
+      run: docker compose -f test/functional/docker-compose.anvil.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
 
     - name: Run tests
       env:
@@ -58,13 +58,13 @@ jobs:
         pytest --reruns 2 \
           -n auto \
           -m "reliability and not light_client_7393" \
-          -c tests-functional/pytest.ini \
+          -c test/functional/pytest.ini \
           --junit-xml=pytest_results.xml \
           --tb=short \
           --docker-image="statusgo-local" \
           --waku-fleet=status.staging \
           --waku-fleets-config="" \
-          --logs-dir=tests-functional/log
+          --logs-dir=test/functional/log
 
     - name: Test Report
       if: always()
@@ -79,4 +79,4 @@ jobs:
       if: always()
       with:
         name: status-backend-logs_${{ matrix.config.name }}
-        path: tests-functional/log
+        path: test/functional/log

@@ -119,7 +119,7 @@ go.work
 go.work.sum
 
 # Token deployment cache files
-tests-functional/snt_addresses.json*
+test/functional/snt_addresses.json*
 
 # libstorage
 libs

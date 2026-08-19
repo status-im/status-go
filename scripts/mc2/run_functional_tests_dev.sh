@@ -59,7 +59,7 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${USE_LOGOS_STORAGE:=false}"
 : "${USE_TORRENT:=false}"
 
-root_path="${GIT_ROOT}/tests-functional"
+root_path="${GIT_ROOT}/test/functional"
 logs_path="${root_path}/logs"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"

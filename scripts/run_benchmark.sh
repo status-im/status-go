@@ -7,7 +7,7 @@ source "${GIT_ROOT}/scripts/colors.sh"
 
 echo -e "${GRN}Running benchmark${RST}"
 
-root_path="${GIT_ROOT}/tests-functional"
+root_path="${GIT_ROOT}/test/functional"
 test_results_path="${root_path}/.results/reports"
 benchmark_results_path="${root_path}/.results/benchmarks"
 

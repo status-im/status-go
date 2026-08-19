@@ -120,7 +120,7 @@ wallet_account_details_derivation = {
 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
-TESTS_DIR = os.path.join(PROJECT_ROOT, "tests-functional")
+TESTS_DIR = os.path.join(PROJECT_ROOT, "test/functional")
 SIGNALS_DIR = os.path.join(TESTS_DIR, "signals")
 FORGE_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "forge_output")
 DEPLOYER_ACCOUNT = user_1
