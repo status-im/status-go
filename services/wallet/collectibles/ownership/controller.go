@@ -17,8 +17,9 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc721"
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -242,7 +243,7 @@ func (c *Controller) startAccountsWatcher() {
 	chAdded, unsubFnAdded := pubsub.Subscribe[accountsevent.AccountsAddedEvent](c.accountsPublisher, 10)
 	chRemoved, unsubFnRemoved := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](c.accountsPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFnAdded()
 		defer unsubFnRemoved()
 		for {
@@ -271,7 +272,7 @@ func (c *Controller) startNetworkEventsWatcher() {
 
 	ch, unsub := pubsub.Subscribe[network.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsub()
 		for {
 			select {
@@ -294,7 +295,7 @@ func (c *Controller) startBalanceChangeWatcher() {
 
 	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](c.multistandardBalancePublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsub()
 		for {
 			select {
@@ -322,7 +323,7 @@ func (c *Controller) startTransferDetectionWatcher() {
 
 	ch, unsub := pubsub.Subscribe[transferdetector.EventTransferDetectionFinished](c.transferDetectorPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsub()
 		for {
 			select {
@@ -394,7 +395,7 @@ func (c *Controller) refetchOwnershipIfRecentTx(account common.Address, chainID 
 	if latestTxTimestamp < timeCheck {
 		c.logger.Debug("Detected transfer is too old, skipping refetch",
 			zap.Stringer("chainID", chainID),
-			zap.String("address", gocommon.TruncateWithDot(account.String())),
+			zap.String("address", logutils.TruncateWithDot(account.String())),
 			zap.Int64("tx timestamp", latestTxTimestamp),
 			zap.Int64("last fetch timestamp", timestamp),
 		)
@@ -411,7 +412,7 @@ func (c *Controller) refetchOwnershipIfRecentTx(account common.Address, chainID 
 func (c *Controller) TriggerLoad(ctx context.Context, chainID walletCommon.ChainID, account common.Address) error {
 	as := account.String()
 	c.logger.Debug("Trigger load on-demand",
-		zap.String("address", gocommon.TruncateWithDot(as)),
+		zap.String("address", logutils.TruncateWithDot(as)),
 		zap.Stringer("chainID", chainID),
 	)
 
@@ -492,7 +493,7 @@ func (c *Controller) loadWithPeriodicalLoaderIfFound(ctx context.Context, chainI
 	defer cancelledUnsubFn()
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		// Trigger load in case it's not already in progress
 		_ = loader.Load(ctx)
 	}()

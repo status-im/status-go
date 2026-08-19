@@ -15,10 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/pubsub"
 
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -261,7 +261,7 @@ func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs [
 
 			wg.Add(1)
 			go func() {
-				defer gocommon.LogOnPanic()
+				defer panics.LogOnPanic()
 				defer wg.Done()
 				if err := s.ownershipController.TriggerLoad(ctx, chainID, address); err != nil {
 					wgErr.Store(err)
@@ -484,7 +484,7 @@ func (s *Service) startOwnershipLoadWatcher() {
 	loadErrorCh, loadErrorUnsub := pubsub.Subscribe[ownership.EventOwnedCollectiblesLoadError](s.publisher, 100)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer loadStartUnsub()
 		defer loadPartialUnsub()
 		defer loadFinishedUnsub()

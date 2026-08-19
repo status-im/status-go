@@ -5,8 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -74,10 +74,10 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 	if contact == nil {
 		contact, err = u.provider.FetchContact(contactID, true)
 		if err != nil {
-			return nil, fmt.Errorf("failed to request contact info from mailserver for public key '%s': %w", gocommon.TruncateWithDot(publicKey), err)
+			return nil, fmt.Errorf("failed to request contact info from mailserver for public key '%s': %w", logutils.TruncateWithDot(publicKey), err)
 		}
 		if contact == nil {
-			return nil, fmt.Errorf("contact wasn't found at the store node %s", gocommon.TruncateWithDot(publicKey))
+			return nil, fmt.Errorf("contact wasn't found at the store node %s", logutils.TruncateWithDot(publicKey))
 		}
 	}
 
@@ -100,7 +100,7 @@ func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Co
 	// This automatically checks the database
 	community, err := u.provider.FetchCommunity(communityID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get community info for communityID '%s': %w", gocommon.TruncateWithDot(communityID), err)
+		return nil, nil, fmt.Errorf("failed to get community info for communityID '%s': %w", logutils.TruncateWithDot(communityID), err)
 	}
 
 	if community == nil {
@@ -109,7 +109,7 @@ func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Co
 
 	statusCommunityLinkPreviews, err := community.ToStatusLinkPreview()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get status community link preview for communityID '%s': %w", gocommon.TruncateWithDot(communityID), err)
+		return nil, nil, fmt.Errorf("failed to get status community link preview for communityID '%s': %w", logutils.TruncateWithDot(communityID), err)
 	}
 
 	return community, statusCommunityLinkPreviews, nil
@@ -123,7 +123,7 @@ func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string
 
 	channel, ok := community.Chats()[channelUUID]
 	if !ok {
-		return nil, fmt.Errorf("channel with channelID '%s' not found in community '%s'", gocommon.TruncateWithDot(channelUUID), gocommon.TruncateWithDot(communityID))
+		return nil, fmt.Errorf("channel with channelID '%s' not found in community '%s'", logutils.TruncateWithDot(channelUUID), logutils.TruncateWithDot(communityID))
 	}
 
 	return &common.StatusCommunityChannelLinkPreview{

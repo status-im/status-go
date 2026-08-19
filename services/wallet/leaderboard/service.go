@@ -11,8 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -202,7 +202,7 @@ func (s *MarketDataService) subscribeToLeaderboard() {
 
 	s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		for sig := range s.pageUpdateSubscription {
 			switch sig.Source() {
 			case TickerFullDataUpdateSource:

@@ -11,7 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	utils "github.com/status-im/status-go/common"
+	protocolcommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/pinnedcommunities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -147,7 +147,7 @@ func (m *Messenger) importPinnedCommunityPayload(payload pinnedcommunities.Paylo
 		return nil, fmt.Errorf("unsupported metadata type %s", metadata.Type.String())
 	}
 
-	signer, err := utils.RecoverKey(&metadata)
+	signer, err := protocolcommon.RecoverKey(&metadata)
 	if err != nil {
 		return nil, fmt.Errorf("recover signer: %w", err)
 	}

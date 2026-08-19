@@ -11,9 +11,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -98,7 +98,7 @@ func (s *Service) startNetworkWatcher() {
 
 	chNetworkChange, unsubFnNetworkChange := pubsub.Subscribe[network.EventActiveNetworksChanged](s.networksPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFnNetworkChange()
 		for {
 			select {
@@ -121,7 +121,7 @@ func (s *Service) startTransactionWatcher() {
 
 	s.subscriptions = s.eventFeed.Subscribe(s.ch)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		for {
 			select {
 			case <-s.stopCh:
@@ -169,7 +169,7 @@ func (s *Service) startAccountWatcher() {
 
 	chAdded, unsubFnAdded := pubsub.Subscribe[accountsevent.AccountsAddedEvent](s.accountsPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFnAdded()
 		for {
 			select {
@@ -186,7 +186,7 @@ func (s *Service) startAccountWatcher() {
 
 	chRemoved, unsubFnRemoved := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](s.accountsPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFnRemoved()
 		for {
 			select {
@@ -210,7 +210,7 @@ func (s *Service) startBalanceChangeWatcher() {
 
 	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](s.multistandardBalancePublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsub()
 		for {
 			select {
@@ -247,7 +247,7 @@ func (s *Service) Start(ctx context.Context) {
 	s.startBalanceChangeWatcher()
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		ticker := time.NewTicker(activityFetchInterval)
 		defer ticker.Stop()
@@ -565,7 +565,7 @@ func (s *Service) startFetchActivity(ctx context.Context, fetcherID fetcherID) {
 	tmpCtx := s.upsertCancelFn(ctx, fetcherID)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer s.runAndRemoveCancelFn(fetcherID)
 		s.fetchActivity(tmpCtx, fetcherID.chainID, fetcherID.account)
 	}()

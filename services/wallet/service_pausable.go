@@ -1,6 +1,6 @@
 package wallet
 
-import statuscommon "github.com/status-im/status-go/common"
+import "github.com/status-im/status-go/internal/pausable"
 
 func (s *Service) PausableName() string { return "wallet" }
 
@@ -30,14 +30,14 @@ func (s *Service) Resume() error {
 	return nil
 }
 
-func (s *Service) PausableState() statuscommon.ServiceState {
+func (s *Service) PausableState() pausable.ServiceState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.started {
-		return statuscommon.ServiceStateStopped
+		return pausable.ServiceStateStopped
 	}
 	if s.paused {
-		return statuscommon.ServiceStatePaused
+		return pausable.ServiceStatePaused
 	}
-	return statuscommon.ServiceStateRunning
+	return pausable.ServiceStateRunning
 }

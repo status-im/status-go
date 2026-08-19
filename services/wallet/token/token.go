@@ -26,12 +26,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/signal"
@@ -282,7 +282,7 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan st
 	}
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		for {
 			select {
 			case <-stopCh:
@@ -302,7 +302,7 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan st
 					// subscriber has consumed the value, and a stalled notifier loop
 					// would miss stopCh and drop follow-up notifications.
 					go func() {
-						defer gocommon.LogOnPanic()
+						defer panics.LogOnPanic()
 						tm.walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
 					}()
 				}
@@ -320,7 +320,7 @@ func (tm *Manager) startAccountsWatcher(stopCh <-chan struct{}) {
 
 	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](tm.accountsPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFn()
 		for {
 			select {
@@ -344,7 +344,7 @@ func (tm *Manager) startNetworksWatcher(stopCh <-chan struct{}) {
 	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](tm.networkManager.GetPublisher(), 10)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFn()
 		for {
 			select {

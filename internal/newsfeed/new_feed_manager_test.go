@@ -8,8 +8,6 @@ import (
 	"github.com/mmcdole/gofeed"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/common"
 )
 
 type NewsFeedManagerSuite struct {
@@ -47,8 +45,8 @@ func (s *NewsFeedManagerSuite) SetupTest() {
 func (s *NewsFeedManagerSuite) TestFetchRSS() {
 	now := time.Now()
 	items := []*gofeed.Item{
-		{Title: "Old Item", PublishedParsed: common.Ptr(now.Add(-48 * time.Hour))},
-		{Title: "New Item", PublishedParsed: common.Ptr(now.Add(-1 * time.Hour))},
+		{Title: "Old Item", PublishedParsed: ptr(now.Add(-48 * time.Hour))},
+		{Title: "New Item", PublishedParsed: ptr(now.Add(-1 * time.Hour))},
 	}
 	mockFeed := &gofeed.Feed{
 		Title: "Test Feed",
@@ -80,8 +78,8 @@ func (s *NewsFeedManagerSuite) TestFetchRSS() {
 func (s *NewsFeedManagerSuite) TestFetchRSSAndHandle() {
 	now := time.Now()
 	items := []*gofeed.Item{
-		{Title: "Old Item", PublishedParsed: common.Ptr(now.Add(-48 * time.Hour))},
-		{Title: "New Item", PublishedParsed: common.Ptr(now.Add(-1 * time.Hour))},
+		{Title: "Old Item", PublishedParsed: ptr(now.Add(-48 * time.Hour))},
+		{Title: "New Item", PublishedParsed: ptr(now.Add(-1 * time.Hour))},
 	}
 	mockFeed := &gofeed.Feed{
 		Title: "Test Feed",
@@ -122,8 +120,8 @@ func (s *NewsFeedManagerSuite) TestFetchRSSAndHandle() {
 func (s *NewsFeedManagerSuite) TestStartAndStopFetching() {
 	now := time.Now()
 	items := []*gofeed.Item{
-		{Title: "Old Item", PublishedParsed: common.Ptr(now.Add(-48 * time.Hour))},
-		{Title: "New Item", PublishedParsed: common.Ptr(now.Add(-1 * time.Hour))},
+		{Title: "Old Item", PublishedParsed: ptr(now.Add(-48 * time.Hour))},
+		{Title: "New Item", PublishedParsed: ptr(now.Add(-1 * time.Hour))},
 	}
 	mockFeed := &gofeed.Feed{
 		Title: "Test Feed",
@@ -160,4 +158,9 @@ func (s *NewsFeedManagerSuite) TestStartAndStopFetching() {
 
 	newsFeedManager.StopPolling()
 	s.Require().False(newsFeedManager.IsPolling())
+}
+
+// ptr returns a pointer to v.
+func ptr[T any](v T) *T {
+	return &v
 }

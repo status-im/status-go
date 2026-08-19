@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
-	"github.com/status-im/status-go/common"
 	logutils "github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	statusgo "github.com/status-im/status-go/mobile"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/version"
@@ -43,7 +43,7 @@ func main() {
 
 	flag.Parse()
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		handleInterrupts()
 	}()
 

@@ -601,7 +601,7 @@ comma := ,
 
 lint-panics: generate
 	GOFLAGS=-tags='$(subst $(space),$(comma),$(strip $(BUILD_TAGS) lint))' \
-	go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/common.LogOnPanic ./...
+	go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/internal/panics.LogOnPanic ./...
 
 lint: generate lint-panics
 lint:

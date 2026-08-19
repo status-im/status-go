@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/communities"
 )
@@ -54,7 +54,7 @@ func (m *Messenger) collectFiltersAndKeys() (types.ChatsToInitialize, []*ecdsa.P
 }
 
 func (m *Messenger) processJoinedCommunities(wg *sync.WaitGroup, filtersCh chan<- types.ChatsToInitialize, errCh chan<- error) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer wg.Done()
 
 	joinedCommunities, err := m.communitiesManager.Joined()
@@ -84,7 +84,7 @@ func (m *Messenger) processCommunitiesSettings(communities []*communities.Commun
 }
 
 func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh chan<- types.ChatsToInitialize, errCh chan<- error) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer wg.Done()
 
 	spectatedCommunities, err := m.communitiesManager.Spectated()
@@ -101,7 +101,7 @@ func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh ch
 }
 
 func (m *Messenger) processChats(wg *sync.WaitGroup, filtersCh chan<- types.ChatsToInitialize, publicKeysCh chan<- []*ecdsa.PublicKey, errCh chan<- error) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer wg.Done()
 
 	// Get chat IDs and public keys from the existing chats.
@@ -241,7 +241,7 @@ func (m *Messenger) processPrivateGroupChat(chat *Chat) ([]*ecdsa.PublicKey, err
 }
 
 func (m *Messenger) processContacts(wg *sync.WaitGroup, publicKeysCh chan<- []*ecdsa.PublicKey, errCh chan<- error) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer wg.Done()
 
 	// Get chat IDs and public keys from the contacts.
@@ -275,7 +275,7 @@ func (m *Messenger) processContacts(wg *sync.WaitGroup, publicKeysCh chan<- []*e
 
 // processControlledCommunities Init filters for the communities we control
 func (m *Messenger) processControlledCommunities(wg *sync.WaitGroup, errCh chan<- error) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer wg.Done()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()

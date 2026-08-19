@@ -6,15 +6,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 // RunAsync runs the specified function asynchronously.
 func RunAsync(f func() error) <-chan error {
 	resp := make(chan error, 1)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		err := f()
 		resp <- err
 		close(resp)

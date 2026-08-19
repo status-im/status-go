@@ -13,8 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -228,7 +229,7 @@ func (c *Controller) startAccountsWatcher() {
 
 	addedCh, addedUnsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](c.accountsPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer addedUnsubFn()
 		for {
 			select {
@@ -252,7 +253,7 @@ func (c *Controller) startNetworksWatcher() {
 	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFn()
 		for {
 			select {
@@ -296,7 +297,7 @@ func (c *Controller) startWalletEventsWatcher() {
 				}
 				for _, account := range accounts {
 					for _, network := range networks {
-						c.logger.Debug("triggering fetch due to pending transaction update", zap.Uint64("chainID", network), zap.String("account", gocommon.TruncateWithDot(account.String())))
+						c.logger.Debug("triggering fetch due to pending transaction update", zap.Uint64("chainID", network), zap.String("account", logutils.TruncateWithDot(account.String())))
 						// TODO: Add only relevant result types to the transaction type
 						// For now we simply fetch all result types. It shouldn't normally cause additional calls
 						// due to use of multicall
@@ -354,7 +355,7 @@ func (c *Controller) stopWalletEventsWatcher() {
 func (c *Controller) startFetcher() {
 	ticker := time.NewTicker(c.config.FetchPeriod)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer ticker.Stop()
 		for {
 			select {
@@ -386,7 +387,7 @@ func (c *Controller) TriggerFullFetch() {
 func (c *Controller) triggerFetch() {
 	if c.firstFetchPending.CompareAndSwap(true, false) {
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			c.fetchNow()
 		}()
 		return
@@ -521,14 +522,14 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			c.logger.Debug(
 				"fetching Native balance",
 				zap.Uint64("chainID", chainID),
-				zap.String("address", gocommon.TruncateWithDot(address.String())),
+				zap.String("address", logutils.TruncateWithDot(address.String())),
 			)
 		}
 		for address, tokenList := range chainFetchConfig.ERC20 {
 			c.logger.Debug(
 				"fetching ERC20 balance",
 				zap.Uint64("chainID", chainID),
-				zap.String("address", gocommon.TruncateWithDot(address.String())),
+				zap.String("address", logutils.TruncateWithDot(address.String())),
 				zap.Int("tokenList", len(tokenList)),
 			)
 		}
@@ -536,7 +537,7 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			c.logger.Debug(
 				"fetching ERC721 balance",
 				zap.Uint64("chainID", chainID),
-				zap.String("address", gocommon.TruncateWithDot(address.String())),
+				zap.String("address", logutils.TruncateWithDot(address.String())),
 				zap.Int("tokenList", len(tokenList)),
 			)
 		}
@@ -544,7 +545,7 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			c.logger.Debug(
 				"fetching ERC1155 balance",
 				zap.Uint64("chainID", chainID),
-				zap.String("address", gocommon.TruncateWithDot(address.String())),
+				zap.String("address", logutils.TruncateWithDot(address.String())),
 				zap.Int("tokenList", len(tokenList)),
 			)
 		}
@@ -563,7 +564,7 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 		c.sendEventBalanceFetchStarted(chainID, chainFetchConfig)
 
 		go func(fetchChainID uint64, ctx context.Context, cancel context.CancelFunc) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer cancel()
 			for {
 				select {
@@ -599,7 +600,7 @@ func (c *Controller) fetchNow() {
 // bypassing the debounce. Used when a transaction has just confirmed and we need fresh balances now.
 func (c *Controller) fetchImmediatelyWithConfig(fetchConfig FetchConfig) {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(fetchConfig)
 		if len(fetchConfigs) == 0 {
 			return

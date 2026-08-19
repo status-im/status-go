@@ -11,8 +11,9 @@ import (
 	"github.com/beevik/ntp"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 )
 
 const (
@@ -80,7 +81,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	responses := make(chan queryResponse, len(servers))
 	for _, server := range servers {
 		go func(server string) {
-			defer common.LogOnPanic()
+			defer panics.LogOnPanic()
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
@@ -137,7 +138,7 @@ var defaultNTPTimeSource = &ntpTimeSource{
 // ntpTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
 type ntpTimeSource struct {
-	common.PauseBroadcaster
+	pausable.PauseBroadcaster
 
 	servers           []string
 	allowedFailures   int
@@ -218,7 +219,7 @@ func (s *ntpTimeSource) runPeriodically(ctx context.Context, fn func() error, st
 		period = s.slowNTPSyncPeriod
 	}
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		sub := s.Subscribe()
 		defer sub.Unsubscribe()
 
@@ -289,7 +290,7 @@ func (s *ntpTimeSource) Start(ctx context.Context) error {
 	s.started = true
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		err := s.updateOffset()
 		if err != nil {
 			// Failure to update can occur if the node is offline.

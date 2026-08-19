@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
-	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/internal/db/sqlite"
 )
 

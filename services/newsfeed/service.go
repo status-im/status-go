@@ -11,9 +11,10 @@ import (
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/newsfeed"
+	"github.com/status-im/status-go/internal/pausable"
+	"github.com/status-im/status-go/internal/platform"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/protocol"
 )
@@ -29,7 +30,7 @@ func isNil(data interface{}) bool {
 }
 
 type Service struct {
-	gocommon.PauseBroadcaster
+	pausable.PauseBroadcaster
 	logger          *zap.Logger
 	storage         Persistence
 	ac              ActivityCenter
@@ -57,7 +58,7 @@ func (s *Service) Start() error {
 		return err
 	}
 	var feedUrl string
-	if gocommon.IsMobilePlatform() {
+	if platform.IsMobilePlatform() {
 		feedUrl = newsfeed.STATUS_MOBILE_FEED_URL
 	} else {
 		feedUrl = newsfeed.STATUS_DESKTOP_FEED_URL

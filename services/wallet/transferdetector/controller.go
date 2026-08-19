@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/eventfilter"
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -129,7 +129,7 @@ func (c *Controller) startAccountsWatcher() {
 	removedCh, removedUnsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](c.accountsPublisher, 10)
 	addedCh, addedUnsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](c.accountsPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer removedUnsubFn()
 		defer addedUnsubFn()
 		for {
@@ -159,7 +159,7 @@ func (c *Controller) startNetworksWatcher() {
 	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFn()
 		for {
 			select {
@@ -178,7 +178,7 @@ func (c *Controller) startNetworksWatcher() {
 func (c *Controller) startFetcher() {
 	ticker := time.NewTicker(c.config.FetchPeriod)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer ticker.Stop()
 		for {
 			select {
@@ -206,7 +206,7 @@ func (c *Controller) TriggerFetch() {
 func (c *Controller) run() {
 	c.fetchDebounceFn(func() {
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			c.runNow()
 		}()
 	})
@@ -255,7 +255,7 @@ func (c *Controller) runNow() {
 	for _, network := range networks {
 		wg.Add(1)
 		go func(chainID uint64) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer wg.Done()
 
 			c.fetchTransfers(ctx, chainID, accounts)
@@ -263,7 +263,7 @@ func (c *Controller) runNow() {
 	}
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		select {
 		case <-c.stopCh:
 			cancel()

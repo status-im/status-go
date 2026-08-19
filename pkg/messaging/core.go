@@ -10,9 +10,9 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging/common"
@@ -328,7 +328,7 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 
 	c.wg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer c.wg.Done()
 
 		fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)

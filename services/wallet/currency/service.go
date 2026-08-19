@@ -9,8 +9,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -45,7 +45,7 @@ func NewService(db *sql.DB, walletFeed *event.Feed, tokenManager *token.Manager,
 
 func (s *Service) Start(ctx context.Context) {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		// Update all fiat currency formats in cache
 		fiatFormats, err := s.getAllFiatCurrencyFormats()
 		if err == nil {
@@ -59,7 +59,7 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		ticker := time.NewTicker(currencyFormatUpdateInterval)
 		defer ticker.Stop()
 		for {

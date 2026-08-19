@@ -13,8 +13,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 const (
@@ -224,7 +224,7 @@ func (r *RelayClient) startHeartbeat(conn *websocket.Conn) {
 
 	r.wg.Add(1)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer r.wg.Done()
 		ticker := time.NewTicker(relayPingInterval)
 		defer ticker.Stop()
@@ -448,7 +448,7 @@ func (r *RelayClient) call(method string, params any) (json.RawMessage, error) {
 }
 
 func (r *RelayClient) readLoop() {
-	defer common.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer r.wg.Done()
 
 	for {

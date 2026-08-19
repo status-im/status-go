@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging/adapters"
 	common "github.com/status-im/status-go/pkg/messaging/common"
 	processor "github.com/status-im/status-go/pkg/messaging/controller/processor"
@@ -132,7 +132,7 @@ func (c *Controller) runSubscriptionsLoop() {
 	defer c.wg.Done()
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		scheduledSendSub, scheduledSendUnsub := pubsub.Subscribe[sender.ScheduledReliableSend](c.sender.Publisher(), 100)
 		defer scheduledSendUnsub()
@@ -200,7 +200,7 @@ func (c *Controller) cleanupLoop(logger *zap.Logger, cleanupFunc func() error) {
 	defer c.wg.Done()
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		// Delay by a few minutes to minimize messenger's startup time
 		var interval time.Duration = 5 * time.Minute

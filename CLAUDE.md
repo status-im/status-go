@@ -53,7 +53,7 @@ make lint        # runs `make generate`, lint-panics, then golangci-lint
 make lint-fix    # golangci-lint --fix
 ```
 
-`lint-panics` enforces that goroutines defer `common.LogOnPanic` (via the `goroutine-defer-guard` tool).
+`lint-panics` enforces that goroutines defer `panics.LogOnPanic` (via the `goroutine-defer-guard` tool).
 Enabled linters: errcheck, gosec, govet, ineffassign, misspell, unconvert, plus goimports formatting with
 `github.com/status-im/status-go` as the local-import prefix (see `.golangci.yml`).
 
@@ -149,7 +149,6 @@ transport)**. Asynchronous results flow back to clients through the `signal` pac
   (zap logging; use `logutils.ZapLogger()`), `connection`, `healthmanager`, `circuitbreaker`, `contracts/`
   (generated, lint-excluded).
 
-- **`common/`** — small cross-cutting helpers, notably `common.LogOnPanic` (required in every goroutine).
 
 ## Conventions
 
@@ -158,4 +157,4 @@ transport)**. Asynchronous results flow back to clients through the `signal` pac
   (`make storage-help` for details). Outside the Nix shell, missing C deps are the usual cause of build failures.
 - Generated files (protobuf, migration bindata, mocks) are committed — run `make generate` after changing
   `.proto`, `//go:generate` directives, or SQL migrations rather than editing generated output.
-- Every spawned goroutine must `defer common.LogOnPanic()` (enforced by `make lint-panics`).
+- Every spawned goroutine must `defer panics.LogOnPanic()` (enforced by `make lint-panics`).

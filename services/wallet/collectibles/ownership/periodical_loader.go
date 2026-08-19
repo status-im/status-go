@@ -8,7 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/pubsub"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 
@@ -90,7 +91,7 @@ func NewPeriodicalLoader(
 func (pl *PeriodicalLoader) Start(withDelay bool, waitForInterval bool) {
 	pl.logger.Debug("starting periodical loader",
 		zap.Uint64("chain", uint64(pl.chainID)),
-		zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
+		zap.String("account", logutils.TruncateWithDot(pl.account.String())),
 		zap.Bool("withDelay", withDelay),
 		zap.Bool("waitForInterval", waitForInterval),
 	)
@@ -105,7 +106,7 @@ func (pl *PeriodicalLoader) Start(withDelay bool, waitForInterval bool) {
 
 	// Trigger
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		if withDelay && pl.params.StartDelay.Seconds() > 0 {
 			pl.state.Store(LoaderStateDelayed)
@@ -119,7 +120,7 @@ func (pl *PeriodicalLoader) Start(withDelay bool, waitForInterval bool) {
 			// Trigger immediate Load
 			pl.logger.Debug("triggering immediate load",
 				zap.Uint64("chain", uint64(pl.chainID)),
-				zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
+				zap.String("account", logutils.TruncateWithDot(pl.account.String())),
 			)
 			pl.triggerLoadAsync(stopCh)
 		}
@@ -133,7 +134,7 @@ func (pl *PeriodicalLoader) Start(withDelay bool, waitForInterval bool) {
 				// Trigger periodic Load
 				pl.logger.Debug("triggering periodic load",
 					zap.Uint64("chain", uint64(pl.chainID)),
-					zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
+					zap.String("account", logutils.TruncateWithDot(pl.account.String())),
 				)
 				pl.triggerLoadAsync(stopCh)
 			case <-stopCh:
@@ -163,7 +164,7 @@ func (pl *PeriodicalLoader) GetState() LoaderState {
 
 func (pl *PeriodicalLoader) triggerLoadAsync(stopCh <-chan struct{}) {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		pl.triggerLoad(stopCh)
 	}()
 }
@@ -172,7 +173,7 @@ func (pl *PeriodicalLoader) triggerLoad(stopCh <-chan struct{}) {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	defer cancelFn() // Cancel ctx after Load ends
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer cancelFn() // Cancel ctx if PeriodicalLoader is stopped
 		select {
 		case <-stopCh:
@@ -191,7 +192,7 @@ func (pl *PeriodicalLoader) Load(ctx context.Context) error {
 		// The load in progress owns the reported state, leave it alone
 		pl.logger.Error("skipping Load because it's already in progress",
 			zap.Uint64("chain", uint64(pl.chainID)),
-			zap.String("account", gocommon.TruncateWithDot(pl.account.String())),
+			zap.String("account", logutils.TruncateWithDot(pl.account.String())),
 		)
 		return err
 	}

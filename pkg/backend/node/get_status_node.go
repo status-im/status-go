@@ -19,13 +19,14 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	common "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/ipfs"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/internal/transactions"
@@ -82,7 +83,7 @@ type StatusNode struct {
 	config    *params.NodeConfig // Status node configuration
 	rpcClient *rpc.Client        // reference to an RPC client
 
-	services  []common.StatusService
+	services  []StatusService
 	rpcServer *gethrpc.Server
 
 	downloader *ipfs.Downloader
@@ -421,7 +422,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 func (n *StatusNode) populateServiceRegistry() {
 	// Register services implementing Pausable
 	for _, service := range n.services {
-		if p, ok := service.(common.Pausable); ok {
+		if p, ok := service.(pausable.Pausable); ok {
 			n.serviceRegistry.Register(p)
 		}
 	}
@@ -440,7 +441,7 @@ func (n *StatusNode) populateServiceRegistry() {
 	if n.downloader != nil {
 		n.serviceRegistry.Register(n.downloader)
 	}
-	if p, ok := n.timeSourceSrvc.(common.Pausable); ok {
+	if p, ok := n.timeSourceSrvc.(pausable.Pausable); ok {
 		n.serviceRegistry.Register(p)
 	}
 }
@@ -498,7 +499,7 @@ func (n *StatusNode) StartTokenManager() {
 	n.mu.Unlock()
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer close(done)
 		if err := tokenManager.Start(context.Background()); err != nil {
 			n.logger.Error("failed to start token manager", zap.Error(err))

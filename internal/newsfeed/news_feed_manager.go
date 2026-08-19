@@ -7,7 +7,7 @@ import (
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 const STATUS_DESKTOP_FEED_URL = "https://status.app/desktop-news/rss/v2"
@@ -146,7 +146,7 @@ func (n *NewsFeedManager) StartPolling(ctx context.Context) {
 	ctx, n.cancel = context.WithCancel(ctx)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		// Initialize interval to 0 for immediate execution
 		var interval time.Duration = 0

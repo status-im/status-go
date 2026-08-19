@@ -9,9 +9,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/contacts"
@@ -247,7 +247,7 @@ func (s *Service) ShareCommunityChannelURLWithChatKey(communityID types.HexBytes
 	}
 
 	if !valid {
-		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
+		return "", fmt.Errorf("channelID should be UUID, got %s", logutils.TruncateWithDot(channelID))
 	}
 
 	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, channelID, shortKey), nil
@@ -260,7 +260,7 @@ func parseCommunityChannelURLWithChatKey(channelID string, publicKey string) (*U
 	}
 
 	if !valid {
-		return nil, fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
+		return nil, fmt.Errorf("channelID should be UUID, got %s", logutils.TruncateWithDot(channelID))
 	}
 
 	communityID, err := decodeCommunityID(publicKey)
@@ -334,7 +334,7 @@ func (s *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, c
 	}
 
 	if !valid {
-		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
+		return "", fmt.Errorf("channelID should be UUID, got %s", logutils.TruncateWithDot(channelID))
 	}
 
 	community, err := s.provider.GetCommunityByID(communityID)
@@ -344,7 +344,7 @@ func (s *Service) ShareCommunityChannelURLWithData(communityID types.HexBytes, c
 
 	channel := community.Chats()[channelID]
 	if channel == nil {
-		return "", fmt.Errorf("channel with channelID %s not found", gocommon.TruncateWithDot(channelID))
+		return "", fmt.Errorf("channel with channelID %s not found", logutils.TruncateWithDot(channelID))
 	}
 
 	data, shortKey, err := s.prepareEncodedCommunityChannelData(community, channel, channelID)

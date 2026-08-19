@@ -8,9 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
@@ -55,7 +55,7 @@ func (m *Manager) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requ
 
 func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	go func() {
-		defer status_common.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		logutils.ZapLogger().Info("BuildTransactionsFromRoute: started", zap.String("uuid", uuid))
 
@@ -117,7 +117,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 
 func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	go func() {
-		defer status_common.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		logutils.ZapLogger().Info("SendRouterTransactionsWithSignatures: started", zap.String("uuid", sendInputParams.Uuid))
 

@@ -16,8 +16,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 )
 
 const maxRequestsPerSecond = 3
@@ -38,7 +39,7 @@ type taskRequest struct {
 }
 
 type Downloader struct {
-	common.PauseBroadcaster
+	pausable.PauseBroadcaster
 
 	ctx             context.Context
 	cancel          func()
@@ -83,12 +84,12 @@ func NewDownloader(rootDir string) *Downloader {
 	// the panic guard so it still runs before LogOnPanic re-raises.
 	d.wg.Add(2)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer d.wg.Done()
 		d.taskDispatcher()
 	}()
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer d.wg.Done()
 		d.worker()
 	}()
@@ -130,7 +131,7 @@ func (d *Downloader) worker() {
 func (d *Downloader) taskDispatcher() {
 	sub := d.Subscribe()
 	defer sub.Unsubscribe()
-	pt := common.NewPausableTicker(common.PausableTickerConfig{
+	pt := pausable.NewPausableTicker(pausable.PausableTickerConfig{
 		Interval: time.Second / maxRequestsPerSecond,
 		OnTick: func() {
 			select {
@@ -266,7 +267,7 @@ func (d *Downloader) exists(cid string) (bool, []byte, error) {
 func (d *Downloader) download(cid string, download bool) ([]byte, error) {
 	path := filepath.Join(d.ipfsDir, cid)
 
-	req, err := http.NewRequest(http.MethodGet, common.IpfsGatewayURL+cid, nil)
+	req, err := http.NewRequest(http.MethodGet, GatewayURL+cid, nil)
 	if err != nil {
 		return nil, err
 	}

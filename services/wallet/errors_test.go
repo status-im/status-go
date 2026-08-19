@@ -1,4 +1,4 @@
-package common
+package wallet
 
 import (
 	"testing"

@@ -14,7 +14,7 @@ import (
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/connector/chainutils"
@@ -192,7 +192,7 @@ func (s *Service) Start() error {
 	wsServer := s.wsServer
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		err := wsServer.ListenAndServe()
 		if !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("connector server closed with error", zap.Error(err))

@@ -10,10 +10,10 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingevents "github.com/status-im/status-go/pkg/messaging/events"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -90,7 +90,7 @@ func (s *MessageSender) Start() {
 	s.wg.Add(1)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer s.wg.Done()
 
 		sentMessagesSub, unsubSentMessages := pubsub.Subscribe[messagingevents.SentMessage](s.messaging.Publisher(), 100)

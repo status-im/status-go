@@ -15,8 +15,8 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/backend"
@@ -58,7 +58,7 @@ func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509
 
 	for _, ip := range reachableIPs {
 		go func(ip net.IP) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			u := c.BuildURL(ip)
 			cert, err := getServerCert(u)
 			if err != nil {

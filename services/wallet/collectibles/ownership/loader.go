@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/pubsub"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -94,7 +94,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 
 	l.logger.Debug("start collectibles Loader",
 		zap.Uint64("chain", uint64(l.chainID)),
-		zap.String("account", gocommon.TruncateWithDot(l.account.String())),
+		zap.String("account", logutils.TruncateWithDot(l.account.String())),
 	)
 
 	var err error
@@ -165,7 +165,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 	pageStart := time.Now()
 	l.logger.Debug("start collectibles Loader",
 		zap.Uint64("chain", uint64(l.chainID)),
-		zap.String("account", gocommon.TruncateWithDot(l.account.String())),
+		zap.String("account", logutils.TruncateWithDot(l.account.String())),
 		zap.Int("page", pageNr),
 	)
 
@@ -176,7 +176,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 			err = ctx.Err()
 			l.logger.Error("cancelled collectibles Loader",
 				zap.Uint64("chain", uint64(l.chainID)),
-				zap.String("account", gocommon.TruncateWithDot(l.account.String())),
+				zap.String("account", logutils.TruncateWithDot(l.account.String())),
 				zap.Int("page", pageNr),
 				zap.Error(err),
 			)
@@ -188,7 +188,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 			err = tmpErr
 			l.logger.Error("failed fetching collectible ownership",
 				zap.Uint64("chain", uint64(l.chainID)),
-				zap.String("account", gocommon.TruncateWithDot(l.account.String())),
+				zap.String("account", logutils.TruncateWithDot(l.account.String())),
 				zap.Int("page", pageNr),
 				zap.Error(err),
 			)
@@ -200,7 +200,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 		if isInitialLoad {
 			l.logger.Debug("partial collectibles Loader",
 				zap.Uint64("chain", uint64(l.chainID)),
-				zap.String("account", gocommon.TruncateWithDot(l.account.String())),
+				zap.String("account", logutils.TruncateWithDot(l.account.String())),
 				zap.Int("page", pageNr),
 				zap.Duration("duration", time.Since(pageStart)),
 				zap.Int("found", len(ownershipPage.Items)),
@@ -234,7 +234,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 
 	l.logger.Debug("end collectibles Loader",
 		zap.Uint64("chain", uint64(l.chainID)),
-		zap.String("account", gocommon.TruncateWithDot(l.account.String())),
+		zap.String("account", logutils.TruncateWithDot(l.account.String())),
 		zap.Duration("in", time.Since(start)),
 		zap.Int("found", len(accumulatedOwnership)),
 	)

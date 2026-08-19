@@ -1,4 +1,4 @@
-package common
+package pausable
 
 import (
 	"sync"
@@ -106,7 +106,7 @@ func (m *PauseBroadcaster) IsPaused() bool {
 func (m *PauseBroadcaster) Subscribe() Subscription {
 	m.initPub()
 	// Buffer must fit initial snapshot plus one transition before the consumer reads; see
-	// common.TestPauseBroadcaster_Subscribe_* and pkg/pubsub.TestTypePublisher_publishDroppedWhenPerSubscriberBufferFull.
+	// pausable.TestPauseBroadcaster_Subscribe_* and pkg/pubsub.TestTypePublisher_publishDroppedWhenPerSubscriberBufferFull.
 	ch := m.pub.Subscribe(2)
 	// Deliver the current state immediately.
 	select {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 func ToColorID(pubkey string) (int64, error) {
@@ -16,7 +16,7 @@ func ToColorID(pubkey string) (int64, error) {
 
 	pubkeyValue, ok := new(big.Int).SetString(pubkey, 0)
 	if !ok {
-		return 0, fmt.Errorf("invalid pubkey: %s", gocommon.TruncateWithDot(pubkey))
+		return 0, fmt.Errorf("invalid pubkey: %s", logutils.TruncateWithDot(pubkey))
 	}
 
 	colorID := new(big.Int).Mod(pubkeyValue, new(big.Int).SetInt64(colorPalletLength-1)).Int64()
@@ -66,12 +66,12 @@ func Slices(compressedPubkey []byte) (res [4][]byte, err error) {
 func ToCompressedKey(pubkey string) ([]byte, error) {
 	pubkeyValue, ok := new(big.Int).SetString(pubkey, 0)
 	if !ok {
-		return nil, fmt.Errorf("invalid pubkey: %s", gocommon.TruncateWithDot(pubkey))
+		return nil, fmt.Errorf("invalid pubkey: %s", logutils.TruncateWithDot(pubkey))
 	}
 
 	x, y := secp256k1.S256().Unmarshal(pubkeyValue.Bytes())
 	if x == nil || !secp256k1.S256().IsOnCurve(x, y) {
-		return nil, fmt.Errorf("invalid pubkey: %s", gocommon.TruncateWithDot(pubkey))
+		return nil, fmt.Errorf("invalid pubkey: %s", logutils.TruncateWithDot(pubkey))
 	}
 
 	return secp256k1.CompressPubkey(x, y), nil

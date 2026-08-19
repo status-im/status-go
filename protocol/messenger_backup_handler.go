@@ -8,10 +8,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/errors"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
@@ -75,7 +75,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		Profile: &backupsync.BackedUpProfile{},
 	}
 
-	err := utils.ValidateDisplayName(&message.DisplayName)
+	err := common.ValidateDisplayName(&message.DisplayName)
 	if err != nil {
 		// Print a warning and set the display name to the account name, but don't stop the recovery
 		m.logger.Warn("invalid display name found", zap.Error(err))
@@ -252,7 +252,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 	_, err = m.SendMessageToControlNode(ctx, community, rawMessage)
 
 	if err != nil {
-		m.logger.Error("failed to request shared addresses", zap.String("communityId", utils.TruncateWithDot(community.IDString())), zap.Error(err))
+		m.logger.Error("failed to request shared addresses", zap.String("communityId", logutils.TruncateWithDot(community.IDString())), zap.Error(err))
 		return err
 	}
 
@@ -273,7 +273,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(syncCommunity *protob
 	if isEncrypted {
 		err = m.requestCommunityEncryptionKeys(community, nil)
 		if err != nil {
-			m.logger.Error("failed to request community encryption keys", zap.String("communityId", utils.TruncateWithDot(community.IDString())), zap.Error(err))
+			m.logger.Error("failed to request community encryption keys", zap.String("communityId", logutils.TruncateWithDot(community.IDString())), zap.Error(err))
 			return err
 		}
 	}

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 // TaskFunc defines the task to be run. The context is canceled when Stop is
@@ -59,7 +59,7 @@ func (t *ConditionalRepeater) RunUntilDone() {
 	t.ctx, t.cancel = context.WithCancel(context.Background())
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer func() {
 			t.ctxMu.Lock()
 			defer t.ctxMu.Unlock()

@@ -26,8 +26,8 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc20"
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/pubsub"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -130,7 +130,7 @@ func (r *Reader) startBalanceChangeWatcher() {
 
 	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](r.multistandardBalancePublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsub()
 		for {
 			select {
@@ -163,7 +163,7 @@ func (r *Reader) startTransferDetectionWatcher() {
 
 	ch, unsub := pubsub.Subscribe[transferdetector.EventTransferDetectionFinished](r.transferDetectorPublisher, 10)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsub()
 		for {
 			select {
@@ -224,7 +224,7 @@ func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokentypes.Stora
 
 			bigBalance, ok := new(big.Int).SetString(token.RawBalance, 10)
 			if !ok {
-				return nil, gocommon.ErrBigIntSetFromString(token.RawBalance)
+				return nil, ErrBigIntSetFromString(token.RawBalance)
 			}
 			cachedBalancesPerChain[token.TokenChainID][address][token.TokenAddress] = bigBalance
 		}
@@ -351,7 +351,7 @@ func (r *Reader) refreshBalanceCache(ctx context.Context, chainIDs []uint64, add
 
 	if r.firstReloadPending.CompareAndSwap(true, false) {
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			r.triggerWalletReload()
 		}()
 	} else {

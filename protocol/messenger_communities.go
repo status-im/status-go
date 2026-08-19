@@ -25,13 +25,13 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	gocommon "github.com/status-im/status-go/common"
-	utils "github.com/status-im/status-go/common"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -235,7 +235,7 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -355,7 +355,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			for pkString := range encryptionKeyActions.CommunityKeyAction.RemovedMembers {
 				pk, err := crypto.HexToPubkey(pkString)
 				if err != nil {
-					m.logger.Error("failed to decode public key", zap.Error(err), zap.String("pk", gocommon.TruncateWithDot(pkString)))
+					m.logger.Error("failed to decode public key", zap.Error(err), zap.String("pk", logutils.TruncateWithDot(pkString)))
 				}
 				payload, err := proto.Marshal(userKicked)
 				if err != nil {
@@ -402,7 +402,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -533,7 +533,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -726,7 +726,7 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 
 	err := m.communitiesKeyDistributor.Distribute(community, keyActions)
 	if err != nil {
-		m.logger.Error("failed to send community keys", zap.String("community ID", gocommon.TruncateWithDot(community.IDString())), zap.Error(err))
+		m.logger.Error("failed to send community keys", zap.String("community ID", logutils.TruncateWithDot(community.IDString())), zap.Error(err))
 	}
 
 	return nil
@@ -908,7 +908,7 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -1592,7 +1592,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 
 		if m.pushNotificationClient == nil {
@@ -3577,7 +3577,7 @@ func (m *Messenger) handleSyncInstallationCommunity(ctx context.Context, message
 	// This is our own message, so we can trust the set community owner
 	// This is good to do so that we don't have to queue all the actions done after the handled community description.
 	// `signer` is `communityID` for a community with no owner token and `owner public key` otherwise
-	signer, err := utils.RecoverKey(&amm)
+	signer, err := common.RecoverKey(&amm)
 	if signer == nil || err != nil {
 		logger.Debug("failed to recover community description signer", zap.Error(err))
 		return err
@@ -3682,7 +3682,7 @@ func (m *Messenger) HandleSyncCommunitySettings(ctx context.Context, messageStat
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
-	defer utils.LogOnPanic()
+	defer panics.LogOnPanic()
 	m.logger.Debug("initializing history archive tasks")
 
 	for _, c := range communities {
@@ -3814,7 +3814,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		time.Sleep(importInitialDelay)
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
@@ -3871,7 +3871,7 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID cryptotypes.HexBytes
 	task.Waiter.Add(1)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer task.Waiter.Done()
 		defer m.archiveManager.RemoveHistoryArchiveDownloadTask(communityID.String())
 		lastSeenArchiveLink, err := m.communitiesManager.GetLastSeenArchiveLink(communityID)
@@ -3902,7 +3902,7 @@ func (m *Messenger) importHistoryArchives(communityID cryptotypes.HexBytes, canc
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		<-cancel
 		cancelFunc()
 	}()
@@ -4548,7 +4548,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -4617,7 +4617,7 @@ func (m *Messenger) rekeyCommunities(logger *zap.Logger) {
 
 		err = m.communitiesKeyDistributor.Distribute(c, keyActions)
 		if err != nil {
-			logger.Error("failed to rekey community", zap.String("community ID", gocommon.TruncateWithDot(c.IDString())), zap.Error(err))
+			logger.Error("failed to rekey community", zap.String("community ID", logutils.TruncateWithDot(c.IDString())), zap.Error(err))
 			continue
 		}
 	}
@@ -4948,18 +4948,18 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(ctx context.Context, sta
 func (m *Messenger) leaveCommunityOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
 	response, err := m.kickedOutOfCommunity(community.ID(), true)
 	if err != nil {
-		m.logger.Error("member soft kick error", zap.String("communityID", gocommon.TruncateWithDot(cryptotypes.EncodeHex(community.ID()))), zap.Error(err))
+		m.logger.Error("member soft kick error", zap.String("communityID", logutils.TruncateWithDot(cryptotypes.EncodeHex(community.ID()))), zap.Error(err))
 	}
 
 	if err := messengerResponse.Merge(response); err != nil {
-		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", gocommon.TruncateWithDot(cryptotypes.EncodeHex(community.ID()))), zap.Error(err))
+		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", logutils.TruncateWithDot(cryptotypes.EncodeHex(community.ID()))), zap.Error(err))
 	}
 }
 
 func (m *Messenger) shareRevealedAccountsOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
 	requestToJoin, err := m.sendSharedAddressToControlNode(community.ControlNode(), community)
 	if err != nil {
-		m.logger.Error("share address to control node failed", zap.String("id", gocommon.TruncateWithDot(cryptotypes.EncodeHex(community.ID()))), zap.Error(err))
+		m.logger.Error("share address to control node failed", zap.String("id", logutils.TruncateWithDot(cryptotypes.EncodeHex(community.ID()))), zap.Error(err))
 
 		if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
 			m.AddActivityCenterNotificationToResponse(community.IDString(), ActivityCenterNotificationTypeShareAccounts, messengerResponse)
@@ -5019,7 +5019,7 @@ const (
 func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 
 		initialDelay := time.NewTimer(requestMissingCommunityEncryptionKeysInitialDelay)

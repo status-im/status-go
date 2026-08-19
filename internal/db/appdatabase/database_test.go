@@ -19,8 +19,8 @@ import (
 	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/testutils"
 
-	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )

@@ -7,12 +7,12 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/protocol/communities"
 )
 
@@ -87,7 +87,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 
 	if !cfg.WaitForResponse {
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			_, _, err := fetch()
 			if err != nil {
 				m.logger.Error("failed to fetch community", zap.Error(err))
@@ -447,7 +447,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 }
 
 func (r *storeNodeRequest) routine() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 
 	r.manager.logger.Info("starting store node request",
 		zap.Any("requestID", r.requestID),

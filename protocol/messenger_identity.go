@@ -7,9 +7,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+	protocolcommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server"
 )
 
@@ -30,7 +30,7 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return nil // Do nothing
 	}
 
-	if err = utils.ValidateDisplayName(&displayName); err != nil {
+	if err = protocolcommon.ValidateDisplayName(&displayName); err != nil {
 		return err
 	}
 

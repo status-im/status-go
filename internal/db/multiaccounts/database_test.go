@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/testutils/fake"

@@ -20,9 +20,9 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingevents "github.com/status-im/status-go/pkg/messaging/events"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -712,7 +712,7 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 func (c *Client) subscribeForMessageEvents() {
 	c.quitWg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer c.quitWg.Done()
 		c.config.Logger.Debug("subscribing for message events")
 
@@ -781,7 +781,7 @@ func (c *Client) startRegistrationLoop() {
 	c.registrationLoopQuitChan = make(chan struct{})
 	c.quitWg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer c.quitWg.Done()
 		err := c.registrationLoop()
 		if err != nil {
@@ -795,7 +795,7 @@ func (c *Client) startResendingLoop() {
 	c.resendingLoopQuitChan = make(chan struct{})
 	c.quitWg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer c.quitWg.Done()
 		err := c.resendingLoop()
 		if err != nil {

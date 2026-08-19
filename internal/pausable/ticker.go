@@ -1,4 +1,4 @@
-package common
+package pausable
 
 import "time"
 
@@ -30,7 +30,7 @@ type PausableTickerConfig struct {
 //
 //	sub := s.Subscribe()
 //	defer sub.Unsubscribe()
-//	pt := common.NewPausableTicker(common.PausableTickerConfig{
+//	pt := pausable.NewPausableTicker(pausable.PausableTickerConfig{
 //	    Interval: 30 * time.Second,
 //	    OnTick:   func() { doWork() },
 //	}, sub.C())

@@ -1,7 +1,7 @@
 package rpc
 
 import (
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -27,7 +27,7 @@ func (tmr *SignalsTransmitter) Start() error {
 	ch, unsubFn := pubsub.Subscribe[EventBlockchainHealthChanged](tmr.publisher, 10)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsubFn()
 		for {
 			select {

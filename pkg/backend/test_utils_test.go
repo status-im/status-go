@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/platform"
 	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/params"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
@@ -20,7 +20,7 @@ func makeTestNodeConfig(t *testing.T) (*params.NodeConfig, error) {
 	networkID := walletcommon.EthereumSepolia
 	testDir := filepath.Join(rootDataDir, "StatusChain")
 
-	if common.OperatingSystemIs(common.WindowsPlatform) {
+	if platform.OperatingSystemIs(platform.WindowsPlatform) {
 		testDir = filepath.ToSlash(testDir)
 	}
 

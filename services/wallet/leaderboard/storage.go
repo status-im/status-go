@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 const DATA_STALE_THRESHOLD = 10 * time.Minute
@@ -66,7 +66,7 @@ func (s *DataStorage) StartAsync() {
 	s.startMu.Unlock()
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer close(startDone)
 		s.Start()
 	}()

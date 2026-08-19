@@ -19,8 +19,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ens/ensresolver"
@@ -188,7 +188,7 @@ func (api *API) ResourceURL(ctx context.Context, chainID uint64, username string
 			return nil, errors.Wrap(err, "failed to obtain base36 representation")
 		}
 
-		parsedURL, _ := url.Parse(gocommon.IpfsGatewayURL)
+		parsedURL, _ := url.Parse(ipfs.GatewayURL)
 		// Remove scheme from the url
 		host := parsedURL.Hostname() + parsedURL.Path + str
 		return &URI{scheme, host, ""}, nil

@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 type MultiStandardBalanceFetcher interface {
@@ -98,5 +98,5 @@ func (f *Fetcher) FetchSingle(ctx context.Context, chainID uint64, tokenAddress 
 			return balance, nil
 		}
 	}
-	return nil, fmt.Errorf("no balance found for chain %d, token %s, account %s", chainID, tokenAddress, gocommon.TruncateWithDot(accountAddress.String()))
+	return nil, fmt.Errorf("no balance found for chain %d, token %s, account %s", chainID, tokenAddress, logutils.TruncateWithDot(accountAddress.String()))
 }

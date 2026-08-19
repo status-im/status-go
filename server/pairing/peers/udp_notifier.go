@@ -9,7 +9,7 @@ import (
 	udpp2p "github.com/schollz/peerdiscovery"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 const (
@@ -98,7 +98,7 @@ func Search(deviceName, deviceType string, notify NotifyHandler, stop chan struc
 	settings.StopChan = stop
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		_, err = udpp2p.Discover(*settings)
 		logger.Error("error while discovering udp peers", zap.Error(err))
 	}()

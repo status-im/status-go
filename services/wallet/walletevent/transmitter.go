@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 )
 
@@ -37,7 +37,7 @@ func (tmr *SignalsTransmitter) Start(ctx context.Context) error {
 
 	tmr.wg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer tmr.wg.Done()
 		for {
 			select {

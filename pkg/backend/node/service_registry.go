@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/server"
 )
@@ -13,9 +13,9 @@ import (
 // ErrServiceNotFound is returned by Pause and Resume when the name is not registered.
 var ErrServiceNotFound = errors.New("service not found in registry")
 
-// PausableMediaServer wraps a server.MediaServer to implement common.Pausable.
+// PausableMediaServer wraps a server.MediaServer to implement pausable.Pausable.
 type PausableMediaServer struct {
-	common.PauseBroadcaster
+	pausable.PauseBroadcaster
 	s *server.MediaServer
 }
 
@@ -39,10 +39,10 @@ func (p *PausableMediaServer) Resume() error {
 	return nil
 }
 
-// PausableMessenger wraps a protocol.Messenger to implement common.Pausable.
+// PausableMessenger wraps a protocol.Messenger to implement pausable.Pausable.
 // Pause() → SetPaused(true) and Resume() → SetPaused(false)
 type PausableMessenger struct {
-	common.PauseBroadcaster
+	pausable.PauseBroadcaster
 	m *protocol.Messenger
 }
 
@@ -68,24 +68,24 @@ func (p *PausableMessenger) Resume() error {
 
 // PausableServiceInfo is a lightweight snapshot of a pausable service's state.
 type PausableServiceInfo struct {
-	Name  string              `json:"name"`
-	State common.ServiceState `json:"state"`
+	Name  string                `json:"name"`
+	State pausable.ServiceState `json:"state"`
 }
 
 // ServiceRegistry tracks services that support granular pause/resume control.
 type ServiceRegistry struct {
 	mu        sync.RWMutex
-	pausables map[string]common.Pausable
+	pausables map[string]pausable.Pausable
 }
 
 func newServiceRegistry() *ServiceRegistry {
 	return &ServiceRegistry{
-		pausables: make(map[string]common.Pausable),
+		pausables: make(map[string]pausable.Pausable),
 	}
 }
 
 // Register adds a Pausable service to the registry.
-func (r *ServiceRegistry) Register(p common.Pausable) {
+func (r *ServiceRegistry) Register(p pausable.Pausable) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.pausables[p.PausableName()] = p

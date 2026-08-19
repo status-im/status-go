@@ -2,8 +2,6 @@ package requests
 
 import (
 	"testing"
-
-	"github.com/status-im/status-go/common"
 )
 
 func TestInitializeApplication_Validate(t *testing.T) {
@@ -86,7 +84,7 @@ func TestInitializeApplication_Validate(t *testing.T) {
 			name: "Full configuration with valid values",
 			app: InitializeApplication{
 				DataDir:              "/valid/path",
-				MediaServerEnableTLS: common.Ptr(true),
+				MediaServerEnableTLS: ptr(true),
 				SentryDSN:            "sentry-dsn",
 				LogDir:               "/logs/path",
 				LogEnabled:           true,
@@ -113,4 +111,9 @@ func TestInitializeApplication_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ptr returns a pointer to v.
+func ptr[T any](v T) *T {
+	return &v
 }

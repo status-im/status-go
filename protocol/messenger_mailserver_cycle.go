@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -118,7 +118,7 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 
 		needed := m.messaging.OnHistoryReconcileNeeded()
@@ -152,7 +152,7 @@ func (m *Messenger) startHistoryCursorMonitor() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 
 		ticker := time.NewTicker(historyCursorMonitorInterval)
@@ -263,7 +263,7 @@ func (m *Messenger) startHistoricSyncWorker() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		defer m.historicSyncWorkerActive.Store(false)
 

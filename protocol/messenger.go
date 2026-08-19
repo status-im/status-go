@@ -24,8 +24,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	gocommon "github.com/status-im/status-go/common"
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/crypto"
@@ -36,10 +34,12 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -681,7 +681,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	if m.config.enablePinnedBootstrap {
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 
 			if err := m.bootstrapPinnedCommunities(); err != nil {
 				m.logger.Warn("failed to bootstrap pinned communities", zap.Error(err))
@@ -703,7 +703,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if m.archiveManager.IsStarted() {
 		m.shutdownWaitGroup.Add(1)
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer m.shutdownWaitGroup.Done()
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
@@ -738,7 +738,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := utils.ValidateDisplayName(&displayName); err != nil {
+	if err := common.ValidateDisplayName(&displayName); err != nil {
 		// Somehow a wrong display name was saved. We need to update it so that others accept our messages
 		pubKey, err := m.settings.GetPublicKey()
 		if err != nil {
@@ -757,7 +757,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 }
 
 func (m *Messenger) startHistoryArchivesImportLoop() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	joinedCommunities, err := m.communitiesManager.Joined()
 	if err != nil {
 		m.logger.Error("failed to get joined communities", zap.Error(err))
@@ -1255,7 +1255,7 @@ func (m *Messenger) handleInstallations(installations []*types.Installation) {
 func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *types.EncryptionSubscriptions) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -1316,7 +1316,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.VerificationRecord) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -1372,7 +1372,7 @@ func (m *Messenger) watchConnectionChange() {
 	}
 
 	subscribedConnectionStatus := func(subscription types.ConnectionStatusSubscription) {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
@@ -1416,7 +1416,7 @@ func (m *Messenger) watchChatsToUnmute() {
 	m.logger.Debug("Checking for chats to unmute every minute")
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			if m.isPaused() {
@@ -1482,7 +1482,7 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		check()
 
@@ -1514,7 +1514,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -1554,7 +1554,7 @@ func (m *Messenger) watchPendingCommunityRequestToJoin() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -1594,7 +1594,7 @@ func (m *Messenger) PublishIdentityImage() error {
 func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {
@@ -1914,7 +1914,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 				zap.String("chatName", chat.Name),
 				zap.Any("messageType", rawMessage.MessageType),
 			)
-			return rawMessage, fmt.Errorf("can't post message type '%d' on chat '%s'", rawMessage.MessageType, gocommon.TruncateWithDot(chat.ID))
+			return rawMessage, fmt.Errorf("can't post message type '%d' on chat '%s'", rawMessage.MessageType, logutils.TruncateWithDot(chat.ID))
 		}
 
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
@@ -2082,7 +2082,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err == nil {
 		message.Text = replacedText
 	} else {
-		m.logger.Error("failed to replace text with public key", zap.String("chatID", gocommon.TruncateWithDot(message.ChatId)), zap.Error(err))
+		m.logger.Error("failed to replace text with public key", zap.String("chatID", logutils.TruncateWithDot(message.ChatId)), zap.Error(err))
 	}
 
 	if len(message.ImagePath) != 0 {
@@ -2817,7 +2817,7 @@ const retrieveMessagesDebounceInterval = time.Second
 func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 
 		matchedCh := m.messaging.SubscribeFilterMatched()
@@ -2953,12 +2953,12 @@ func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, s
 
 	chat, ok := r.AllChats.Load(msg.LocalChatID)
 	if !ok {
-		return fmt.Errorf("chat ID '%s' not present", gocommon.TruncateWithDot(msg.LocalChatID))
+		return fmt.Errorf("chat ID '%s' not present", logutils.TruncateWithDot(msg.LocalChatID))
 	}
 
 	contact, ok := r.AllContacts.Load(contactID)
 	if !ok {
-		return fmt.Errorf("contact ID '%s' not present", gocommon.TruncateWithDot(contactID))
+		return fmt.Errorf("contact ID '%s' not present", logutils.TruncateWithDot(contactID))
 	}
 
 	// Use contact from persistence when available so we get Images with Payload (needed for notification icon
@@ -3046,7 +3046,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 
 	chat, ok := r.AllChats.Load(message.LocalChatID)
 	if !ok {
-		return fmt.Errorf("chat ID '%s' not present", gocommon.TruncateWithDot(message.LocalChatID))
+		return fmt.Errorf("chat ID '%s' not present", logutils.TruncateWithDot(message.LocalChatID))
 	}
 
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
@@ -4296,7 +4296,7 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 			m.allChats.Store(chat.ID, chat)
 			response.AddChat(chat)
 		} else {
-			err = fmt.Errorf("chat with chatID %s not found", gocommon.TruncateWithDot(chatID))
+			err = fmt.Errorf("chat with chatID %s not found", logutils.TruncateWithDot(chatID))
 		}
 	}
 	return response, err

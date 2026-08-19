@@ -6,8 +6,8 @@ import (
 	"math"
 	"time"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/panics"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -22,7 +22,7 @@ func (m *Messenger) watchExpiredMessages() {
 	m.logger.Debug("watching expired messages")
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		for {
 			select {

@@ -17,11 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/internal/contracts/ierc1155"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -795,7 +795,7 @@ func (o *Manager) fetchCommunityCollectibles(ctx context.Context, communityAsset
 
 		err := o.fetchCommunityAssets(communityID, assets)
 		if err != nil {
-			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(err))
 			continue
 		}
 
@@ -878,7 +878,7 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
 	communityFound, err := o.communityManager.FillCollectiblesMetadata(communityID, communityAssets)
 	if err != nil {
-		logutils.ZapLogger().Error("FillCollectiblesMetadata failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+		logutils.ZapLogger().Error("FillCollectiblesMetadata failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(err))
 	} else if !communityFound {
 		logutils.ZapLogger().Warn("fetchCommunityAssets community not found", zap.String("communityID", communityID))
 	}
@@ -899,13 +899,13 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 
 	err = o.collectiblesDataDB.SetData(collectiblesData, allowUpdate)
 	if err != nil {
-		logutils.ZapLogger().Error("collectiblesDataDB SetData failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+		logutils.ZapLogger().Error("collectiblesDataDB SetData failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(err))
 		return err
 	}
 
 	err = o.collectionsDataDB.SetData(collectionsData, allowUpdate)
 	if err != nil {
-		logutils.ZapLogger().Error("collectionsDataDB SetData failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+		logutils.ZapLogger().Error("collectionsDataDB SetData failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(err))
 		return err
 	}
 
@@ -913,7 +913,7 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 		if asset.CollectibleCommunityInfo != nil {
 			err = o.collectiblesDataDB.SetCommunityInfo(asset.CollectibleData.ID, *asset.CollectibleCommunityInfo)
 			if err != nil {
-				logutils.ZapLogger().Error("collectiblesDataDB SetCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+				logutils.ZapLogger().Error("collectiblesDataDB SetCommunityInfo failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(err))
 				return err
 			}
 		}
@@ -928,10 +928,10 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 	}
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		err := o.fetchCommunityAssets(communityID, communityAssets)
 		if err != nil {
-			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(err))
 			return
 		}
 
@@ -1176,7 +1176,7 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 
 func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		socials, err := o.getOrFetchSocialsForCollection(context.Background(), contractID)
 		if err != nil || socials == nil {

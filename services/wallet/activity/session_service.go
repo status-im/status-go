@@ -11,8 +11,8 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/activityfetcher"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -273,7 +273,7 @@ func (s *Service) subscribeToEvents() {
 
 // processEvents runs only if more than one session is active
 func (s *Service) processEvents(ctx context.Context) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	eventCount := 0
 	changedTxs := make([]TransactionID, 0)
 	newTxs := false
@@ -443,7 +443,7 @@ func (s *Service) processEntryDataUpdates(sessionID SessionID, entries []Entry, 
 }
 
 func notify(eventFeed *event.Feed, id SessionID, hasNewOnTop bool, mixed []*EntryUpdate) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	payload := SessionUpdate{
 		New: mixed,
 	}
@@ -482,7 +482,7 @@ func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
 	ctx := context.Background()
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		activityData, err := s.getActivityDetails(ctx, entries)
 		if len(activityData) != 0 {
 			sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringUpdate, activityData, err)

@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+	protocolcommon "github.com/status-im/status-go/protocol/common"
 )
 
 const testDisplayName = "My New Display Name"
@@ -211,12 +211,12 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 		s.Require().ErrorIs(err, expectedErr)
 	}
 
-	setInvalidName("dot.not", utils.ErrInvalidDisplayNameRegExp)
-	setInvalidName("t", utils.ErrInvalidDisplayNameLength)
-	setInvalidName("tt", utils.ErrInvalidDisplayNameLength)
-	setInvalidName("ttt", utils.ErrInvalidDisplayNameLength)
-	setInvalidName("tttt", utils.ErrInvalidDisplayNameLength)
-	setInvalidName("name is bigger than 24 symb", utils.ErrInvalidDisplayNameLength)
+	setInvalidName("dot.not", protocolcommon.ErrInvalidDisplayNameRegExp)
+	setInvalidName("t", protocolcommon.ErrInvalidDisplayNameLength)
+	setInvalidName("tt", protocolcommon.ErrInvalidDisplayNameLength)
+	setInvalidName("ttt", protocolcommon.ErrInvalidDisplayNameLength)
+	setInvalidName("tttt", protocolcommon.ErrInvalidDisplayNameLength)
+	setInvalidName("name is bigger than 24 symb", protocolcommon.ErrInvalidDisplayNameLength)
 
 	err = s.m.SetDisplayName("name with space")
 	s.Require().NoError(err)
