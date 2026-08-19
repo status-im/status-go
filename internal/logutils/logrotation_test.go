@@ -39,8 +39,14 @@ func TestRotateLogFileForNewSessionProducesLumberjackParseableName(t *testing.T)
 func TestRotateLogFileForNewSessionKeepsActiveFile(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "test.log")
-	// mtime is now, i.e. after processStartTime: the file belongs to this session.
 	require.NoError(t, os.WriteFile(file, []byte("x"), 0600))
+	// Stamp the mtime rather than relying on the write landing after processStartTime.
+	// That assumption has almost no margin: processStartTime is set when this package is
+	// initialised, and the test runs ~0.5ms later (~0.1ms when gotestsum --rerun-fails
+	// re-runs it alone). Filesystem mtimes are coarser than time.Now() and can lag it by
+	// more than that, so the file would stat as older than the process and be archived.
+	active := processStartTime.Add(time.Minute)
+	require.NoError(t, os.Chtimes(file, active, active))
 
 	require.NoError(t, rotateLogFileForNewSession(file))
 
