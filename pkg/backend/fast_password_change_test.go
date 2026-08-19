@@ -8,8 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
 	keystorepkg "github.com/status-im/status-go/internal/accounts-management/keystore"
 	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	types "github.com/status-im/status-go/internal/crypto/types"
 	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/sqlite"
@@ -150,6 +152,49 @@ func TestMigrationRejectsWrongOldPassword(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestAddKeypairWithEmptyPasswordOnDEKProfile verifies that adding a keypair with an empty password (allowed
+// by the API and used by clients) still works on a DEK profile: the write resolver falls back to the session
+// secret, so the new keystore files stay uniformly encrypted with the profile DEK.
+func TestAddKeypairWithEmptyPasswordOnDEKProfile(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, true, true, false)
+	b := testContext.backend
+	keyUID := testContext.profileKeypair.KeyUID
+
+	require.NoError(t, b.StartNode(testContext.config))
+	defer func() {
+		require.NoError(t, b.StopNode())
+	}()
+
+	const password1 = "new-password-1"
+	require.NoError(t, b.ChangeDatabasePassword(keyUID, testPassword, password1, false))
+	b.UpdateRootDataDir(testContext.config.RootDataDir)
+	require.True(t, envelope.Exists(b.rootDataDir, keyUID))
+
+	const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	kp, err := b.AccountsManager().CreateKeypairFromMnemonicAndStore(mnemonic, "", "empty password keypair",
+		accsmanagementtypes.ColdWalletTypeNone,
+		&accsmanagementtypes.AccountCreationDetails{Path: accsmanagementcommon.PathDefaultWalletAccount}, false, 0)
+	require.NoError(t, err)
+	require.NotNil(t, kp)
+
+	// The new keystore files are encrypted with the profile DEK: they open with the login password (resolved
+	// through the envelope), while reads keep verifying the provided password strictly.
+	masterAddress := types.HexToAddress(kp.DerivedFrom)
+	ok, err := b.AccountsManager().VerifyAccountPassword(masterAddress, password1)
+	require.NoError(t, err)
+	require.True(t, ok)
+	// A password that cannot unwrap the envelope keeps the pre-DEK error contract.
+	_, err = b.AccountsManager().VerifyAccountPassword(masterAddress, "")
+	require.ErrorIs(t, err, keystorepkg.ErrIncorrectPasswordProvided)
+
+	// Deletion stays password-gated: a password that does not resolve must not delete the keys,
+	// while the login password does.
+	_, err = b.AccountsManager().DeleteKeypair(kp.KeyUID, "wrong-password", 0)
+	require.ErrorIs(t, err, keystorepkg.ErrIncorrectPasswordProvided)
+	_, err = b.AccountsManager().DeleteKeypair(kp.KeyUID, password1, 0)
+	require.NoError(t, err)
+}
+
 // TestChangeDatabasePasswordRekey verifies that a deep rekey rotates the DEK and
 // re-encrypts the databases and keystore with it.
 func TestChangeDatabasePasswordRekey(t *testing.T) {
@@ -208,12 +253,12 @@ func TestCreateAccountUsesDEKFromDayOne(t *testing.T) {
 	}
 
 	c := make(chan interface{}, 10)
-	signal.SetMobileSignalHandler(func(data []byte) {
+	signal.SetHandler(func(data []byte) {
 		if strings.Contains(string(data), "node.login") {
 			c <- struct{}{}
 		}
 	})
-	t.Cleanup(signal.ResetMobileSignalHandler)
+	t.Cleanup(signal.ResetHandler)
 
 	account, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)

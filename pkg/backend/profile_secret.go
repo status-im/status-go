@@ -3,8 +3,10 @@ package backend
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"errors"
 	"sync"
 
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 )
 
@@ -177,13 +179,46 @@ func (b *StatusBackend) ResolveKeystoreSecret(keyUID, password string) (string, 
 	return resolved.secret, nil
 }
 
+// sessionSecret returns the cached profile secret (DEK) for keyUID, available while the profile is unlocked
+// in this session.
+func (b *StatusBackend) sessionSecret(keyUID string) (string, bool) {
+	c := &b.secretCache
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.keyUID == keyUID && c.dekHex != "" {
+		return c.dekHex, true
+	}
+	return "", false
+}
+
+// asKeystoreResolutionError keeps the pre-DEK error contract of the keystore operations: a password that
+// cannot unwrap the profile envelope is simply an incorrect password.
+func asKeystoreResolutionError(err error) error {
+	if errors.Is(err, envelope.ErrInvalidKEK) {
+		return keystore.ErrIncorrectPasswordProvided
+	}
+	return err
+}
+
 // setSecretResolverForProfile points the accounts manager's keystore operations at this profile's secret resolution.
 func (b *StatusBackend) setSecretResolverForProfile(keyUID string, kdfIterations int) {
 	b.accountsManager.SetSecretResolver(func(password string) (string, error) {
 		resolved, err := b.resolveProfileSecret(keyUID, password, kdfIterations)
 		if err != nil {
-			return "", err
+			return "", asKeystoreResolutionError(err)
 		}
 		return resolved.secret, nil
+	})
+	// Keystore writes must keep the directory uniformly encrypted with the profile secret. Clients may pass a
+	// password that is not the login password, so fall back to the session secret instead of failing.
+	b.accountsManager.SetWriteSecretResolver(func(password string) (string, error) {
+		resolved, err := b.resolveProfileSecret(keyUID, password, kdfIterations)
+		if err == nil {
+			return resolved.secret, nil
+		}
+		if secret, ok := b.sessionSecret(keyUID); ok {
+			return secret, nil
+		}
+		return "", asKeystoreResolutionError(err)
 	})
 }

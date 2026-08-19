@@ -28,6 +28,7 @@ type AccountsManager struct {
 	profileKeyUID       string
 	selectedChatAccount *generator.Account
 	secretResolver      SecretResolver
+	writeSecretResolver SecretResolver
 
 	logger *zap.Logger
 }
@@ -74,6 +75,23 @@ func (m *AccountsManager) resolveSecret(password string) (string, error) {
 		return password, nil
 	}
 	return m.secretResolver(password)
+}
+
+// SetWriteSecretResolver sets (or clears, with nil) the resolver used for keystore store/import operations.
+// Deletion intentionally stays on the strict resolver: it is authorized by the password.
+func (m *AccountsManager) SetWriteSecretResolver(resolver SecretResolver) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.writeSecretResolver = resolver
+}
+
+// resolveSecretForWrite resolves the secret for keystore store/import operations.
+func (m *AccountsManager) resolveSecretForWrite(password string) (string, error) {
+	if m.writeSecretResolver != nil {
+		return m.writeSecretResolver(password)
+	}
+	return m.resolveSecret(password)
 }
 
 func (m *AccountsManager) setKeystore(keystore KeyStore) {
