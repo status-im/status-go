@@ -10,8 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -84,7 +84,7 @@ func (cm *Manager) fetchCommunityInfo(communityID string, fetcher func() (*third
 	if err != nil {
 		dbErr := cm.setCommunityInfo(communityID, nil)
 		if dbErr != nil {
-			logutils.ZapLogger().Error("SetCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(dbErr))
+			logutils.ZapLogger().Error("SetCommunityInfo failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(dbErr))
 		}
 		return nil, err
 	}
@@ -100,10 +100,10 @@ func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.Community
 
 func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		communityInfo, err := cm.FetchCommunityMetadata(communityID)
 		if err != nil {
-			logutils.ZapLogger().Error("FetchCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+			logutils.ZapLogger().Error("FetchCommunityInfo failed", zap.String("communityID", logutils.TruncateWithDot(communityID)), zap.Error(err))
 		}
 		cm.signalUpdatedCommunityMetadata(communityID, communityInfo)
 	}()

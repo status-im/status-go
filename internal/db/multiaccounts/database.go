@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/migrations"
 	"github.com/status-im/status-go/internal/db/sqlite"

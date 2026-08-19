@@ -20,7 +20,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
@@ -71,7 +70,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		return err
 	}
 
-	services := []common.StatusService{}
+	services := []StatusService{}
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appgeneralService())
 	services = append(services, b.personalService())
@@ -145,7 +144,7 @@ func (b *StatusNode) runServicesMigrations() error {
 	return nil
 }
 
-func (b *StatusNode) registerService(s common.StatusService) error {
+func (b *StatusNode) registerService(s StatusService) error {
 	for _, api := range s.APIs() {
 		b.logger.Debug("registering service api", zap.String("namespace", api.Namespace))
 		err := b.rpcServer.RegisterName(api.Namespace, api.Service)
@@ -381,7 +380,7 @@ func (b *StatusNode) localNotificationsService(network uint64) (*localnotificati
 	return b.localNotificationsSrvc, nil
 }
 
-func appendIf(condition bool, services []common.StatusService, service common.StatusService) []common.StatusService {
+func appendIf(condition bool, services []StatusService, service StatusService) []StatusService {
 	if !condition {
 		return services
 	}

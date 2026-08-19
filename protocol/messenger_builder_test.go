@@ -13,10 +13,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"

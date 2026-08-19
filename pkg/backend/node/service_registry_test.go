@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/pausable"
 )
 
 // fakePausable is a minimal Pausable for testing.
 type fakePausable struct {
-	common.PauseBroadcaster
+	pausable.PauseBroadcaster
 	name string
 }
 
@@ -43,7 +43,7 @@ func TestServiceRegistry_RegisterAndList(t *testing.T) {
 	names := map[string]bool{}
 	for _, info := range list {
 		names[info.Name] = true
-		require.Equal(t, common.ServiceStateRunning, info.State)
+		require.Equal(t, pausable.ServiceStateRunning, info.State)
 	}
 	require.True(t, names["wallet"])
 	require.True(t, names["messaging"])
@@ -55,10 +55,10 @@ func TestServiceRegistry_PauseAndResume(t *testing.T) {
 	r.Register(p)
 
 	require.NoError(t, r.Pause("wallet"))
-	require.Equal(t, common.ServiceStatePaused, p.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, p.PausableState())
 
 	require.NoError(t, r.Resume("wallet"))
-	require.Equal(t, common.ServiceStateRunning, p.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, p.PausableState())
 }
 
 func TestServiceRegistry_PauseUnknownReturnsError(t *testing.T) {
@@ -85,8 +85,8 @@ func TestServiceRegistry_PauseMultiple(t *testing.T) {
 	r.Register(connector)
 
 	require.NoError(t, r.PauseMultiple([]string{"wallet", "connector"}))
-	require.Equal(t, common.ServiceStatePaused, wallet.PausableState())
-	require.Equal(t, common.ServiceStatePaused, connector.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, wallet.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, connector.PausableState())
 }
 
 func TestServiceRegistry_PauseAll_ResumeAll(t *testing.T) {
@@ -99,14 +99,14 @@ func TestServiceRegistry_PauseAll_ResumeAll(t *testing.T) {
 	r.Register(newsfeed)
 
 	require.NoError(t, r.PauseAll())
-	require.Equal(t, common.ServiceStatePaused, wallet.PausableState())
-	require.Equal(t, common.ServiceStatePaused, connector.PausableState())
-	require.Equal(t, common.ServiceStatePaused, newsfeed.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, wallet.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, connector.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, newsfeed.PausableState())
 
 	require.NoError(t, r.ResumeAll())
-	require.Equal(t, common.ServiceStateRunning, wallet.PausableState())
-	require.Equal(t, common.ServiceStateRunning, connector.PausableState())
-	require.Equal(t, common.ServiceStateRunning, newsfeed.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, wallet.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, connector.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, newsfeed.PausableState())
 }
 
 func TestServiceRegistry_PauseMultiple_PartialError(t *testing.T) {
@@ -122,7 +122,7 @@ func TestServiceRegistry_PauseMultiple_PartialError(t *testing.T) {
 
 // errorPausable returns an error on Pause.
 type errorPausable struct {
-	common.PauseBroadcaster
+	pausable.PauseBroadcaster
 }
 
 func (p *errorPausable) PausableName() string { return "broken" }

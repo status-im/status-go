@@ -9,8 +9,9 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 )
 
 const (
@@ -197,12 +198,12 @@ type RPCRpsLimiter struct {
 
 	quit chan struct{}
 
-	pauseBroadcaster *gocommon.PauseBroadcaster
+	pauseBroadcaster *pausable.PauseBroadcaster
 }
 
 // NewRPCRpsLimiter creates a rate limiter. pauseBroadcaster (owned by the rpc.Client) that lets
 // the limiter stop its 1s ticker while the app is backgrounded — RPC traffic is paused then.
-func NewRPCRpsLimiter(pauseBroadcaster *gocommon.PauseBroadcaster) *RPCRpsLimiter {
+func NewRPCRpsLimiter(pauseBroadcaster *pausable.PauseBroadcaster) *RPCRpsLimiter {
 
 	limiter := RPCRpsLimiter{
 		uuid:                 uuid.New(),
@@ -227,7 +228,7 @@ func (rl *RPCRpsLimiter) ReduceLimit() {
 
 func (rl *RPCRpsLimiter) start() {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		var pauseCh <-chan bool
 		if rl.pauseBroadcaster != nil {
@@ -240,7 +241,7 @@ func (rl *RPCRpsLimiter) start() {
 			pauseCh = ch
 		}
 
-		pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+		pt := pausable.NewPausableTicker(pausable.PausableTickerConfig{
 			Interval: tickerInterval,
 			OnTick: func() {
 				rl.onTick()

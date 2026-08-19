@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/platform"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -413,7 +413,7 @@ func (pms *PayloadMarshallerSuite) TestKeycardPairingPasswordAdjustments_Unmarsh
 		pb, err := ppm.MarshalProtobuf()
 		require.NoError(t, err)
 		ppm.password = ""
-		common.IsMobilePlatform = func() bool { return true }
+		platform.IsMobilePlatform = func() bool { return true }
 
 		err = ppm.UnmarshalProtobuf(pb)
 		require.NoError(t, err)
@@ -429,7 +429,7 @@ func (pms *PayloadMarshallerSuite) TestKeycardPairingPasswordAdjustments_Unmarsh
 			keys:         make(map[string][]byte),
 		}
 		ppm := NewPairingPayloadMarshaller(ap, pms.Logger)
-		common.IsMobilePlatform = func() bool { return false }
+		platform.IsMobilePlatform = func() bool { return false }
 		ppm.multiaccount.KeycardPairing = "ABCDF"
 		pb, err := ppm.MarshalProtobuf()
 		require.NoError(t, err)
@@ -452,7 +452,7 @@ func (pms *PayloadMarshallerSuite) TestKeycardPairingPasswordAdjustments_Unmarsh
 		pb, err := ppm.MarshalProtobuf()
 		require.NoError(t, err)
 		ppm.password = ""
-		common.IsMobilePlatform = func() bool { return false }
+		platform.IsMobilePlatform = func() bool { return false }
 
 		err = ppm.UnmarshalProtobuf(pb)
 		require.NoError(t, err)

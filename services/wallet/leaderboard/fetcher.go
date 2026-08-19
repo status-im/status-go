@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -63,7 +63,7 @@ func NewProxyFetcher(config ServiceConfig, storage *DataStorage, subscriptionMan
 // Start begins the data refresh loops
 func (f *ProxyFetcher) Start(ctx context.Context) {
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		<-ctx.Done()
 		f.Stop() // gracefully stop if running
 	}()
@@ -93,13 +93,13 @@ func (f *ProxyFetcher) StartRefreshLoops() {
 
 	// Start crypto data refresh loop
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		f.cryptoRefreshLoop(ctx)
 	}()
 
 	// Start price data refresh loop
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		f.priceRefreshLoop(ctx)
 	}()
 }

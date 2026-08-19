@@ -16,9 +16,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
@@ -311,7 +311,7 @@ func (m *ArchiveManagerLogosStorage) downloadHistoryArchiveIndex(
 	done := make(chan struct{})
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		select {
 		case <-cancelTask:
 			m.logger.Debug("[LogosStorage][download_history_archive_index] cancelling downloading index from LogosStorage")

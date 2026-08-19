@@ -10,8 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/services/wallet/common"
 )
@@ -31,7 +31,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 	}
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		// Initialize interval to 0 for immediate execution
 		var interval time.Duration = 0
 
@@ -144,7 +144,7 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 	m.shutdownWaitGroup.Add(1)
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		m.logger.Debug("fetching unknown curated communities")
 

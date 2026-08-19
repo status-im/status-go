@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	gocommon "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/contracts"
@@ -22,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -153,7 +153,7 @@ func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 }
 
 func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -174,7 +174,7 @@ func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan 
 	for _, tokenID := range tokenIDs {
 		c.Wait()
 		go func(tokenID *big.Int) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer c.Done()
 			packID, err := stickerPack.TokenPackId(callOpts, tokenID)
 			if err != nil {
@@ -235,7 +235,7 @@ func (api *API) getPurchasedPackIDs(chainID uint64, account types.Address) ([]*b
 }
 
 func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack, errChan chan<- error, doneChan chan<- struct{}) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -274,7 +274,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 	for i := uint64(0); i < numPacks.Uint64(); i++ {
 		c.Wait()
 		go func(i uint64) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer c.Done()
 
 			packID := new(big.Int).SetUint64(i)
@@ -402,7 +402,7 @@ func (api *API) getContractPacks(chainID uint64) ([]StickerPack, error) {
 }
 
 func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accsmanagementtypes.Account, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -415,7 +415,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accsmanagementt
 	for _, account := range accs {
 		c.Wait()
 		go func(acc *accsmanagementtypes.Account) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer c.Done()
 			packs, err := api.getPurchasedPackIDs(chainID, acc.Address)
 			if err != nil {
@@ -432,7 +432,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accsmanagementt
 }
 
 func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, balance *big.Int, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -453,7 +453,7 @@ func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, bal
 	for i := uint64(0); i < balance.Uint64(); i++ {
 		c.Wait()
 		go func(i uint64) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer c.Done()
 			tokenID, err := stickerPack.TokenOfOwnerByIndex(callOpts, common.Address(account), new(big.Int).SetUint64(i))
 			if err != nil {

@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	gocommon "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
@@ -28,6 +27,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
@@ -75,7 +75,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
-	gocommon.PauseBroadcaster
+	pausable.PauseBroadcaster
 	messaging       *messaging.API
 	messenger       *protocol.Messenger
 	cancelMessenger chan struct{}

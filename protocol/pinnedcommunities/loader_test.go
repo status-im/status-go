@@ -9,7 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
-	utils "github.com/status-im/status-go/common"
+	protocolcommon "github.com/status-im/status-go/protocol/common"
 	protocolprotobuf "github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -73,7 +73,7 @@ func TestEmbeddedPinnedCommunitiesAreImportable(t *testing.T) {
 		require.Equal(t, protocolprotobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, metadata.Type,
 			"metadata type should be COMMUNITY_DESCRIPTION for %s", p.FileName)
 
-		signer, err := utils.RecoverKey(&metadata)
+		signer, err := protocolcommon.RecoverKey(&metadata)
 		require.NoError(t, err, "signer should recover for %s", p.FileName)
 		require.NotNil(t, signer, "signer should not be nil for %s", p.FileName)
 

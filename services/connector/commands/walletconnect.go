@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/connector/walletconnect"
 )
@@ -56,7 +56,7 @@ func (d *wcSessionDisconnector) DisconnectSession(ctx context.Context, topic str
 
 	if client, err := d.getClient.resolve(); err == nil {
 		go func(ctx context.Context, topic string, client *walletconnect.Client) {
-			defer common.LogOnPanic()
+			defer panics.LogOnPanic()
 			_ = client.SendSessionDelete(ctx, topic)
 		}(ctx, topic, client)
 	}

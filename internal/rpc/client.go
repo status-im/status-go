@@ -12,9 +12,11 @@ import (
 
 	"go.uber.org/zap"
 
-	appCommon "github.com/status-im/status-go/common"
 	healthmanager "github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
+	"github.com/status-im/status-go/internal/platform"
 	chain "github.com/status-im/status-go/internal/rpc/chain"
 	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
@@ -42,7 +44,7 @@ var (
 )
 
 func init() {
-	if appCommon.IsMobilePlatform() {
+	if platform.IsMobilePlatform() {
 		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile, version.Version())
 	} else {
 		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop, version.Version())
@@ -62,7 +64,7 @@ type EthClientGetter interface {
 // Client manages RPC clients for multiple chains with
 // multiple providers for each chain.
 type Client struct {
-	appCommon.PauseBroadcaster
+	pausable.PauseBroadcaster
 
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
@@ -138,7 +140,7 @@ func (c *Client) Start(ctx context.Context) {
 	c.stopMonitoringFunc = cancel
 	statusCh := c.healthMgr.Subscribe()
 	go func() {
-		defer appCommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		c.monitorHealth(cancelableCtx, statusCh)
 	}()
 }

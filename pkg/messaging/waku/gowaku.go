@@ -75,9 +75,10 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
@@ -121,7 +122,7 @@ type IMetricsHandler interface {
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
-	gocommon.PauseBroadcaster
+	pausable.PauseBroadcaster
 
 	node *node.WakuNode // reference to a libp2p waku node
 
@@ -219,7 +220,7 @@ func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
 func newTTLCache() *ttlcache.Cache[gethcommon.Hash, struct{}] {
 	cache := ttlcache.New(ttlcache.WithTTL[gethcommon.Hash, struct{}](cacheTTL))
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		cache.Start()
 	}()
 	return cache
@@ -397,13 +398,13 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, useOnlyDnsDiscCache 
 			// Use DNS Discovery
 			wg.Add(1)
 			go func(addr string) {
-				defer gocommon.LogOnPanic()
+				defer panics.LogOnPanic()
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR, useOnlyDnsDiscCache); err != nil {
 					// prevent w.ctx in retryDnsDiscoveryWithBackoff from set to nil when w.Stop() is called
 					w.wg.Add(1)
 					go func() {
-						defer gocommon.LogOnPanic()
+						defer panics.LogOnPanic()
 						defer w.wg.Done()
 						w.retryDnsDiscoveryWithBackoff(ctx, addr, w.dnsDiscAsyncRetrievedSignal)
 					}()
@@ -549,7 +550,7 @@ func (w *Waku) discoverAndConnect(address string) {
 	}
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		// Retry on failure with exponential backoff: at cold start on Android,
 		// the device DNS resolver isn't always ready when statusgo starts and
 		// the enrtree:// lookup hits ::1:53 with "connection refused". Without
@@ -614,14 +615,14 @@ func handlePeerAddress(addr string, handler peerAddressHandler) error {
 }
 
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses connect, so it will execute identify as part of its
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
 func (w *Waku) runPeerExchangeLoop() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer w.wg.Done()
 
 	if !w.cfg.EnablePeerExchangeClient {
@@ -696,7 +697,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string) error {
 
 	w.wg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer w.wg.Done()
 		for {
 			select {
@@ -736,7 +737,7 @@ func (w *Waku) subscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event
 func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
 	events := make(chan common.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		for e := range events {
 			eventsProxy <- *NewWakuV2EnvelopeEventWrapper(&e)
 		}
@@ -871,7 +872,7 @@ func (w *Waku) Start() error {
 	if w.cfg.MetricsEnabled {
 		w.wg.Add(1)
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer w.wg.Done()
 			peerTelemetryTickerInterval := 10 * time.Second
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
@@ -960,7 +961,7 @@ func (w *Waku) Start() error {
 	go w.broadcast()
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		w.sendQueue.Start(w.ctx)
 	}()
 
@@ -985,7 +986,7 @@ func (w *Waku) startConnectionMonitoringLoop() {
 }
 
 func (w *Waku) runConnectionMonitoringLoop() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer w.wg.Done()
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -1332,7 +1333,7 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 
 // processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
 func (w *Waku) processQueueLoop() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer w.wg.Done()
 	for {
 		select {
@@ -1420,7 +1421,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	if w.cfg.IsLightClient() {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
 		go func() {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			w.filterManager.OnConnectionStatusChange("", isOnline, byte(state.Type))
 		}()
 		w.handleNetworkChangeFromApp(state)
@@ -1447,7 +1448,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // It backs off exponentially until maxRetries, at which point it restarts from 0
 // It also restarts if there's a connection change signalled from the client
 func (w *Waku) seedBootnodesForDiscV5() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer w.wg.Done()
 
 	if !w.cfg.EnableDiscV5 || w.node.DiscV5() == nil {

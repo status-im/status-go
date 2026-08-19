@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/security"
@@ -381,10 +380,10 @@ func (c *NodeConfig) UpdateWithDefaults() error {
 	// Ensure TorrentConfig is valid
 	if c.TorrentConfig.Enabled {
 		if c.TorrentConfig.DataDir == "" {
-			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, gocommon.ArchivesRelativePath)
+			c.TorrentConfig.DataDir = filepath.Join(c.RootDataDir, ArchivesRelativePath)
 		}
 		if c.TorrentConfig.TorrentDir == "" {
-			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, gocommon.TorrentTorrentsRelativePath)
+			c.TorrentConfig.TorrentDir = filepath.Join(c.RootDataDir, TorrentTorrentsRelativePath)
 		}
 	}
 
@@ -584,3 +583,16 @@ func (c *NodeConfig) ProfileLogSettings() logutils.LogSettings {
 		LogToStderr:     c.LogToStderr,
 	}
 }
+
+const (
+	// ArchivesRelativePath is where community history archives are stored,
+	// relative to the root data dir.
+	ArchivesRelativePath = "data/archivedata"
+	// TorrentTorrentsRelativePath is where the torrent files backing the
+	// community history archives are stored, relative to the root data dir.
+	TorrentTorrentsRelativePath = "data/torrents"
+
+	// MainnetEthereumNetworkURL is the URL the upstream ethereum mainnet is
+	// loaded from, so that we avoid syncing a node.
+	MainnetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+)

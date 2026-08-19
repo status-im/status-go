@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"reflect"
 	"slices"
 	"sync"
 	"time"
@@ -18,7 +19,6 @@ import (
 	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	utils "github.com/status-im/status-go/common"
 	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	accstypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
@@ -419,7 +419,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		// update token meta image to url rather than base64 image
 		var tokenMetadata []*protobuf.CommunityTokenMetadata
 
-		if !utils.IsNil(o.mediaServer) {
+		if !isNil(o.mediaServer) {
 			for _, m := range o.config.CommunityDescription.CommunityTokensMetadata {
 				copyM := proto.Clone(m).(*protobuf.CommunityTokenMetadata)
 				copyM.Image = o.mediaServer.MakeCommunityDescriptionTokenImageURL(o.IDString(), copyM.GetSymbol())
@@ -434,7 +434,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			communityItem.Color = o.config.CommunityDescription.Identity.Color
 			communityItem.Description = o.config.CommunityDescription.Identity.Description
 
-			if !utils.IsNil(o.mediaServer) {
+			if !isNil(o.mediaServer) {
 				for t := range o.config.CommunityDescription.Identity.Images {
 					if communityItem.Images == nil {
 						communityItem.Images = make(map[string]Image)
@@ -2792,4 +2792,16 @@ func (c *Community) Fake(f *gofakeit.Faker) (any, error) {
 
 	community, err := New(config, &timeSource, nil, nil)
 	return community, err
+}
+
+// isNil reports whether i is a nil pointer or a nil value held in an interface.
+func isNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr, reflect.Interface:
+		return reflect.ValueOf(i).IsNil()
+	}
+	return false
 }

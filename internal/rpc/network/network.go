@@ -6,11 +6,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc/network/db"
 	persistence "github.com/status-im/status-go/internal/rpc/network/db"
 	"github.com/status-im/status-go/params"
@@ -103,7 +103,7 @@ func (nm *Manager) startSettingsChangeSubscription() {
 	}
 	ch, unsub := pubsub.Subscribe[settings.EventSettingChanged](nm.accountsPublisher, 1)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer unsub()
 		for {
 			select {

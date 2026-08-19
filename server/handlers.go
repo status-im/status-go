@@ -20,8 +20,8 @@ import (
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -312,7 +312,7 @@ func (s *MediaServer) handleAccountImagesImpl(w http.ResponseWriter, parsed Imag
 
 	identityImage, err := s.multiaccountsDB.GetIdentityImage(parsed.KeyUID, parsed.ImageName)
 	if err != nil {
-		s.logger.Error("handleAccountImagesImpl: failed to load image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
+		s.logger.Error("handleAccountImagesImpl: failed to load image.", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
 
@@ -327,7 +327,7 @@ func (s *MediaServer) handleAccountImagesImpl(w http.ResponseWriter, parsed Imag
 
 	payload, err := images.RoundCrop(identityImage.Payload)
 	if err != nil {
-		s.logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
+		s.logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
 
@@ -336,7 +336,7 @@ func (s *MediaServer) handleAccountImagesImpl(w http.ResponseWriter, parsed Imag
 	if parsed.Ring {
 		account, err := s.multiaccountsDB.GetAccount(parsed.KeyUID)
 		if err != nil {
-			s.logger.Error("handleAccountImagesImpl: failed to GetAccount .", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+			s.logger.Error("handleAccountImagesImpl: failed to GetAccount .", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 			return
 		}
 
@@ -344,12 +344,12 @@ func (s *MediaServer) handleAccountImagesImpl(w http.ResponseWriter, parsed Imag
 
 		if accColorHash == nil {
 			if parsed.PublicKey == "" {
-				s.logger.Error("handleAccountImagesImpl: no public key for color hash", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)))
+				s.logger.Error("handleAccountImagesImpl: no public key for color hash", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)))
 			}
 
 			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
-				s.logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+				s.logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 			}
 		}
 
@@ -468,7 +468,7 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 		account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
 
 		if err != nil {
-			logger.Error("handleAccountInitialsImpl: failed to get account.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+			logger.Error("handleAccountInitialsImpl: failed to get account.", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 			return
 		}
 		name = account.Name
@@ -481,7 +481,7 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 
 	if err != nil {
 		logger.Error("handleAccountInitialsImpl: failed to generate initials image.",
-			zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)),
+			zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)),
 			zap.Error(err))
 		return
 	}
@@ -489,12 +489,12 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	if parsed.Ring {
 		if accColorHash == nil {
 			if parsed.PublicKey == "" {
-				logger.Error("handleAccountInitialsImpl: no public key, can't draw ring", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+				logger.Error("handleAccountInitialsImpl: no public key, can't draw ring", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 			}
 
 			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
-				logger.Error("handleAccountInitialsImpl: failed to generate color hash from pubkey", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+				logger.Error("handleAccountInitialsImpl: failed to generate color hash from pubkey", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 			}
 		}
 
@@ -519,7 +519,7 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	}
 
 	if len(payload) == 0 {
-		logger.Error("handleAccountInitialsImpl: empty image", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+		logger.Error("handleAccountInitialsImpl: empty image", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 		return
 	}
 	mime, err := images.GetProtobufImageMime(payload)
@@ -547,7 +547,7 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 	payload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
 
 	if err != nil {
-		logger.Error("handleAccountInitialsPlaceholder: failed to generate initials image.", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.String("name", parsed.FullName), zap.Error(err))
+		logger.Error("handleAccountInitialsPlaceholder: failed to generate initials image.", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.String("name", parsed.FullName), zap.Error(err))
 		return
 	}
 
@@ -560,7 +560,7 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 	}
 
 	if len(payload) == 0 {
-		logger.Error("handleAccountInitialsPlaceholder: empty image", zap.String("keyUid", gocommon.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
+		logger.Error("handleAccountInitialsPlaceholder: empty image", zap.String("keyUid", logutils.TruncateWithDot(parsed.KeyUID)), zap.Error(err))
 		return
 	}
 	mime, err := images.GetProtobufImageMime(payload)
@@ -639,13 +639,13 @@ func (s *MediaServer) handleContactImages(w http.ResponseWriter, r *http.Request
 	var payload []byte
 	err := s.db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, parsed.PublicKey, parsed.ImageName).Scan(&payload)
 	if err != nil {
-		s.logger.Error("failed to load image.", zap.String("contact id", gocommon.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
+		s.logger.Error("failed to load image.", zap.String("contact id", logutils.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
 		return
 	}
 
 	img, _, err := image.Decode(bytes.NewReader(payload))
 	if err != nil {
-		s.logger.Error("failed to decode config.", zap.String("contact id", gocommon.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
+		s.logger.Error("failed to decode config.", zap.String("contact id", logutils.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
 		return
 	}
 	width := img.Bounds().Dx()
@@ -999,20 +999,20 @@ func (s *MediaServer) handleCommunityDescriptionImages(w http.ResponseWriter, r 
 		}
 	}
 	if imagePayload == nil {
-		s.logger.Error("can't find community description image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("name", name))
+		s.logger.Error("can't find community description image", zap.String("community id", logutils.TruncateWithDot(communityID)), zap.String("name", name))
 		return
 	}
 
 	mime, err := images.GetProtobufImageMime(imagePayload)
 	if err != nil {
-		s.logger.Error("failed to get community image mime", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+		s.logger.Error("failed to get community image mime", zap.String("community id", logutils.TruncateWithDot(communityID)), zap.Error(err))
 	}
 
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "no-store")
 	_, err = w.Write(imagePayload)
 	if err != nil {
-		s.logger.Error("failed to write community image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.Error(err))
+		s.logger.Error("failed to write community image", zap.String("community id", logutils.TruncateWithDot(communityID)), zap.Error(err))
 	}
 }
 
@@ -1049,7 +1049,7 @@ func (s *MediaServer) handleCommunityDescriptionTokenImages(w http.ResponseWrite
 		}
 	}
 	if foundToken == nil {
-		s.logger.Error("can't find community description token image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol))
+		s.logger.Error("can't find community description token image", zap.String("community id", logutils.TruncateWithDot(communityID)), zap.String("symbol", symbol))
 		return
 	}
 
@@ -1060,14 +1060,14 @@ func (s *MediaServer) handleCommunityDescriptionTokenImages(w http.ResponseWrite
 	}
 	mime, err := images.GetProtobufImageMime(imagePayload)
 	if err != nil {
-		s.logger.Error("failed to get community description token image mime", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
+		s.logger.Error("failed to get community description token image mime", zap.String("community id", logutils.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
 	}
 
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "no-store")
 	_, err = w.Write(imagePayload)
 	if err != nil {
-		s.logger.Error("failed to write community description token image", zap.String("community id", gocommon.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
+		s.logger.Error("failed to write community description token image", zap.String("community id", logutils.TruncateWithDot(communityID)), zap.String("symbol", symbol), zap.Error(err))
 	}
 }
 

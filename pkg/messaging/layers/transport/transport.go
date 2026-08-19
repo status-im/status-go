@@ -13,10 +13,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -32,7 +33,7 @@ type Option func(*Transport) error
 
 // Transport is a transport based on Whisper service.
 type Transport struct {
-	gocommon.PauseBroadcaster
+	pausable.PauseBroadcaster
 
 	waku       wakutypes.Waku
 	api        MessagingAPI      // backend used to send messages and read received envelopes
@@ -164,7 +165,7 @@ func NewTransport(
 // route it against their own filters. The events channel is amply buffered so
 // the backend's producer is never blocked.
 func (t *Transport) receiveLoop() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 
 	events := make(chan wakutypes.EnvelopeEvent, 100)
 	sub := t.api.SubscribeEnvelopeEvents(events)
@@ -749,10 +750,10 @@ func (t *Transport) Stop() error {
 
 func (t *Transport) cleanFiltersLoop() {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		sub := t.Subscribe()
 		defer sub.Unsubscribe()
-		pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+		pt := pausable.NewPausableTicker(pausable.PausableTickerConfig{
 			Interval: cleanFiltersLoopInterval,
 			OnTick: func() {
 				err := t.cleanFilters()

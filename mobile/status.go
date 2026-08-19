@@ -19,7 +19,6 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	gocommon "github.com/status-im/status-go/common"
 	abi_spec "github.com/status-im/status-go/internal/abi-spec"
 	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
@@ -393,13 +392,13 @@ func login(accountData, password, configJSON string) error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
+			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", logutils.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return statusBackend.LoggedIn(account.KeyUID, err)
 		}
 
 		err = statusBackend.StartNodeWithAccount(account, password, &conf, nil)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", logutils.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
@@ -558,7 +557,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", logutils.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
@@ -1752,7 +1751,7 @@ func IsAddress(address string) string {
 func isAddress(address string) string {
 	valid, err := abi_spec.IsAddress(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
+		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", logutils.TruncateWithDot(address)), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)

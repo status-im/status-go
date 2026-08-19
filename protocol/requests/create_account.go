@@ -5,9 +5,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
+	protocolcommon "github.com/status-im/status-go/protocol/common"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
@@ -141,7 +141,7 @@ func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 		return ErrCreateAccountInvalidDisplayName
 	}
 
-	if err := utils.ValidateDisplayName(&c.DisplayName); err != nil {
+	if err := protocolcommon.ValidateDisplayName(&c.DisplayName); err != nil {
 		return errors.Wrap(ErrCreateAccountInvalidDisplayName, err.Error())
 	}
 

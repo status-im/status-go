@@ -8,9 +8,9 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 const (
@@ -55,7 +55,7 @@ func (p *Publisher) Start() <-chan struct{} {
 
 	p.quitWg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		p.quitWg.Done()
 		p.tickerLoop()
 	}()

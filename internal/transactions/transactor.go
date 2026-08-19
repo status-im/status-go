@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	gocommon "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto"
@@ -444,8 +443,8 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 func (t *Transactor) logNewTx(args wallettypes.SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int) {
 	if args.IsDynamicFeeTx() {
 		t.logger.Info("New dynamic fee transaction",
-			zap.String("From", gocommon.TruncateWithDot(args.From.Hex())),
-			zap.String("To", gocommon.TruncateWithDot(args.To.Hex())),
+			zap.String("From", logutils.TruncateWithDot(args.From.Hex())),
+			zap.String("To", logutils.TruncateWithDot(args.To.Hex())),
 			zap.Uint64("Gas", gas),
 			zap.Stringer("GasTipCap", (*big.Int)(args.MaxPriorityFeePerGas)),
 			zap.Stringer("GasFeeCap", (*big.Int)(args.MaxFeePerGas)),
@@ -453,8 +452,8 @@ func (t *Transactor) logNewTx(args wallettypes.SendTxArgs, gas uint64, gasPrice 
 		)
 	} else {
 		t.logger.Info("New legacy transaction",
-			zap.String("From", gocommon.TruncateWithDot(args.From.Hex())),
-			zap.String("To", gocommon.TruncateWithDot(args.To.Hex())),
+			zap.String("From", logutils.TruncateWithDot(args.From.Hex())),
+			zap.String("To", logutils.TruncateWithDot(args.To.Hex())),
 			zap.Uint64("Gas", gas),
 			zap.Stringer("GasPrice", gasPrice),
 			zap.Stringer("Value", value),
@@ -466,10 +465,10 @@ func (t *Transactor) logNewContract(args wallettypes.SendTxArgs, gas uint64, gas
 	contractAddress := crypto.CreateAddress(args.From, nonce)
 
 	t.logger.Info("New contract",
-		zap.String("From", gocommon.TruncateWithDot(args.From.Hex())),
+		zap.String("From", logutils.TruncateWithDot(args.From.Hex())),
 		zap.Uint64("Gas", gas),
 		zap.Stringer("GasPrice", gasPrice),
 		zap.Stringer("Value", value),
-		zap.String("Contract address", gocommon.TruncateWithDot(contractAddress.Hex())),
+		zap.String("Contract address", logutils.TruncateWithDot(contractAddress.Hex())),
 	)
 }

@@ -25,8 +25,6 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/common/dbsetup"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	generator "github.com/status-im/status-go/internal/accounts-management/generator"
@@ -35,6 +33,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	multiacccommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
@@ -43,9 +42,12 @@ import (
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
+	"github.com/status-im/status-go/internal/ipfs"
 	logutils "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/internal/nodecfg"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/platform"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/transactions"
@@ -125,9 +127,9 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 	logger.Info("Status backend initialized",
 		zap.String("backend geth version", version.Version()),
 		zap.String("commit", version.GitCommit()),
-		zap.String("IpfsGatewayURL", gocommon.IpfsGatewayURL))
+		zap.String("IpfsGatewayURL", ipfs.GatewayURL))
 
-	if gocommon.IsMobilePlatform() {
+	if platform.IsMobilePlatform() {
 		// A limit below the working set (~350-620MB while syncing a large
 		// community) forces the GC into permanent maximum-aggression mode;
 		// 500MB keeps an OOM guard while leaving the GC headroom for the
@@ -319,7 +321,7 @@ func (b *StatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Accoun
 			return &acc, nil
 		}
 	}
-	return nil, fmt.Errorf("account with keyUID %s not found", gocommon.TruncateWithDot(keyUID))
+	return nil, fmt.Errorf("account with keyUID %s not found", logutils.TruncateWithDot(keyUID))
 }
 
 func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
@@ -457,7 +459,7 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 		err error
 	}, 1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		db, openErr := walletdatabase.OpenDB(walletDBPath, password, account.KDFIterations)
 		walletResultCh <- struct {
 			db  *sql.DB
@@ -465,7 +467,7 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 		}{db: db, err: openErr}
 	}()
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		db, openErr := appdatabase.OpenDB(appDBPath, password, account.KDFIterations)
 		appResultCh <- struct {
 			db  *sql.DB

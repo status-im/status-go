@@ -15,7 +15,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/pausable"
 	mock_backup_controller "github.com/status-im/status-go/services/backup/mock"
 )
 
@@ -133,13 +133,13 @@ func TestControllerLifecycleState(t *testing.T) {
 	}, logger)
 	require.NoError(t, err)
 
-	require.Equal(t, common.ServiceStateStopped, controller.PausableState())
+	require.Equal(t, pausable.ServiceStateStopped, controller.PausableState())
 
 	controller.Start()
-	require.Equal(t, common.ServiceStateRunning, controller.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, controller.PausableState())
 
 	controller.Stop()
-	require.Equal(t, common.ServiceStateStopped, controller.PausableState())
+	require.Equal(t, pausable.ServiceStateStopped, controller.PausableState())
 }
 
 func TestControllerStartPausesAndResumesByLifecycle(t *testing.T) {

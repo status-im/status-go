@@ -9,7 +9,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -505,7 +504,7 @@ func (s *MessengerCommunitiesSignersSuite) testDescriptionSignature(description 
 	err := proto.Unmarshal(description, &amm)
 	s.Require().NoError(err)
 
-	signer, err := utils.RecoverKey(&amm)
+	signer, err := common.RecoverKey(&amm)
 	s.Require().NoError(err)
 	s.NotNil(signer)
 }

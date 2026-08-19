@@ -13,7 +13,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 const (
@@ -100,7 +100,7 @@ func (p *storePager) run(
 	for _, chunk := range chunks {
 		wg.Add(1)
 		go func(contentTopics []string) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer wg.Done()
 			if err := p.fetchChunkBounded(ctx, peerInfo, pubsubTopic, contentTopics, from, to, pageLimit, shouldProcessNextPage, processEnvelopes); err != nil {
 				mu.Lock()

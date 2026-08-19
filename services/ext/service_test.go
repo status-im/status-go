@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -14,9 +14,9 @@ import (
 func TestServicePauseResumeBackgroundWithNilMessenger(t *testing.T) {
 	svc := &Service{}
 	require.NoError(t, svc.Pause())
-	require.Equal(t, common.ServiceStatePaused, svc.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, svc.PausableState())
 	require.NoError(t, svc.Resume())
-	require.Equal(t, common.ServiceStateRunning, svc.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, svc.PausableState())
 }
 
 func TestServicePauseResumeBackgroundWithMessenger(t *testing.T) {
@@ -24,9 +24,9 @@ func TestServicePauseResumeBackgroundWithMessenger(t *testing.T) {
 		messenger: &protocol.Messenger{},
 	}
 	require.NoError(t, svc.Pause())
-	require.Equal(t, common.ServiceStatePaused, svc.PausableState())
+	require.Equal(t, pausable.ServiceStatePaused, svc.PausableState())
 	require.NoError(t, svc.Resume())
-	require.Equal(t, common.ServiceStateRunning, svc.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, svc.PausableState())
 }
 
 // Regression test: right after a profile sync the community description

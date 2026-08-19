@@ -11,7 +11,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
 )
 
@@ -48,7 +48,7 @@ func (w *Waku) sendEnvelope(pubsubTopic string, msg *pb.WakuMessage, priority *i
 }
 
 func (w *Waku) broadcast() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer w.wg.Done()
 	for {
 		var envelope *protocol.Envelope
@@ -66,7 +66,7 @@ func (w *Waku) broadcast() {
 }
 
 func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer w.wg.Done()
 
 	logger := w.logger.With(zap.Stringer("envelopeHash", envelope.Hash()), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().GetTimestamp()))

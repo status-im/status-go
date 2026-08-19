@@ -19,10 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/internal/panics"
 	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/services/rpcstats"
 
@@ -131,7 +131,7 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 
 	// Start a goroutine to watch for client closure
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		select {
 		case <-c.done:
 			cancel()

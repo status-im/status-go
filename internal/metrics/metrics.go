@@ -10,8 +10,8 @@ import (
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 // Server runs and controls a HTTP pprof interface.
@@ -78,7 +78,7 @@ func healthHandler() http.Handler {
 
 // Listen starts the HTTP server in the background.
 func (s *Server) Listen() {
-	defer common.LogOnPanic()
+	defer panics.LogOnPanic()
 	err := s.server.ListenAndServe()
 	logutils.ZapLogger().Info("metrics server stopped", zap.Error(err))
 }

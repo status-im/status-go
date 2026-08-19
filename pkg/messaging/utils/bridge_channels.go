@@ -1,11 +1,11 @@
 package utils
 
-import "github.com/status-im/status-go/common"
+import "github.com/status-im/status-go/internal/panics"
 
 func BridgeChannels[In any, Out any](in <-chan In, convert func(In) Out) <-chan Out {
 	out := make(chan Out)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer close(out)
 		for v := range in {
 			out <- convert(v)
@@ -17,7 +17,7 @@ func BridgeChannels[In any, Out any](in <-chan In, convert func(In) Out) <-chan 
 func BridgeChannelsSlice[In any, Out any](in <-chan []In, convert func(In) Out) <-chan []Out {
 	out := make(chan []Out)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer close(out)
 		for v := range in {
 			var converted []Out

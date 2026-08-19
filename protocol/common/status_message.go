@@ -3,7 +3,6 @@ package common
 import (
 	"crypto/ecdsa"
 
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -52,7 +51,7 @@ func processMessageApplicationLayer(m *StatusMessage) error {
 		return err
 	}
 
-	recoveredKey, err := utils.RecoverKey(message)
+	recoveredKey, err := RecoverKey(message)
 	if err != nil {
 		return err
 	}

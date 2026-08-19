@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/security"
@@ -131,7 +130,7 @@ func TestNodeConfigValidate(t *testing.T) {
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"UpstreamConfig": {
 					"Enabled": true,
-					"URL": "` + gocommon.MainnetEthereumNetworkURL + `"
+					"URL": "` + params.MainnetEthereumNetworkURL + `"
 				}
 			}`,
 		},

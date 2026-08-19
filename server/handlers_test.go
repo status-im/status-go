@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"

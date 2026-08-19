@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	gocommon "github.com/status-im/status-go/common"
 	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto/types"
 	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/messaging"
@@ -284,7 +284,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	nodeConfig.RootDataDir = request.RootDataDir
 	nodeConfig.LogEnabled = request.LogEnabled
 	nodeConfig.LogToStderr = request.LogToStderr
-	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID) + ".log"
+	nodeConfig.LogFile = logutils.TruncateWithDot(keyUID) + ".log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.KeycardPairingDataFile = filepath.Join(nodeConfig.RootDataDir, DefaultKeycardPairingDataFileRelativePath)
@@ -356,8 +356,8 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	nodeConfig.TorrentConfig = params.TorrentConfig{
 		Enabled:    false,
 		Port:       0,
-		DataDir:    filepath.Join(nodeConfig.RootDataDir, gocommon.ArchivesRelativePath),
-		TorrentDir: filepath.Join(nodeConfig.RootDataDir, gocommon.TorrentTorrentsRelativePath),
+		DataDir:    filepath.Join(nodeConfig.RootDataDir, params.ArchivesRelativePath),
+		TorrentDir: filepath.Join(nodeConfig.RootDataDir, params.TorrentTorrentsRelativePath),
 	}
 
 	if request.TorrentConfigEnabled != nil {

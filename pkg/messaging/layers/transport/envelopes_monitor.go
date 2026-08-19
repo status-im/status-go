@@ -6,8 +6,9 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -77,7 +78,7 @@ type monitoredEnvelope struct {
 
 // EnvelopesMonitor is responsible for monitoring waku envelopes state.
 type EnvelopesMonitor struct {
-	gocommon.PauseBroadcaster
+	pausable.PauseBroadcaster
 
 	w       wakutypes.Waku
 	handler EnvelopeEventsHandler
@@ -141,7 +142,7 @@ func (m *EnvelopesMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.wg.Done()
 		m.handleEnvelopeEvents()
 	}()

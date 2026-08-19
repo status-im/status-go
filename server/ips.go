@@ -5,8 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/platform"
 )
 
 var (
@@ -97,7 +97,7 @@ func getAndroidLocalIP() ([][]net.IP, error) {
 func getLocalAddresses() ([][]net.IP, error) {
 	// TODO until we can resolve Android errors when calling net.Interfaces() just return the outbound local address.
 	//  Sorry Android
-	if common.OperatingSystemIs(common.AndroidPlatform) {
+	if platform.OperatingSystemIs(platform.AndroidPlatform) {
 		return getAndroidLocalIP()
 	}
 
@@ -191,7 +191,7 @@ func getAllAvailableNetworks() ([]net.IPNet, error) {
 // that returns a reachable server's address to be used by local pairing client.
 func FindReachableAddressesForPairingClient(serverIps []net.IP) ([]net.IP, error) {
 	// TODO until we can resolve Android errors when calling net.Interfaces() just noop. Sorry Android
-	if common.OperatingSystemIs(common.AndroidPlatform) {
+	if platform.OperatingSystemIs(platform.AndroidPlatform) {
 		return serverIps, nil
 	}
 

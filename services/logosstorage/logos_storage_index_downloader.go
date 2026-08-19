@@ -6,9 +6,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/status-im/status-go/common"
-
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/panics"
 )
 
 type LogosStorageIndexDownloader struct {
@@ -28,7 +28,7 @@ func (d *LogosStorageIndexDownloader) DownloadIndexFileFromLocalNode(
 	indexCid string,
 	output io.Writer,
 ) error {
-	defer common.LogOnPanic()
+	defer panics.LogOnPanic()
 
 	d.logger.Debug("[LOGOS_STORAGE][download_index_file_from_local_node] downloading LogosStorage index file from local node", zap.String("indexCid", indexCid))
 
@@ -40,7 +40,7 @@ func (d *LogosStorageIndexDownloader) DownloadIndexFileFromNetwork(
 	indexCid string,
 	output io.Writer,
 ) error {
-	defer common.LogOnPanic()
+	defer panics.LogOnPanic()
 
 	d.logger.Debug("[LogosStorage][download_index_file_from_network] downloading LogosStorage index file from network", zap.String("indexCid", indexCid))
 

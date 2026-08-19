@@ -11,7 +11,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
@@ -32,6 +31,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	archivecommons "github.com/status-im/status-go/protocol/communities/archive/commons"
@@ -402,7 +403,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *contacts.C
 	}
 
 	if chat == nil {
-		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", gocommon.TruncateWithDot(contact.ID))
+		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", logutils.TruncateWithDot(contact.ID))
 	}
 
 	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contact.ID)
@@ -1160,7 +1161,7 @@ func (m *Messenger) HandleContactUpdate(ctx context.Context, state *ReceivedMess
 		return ErrMessageNotAllowed
 	}
 
-	if err = gocommon.ValidateDisplayName(&message.DisplayName); err != nil {
+	if err = common.ValidateDisplayName(&message.DisplayName); err != nil {
 		return err
 	}
 
@@ -1320,7 +1321,7 @@ func (m *Messenger) HandleHistoryArchiveLinkMessage(state *ReceivedMessageState,
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
 			go func(currentTask *archivetypes.HistoryArchiveDownloadTask, communityID cryptotypes.HexBytes) {
-				defer gocommon.LogOnPanic()
+				defer panics.LogOnPanic()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()
@@ -1702,7 +1703,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(ctx context.Context, st
 				return err
 			}
 			go func(currentTask *archivetypes.HistoryArchiveDownloadTask) {
-				defer gocommon.LogOnPanic()
+				defer panics.LogOnPanic()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()
@@ -2832,7 +2833,7 @@ func (m *Messenger) HandleChatIdentity(ctx context.Context, state *ReceivedMessa
 	}
 
 	if clockChanged {
-		if err = gocommon.ValidateDisplayName(&ci.DisplayName); err != nil {
+		if err = common.ValidateDisplayName(&ci.DisplayName); err != nil {
 			return err
 		}
 

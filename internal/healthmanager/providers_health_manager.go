@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	status_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/healthmanager/aggregator"
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 // DefaultDownDebounce delays Down emission to suppress short provider blips.
@@ -116,7 +116,7 @@ func (p *ProvidersHealthManager) stopDownTimer() {
 
 // Uses background context because the request ctx is usually cancelled by the time the timer fires.
 func (p *ProvidersHealthManager) emitDownIfStillDown() {
-	defer status_common.LogOnPanic()
+	defer panics.LogOnPanic()
 
 	p.mu.Lock()
 	p.downTimer = nil

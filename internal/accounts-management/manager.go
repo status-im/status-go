@@ -7,12 +7,12 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	accsmanagementerrors "github.com/status-im/status-go/internal/accounts-management/errors"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 // AccountsManager represents the default account manager implementation
@@ -77,8 +77,8 @@ func (m *AccountsManager) VerifyAccountPassword(address cryptotypes.Address, pas
 
 	if account.Address() != address {
 		return false, ErrAccountMismatch.
-			WithContext("got", gocommon.TruncateWithDot(account.Address().Hex())).
-			WithContext("want", gocommon.TruncateWithDot(address.Hex()))
+			WithContext("got", logutils.TruncateWithDot(account.Address().Hex())).
+			WithContext("want", logutils.TruncateWithDot(address.Hex()))
 	}
 
 	return true, nil

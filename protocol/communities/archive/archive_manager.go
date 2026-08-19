@@ -11,8 +11,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -253,7 +253,7 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID cryptotypes.Hex
 }
 
 func (m *ArchiveManager) StartHistoryArchiveTasksInterval(communityID cryptotypes.HexBytes, chatID string, encrypted bool, interval time.Duration) {
-	defer common.LogOnPanic()
+	defer panics.LogOnPanic()
 	id := cryptotypes.EncodeHex(communityID)
 
 	if _, exists := m.historyArchiveTasks.Load(id); exists {

@@ -5,12 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/signal"
 )
 
@@ -33,7 +35,7 @@ type Provider interface {
 }
 
 type Controller struct {
-	common.PauseBroadcaster
+	pausable.PauseBroadcaster
 
 	config Config
 	core   *core
@@ -60,7 +62,7 @@ func NewController(config Config, logger *zap.Logger) (*Controller, error) {
 	if len(config.PrivateKey) == 0 {
 		return nil, errors.New("private key must be provided")
 	}
-	if common.IsNil(config.FileNameProvider) {
+	if isNil(config.FileNameProvider) {
 		return nil, errors.New("filename provider must be provided")
 	}
 
@@ -88,11 +90,11 @@ func (c *Controller) Start() {
 	c.wg.Add(1)
 
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer c.wg.Done()
 		sub := c.Subscribe()
 		defer sub.Unsubscribe()
-		pt := common.NewPausableTicker(common.PausableTickerConfig{
+		pt := pausable.NewPausableTicker(pausable.PausableTickerConfig{
 			Interval: c.config.Interval,
 			OnTick: func() {
 				_, err := c.PerformBackup()
@@ -169,4 +171,16 @@ func (c *Controller) LoadBackup(filePath string) error {
 	}
 
 	return c.core.Restore(c.config.PrivateKey, backupData)
+}
+
+// isNil reports whether i is a nil pointer or a nil value held in an interface.
+func isNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr, reflect.Interface:
+		return reflect.ValueOf(i).IsNil()
+	}
+	return false
 }

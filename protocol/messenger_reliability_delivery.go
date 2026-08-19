@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	gocommon "github.com/status-im/status-go/common"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging/events"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -15,7 +15,7 @@ func (m *Messenger) watchReliabilityDeliveryEvents() {
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		defer unsubscribe()
 

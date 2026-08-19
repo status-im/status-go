@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/go-version"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/ens"
 )
@@ -31,7 +31,7 @@ type API struct {
 
 func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVersion string) {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
 

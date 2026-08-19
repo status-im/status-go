@@ -18,8 +18,9 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/timesource"
 )
 
@@ -38,7 +39,7 @@ type Verifier struct {
 	quit            chan struct{}
 	quitWg          sync.WaitGroup
 
-	pause gocommon.PauseBroadcaster
+	pause pausable.PauseBroadcaster
 }
 
 func New(logger *zap.Logger, timesource timesource.Provider, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
@@ -116,12 +117,12 @@ func (v *Verifier) SetPaused(paused bool) {
 }
 
 func (v *Verifier) verifyLoop() {
-	defer gocommon.LogOnPanic()
+	defer panics.LogOnPanic()
 	defer v.quitWg.Done()
 
 	sub := v.pause.Subscribe()
 	defer sub.Unsubscribe()
-	pt := gocommon.NewPausableTicker(gocommon.PausableTickerConfig{
+	pt := pausable.NewPausableTicker(pausable.PausableTickerConfig{
 		Interval: ensVerifyInterval,
 		OnTick: func() {
 			if !v.online || v.rpcEndpoint == "" || v.contractAddress == "" {
@@ -206,7 +207,7 @@ func (v *Verifier) verify(ctx context.Context, rpcEndpoint, contractAddress stri
 	for _, ensInfo := range ensDetails {
 		v.quitWg.Add(1)
 		go func(info Details) {
-			defer gocommon.LogOnPanic()
+			defer panics.LogOnPanic()
 			defer v.quitWg.Done()
 			select {
 			case ch <- v.verifyENSName(info, ethClient):

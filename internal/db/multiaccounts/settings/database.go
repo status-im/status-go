@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/db/dbsetup"
 	maErrors "github.com/status-im/status-go/internal/db/multiaccounts/errors"
 	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/logutils"

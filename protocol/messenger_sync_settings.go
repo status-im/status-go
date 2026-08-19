@@ -6,8 +6,8 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -84,7 +84,7 @@ func (m *Messenger) syncSettings(rawMessageHandler RawMessageHandler) error {
 // startSyncSettingsLoop watches the m.settings.SyncQueue and sends a sync message in response to a settings update
 func (m *Messenger) startSyncSettingsLoop() {
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		logger := m.logger.Named("SyncSettingsLoop")
 
 		for {
@@ -125,7 +125,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 func (m *Messenger) startSettingsChangesLoop() {
 	channel := m.settings.SubscribeToChanges()
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		for {
 			select {
 			case s := <-channel:

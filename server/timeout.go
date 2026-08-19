@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 // timeoutManager represents a discrete encapsulation of timeout functionality.
@@ -58,7 +58,7 @@ func (t *timeoutManager) StopTimeout() {
 // run inits the main timeout run function that awaits for the exit command to be triggered or for the
 // timeout duration to elapse and trigger the parameter terminate function.
 func (t *timeoutManager) run(terminate func(), exit chan struct{}) {
-	defer common.LogOnPanic()
+	defer panics.LogOnPanic()
 	select {
 	case <-exit:
 		return

@@ -102,7 +102,7 @@ To cover these requirements, I added these environment variables:
 
 - We recover from panics in here:
   https://github.com/status-im/status-go/blob/fcedb013166785e7def8710118086f4b650c33b1/common/utils.go#L102 https://github.com/status-im/status-go/blob/fcedb013166785e7def8710118086f4b650c33b1/mobile/callog/status_request_log.go#L69 https://github.com/status-im/status-go/blob/fcedb013166785e7def8710118086f4b650c33b1/cmd/status-backend/main.go#L40
-  This covers all goroutines, because we have a linter to check that all goroutines have `defer common.LogOnPanic`.
+  This covers all goroutines, because we have a linter to check that all goroutines have `defer panics.LogOnPanic`.
 - Sentry is currently initialized in 2 places:
     - `InitializeApplication` - covers desktop/mobile clients
       https://github.com/status-im/status-go/blob/fcedb013166785e7def8710118086f4b650c33b1/mobile/status.go#L105-L108

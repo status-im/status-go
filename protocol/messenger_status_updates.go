@@ -10,9 +10,9 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -206,7 +206,7 @@ func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
 	ctx := context.Background()
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 
 		select {
 		// Ensure that we are connected before sending a message
@@ -330,7 +330,7 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 	referenceClock := uint64(time.Now().Unix()) - fiveMinutes
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		for {
 			select {
 			case <-time.After(time.Duration(waitDuration) * time.Second):

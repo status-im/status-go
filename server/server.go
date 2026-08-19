@@ -16,7 +16,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 // backgroundShutdownTimeout bounds how long Server.ToBackground waits for
@@ -216,7 +216,7 @@ func (s *Server) listen() error {
 }
 
 func (s *Server) serve(currentServer *http.Server, currentListener net.Listener) {
-	defer common.LogOnPanic()
+	defer panics.LogOnPanic()
 
 	defer func() {
 		s.mu.Lock()
@@ -325,7 +325,7 @@ func (s *Server) Start() error {
 	s.serveDone = done
 	s.serveWg.Add(1)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer close(done)
 		defer s.serveWg.Done()
 		s.serve(s.server, s.listener)

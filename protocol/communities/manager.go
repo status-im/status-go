@@ -28,7 +28,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	utils "github.com/status-im/status-go/common"
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto"
@@ -50,6 +49,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 )
 
@@ -452,7 +453,7 @@ func (m *Manager) Start() error {
 
 	m.quitWg.Add(1)
 	go func() {
-		defer utils.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.quitWg.Done()
 		_ = m.fillMissingCommunityTokens()
 	}()
@@ -463,7 +464,7 @@ func (m *Manager) Start() error {
 func (m *Manager) runENSVerificationLoop() {
 	m.quitWg.Add(1)
 	go func() {
-		defer utils.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.quitWg.Done()
 		for {
 			select {
@@ -546,7 +547,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 	m.logger.Info("starting owner verification loop")
 	m.quitWg.Add(1)
 	go func() {
-		defer utils.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.quitWg.Done()
 		for {
 			select {
@@ -578,7 +579,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 func (m *Manager) ValidateCommunityByID(communityID cryptotypes.HexBytes) (*CommunityResponse, error) {
 	communitiesToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
 	if err != nil {
-		m.logger.Error("failed to validate community by ID", zap.String("id", utils.TruncateWithDot(communityID.String())), zap.Error(err))
+		m.logger.Error("failed to validate community by ID", zap.String("id", logutils.TruncateWithDot(communityID.String())), zap.Error(err))
 		return nil, err
 	}
 	return m.validateCommunity(communitiesToValidate)
@@ -1291,7 +1292,7 @@ func (m *Manager) checkChannelsPermissions(channelsPermissionsPreParsedData map[
 func (m *Manager) StartMembersReevaluationLoop(communityID cryptotypes.HexBytes, reevaluateOnStart bool) {
 	m.quitWg.Add(1)
 	go func() {
-		defer utils.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.quitWg.Done()
 		m.reevaluateMembersLoop(communityID, reevaluateOnStart)
 	}()
@@ -3482,7 +3483,7 @@ func UnwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *proto
 	if applicationMetadataMessage.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		return nil, nil, ErrInvalidMessage
 	}
-	signer, err := utils.RecoverKey(applicationMetadataMessage)
+	signer, err := common.RecoverKey(applicationMetadataMessage)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -4478,7 +4479,7 @@ func (m *Manager) handleCommunityTokensMetadata(community *Community) error {
 func (m *Manager) handleCommunityTokensMetadataAsync(communityID string) {
 	m.quitWg.Add(1)
 	go func() {
-		defer utils.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer m.quitWg.Done()
 
 		select {
@@ -5284,7 +5285,7 @@ func unmarshalCommunityDescriptionMessage(signedDescription []byte, signerPubkey
 		return nil, ErrInvalidMessage
 	}
 
-	signer, err := utils.RecoverKey(metadata)
+	signer, err := common.RecoverKey(metadata)
 	if err != nil {
 		return nil, err
 	}

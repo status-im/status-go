@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/pausable"
 )
 
 type failingDNSResolver struct {
@@ -75,13 +75,13 @@ func TestWakuLifecycleState(t *testing.T) {
 	w, err := New(nil, nil, nil, nil)
 	require.NoError(t, err)
 
-	require.Equal(t, gocommon.ServiceStateStopped, w.PausableState())
+	require.Equal(t, pausable.ServiceStateStopped, w.PausableState())
 
 	w.MarkStarted()
-	require.Equal(t, gocommon.ServiceStateRunning, w.PausableState())
+	require.Equal(t, pausable.ServiceStateRunning, w.PausableState())
 
 	w.MarkStopped()
-	require.Equal(t, gocommon.ServiceStateStopped, w.PausableState())
+	require.Equal(t, pausable.ServiceStateStopped, w.PausableState())
 }
 
 // Regression test for #7620: storeClient is only populated by Start, so a

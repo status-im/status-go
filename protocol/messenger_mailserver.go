@@ -9,10 +9,10 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -75,7 +75,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	}
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		response, err := m.syncChatWithFilters(chat.ID)
 		if err != nil {
 			m.logger.Error("failed to sync chat", zap.Error(err))
@@ -101,7 +101,7 @@ func (m *Messenger) scheduleSyncFilters(filters messagingtypes.ChatFilters) (boo
 	}
 
 	go func() {
-		defer gocommon.LogOnPanic()
+		defer panics.LogOnPanic()
 		response, err := m.syncFilters(filters)
 		if err != nil {
 			m.logger.Error("failed to sync filter", zap.Error(err))

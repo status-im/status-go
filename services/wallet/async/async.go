@@ -7,8 +7,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 )
 
 type Command func(context.Context) error
@@ -57,7 +57,7 @@ type Group struct {
 func (g *Group) Add(cmd Command) {
 	g.wg.Add(1)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		_ = cmd(g.ctx)
 		g.wg.Done()
 	}()
@@ -74,7 +74,7 @@ func (g *Group) Wait() {
 func (g *Group) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		g.Wait()
 		close(ch)
 	}()
@@ -113,7 +113,7 @@ func (d *AtomicGroup) Name() string {
 func (d *AtomicGroup) Add(cmd Command) {
 	d.wg.Add(1)
 	go func() {
-		defer common.LogOnPanic()
+		defer panics.LogOnPanic()
 		defer d.done()
 		err := cmd(d.ctx)
 		d.mu.Lock()
