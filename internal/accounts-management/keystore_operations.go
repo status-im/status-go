@@ -103,7 +103,7 @@ func (m *AccountsManager) storeToKeystore(acc *generator.Account, password strin
 		return ErrAccountIsNil
 	}
 
-	secret, err := m.resolveSecret(password)
+	secret, err := m.resolveSecretForWrite(password)
 	if err != nil {
 		return err
 	}
@@ -140,6 +140,8 @@ func (m *AccountsManager) deleteAccountFromKeystoreIfExists(address cryptotypes.
 		m.logger.Error("cannot delete account, keystore is missing", zap.String("address", address.Hex()))
 		return ErrKeystoreMissing
 	}
+	// Deletion is authorized by the password: use the strict resolver, so a password that does not resolve
+	// (and thus could not decrypt the key) cannot delete it either.
 	secret, err := m.resolveSecret(password)
 	if err != nil {
 		return err
