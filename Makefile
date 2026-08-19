@@ -143,6 +143,18 @@ LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 
+# `logos-delivery` variables (liblogosdelivery, linked via logos-delivery-go-bindings).
+# Provide LOGOS_DELIVERY_LIB_DIR and LOGOS_DELIVERY_INC_DIR; the Nix shell sets
+# both from the flake input.
+ifdef LOGOS_DELIVERY_LIB_DIR
+ifndef LOGOS_DELIVERY_INC_DIR
+    $(error LOGOS_DELIVERY_INC_DIR must be provided when LOGOS_DELIVERY_LIB_DIR is set)
+endif
+LIBLOGOSDELIVERY ?= $(LOGOS_DELIVERY_LIB_DIR)/liblogosdelivery.$(LIB_EXT)
+CGO_CFLAGS+=-I$(LOGOS_DELIVERY_INC_DIR)
+CGO_LDFLAGS+=-L$(LOGOS_DELIVERY_LIB_DIR) -llogosdelivery
+endif
+
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
 USE_TORRENT ?= false
@@ -167,6 +179,9 @@ endif
 LIBSTORAGE ?= $(LOGOS_STORAGE_LIB_DIR)/libstorage.$(LIB_EXT)
 
 RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
+ifdef LOGOS_DELIVERY_LIB_DIR
+    RUNTIME_LIB_DIRS := $(LOGOS_DELIVERY_LIB_DIR):$(RUNTIME_LIB_DIRS)
+endif
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage

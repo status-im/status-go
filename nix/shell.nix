@@ -11,7 +11,7 @@ in pkgs.mkShell {
     git jq which gcc rustc cargo openjdk openssl nim go
     golangci-lint go-junit-report gopls
     protobuf_29 protoc-gen-go gotestsum
-    libsds libstorage
+    libsds libstorage liblogosdelivery
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper
   ] ++ lib.optionals (!(stdenv.isLinux && isAarch64)) [
@@ -28,7 +28,10 @@ in pkgs.mkShell {
     export NIM_SDS_INC_DIR="${pkgs.libsds}/include"
     export NIM_SDS_LIB_DIR="${pkgs.libsds}/lib"
 
-    export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [libsds libstorage])}"
+    export LOGOS_DELIVERY_INC_DIR="${pkgs.liblogosdelivery}/include"
+    export LOGOS_DELIVERY_LIB_DIR="${pkgs.liblogosdelivery}/lib"
+
+    export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [libsds libstorage liblogosdelivery])}"
   '' + lib.optionalString (!isDarwin && isAarch64) ''
     export ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk/
     export ANDROID_NDK=\$ANDROID_HOME/ndk-bundle
