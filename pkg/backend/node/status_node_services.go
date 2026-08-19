@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/preferences"
 	"github.com/status-im/status-go/pkg/services/rpcstats"
 	"github.com/status-im/status-go/pkg/services/stickers"
+	"github.com/status-im/status-go/pkg/services/storagestats"
 	"github.com/status-im/status-go/pkg/services/updates"
 	"github.com/status-im/status-go/pkg/services/wakuv2ext"
 	"github.com/status-im/status-go/pkg/services/wallet"
@@ -83,6 +84,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *media.
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(b.appDB != nil, services, b.preferencesService())
+	services = appendIf(b.appDB != nil, services, b.storageStatsService())
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
@@ -305,6 +307,13 @@ func (b *StatusNode) appgeneralService() *appgeneral.Service {
 		b.appGeneralSrvc = appgeneral.New()
 	}
 	return b.appGeneralSrvc
+}
+
+func (b *StatusNode) storageStatsService() *storagestats.Service {
+	if b.storageStatsSrvc == nil {
+		b.storageStatsSrvc = storagestats.New(b.appDB, b.walletDB, b.logger)
+	}
+	return b.storageStatsSrvc
 }
 
 func (b *StatusNode) WalletService() *wallet.Service {
