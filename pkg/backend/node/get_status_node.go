@@ -53,6 +53,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/rpcstats"
 	"github.com/status-im/status-go/pkg/services/sharedurls"
 	"github.com/status-im/status-go/pkg/services/stickers"
+	"github.com/status-im/status-go/pkg/services/storagestats"
 	"github.com/status-im/status-go/pkg/services/updates"
 	"github.com/status-im/status-go/pkg/services/utils"
 	"github.com/status-im/status-go/pkg/services/wakuv2ext"
@@ -126,6 +127,7 @@ type StatusNode struct {
 	newsfeedSrvc           *newsfeed.Service
 	preferencesSrvc        *preferences.Service
 	sharedUrlsSrvc         *sharedurls.Service
+	storageStatsSrvc       *storagestats.Service
 	linkPreviewSrvc        *linkpreview.Service
 
 	walletFeed        event.Feed
@@ -581,6 +583,7 @@ func (n *StatusNode) Stop() error {
 	n.appGeneralSrvc = nil
 	n.newsfeedSrvc = nil
 	n.preferencesSrvc = nil
+	n.storageStatsSrvc = nil
 
 	n.logger.Debug("status node stopped")
 	return errors.Join(errs...)
