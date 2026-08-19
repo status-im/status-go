@@ -93,8 +93,12 @@ not trickle.
 | [#7725](https://github.com/status-im/status-go/pull/7725) | `refactor/7067-server` | dissolve `server/` | #7724 | 87 |
 | [#7726](https://github.com/status-im/status-go/pull/7726) | `refactor/7067-tests-dir` | tests → `test/` | #7725 | 202 |
 
-Every commit in the stack passes `go vet ./...` across the whole tree **individually**, so the
-stack is bisectable and each PR reviews on its own.
+Linked on GitHub as native stack **#7727**, rebased onto `develop` @ `c3df487e3`.
+
+**Verified:** `go vet ./...` is clean on all four commits **individually** under Go 1.26.4, so the
+stack is bisectable and each PR type-checks on its own — tests included, since vet compiles the
+`_test.go` files that `go build` skips. The 21 test packages covering everything relocated or
+touched all pass.
 
 Items **E** (rename `internal/accounts-management`) and **F** (`go:embed` for SQL migrations) were
 dropped by decision: E is churn without payoff right now, F is out of scope for this ticket.
@@ -208,7 +212,7 @@ The issue asks to be split. Proposed:
 | **D9** | Item 20's IPFS sub-points ("disabled in privacy mode", "use own IPFS node") are product features, not layout. | Move them out of #7067 into a product issue. |
 | **D11** | `services/media` still exports `MediaServer`, so `media.MediaServer` stutters. Rename to `media.Server` / `media.Interface`? | ~40 call sites. My weak preference is a follow-up — a relocation PR that also renames types is harder to review. Say the word and I'll fold it into #7725. |
 | **D12** | Splitting `server` forced a test-only method onto `httpserver.Server`. | The MediaServer URL tests set `address`, `cachedPort` and `config` directly. #7725 adds `ListeningAddr()` and `CachedPort()` (defensible public API) plus a marked `SetURLStateForTest`. Worth a look from whoever owns that code. |
-| **D13** | The Nix dev shell cannot be built on `linux-arm64`. | `codecov-cli` 404s for the linux-arm64 platform, failing the whole shell derivation; and the pinned `status-im/go-sqlcipher` fork doesn't compile under GCC 14 on aarch64. Neither is caused by this work — both reproduce on untouched `develop` — but together nobody on ARM Linux can build or test status-go. Deserves its own issue. |
+| **D13** | Building status-go on `linux-arm64` — one fix, one regression. | **Fixed upstream:** the `codecov-cli` 404 is gone, now guarded by `lib.optionals (!(stdenv.isLinux && isAarch64))`. **New and worse:** `nix/shell.nix:33` interpolates `${pkgs.androidPkgs.androidsdk}` into the shellHook under `lib.optionalString (!isDarwin && isAarch64)` — ARM Linux only. Interpolation forces the derivation, so merely entering the dev shell builds the whole Android SDK chain (pipewire, sdl3, modemmanager, libqmi) and dies on libqmi. Plus the pinned `status-im/go-sqlcipher` fork still doesn't compile under GCC 14 on aarch64. Between them, nobody on ARM Linux can enter the shell or build. The Android env vars are only needed by `statusgo-android-library`, so gating them behind that target is a small fix. Own issue. |
 | **D10** | Item 4: `multiaccounts` "needs to be cleaned up A LOT" is unscoped. What does "cleaned up" mean concretely? | Needs your definition before anyone can estimate it. |
 
 ---
