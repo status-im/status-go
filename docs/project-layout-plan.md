@@ -6,8 +6,9 @@ The issue's checklist runs to number 38 but skips 2, 5, 34 and 37 — **34 actua
 Against `develop` today:
 
 - **13 done** (12 clean, 1 landed somewhere other than where the issue said — item 22)
+- **7 in review** — Wave 1, shipped as the stacked PRs #7723 → #7724 → #7725 → #7726
 - **9 partially done** — the move landed, the "clean it up / delete it" half is open
-- **12 not started**
+- **5 not started**
 
 Twelve PRs landed the done part: #7116, #7190, #7191, #7205, #7206, #7207, #7209, #7214,
 #7222, #7223, #7224, #7226.
@@ -34,10 +35,10 @@ Twelve PRs landed the done part: #7116, #7190, #7191, #7205, #7206, #7207, #7209
 | 6 | `centralizedmetrics` → `services/` | 🟡 | Landed as `internal/metrics` instead. **Decision D4.** |
 | 7 | `circuitbreaker` → `internal`, then delete | 🟡 | `internal/circuitbreaker` ✅. Deletion 🔴 (**D5**). |
 | 8 | `cmd` cleanup | ✅ | `cmd/generate_handlers` and `cmd/library` both gone. `cmd/` = `status-backend`, `push-notification-server`. |
-| 9 | `common/dbsetup` → `internal/db` | 🔴 | `common/dbsetup/db_setup.go` (52 LOC) still at root. |
-| 10 | `common/device.go` → `internal/platform` | 🔴 | `common/devices.go` (17 LOC) still at root. |
+| 9 | `common/dbsetup` → `internal/db` | 🔵 in review | Moved to `internal/db/dbsetup` in #7724. |
+| 10 | `common/device.go` → `internal/platform` | 🔵 in review | Now `internal/platform`, in #7724. |
 | 11 | `internal/connection` | ✅ | Done. |
-| 12 | `constants` split | 🔴 | `common/constants.go` (13 LOC, 4 constants) still at root. |
+| 12 | `constants` split | 🔵 in review | Split three ways in #7724: archive/torrent paths + mainnet URL → `params`, IPFS gateway → `internal/ipfs.GatewayURL`. |
 | 13 | `internal/contracts` | ✅ | Done. |
 | 14 | `crypto` → `internal` (then out) | 🟡 | `internal/crypto` ✅. Removal 🔴 (**D5**). |
 | 15 | `deprecation` dies | ✅ | Removed in #7209 (profile/timeline chats gone with it). |
@@ -54,13 +55,13 @@ Twelve PRs landed the done part: #7116, #7190, #7191, #7205, #7206, #7207, #7209
 | 26 | `cluster` → out / split | 🔴 | `params/cluster.go` (103 LOC) still there. **D5.** |
 | 27 | `protocol` → `internal` | 🔴 | **392 Go files, 331 importing files.** Not started. |
 | 28 | `rpc` → `internal` | ✅ | `internal/rpc`. |
-| 29 | `localpairing` → service | 🔴 | Still `server/pairing`. |
-| 30 | `server_media` → `services/media` | 🔴 | Still `server/server_media.go` + `server/handlers*.go`. |
+| 29 | `localpairing` → service | 🔵 in review | Now `services/pairing`, in #7725. |
+| 30 | `server_media` → `services/media` | 🔵 in review | Now `services/media`, in #7725; generic HTTP plumbing → `internal/httpserver`. |
 | 31 | `services` → `pkg` | 🔴 | **545 Go files, 375 importing files.** Not started. |
-| 32 | `signals` → `internal`, non-global | 🔴 | Root `signal/` (19 files). Still global `send()` / `SetHandler()` / `SetSignalEventCallback()`. |
+| 32 | `signals` → `internal`, non-global | 🔵 in review | Moved to `internal/signal` in #7723. The "no global functions" half is left out — behavioural, touches the C-binding callback. |
 | 33 | `static` split + `go:embed` instead of bindata | 🟡 | Asset bindata is gone ✅. **SQL migrations still use `go-bindata`** — 13 generator dirs: 4 under `internal/db/`, 3 under `protocol/`, 5 under `pkg/messaging/`, 1 under `services/newsfeed/`. |
 | 35 | `t` → `internal` | ✅ | → `internal/testutils`. |
-| 36 | `tests-functional` + `tests-unit-network` → `/test` | 🔴 | Both still at root. |
+| 36 | `tests-functional` + `tests-unit-network` → `/test` | 🔵 in review | Now `test/functional` and `test/unit-network`, in #7726. |
 | 38 | `transactions` → `internal`, then out | 🟡 | `internal/transactions` ✅. Removal + `MessageSigner` interface 🔴 (**D5**). |
 
 ### What's still at the repo root
@@ -83,7 +84,21 @@ Ordering principle: drain everything small and semantic **before** the two mega-
 with every open branch in the repo. They should land in a single announced freeze window,
 not trickle.
 
-### Wave 1 — small, mechanical, zero design risk (can start today, parallelizable)
+### Wave 1 — SHIPPED FOR REVIEW as a four-PR stack
+
+| PR | Branch | Scope | Base | Files |
+|---|---|---|---|---|
+| [#7723](https://github.com/status-im/status-go/pull/7723) | `refactor/7067-signal-internal` | `signal/` → `internal/signal/` | `develop` | 80 |
+| [#7724](https://github.com/status-im/status-go/pull/7724) | `refactor/7067-common` | dissolve `common/` | #7723 | 158 |
+| [#7725](https://github.com/status-im/status-go/pull/7725) | `refactor/7067-server` | dissolve `server/` | #7724 | 87 |
+| [#7726](https://github.com/status-im/status-go/pull/7726) | `refactor/7067-tests-dir` | tests → `test/` | #7725 | 202 |
+
+Every commit in the stack passes `go vet ./...` across the whole tree **individually**, so the
+stack is bisectable and each PR reviews on its own.
+
+Items **E** (rename `internal/accounts-management`) and **F** (`go:embed` for SQL migrations) were
+dropped by decision: E is churn without payoff right now, F is out of scope for this ticket.
+
 
 **A. Dissolve `common/`** — one PR, ~138 import sites, no logic change.
 
@@ -115,12 +130,12 @@ should be its own issue (it touches `mobile/` and the C-binding callback).
 `tests-unit-network/` → `test/unit-network/`. Touches the Makefile, `tests-functional/Makefile`,
 Dockerfiles, CI (Jenkins/GH workflows) and `tests-functional/README.MD`. Zero Go impact.
 
-**E. Rename `internal/accounts-management` → `internal/accounts`** (item 1) — and resolve the
+**E. Rename `internal/accounts-management` → `internal/accounts`** (item 1) — ~~DROPPED~~ — and resolve the
 collision with `services/accounts` (the service is the RPC surface, the internal package is the
 keystore/manager; the naming should say so, e.g. `internal/accounts` + `services/accounts`
 is fine as-is once one of them is documented, or rename the internal one `internal/keystore`).
 
-**F. `go:embed` for SQL migrations** (item 33 remainder) — replace `go tool go-bindata` in the
+**F. `go:embed` for SQL migrations** (item 33 remainder) — ~~OUT OF SCOPE, needs its own issue~~ — replace `go tool go-bindata` in the
 13 `.../migrations/**/doc.go` generators with `//go:embed`. Real benefit: `go build ./...`
 currently **fails on a clean checkout** without `make generate`; `go:embed` removes that step
 and unblocks plain-IDE workflows. Needs care: `status-im/migrate` expects a `bindata.AssetSource`,
@@ -188,9 +203,12 @@ The issue asks to be split. Proposed:
 | **D4** | Item 6 says `centralizedmetrics` → `services/`; it landed as `internal/metrics`. | Keep `internal/metrics` if it has no RPC surface. Move to `services/metrics` only if clients call it over RPC — you'll know which. |
 | **D5** | The four "AFUERA" packages — `circuitbreaker`, `crypto`, `transactions`, `params/cluster`. What replaces each, and is deletion in scope for this issue or a follow-up? | Split each into its own issue with an owner; they're architectural removals, not moves, and they'll stall #7067 if bundled. |
 | **D6** | Per-service settings: `<Service>Config` + `Set<Setting>` **vs** `type Settings interface` with `Get<Setting>` / `GetSetting <-chan T`. The issue records both, undecided. | Needs you + backend leads. This gates `NodeConfig` death, the settings split, `params/` dissolution and half of `mobile/`. Suggest making it a decision issue with a written proposal rather than leaving it in the checklist. |
-| **D7** | Once `common/` dies, where do the truly generic helpers go (`IsNil`, `Ptr`, `TruncateWithDot`)? The issue bans "packages with unknown purpose". | Inline them at their (few) consumers, or `internal/goutil` with a one-line doc.go stating scope. Explicitly *not* a new `internal/common`. |
+| **D7** | ~~Where do the generic helpers go?~~ **Answered in #7724.** | `IsNil` had 2 call sites and `Ptr` 7 across two test files → inlined as unexported helpers. `TruncateWithDot` has 122 call sites, all inside log lines or error messages → `internal/logutils` as redaction. No junk-drawer package created. Say the word if you'd rather have `internal/goutil`. |
 | **D8** | Timing for the two mega-moves (J, K). Who has long-lived branches that would be destroyed by a 700-file rename? | Pick a date, announce it, land both PRs the same day. I'd do it right after Wave 1 drains. |
 | **D9** | Item 20's IPFS sub-points ("disabled in privacy mode", "use own IPFS node") are product features, not layout. | Move them out of #7067 into a product issue. |
+| **D11** | `services/media` still exports `MediaServer`, so `media.MediaServer` stutters. Rename to `media.Server` / `media.Interface`? | ~40 call sites. My weak preference is a follow-up — a relocation PR that also renames types is harder to review. Say the word and I'll fold it into #7725. |
+| **D12** | Splitting `server` forced a test-only method onto `httpserver.Server`. | The MediaServer URL tests set `address`, `cachedPort` and `config` directly. #7725 adds `ListeningAddr()` and `CachedPort()` (defensible public API) plus a marked `SetURLStateForTest`. Worth a look from whoever owns that code. |
+| **D13** | The Nix dev shell cannot be built on `linux-arm64`. | `codecov-cli` 404s for the linux-arm64 platform, failing the whole shell derivation; and the pinned `status-im/go-sqlcipher` fork doesn't compile under GCC 14 on aarch64. Neither is caused by this work — both reproduce on untouched `develop` — but together nobody on ARM Linux can build or test status-go. Deserves its own issue. |
 | **D10** | Item 4: `multiaccounts` "needs to be cleaned up A LOT" is unscoped. What does "cleaned up" mean concretely? | Needs your definition before anyone can estimate it. |
 
 ---
