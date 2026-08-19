@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/httpserver"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	protocolcommon "github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/server"
 )
 
 const (
@@ -148,7 +148,7 @@ func (m *Messenger) setInstallationHostname() error {
 		if deviceName != "" {
 			imd.Name = deviceName
 		} else {
-			hn, err := server.GetDeviceName()
+			hn, err := httpserver.GetDeviceName()
 			if err != nil {
 				return err
 			}

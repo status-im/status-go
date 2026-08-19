@@ -33,7 +33,6 @@ import (
 	"github.com/status-im/status-go/params"
 	noderpc "github.com/status-im/status-go/pkg/backend/node/rpc"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	appgeneral "github.com/status-im/status-go/services/app-general"
 	"github.com/status-im/status-go/services/backup"
@@ -46,6 +45,7 @@ import (
 	"github.com/status-im/status-go/services/gif"
 	"github.com/status-im/status-go/services/linkpreview"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/newsfeed"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
@@ -92,7 +92,7 @@ type StatusNode struct {
 	mediaServerAdvertizeHost string
 	mediaServerAdvertizePort int
 	mediaServerEnableTLS     *bool
-	mediaServer              *server.MediaServer
+	mediaServer              *media.Server
 
 	tokenManager *token.Manager
 
@@ -165,7 +165,7 @@ func (n *StatusNode) Config() *params.NodeConfig {
 	return n.config
 }
 
-func (n *StatusNode) MediaServer() *server.MediaServer {
+func (n *StatusNode) MediaServer() *media.Server {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
@@ -179,15 +179,15 @@ func (n *StatusNode) startMediaServer() error {
 		}
 	}
 
-	var opts []server.MediaServerOption
+	var opts []media.MediaServerOption
 	if n.mediaServerEnableTLS != nil {
-		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
+		opts = append(opts, media.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
 	}
 	if n.mediaServerAddress != nil {
-		opts = append(opts, server.WithMediaServerAddress(*n.mediaServerAddress))
+		opts = append(opts, media.WithMediaServerAddress(*n.mediaServerAddress))
 	}
-	opts = append(opts, server.WithMediaServerAdvertizeAddress(n.mediaServerAdvertizeHost, n.mediaServerAdvertizePort))
-	mediaServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
+	opts = append(opts, media.WithMediaServerAdvertizeAddress(n.mediaServerAdvertizeHost, n.mediaServerAdvertizePort))
+	mediaServer, err := media.NewServer(nil, nil, n.multiaccountsDB, nil, opts...)
 	if err != nil {
 		return err
 	}

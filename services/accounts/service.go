@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/syncing"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 // NewService initializes service instance.
@@ -32,7 +32,7 @@ func NewService(
 	manager *accsmanagement.AccountsManager,
 	config *params.NodeConfig,
 	publisher *pubsub.Publisher,
-	mediaServer *server.MediaServer,
+	mediaServer *media.Server,
 	logger *zap.Logger,
 ) *Service {
 	s := &Service{
@@ -63,7 +63,7 @@ type Service struct {
 	config      *params.NodeConfig
 	account     *multiaccounts.Account
 	messenger   *protocol.Messenger
-	mediaServer *server.MediaServer
+	mediaServer *media.Server
 	publisher   *pubsub.Publisher
 	logger      *zap.Logger
 }

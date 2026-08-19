@@ -42,7 +42,6 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
@@ -52,6 +51,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
+	"github.com/status-im/status-go/services/media"
 )
 
 type Publisher interface {
@@ -116,7 +116,7 @@ type Manager struct {
 	PermissionChecker        PermissionChecker
 	keyDistributor           KeyDistributor
 	communityLock            *CommunityLock
-	mediaServer              server.MediaServerInterface
+	mediaServer              media.MediaServerInterface
 	communityImageVersions   map[string]uint32
 	cache                    *ttlcache.Cache[string, ReadonlyCommunity]
 }
@@ -286,7 +286,7 @@ func NewManager(
 	messaging *messaging.API,
 	timesource common.TimeSource,
 	keyDistributor KeyDistributor,
-	mediaServer server.MediaServerInterface,
+	mediaServer media.MediaServerInterface,
 	opts ...ManagerOption,
 ) (*Manager, error) {
 	if identity == nil {
@@ -429,7 +429,7 @@ type CommunityResponse struct {
 	FailedToDecrypt []*CommunityPrivateDataFailedToDecrypt `json:"-"`
 }
 
-func (m *Manager) SetMediaServer(mediaServer server.MediaServerInterface) {
+func (m *Manager) SetMediaServer(mediaServer media.MediaServerInterface) {
 	m.mediaServer = mediaServer
 	m.SetMediaServerProperties()
 }

@@ -12,7 +12,7 @@ import (
 
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -32,7 +32,7 @@ const (
 type Manager struct {
 	db                    *DataDB
 	communityInfoProvider thirdparty.CommunityInfoProvider
-	mediaServer           *server.MediaServer
+	mediaServer           *media.Server
 	feed                  *event.Feed
 }
 
@@ -43,7 +43,7 @@ type Data struct {
 	Image string `json:"image,omitempty"`
 }
 
-func NewManager(db *sql.DB, mediaServer *server.MediaServer, feed *event.Feed) *Manager {
+func NewManager(db *sql.DB, mediaServer *media.Server, feed *event.Feed) *Manager {
 	return &Manager{
 		db:          NewDataDB(db),
 		mediaServer: mediaServer,

@@ -31,7 +31,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 // enrichedCommunityMember is the JSON-serialization wrapper that combines
@@ -100,7 +100,7 @@ type Community struct {
 	mutex       sync.Mutex
 	timesource  common.TimeSource
 	encryptor   DescriptionEncryptor
-	mediaServer server.MediaServerInterface
+	mediaServer media.MediaServerInterface
 }
 
 type ReadonlyCommunity interface {
@@ -111,7 +111,7 @@ type ReadonlyCommunity interface {
 	IsBanned(pk *ecdsa.PublicKey) bool
 }
 
-func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer server.MediaServerInterface) (*Community, error) {
+func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer media.MediaServerInterface) (*Community, error) {
 	if config.MemberIdentity == nil {
 		return nil, errors.New("no member identity")
 	}

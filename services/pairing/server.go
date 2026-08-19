@@ -1,0 +1,431 @@
+package pairing
+
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/json"
+	"net"
+	"net/netip"
+	"runtime"
+	"time"
+
+	errorspkg "github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/httpserver"
+	logutils "github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/pkg/backend"
+)
+
+/*
+|--------------------------------------------------------------------------
+| type BaseServer struct {
+|--------------------------------------------------------------------------
+|
+|
+|
+*/
+
+type BaseServer struct {
+	*httpserver.Server
+	challengeGiver *ChallengeGiver
+
+	config ServerConfig
+}
+
+// NewBaseServer returns a *BaseServer init from the given *SenderServerConfig
+func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig) (*BaseServer, error) {
+	cg, err := NewChallengeGiver(e, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	addr, ok := netip.AddrFromSlice(config.ListenIP)
+	if !ok {
+		return nil, errorspkg.New("invalid listen IP")
+	}
+
+	bs := &BaseServer{
+		Server: httpserver.NewServer(
+			logger,
+			&httpserver.Config{
+				Cert:     config.Cert,
+				AddrPort: netip.AddrPortFrom(addr, 0),
+			},
+		),
+		challengeGiver: cg,
+		config:         *config,
+	}
+	bs.SetTimeout(config.Timeout)
+	return bs, nil
+}
+
+// MakeConnectionParams generates a *ConnectionParams based on the Server's current state
+func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
+	return NewConnectionParams(s.config.IPAddresses, s.GetPort(), s.config.PK, s.config.EK, s.config.InstallationID, s.config.KeyUID), nil
+}
+
+func MakeServerConfig(config *ServerConfig) error {
+	tlsKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	AESKey := make([]byte, 32)
+	_, err = rand.Read(AESKey)
+	if err != nil {
+		return err
+	}
+
+	ips, err := httpserver.GetLocalAddressesForPairingServer()
+	if err != nil {
+		return err
+	}
+
+	now := timesource.GetCurrentTime()
+	logutils.ZapLogger().Debug("pairing server generate cert",
+		logutils.UnixTimeMs("system time", time.Now()),
+		logutils.UnixTimeMs("timesource time", now),
+	)
+	tlsCert, _, err := GenerateCertFromKey(tlsKey, now, ips, []string{})
+	if err != nil {
+		return err
+	}
+
+	config.PK = &tlsKey.PublicKey
+	config.EK = AESKey
+	config.Cert = &tlsCert
+	config.IPAddresses = ips
+	config.ListenIP = net.IPv4zero
+
+	return nil
+}
+
+/*
+|--------------------------------------------------------------------------
+| type SenderServer struct {
+|--------------------------------------------------------------------------
+|
+| With AccountPayloadMounter, RawMessagePayloadMounter and InstallationPayloadMounterReceiver
+|
+*/
+
+type SenderServer struct {
+	*BaseServer
+	accountMounter      PayloadMounter
+	rawMessageMounter   PayloadMounter
+	installationMounter PayloadMounterReceiver
+	backend             *backend.StatusBackend
+}
+
+// NewSenderServer returns a *SenderServer init from the given *SenderServerConfig
+func NewSenderServer(backend *backend.StatusBackend, config *SenderServerConfig) (*SenderServer, error) {
+	logger := logutils.ZapLogger().Named("SenderServer")
+	e := NewPayloadEncryptor(config.ServerConfig.EK)
+
+	bs, err := NewBaseServer(logger, e, config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	am, rmm, imr, err := NewPayloadMounters(logger, e, backend, config.SenderConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SenderServer{
+		BaseServer:          bs,
+		accountMounter:      am,
+		rawMessageMounter:   rmm,
+		installationMounter: imr,
+		backend:             backend,
+	}, nil
+}
+
+func (s *SenderServer) startSendingData() error {
+	logger := s.GetLogger()
+	beforeSending := func() {
+		if s.backend != nil {
+			err := s.backend.LocalPairingStarted()
+			if err != nil {
+				logger.Error("startSendingData backend.LocalPairingStarted()", zap.Error(err))
+			}
+		}
+	}
+	s.SetHandlers(httpserver.HandlerPatternMap{
+		pairingChallenge:      handlePairingChallenge(s.challengeGiver),
+		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.accountMounter, beforeSending)),
+		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(logger, s.rawMessageMounter, beforeSending)),
+		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
+		//  the other handlers.
+		//  https://github.com/status-im/status-go/issues/3304
+		// receive installation data from receiver
+		pairingReceiveInstallation: middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s.GetLogger(), s.installationMounter)),
+	})
+	return s.Start()
+}
+
+// MakeFullSenderServer generates a fully configured and randomly seeded SenderServer
+func MakeFullSenderServer(backend *backend.StatusBackend, config *SenderServerConfig) (*SenderServer, error) {
+	config.ServerConfig.InstallationID = backend.InstallationID()
+	config.ServerConfig.KeyUID = backend.KeyUID()
+	err := MakeServerConfig(config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	config.SenderConfig.DB = backend.GetMultiaccountDB()
+	return NewSenderServer(backend, config)
+}
+
+// StartUpSenderServer generates a SenderServer, starts the sending server
+// and returns the ConnectionParams string to allow a ReceiverClient to make a successful connection.
+func StartUpSenderServer(backend *backend.StatusBackend, configJSON string) (string, error) {
+	conf := NewSenderServerConfig()
+	err := json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return "", err
+	}
+	if len(conf.SenderConfig.ChatKey) == 0 {
+		err = validateAndVerifyPassword(conf, conf.SenderConfig)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	backend.LocalPairingStateManager.SetMessageSyncEnabled(conf.SenderConfig.MessageSyncingEnabled)
+
+	ps, err := MakeFullSenderServer(backend, conf)
+	if err != nil {
+		return "", err
+	}
+
+	err = ps.startSendingData()
+	if err != nil {
+		return "", err
+	}
+
+	cp, err := ps.MakeConnectionParams()
+	if err != nil {
+		return "", err
+	}
+
+	return cp.ToString(), nil
+}
+
+/*
+|--------------------------------------------------------------------------
+| ReceiverServer
+|--------------------------------------------------------------------------
+|
+| With AccountPayloadReceiver, RawMessagePayloadReceiver, InstallationPayloadMounterReceiver
+|
+*/
+
+type ReceiverServer struct {
+	*BaseServer
+	accountReceiver      PayloadReceiver
+	rawMessageReceiver   PayloadReceiver
+	installationReceiver PayloadMounterReceiver
+	backend              *backend.StatusBackend
+}
+
+// NewReceiverServer returns a *SenderServer init from the given *ReceiverServerConfig
+func NewReceiverServer(backend *backend.StatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
+	logger := logutils.ZapLogger().Named("SenderServer")
+	e := NewPayloadEncryptor(config.ServerConfig.EK)
+
+	bs, err := NewBaseServer(logger, e, config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	ar, rmr, imr, err := NewPayloadReceivers(logger, e, backend, config.ReceiverConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ReceiverServer{
+		BaseServer:           bs,
+		accountReceiver:      ar,
+		rawMessageReceiver:   rmr,
+		installationReceiver: imr,
+		backend:              backend,
+	}, nil
+}
+
+func (s *ReceiverServer) startReceivingData() error {
+	logger := s.GetLogger()
+	beforeSending := func() {
+		if s.backend != nil {
+			err := s.backend.LocalPairingStarted()
+			if err != nil {
+				logger.Error("startSendingData backend.LocalPairingStarted()", zap.Error(err))
+			}
+		}
+	}
+	s.SetHandlers(httpserver.HandlerPatternMap{
+		pairingChallenge:         handlePairingChallenge(s.challengeGiver),
+		pairingReceiveAccount:    handleReceiveAccount(logger, s.accountReceiver),
+		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(logger, s.rawMessageReceiver),
+		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
+		//  the other handlers.
+		//  https://github.com/status-im/status-go/issues/3304
+		// send installation data back to sender
+		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(logger, s.installationReceiver, beforeSending)),
+	})
+	return s.Start()
+}
+
+// MakeFullReceiverServer generates a fully configured and randomly seeded ReceiverServer
+func MakeFullReceiverServer(backend *backend.StatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
+	config.ServerConfig.InstallationID = backend.InstallationID()
+	config.ServerConfig.KeyUID = backend.KeyUID()
+
+	err := MakeServerConfig(config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// ignore err because we allow no active account here
+	activeAccount, _ := backend.GetActiveAccount()
+	if activeAccount != nil {
+		config.ReceiverConfig.LoggedInKeyUID = activeAccount.KeyUID
+	}
+	config.ReceiverConfig.DB = backend.GetMultiaccountDB()
+
+	return NewReceiverServer(backend, config)
+}
+
+// StartUpReceiverServer generates a ReceiverServer, starts the sending server
+// and returns the ConnectionParams string to allow a SenderClient to make a successful connection.
+func StartUpReceiverServer(backend *backend.StatusBackend, configJSON string) (string, error) {
+	conf := NewReceiverServerConfig()
+	err := json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return "", err
+	}
+
+	// This is a temporal solution to allow clients not to pass DeviceType.
+	// Check DeviceType deprecation reason for more info.
+	conf.ReceiverConfig.DeviceType = runtime.GOOS
+
+	err = validateReceiverConfig(conf, conf.ReceiverConfig)
+	if err != nil {
+		return "", err
+	}
+
+	ps, err := MakeFullReceiverServer(backend, conf)
+	if err != nil {
+		return "", err
+	}
+
+	err = ps.startReceivingData()
+	if err != nil {
+		return "", err
+	}
+
+	cp, err := ps.MakeConnectionParams()
+	if err != nil {
+		return "", err
+	}
+
+	return cp.ToString(), nil
+}
+
+/*
+|--------------------------------------------------------------------------
+| type KeystoreFilesSenderServer struct {
+|--------------------------------------------------------------------------
+*/
+
+type KeystoreFilesSenderServer struct {
+	*BaseServer
+	keystoreFilesMounter PayloadMounter
+	backend              *backend.StatusBackend
+}
+
+func NewKeystoreFilesSenderServer(backend *backend.StatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
+	logger := logutils.ZapLogger().Named("SenderServer")
+	e := NewPayloadEncryptor(config.ServerConfig.EK)
+
+	bs, err := NewBaseServer(logger, e, config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	kfm, err := NewKeystoreFilesPayloadMounter(backend, e, config.SenderConfig, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KeystoreFilesSenderServer{
+		BaseServer:           bs,
+		keystoreFilesMounter: kfm,
+		backend:              backend,
+	}, nil
+}
+
+func (s *KeystoreFilesSenderServer) startSendingData() error {
+	logger := s.GetLogger()
+	beforeSending := func() {
+		if s.backend != nil {
+			err := s.backend.LocalPairingStarted()
+			if err != nil {
+				logger.Error("startSendingData backend.LocalPairingStarted()", zap.Error(err))
+			}
+		}
+	}
+	s.SetHandlers(httpserver.HandlerPatternMap{
+		pairingChallenge:   handlePairingChallenge(s.challengeGiver),
+		pairingSendAccount: middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.keystoreFilesMounter, beforeSending)),
+	})
+	return s.Start()
+}
+
+// MakeFullSenderServer generates a fully configured and randomly seeded KeystoreFilesSenderServer
+func MakeKeystoreFilesSenderServer(backend *backend.StatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
+	config.ServerConfig.InstallationID = backend.InstallationID()
+	config.ServerConfig.KeyUID = backend.KeyUID()
+
+	err := MakeServerConfig(config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewKeystoreFilesSenderServer(backend, config)
+}
+
+// StartUpKeystoreFilesSenderServer generates a KeystoreFilesSenderServer, starts the sending server
+// and returns the ConnectionParams string to allow a ReceiverClient to make a successful connection.
+func StartUpKeystoreFilesSenderServer(backend *backend.StatusBackend, configJSON string) (string, error) {
+	conf := NewKeystoreFilesSenderServerConfig()
+	err := json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return "", err
+	}
+
+	err = validateKeystoreFilesConfig(backend, conf)
+	if err != nil {
+		return "", err
+	}
+
+	ps, err := MakeKeystoreFilesSenderServer(backend, conf)
+	if err != nil {
+		return "", err
+	}
+
+	err = ps.startSendingData()
+	if err != nil {
+		return "", err
+	}
+
+	cp, err := ps.MakeConnectionParams()
+	if err != nil {
+		return "", err
+	}
+
+	return cp.ToString(), nil
+}

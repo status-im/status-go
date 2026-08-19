@@ -5,9 +5,9 @@ import (
 
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/server"
 
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/services/media"
 )
 
 var (
@@ -15,14 +15,14 @@ var (
 	ErrUpdatingWrongAccount = errors.New("failed to update wrong account. Please login with that account first")
 )
 
-func NewMultiAccountsAPI(db *multiaccounts.Database, mediaServer *server.MediaServer) *MultiAccountsAPI {
+func NewMultiAccountsAPI(db *multiaccounts.Database, mediaServer *media.Server) *MultiAccountsAPI {
 	return &MultiAccountsAPI{db: db, mediaServer: mediaServer}
 }
 
 // MultiAccountsAPI is class with methods available over RPC.
 type MultiAccountsAPI struct {
 	db          *multiaccounts.Database
-	mediaServer *server.MediaServer
+	mediaServer *media.Server
 }
 
 func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error {
