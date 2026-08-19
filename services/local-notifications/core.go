@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/internal/signal"
 )
 
 type PushCategory string

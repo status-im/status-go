@@ -7,10 +7,10 @@ import (
 	"go.uber.org/zap"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/signal"
 )
 
 type HistoryArchiveSignals struct {

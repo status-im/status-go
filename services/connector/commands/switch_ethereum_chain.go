@@ -8,10 +8,10 @@ import (
 	"strconv"
 
 	"github.com/status-im/status-go/internal/rpc/network"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/signal"
 )
 
 // errors

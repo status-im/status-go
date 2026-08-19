@@ -16,10 +16,10 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/rpc/network"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/connector/walletconnect"
-	"github.com/status-im/status-go/signal"
 )
 
 const serviceName = "connector"

@@ -21,7 +21,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/internal/signal"
 
 	"go.uber.org/zap"
 

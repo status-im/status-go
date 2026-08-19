@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
@@ -44,7 +45,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/signal"
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {

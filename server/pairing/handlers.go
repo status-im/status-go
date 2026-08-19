@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/internal/signal"
 )
 
 const (

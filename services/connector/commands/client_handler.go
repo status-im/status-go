@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/signal"
 )
 
 var (

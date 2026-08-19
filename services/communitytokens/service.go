@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
@@ -37,7 +38,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/signal"
 )
 
 // Collectibles service

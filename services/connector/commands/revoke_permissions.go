@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/status-im/status-go/internal/signal"
 	persistence "github.com/status-im/status-go/services/connector/database"
-	"github.com/status-im/status-go/signal"
 )
 
 type RevokePermissionsCommand struct {

@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/db/walletdatabase"
 	"github.com/status-im/status-go/internal/rpc/network"
 	network_testutil "github.com/status-im/status-go/internal/rpc/network/testutil"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
@@ -21,7 +22,6 @@ import (
 	mock_chainutils "github.com/status-im/status-go/services/connector/chainutils/mock"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/signal"
 )
 
 var testDAppData = signal.ConnectorDApp{

@@ -9,9 +9,9 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/pairing/peers"
-	"github.com/status-im/status-go/signal"
 )
 
 type PeerNotifier struct {

@@ -32,6 +32,7 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -47,7 +48,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/sharedurls"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/signal"
 )
 
 // 7 days interval

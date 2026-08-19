@@ -12,11 +12,11 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
-	"github.com/status-im/status-go/signal"
 )
 
 func assertPathsEqual(t *testing.T, expected, actual routes.Route) {
