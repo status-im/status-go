@@ -2,14 +2,14 @@
 
 Baseline: `develop` @ `c3df487e3` (2026-08-19).
 
-The issue lists 38 numbered items (numbering skips 2, 5, 34, 37 — nothing is missing, the
-original list was just renumbered). Of those:
+The issue's checklist runs to number 38 but skips 2, 5, 34 and 37 — **34 actual items**.
+Against `develop` today:
 
-- **17 fully done**
-- **8 partially done** (moved, but the "clean it up / delete it" half is open)
-- **13 not started**
+- **13 done** (12 clean, 1 landed somewhere other than where the issue said — item 22)
+- **9 partially done** — the move landed, the "clean it up / delete it" half is open
+- **12 not started**
 
-Nine PRs landed the done part: #7116, #7190, #7191, #7205, #7206, #7207, #7209, #7214,
+Twelve PRs landed the done part: #7116, #7190, #7191, #7205, #7206, #7207, #7209, #7214,
 #7222, #7223, #7224, #7226.
 
 ---
