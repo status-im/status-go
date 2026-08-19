@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 func TestMessengerPrepareMessage(t *testing.T) {
@@ -91,7 +91,7 @@ func (s *TestMessengerPrepareMessageSuite) testMessageContainsImage(testAlbum bo
 	err = s.p.SaveMessages(messages)
 	s.Require().NoError(err)
 
-	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
+	mediaServer, err := media.NewServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
 
@@ -159,7 +159,7 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_NoQuotedMessage_THEN_Retrie
 	err = s.p.SaveMessages(messages)
 	s.Require().NoError(err)
 
-	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
+	mediaServer, err := media.NewServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
 
@@ -185,7 +185,7 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_QuotedMessageDoesNotContain
 	err = s.p.SaveMessages(messages)
 	s.Require().NoError(err)
 
-	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
+	mediaServer, err := media.NewServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
 
@@ -214,7 +214,7 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_MessageContainsImage_THEN_P
 	err := s.m.SaveMessages([]*common.Message{message})
 	s.Require().NoError(err)
 
-	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
+	mediaServer, err := media.NewServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
 	s.m.SetMediaServer(mediaServer)

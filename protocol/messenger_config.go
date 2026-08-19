@@ -18,9 +18,9 @@ import (
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet"
 )
 
@@ -79,7 +79,7 @@ type config struct {
 	logosStorageConfig     *params.LogosStorageConfig
 	walletService          *wallet.Service
 	communityTokensService communities.CommunityTokensServiceInterface
-	httpServer             *server.MediaServer
+	httpServer             *media.Server
 	rpcClient              *rpc.Client
 	tokenManager           communities.TokenManager
 	tokenBalanceManager    communities.TokenBalanceManager
@@ -263,7 +263,7 @@ func WithLogosStorageConfig(logosStorageConfig *params.LogosStorageConfig) Optio
 	}
 }
 
-func WithHTTPServer(s *server.MediaServer) Option {
+func WithHTTPServer(s *media.Server) Option {
 	return func(c *config) error {
 		c.httpServer = s
 		return nil

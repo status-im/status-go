@@ -10,13 +10,13 @@ import (
 	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
 )
 
 // NewService initializes service instance.
 func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, config *params.NodeConfig,
-	downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *pendingtxtracker.PendingTxTracker) *Service {
+	downloader *ipfs.Downloader, httpServer *media.Server, pendingTracker *pendingtxtracker.PendingTxTracker) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{
@@ -37,7 +37,7 @@ type Service struct {
 	rpcClient       *rpc.Client
 	accountsManager *accsmanagement.AccountsManager
 	downloader      *ipfs.Downloader
-	httpServer      *server.MediaServer
+	httpServer      *media.Server
 	ctx             context.Context
 	cancel          context.CancelFunc
 	api             *API

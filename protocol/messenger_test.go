@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 const (
@@ -1544,7 +1544,7 @@ func (s *MessengerSuite) TestLastSentField() {
 // }
 
 func (s *MessengerSuite) TestSendMessageWithPreviews() {
-	mediaServer, err := server.NewMediaServer(s.m.database, nil, nil, nil)
+	mediaServer, err := media.NewServer(s.m.database, nil, nil, nil)
 	s.Require().NoError(err)
 	s.m.SetMediaServer(mediaServer)
 

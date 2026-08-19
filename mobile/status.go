@@ -41,8 +41,8 @@ import (
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/emojihash"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/server/pairing"
+	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/services/pairing"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -1276,7 +1276,7 @@ func convertToRegularAccountV2(requestJSON string) string {
 }
 
 func ImageServerTLSCert() string {
-	cert, err := server.PublicMediaTLSCert()
+	cert, err := media.PublicMediaTLSCert()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -1527,9 +1527,9 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 }
 
 // inputConnectionStringForBootstrapping starts a pairing.ReceiverClient
-// The given server.ConnectionParams string will determine the server.Mode
+// The given pairing.ConnectionParams string will determine the pairing.Mode
 //
-// server.Mode = server.Sending
+// pairing.Mode = pairing.Sending
 // Used when the device is Logged out or has no Account keys and has a camera to read a QR code
 //
 // Example: A mobile device (device with a camera) receiving account data from
@@ -1616,9 +1616,9 @@ func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) s
 }
 
 // inputConnectionStringForBootstrappingAnotherDevice starts a pairing.SendingClient
-// The given server.ConnectionParams string will determine the server.Mode
+// The given pairing.ConnectionParams string will determine the pairing.Mode
 //
-// server.Mode = server.Receiving
+// pairing.Mode = pairing.Receiving
 // Used when the device is Logged in and therefore has Account keys and the has a camera to read a QR code
 //
 // Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
@@ -1692,7 +1692,7 @@ func InputConnectionStringForImportingKeypairsKeystores(cs, configJSON string) s
 }
 
 // inputConnectionStringForImportingKeypairsKeystores starts a pairing.ReceiverClient
-// The given server.ConnectionParams string will determine the server.Mode
+// The given pairing.ConnectionParams string will determine the pairing.Mode
 // Used when the device is Logged in and has Account keys and has a camera to read a QR code
 //
 // Example: A mobile device (device with a camera) receiving account data from

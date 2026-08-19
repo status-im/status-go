@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/httpserver"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -23,7 +24,6 @@ import (
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 )
 
@@ -457,7 +457,7 @@ func (s *MessengerInstallationSuite) TestInitInstallations() {
 	// correctly.
 	s.Require().Equal(1, m.allInstallations.Len())
 
-	deviceName, err := server.GetDeviceName()
+	deviceName, err := httpserver.GetDeviceName()
 	s.Require().NoError(err)
 	installation, ok := m.allInstallations.Load(m.installationID)
 	s.Require().True(ok)

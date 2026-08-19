@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 func TestMessengerRemoveMessageSuite(t *testing.T) {
@@ -490,7 +490,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageReplyToImage() {
 	ogMessage := sendResponse.Messages()[0]
 
 	// create an http server
-	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
+	mediaServer, err := media.NewServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())
@@ -542,7 +542,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessageForMeReplyToImage() {
 	ogMessage := sendResponse.Messages()[0]
 
 	// create an http server
-	mediaServer, err := server.NewMediaServer(nil, nil, nil, nil)
+	mediaServer, err := media.NewServer(nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())

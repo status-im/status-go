@@ -7,19 +7,19 @@ import (
 
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/media"
 )
 
 // ErrServiceNotFound is returned by Pause and Resume when the name is not registered.
 var ErrServiceNotFound = errors.New("service not found in registry")
 
-// PausableMediaServer wraps a server.MediaServer to implement pausable.Pausable.
+// PausableMediaServer wraps a media.Server to implement pausable.Pausable.
 type PausableMediaServer struct {
 	pausable.PauseBroadcaster
-	s *server.MediaServer
+	s *media.Server
 }
 
-func newPausableMediaServer(s *server.MediaServer) *PausableMediaServer {
+func newPausableMediaServer(s *media.Server) *PausableMediaServer {
 	p := &PausableMediaServer{s: s}
 	p.MarkStarted()
 	return p

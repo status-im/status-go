@@ -34,8 +34,8 @@ import (
 	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/syncing"
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens/ensresolver"
+	"github.com/status-im/status-go/services/media"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/activityfetcher"
 	alchemymanager "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
@@ -127,7 +127,7 @@ func NewService(
 	ensResolver *ensresolver.EnsResolver,
 	pendingTxManager *pendingtxtracker.PendingTxTracker,
 	feed *event.Feed,
-	mediaServer *server.MediaServer,
+	mediaServer *media.Server,
 	tokenManager *token.Manager,
 ) (*Service, error) {
 	signals := &walletevent.SignalsTransmitter{
