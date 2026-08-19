@@ -19,12 +19,12 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
+	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/protocol/contacts"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/signal"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"

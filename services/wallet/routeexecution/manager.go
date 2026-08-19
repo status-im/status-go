@@ -11,6 +11,7 @@ import (
 	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
@@ -20,7 +21,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/signal"
 )
 
 const (

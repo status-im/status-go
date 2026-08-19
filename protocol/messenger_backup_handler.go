@@ -12,12 +12,12 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/errors"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	ensservice "github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/signal"
 )
 
 const (

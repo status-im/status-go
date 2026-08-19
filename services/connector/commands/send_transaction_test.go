@@ -15,9 +15,9 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/signal"
 )
 
 func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types.Address) (RPCRequest, error) {

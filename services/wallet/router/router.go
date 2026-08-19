@@ -19,6 +19,7 @@ import (
 	communityToken "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -33,7 +34,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/signal"
 )
 
 var (

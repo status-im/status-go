@@ -14,8 +14,8 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/newsfeed"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/signal"
 )
 
 var (

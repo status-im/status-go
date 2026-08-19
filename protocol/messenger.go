@@ -40,6 +40,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/contacts"
 
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/archive"
@@ -57,7 +58,6 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/signal"
 
 	_ "github.com/mmcdole/gofeed"
 )

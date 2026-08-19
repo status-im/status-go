@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/network"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
@@ -42,7 +43,6 @@ import (
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/signal"
 )
 
 const (

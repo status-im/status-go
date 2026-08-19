@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/signal"
 )
 
 func TestFailToSwitchEthereumChainWithMissingDAppFields(t *testing.T) {

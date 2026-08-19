@@ -35,6 +35,7 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -48,7 +49,6 @@ import (
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/signal"
 
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 )

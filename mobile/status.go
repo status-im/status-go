@@ -31,6 +31,7 @@ import (
 	logutils "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/logutils/callog"
 	"github.com/status-im/status-go/internal/logutils/requestlog"
+	"github.com/status-im/status-go/internal/signal"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend"
@@ -46,7 +47,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/signal"
 )
 
 func call(fn any, params ...any) any {

@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/internal/signal"
 )
 
 //go:generate go tool mockgen -package=mock_backup_controller -source controller.go -destination=mock/mock_backup_controller.go

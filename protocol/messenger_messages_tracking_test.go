@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/signal"
 )
 
 func TestMessengerMessagesTrackingSuite(t *testing.T) {

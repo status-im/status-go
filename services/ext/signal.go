@@ -2,11 +2,11 @@ package ext
 
 import (
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/backupsync"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/signal"
 )
 
 // EnvelopeSignalHandler sends signals when envelope is sent or expired.

@@ -13,12 +13,12 @@ import (
 
 	"github.com/status-im/status-go/common"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	archivetypes "github.com/status-im/status-go/protocol/communities/archive/types"
 	archiveutils "github.com/status-im/status-go/protocol/communities/archive/utils"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/signal"
 )
 
 type ArchiveManager struct {

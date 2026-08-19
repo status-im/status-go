@@ -2,8 +2,8 @@ package rpc
 
 import (
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/signal"
 )
 
 type SignalsTransmitter struct {

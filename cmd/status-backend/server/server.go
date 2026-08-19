@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/cmd/status-backend/server/api"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/internal/signal"
 )
 
 func init() {

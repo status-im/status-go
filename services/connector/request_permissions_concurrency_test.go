@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
-	"github.com/status-im/status-go/signal"
 )
 
 var concurrencyTestAccountAddress = types.BytesToAddress(types.FromHex("0x0000000000000000000000000000000000000001"))

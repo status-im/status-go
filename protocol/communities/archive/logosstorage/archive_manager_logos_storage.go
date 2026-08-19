@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -28,7 +29,6 @@ import (
 	archiveutils "github.com/status-im/status-go/protocol/communities/archive/utils"
 	"github.com/status-im/status-go/protocol/protobuf"
 	logosstorage "github.com/status-im/status-go/services/logosstorage"
-	"github.com/status-im/status-go/signal"
 )
 
 type ArchiveManagerLogosStorage struct {

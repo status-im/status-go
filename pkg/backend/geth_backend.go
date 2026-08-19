@@ -47,6 +47,7 @@ import (
 	"github.com/status-im/status-go/internal/metrics"
 	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkdefaults"
@@ -66,7 +67,6 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/signal"
 )
 
 var (

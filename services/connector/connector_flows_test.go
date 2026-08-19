@@ -15,11 +15,11 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/signal"
 )
 
 func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
