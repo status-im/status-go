@@ -14,19 +14,19 @@ import (
 
 func TestSendSupportBotContactRequest(t *testing.T) {
 	testCases := []struct {
-		name    string
-		state   int64
-		message string
+		name                  string
+		state                 int64
+		expectsContactRequest bool
 	}{
 		{
-			name:    "existing user",
-			state:   settings.SupportBotContactRequestStatePendingExisting,
-			message: supportBotExistingUserMessage,
+			name:                  "existing user",
+			state:                 settings.SupportBotContactRequestStatePendingExisting,
+			expectsContactRequest: false,
 		},
 		{
-			name:    "new user",
-			state:   settings.SupportBotContactRequestStatePendingNew,
-			message: supportBotNewUserMessage,
+			name:                  "new user",
+			state:                 settings.SupportBotContactRequestStatePendingNew,
+			expectsContactRequest: true,
 		},
 	}
 
@@ -42,8 +42,12 @@ func TestSendSupportBotContactRequest(t *testing.T) {
 			messages, _, err := m.persistence.MessageByChatID(chatID, "", 10)
 			require.NoError(t, err)
 			contactRequest := FindFirstByContentType(messages, protobuf.ChatMessage_CONTACT_REQUEST)
-			require.NotNil(t, contactRequest)
-			require.Equal(t, testCase.message, contactRequest.Text)
+			if testCase.expectsContactRequest {
+				require.NotNil(t, contactRequest)
+				require.Equal(t, supportBotNewUserMessage, contactRequest.Text)
+			} else {
+				require.Nil(t, contactRequest)
+			}
 
 			state, err := m.settings.SupportBotContactRequestState()
 			require.NoError(t, err)
@@ -63,7 +67,7 @@ func TestSendSupportBotContactRequest(t *testing.T) {
 	}
 }
 
-func TestMessengerStartSendsSupportBotContactRequest(t *testing.T) {
+func TestMessengerStartSkipsExistingUserSupportBotContactRequest(t *testing.T) {
 	messagingEnv, err := messaging.NewTestMessagingEnvironment()
 	require.NoError(t, err)
 	require.NoError(t, messagingEnv.Setup(t))
@@ -86,21 +90,7 @@ func TestMessengerStartSendsSupportBotContactRequest(t *testing.T) {
 	messages, _, err := m.persistence.MessageByChatID(chatID, "", 10)
 	require.NoError(t, err)
 	contactRequest := FindFirstByContentType(messages, protobuf.ChatMessage_CONTACT_REQUEST)
-	require.NotNil(t, contactRequest)
-	require.Equal(t, supportBotExistingUserMessage, contactRequest.Text)
-}
-
-func TestSupportBotContactRequestMessage(t *testing.T) {
-	message, err := supportBotContactRequestMessage(settings.SupportBotContactRequestStatePendingExisting)
-	require.NoError(t, err)
-	require.Equal(t, supportBotExistingUserMessage, message)
-
-	message, err = supportBotContactRequestMessage(settings.SupportBotContactRequestStatePendingNew)
-	require.NoError(t, err)
-	require.Equal(t, supportBotNewUserMessage, message)
-
-	_, err = supportBotContactRequestMessage(settings.SupportBotContactRequestStateDone)
-	require.Error(t, err)
+	require.Nil(t, contactRequest)
 }
 
 func newSupportBotTestMessenger(t *testing.T) *Messenger {

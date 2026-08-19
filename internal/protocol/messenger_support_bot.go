@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -10,8 +9,7 @@ import (
 )
 
 const (
-	supportBotExistingUserMessage = "Hi, I just upgraded to the latest version of Status."
-	supportBotNewUserMessage      = "Hi, I'm a new Status user."
+	supportBotNewUserMessage = "->"
 )
 
 var supportBotChatKey = os.Getenv("STATUS_SUPPORT_BOT_CHAT_KEY")
@@ -28,6 +26,9 @@ func (m *Messenger) sendSupportBotContactRequest() error {
 	if state == settings.SupportBotContactRequestStateDone {
 		return nil
 	}
+	if state == settings.SupportBotContactRequestStatePendingExisting {
+		return m.markSupportBotContactRequestDone()
+	}
 
 	chatID, err := requests.ConvertCompressedToLegacyKey(m.config.supportBotChatKey)
 	if err != nil {
@@ -40,13 +41,9 @@ func (m *Messenger) sendSupportBotContactRequest() error {
 		return m.markSupportBotContactRequestDone()
 	}
 
-	message, err := supportBotContactRequestMessage(state)
-	if err != nil {
-		return err
-	}
 	response, err := m.SendContactRequest(m.ctx, &requests.SendContactRequest{
 		ID:      chatID,
-		Message: message,
+		Message: supportBotNewUserMessage,
 	})
 	if err != nil {
 		return err
@@ -72,15 +69,4 @@ func (m *Messenger) shouldAbortSupportBotContactRequest() bool {
 
 func (m *Messenger) markSupportBotContactRequestDone() error {
 	return m.settings.SaveSettingField(settings.SupportBotContactRequestState, settings.SupportBotContactRequestStateDone)
-}
-
-func supportBotContactRequestMessage(state int64) (string, error) {
-	switch state {
-	case settings.SupportBotContactRequestStatePendingExisting:
-		return supportBotExistingUserMessage, nil
-	case settings.SupportBotContactRequestStatePendingNew:
-		return supportBotNewUserMessage, nil
-	default:
-		return "", fmt.Errorf("invalid support bot contact request state: %d", state)
-	}
 }
