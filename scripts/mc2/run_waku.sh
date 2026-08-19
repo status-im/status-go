@@ -6,7 +6,7 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/scripts/colors.sh"
 source "${GIT_ROOT}/scripts/codecov.sh"
 
-root_path="${GIT_ROOT}/tests-functional"
+root_path="${GIT_ROOT}/test/functional"
 
 identifier=${BUILD_ID:-$(git rev-parse --short HEAD)}
 container_name="waku-${identifier}"

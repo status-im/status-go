@@ -1,6 +1,6 @@
 # Reliability Test Suite
 
-This test suite, located under `tests-functional/tests/reliability`, is designed to evaluate the robustness and stability of the system under challenging network and runtime conditions. These tests go beyond typical functional checks and simulate real-world scenarios that stress the system's resilience.
+This test suite, located under `test/functional/tests/reliability`, is designed to evaluate the robustness and stability of the system under challenging network and runtime conditions. These tests go beyond typical functional checks and simulate real-world scenarios that stress the system's resilience.
 
 ## 🧪 What We Test
 
@@ -24,11 +24,11 @@ The suite includes tests that simulate:
 
 ## 🚀 How to Run
 
-Running the reliability tests is nearly identical to running functional tests see [how-to-run guide](https://github.com/status-im/status-go/blob/develop/tests-functional/README.MD#how-to-run).
+Running the reliability tests is nearly identical to running functional tests see [how-to-run guide](https://github.com/status-im/status-go/blob/develop/test/functional/README.MD#how-to-run).
 Example of running a test:
 
 ```bash
-pytest tests-functional/tests/reliability/ -k test_one_to_one_message_with_latency
+pytest test/functional/tests/reliability/ -k test_one_to_one_message_with_latency
 ```
 
 Note! To run locally you need [`tc`](https://man7.org/linux/man-pages/man8/tc.8.html) (ex: wasn't able to run it on `windows` or `wsl`) on your host.

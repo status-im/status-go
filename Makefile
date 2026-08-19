@@ -556,7 +556,7 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list -tags '$(BUILD_TAGS)'
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
-	grep -v /tests-unit-network)
+	grep -v /test/unit-network)
 test-unit: ##@tests Run unit and integration tests
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	./scripts/run_unit_tests.sh
@@ -567,7 +567,7 @@ test-single: test-unit-prep
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
-test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./tests-unit-network/...)
+test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./test/unit-network/...)
 test-unit-network: ##@tests Run unit and integration tests with network access
 	./scripts/run_unit_tests.sh
 
@@ -679,7 +679,7 @@ codecov-validate:
 
 .PHONY: pytest-lint
 pytest-lint:
-	$(MAKE) -C tests-functional lint
+	$(MAKE) -C test/functional lint
 
 generate-db: ##@build Generate fake sqlite DBs in ./build directory for IDE SQL inspections
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \

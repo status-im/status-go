@@ -17,14 +17,14 @@ Functional tests for status-go
 2. Install [Python 3](https://www.python.org/downloads/) (tested with 3.10 and 3.12 and it works with both)
    - **Note:** For Python 3.10 compatibility, the codebase uses `Iterator[str]` instead of `Generator[str]` for type annotations to avoid typing issues with older Python versions.
 3. Set up a virtual environment (required for linting):
-   - In `./tests-functional`, run:
+   - In `./test/functional`, run:
      ```bash
      python3 -m venv .venv
      source .venv/bin/activate
      pip install -r requirements.txt
      pre-commit install
      ```
-   - **Important**: The virtual environment must be created in the `./tests-functional` directory for pre-commit linting and type-checking tools like Pyright to work correctly.
+   - **Important**: The virtual environment must be created in the `./test/functional` directory for pre-commit linting and type-checking tools like Pyright to work correctly.
    - **Optional (for test development)**: Use Python virtual environment for better dependency management. You can follow the guide [here](https://akrabat.com/creating-virtual-environments-with-pyenv/)
 
 ## How to Run
@@ -39,14 +39,14 @@ Functional tests for status-go
 2. Functional tests rely on local instances of Waku and Anvil.
    Run this command to start all environment dependencies:
     ```sh
-    docker compose -f tests-functional/docker-compose.anvil.yml -f tests-functional/docker-compose.waku.yml up --build --remove-orphans
+    docker compose -f test/functional/docker-compose.anvil.yml -f test/functional/docker-compose.waku.yml up --build --remove-orphans
     ```
    This will:
     * Start a Waku fleet of 1 boot node + 1 store node
     * Start Anvil with ChainID 31337 exposed on `0.0.0.0:8545`
     * Deploy required Status contracts to Anvil
 
-3. In `./tests-functional/tests` directory run (with the `venv` running):
+3. In `./test/functional/tests` directory run (with the `venv` running):
    ```sh
     pytest -m rpc
    ```
@@ -114,8 +114,8 @@ sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
 
 ## Implementation details
 
-- Functional tests are implemented in `./tests-functional/tests` based on [pytest](https://docs.pytest.org/en/8.2.x/)
-- Backend fixtures and test infrastructure are defined in `./tests-functional/tests/conftest.py`
+- Functional tests are implemented in `./test/functional/tests` based on [pytest](https://docs.pytest.org/en/8.2.x/)
+- Backend fixtures and test infrastructure are defined in `./test/functional/tests/conftest.py`
 - Every test has the following verifications:
     - `validate_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` / `error` field, and expected ID.
 
@@ -265,7 +265,7 @@ The test fixture architecture has been recently improved with the following chan
 
 We use `pre-commit` setup for linting. To run linters:
 ```shell
-cd tests-functional
+cd test/functional
 make lint
 ```
 or run from the root of `status-go` repo:
@@ -274,7 +274,7 @@ make pytest-lint
 ```
 
 Note that `pyright` uses `pyrightconfig.json` configuration from the repository root 
-and expects a Python virtual environment to be in `./tests-functional/.venv`. 
+and expects a Python virtual environment to be in `./test/functional/.venv`. 
 
 # Known issues
 
@@ -307,7 +307,7 @@ which points at Rosetta's emulation of the crypto path.
 recreate the fleet:
 
 ```sh
-docker compose -f tests-functional/docker-compose.anvil.yml -f tests-functional/docker-compose.waku.yml up --build --remove-orphans -d
+docker compose -f test/functional/docker-compose.anvil.yml -f test/functional/docker-compose.waku.yml up --build --remove-orphans -d
 ```
 
 With the default (QEMU) emulation the go↔nim handshake succeeds.
@@ -315,7 +315,7 @@ With the default (QEMU) emulation the go↔nim handshake succeeds.
 
 ## Reliability tests
 
-This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/tests-functional/tests/reliability/README.MD)
+This framework also hosts a suite of reliability tests. See more info [here](https://github.com/status-im/status-go/blob/develop/test/functional/tests/reliability/README.MD)
 
 ## RuntimeError: Docker image 'statusgo-xyz:latest' not found
 

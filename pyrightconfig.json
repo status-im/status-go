@@ -1,5 +1,5 @@
 {
-    "include": ["tests-functional"],
-    "venvPath": "./tests-functional", // Ensure the virtual environment (.venv) is located in ./tests-functional
+    "include": ["test/functional"],
+    "venvPath": "./test/functional", // Ensure the virtual environment (.venv) is located in ./test/functional
     "venv": ".venv"
 }

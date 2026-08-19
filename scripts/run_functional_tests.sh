@@ -23,7 +23,7 @@ fi
 
 echo -e "${GRN}Running functional tests${RST}"
 
-root_path="${GIT_ROOT}/tests-functional"
+root_path="${GIT_ROOT}/test/functional"
 coverage_reports_path="${root_path}/coverage"
 binary_coverage_reports_path="${coverage_reports_path}/binary"
 merged_coverage_reports_path="${coverage_reports_path}/merged"

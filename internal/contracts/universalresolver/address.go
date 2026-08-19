@@ -20,7 +20,7 @@ var contractAddressByChainID = map[uint64]common.Address{
 	walletCommon.EthereumMainnet: canonicalAddress,
 	walletCommon.EthereumSepolia: canonicalAddress,
 	// Anvil (local functional tests): the canonical Universal Resolver has no
-	// Anvil deployment, so tests-functional/deploy_contracts.sh deploys a minimal
+	// Anvil deployment, so test/functional/deploy_contracts.sh deploys a minimal
 	// stand-in at a deterministic address. Keep this in sync with that deploy.
 	walletCommon.AnvilMainnet: common.HexToAddress("0x68B1D87F95878fE05B998F19b66F4baba5De1aed"),
 }

@@ -60,14 +60,14 @@ Enabled linters: errcheck, gosec, govet, ineffassign, misspell, unconvert, plus 
 ## Test
 
 Testing has two pillars: Go unit/integration tests, and a large **Python functional-test suite**
-(`tests-functional/`) that exercises the full backend end-to-end. Both are first-class — many behaviors
+(`test/functional/`) that exercises the full backend end-to-end. Both are first-class — many behaviors
 (messaging delivery, communities, wallet flows) are primarily covered by the functional tests, so changes
 to backend behavior usually need attention in both.
 
 ```shell
 make test                  # alias for test-unit (short dev run); runs `make generate` first
 make test-unit-race        # with -race
-make test-unit-network     # tests needing real network access (./tests-unit-network/...)
+make test-unit-network     # tests needing real network access (./test/unit-network/...)
 ```
 
 Tests use [testify/suite](https://godoc.org/github.com/stretchr/testify/suite). To run a single test, target
@@ -82,10 +82,10 @@ go test -v ./server/pairing -test.run TestSyncDeviceSuite -testify.m ^TestTransf
 
 ### Functional tests
 
-End-to-end tests live in `tests-functional/` and are written in **Python/pytest** (not Go). They spin up
+End-to-end tests live in `test/functional/` and are written in **Python/pytest** (not Go). They spin up
 `status-go` Docker containers and require local Waku + Anvil fleets. `make test-functional` runs the full
-suite via Docker; for local iteration set up a venv in `tests-functional/.venv` and run `pytest -m rpc`
-(use `-k <name>` for a single test). See `tests-functional/README.MD` for the full workflow, fixtures
+suite via Docker; for local iteration set up a venv in `test/functional/.venv` and run `pytest -m rpc`
+(use `-k <name>` for a single test). See `test/functional/README.MD` for the full workflow, fixtures
 (`backend_factory`, `backend_new_profile`, `backend_recovered_profile`), and the Apple-Silicon Rosetta caveat.
 
 ## Database migrations

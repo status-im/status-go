@@ -22,16 +22,16 @@ jobs:
         python-version: '3.12'
         cache: 'pip'
 
-    - name: Set up virtual environment in /tests-functional/
+    - name: Set up virtual environment in /test/functional/
       run: |
-        python -m venv tests-functional/.venv
+        python -m venv test/functional/.venv
 
     - name: Install dependencies based on requirements.txt
       run: |
-        source tests-functional/.venv/bin/activate
-        pip install -r tests-functional/requirements.txt
+        source test/functional/.venv/bin/activate
+        pip install -r test/functional/requirements.txt
 
     - name: Run pytest-lint
       run: |
-        source tests-functional/.venv/bin/activate
+        source test/functional/.venv/bin/activate
         make pytest-lint
