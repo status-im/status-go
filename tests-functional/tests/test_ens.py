@@ -6,8 +6,11 @@ import uuid
 import pytest
 
 from clients.api import ApiResponseError
+from clients.signals import SignalType
 import resources.constants as constants
+from steps import async_messenger
 from utils import wallet_utils
+from utils.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +141,146 @@ def register_ens_name(foundry, ens_addresses, username, account_address, public_
 def register_and_sync_ens_name(foundry, ens_addresses, username, account_address, public_key):
     register_ens_name(foundry, ens_addresses, username, account_address, public_key)
     sync_registry_to_well_known(foundry, ens_addresses["registry"], username)
+
+
+MAINNET_NETWORK = {
+    "chainID": 1,
+    "chainName": "Ethereum Mainnet",
+    "rpcProviders": [
+        {
+            "chainId": 1,
+            "name": "Anvil as Mainnet",
+            "url": Config.anvil_url,
+            "enabled": True,
+            "authType": "token-auth",
+            "enableRpsLimiter": False,
+            "type": "embedded-direct",
+        }
+    ],
+    "shortName": "eth",
+    "nativeCurrencyName": "Ether",
+    "nativeCurrencySymbol": "ETH",
+    "nativeCurrencyDecimals": 18,
+    "isTest": False,
+    "layer": 1,
+    "enabled": True,
+    "isActive": True,
+    "isDeactivatable": False,
+}
+
+
+@pytest.mark.rpc
+@pytest.mark.ens
+@pytest.mark.asyncio
+class TestEnsVisibility:
+
+    @pytest.fixture
+    async def sender(
+        self,
+        async_backend_new_profile,
+        foundry_client,
+        ens_addresses,
+        multicall3_deployer,
+    ):
+        backend = await async_backend_new_profile(
+            "ens_sender",
+            multicall_contract_address=multicall3_deployer.contract_address,
+        )
+        username = f"ensvis{uuid.uuid4().hex[:8]}"
+        full_name = f"{username}.stateofus.eth"
+
+        register_and_sync_ens_name(
+            foundry_client,
+            ens_addresses,
+            username,
+            constants.DEPLOYER_ACCOUNT.address,
+            backend.public_key,
+        )
+        backend.backend.ens_service.add(CHAIN_ID, full_name)
+        logger.info(f"Sender registered and linked {full_name}")
+
+        backend._ens_full_name = full_name
+        return backend
+
+    @pytest.fixture
+    async def receiver(self, async_backend_new_profile, ens_addresses, multicall3_deployer):
+        return await async_backend_new_profile(
+            "ens_receiver",
+            multicall_contract_address=multicall3_deployer.contract_address,
+            extra_networks_override=[MAINNET_NETWORK],
+            verify_ens_contract_address=ens_addresses["registry"],
+        )
+
+    async def test_ens_name_visible_to_contact(self, sender, receiver):
+        """Verify ENS name propagates to a contact via sendContactUpdates.
+
+        Tests ContactUpdate propagation, not chat messages — those never carry
+        the sender's ENS name (https://github.com/status-im/status-go/issues/7713).
+        """
+        full_name = sender._ens_full_name
+
+        await async_messenger.make_contacts(sender, receiver)
+
+        async with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda s: any(c.get("name") == full_name for c in (s.event.get("contacts") or [])),
+            timeout=30,
+        ):
+            sender.wakuext_service.send_contact_updates(full_name, "", "blue")
+            logger.info(f"Sender propagated ENS name: {full_name}")
+
+        contact = receiver.wakuext_service.get_contact_by_id(sender.public_key)
+        assert contact is not None, "get_contact_by_id returned None"
+        assert contact.get("name") == full_name, f"ENS name not visible to receiver: expected={full_name}, got={contact.get('name')}"
+
+    async def test_ens_name_verified_by_contact(self, sender, receiver):
+        """Verify ENS name can be marked as verified on the receiver side.
+
+        Uses the manual wakuext_ensVerified RPC — automatic verification never
+        triggers (https://github.com/status-im/status-go/issues/7712).
+        """
+        full_name = sender._ens_full_name
+
+        await async_messenger.make_contacts(sender, receiver)
+
+        async with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda s: any(c.get("name") == full_name for c in (s.event.get("contacts") or [])),
+            timeout=30,
+        ):
+            sender.wakuext_service.send_contact_updates(full_name, "", "blue")
+            logger.info(f"Sender propagated ENS name: {full_name}")
+
+        contact = receiver.wakuext_service.get_contact_by_id(sender.public_key)
+        assert contact is not None, "get_contact_by_id returned None"
+        assert contact.get("name") == full_name, f"ENS name not visible: expected={full_name}, got={contact.get('name')}"
+
+        receiver.wakuext_service.ens_verified(sender.public_key, full_name)
+
+        contact = receiver.wakuext_service.get_contact_by_id(sender.public_key)
+        assert contact is not None, "get_contact_by_id returned None after verification"
+        assert contact.get("ensVerified") is True, f"ENS name not verified after ensVerified call: contact={contact}"
+
+    async def test_ens_name_auto_verified(self, sender, receiver):
+        """The verifier loop should confirm the ENS name on-chain without manual RPC calls."""
+        full_name = sender._ens_full_name
+
+        await async_messenger.make_contacts(sender, receiver)
+
+        async with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda s: any(c.get("name") == full_name for c in (s.event.get("contacts") or [])),
+            timeout=30,
+        ):
+            sender.wakuext_service.send_contact_updates(full_name, "", "blue")
+            logger.info(f"Sender propagated ENS name: {full_name}")
+
+        async with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda s: any(c.get("name") == full_name and c.get("ensVerified") is True for c in (s.event.get("contacts") or [])),
+            timeout=75,
+        ):
+            pass
 
 
 @pytest.mark.rpc
@@ -420,8 +563,8 @@ class TestEnsRouterRegistration:
         found = any(u.get("username") == full_name for u in usernames)
         assert found, f"{full_name} not found in {usernames}"
 
-    def test_ens_release_after_router_registration(self, backend):
-        """Register ENS name via router, then release it on-chain after expiry."""
+    def test_ens_release_via_router(self, backend):
+        """Release ENS name via wallet router after registration period expires."""
         username = random_ens_username()
         full_name = f"{username}.stateofus.eth"
         one_year_seconds = 365 * 24 * 60 * 60
@@ -463,31 +606,30 @@ class TestEnsRouterRegistration:
 
         sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
 
-        backend.ens_service.add(CHAIN_ID, full_name)
-
         with anvil_snapshot(self.foundry):
             cast_rpc(self.foundry, "evm_increaseTime", [one_year_seconds + 1])
             cast_rpc(self.foundry, "evm_mine")
             logger.info("Advanced time past 365 days")
 
-            label = cast_keccak(self.foundry, username)
-            registrar = self.ens_addresses["registrar"]
-            cast_send(
-                self.foundry,
-                registrar,
-                "release(bytes32)",
-                [label],
-                private_key=constants.user_1.private_key,
+            wallet_utils.send_router_transaction(
+                backend,
+                uuid=str(uuid.uuid4()),
+                sendType=2,  # ENSRelease
+                addrFrom=constants.user_1.address,
+                addrTo=constants.user_1.address,
+                amountIn="0x0",
+                amountOut="0x0",
+                tokenKey=token_key,
+                tokenIDIsOwnerToken=False,
+                toTokenKey=token_key,
+                fromChainID=CHAIN_ID,
+                toChainID=CHAIN_ID,
+                gasFeeMode=1,
+                username=username,
             )
-            logger.info(f"Released {full_name}")
+            logger.info(f"Released {full_name} via router")
 
             sync_registry_to_well_known(self.foundry, self.ens_addresses["registry"], username)
 
             owner = backend.ens_service.owner_of(CHAIN_ID, full_name)
             assert owner == "0x0000000000000000000000000000000000000000", f"Owner should be zero after release: {owner}"
-
-        backend.ens_service.remove(CHAIN_ID, full_name)
-
-        usernames = backend.ens_service.get_ens_usernames() or []
-        active = [u.get("username") for u in usernames if not u.get("removed")]
-        assert full_name not in active, f"{full_name} should have been removed"
