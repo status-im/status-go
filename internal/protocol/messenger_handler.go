@@ -22,8 +22,8 @@ import (
 	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
+	"github.com/status-im/status-go/pkg/services/browsers"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"

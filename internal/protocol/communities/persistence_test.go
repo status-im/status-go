@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/sqlite"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 )
 
 func TestPersistenceSuite(t *testing.T) {

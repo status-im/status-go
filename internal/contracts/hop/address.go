@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
 var errorNotAvailableOnChainID = errors.New("not available for chainID")

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/pkg/services/browsers"
 )
 
 func (m *Messenger) AddBookmark(ctx context.Context, bookmark browsers.Bookmark) error {

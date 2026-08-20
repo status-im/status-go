@@ -25,8 +25,8 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	logosstorage "github.com/status-im/status-go/services/logosstorage"
-	mocklogosstorage "github.com/status-im/status-go/services/logosstorage/mock"
+	logosstorage "github.com/status-im/status-go/pkg/services/logosstorage"
+	mocklogosstorage "github.com/status-im/status-go/pkg/services/logosstorage/mock"
 
 	"github.com/stretchr/testify/suite"
 )

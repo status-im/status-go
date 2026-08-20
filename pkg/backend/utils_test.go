@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/pkg/services/personal"
 )
 
 func TestHashMessage(t *testing.T) {

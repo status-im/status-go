@@ -41,11 +41,11 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/multiformat"
-	"github.com/status-im/status-go/services/media"
-	"github.com/status-im/status-go/services/pairing"
-	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/pkg/services/media"
+	"github.com/status-im/status-go/pkg/services/pairing"
+	"github.com/status-im/status-go/pkg/services/personal"
+	"github.com/status-im/status-go/pkg/services/typeddata"
+	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
 
 func call(fn any, params ...any) any {

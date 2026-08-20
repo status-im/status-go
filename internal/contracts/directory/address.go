@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	wallet_common "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 var errorNotAvailableOnChainID = errors.New("not available for chainID")

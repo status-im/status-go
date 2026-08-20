@@ -20,9 +20,9 @@ import (
 
 	"github.com/status-im/status-go/internal/protocol/ens"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
 type PermissionChecker interface {

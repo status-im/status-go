@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/services/wallet/onramp"
-	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
+	"github.com/status-im/status-go/pkg/services/wallet/onramp"
+	mock_token "github.com/status-im/status-go/pkg/services/wallet/token/mock/token"
 
 	"github.com/stretchr/testify/require"
 

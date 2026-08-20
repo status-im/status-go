@@ -7,7 +7,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/protocol/common"
-	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 func communityToRecord(community *Community) (*CommunityRecord, error) {

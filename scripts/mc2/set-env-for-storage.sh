@@ -79,4 +79,4 @@ echo "  CGO_CFLAGS=${CGO_CFLAGS}"
 echo "  CGO_LDFLAGS=${CGO_LDFLAGS}"
 echo ""
 echo "You can now run storage tests with gotestsum, for example:"
-echo '  gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "gowaku_no_rln use_logos_storage gowaku_skip_migrations"'
+echo '  gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "gowaku_no_rln use_logos_storage gowaku_skip_migrations"'

@@ -5,7 +5,7 @@ import (
 
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
 
 const (

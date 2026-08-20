@@ -1,0 +1,160 @@
+package efp
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/url"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
+)
+
+const baseURL = "https://data.ethfollow.xyz/api/v1"
+
+// ENSData represents ENS information from the EFP API
+type ENSData struct {
+	Name      string            `json:"name"`
+	Address   string            `json:"address"`
+	Avatar    string            `json:"avatar"`
+	Records   map[string]string `json:"records"`
+	UpdatedAt string            `json:"updated_at"`
+}
+
+// EFPFollowingRecord represents a single following record from the EFP API
+type EFPFollowingRecord struct {
+	Version    int      `json:"version"`
+	RecordType string   `json:"record_type"`
+	Data       string   `json:"data"` // Ethereum address
+	Tags       []string `json:"tags"`
+	ENS        *ENSData `json:"ens"` // Nullable ENS data
+}
+
+// EFPFollowingResponse represents the response from the EFP following endpoint
+type EFPFollowingResponse struct {
+	Following []EFPFollowingRecord `json:"following"`
+}
+
+// EFPStatsResponse represents the stats from the EFP API
+type EFPStatsResponse struct {
+	FollowingCount int `json:"following_count"`
+	FollowersCount int `json:"followers_count"`
+}
+
+// FollowingAddress represents a processed following address for internal use
+type FollowingAddress struct {
+	Address common.Address    `json:"address"`
+	Tags    []string          `json:"tags"`
+	ENSName string            `json:"ensName"` // ENS name from API
+	Avatar  string            `json:"avatar"`  // Avatar URL from API
+	Records map[string]string `json:"records"` // Social links and other ENS records
+}
+
+type Client struct {
+	httpClient *thirdparty.HTTPClient
+	baseURL    string
+}
+
+func NewClient(httpClient *thirdparty.HTTPClient) *Client {
+	return &Client{
+		httpClient: httpClient,
+		baseURL:    baseURL,
+	}
+}
+
+func (c *Client) ID() string {
+	return "efp"
+}
+
+func (c *Client) IsConnected() bool {
+	// For now, always return true since we don't have connection status tracking
+	// This can be enhanced later with proper connection status management
+	return true
+}
+
+// FetchFollowingAddresses fetches the list of addresses that the given user is following
+func (c *Client) FetchFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]FollowingAddress, error) {
+	var urlStr string
+
+	if search != "" {
+		// Search returns all results (no pagination)
+		urlStr = fmt.Sprintf("%s/users/%s/searchFollowing?include=ens&sort=latest&term=%s",
+			c.baseURL, userAddress.Hex(), url.QueryEscape(search))
+	} else {
+		// Regular listing uses pagination
+		if limit <= 0 {
+			limit = 10
+		}
+		if limit > 100 {
+			limit = 100
+		}
+		if offset < 0 {
+			offset = 0
+		}
+		urlStr = fmt.Sprintf("%s/users/%s/following?include=ens&limit=%d&offset=%d&sort=latest",
+			c.baseURL, userAddress.Hex(), limit, offset)
+	}
+
+	response, err := c.httpClient.DoGetRequest(ctx, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return handleFollowingResponse(response)
+}
+
+// FetchFollowingStats fetches the stats (following/followers count) for a user
+func (c *Client) FetchFollowingStats(ctx context.Context, userAddress common.Address) (int, error) {
+	urlStr := fmt.Sprintf("%s/users/%s/stats", c.baseURL, userAddress.Hex())
+
+	response, err := c.httpClient.DoGetRequest(ctx, urlStr, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	var statsResponse EFPStatsResponse
+	err = json.Unmarshal(response, &statsResponse)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshal EFP stats response: %w", err)
+	}
+
+	return statsResponse.FollowingCount, nil
+}
+
+func handleFollowingResponse(response []byte) ([]FollowingAddress, error) {
+	var efpResponse EFPFollowingResponse
+	err := json.Unmarshal(response, &efpResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal EFP response: %w - %s", err, string(response))
+	}
+
+	result := make([]FollowingAddress, 0, len(efpResponse.Following))
+	for _, record := range efpResponse.Following {
+		// Only process address records
+		if record.RecordType != "address" {
+			continue
+		}
+
+		// Parse the address
+		if !common.IsHexAddress(record.Data) {
+			continue // Skip invalid addresses
+		}
+
+		followingAddr := FollowingAddress{
+			Address: common.HexToAddress(record.Data),
+			Tags:    record.Tags,
+		}
+
+		// Include ENS data if available
+		if record.ENS != nil {
+			followingAddr.ENSName = record.ENS.Name
+			followingAddr.Avatar = record.ENS.Avatar
+			followingAddr.Records = record.ENS.Records
+		}
+
+		result = append(result, followingAddr)
+	}
+
+	return result, nil
+}

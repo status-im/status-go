@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 func TestStatusNodeStart(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
-	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 func TestMessengerActivityCenterMessageSuite(t *testing.T) {

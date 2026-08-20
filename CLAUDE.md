@@ -19,8 +19,7 @@ The messaging specifications Status implements are published at https://lip.logo
 > Layout: the repo is mid-migration toward the standard Go layout
 > ([golang-standards/project-layout](https://github.com/golang-standards/project-layout), tracked in
 > [status-im/status-go#7067](https://github.com/status-im/status-go/issues/7067)) — the backend now lives in
-> `pkg/backend/` and the messaging core in `pkg/messaging/`, but much code (`services/`,
-> `mobile/`, …) still sits at the repo root, and some `docs/building.md` paths (e.g. `./api/`, `./messaging/`)
+> `pkg/backend/` and the messaging core in `pkg/messaging/`, but some code (`mobile/`, `params/`) still sits at the repo root, and some `docs/building.md` paths (e.g. `./api/`, `./messaging/`)
 > are stale. Prefer the layout described below.
 
 ## Build
@@ -134,7 +133,7 @@ transport)**. Asynchronous results flow back to clients through the `signal` pac
   `waku/` (the logos-delivery / go-waku transport integration, `gowaku.go`), driven by `controller/` (receive)
   and `controller/sender/` (send). See `pkg/messaging/waku/README.md` and `layers/encryption/README.md`.
 
-- **`services/`** — JSON-RPC services registered on the node and exposed over RPC: `wallet/` (largest;
+- **`pkg/services/`** — JSON-RPC services registered on the node and exposed over RPC: `wallet/` (largest;
   balances, transactions, collectibles, swaps), `accounts/`, `ext/` & `wakuv2ext/` (messenger RPC bridge),
   `ens/`, `stickers/`, `communitytokens/`, `connector/` (dApp connector), `local-notifications/`,
   `logosstorage/`, etc.

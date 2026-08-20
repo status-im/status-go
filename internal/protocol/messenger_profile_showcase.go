@@ -24,9 +24,9 @@ import (
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/identity"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
 var errorDecryptingPayloadEncryptionKey = errors.New("decrypting the payload encryption key resulted in no error and a nil key")

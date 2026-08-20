@@ -9,7 +9,7 @@ import (
 	"github.com/status-im/status-go/internal/platform"
 	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/params"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 // makeTestNodeConfig defines a function to return a params.NodeConfig

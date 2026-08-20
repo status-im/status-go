@@ -61,14 +61,14 @@ import (
 	"github.com/status-im/status-go/pkg/backend/node"
 	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
 	"github.com/status-im/status-go/pkg/sentry"
+	"github.com/status-im/status-go/pkg/services/ens"
+	"github.com/status-im/status-go/pkg/services/ext"
+	"github.com/status-im/status-go/pkg/services/pairing/statecontrol"
+	"github.com/status-im/status-go/pkg/services/personal"
+	"github.com/status-im/status-go/pkg/services/typeddata"
+	"github.com/status-im/status-go/pkg/services/wallet"
+	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 	"github.com/status-im/status-go/pkg/version"
-	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/ext"
-	"github.com/status-im/status-go/services/pairing/statecontrol"
-	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 var (

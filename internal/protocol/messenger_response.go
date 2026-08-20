@@ -10,10 +10,10 @@ import (
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/pkg/messaging/types"
-	ensservice "github.com/status-im/status-go/services/ens"
+	ensservice "github.com/status-im/status-go/pkg/services/ens"
 
-	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/pkg/services/browsers"
+	"github.com/status-im/status-go/pkg/services/wallet"
 
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/protocol/common"
@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/discord"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/verification"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 )
 
 type RemovedMessage struct {

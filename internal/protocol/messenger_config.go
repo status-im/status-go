@@ -18,10 +18,10 @@ import (
 	"github.com/status-im/status-go/params"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/media"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/pkg/services/browsers"
+	"github.com/status-im/status-go/pkg/services/mailservers"
+	"github.com/status-im/status-go/pkg/services/media"
+	"github.com/status-im/status-go/pkg/services/wallet"
 )
 
 type MessageDeliveredHandler func(string, string)

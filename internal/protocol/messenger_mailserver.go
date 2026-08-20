@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/pkg/services/mailservers"
 )
 
 const (

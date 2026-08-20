@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/contacts"
 
 	"github.com/status-im/status-go/internal/protocol/protobuf"
-	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/pkg/services/browsers"
 )
 
 var (

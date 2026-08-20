@@ -7,7 +7,7 @@ import (
 
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/protocol"
-	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 // ErrServiceNotFound is returned by Pause and Resume when the name is not registered.

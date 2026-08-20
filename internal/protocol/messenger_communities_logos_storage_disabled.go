@@ -5,7 +5,7 @@ package protocol
 import (
 	"errors"
 
-	"github.com/status-im/status-go/services/logosstorage"
+	"github.com/status-im/status-go/pkg/services/logosstorage"
 )
 
 func (m *Messenger) Connect(_ string, _ []string) error {

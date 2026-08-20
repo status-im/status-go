@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/pkg/services/browsers"
 )
 
 func TestBrowserSuite(t *testing.T) {

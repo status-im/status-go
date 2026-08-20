@@ -11,7 +11,7 @@ import (
 	multiAccCommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/pkg/services/wallet"
 )
 
 func (m *Messenger) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {

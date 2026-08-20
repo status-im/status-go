@@ -5,7 +5,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/common"
-	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/pkg/services/personal"
 )
 
 type SignerStub struct{}

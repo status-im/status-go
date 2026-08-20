@@ -10,7 +10,7 @@ import (
 
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/pkg/services/browsers"
 )
 
 func TestMessengerSyncBookmarkSuite(t *testing.T) {

@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 )
 
 type CommunityEventsTestsInterface interface {

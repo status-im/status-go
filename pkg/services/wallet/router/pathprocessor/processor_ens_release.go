@@ -1,0 +1,121 @@
+package pathprocessor
+
+import (
+	"context"
+	"math/big"
+	"strings"
+
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/status-im/status-go/internal/contracts"
+	"github.com/status-im/status-go/internal/contracts/registrar"
+	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/transactions"
+	"github.com/status-im/status-go/pkg/services/ens/ensresolver"
+	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
+	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
+)
+
+type ENSReleaseProcessor struct {
+	contractMaker   *contracts.ContractMaker
+	ethClientGetter rpc.EthClientGetter
+	transactor      transactions.TransactorIface
+	ensResolver     *ensresolver.EnsResolver
+}
+
+func NewENSReleaseProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSReleaseProcessor {
+	return &ENSReleaseProcessor{
+		contractMaker:   contracts.NewContractMaker(ethClientGetter),
+		ethClientGetter: ethClientGetter,
+		transactor:      transactor,
+		ensResolver:     ensResolver,
+	}
+}
+
+func createENSReleaseErrorResponse(err error) error {
+	return createErrorResponse(pathProcessorCommon.ProcessorENSReleaseName, err)
+}
+
+func (s *ENSReleaseProcessor) Name() string {
+	return pathProcessorCommon.ProcessorENSReleaseName
+}
+
+func (s *ENSReleaseProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
+	return params.FromChain.ChainID == walletCommon.EthereumMainnet ||
+		params.FromChain.ChainID == walletCommon.EthereumSepolia ||
+		params.FromChain.ChainID == walletCommon.AnvilMainnet, nil
+}
+
+func (s *ENSReleaseProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
+}
+
+func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
+	if err != nil {
+		return []byte{}, createENSReleaseErrorResponse(err)
+	}
+
+	name := pathProcessorCommon.GetNameFromEnsUsername(params.Username)
+	return registrarABI.Pack("release", walletCommon.UsernameToLabel(name))
+}
+
+func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
+	if params.TestsMode {
+		if params.TestEstimationMap != nil {
+			if val, ok := params.TestEstimationMap[s.Name()]; ok {
+				return val.Value, val.Err
+			}
+		}
+		return 0, ErrNoEstimationFound
+	}
+
+	contractAddress, err := s.GetContractAddress(params)
+	if err != nil {
+		return 0, createENSReleaseErrorResponse(err)
+	}
+
+	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
+	if err != nil {
+		return 0, createENSReleaseErrorResponse(err)
+	}
+
+	msg := ethereum.CallMsg{
+		From:  params.FromAddr,
+		To:    &contractAddress,
+		Value: walletCommon.ZeroBigIntValue(),
+		Data:  input,
+	}
+
+	estimation, err := ethClient.EstimateGas(context.Background(), msg)
+	if err != nil {
+		return 0, createENSReleaseErrorResponse(err)
+	}
+
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
+
+	return uint64(increasedEstimation), nil
+}
+
+func (s *ENSReleaseProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
+}
+
+func (s *ENSReleaseProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
+	return params.AmountIn, nil
+}
+
+func (s *ENSReleaseProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
+	addr, err := s.ensResolver.GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
+	if err != nil {
+		return common.Address{}, err
+	}
+	if addr == walletCommon.ZeroAddress() {
+		return common.Address{}, ErrENSRegistrarNotFound
+	}
+	return addr, nil
+}

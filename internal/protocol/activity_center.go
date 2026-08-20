@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/verification"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
 // The activity center is a place where we store incoming notifications before

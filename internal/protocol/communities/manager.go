@@ -42,16 +42,16 @@ import (
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/pkg/services/personal"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	archivetypes "github.com/status-im/status-go/internal/protocol/communities/archive/types"
-	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 type Publisher interface {

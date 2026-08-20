@@ -52,12 +52,12 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/protocol/verification"
 	"github.com/status-im/status-go/internal/signal"
-	"github.com/status-im/status-go/services/browsers"
-	ensservice "github.com/status-im/status-go/services/ens"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	mailserversDB "github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/media"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/pkg/services/browsers"
+	ensservice "github.com/status-im/status-go/pkg/services/ens"
+	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
+	mailserversDB "github.com/status-im/status-go/pkg/services/mailservers"
+	"github.com/status-im/status-go/pkg/services/media"
+	"github.com/status-im/status-go/pkg/services/wallet"
 
 	_ "github.com/mmcdole/gofeed"
 )

@@ -27,9 +27,9 @@ import (
 	"github.com/status-im/status-go/params"
 	messaging "github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/sentry"
+	mailserversDB "github.com/status-im/status-go/pkg/services/mailservers"
+	"github.com/status-im/status-go/pkg/services/personal"
 	"github.com/status-im/status-go/pkg/version"
-	mailserversDB "github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/personal"
 )
 
 var (

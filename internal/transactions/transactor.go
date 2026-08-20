@@ -23,10 +23,10 @@ import (
 	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/pendingtxtracker"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	wallet_common "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
 
 const (

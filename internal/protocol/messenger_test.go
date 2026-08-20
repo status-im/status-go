@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 const (

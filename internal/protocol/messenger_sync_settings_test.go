@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/testutils"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/pkg/services/stickers"
 )
 
 var (

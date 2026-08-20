@@ -1,7 +1,7 @@
 package requests
 
 import (
-	"github.com/status-im/status-go/services/pairing"
+	"github.com/status-im/status-go/pkg/services/pairing"
 )
 
 type InputConnectionStringForBootstrapping struct {
