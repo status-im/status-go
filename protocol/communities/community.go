@@ -286,7 +286,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 
 		communityItem.CommunityAdminSettings = CommunityAdminSettings{
 			PinMessageAllMembersEnabled:   false,
-			CreateThreadAllMembersEnabled: false,
+			CreateThreadAllMembersEnabled: true,
 		}
 
 		if o.config.CommunityDescription.AdminSettings != nil {
@@ -449,7 +449,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 
 		communityItem.CommunityAdminSettings = CommunityAdminSettings{
 			PinMessageAllMembersEnabled:   false,
-			CreateThreadAllMembersEnabled: false,
+			CreateThreadAllMembersEnabled: true,
 		}
 
 		if o.config.CommunityDescription.AdminSettings != nil {
