@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -64,6 +65,9 @@ type MediaServerConfig struct {
 type MediaServer struct {
 	*Server
 
+	// providersMu guards db, walletDB and downloader, which are swapped at
+	// teardown while handlers are still running.
+	providersMu                 sync.RWMutex
 	db                          *sql.DB
 	downloader                  *ipfs.Downloader
 	multiaccountsDB             *multiaccounts.Database
@@ -191,10 +195,38 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	return s, nil
 }
 
+// SetDataProviders swaps the backing data sources. It is called during node
+// teardown while handlers are still in flight, so the fields are only ever
+// touched under providersMu; handlers must read them via the accessors below
+// and keep the result, never re-reading between a nil check and a use.
 func (s *MediaServer) SetDataProviders(db *sql.DB, walletDB *sql.DB, downloader *ipfs.Downloader) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.db = db
 	s.walletDB = walletDB
 	s.downloader = downloader
+}
+
+func (s *MediaServer) appDatabase() *sql.DB {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
+
+	return s.db
+}
+
+func (s *MediaServer) walletDatabase() *sql.DB {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
+
+	return s.walletDB
+}
+
+func (s *MediaServer) ipfsDownloader() *ipfs.Downloader {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
+
+	return s.downloader
 }
 
 func (s *MediaServer) Start() error {

@@ -106,7 +106,8 @@ func checkForFetchImageError(err error, logger *zap.Logger, parsedImageParams Im
 }
 
 func (s *MediaServer) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -114,14 +115,15 @@ func (s *MediaServer) handleLinkPreviewThumbnail(w http.ResponseWriter, r *http.
 
 	parsed := validateAndReturnImageParams(r, w, s.logger)
 	if parsed.URL != "" {
-		thumbnail, err := getThumbnailPayload(s.db, parsed.MessageID, parsed.URL)
+		thumbnail, err := getThumbnailPayload(db, parsed.MessageID, parsed.URL)
 		checkForFetchImageError(err, s.logger, parsed, w, "thumbnail")
 		getMimeTypeAndWriteImage(w, s.logger, thumbnail)
 	}
 }
 
 func (s *MediaServer) handleLinkPreviewFavicon(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.logger.Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -129,7 +131,7 @@ func (s *MediaServer) handleLinkPreviewFavicon(w http.ResponseWriter, r *http.Re
 
 	parsed := validateAndReturnImageParams(r, w, s.logger)
 	if parsed.URL != "" {
-		favicon, err := getFaviconPayload(s.db, parsed.MessageID, parsed.URL)
+		favicon, err := getFaviconPayload(db, parsed.MessageID, parsed.URL)
 		checkForFetchImageError(err, s.logger, parsed, w, "favicon")
 		getMimeTypeAndWriteImage(w, s.logger, favicon)
 	}
@@ -225,6 +227,13 @@ func getStatusLinkPreviewThumbnail(db *sql.DB, messageID string, URL string, ima
 }
 
 func (s *MediaServer) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r *http.Request) {
+	db := s.appDatabase()
+	if db == nil {
+		s.logger.Warn("can't handle media request without appdb")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	params := r.URL.Query()
 	parsed := ParseImageParams(s.logger, params)
 
@@ -243,7 +252,7 @@ func (s *MediaServer) handleStatusLinkPreviewThumbnail(w http.ResponseWriter, r 
 		return
 	}
 
-	thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(s.db, parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
+	thumbnail, httpsStatusCode, err := getStatusLinkPreviewThumbnail(db, parsed.MessageID, parsed.URL, common.MediaServerImageID(parsed.ImageID))
 	if err != nil {
 		http.Error(w, err.Error(), httpsStatusCode)
 		return
