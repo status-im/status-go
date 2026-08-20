@@ -398,7 +398,7 @@ func TestGetCachedBalancesInternal(t *testing.T) {
 // TestFetchBalancesWithRefresh is no longer needed since refreshBalanceCache is an internal implementation detail
 // and is now tested indirectly through other tests
 
-// TestGetLastTokenUpdateTimestamps tests the GetLastTokenUpdateTimestamps method with internal access.
+// TestGetLastTokenUpdateTimestampsInternal tests the GetLastTokenUpdateTimestamps method with internal access.
 func TestGetLastTokenUpdateTimestampsInternal(t *testing.T) {
 	// Setup the Reader and mock dependencies.
 	reader, _, _, mockCtrl := setupReader(t)
