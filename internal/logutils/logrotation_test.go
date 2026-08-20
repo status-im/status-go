@@ -39,8 +39,11 @@ func TestRotateLogFileForNewSessionProducesLumberjackParseableName(t *testing.T)
 func TestRotateLogFileForNewSessionKeepsActiveFile(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "test.log")
-	// mtime is now, i.e. after processStartTime: the file belongs to this session.
+	// Set mtime explicitly after processStartTime so this remains deterministic on
+	// filesystems with coarse timestamp resolution.
 	require.NoError(t, os.WriteFile(file, []byte("x"), 0600))
+	activeTime := processStartTime.Add(2 * time.Second)
+	require.NoError(t, os.Chtimes(file, activeTime, activeTime))
 
 	require.NoError(t, rotateLogFileForNewSession(file))
 
