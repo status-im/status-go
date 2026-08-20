@@ -1085,6 +1085,23 @@ func (db sqlitePersistence) latestIncomingMessageClock(chatID string) (uint64, e
 	return clock, nil
 }
 
+func (db sqlitePersistence) latestIncomingThreadMessageClock(chatID string, threadID string) (uint64, error) {
+	var clock uint64
+	err := db.db.QueryRow(`
+		SELECT
+			clock_value
+		FROM
+			user_messages
+		WHERE
+			local_chat_id = ? AND thread_id = ? AND outgoing_status = ''
+		ORDER BY clock_value DESC
+		LIMIT 1`, chatID, threadID).Scan(&clock)
+	if err != nil {
+		return 0, err
+	}
+	return clock, nil
+}
+
 func (db sqlitePersistence) PendingContactRequests(currCursor string, limit int) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
@@ -2634,6 +2651,43 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return (seen + mentionedOrReplied), mentionedOrReplied, nil
+}
+
+func (db sqlitePersistence) MarkThreadRead(chatID string, threadID string, clock uint64) (int64, int64, error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND thread_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned) AND not(replied)`, chatID, threadID, clock)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	seen, err := seenResult.RowsAffected()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	mentionedOrRepliedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND thread_id = ? AND seen = 0 AND clock_value <= ? AND (mentioned OR replied)`, chatID, threadID, clock)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	mentionedOrReplied, err := mentionedOrRepliedResult.RowsAffected()
 	if err != nil {
 		return 0, 0, err
 	}
