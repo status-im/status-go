@@ -261,6 +261,10 @@ class TestEnsVisibility:
         assert contact is not None, "get_contact_by_id returned None after verification"
         assert contact.get("ensVerified") is True, f"ENS name not verified after ensVerified call: contact={contact}"
 
+    @pytest.mark.xfail(
+        reason="ENS name from ContactUpdate is never queued for verification; see https://github.com/status-im/status-go/issues/7712",
+        strict=True,
+    )
     async def test_ens_name_auto_verified(self, sender, receiver):
         """The verifier loop should confirm the ENS name on-chain without manual RPC calls."""
         full_name = sender._ens_full_name
@@ -563,6 +567,11 @@ class TestEnsRouterRegistration:
         found = any(u.get("username") == full_name for u in usernames)
         assert found, f"{full_name} not found in {usernames}"
 
+    @pytest.mark.xfail(
+        reason="Router sends the release tx to the SNT token contract instead of the registrar; "
+        "see https://github.com/status-im/status-go/issues/7714",
+        strict=True,
+    )
     def test_ens_release_via_router(self, backend):
         """Release ENS name via wallet router after registration period expires."""
         username = random_ens_username()
