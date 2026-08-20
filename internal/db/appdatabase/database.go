@@ -17,8 +17,8 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrations"
 
-	"github.com/status-im/status-go/services/wallet/bigint"
-	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 const nodeCfgMigrationDate = 1640111208

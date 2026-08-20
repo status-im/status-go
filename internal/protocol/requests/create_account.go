@@ -8,7 +8,7 @@ import (
 	protocolcommon "github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")

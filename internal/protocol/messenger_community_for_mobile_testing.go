@@ -4,7 +4,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 func (m *Messenger) createCommunityChat(communityID types.HexBytes, name string) (*MessengerResponse, error) {

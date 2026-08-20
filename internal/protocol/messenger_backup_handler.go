@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/signal"
-	ensservice "github.com/status-im/status-go/services/ens"
+	ensservice "github.com/status-im/status-go/pkg/services/ens"
 )
 
 const (

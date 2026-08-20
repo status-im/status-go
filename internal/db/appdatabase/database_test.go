@@ -21,8 +21,8 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase/migrationsprevnodecfg"
 	"github.com/status-im/status-go/internal/db/dbsetup"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 func Test_GetDBFilename(t *testing.T) {

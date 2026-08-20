@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/internal/protocol/communities/archive"
-	"github.com/status-im/status-go/services/logosstorage"
+	"github.com/status-im/status-go/pkg/services/logosstorage"
 )
 
 func (m *Messenger) Connect(peerID string, addrs []string) error {

@@ -1,0 +1,644 @@
+package communitytokens
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"math/big"
+
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
+	ethRpc "github.com/ethereum/go-ethereum/rpc"
+
+	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/protocol"
+	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/internal/transactions"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/services/communitytokens/communitytokensdatabase"
+	ac "github.com/status-im/status-go/pkg/services/wallet/activity/common"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/pkg/services/wallet/requests"
+	"github.com/status-im/status-go/pkg/services/wallet/router/fees"
+	"github.com/status-im/status-go/pkg/services/wallet/router/sendtype"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
+	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
+)
+
+// Collectibles service
+type Service struct {
+	manager         *Manager
+	accountsManager *accsmanagement.AccountsManager
+	config          *params.NodeConfig
+	db              *communitytokensdatabase.Database
+	Messenger       *protocol.Messenger
+	walletFeed      *event.Feed
+	walletWatcher   *walletevent.Watcher
+	transactor      *transactions.Transactor
+	feeManager      *fees.FeeManager
+	ethClientGetter rpc.EthClientGetter
+	logger          *zap.Logger
+}
+
+// Returns a new Collectibles Service.
+func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsManager, config *params.NodeConfig, appDb *sql.DB,
+	walletFeed *event.Feed, transactor *transactions.Transactor) *Service {
+	logger := logutils.ZapLogger().Named("communitytokens")
+	return &Service{
+		manager:         NewManager(rpcClient, config.WalletConfig.CommunityTokenDeployerOverrides),
+		accountsManager: accountsManager,
+		config:          config,
+		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
+		walletFeed:      walletFeed,
+		transactor:      transactor,
+		feeManager:      fees.NewFeeManager(rpcClient, logger.Named("feeManager")),
+		ethClientGetter: rpcClient,
+		logger:          logger,
+	}
+}
+
+// APIs returns a list of new APIs.
+func (s *Service) APIs() []ethRpc.API {
+	return []ethRpc.API{
+		{
+			Namespace: "communitytokens",
+			Version:   "0.1.0",
+			Service:   NewAPI(s),
+			Public:    true,
+		},
+	}
+}
+
+// Start is run when a service is started.
+func (s *Service) Start() error {
+
+	s.walletWatcher = walletevent.NewWatcher(s.walletFeed, s.handleWalletEvent)
+	s.walletWatcher.Start()
+
+	return nil
+}
+
+func (s *Service) handleWalletEvent(event walletevent.Event) {
+	if event.Type == pendingtxtracker.EventPendingTransactionStatusChanged {
+		var p pendingtxtracker.StatusChangedPayload
+		err := json.Unmarshal([]byte(event.Message), &p)
+		if err != nil {
+			s.logger.Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())
+			return
+		}
+		if p.Status == ac.Pending {
+			return
+		}
+		if p.SendDetails == nil {
+			s.logger.Error(errors.Wrap(err, fmt.Sprintf("cannot resolve details for tx hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
+			return
+		}
+
+		addressTo := common.Address(p.SendDetails.ToAddress)
+		fromChainID := walletCommon.ChainID(p.SendDetails.FromChain)
+		txHash := p.Hash
+		for _, tx := range p.SentTransactions {
+			if common.Hash(tx.Hash) == p.Hash {
+				addressTo = common.Address(tx.ToAddress)
+				fromChainID = walletCommon.ChainID(tx.FromChain)
+			}
+		}
+
+		var communityToken, ownerToken, masterToken *token.CommunityToken = &token.CommunityToken{}, &token.CommunityToken{}, &token.CommunityToken{}
+		var tokenErr error
+		switch p.SendDetails.SendType {
+		case int(sendtype.CommunityDeployAssets),
+			int(sendtype.CommunityDeployCollectibles):
+			communityToken, tokenErr = s.handleDeployCommunityToken(p.Status, addressTo, fromChainID)
+		case int(sendtype.CommunityMintTokens):
+			communityToken, tokenErr = s.handleAirdropCommunityToken(p.Status, addressTo, fromChainID)
+		case int(sendtype.CommunityRemoteBurn):
+			communityToken, tokenErr = s.handleRemoteDestructCollectible(p.Status, addressTo, fromChainID)
+		case int(sendtype.CommunityBurn):
+			communityToken, tokenErr = s.handleBurnCommunityToken(p.Status, addressTo, fromChainID)
+		case int(sendtype.CommunityDeployOwnerToken):
+			ownerToken, masterToken, tokenErr = s.handleDeployOwnerToken(p.Status, fromChainID, txHash)
+		case int(sendtype.CommunitySetSignerPubKey):
+			communityToken, tokenErr = s.handleSetSignerPubKey(p.Status, addressTo, fromChainID)
+		default:
+			return
+		}
+
+		errorStr := ""
+		if tokenErr != nil {
+			errorStr = tokenErr.Error()
+		}
+
+		signal.SendCommunityTokenTransactionStatusSignal(p.SendDetails.SendType, p.Status == ac.Success, txHash,
+			communityToken, ownerToken, masterToken, errorStr)
+	}
+}
+
+func (s *Service) handleAirdropCommunityToken(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
+	if communityToken == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, logutils.TruncateWithDot(toAddress.String()))
+	} else {
+		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
+			communityToken.Address, protobuf.CommunityTokenAction_AIRDROP)
+		if publishErr != nil {
+			s.logger.Warn("can't publish airdrop action")
+		}
+	}
+	return communityToken, err
+}
+
+func (s *Service) handleRemoteDestructCollectible(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
+	if communityToken == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, logutils.TruncateWithDot(toAddress.String()))
+	} else {
+		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
+			communityToken.Address, protobuf.CommunityTokenAction_REMOTE_DESTRUCT)
+		if publishErr != nil {
+			s.logger.Warn("can't publish remote destruct action")
+		}
+	}
+	return communityToken, err
+}
+
+func (s *Service) handleBurnCommunityToken(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
+	if status == ac.Success {
+		// get new max supply and update database
+		newMaxSupply, err := s.maxSupply(context.Background(), uint64(chainID), toAddress.String())
+		if err != nil {
+			return nil, err
+		}
+		err = s.Messenger.UpdateCommunityTokenSupply(int(chainID), toAddress.String(), &bigint.BigInt{Int: newMaxSupply})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
+
+	if communityToken == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, logutils.TruncateWithDot(toAddress.String()))
+	} else {
+		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
+			communityToken.Address, protobuf.CommunityTokenAction_BURN)
+		if publishErr != nil {
+			s.logger.Warn("can't publish burn action")
+		}
+	}
+	return communityToken, err
+}
+
+func (s *Service) handleDeployOwnerToken(status string, chainID walletCommon.ChainID, txHash common.Hash) (*token.CommunityToken, *token.CommunityToken, error) {
+	newMasterAddress, err := s.GetMasterTokenContractAddressFromHash(context.Background(), uint64(chainID), txHash.Hex())
+	if err != nil {
+		return nil, nil, err
+	}
+	newOwnerAddress, err := s.GetOwnerTokenContractAddressFromHash(context.Background(), uint64(chainID), txHash.Hex())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = s.Messenger.UpdateCommunityTokenAddress(int(chainID), s.TemporaryOwnerContractAddress(txHash.Hex()), newOwnerAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = s.Messenger.UpdateCommunityTokenAddress(int(chainID), s.TemporaryMasterContractAddress(txHash.Hex()), newMasterAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ownerToken, err := s.updateStateAndAddTokenToCommunityDescription(status, int(chainID), newOwnerAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	masterToken, err := s.updateStateAndAddTokenToCommunityDescription(status, int(chainID), newMasterAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ownerToken, masterToken, nil
+}
+
+func (s *Service) updateStateAndAddTokenToCommunityDescription(status string, chainID int, address string) (*token.CommunityToken, error) {
+	tokenToUpdate, err := s.Messenger.GetCommunityTokenByChainAndAddress(chainID, address)
+	if err != nil {
+		return nil, err
+	}
+	if tokenToUpdate == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainID=%v, address=%v", chainID, logutils.TruncateWithDot(address))
+	}
+
+	if status == ac.Success {
+		err := s.Messenger.UpdateCommunityTokenState(chainID, address, token.Deployed)
+		if err != nil {
+			return nil, err
+		}
+		err = s.Messenger.AddCommunityToken(tokenToUpdate.CommunityID, chainID, address)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := s.Messenger.UpdateCommunityTokenState(chainID, address, token.Failed)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return s.Messenger.GetCommunityTokenByChainAndAddress(chainID, address)
+}
+
+func (s *Service) handleDeployCommunityToken(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
+	return s.updateStateAndAddTokenToCommunityDescription(status, int(chainID), toAddress.String())
+}
+
+func (s *Service) handleSetSignerPubKey(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
+
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
+	if err != nil {
+		return nil, err
+	}
+	if communityToken == nil {
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, logutils.TruncateWithDot(toAddress.String()))
+	}
+
+	if status == ac.Success {
+		_, err := s.Messenger.PromoteSelfToControlNode(types.FromHex(communityToken.CommunityID))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return communityToken, err
+}
+
+// Stop is run when a service is stopped.
+func (s *Service) Stop() error {
+	if s.walletWatcher != nil {
+		s.walletWatcher.Stop()
+	}
+	return nil
+}
+
+func (s *Service) Init(messenger *protocol.Messenger) {
+	s.Messenger = messenger
+}
+
+func (s *Service) remainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	tokenType, err := s.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return s.remainingCollectiblesSupply(ctx, chainID, contractAddress)
+	case protobuf.CommunityTokenType_ERC20:
+		return s.remainingAssetsSupply(ctx, chainID, contractAddress)
+	default:
+		return nil, fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
+// RemainingSupply = MaxSupply - MintedCount
+func (s *Service) remainingCollectiblesSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := s.manager.NewCollectiblesInstance(chainID, common.HexToAddress(contractAddress))
+	if err != nil {
+		return nil, err
+	}
+	maxSupply, err := contractInst.MaxSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	mintedCount, err := contractInst.MintedCount(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	var res = new(big.Int)
+	res.Sub(maxSupply, mintedCount)
+	return &bigint.BigInt{Int: res}, nil
+}
+
+// RemainingSupply = MaxSupply - TotalSupply
+func (s *Service) remainingAssetsSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := s.manager.NewAssetsInstance(chainID, common.HexToAddress(contractAddress))
+	if err != nil {
+		return nil, err
+	}
+	maxSupply, err := contractInst.MaxSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	totalSupply, err := contractInst.TotalSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	var res = new(big.Int)
+	res.Sub(maxSupply, totalSupply)
+	return &bigint.BigInt{Int: res}, nil
+}
+
+func (s *Service) ValidateWalletsAndAmounts(walletAddresses []string, amount *bigint.BigInt) error {
+	if len(walletAddresses) == 0 {
+		return errors.New("wallet addresses list is empty")
+	}
+	if amount.Cmp(big.NewInt(0)) <= 0 {
+		return errors.New("amount is <= 0")
+	}
+	return nil
+}
+
+func (s *Service) GetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
+
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := s.manager.NewOwnerTokenInstance(chainID, common.HexToAddress(contractAddress))
+	if err != nil {
+		return "", err
+	}
+	signerPubKey, err := contractInst.SignerPublicKey(callOpts)
+	if err != nil {
+		return "", err
+	}
+
+	return types.ToHex(signerPubKey), nil
+}
+
+func (s *Service) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
+	// 1. Get Owner Token contract address from deployer contract - SafeGetOwnerTokenAddress()
+	ownerTokenAddr, err := s.SafeGetOwnerTokenAddress(ctx, chainID, communityID)
+	if err != nil {
+		return "", err
+	}
+	// 2. Get Signer from owner token contract - GetSignerPubKey()
+	return s.GetSignerPubKey(ctx, chainID, ownerTokenAddr)
+}
+
+func (s *Service) SafeGetOwnerTokenAddress(ctx context.Context, chainID uint64, communityID string) (string, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	deployerContractInst, err := s.manager.NewCommunityTokenDeployerInstance(chainID)
+	if err != nil {
+		return "", err
+	}
+	registryAddr, err := deployerContractInst.DeploymentRegistry(callOpts)
+	if err != nil {
+		return "", err
+	}
+	registryContractInst, err := s.manager.NewCommunityOwnerTokenRegistryInstance(chainID, registryAddr)
+	if err != nil {
+		return "", err
+	}
+	communityEthAddress, err := convert33BytesPubKeyToEthAddress(communityID)
+	if err != nil {
+		return "", err
+	}
+	ownerTokenAddress, err := registryContractInst.GetEntry(callOpts, communityEthAddress)
+
+	return ownerTokenAddress.Hex(), err
+}
+
+func (s *Service) GetCollectibleContractData(chainID uint64, contractAddress string) (*communities.CollectibleContractData, error) {
+	return s.manager.GetCollectibleContractData(chainID, contractAddress)
+}
+
+func (s *Service) GetAssetContractData(chainID uint64, contractAddress string) (*communities.AssetContractData, error) {
+	return s.manager.GetAssetContractData(chainID, contractAddress)
+}
+
+func (s *Service) DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error) {
+	return s.manager.DeploymentSignatureDigest(chainID, addressFrom, communityID)
+}
+
+// FetchCollectibleOwnersByContractAddressDirectly queries ERC721 contract ownership
+// directly via RPC, bypassing third-party collectibles providers. This is used as a
+// fallback for chains not supported by those providers (e.g. local Anvil chain 31337).
+func (s *Service) FetchCollectibleOwnersByContractAddressDirectly(ctx context.Context, chainID uint64, contractAddress string) (*thirdparty.CollectibleContractOwnership, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+
+	contractInst, err := s.manager.NewCollectiblesInstance(chainID, common.HexToAddress(contractAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	mintedCount, err := contractInst.MintedCount(callOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	ownersMap := make(map[common.Address][]thirdparty.TokenBalance)
+	for i := int64(0); i < mintedCount.Int64(); i++ {
+		tokenID, err := contractInst.TokenByIndex(callOpts, big.NewInt(i))
+		if err != nil {
+			return nil, fmt.Errorf("TokenByIndex(%d) failed: %w", i, err)
+		}
+		owner, err := contractInst.OwnerOf(callOpts, tokenID)
+		if err != nil {
+			return nil, fmt.Errorf("OwnerOf(tokenID=%s) failed: %w", tokenID, err)
+		}
+		ownersMap[owner] = append(ownersMap[owner], thirdparty.TokenBalance{
+			TokenID: &bigint.BigInt{Int: new(big.Int).Set(tokenID)},
+			Balance: &bigint.BigInt{Int: big.NewInt(1)},
+		})
+	}
+
+	ownership := &thirdparty.CollectibleContractOwnership{
+		ContractAddress: common.HexToAddress(contractAddress),
+	}
+	for ownerAddr, balances := range ownersMap {
+		ownership.Owners = append(ownership.Owners, thirdparty.CollectibleOwner{
+			OwnerAddress:  ownerAddr,
+			TokenBalances: balances,
+		})
+	}
+
+	return ownership, nil
+}
+
+func (s *Service) ProcessCommunityTokenAction(message *protobuf.CommunityTokenAction) error {
+	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(message.ChainId), message.ContractAddress)
+	if err != nil {
+		return err
+	}
+	if communityToken == nil {
+		return fmt.Errorf("can't find community token in database: chain %v, address %v", message.ChainId, message.ContractAddress)
+	}
+
+	if message.ActionType == protobuf.CommunityTokenAction_BURN {
+		// get new max supply and update database
+		newMaxSupply, err := s.maxSupply(context.Background(), uint64(communityToken.ChainID), communityToken.Address)
+		if err != nil {
+			return nil
+		}
+		err = s.Messenger.UpdateCommunityTokenSupply(communityToken.ChainID, communityToken.Address, &bigint.BigInt{Int: newMaxSupply})
+		if err != nil {
+			return err
+		}
+		communityToken, _ = s.Messenger.GetCommunityTokenByChainAndAddress(int(message.ChainId), message.ContractAddress)
+	}
+
+	signal.SendCommunityTokenActionSignal(communityToken, message.ActionType)
+
+	return nil
+}
+
+func (s *Service) maxSupplyCollectibles(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := s.manager.NewCollectiblesInstance(chainID, common.HexToAddress(contractAddress))
+	if err != nil {
+		return nil, err
+	}
+	return contractInst.MaxSupply(callOpts)
+}
+
+func (s *Service) maxSupplyAssets(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := s.manager.NewAssetsInstance(chainID, common.HexToAddress(contractAddress))
+	if err != nil {
+		return nil, err
+	}
+	return contractInst.MaxSupply(callOpts)
+}
+
+func (s *Service) maxSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	tokenType, err := s.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return s.maxSupplyCollectibles(ctx, chainID, contractAddress)
+	case protobuf.CommunityTokenType_ERC20:
+		return s.maxSupplyAssets(ctx, chainID, contractAddress)
+	default:
+		return nil, fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
+func (s *Service) CreateCommunityTokenAndSave(chainID int, deploymentParameters requests.DeploymentParameters,
+	deployerAddress string, contractAddress string, tokenType protobuf.CommunityTokenType, privilegesLevel token.PrivilegesLevel, transactionHash string) (*token.CommunityToken, error) {
+
+	contractVersion := ""
+	if privilegesLevel == token.CommunityLevel {
+		contractVersion = s.currentVersion()
+	}
+
+	tokenToSave := &token.CommunityToken{
+		TokenType:          tokenType,
+		CommunityID:        deploymentParameters.CommunityID,
+		Address:            contractAddress,
+		Name:               deploymentParameters.Name,
+		Symbol:             deploymentParameters.Symbol,
+		Description:        deploymentParameters.Description,
+		Supply:             &bigint.BigInt{Int: deploymentParameters.GetSupply()},
+		InfiniteSupply:     deploymentParameters.InfiniteSupply,
+		Transferable:       deploymentParameters.Transferable,
+		RemoteSelfDestruct: deploymentParameters.RemoteSelfDestruct,
+		ChainID:            chainID,
+		DeployState:        token.InProgress,
+		Decimals:           deploymentParameters.Decimals,
+		Deployer:           deployerAddress,
+		PrivilegesLevel:    privilegesLevel,
+		Base64Image:        deploymentParameters.Base64Image,
+		TransactionHash:    transactionHash,
+		Version:            contractVersion,
+	}
+
+	return s.Messenger.SaveCommunityToken(tokenToSave, deploymentParameters.CroppedImage)
+}
+
+const (
+	MasterSuffix = "-master"
+	OwnerSuffix  = "-owner"
+)
+
+func (s *Service) TemporaryMasterContractAddress(hash string) string {
+	return hash + MasterSuffix
+}
+
+func (s *Service) TemporaryOwnerContractAddress(hash string) string {
+	return hash + OwnerSuffix
+}
+
+func (s *Service) GetMasterTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
+	ethClient, err := s.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	receipt, err := ethClient.EthGetTransactionReceipt(ctx, common.HexToHash(txHash))
+	if err != nil {
+		return "", err
+	}
+
+	deployerContractInst, err := s.manager.NewCommunityTokenDeployerInstance(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	logMasterTokenCreatedSig := []byte("DeployMasterToken(address)")
+	logMasterTokenCreatedSigHash := crypto.Keccak256Hash(logMasterTokenCreatedSig)
+
+	for _, vLog := range receipt.Logs {
+		if vLog.Topics[0].Hex() == logMasterTokenCreatedSigHash.Hex() {
+			event, err := deployerContractInst.ParseDeployMasterToken(*vLog)
+			if err != nil {
+				return "", err
+			}
+			return event.Arg0.Hex(), nil
+		}
+	}
+	return "", fmt.Errorf("can't find master token address in transaction: %s", logutils.TruncateWithDot(txHash))
+}
+
+func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
+	ethClient, err := s.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	receipt, err := ethClient.EthGetTransactionReceipt(ctx, common.HexToHash(txHash))
+	if err != nil {
+		return "", err
+	}
+
+	deployerContractInst, err := s.manager.NewCommunityTokenDeployerInstance(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	logOwnerTokenCreatedSig := []byte("DeployOwnerToken(address)")
+	logOwnerTokenCreatedSigHash := crypto.Keccak256Hash(logOwnerTokenCreatedSig)
+
+	for _, vLog := range receipt.Logs {
+		if vLog.Topics[0].Hex() == logOwnerTokenCreatedSigHash.Hex() {
+			event, err := deployerContractInst.ParseDeployOwnerToken(*vLog)
+			if err != nil {
+				return "", err
+			}
+			return event.Arg0.Hex(), nil
+		}
+	}
+	return "", fmt.Errorf("can't find owner token address in transaction: %s", logutils.TruncateWithDot(txHash))
+}
+
+func (s *Service) publishTokenActionToPrivilegedMembers(communityID string, chainID uint64, contractAddress string, actionType protobuf.CommunityTokenAction_ActionType) error {
+	decodedCommunityID, err := types.DecodeHex(communityID)
+	if err != nil {
+		return err
+	}
+	return s.Messenger.PublishTokenActionToPrivilegedMembers(decodedCommunityID, chainID, contractAddress, actionType)
+}

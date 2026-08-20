@@ -31,7 +31,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/v1"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/pkg/multiformat"
-	"github.com/status-im/status-go/services/media"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 // enrichedCommunityMember is the JSON-serialization wrapper that combines

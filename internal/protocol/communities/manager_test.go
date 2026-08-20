@@ -32,10 +32,10 @@ import (
 	testutils "github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
 func TestManagerSuite(t *testing.T) {

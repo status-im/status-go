@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/internal/protocol/requests"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 

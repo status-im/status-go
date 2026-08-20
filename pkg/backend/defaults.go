@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/messaging"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 const (

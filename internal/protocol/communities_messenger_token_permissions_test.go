@@ -29,7 +29,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
 const testChainID1 = 1

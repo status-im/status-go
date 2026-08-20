@@ -30,10 +30,10 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
+	tokenTypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 
 	mock_protocol_accounts_manager "github.com/status-im/status-go/internal/protocol/mock"
 

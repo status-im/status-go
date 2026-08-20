@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	protocolRequests "github.com/status-im/status-go/internal/protocol/requests"
-	"github.com/status-im/status-go/services/pairing"
+	"github.com/status-im/status-go/pkg/services/pairing"
 )
 
 func TestInputConnectionStringForBootstrapping_Validate(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {

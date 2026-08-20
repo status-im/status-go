@@ -3,7 +3,7 @@ package backupsync
 import (
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/protocol/identity"
-	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/pkg/services/ens"
 )
 
 type BackedUpProfile struct {

@@ -15,10 +15,10 @@ import (
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params/networkdefaults"
-	alchemymanager "github.com/status-im/status-go/services/wallet/activityfetcher/alchemy"
-	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
+	alchemymanager "github.com/status-im/status-go/pkg/services/wallet/activityfetcher/alchemy"
+	"github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/activity/alchemy"
 	t_common "github.com/status-im/status-go/test/unit-network/common"
 )
 

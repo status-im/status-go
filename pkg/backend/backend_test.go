@@ -41,10 +41,10 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/services/wallet"
-	walletservice "github.com/status-im/status-go/services/wallet"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/typeddata"
+	"github.com/status-im/status-go/pkg/services/wallet"
+	walletservice "github.com/status-im/status-go/pkg/services/wallet"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {

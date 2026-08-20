@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/protocol/communities"
-	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 const (

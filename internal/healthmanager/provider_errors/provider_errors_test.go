@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/status-im/status-go/services/wallet/puzzleauth"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
 
 // TestIsConnectionError tests the IsConnectionError function.

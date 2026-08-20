@@ -32,7 +32,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
 
 func TestTransactorSuite(t *testing.T) {

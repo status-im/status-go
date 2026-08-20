@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/security"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
 // ----------

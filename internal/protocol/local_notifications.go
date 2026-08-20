@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/identity/identicon"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 )
 
 // Notification setting values (must match settings_notifications constants)

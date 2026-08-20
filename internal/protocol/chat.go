@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
-	"github.com/status-im/status-go/services/utils"
+	"github.com/status-im/status-go/pkg/services/utils"
 )
 
 var chatColors = []string{

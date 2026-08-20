@@ -52,7 +52,7 @@ MIGRATION_DIRS=( \
   "pkg/messaging/waku/migrations/migrations/sqlite" \
   "pkg/messaging/layers/encryption/migrations/migrations/sqlite" \
   "pkg/messaging/layers/transport/migrations/migrations/sqlite" \
-  "services/newsfeed/migrations/migrations/sqlite" \
+  "pkg/services/newsfeed/migrations/migrations/sqlite" \
   "walletdatabase/migrations/sql" \
 )
 

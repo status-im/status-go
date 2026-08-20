@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/communities/token"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 )
 
 type Persistence struct {

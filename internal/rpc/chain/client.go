@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/internal/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/internal/panics"
 	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
-	"github.com/status-im/status-go/services/rpcstats"
+	"github.com/status-im/status-go/pkg/services/rpcstats"
 
 	sdkethclient "github.com/status-im/go-wallet-sdk/pkg/ethclient"
 )

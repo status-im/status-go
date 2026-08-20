@@ -43,11 +43,11 @@ import (
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
 	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/services/logosstorage"
-	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/sharedurls"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
+	"github.com/status-im/status-go/pkg/services/logosstorage"
+	"github.com/status-im/status-go/pkg/services/personal"
+	"github.com/status-im/status-go/pkg/services/sharedurls"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 )
 
 // 7 days interval

@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/puzzleauth"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
 
 // CreateEthClientFromProvider creates an Ethereum RPC client from the given RpcProvider.

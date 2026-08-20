@@ -37,8 +37,8 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/services/media"
+	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 func TestMessengerCommunitiesSuite(t *testing.T) {

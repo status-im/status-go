@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/communities/token"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 )
 
 func TestAdminCommunityEventsSuite(t *testing.T) {

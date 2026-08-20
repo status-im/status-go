@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 // rpcWrapper wraps provides convenient interface for ethereum RPC APIs we need for sending transactions

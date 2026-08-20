@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 )
 
 func TestEventToSystemMessageSuite(t *testing.T) {

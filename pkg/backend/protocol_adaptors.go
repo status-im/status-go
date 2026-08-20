@@ -10,9 +10,9 @@ import (
 
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/rpc/network"
-	"github.com/status-im/status-go/services/wallet/token"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/tokenbalances"
+	"github.com/status-im/status-go/pkg/services/wallet/token"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
+	"github.com/status-im/status-go/pkg/services/wallet/tokenbalances"
 )
 
 var _ communities.NetworkManager = (*CommunitiesNetworkManager)(nil)

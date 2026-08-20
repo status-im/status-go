@@ -216,7 +216,7 @@ STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS
 STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
 test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
-	$(STORAGE_TEST_ENV) gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
@@ -515,18 +515,18 @@ generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_HOST_ENV) $(GO_GENERATE_CMD) $(PACKAGES)
-	@$(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./services/logosstorage
+	@$(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./pkg/services/logosstorage
 
 generate-contracts:
 	go generate ./contracts
 
 download-tokens:
 	echo "Downloading token lists..."; \
-	GOROOT=$$(go env GOROOT) GOFLAGS="-mod=mod" go run ./services/wallet/token/local-token-lists/default-lists/downloader/main.go; \
+	GOROOT=$$(go env GOROOT) GOFLAGS="-mod=mod" go run ./pkg/services/wallet/token/local-token-lists/default-lists/downloader/main.go; \
 	echo "token list downloaded successfully"; \
 
 analyze-token-stores:
-	go run -mod=mod ./services/wallet/token/local-token-lists/analyzer/main.go
+	go run -mod=mod ./pkg/services/wallet/token/local-token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)

@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
-	"github.com/status-im/status-go/services/wallet/puzzleauth"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
 
 // ProviderErrorType defines the type of non-RPC error for JSON serialization.

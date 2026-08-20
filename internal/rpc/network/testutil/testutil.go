@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 // Helper function to create a provider

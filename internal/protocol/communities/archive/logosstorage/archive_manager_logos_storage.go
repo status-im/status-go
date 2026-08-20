@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	logosstorage "github.com/status-im/status-go/services/logosstorage"
+	logosstorage "github.com/status-im/status-go/pkg/services/logosstorage"
 )
 
 type ArchiveManagerLogosStorage struct {

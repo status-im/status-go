@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
 )
 
 // TODO move this code out of the protocol package

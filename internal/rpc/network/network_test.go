@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 type NetworkManagerTestSuite struct {
