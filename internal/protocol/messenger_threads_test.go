@@ -138,6 +138,52 @@ func (s *MessengerThreadsSuite) TestThreadsByChatID() {
 	s.Require().Equal("Second thread", threadIDs["parent-2"].Name)
 }
 
+func (s *MessengerThreadsSuite) TestThreadsIncludeUnreadCounts() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parentMsg := buildTestMessage(*chat)
+	parentMsg.ID = "parent-id"
+	parentMsg.Text = "Parent"
+	parentMsg.ChatMessage.Text = "Parent"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parentMsg}))
+
+	_, err := s.m.CreateThread(chat.ID, "parent-id")
+	s.Require().NoError(err)
+
+	threadID := "parent-id"
+	unreadReply := buildTestMessage(*chat)
+	unreadReply.ID = "reply-unread"
+	unreadReply.Text = "Unread reply"
+	unreadReply.ChatMessage.Text = "Unread reply"
+	unreadReply.ChatMessage.ThreadId = &threadID
+	unreadReply.ResponseTo = "parent-id"
+	unreadReply.Mentioned = true
+	unreadReply.Seen = false
+
+	seenReply := buildTestMessage(*chat)
+	seenReply.ID = "reply-seen"
+	seenReply.Text = "Seen reply"
+	seenReply.ChatMessage.Text = "Seen reply"
+	seenReply.ChatMessage.ThreadId = &threadID
+	seenReply.ResponseTo = "parent-id"
+	seenReply.Mentioned = true
+	seenReply.Seen = true
+
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{unreadReply, seenReply}))
+
+	threads, err := s.m.ThreadsByChatID(chat.ID)
+	s.Require().NoError(err)
+	s.Require().Len(threads, 1)
+	s.Require().Equal(uint(1), threads[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), threads[0].UnviewedMentionsCount)
+
+	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(1), thread.UnviewedMessagesCount)
+	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
+}
+
 func (s *MessengerThreadsSuite) TestMessagesByThreadID() {
 	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -253,6 +299,116 @@ func (s *MessengerThreadsSuite) TestSendMessageToThreadCreatesThreadIfNotExists(
 	s.Require().NoError(err)
 	s.Require().Len(threads, 1)
 	s.Require().Equal("parent-id", threads[0].ThreadID)
+}
+
+func (s *MessengerThreadsSuite) TestReceivedThreadReplyDoesNotIncrementParentUnreadCount() {
+	receiver := s.m
+	receiver.featureFlags.Threads = true
+
+	sender := s.newMessenger()
+	sender.featureFlags.Threads = true
+	chatID := "thread-unread-public-chat"
+
+	receiverChat := CreatePublicChat(chatID, receiver.getTimesource())
+	s.Require().NoError(receiver.SaveChat(receiverChat))
+	_, err := receiver.Join(receiverChat)
+	s.Require().NoError(err)
+
+	senderChat := CreatePublicChat(chatID, sender.getTimesource())
+	s.Require().NoError(sender.SaveChat(senderChat))
+	_, err = sender.Join(senderChat)
+	s.Require().NoError(err)
+
+	parentMsg := buildTestMessage(*senderChat)
+	parentMsg.Text = "Parent message"
+	parentMsg.ChatMessage.Text = "Parent message"
+
+	parentResponse, err := sender.SendChatMessage(context.Background(), parentMsg)
+	s.Require().NoError(err)
+	s.Require().Len(parentResponse.Messages(), 1)
+	parentID := parentResponse.Messages()[0].ID
+
+	_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
+		for _, msg := range response.Messages() {
+			if msg.ID == parentID {
+				return true
+			}
+		}
+
+		return false
+	}, "parent message not received")
+	s.Require().NoError(err)
+
+	_, err = receiver.MarkAllRead(context.Background(), chatID)
+	s.Require().NoError(err)
+	receiverParentChat, ok := receiver.allChats.Load(chatID)
+	s.Require().True(ok)
+	s.Require().Equal(uint(0), receiverParentChat.UnviewedMessagesCount)
+	s.Require().Equal(uint(0), receiverParentChat.UnviewedMentionsCount)
+
+	_, err = sender.CreateThread(chatID, parentID)
+	s.Require().NoError(err)
+
+	threadID := parentID
+	threadReply := buildTestMessage(*senderChat)
+	threadReply.Text = "Reply from thread"
+	threadReply.ChatMessage.Text = "Reply from thread"
+	threadReply.ChatMessage.ThreadId = &threadID
+	threadReply.ResponseTo = parentID
+	threadReply.Mentioned = true
+
+	threadResponse, err := sender.SendChatMessage(context.Background(), threadReply)
+	s.Require().NoError(err)
+
+	var threadReplyID string
+	for _, msg := range threadResponse.Messages() {
+		if msg.Text == "Reply from thread" && msg.GetThreadId() == parentID {
+			threadReplyID = msg.ID
+			break
+		}
+	}
+	s.Require().NotEmpty(threadReplyID)
+
+	receiverResponse, err := WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
+		for _, msg := range response.Messages() {
+			if msg.ID == threadReplyID {
+				s.Require().Equal(parentID, msg.GetThreadId())
+				return true
+			}
+		}
+
+		return false
+	}, "thread reply not received")
+	s.Require().NoError(err)
+
+	receiverParentChat, ok = receiver.allChats.Load(chatID)
+	s.Require().True(ok)
+	s.Require().Equal(uint(0), receiverParentChat.UnviewedMessagesCount)
+	s.Require().Equal(uint(0), receiverParentChat.UnviewedMentionsCount)
+
+	var responseChat *Chat
+	for _, chat := range receiverResponse.Chats() {
+		if chat.ID == chatID {
+			responseChat = chat
+			break
+		}
+	}
+	s.Require().NotNil(responseChat)
+	s.Require().Equal(uint(0), responseChat.UnviewedMessagesCount)
+	s.Require().Equal(uint(0), responseChat.UnviewedMentionsCount)
+
+	var responseThread *Thread
+	for _, thread := range receiverResponse.Threads() {
+		if thread.ThreadID == parentID {
+			responseThread = thread
+			break
+		}
+	}
+	s.Require().NotNil(responseThread)
+
+	thread, err := receiver.persistence.ThreadByID(chatID, parentID)
+	s.Require().NoError(err)
+	s.Require().Equal(parentID, thread.ThreadID)
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadValidatesEmptyParams() {

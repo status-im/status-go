@@ -1815,7 +1815,7 @@ func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage E
 	editedMessageHasMentions := editedMessage.Mentioned
 
 	// Messages in OneToOne chats increase the UnviewedMentionsCount whether or not they include a Mention
-	if !chat.OneToOne() {
+	if !chat.OneToOne() && editedMessage.GetThreadId() == "" {
 		if editedMessageHasMentions && !originalMessageMentioned && !editedMessage.Seen {
 			// Increase unviewed count when the edited message has a mention and didn't have one before
 			chat.UnviewedMentionsCount++
@@ -1936,7 +1936,7 @@ func (m *Messenger) handleDeleteMessage(ctx context.Context, state *ReceivedMess
 		}
 
 		// Reduce chat mention count and unread count if unread
-		if !messageToDelete.Seen && !unreadCountDecreased {
+		if !messageToDelete.Seen && !unreadCountDecreased && messageToDelete.GetThreadId() == "" {
 			unreadCountDecreased = true
 			if chat.UnviewedMessagesCount > 0 {
 				chat.UnviewedMessagesCount--
@@ -3031,6 +3031,10 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 }
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
+	if message.GetThreadId() != "" {
+		return
+	}
+
 	chat.UnviewedMessagesCount++
 	if message.Mentioned || message.Replied || chat.OneToOne() {
 		chat.UnviewedMentionsCount++
