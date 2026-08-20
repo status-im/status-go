@@ -16,8 +16,8 @@ import (
 	"github.com/status-im/status-go/internal/contracts/community-tokens/assets"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
-	communitytoken "github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/protobuf"
+	communitytoken "github.com/status-im/status-go/internal/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"
 	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )

@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	identityUtils "github.com/status-im/status-go/internal/protocol/identity"
+	"github.com/status-im/status-go/internal/protocol/identity/alias"
+	"github.com/status-im/status-go/internal/protocol/identity/emojihash"
 	"github.com/status-im/status-go/pkg/multiformat"
-	identityUtils "github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/identity/emojihash"
 )
 
 func TestGetPublicKeyData(t *testing.T) {

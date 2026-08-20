@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 type ColorHash [][2]int

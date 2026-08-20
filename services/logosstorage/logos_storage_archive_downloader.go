@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/internal/panics"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 
 	"go.uber.org/zap"
 )

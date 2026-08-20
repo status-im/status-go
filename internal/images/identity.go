@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/internal/crypto"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 type IdentityImage struct {

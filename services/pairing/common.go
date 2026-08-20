@@ -12,8 +12,8 @@ import (
 
 	"github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/pkg/backend"
-	"github.com/status-im/status-go/protocol/requests"
 
 	"gopkg.in/go-playground/validator.v9"
 )

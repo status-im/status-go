@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc"
 
-	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/requests"
 )

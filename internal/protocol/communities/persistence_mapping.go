@@ -1,0 +1,152 @@
+package communities
+
+import (
+	"crypto/ecdsa"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/services/media"
+)
+
+func communityToRecord(community *Community) (*CommunityRecord, error) {
+	wrappedDescription, err := community.ToProtocolMessageBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommunityRecord{
+		id:           community.ID(),
+		privateKey:   crypto.FromECDSA(community.PrivateKey()),
+		controlNode:  crypto.FromECDSAPub(community.ControlNode()),
+		description:  wrappedDescription,
+		joined:       community.config.Joined,
+		joinedAt:     community.config.JoinedAt,
+		lastOpenedAt: community.config.LastOpenedAt,
+		verified:     community.config.Verified,
+		spectated:    community.config.Spectated,
+		muted:        community.config.Muted,
+		mutedTill:    community.config.MuteTill,
+	}, nil
+}
+
+func communityToEventsRecord(community *Community) (*EventsRecord, error) {
+	if community.config.EventsData == nil {
+		return nil, nil
+	}
+
+	rawEvents, err := communityEventsToJSONEncodedBytes(community.config.EventsData.Events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &EventsRecord{
+		id:             community.ID(),
+		rawEvents:      rawEvents,
+		rawDescription: community.config.EventsData.EventsBaseCommunityDescription,
+	}, nil
+}
+
+func recordToRequestToJoin(r *RequestToJoinRecord) *RequestToJoin {
+	// FIXME: fill revealed addresses
+	return &RequestToJoin{
+		ID:          r.id,
+		PublicKey:   r.publicKey,
+		Clock:       uint64(r.clock),
+		ENSName:     r.ensName,
+		ChatID:      r.chatID,
+		CommunityID: r.communityID,
+		State:       RequestToJoinState(r.state),
+	}
+}
+
+func recordBundleToCommunity(
+	r *CommunityRecordBundle,
+	memberIdentity *ecdsa.PrivateKey,
+	installationID string,
+	logger *zap.Logger,
+	timesource common.TimeSource,
+	encryptor DescriptionEncryptor,
+	mediaServer media.MediaServerInterface,
+	initializer func(*Community) error,
+) (*Community, error) {
+	var privateKey *ecdsa.PrivateKey
+	var controlNode *ecdsa.PublicKey
+	var err error
+
+	if r.community.privateKey != nil {
+		privateKey, err = crypto.ToECDSA(r.community.privateKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if r.community.controlNode != nil {
+		controlNode, err = crypto.UnmarshalPubkey(r.community.controlNode)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	description, err := decodeWrappedCommunityDescription(r.community.description)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := crypto.DecompressPubkey(r.community.id)
+	if err != nil {
+		return nil, err
+	}
+
+	var eventsData *EventsData
+	if r.events != nil {
+		eventsData, err = decodeEventsData(r.events.rawEvents, r.events.rawDescription)
+		if err != nil {
+			return nil, err
+
+		}
+	}
+
+	isControlDevice := r.installationID != nil && *r.installationID == installationID
+
+	config := Config{
+		PrivateKey:                          privateKey,
+		ControlNode:                         controlNode,
+		ControlDevice:                       isControlDevice,
+		CommunityDescription:                description,
+		MemberIdentity:                      memberIdentity,
+		CommunityDescriptionProtocolMessage: r.community.description,
+		Logger:                              logger,
+		ID:                                  id,
+		Verified:                            r.community.verified,
+		Muted:                               r.community.muted,
+		MuteTill:                            r.community.mutedTill,
+		Joined:                              r.community.joined,
+		JoinedAt:                            r.community.joinedAt,
+		LastOpenedAt:                        r.community.lastOpenedAt,
+		Spectated:                           r.community.spectated,
+		EventsData:                          eventsData,
+	}
+
+	community, err := New(config, timesource, encryptor, mediaServer)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.requestToJoin != nil {
+		community.config.RequestedToJoinAt = uint64(r.requestToJoin.clock)
+		requestToJoin := recordToRequestToJoin(r.requestToJoin)
+		if !requestToJoin.Empty() {
+			community.AddRequestToJoin(requestToJoin)
+		}
+	}
+
+	if initializer != nil {
+		err = initializer(community)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return community, nil
+}

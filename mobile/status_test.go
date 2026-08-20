@@ -10,8 +10,8 @@ import (
 
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/signal"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestSetSignalHandler(t *testing.T) {

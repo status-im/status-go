@@ -2,8 +2,8 @@ package sharedurls
 
 import (
 	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/contacts"
 )
 
 //go:generate go tool mockgen -package=mock_sharedurls -source=providers.go -destination=./mock/providers.go

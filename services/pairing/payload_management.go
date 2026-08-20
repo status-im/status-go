@@ -13,7 +13,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 var (

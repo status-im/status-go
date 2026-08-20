@@ -15,9 +15,9 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/protocol"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
-	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
 

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 
 	logosstorage "github.com/status-im/status-go/services/logosstorage"
 

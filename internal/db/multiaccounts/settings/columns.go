@@ -2,7 +2,7 @@ package settings
 
 import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/errors"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 const (

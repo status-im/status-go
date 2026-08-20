@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 const (

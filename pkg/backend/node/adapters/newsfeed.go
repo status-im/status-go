@@ -1,7 +1,7 @@
 package adapters
 
 import (
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/internal/protocol"
 )
 
 type NewsFeedActivityCenter struct {

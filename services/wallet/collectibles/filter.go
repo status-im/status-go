@@ -10,7 +10,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"

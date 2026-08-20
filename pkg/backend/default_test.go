@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 func setupConfigs() (*params.NodeConfig, *requests.APIConfig) {

@@ -16,8 +16,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/signal"
-	"github.com/status-im/status-go/protocol/common"
 )
 
 func setupServer(t *testing.T) (*Server, string) {

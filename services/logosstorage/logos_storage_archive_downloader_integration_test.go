@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	logosstorage "github.com/status-im/status-go/services/logosstorage"
 
 	"github.com/stretchr/testify/assert"

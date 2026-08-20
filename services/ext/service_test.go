@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/pausable"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 

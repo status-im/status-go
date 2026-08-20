@@ -1,0 +1,230 @@
+package protocol
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/testutils"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+)
+
+func TestMessengerDeleteMessageForMeSuite(t *testing.T) {
+	suite.Run(t, new(MessengerDeleteMessageForMeSuite))
+}
+
+type MessengerDeleteMessageForMeSuite struct {
+	MessengerBaseTestSuite
+	m2 *Messenger
+}
+
+func (s *MessengerDeleteMessageForMeSuite) SetupTest() {
+	s.MessengerBaseTestSuite.SetupTest()
+	s.m2 = s.anotherMessenger()
+}
+
+func (s *MessengerDeleteMessageForMeSuite) Pair() {
+	err := s.m2.SetInstallationMetadata(s.m2.installationID, &messagingtypes.InstallationMetadata{
+		Name:       "alice2",
+		DeviceType: "alice2",
+	})
+	s.Require().NoError(err)
+	response, err := s.m2.SendPairInstallation(context.Background(), "", nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
+		"installation not received",
+	)
+
+	s.Require().NoError(err)
+	actualInstallation := response.Installations()[0]
+	s.Require().Equal(s.m2.installationID, actualInstallation.ID)
+	s.Require().NotNil(actualInstallation.InstallationMetadata)
+	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.Name)
+	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.DeviceType)
+
+	_, err = s.m.EnableInstallation(s.m2.installationID)
+	s.Require().NoError(err)
+}
+
+func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
+	s.Pair()
+	chatID := "foobarsynctest"
+	_, err := s.m.createPublicChat(chatID, &MessengerResponse{})
+	s.Require().NoError(err)
+
+	_, err = s.m2.createPublicChat(chatID, &MessengerResponse{})
+	s.Require().NoError(err)
+
+	otherMessenger := s.newMessenger()
+
+	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
+	s.Require().NoError(err)
+
+	chat := otherMessenger.Chat(chatID)
+	message := buildTestMessage(*chat)
+
+	response, err := otherMessenger.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	messageID := response.Messages()[0].ID
+
+	var receivedPubChatMessage *common.Message
+	var alice1ReceivedMessage, alice2ReceivedMessage bool
+	var notReceivedMessageError = errors.New("not received all messages")
+	err = testutils.RetryWithBackOff(func() error {
+		response, err = s.m.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Messages()) > 0 {
+			alice1ReceivedMessage = true
+		}
+
+		response, err = s.m2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Messages()) > 0 {
+			alice2ReceivedMessage = true
+		}
+
+		messages := response.Messages()
+		if len(messages) > 0 {
+			receivedPubChatMessage = messages[0]
+			if alice1ReceivedMessage && alice2ReceivedMessage {
+				return nil
+			}
+		}
+
+		return notReceivedMessageError
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(receivedPubChatMessage.ChatId, chatID)
+	s.Require().Equal(receivedPubChatMessage.ID, messageID)
+	s.Require().False(receivedPubChatMessage.DeletedForMe)
+
+	// message synced to alice1
+	alice1Msg, err := s.m.MessageByID(messageID)
+	s.Require().NoError(err)
+	s.Require().False(alice1Msg.DeletedForMe)
+
+	response, err = s.m.DeleteMessageForMeAndSync(context.Background(), chatID, messageID)
+	s.Require().NoError(err)
+	s.Require().True(response.Messages()[0].DeletedForMe)
+	s.Require().Equal(response.Chats()[0].LastMessage.ID, messageID)
+	s.Require().Equal(response.Chats()[0].LastMessage.DeletedForMe, true)
+
+	err = testutils.RetryWithBackOff(func() error {
+		response, err = s.m2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.messages) > 0 {
+			return nil
+		}
+
+		return notReceivedMessageError
+	})
+	s.Require().NoError(err)
+
+	deletedForMeMessage, err := s.m2.MessageByID(messageID)
+	s.Require().NoError(err)
+	s.Require().True(deletedForMeMessage.DeletedForMe)
+
+	// no DeletedForMe in others' message
+	err = testutils.RetryWithBackOff(func() error {
+		response, err = otherMessenger.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.messages) > 0 {
+			return nil
+		}
+
+		return notReceivedMessageError
+	})
+	s.Require().ErrorIs(err, notReceivedMessageError)
+	otherMessage, err := otherMessenger.MessageByID(messageID)
+	s.Require().NoError(err)
+	s.Require().False(otherMessage.DeletedForMe)
+}
+
+func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSide() {
+	alice := s.newMessenger()
+	bob := s.newMessenger()
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.getTimesource())
+	err := alice.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.getTimesource())
+	err = bob.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	messageCount := 3
+	var album []*common.Message
+	for i := 0; i < messageCount; i++ {
+		image, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		s.NoError(err)
+		album = append(album, image)
+	}
+
+	response, err := bob.SendChatMessages(context.Background(), album)
+	s.NoError(err)
+
+	// Check that album count was the number of the images sent
+	imagesCount := uint32(0)
+	for _, message := range response.Messages() {
+		if message.ContentType == protobuf.ChatMessage_IMAGE {
+			imagesCount++
+		}
+	}
+	for _, message := range response.Messages() {
+		s.Require().NotNil(message.GetImage())
+		s.Require().Equal(message.GetImage().AlbumImagesCount, imagesCount)
+	}
+
+	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), messageCount)
+
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool { return len(r.messages) == messageCount },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), messageCount)
+	for _, message := range response.Messages() {
+		image := message.GetImage()
+		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().Equal(image.AlbumImagesCount, imagesCount)
+		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
+	}
+
+	messages := response.Messages()
+	firstMessageID := messages[0].ID
+	localChatID := messages[0].LocalChatID
+	sendResponse, err := alice.DeleteMessageForMeAndSync(context.Background(), localChatID, firstMessageID)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 3)
+	s.Require().Len(sendResponse.Chats(), 1)
+
+	// LastMessage marked as deleted
+	s.Require().Equal(sendResponse.Chats()[0].LastMessage.ID, album[2].ID)
+	s.Require().Equal(sendResponse.Chats()[0].LastMessage.DeletedForMe, true)
+}

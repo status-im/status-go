@@ -13,13 +13,13 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/protocol"
+	"github.com/status-im/status-go/internal/protocol/identity/alias"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/messaging"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 )
 

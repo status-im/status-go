@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/walletdatabase"
-	protocolsqlite "github.com/status-im/status-go/protocol/sqlite"
+	protocolsqlite "github.com/status-im/status-go/internal/protocol/sqlite"
 	"github.com/status-im/status-go/services/newsfeed"
 )
 

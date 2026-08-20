@@ -28,8 +28,8 @@ type MethodInfo struct {
 }
 
 func main() {
-	inputFile := "../../protocol/protobuf/application_metadata_message.proto"
-	outputFile := "../../protocol/messenger_handlers.go"
+	inputFile := "../../internal/protocol/protobuf/application_metadata_message.proto"
+	outputFile := "../../internal/protocol/messenger_handlers.go"
 	templateFile := "./template.txt"
 	enumName := "Type"
 

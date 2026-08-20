@@ -108,7 +108,7 @@ mock.go
 bindata.go
 migrations.go
 cmd/status-backend/server/endpoints.go
-protocol/messenger_handlers.go
+internal/protocol/messenger_handlers.go
 pkg/version/VERSION
 pkg/version/GIT_COMMIT
 pkg/sentry/SENTRY_CONTEXT_NAME

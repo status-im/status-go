@@ -3,7 +3,7 @@ package newsfeed
 import (
 	"time"
 
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/internal/protocol"
 )
 
 //go:generate go tool mockgen -package=mock_newsfeed -source=interfaces.go -destination=mock/interfaces.go

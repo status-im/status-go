@@ -1,7 +1,7 @@
 package testutils
 
 import (
-	"github.com/status-im/status-go/protocol/zaputil"
+	"github.com/status-im/status-go/internal/protocol/zaputil"
 
 	"go.uber.org/zap"
 )

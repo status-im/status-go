@@ -19,7 +19,7 @@ The messaging specifications Status implements are published at https://lip.logo
 > Layout: the repo is mid-migration toward the standard Go layout
 > ([golang-standards/project-layout](https://github.com/golang-standards/project-layout), tracked in
 > [status-im/status-go#7067](https://github.com/status-im/status-go/issues/7067)) — the backend now lives in
-> `pkg/backend/` and the messaging core in `pkg/messaging/`, but much code (`protocol/`, `services/`,
+> `pkg/backend/` and the messaging core in `pkg/messaging/`, but much code (`services/`,
 > `mobile/`, …) still sits at the repo root, and some `docs/building.md` paths (e.g. `./api/`, `./messaging/`)
 > are stale. Prefer the layout described below.
 
@@ -96,7 +96,7 @@ target (each maintains its own migration dir):
 ```shell
 make migration            # app DB    -> internal/db/appdatabase/migrations/sql
 make migration-wallet     # wallet DB -> internal/db/walletdatabase/migrations/sql
-make migration-protocol   # protocol  -> protocol/migrations/sqlite
+make migration-protocol   # protocol  -> internal/protocol/migrations/sqlite
 make migration-check      # verify migrations are consistent
 ```
 
@@ -104,7 +104,7 @@ make migration-check      # verify migrations are consistent
 
 - Conventional Commits are enforced (`make commit-check`). Work off and PR into `develop`.
 - CI requires ≥50% patch coverage. High-risk features should sit behind feature flags
-  (`protocol/common/feature_flags.go` or `pkg/featureflags/`).
+  (`internal/protocol/common/feature_flags.go` or `pkg/featureflags/`).
 
 ## Architecture
 
@@ -124,7 +124,7 @@ transport)**. Asynchronous results flow back to clients through the `signal` pac
   SQLite DBs, multiaccounts, node lifecycle, accounts manager, and wires everything together. `pkg/backend/node/`
   holds `StatusNode`, which constructs and registers the RPC services.
 
-- **`protocol/`** — Status messaging *application* logic. The hub is `Messenger` (`messenger.go`,
+- **`internal/protocol/`** — Status messaging *application* logic. The hub is `Messenger` (`messenger.go`,
   `messenger_*.go`, `messenger_handler.go`). Subpackages: `communities/`, `contacts/`, `encryption`/`v1`,
   `protobuf/` (wire format), `requests/` (typed API request structs), `migrations/`, push notification
   client/server.

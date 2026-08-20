@@ -1,8 +1,8 @@
 package pairing
 
 import (
+	"github.com/status-im/status-go/internal/protocol"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/protocol"
 )
 
 func GetMessengerInstallationsMap(m *protocol.Messenger) map[string]struct{} {

@@ -10,7 +10,7 @@ import (
 	"github.com/andybalholm/brotli"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 const statusInternalBaseShareURL = "status-app://"

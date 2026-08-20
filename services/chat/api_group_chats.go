@@ -5,10 +5,10 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/contacts"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/internal/protocol"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol/requests"
 )
 
 type GroupChatResponse struct {

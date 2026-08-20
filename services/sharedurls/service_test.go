@@ -9,10 +9,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/pkg/multiformat"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/contacts"
-	"github.com/status-im/status-go/protocol/protobuf"
 	mock_provider "github.com/status-im/status-go/services/sharedurls/mock"
 )
 

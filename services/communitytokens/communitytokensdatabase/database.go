@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 type Database struct {
