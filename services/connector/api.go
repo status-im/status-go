@@ -116,6 +116,10 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 		if request.ClientID != "" {
 			return "", ErrCannotOverrideClientIDForUntrustedConnection
 		}
+		// Bind dApp identity to the browser Origin (not client-supplied JSON "url").
+		if origin := GetRequestOrigin(ctx); origin != "" {
+			request.URL = origin
+		}
 	} else {
 		// Trusted connections MUST provide a ClientID
 		if request.ClientID == "" {
