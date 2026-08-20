@@ -26,9 +26,9 @@ cast rpc anvil_setCode $DEST $CODE --rpc-url $RPC_URL > /dev/null
 for NODE in "$@"; do
     BASE_SLOT=$(cast index bytes32 $NODE 0)
     for OFFSET in 0 1 2; do
-        SLOT=$(perl -e "use Math::BigInt; print '0x', Math::BigInt->new('$BASE_SLOT')->badd($OFFSET)->as_hex() =~ s/^0x//r;")
-        # Pad to 66 chars (0x + 64 hex)
-        SLOT=$(printf "0x%064s" "$(echo $SLOT | sed 's/0x//')")
+        RAW_HEX=$(perl -e "use Math::BigInt; print Math::BigInt->new('$BASE_SLOT')->badd($OFFSET)->as_hex() =~ s/^0x//r;")
+        # Pad to 66 chars (0x + 64 hex zeros)
+        SLOT=$(printf "0x%064s" "$RAW_HEX" | tr ' ' '0')
         VALUE=$(cast storage $SOURCE $SLOT --rpc-url $RPC_URL)
         cast rpc anvil_setStorageAt $DEST $SLOT $VALUE --rpc-url $RPC_URL > /dev/null
     done
