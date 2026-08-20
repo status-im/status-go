@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestCreateAccountAndLogin(t *testing.T) {

@@ -3,8 +3,8 @@ package common
 import (
 	"os"
 
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 func GetWalletSecretsConfigFromEnv() *requests.WalletSecretsConfig {

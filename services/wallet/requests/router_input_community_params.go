@@ -9,8 +9,8 @@ import (
 
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/images"
-	communitiestoken "github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/protobuf"
+	communitiestoken "github.com/status-im/status-go/internal/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 )

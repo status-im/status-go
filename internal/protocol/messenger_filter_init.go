@@ -1,0 +1,323 @@
+package protocol
+
+import (
+	"crypto/ecdsa"
+	stderrors "errors"
+	"math/rand"
+	"sync"
+	"time"
+
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/pkg/messaging/types"
+)
+
+// InitFilters analyzes chats and contacts in order to setup filters
+// which are responsible for retrieving messages.
+func (m *Messenger) InitFilters() error {
+	// Seed the for color generation
+	rand.Seed(time.Now().Unix())
+
+	// Subscription to the non-protected pubsub topic (community control
+	// messages) is now handled internally by the messaging backend on start.
+	filters, publicKeys, err := m.collectFiltersAndKeys()
+	if err != nil {
+		return err
+	}
+
+	err = m.messaging.InitChats(filters, publicKeys)
+	return err
+}
+
+func (m *Messenger) collectFiltersAndKeys() (types.ChatsToInitialize, []*ecdsa.PublicKey, error) {
+	var wg sync.WaitGroup
+	errCh := make(chan error, 5)
+	filtersCh := make(chan types.ChatsToInitialize, 3)
+	publicKeysCh := make(chan []*ecdsa.PublicKey, 2)
+
+	wg.Add(5)
+	go m.processJoinedCommunities(&wg, filtersCh, errCh)
+	go m.processSpectatedCommunities(&wg, filtersCh, errCh)
+	go m.processChats(&wg, filtersCh, publicKeysCh, errCh)
+	go m.processContacts(&wg, publicKeysCh, errCh)
+	go m.processControlledCommunities(&wg, errCh)
+
+	wg.Wait()
+	close(filtersCh)
+	close(publicKeysCh)
+	close(errCh)
+
+	return m.collectResults(filtersCh, publicKeysCh, errCh)
+}
+
+func (m *Messenger) processJoinedCommunities(wg *sync.WaitGroup, filtersCh chan<- types.ChatsToInitialize, errCh chan<- error) {
+	defer panics.LogOnPanic()
+	defer wg.Done()
+
+	joinedCommunities, err := m.communitiesManager.Joined()
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	filtersToInit := m.processCommunitiesSettings(joinedCommunities)
+	filtersCh <- filtersToInit
+}
+
+func (m *Messenger) processCommunitiesSettings(communities []*communities.Community) types.ChatsToInitialize {
+	logger := m.logger.With(zap.String("site", "processCommunitiesSettings"))
+	filtersToInit := make(types.ChatsToInitialize, 0, len(communities))
+
+	for _, org := range communities {
+		// the org advertise on the public topic derived by the pk
+		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
+
+		if err := m.communitiesManager.EnsureCommunitySettings(org); err != nil {
+			logger.Warn("failed to process community settings", zap.Error(err))
+		}
+	}
+
+	return filtersToInit
+}
+
+func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh chan<- types.ChatsToInitialize, errCh chan<- error) {
+	defer panics.LogOnPanic()
+	defer wg.Done()
+
+	spectatedCommunities, err := m.communitiesManager.Spectated()
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	filtersToInit := make(types.ChatsToInitialize, 0, len(spectatedCommunities))
+	for _, org := range spectatedCommunities {
+		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
+	}
+	filtersCh <- filtersToInit
+}
+
+func (m *Messenger) processChats(wg *sync.WaitGroup, filtersCh chan<- types.ChatsToInitialize, publicKeysCh chan<- []*ecdsa.PublicKey, errCh chan<- error) {
+	defer panics.LogOnPanic()
+	defer wg.Done()
+
+	// Get chat IDs and public keys from the existing chats.
+	// TODO: Get only active chats by the query.
+	chats, err := m.persistence.Chats()
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	validChats := m.validateChats(chats)
+	communitiesCache := make(map[string]*communities.Community)
+	m.initChatsFirstMessageTimestamp(communitiesCache, validChats)
+
+	filters, publicKeys, err := m.processValidChats(validChats, communitiesCache)
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	filtersCh <- filters
+	publicKeysCh <- publicKeys
+}
+
+func (m *Messenger) validateChats(chats []*Chat) []*Chat {
+	logger := m.logger.With(zap.String("site", "validateChats"))
+	var validChats []*Chat
+
+	for _, chat := range chats {
+		if err := chat.Validate(); err != nil {
+			logger.Warn("failed to validate chat", zap.Error(err))
+			continue
+		}
+		validChats = append(validChats, chat)
+	}
+
+	return validChats
+}
+
+func (m *Messenger) processValidChats(validChats []*Chat, communityInfo map[string]*communities.Community) (types.ChatsToInitialize, []*ecdsa.PublicKey, error) {
+	var filtersToInit types.ChatsToInitialize
+	var publicKeys []*ecdsa.PublicKey
+
+	for _, chat := range validChats {
+		if !chat.Active || chat.Timeline() {
+			m.allChats.Store(chat.ID, chat)
+			continue
+		}
+
+		filters, pks, err := m.processSingleChat(chat, communityInfo)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		filtersToInit = append(filtersToInit, filters...)
+		publicKeys = append(publicKeys, pks...)
+		m.allChats.Store(chat.ID, chat)
+	}
+
+	return filtersToInit, publicKeys, nil
+}
+
+func (m *Messenger) processSingleChat(chat *Chat, communityInfo map[string]*communities.Community) (types.ChatsToInitialize, []*ecdsa.PublicKey, error) {
+	var filters types.ChatsToInitialize
+	var publicKeys []*ecdsa.PublicKey
+
+	switch chat.ChatType {
+	case ChatTypePublic, ChatTypeProfile:
+		filters = append(filters, &types.ChatToInitialize{ChatID: chat.ID})
+
+	case ChatTypeCommunityChat:
+		// Since universalChatID is being used, no specific filters needs to be registered for all community chats.
+		// Reasoning: https://github.com/status-im/status-go/pull/5993
+		err := m.processCommunityChat(chat, communityInfo)
+		if err != nil {
+			return nil, nil, err
+		}
+	case ChatTypeOneToOne:
+		pk, err := chat.PublicKey()
+		if err != nil {
+			return nil, nil, err
+		}
+		publicKeys = append(publicKeys, pk)
+
+	case ChatTypePrivateGroupChat:
+		pks, err := m.processPrivateGroupChat(chat)
+		if err != nil {
+			return nil, nil, err
+		}
+		publicKeys = append(publicKeys, pks...)
+
+	default:
+		return nil, nil, errors.New("invalid chat type")
+	}
+
+	return filters, publicKeys, nil
+}
+
+func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*communities.Community) error {
+	community, ok := communityInfo[chat.CommunityID]
+	if !ok {
+		var err error
+		community, err = m.communitiesManager.GetByIDString(chat.CommunityID)
+		if err != nil {
+			return err
+		}
+		communityInfo[chat.CommunityID] = community
+	}
+
+	if chat.UnviewedMessagesCount > 0 || chat.UnviewedMentionsCount > 0 {
+		// Make sure the unread count is 0 for the channels the user cannot view
+		// It's possible that the users received messages to a channel before permissions were added
+		if !community.CanView(&m.identity.PublicKey, chat.CommunityChatID()) {
+			chat.UnviewedMessagesCount = 0
+			chat.UnviewedMentionsCount = 0
+		}
+	}
+
+	// Members could be populated in the DB from previous inserts
+	if !community.ChannelHasPermissions(chat.CommunityChatID()) {
+		chat.Members = []ChatMember{}
+	}
+
+	return nil
+}
+
+func (m *Messenger) processPrivateGroupChat(chat *Chat) ([]*ecdsa.PublicKey, error) {
+	var publicKeys []*ecdsa.PublicKey
+	for _, member := range chat.Members {
+		publicKey, err := member.PublicKey()
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid public key for member %s in chat %s", member.ID, chat.Name)
+		}
+		publicKeys = append(publicKeys, publicKey)
+	}
+	return publicKeys, nil
+}
+
+func (m *Messenger) processContacts(wg *sync.WaitGroup, publicKeysCh chan<- []*ecdsa.PublicKey, errCh chan<- error) {
+	defer panics.LogOnPanic()
+	defer wg.Done()
+
+	// Get chat IDs and public keys from the contacts.
+	contacts, err := m.persistence.Contacts()
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	var publicKeys []*ecdsa.PublicKey
+	for idx, contact := range contacts {
+		if err = m.updateContactImagesURL(contact); err != nil {
+			errCh <- err
+			return
+		}
+		m.allContacts.Store(contact.ID, contacts[idx])
+		// We only need filters for contacts added by us and not blocked.
+		if !contact.Added() || contact.Blocked {
+			continue
+		}
+
+		publicKey, err := contact.PublicKey()
+		if err != nil {
+			m.logger.Error("failed to get contact's public key", zap.Error(err))
+			continue
+		}
+		publicKeys = append(publicKeys, publicKey)
+	}
+	publicKeysCh <- publicKeys
+}
+
+// processControlledCommunities Init filters for the communities we control
+func (m *Messenger) processControlledCommunities(wg *sync.WaitGroup, errCh chan<- error) {
+	defer panics.LogOnPanic()
+	defer wg.Done()
+
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	var communityFiltersToInitialize types.CommunitiesToInitialize
+	for _, c := range controlledCommunities {
+		communityFiltersToInitialize = append(communityFiltersToInitialize, &types.CommunityToInitialize{
+			PrivKey: c.PrivateKey(),
+		})
+	}
+
+	_, err = m.InitCommunityFilters(communityFiltersToInitialize)
+	if err != nil {
+		errCh <- err
+	}
+}
+
+func (m *Messenger) collectResults(filtersCh <-chan types.ChatsToInitialize, publicKeysCh <-chan []*ecdsa.PublicKey, errCh <-chan error) (types.ChatsToInitialize, []*ecdsa.PublicKey, error) {
+	var errs []error
+	for err := range errCh {
+		m.logger.Error("error collecting filters and public keys", zap.Error(err))
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return nil, nil, stderrors.Join(errs...)
+	}
+
+	var allFilters types.ChatsToInitialize
+	var allPublicKeys []*ecdsa.PublicKey
+
+	for filters := range filtersCh {
+		allFilters = append(allFilters, filters...)
+	}
+
+	for pks := range publicKeysCh {
+		allPublicKeys = append(allPublicKeys, pks...)
+	}
+
+	return allFilters, allPublicKeys, nil
+}

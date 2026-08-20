@@ -6,8 +6,8 @@ import (
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/protocol"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
 )
 
 func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {

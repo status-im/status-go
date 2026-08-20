@@ -6,9 +6,9 @@ import (
 	"github.com/forPelevin/gomoji"
 
 	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 type SendMessageResponse struct {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/protocol/zaputil"
+	"github.com/status-im/status-go/internal/protocol/zaputil"
 )
 
 var (

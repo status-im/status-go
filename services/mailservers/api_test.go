@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
+	"github.com/status-im/status-go/internal/protocol/sqlite"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/status-im/status-go/protocol/sqlite"
 )
 
 func setupTestDB(t *testing.T) *Database {

@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/status-im/status-go/internal/pausable"
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/internal/protocol"
 	"github.com/status-im/status-go/services/media"
 )
 

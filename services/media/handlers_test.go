@@ -26,9 +26,9 @@ import (
 
 	"github.com/status-im/status-go/internal/db/dbsetup"
 
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/sqlite"
 )
 
 func TestHandlersSuite(t *testing.T) {

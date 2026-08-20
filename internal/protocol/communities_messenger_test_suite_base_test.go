@@ -1,0 +1,119 @@
+package protocol
+
+import (
+	"crypto/ecdsa"
+	"math/big"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
+)
+
+type CommunitiesMessengerTestSuiteBase struct {
+	MessengerBaseTestSuite
+
+	mockedBalances          communities.BalancesByChain
+	mockedCollectibles      communities.CollectiblesByChain
+	collectiblesServiceMock *CollectiblesServiceMock
+	collectiblesManagerMock *CollectiblesManagerMock
+	accountsTestData        map[string][]string
+	accountsPasswords       map[string]string
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) SetupTest() {
+	s.MessengerBaseTestSuite.setupMessaging()
+
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
+	s.accountsTestData = make(map[string][]string)
+	s.accountsPasswords = make(map[string]string)
+	s.mockedCollectibles = make(communities.CollectiblesByChain)
+	s.collectiblesManagerMock = &CollectiblesManagerMock{
+		Collectibles: &s.mockedCollectibles,
+	}
+
+	s.mockedBalances = make(communities.BalancesByChain)
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) newMessenger(password string, walletAddresses []string) *Messenger {
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	return s.newMessengerWithConfig(testMessengerConfig{
+		privateKey: privateKey,
+	}, password, walletAddresses)
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) newMessengerWithKey(privateKey *ecdsa.PrivateKey, password string, walletAddresses []string) *Messenger {
+	return s.newMessengerWithConfig(testMessengerConfig{
+		privateKey: privateKey,
+	}, password, walletAddresses)
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) newMessengerWithConfig(config testMessengerConfig, password string, walletAddresses []string) *Messenger {
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
+		testMessengerConfig: config,
+		password:            password,
+		walletAddresses:     walletAddresses,
+		mockedBalances:      &s.mockedBalances,
+		collectiblesService: s.collectiblesServiceMock,
+		collectiblesManager: s.collectiblesManagerMock,
+	})
+
+	publicKey := messenger.IdentityPublicKeyString()
+	s.accountsTestData[publicKey] = walletAddresses
+	s.accountsPasswords[publicKey] = password
+	return messenger
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) joinCommunity(community *communities.Community, controlNode *Messenger, user *Messenger) {
+	userPk := user.IdentityPublicKeyString()
+	addresses, exists := s.accountsTestData[userPk]
+	s.Require().True(exists)
+	password, exists := s.accountsPasswords[userPk]
+	s.Require().True(exists)
+	joinCommunity(&s.Suite, community.ID(), controlNode, user, password, addresses)
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) joinOnRequestCommunity(community *communities.Community, controlNode *Messenger, user *Messenger) {
+	userPk := user.IdentityPublicKeyString()
+	addresses, exists := s.accountsTestData[userPk]
+	s.Require().True(exists)
+	password, exists := s.accountsPasswords[userPk]
+	s.Require().True(exists)
+	joinOnRequestCommunity(&s.Suite, community.ID(), controlNode, user, password, addresses)
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) createRequestToJoinCommunity(communityID types.HexBytes, user *Messenger) *requests.RequestToJoinCommunity {
+	userPk := user.IdentityPublicKeyString()
+	addresses, exists := s.accountsTestData[userPk]
+	s.Require().True(exists)
+	password, exists := s.accountsPasswords[userPk]
+	s.Require().True(exists)
+	return createRequestToJoinCommunity(&s.Suite, communityID, user, password, addresses)
+}
+
+func (s *CommunitiesMessengerTestSuiteBase) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
+	walletAddress := gethcommon.HexToAddress(address)
+	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
+	balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
+	s.Require().True(ok)
+
+	if _, exists := s.mockedBalances[chainID]; !exists {
+		s.mockedBalances[chainID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	}
+
+	if _, exists := s.mockedBalances[chainID][walletAddress]; !exists {
+		s.mockedBalances[chainID][walletAddress] = make(map[gethcommon.Address]*hexutil.Big)
+	}
+
+	if _, exists := s.mockedBalances[chainID][walletAddress][contractAddress]; !exists {
+		s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
+	}
+
+	makeAddressSatisfyTheCriteria(&s.Suite, s.mockedBalances, s.mockedCollectibles, chainID, address, criteria)
+}

@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/internal/db/sqlite"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 var (

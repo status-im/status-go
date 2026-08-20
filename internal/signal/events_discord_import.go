@@ -1,7 +1,7 @@
 package signal
 
 import (
-	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/internal/protocol/discord"
 )
 
 const (

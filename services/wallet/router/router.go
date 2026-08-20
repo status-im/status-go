@@ -14,10 +14,10 @@ import (
 
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
+	communityToken "github.com/status-im/status-go/internal/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
-	communityToken "github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/protobuf"
 
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/services/wallet/async"

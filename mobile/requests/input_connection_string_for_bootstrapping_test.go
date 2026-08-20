@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	protocolRequests "github.com/status-im/status-go/protocol/requests"
+	protocolRequests "github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/services/pairing"
 )
 

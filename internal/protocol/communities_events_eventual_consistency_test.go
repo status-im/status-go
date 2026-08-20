@@ -1,0 +1,181 @@
+package protocol
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
+)
+
+func TestCommunityEventsEventualConsistencySuite(t *testing.T) {
+	suite.Run(t, new(CommunityEventsEventualConsistencySuite))
+}
+
+type CommunityEventsEventualConsistencySuite struct {
+	EventSenderCommunityEventsSuiteBase
+
+	messagesOrderController *MessagesOrderController
+}
+
+func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
+	s.setupMessaging()
+
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
+	s.accountsTestData = make(map[string][]string)
+	s.accountsPasswords = make(map[string]string)
+	s.mockedBalances = createMockedWalletBalance(&s.Suite)
+
+	s.messagesOrderController = NewMessagesOrderController(messagesOrderRandom)
+	s.messagesOrderController.Start(s.messagingEnv.SubscribePostEvents())
+
+	s.owner = s.newMessenger("", []string{})
+	s.eventSender = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
+	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
+
+}
+
+func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, walletAddresses []string) *Messenger {
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.messagingEnv, testCommunitiesMessengerConfig{
+		testMessengerConfig: testMessengerConfig{
+			messagesOrderController: s.messagesOrderController,
+		},
+		password:            password,
+		walletAddresses:     walletAddresses,
+		mockedBalances:      &s.mockedBalances,
+		collectiblesService: s.collectiblesServiceMock,
+	})
+
+	publicKey := messenger.IdentityPublicKeyString()
+	s.accountsTestData[publicKey] = walletAddresses
+	s.accountsPasswords[publicKey] = password
+	return messenger
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TearDownTest() {
+	s.messagesOrderController.Stop()
+}
+
+type requestToJoinActionType int
+
+const (
+	requestToJoinAccept requestToJoinActionType = iota
+	requestToJoinReject
+)
+
+func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []requestToJoinActionType, messagesOrder messagesOrderType) {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
+	s.Require().True(community.IsControlNode())
+
+	// set up additional user that will send request to join
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
+
+	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, user)
+
+	// user sends request to join
+	userPPk := user.IdentityPublicKeyString()
+	userPassword, exists := s.accountsPasswords[userPPk]
+	s.Require().True(exists)
+	userAccounts, exists := s.accountsTestData[userPPk]
+	s.Require().True(exists)
+	requestToJoin := createRequestToJoinCommunity(&s.Suite, community.ID(), user, userPassword, userAccounts)
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+
+	sentRequest := response.RequestsToJoinCommunity()[0]
+
+	checkRequestToJoin := func(r *MessengerResponse) bool {
+		for _, request := range r.RequestsToJoinCommunity() {
+			if request.ENSName == requestToJoin.ENSName {
+				return true
+			}
+		}
+		return false
+	}
+
+	// admin receives request to join
+	response, err = WaitOnMessengerResponse(
+		s.eventSender,
+		checkRequestToJoin,
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+
+	for _, action := range actions {
+		switch action {
+		case requestToJoinAccept:
+			acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
+			_, err = s.eventSender.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+			s.Require().NoError(err)
+
+		case requestToJoinReject:
+			rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
+			_, err = s.eventSender.DeclineRequestToJoinCommunity(rejectRequestToJoin)
+			s.Require().NoError(err)
+		}
+	}
+
+	// ensure all messages are pushed to waku
+	/*
+		FIXME: we should do it smarter, as follows:
+		```
+		hashes1, err := admin.SendEvent()
+		hashes2, err := admin.SendEvent()
+		WaitForHashes([][]byte{hashes1, hashes2}, admin.waku)
+		s.messagesOrderController.setCustomOrder([][]{hashes1, hashes2})
+		```
+	*/
+	time.Sleep(1 * time.Second)
+
+	// ensure events are received in order
+	s.messagesOrderController.order = messagesOrder
+
+	response, err = s.owner.RetrieveAll()
+	s.Require().NoError(err)
+
+	lastAction := actions[len(actions)-1]
+	responseChecker := func(mr *MessengerResponse) bool {
+		if len(mr.RequestsToJoinCommunity()) == 0 || len(mr.Communities()) == 0 {
+			return false
+		}
+		switch lastAction {
+		case requestToJoinAccept:
+			return mr.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStateAccepted &&
+				mr.Communities()[0].HasMember(&user.identity.PublicKey)
+		case requestToJoinReject:
+			return mr.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStateDeclined &&
+				!mr.Communities()[0].HasMember(&user.identity.PublicKey)
+		}
+		return false
+	}
+
+	switch messagesOrder {
+	case messagesOrderAsPosted:
+		_, err = WaitOnSignaledMessengerResponse(s.owner, responseChecker, "lack of eventual consistency")
+		s.Require().NoError(err)
+	case messagesOrderReversed:
+		s.Require().True(responseChecker(response))
+	}
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestToJoin_InOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinAccept, requestToJoinReject}, messagesOrderAsPosted)
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminAcceptRejectRequestToJoin_OutOfOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinAccept, requestToJoinReject}, messagesOrderReversed)
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminRejectAcceptRequestToJoin_InOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinReject, requestToJoinAccept}, messagesOrderAsPosted)
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TestAdminRejectAcceptRequestToJoin_OutOfOrder() {
+	s.testRequestsToJoin([]requestToJoinActionType{requestToJoinReject, requestToJoinAccept}, messagesOrderReversed)
+}

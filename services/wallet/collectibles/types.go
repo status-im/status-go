@@ -1,7 +1,7 @@
 package collectibles
 
 import (
-	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/communities/token"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )

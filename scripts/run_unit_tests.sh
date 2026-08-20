@@ -166,12 +166,12 @@ else
     if [[ -n "${BUILD_TAGS}" ]]; then
       protocol_list_cmd+=(-tags "${BUILD_TAGS}")
     fi
-    protocol_list_cmd+=(github.com/status-im/status-go/protocol)
+    protocol_list_cmd+=(github.com/status-im/status-go/internal/protocol)
 
     mapfile -t protocol_tests < <("${protocol_list_cmd[@]}" | awk '/^Test/ { print $0 }' | sort -u)
     if [[ ${#protocol_tests[@]} -eq 0 ]]; then
       echo -e "${YLW}No protocol tests discovered, running package without sharding${RST}"
-      run_test_for_packages github.com/status-im/status-go/protocol "1" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (fallback, no discovered tests)" &
+      run_test_for_packages github.com/status-im/status-go/internal/protocol "1" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (fallback, no discovered tests)" &
       bg_pids+=("$!")
     else
       echo -e "${GRN}Protocol sharding:${RST} ${#protocol_tests[@]} top-level tests across ${protocol_shards} shards"
@@ -195,7 +195,7 @@ else
           continue
         fi
         protocol_filter="^(${protocol_shard_filters[$i]})$"
-        run_test_for_packages github.com/status-im/status-go/protocol "${protocol_iteration}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (shard $((i + 1))/${protocol_shards})" "${protocol_filter}" &
+        run_test_for_packages github.com/status-im/status-go/internal/protocol "${protocol_iteration}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (shard $((i + 1))/${protocol_shards})" "${protocol_filter}" &
         bg_pids+=("$!")
         protocol_iteration=$((protocol_iteration + 1))
       done
@@ -203,7 +203,7 @@ else
   else
     # Spawn separate processes to run `protocol` package for each nightly iteration
     for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-      run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+      run_test_for_packages github.com/status-im/status-go/internal/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
       bg_pids+=("$!")
     done
   fi

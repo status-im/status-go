@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/httpserver"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/common"
 )
 
 type TestPairingServerComponents struct {

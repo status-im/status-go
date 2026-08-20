@@ -4,10 +4,10 @@ import (
 	"reflect"
 
 	"github.com/status-im/status-go/internal/accounts-management/types"
+	identityUtils "github.com/status-im/status-go/internal/protocol/identity"
+	"github.com/status-im/status-go/internal/protocol/identity/alias"
+	"github.com/status-im/status-go/internal/protocol/identity/emojihash"
 	"github.com/status-im/status-go/pkg/multiformat"
-	identityUtils "github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/identity/emojihash"
 )
 
 // GetPublicKeyData processes a public key and returns its full visual

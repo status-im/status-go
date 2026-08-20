@@ -44,9 +44,9 @@ BASE_BRANCH=${BASE_BRANCH:-develop}
 BASE_COMMIT=${1:-origin/${BASE_BRANCH}}
 
 MIGRATION_DIRS=( \
-  "protocol/migrations/sqlite" \
-  "protocol/pushnotificationclient/migrations/migrations/sqlite" \
-  "protocol/pushnotificationserver/migrations/migrations/sqlite" \
+  "internal/protocol/migrations/sqlite" \
+  "internal/protocol/pushnotificationclient/migrations/migrations/sqlite" \
+  "internal/protocol/pushnotificationserver/migrations/migrations/sqlite" \
   "appdatabase/migrations/sql" \
   "pkg/messaging/common/migrations/sqlite" \
   "pkg/messaging/waku/migrations/migrations/sqlite" \
@@ -71,8 +71,13 @@ for MIGRATION_DIR in "${MIGRATION_DIRS[@]}"; do
   # Files present in BASE_COMMIT
   base_files=$(git ls-tree -r --name-only ${BASE_COMMIT} ${MIGRATION_DIR}/*.sql | sort)
 
-  # Files changed on this branch since the merge-base
-  new_files=$(git diff --name-only ${merge_base}...HEAD ${MIGRATION_DIR}/*.sql | sort)
+  # Files added or modified on this branch since the merge-base.
+  # Renames are excluded: moving a migration is not a new migration, and its
+  # historical filename must not be re-validated against the timestamp rule.
+  # The pathspec is applied after the diff so that rename detection can still
+  # pair a file with its source in another directory.
+  new_files=$(git diff --name-only --diff-filter=AM --find-renames ${merge_base}...HEAD \
+    | { grep -E "^${MIGRATION_DIR}/[^/]*\.sql$" || true; } | sort)
 
   # Combine lists
   all_files=$(echo -e "$base_files\n$new_files")

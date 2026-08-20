@@ -10,11 +10,11 @@ import (
 
 	"github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/backend"
 	"github.com/status-im/status-go/pkg/messaging"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 )
 
 type SyncRawMessageHandler struct {

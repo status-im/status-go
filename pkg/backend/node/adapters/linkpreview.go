@@ -3,9 +3,9 @@ package adapters
 import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol"
+	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/contacts"
 )
 
 type LinkPreviewSettingsAdapter struct {

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 
 	"go.uber.org/zap"
 
@@ -22,8 +22,8 @@ import (
 
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/protocol/identity/colorhash"
-	"github.com/status-im/status-go/protocol/identity/ring"
+	"github.com/status-im/status-go/internal/protocol/identity/colorhash"
+	"github.com/status-im/status-go/internal/protocol/identity/ring"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 

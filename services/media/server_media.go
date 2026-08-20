@@ -19,9 +19,9 @@ import (
 	"github.com/status-im/status-go/internal/httpserver"
 	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/signal"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 

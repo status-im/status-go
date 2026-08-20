@@ -51,7 +51,7 @@ linters:
         text: make it a constant
       - linters:
           - goconst
-        path: protocol/message_handler\.go
+        path: internal/protocol/message_handler\.go
         text: make it a constant
       - linters:
           - goconst

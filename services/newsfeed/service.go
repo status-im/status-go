@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/platform"
+	"github.com/status-im/status-go/internal/protocol"
 	"github.com/status-im/status-go/internal/signal"
-	"github.com/status-im/status-go/protocol"
 )
 
 var (

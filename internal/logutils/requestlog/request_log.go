@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/protocol/zaputil"
+	"github.com/status-im/status-go/internal/protocol/zaputil"
 )
 
 var (

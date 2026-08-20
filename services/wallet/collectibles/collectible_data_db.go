@@ -8,7 +8,7 @@ import (
 	"math/big"
 
 	"github.com/status-im/status-go/internal/db/sqlite"
-	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/internal/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )

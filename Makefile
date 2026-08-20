@@ -217,8 +217,8 @@ STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
 test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
 	$(STORAGE_TEST_ENV) gotestsum --packages="./services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
-	$(STORAGE_TEST_ENV) gotestsum --packages="./protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
-	$(STORAGE_TEST_ENV) gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
+	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
 
 TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
@@ -227,12 +227,12 @@ TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
 TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
 
 test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
-	$(TORRENT_TEST_ENV) gotestsum --packages="./protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
-	$(TORRENT_TEST_ENV) gotestsum --packages="./protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
+	$(TORRENT_TEST_ENV) gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
+	$(TORRENT_TEST_ENV) gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
 
 history-archive-help: ##@build Show history archive build/test toggles and env vars
-	@cat protocol/communities/archive/README.md
+	@cat internal/protocol/communities/archive/README.md
 
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
@@ -669,7 +669,7 @@ install-git-hooks:
 -include install-git-hooks
 .PHONY: install-git-hooks
 
-migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
+migration-protocol: DEFAULT_PROTOCOL_PATH := internal/protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$$(date +%s)_$(D).up.sql
 

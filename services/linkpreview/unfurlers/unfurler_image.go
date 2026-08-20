@@ -12,8 +12,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/images"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 const (
