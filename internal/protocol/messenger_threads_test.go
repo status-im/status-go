@@ -411,6 +411,69 @@ func (s *MessengerThreadsSuite) TestReceivedThreadReplyDoesNotIncrementParentUnr
 	s.Require().Equal(parentID, thread.ThreadID)
 }
 
+func (s *MessengerThreadsSuite) TestMarkThreadReadClearsOnlyThreadMessages() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parentMsg := buildTestMessage(*chat)
+	parentMsg.ID = "parent-id"
+	parentMsg.Text = "Parent"
+	parentMsg.ChatMessage.Text = "Parent"
+	parentMsg.Seen = false
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parentMsg}))
+
+	_, err := s.m.CreateThread(chat.ID, "parent-id")
+	s.Require().NoError(err)
+
+	threadID := "parent-id"
+	unreadReply := buildTestMessage(*chat)
+	unreadReply.ID = "reply-unread"
+	unreadReply.Text = "Unread reply"
+	unreadReply.ChatMessage.Text = "Unread reply"
+	unreadReply.ChatMessage.ThreadId = &threadID
+	unreadReply.ResponseTo = "parent-id"
+	unreadReply.Mentioned = true
+	unreadReply.Seen = false
+
+	olderUnreadReply := buildTestMessage(*chat)
+	olderUnreadReply.ID = "reply-older-unread"
+	olderUnreadReply.Text = "Older unread reply"
+	olderUnreadReply.ChatMessage.Text = "Older unread reply"
+	olderUnreadReply.ChatMessage.ThreadId = &threadID
+	olderUnreadReply.ResponseTo = "parent-id"
+	olderUnreadReply.Seen = false
+
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{olderUnreadReply, unreadReply}))
+
+	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(2), thread.UnviewedMessagesCount)
+	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
+
+	response, err := s.m.MarkThreadRead(context.Background(), chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal(uint(0), response.Threads()[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(0), response.Threads()[0].UnviewedMentionsCount)
+
+	parentAfter, err := s.m.MessageByID("parent-id")
+	s.Require().NoError(err)
+	s.Require().False(parentAfter.Seen)
+
+	replyAfter, err := s.m.MessageByID("reply-unread")
+	s.Require().NoError(err)
+	s.Require().True(replyAfter.Seen)
+
+	olderReplyAfter, err := s.m.MessageByID("reply-older-unread")
+	s.Require().NoError(err)
+	s.Require().True(olderReplyAfter.Seen)
+
+	thread, err = s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(0), thread.UnviewedMessagesCount)
+	s.Require().Equal(uint(0), thread.UnviewedMentionsCount)
+}
+
 func (s *MessengerThreadsSuite) TestCreateThreadValidatesEmptyParams() {
 	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
 	s.Require().NoError(s.m.SaveChat(chat))
