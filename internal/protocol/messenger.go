@@ -3821,6 +3821,10 @@ func (m *Messenger) latestIncomingMessageClock(chatID string) (uint64, error) {
 	return m.persistence.latestIncomingMessageClock(chatID)
 }
 
+func (m *Messenger) latestIncomingThreadMessageClock(chatID string, threadID string) (uint64, error) {
+	return m.persistence.latestIncomingThreadMessageClock(chatID, threadID)
+}
+
 func (m *Messenger) MessageByChatID(chatID, threadID, cursor string, limit int) ([]*common.Message, string, error) {
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
@@ -4306,6 +4310,34 @@ func (m *Messenger) MarkAllRead(ctx context.Context, chatID string) (*MessengerR
 	if err != nil {
 		return nil, err
 	}
+	return response, nil
+}
+
+func (m *Messenger) MarkThreadRead(ctx context.Context, chatID string, threadID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	if threadID == "" {
+		return m.MarkAllRead(ctx, chatID)
+	}
+
+	if _, ok := m.allChats.Load(chatID); !ok {
+		return nil, ErrChatNotFoundError
+	}
+
+	clock, _ := m.latestIncomingThreadMessageClock(chatID, threadID)
+	if clock != 0 {
+		_, _, err := m.persistence.MarkThreadRead(chatID, threadID, clock)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	thread, err := m.persistence.ThreadByID(chatID, threadID)
+	if err != nil {
+		return nil, err
+	}
+	response.AddThread(thread)
+
 	return response, nil
 }
 
