@@ -61,7 +61,7 @@ class TestRpc:
         assert result is None
 
     def test_get_ethereum_chain(self):
-        result = self.rpc_client.wallet_service.get_ethereum_chain()
+        result = self.rpc_client.networks_service.get_ethereum_chains()
         assert result[0].get("Prod").get("chainId") == ANVIL_NETWORK_ID
         assert result[0].get("Prod").get("chainName") == "Anvil"
         assert result[0].get("Prod").get("nativeCurrencyName") == "Ether"

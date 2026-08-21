@@ -36,3 +36,27 @@ func (api *API) SetChainActive(ctx context.Context, chainID uint64, active bool)
 func (api *API) SetChainEnabled(ctx context.Context, chainID uint64, enabled bool) error {
 	return api.manager.SetEnabled(chainID, enabled)
 }
+
+// AddEthereumChain adds or updates a network.
+//
+// Deprecated: custom networks are not currently supported. Change settings
+// using specific API functions.
+func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
+	return api.manager.Upsert(&network)
+}
+
+// DeleteEthereumChain removes a network.
+//
+// Deprecated: custom networks are not currently supported. Change settings
+// using specific API functions.
+func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
+	return api.manager.Delete(chainID)
+}
+
+// GetEthereumChains returns networks paired by prod and test chain.
+//
+// Deprecated: combined networks are not used anymore, use
+// GetFlatEthereumChains instead.
+func (api *API) GetEthereumChains(ctx context.Context) ([]*CombinedNetwork, error) {
+	return api.manager.GetCombinedNetworks()
+}
