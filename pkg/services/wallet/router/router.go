@@ -853,6 +853,7 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 		FromAddr:           input.AddrFrom,
 		AmountIn:           input.AmountIn.ToInt(),
 		SlippagePercentage: input.SlippagePercentage,
+		RouteOrder:         input.RouteOrder,
 
 		Username:  input.Username,
 		PublicKey: input.PublicKey,
