@@ -151,6 +151,7 @@ func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error 
 	secret := senderConfig.Password
 	rootDataDir := rootDataDirFromKeystorePath(senderConfig.KeystorePath, senderConfig.KeyUID)
 	if envelope.Exists(rootDataDir, senderConfig.KeyUID) {
+		// The KEK (client-hashed password) is required here, credentials like DEK or its client hash should not be used here.
 		secret, _, err = envelope.Unwrap(rootDataDir, senderConfig.KeyUID, senderConfig.Password)
 		if err != nil {
 			return err

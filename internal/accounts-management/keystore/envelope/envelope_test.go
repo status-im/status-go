@@ -18,11 +18,26 @@ const (
 func TestGenerate(t *testing.T) {
 	dek1, err := Generate()
 	require.NoError(t, err)
-	require.Len(t, dek1, 2*dekLength)
+	require.Len(t, dek1, 2*DekLength)
 
 	dek2, err := Generate()
 	require.NoError(t, err)
 	require.NotEqual(t, dek1, dek2)
+}
+
+func TestReadDBKdfIterations(t *testing.T) {
+	dir := t.TempDir()
+
+	_, err := ReadDBKdfIterations(dir, testKeyUID)
+	require.Error(t, err)
+
+	dek, err := Generate()
+	require.NoError(t, err)
+	require.NoError(t, Write(dir, testKeyUID, dek, testKEK, 3200))
+
+	iterations, err := ReadDBKdfIterations(dir, testKeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 3200, iterations)
 }
 
 func TestWriteUnwrapRoundTrip(t *testing.T) {

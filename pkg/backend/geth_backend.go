@@ -752,6 +752,7 @@ func (b *StatusBackend) LoginAccount(request *requests.Login) error {
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
+		b.clearProfileSecretCache()
 	}
 	if b.LocalPairingStateManager.IsPairing() {
 		if err == nil {
@@ -770,6 +771,12 @@ func (b *StatusBackend) LoginAccount(request *requests.Login) error {
 func (b *StatusBackend) loginAccount(request *requests.Login) error {
 	if err := request.Validate(); err != nil {
 		return err
+	}
+
+	if request.DEK != "" {
+		if err := b.prepareDEKLogin(request); err != nil {
+			return err
+		}
 	}
 
 	if request.Mnemonic != "" {
@@ -1211,7 +1218,16 @@ func (b *StatusBackend) changeDatabasePasswordSerialized(keyUID, password, newPa
 		if !rekey {
 			// Fast path: nothing that is open (databases, keystore, node) changes.
 			if err := envelope.Rewrap(b.rootDataDir, keyUID, password, newPassword); err != nil {
-				return nil, err
+				if !errors.Is(err, envelope.ErrInvalidKEK) {
+					return nil, err
+				}
+				resolved, rerr := b.resolveProfileSecret(keyUID, password, 0)
+				if rerr != nil || !resolved.migrated {
+					return nil, err
+				}
+				if werr := envelope.Write(b.rootDataDir, keyUID, resolved.secret, newPassword, resolved.dbKdfIter); werr != nil {
+					return nil, werr
+				}
 			}
 			b.refreshSecretCacheKEK(keyUID, newPassword)
 			return nil, nil
