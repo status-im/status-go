@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
 	ac "github.com/status-im/status-go/pkg/services/wallet/activity/common"
 	"github.com/status-im/status-go/pkg/services/wallet/common"
@@ -62,7 +62,7 @@ func getTestData() []struct {
 }
 
 func Test_PuTrackedTx(t *testing.T) {
-	walletDB, closeFn, err := testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "pendingtxtracker-tests")
+	walletDB, closeFn, err := testutils.SetupTestSQLDB(walletdb.DbInitializer{}, "pendingtxtracker-tests")
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, closeFn())

@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	ac "github.com/status-im/status-go/pkg/services/wallet/activity/common"
@@ -67,7 +67,7 @@ var (
 
 // setupTestDB creates an in-memory SQLite database for testing
 func setupTestDB(t *testing.T) (*sql.DB, func()) {
-	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
 	return db, func() {

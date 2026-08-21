@@ -47,13 +47,13 @@ MIGRATION_DIRS=( \
   "internal/protocol/migrations/sqlite" \
   "internal/protocol/pushnotificationclient/migrations/migrations/sqlite" \
   "internal/protocol/pushnotificationserver/migrations/migrations/sqlite" \
-  "appdatabase/migrations/sql" \
+  "internal/db/appdatabase/migrations/sql" \
   "pkg/messaging/common/migrations/sqlite" \
   "pkg/messaging/waku/migrations/migrations/sqlite" \
   "pkg/messaging/layers/encryption/migrations/migrations/sqlite" \
   "pkg/messaging/layers/transport/migrations/migrations/sqlite" \
   "pkg/services/newsfeed/migrations/migrations/sqlite" \
-  "walletdatabase/migrations/sql" \
+  "internal/db/walletdb/migrations/sql" \
 )
 
 # Update base ref locally to ensure comparisons are accurate

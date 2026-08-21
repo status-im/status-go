@@ -39,7 +39,7 @@ import (
 	multiacccommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/sqlite"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/ipfs"
@@ -460,7 +460,7 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 	}, 1)
 	go func() {
 		defer panics.LogOnPanic()
-		db, openErr := walletdatabase.OpenDB(walletDBPath, password, account.KDFIterations)
+		db, openErr := walletdb.OpenDB(walletDBPath, password, account.KDFIterations)
 		walletResultCh <- struct {
 			db  *sql.DB
 			err error
@@ -488,7 +488,7 @@ func (b *StatusBackend) ensureEstablishedDBsOpened(account multiaccounts.Account
 		return appResult.err
 	}
 
-	if err = walletdatabase.MigrateDB(walletResult.db); err != nil {
+	if err = walletdb.MigrateDB(walletResult.db); err != nil {
 		_ = walletResult.db.Close()
 		_ = appResult.db.Close()
 		return err
@@ -600,7 +600,7 @@ func (b *StatusBackend) ensureWalletDBOpened(account multiaccounts.Account, pass
 		return err
 	}
 
-	b.walletDB, err = walletdatabase.InitializeDB(dbWalletPath, password, account.KDFIterations)
+	b.walletDB, err = walletdb.InitializeDB(dbWalletPath, password, account.KDFIterations)
 	if err != nil {
 		b.logger.Error("failed to initialize wallet db", zap.Error(err))
 		return err

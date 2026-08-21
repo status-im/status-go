@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/dbsetup"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	logutils "github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/protocol"
@@ -278,7 +278,7 @@ func createAppDatabase(path string) (*sql.DB, error) {
 
 func createWalletDatabase(path string) (*sql.DB, error) {
 	filename := path + "-wallet.db"
-	walletDB, err := walletdatabase.InitializeDB(filename, "", dbsetup.ReducedKDFIterationsNumber)
+	walletDB, err := walletdb.InitializeDB(filename, "", dbsetup.ReducedKDFIterationsNumber)
 	if err != nil {
 		logger.Error("failed to initialize wallet db", zap.Error(err))
 		return nil, err

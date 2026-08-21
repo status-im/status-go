@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/services/wallet/async"
 )
@@ -90,7 +90,7 @@ func (f *MockFetcher) Stop()                     {}
 func (f *MockFetcher) StartRefreshLoops()        {}
 
 func setupTestWalletDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "wallet-tests")
+	db, cleanup, err := testutils.SetupTestSQLDB(walletdb.DbInitializer{}, "wallet-tests")
 	require.NoError(t, err)
 	return db, func() { require.NoError(t, cleanup()) }
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
 )
 
@@ -22,7 +22,7 @@ func setupTestDBs() (appDB *sql.DB, walletDB *sql.DB, closeFn func() error, err 
 		return nil, nil, nil, fmt.Errorf("failed to setup app db: %w", err)
 	}
 
-	walletDB, err = testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err = testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to setup wallet db: %w", err)
 	}

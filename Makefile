@@ -657,7 +657,7 @@ version:
 tag-version:
 	bash scripts/tag_version.sh $(TARGET_COMMIT)
 
-migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := internal/db/walletdatabase/migrations/sql
+migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := internal/db/walletdb/migrations/sql
 migration-wallet:
 	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$$(date +%s)_$(D).up.sql
 

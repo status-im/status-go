@@ -1,10 +1,9 @@
-package walletdatabase
+package walletdb
 
 import (
 	"database/sql"
 
 	sqlite "github.com/status-im/status-go/internal/db/sqlite"
-	"github.com/status-im/status-go/internal/db/walletdatabase/migrations"
 )
 
 type DbInitializer struct {
@@ -12,13 +11,6 @@ type DbInitializer struct {
 
 func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
 	return InitializeDB(path, password, kdfIterationsNumber)
-}
-
-var walletCustomSteps = []*sqlite.PostStep{}
-
-func doMigration(db *sql.DB) error {
-	// Run all the new migrations
-	return migrations.Migrate(db, walletCustomSteps)
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -38,8 +30,4 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 
 func OpenDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
 	return sqlite.OpenDB(path, password, kdfIterationsNumber)
-}
-
-func MigrateDB(db *sql.DB) error {
-	return doMigration(db)
 }

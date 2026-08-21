@@ -11,7 +11,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	protocolsqlite "github.com/status-im/status-go/internal/protocol/sqlite"
 	"github.com/status-im/status-go/pkg/services/newsfeed"
 )
@@ -93,7 +93,7 @@ func generateWalletDB(outDir string) error {
 	}
 
 	// Use the same initializer the app uses
-	var init walletdatabase.DbInitializer
+	var init walletdb.DbInitializer
 	_, err := init.Initialize(path, *password, *kdfIterationsNumber)
 	if err != nil {
 		return err
