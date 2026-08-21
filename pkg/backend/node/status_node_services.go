@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/gif"
 	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 	"github.com/status-im/status-go/pkg/services/media"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/permissions"
 	"github.com/status-im/status-go/pkg/services/personal"
 	"github.com/status-im/status-go/pkg/services/preferences"
@@ -73,6 +74,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *media.
 
 	services := []StatusService{}
 	services = append(services, b.rpcStatsService())
+	services = append(services, b.networksService())
 	services = append(services, b.appgeneralService())
 	services = append(services, b.personalService())
 	services = append(services, b.pendingTrackerService(&b.walletFeed))
@@ -192,7 +194,7 @@ func (b *StatusNode) connectorService() *connector.Service {
 			b.walletDB,
 			b.rpcClient,
 			fees.NewFeeManager(b.rpcClient, logger.Named("feeManager")),
-			b.rpcClient.GetNetworkManager(),
+			b.networkManager,
 			&connector.Config{
 				WSEnabled: b.config.WSEnabled,
 				WSHost:    b.config.WSHost,
@@ -202,6 +204,14 @@ func (b *StatusNode) connectorService() *connector.Service {
 		)
 	}
 	return b.connectorSrvc
+}
+
+func (b *StatusNode) networksService() *networks.Service {
+	if b.networksSrvc == nil {
+		b.networksSrvc = networks.NewService(b.networkManager)
+	}
+
+	return b.networksSrvc
 }
 
 func (b *StatusNode) rpcStatsService() *rpcstats.Service {

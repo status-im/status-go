@@ -13,12 +13,12 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdb"
-	"github.com/status-im/status-go/internal/rpc/network"
-	network_testutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	mock_chainutils "github.com/status-im/status-go/pkg/services/connector/chainutils/mock"
+	"github.com/status-im/status-go/pkg/services/networks"
+	network_testutil "github.com/status-im/status-go/pkg/services/networks/testutil"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
@@ -60,9 +60,9 @@ func setupTests(t *testing.T) (state testState) {
 	config := params.NodeConfig{
 		NetworkID: 10,
 	}
-	networks := json.RawMessage("{}")
+	emptyNetworks := json.RawMessage("{}")
 	settingsObj := settings.Settings{
-		Networks: &networks,
+		Networks: &emptyNetworks,
 	}
 
 	settDb, err := settings.MakeNewDB(state.db)
@@ -72,7 +72,7 @@ func setupTests(t *testing.T) (state testState) {
 
 	state.mockCtrl = gomock.NewController(t)
 
-	networkManager := network.NewManager(state.db, nil)
+	networkManager := networks.NewManager(state.db, nil)
 	require.NotNil(t, networkManager)
 
 	initNetworks := []params.Network{

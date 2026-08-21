@@ -4,9 +4,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/status-im/status-go/internal/rpc/network/db"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/networks/db"
 )
 
 // MergeProvidersPreservingUsersAndEnabledState merges new embedded providers with the current ones,

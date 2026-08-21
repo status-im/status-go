@@ -12,10 +12,10 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/protocol/requests"
-	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
+	networktestutil "github.com/status-im/status-go/pkg/services/networks/testutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	networks = json.RawMessage("{}")
+	emptyNetworks = json.RawMessage("{}")
 )
 
 type setupContext struct {
@@ -138,7 +138,7 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			InstallationID:    messaging.GenerateInstallationID(),
 			LatestDerivedPath: 0,
 			Name:              "Jittery Cornflowerblue Kingbird",
-			Networks:          &networks,
+			Networks:          &emptyNetworks,
 			PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
 			PreviewPrivacy:    false,
 			PublicKey:         genMasterAcc.PublicKeyHex(),

@@ -1,4 +1,4 @@
-package network
+package networks
 
 import (
 	"github.com/status-im/status-go/internal/errors"

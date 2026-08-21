@@ -24,12 +24,13 @@ import (
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	protocolsqlite "github.com/status-im/status-go/internal/protocol/sqlite"
 	"github.com/status-im/status-go/internal/rpc"
-	network_mock "github.com/status-im/status-go/internal/rpc/network/mock"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
 	"github.com/status-im/status-go/pkg/services/communitytokens/communitytokensdatabase"
+	"github.com/status-im/status-go/pkg/services/networks"
+	network_mock "github.com/status-im/status-go/pkg/services/networks/mock"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
@@ -73,9 +74,12 @@ func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
 
 	accountsPublisher := pubsub.NewPublisher()
 
+	networkManager := networks.NewManager(appDB, nil)
+	require.NotNil(t, networkManager)
+	require.NoError(t, networkManager.InitEmbeddedNetworks(nil))
+
 	config := rpc.ClientConfig{
-		Networks: nil,
-		DB:       appDB,
+		NetworkManager: networkManager,
 	}
 	rpcClient, _ := rpc.NewClient(config)
 

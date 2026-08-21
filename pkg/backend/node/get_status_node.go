@@ -46,6 +46,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/linkpreview"
 	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 	"github.com/status-im/status-go/pkg/services/media"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/newsfeed"
 	"github.com/status-im/status-go/pkg/services/permissions"
 	"github.com/status-im/status-go/pkg/services/personal"
@@ -81,8 +82,9 @@ type StatusNode struct {
 
 	running atomic.Bool
 
-	config    *params.NodeConfig // Status node configuration
-	rpcClient *rpc.Client        // reference to an RPC client
+	config         *params.NodeConfig // Status node configuration
+	rpcClient      *rpc.Client        // reference to an RPC client
+	networkManager *networks.Manager
 
 	services  []StatusService
 	rpcServer *gethrpc.Server
@@ -110,6 +112,7 @@ type StatusNode struct {
 	browsersSrvc           *browsers.Service
 	permissionsSrvc        *permissions.Service
 	walletSrvc             *wallet.Service
+	networksSrvc           *networks.Service
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         timesource.Service
@@ -509,10 +512,23 @@ func (n *StatusNode) StartTokenManager() {
 	}()
 }
 
+// NetworkManager returns the network manager owned by the node.
+func (n *StatusNode) NetworkManager() *networks.Manager {
+	return n.networkManager
+}
+
 func (n *StatusNode) setupRPCClient() (err error) {
+	networkManager := networks.NewManager(n.appDB, n.accountsPublisher)
+	if networkManager == nil {
+		return errorspkg.New("failed to create network manager")
+	}
+	if err = networkManager.InitEmbeddedNetworks(n.config.Networks); err != nil {
+		return errorspkg.Wrap(err, "network manager failed to initialize")
+	}
+	n.networkManager = networkManager
+
 	config := rpc.ClientConfig{
-		Networks:          n.config.Networks,
-		DB:                n.appDB,
+		NetworkManager:    networkManager,
 		AccountsPublisher: n.accountsPublisher,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
@@ -570,6 +586,8 @@ func (n *StatusNode) Stop() error {
 	n.browsersSrvc = nil
 	n.permissionsSrvc = nil
 	n.walletSrvc = nil
+	n.networksSrvc = nil
+	n.networkManager = nil
 	n.localNotificationsSrvc = nil
 	n.personalSrvc = nil
 	n.timeSourceSrvc = nil

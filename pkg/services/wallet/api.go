@@ -24,8 +24,8 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/typeddata"
 	"github.com/status-im/status-go/pkg/services/wallet/activity"
 	"github.com/status-im/status-go/pkg/services/wallet/collectibles"
@@ -356,7 +356,7 @@ func (api *API) SetChainEnabled(ctx context.Context, chainID uint64, enabled boo
 }
 
 // @deprecated: Combined networks are not used anymore, use GetFlatEthereumChains instead
-func (api *API) GetEthereumChains(ctx context.Context) ([]*network.CombinedNetwork, error) {
+func (api *API) GetEthereumChains(ctx context.Context) ([]*networks.CombinedNetwork, error) {
 	logutils.ZapLogger().Debug("call to GetEthereumChains")
 	return api.s.rpcClient.GetNetworkManager().GetCombinedNetworks()
 }

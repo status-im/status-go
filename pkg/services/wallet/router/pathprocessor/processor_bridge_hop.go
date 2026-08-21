@@ -30,8 +30,8 @@ import (
 	hopL2OptimismBridge "github.com/status-im/status-go/internal/contracts/hop/l2Contracts/l2OptimismBridge"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/transactions"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
@@ -139,11 +139,11 @@ type HopBridgeProcessor struct {
 	tokenManager    *token.Manager
 	contractMaker   *contracts.ContractMaker
 	ethClientGetter rpc.EthClientGetter
-	networkManager  network.ManagerInterface
+	networkManager  networks.ManagerInterface
 	bonderFee       *sync.Map // [fromChainName-toChainName]BonderFee
 }
 
-func NewHopBridgeProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager network.ManagerInterface) *HopBridgeProcessor {
+func NewHopBridgeProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager networks.ManagerInterface) *HopBridgeProcessor {
 	return &HopBridgeProcessor{
 		contractMaker:   contracts.NewContractMaker(ethClientGetter),
 		ethClientGetter: ethClientGetter,

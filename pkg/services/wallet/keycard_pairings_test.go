@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/pkg/services/networks"
 )
 
 func TestKeycardPairingsFile(t *testing.T) {
@@ -29,8 +30,12 @@ func TestKeycardPairingsFile(t *testing.T) {
 
 	accountsPublisher := pubsub.NewPublisher()
 
+	networkManager := networks.NewManager(appDB, nil)
+	require.NotNil(t, networkManager)
+	require.NoError(t, networkManager.InitEmbeddedNetworks(nil))
+
 	rpcClient, err := rpc.NewClient(rpc.ClientConfig{
-		DB:                db,
+		NetworkManager:    networkManager,
 		AccountsPublisher: accountsPublisher,
 	})
 	require.NoError(t, err)

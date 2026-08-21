@@ -1,4 +1,4 @@
-package network_test
+package networks_test
 
 import (
 	"database/sql"
@@ -7,13 +7,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	"github.com/status-im/status-go/internal/rpc/network"
-	"github.com/status-im/status-go/internal/rpc/network/db"
-	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/networks"
+	"github.com/status-im/status-go/pkg/services/networks/db"
+	"github.com/status-im/status-go/pkg/services/networks/testutil"
 	"github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
@@ -21,7 +21,7 @@ type NetworkManagerTestSuite struct {
 	suite.Suite
 	db      *sql.DB
 	cleanup func()
-	manager *network.Manager
+	manager *networks.Manager
 }
 
 func (s *NetworkManagerTestSuite) SetupTest() {
@@ -30,7 +30,7 @@ func (s *NetworkManagerTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.db = testDb
 	s.cleanup = func() { s.Require().NoError(cleanup()) }
-	s.manager = network.NewManager(testDb, nil)
+	s.manager = networks.NewManager(testDb, nil)
 	persistence := db.NewNetworksPersistence(testDb)
 
 	// Use testutil to initialize networks
@@ -341,7 +341,7 @@ func (s *NetworkManagerTestSuite) TestSetActiveMaxNumberOfActiveNetworks() {
 	// Check that we're at the limit of active networks
 	activeNetworks, err := s.manager.GetActiveNetworks()
 	s.Require().NoError(err)
-	s.Require().Len(activeNetworks, network.MaxActiveNetworks)
+	s.Require().Len(activeNetworks, networks.MaxActiveNetworks)
 
 	// Check that the "Optimistic Ethereum" network is inactive by default
 	n = s.manager.Find(common.OptimismMainnet)
