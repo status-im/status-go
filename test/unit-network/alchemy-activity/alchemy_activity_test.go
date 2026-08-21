@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/services/networks"
 	alchemymanager "github.com/status-im/status-go/pkg/services/wallet/activityfetcher/alchemy"
 	"github.com/status-im/status-go/pkg/services/wallet/common"
@@ -30,7 +29,7 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	require.NoError(t, err)
 
 	walletConfig := t_common.GetWalletConfigFromEnv()
-	defaultNetworks := networkdefaults.BuildDefaultNetworks(walletConfig, true)
+	defaultNetworks := networks.BuildDefaultNetworks(walletConfig, true)
 	networkManager := networks.NewManager(appDB, nil)
 	err = networkManager.InitEmbeddedNetworks(defaultNetworks)
 	require.NoError(t, err)
