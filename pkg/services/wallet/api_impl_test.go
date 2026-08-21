@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/networks"
@@ -66,7 +65,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 		),
 	}
 
-	testNetworks = networkhelper.OverrideBasicAuth(testNetworks, params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
+	testNetworks = networks.OverrideBasicAuth(testNetworks, params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
 	require.NotEmpty(t, testNetworks)
 
 	networkManager := networks.NewManager(appDB, nil)

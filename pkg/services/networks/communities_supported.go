@@ -1,22 +1,22 @@
-package networkhelper
+package networks
 
 import (
 	communitytokendeployer "github.com/status-im/status-go/internal/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/params"
 )
 
-// WithCommunitiesSupported returns a copy of the given networks slice with CommunitiesSupported
+// withCommunitiesSupported returns a copy of the given networks slice with CommunitiesSupported
 // set based on CommunitiesSupportedOnChain(chainID).
-func WithCommunitiesSupported(networks []params.Network) []params.Network {
-	updated := DeepCopyNetworks(networks)
+func withCommunitiesSupported(networks []params.Network) []params.Network {
+	updated := deepCopyNetworks(networks)
 	for i := range updated {
 		updated[i].CommunitiesSupported = communitytokendeployer.CommunitiesSupportedOnChain(updated[i].ChainID)
 	}
 	return updated
 }
 
-// ApplyCommunitiesSupported sets CommunitiesSupported in-place for each network.
-func ApplyCommunitiesSupported(networks []*params.Network) {
+// applyCommunitiesSupported sets CommunitiesSupported in-place for each network.
+func applyCommunitiesSupported(networks []*params.Network) {
 	for _, n := range networks {
 		if n == nil {
 			continue

@@ -9,7 +9,6 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/networks/db"
@@ -101,7 +100,7 @@ func (s *NetworkManagerTestSuite) TestUserAddsCustomProviders() {
 	// Assert providers
 	foundNetwork := s.manager.Find(common.EthereumMainnet)
 	s.Require().NotNil(foundNetwork)
-	expectedProviders := append(customProviders, networkhelper.GetEmbeddedProviders(foundNetwork.RpcProviders)...)
+	expectedProviders := append(customProviders, networks.GetEmbeddedProviders(foundNetwork.RpcProviders)...)
 	testutil.CompareProvidersList(s.T(), expectedProviders, foundNetwork.RpcProviders)
 }
 
@@ -126,7 +125,7 @@ func (s *NetworkManagerTestSuite) TestInitNetworksKeepsUserProviders() {
 	// Check that custom providers are retained
 	foundNetwork := s.manager.Find(common.EthereumMainnet)
 	s.Require().NotNil(foundNetwork)
-	expectedProviders := append(customProviders, networkhelper.GetEmbeddedProviders(initNetworks[0].RpcProviders)...)
+	expectedProviders := append(customProviders, networks.GetEmbeddedProviders(initNetworks[0].RpcProviders)...)
 	testutil.CompareProvidersList(s.T(), expectedProviders, foundNetwork.RpcProviders)
 }
 
@@ -144,10 +143,10 @@ func (s *NetworkManagerTestSuite) TestInitNetworksDoesNotSaveEmbeddedProviders()
 	s.Require().NoError(err)
 
 	// Check that embedded providers are not saved using persistence
-	networks, err := persistence.GetNetworks(false, nil)
+	storedNetworks, err := persistence.GetNetworks(false, nil)
 	s.Require().NoError(err)
-	s.Require().Len(networks, 1)
-	s.Require().Len(networks[0].RpcProviders, 0)
+	s.Require().Len(storedNetworks, 1)
+	s.Require().Len(storedNetworks[0].RpcProviders, 0)
 }
 
 func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
@@ -157,45 +156,45 @@ func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
 			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
 		}),
 	}
-	expectedProviders := networkhelper.GetEmbeddedProviders(initNetworks[0].RpcProviders)
+	expectedProviders := networks.GetEmbeddedProviders(initNetworks[0].RpcProviders)
 	err := s.manager.InitEmbeddedNetworks(initNetworks)
 	s.Require().NoError(err)
 
 	// functor tests if embedded providers are present in the networks
-	expectEmbeddedProviders := func(networks []*params.Network) {
-		for _, network := range networks {
+	expectEmbeddedProviders := func(nets []*params.Network) {
+		for _, network := range nets {
 			if network.ChainID == common.EthereumMainnet {
-				storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(network.RpcProviders)
+				storedEmbeddedProviders := networks.GetEmbeddedProviders(network.RpcProviders)
 				testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
 			}
 		}
 	}
 
 	// GetAll
-	networks, err := s.manager.GetAll()
+	storedNetworks, err := s.manager.GetAll()
 	s.Require().NoError(err)
-	expectEmbeddedProviders(networks)
+	expectEmbeddedProviders(storedNetworks)
 
 	// Get
-	networks, err = s.manager.Get(false)
+	storedNetworks, err = s.manager.Get(false)
 	s.Require().NoError(err)
-	expectEmbeddedProviders(networks)
+	expectEmbeddedProviders(storedNetworks)
 
 	// GetActiveNetworks
-	networks, err = s.manager.GetActiveNetworks()
+	storedNetworks, err = s.manager.GetActiveNetworks()
 	s.Require().NoError(err)
-	expectEmbeddedProviders(networks)
+	expectEmbeddedProviders(storedNetworks)
 
 	// GetCombinedNetworks
 	combinedNetworks, err := s.manager.GetCombinedNetworks()
 	s.Require().NoError(err)
 	for _, combinedNetwork := range combinedNetworks {
 		if combinedNetwork.Test != nil && combinedNetwork.Test.ChainID == common.EthereumMainnet {
-			storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(combinedNetwork.Test.RpcProviders)
+			storedEmbeddedProviders := networks.GetEmbeddedProviders(combinedNetwork.Test.RpcProviders)
 			testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
 		}
 		if combinedNetwork.Prod != nil && combinedNetwork.Prod.ChainID == common.EthereumMainnet {
-			storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(combinedNetwork.Prod.RpcProviders)
+			storedEmbeddedProviders := networks.GetEmbeddedProviders(combinedNetwork.Prod.RpcProviders)
 			testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
 		}
 	}
@@ -225,11 +224,11 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulation() {
 	s.Require().NoError(err)
 
 	// Fetch networks and verify legacy field population
-	networks, err := persistence.GetNetworks(false, nil)
+	storedNetworks, err := persistence.GetNetworks(false, nil)
 	s.Require().NoError(err)
-	s.Require().Len(networks, 1)
+	s.Require().Len(storedNetworks, 1)
 
-	network := networks[0]
+	network := storedNetworks[0]
 
 	// Check legacy fields
 	s.Equal("https://direct1.ethereum.io", network.OriginalRPCURL)
@@ -254,11 +253,11 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders(
 	s.Require().NoError(err)
 
 	// Fetch networks and verify legacy field population
-	networks, err := persistence.GetNetworks(false, nil)
+	storedNetworks, err := persistence.GetNetworks(false, nil)
 	s.Require().NoError(err)
-	s.Require().Len(networks, 1)
+	s.Require().Len(storedNetworks, 1)
 
-	network := networks[0]
+	network := storedNetworks[0]
 
 	// Check legacy fields
 	s.Equal("https://direct1.sepolia.io", network.OriginalRPCURL)
@@ -284,12 +283,12 @@ func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
 
 	// Verify the network was upserted without embedded providers
 	persistence := db.NewNetworksPersistence(s.db)
-	networks, err := persistence.GetNetworks(false, &chainID)
+	storedNetworks, err := persistence.GetNetworks(false, &chainID)
 	s.Require().NoError(err)
-	s.Require().Len(networks, 1)
-	s.Require().Len(networkhelper.GetEmbeddedProviders(networks[0].RpcProviders), 0)
-	s.Require().False(networks[0].IsActive)
-	s.Require().True(networks[0].IsDeactivatable)
+	s.Require().Len(storedNetworks, 1)
+	s.Require().Len(networks.GetEmbeddedProviders(storedNetworks[0].RpcProviders), 0)
+	s.Require().False(storedNetworks[0].IsActive)
+	s.Require().True(storedNetworks[0].IsDeactivatable)
 }
 
 func (s *NetworkManagerTestSuite) TestSetActive() {
