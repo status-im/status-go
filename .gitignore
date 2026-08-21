@@ -79,6 +79,9 @@ report.xml
 test.log
 test_*.log
 **/exit_code_*.txt
+# written by the pre-login logger when tests run
+pre_login.log
+pre_login-*.log
 
 # status-cli logs
 alice.log

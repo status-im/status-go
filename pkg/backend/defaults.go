@@ -1,10 +1,8 @@
 package backend
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 
@@ -72,12 +70,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 
 	s.DappsAddress = types.HexToAddress(derivedAddresses[accscommon.PathDefaultWalletAccount].Address)
 	s.EIP1581Address = types.HexToAddress(derivedAddresses[accscommon.PathEIP1581Root].Address)
-
-	signingPhrase, err := buildSigningPhrase()
-	if err != nil {
-		return nil, err
-	}
-	s.SigningPhrase = signingPhrase
 
 	s.SendPushNotifications = true
 	s.InstallationID = messaging.GenerateInstallationID()
@@ -405,22 +397,4 @@ func DefaultKeystorePath(rootDataDir string, keyUID string) (string, string) {
 	relativePath := filepath.Join(DefaultKeystoreRelativePath, keyUID)
 	absolutePath := filepath.Join(rootDataDir, relativePath)
 	return relativePath, absolutePath
-}
-
-func buildSigningPhrase() (string, error) {
-	length := big.NewInt(int64(len(dictionary)))
-	a, err := rand.Int(rand.Reader, length)
-	if err != nil {
-		return "", err
-	}
-	b, err := rand.Int(rand.Reader, length)
-	if err != nil {
-		return "", err
-	}
-	c, err := rand.Int(rand.Reader, length)
-	if err != nil {
-		return "", err
-	}
-
-	return dictionary[a.Int64()] + " " + dictionary[b.Int64()] + " " + dictionary[c.Int64()], nil
 }

@@ -142,7 +142,6 @@ func setupTestContext(t *testing.T, password string, storeProfile bool, storeMul
 			PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
 			PreviewPrivacy:    false,
 			PublicKey:         genMasterAcc.PublicKeyHex(),
-			SigningPhrase:     "yurt joey vibe",
 			WalletRootAddress: derivedAccs[accscommon.PathWalletRoot].Address(),
 		}
 	}
