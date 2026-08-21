@@ -1,4 +1,4 @@
-package networkdefaults
+package networks
 
 import (
 	"fmt"
