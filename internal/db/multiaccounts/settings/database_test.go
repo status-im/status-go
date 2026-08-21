@@ -36,7 +36,6 @@ var (
 		PhotoPath:                           "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
 		PreviewPrivacy:                      false,
 		PublicKey:                           "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
-		SigningPhrase:                       "yurt joey vibe",
 		SendPushNotifications:               true,
 		ProfilePicturesShowTo:               ProfilePicturesShowToContactsOnly,
 		ProfilePicturesVisibility:           ProfilePicturesVisibilityContactsOnly,
