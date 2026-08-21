@@ -1,4 +1,4 @@
-package network
+package networks
 
 import (
 	"database/sql"
@@ -11,11 +11,11 @@ import (
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
-	"github.com/status-im/status-go/internal/rpc/network/db"
-	persistence "github.com/status-im/status-go/internal/rpc/network/db"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/pkg/services/networks/db"
+	persistence "github.com/status-im/status-go/pkg/services/networks/db"
 )
 
 //go:generate go tool mockgen -package=mock -source=network.go -destination=mock/network.go

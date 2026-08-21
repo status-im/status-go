@@ -21,13 +21,14 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/rpc"
-	network_mock "github.com/status-im/status-go/internal/rpc/network/mock"
-	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/networks"
+	network_mock "github.com/status-im/status-go/pkg/services/networks/mock"
+	"github.com/status-im/status-go/pkg/services/networks/testutil"
 	"github.com/status-im/status-go/pkg/services/wallet/requests"
 	"github.com/status-im/status-go/pkg/services/wallet/token"
 	mock_tokenbalances "github.com/status-im/status-go/pkg/services/wallet/tokenbalances/mock"
@@ -58,19 +59,22 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	}))
 	defer serverWith1SecDelay.Close()
 
-	networks := []params.Network{
+	testNetworks := []params.Network{
 		*testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
 			*params.NewEthRpcProxyProvider(chainID, "Test Provider", security.NewSensitiveString(serverWith1SecDelay.URL+"/nodefleet/"), false, false),
 		},
 		),
 	}
 
-	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
-	require.NotEmpty(t, networks)
+	testNetworks = networkhelper.OverrideBasicAuth(testNetworks, params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString(gofakeit.Username()), security.NewSensitiveString(gofakeit.LetterN(5)))
+	require.NotEmpty(t, testNetworks)
+
+	networkManager := networks.NewManager(appDB, nil)
+	require.NotNil(t, networkManager)
+	require.NoError(t, networkManager.InitEmbeddedNetworks(testNetworks))
 
 	config := rpc.ClientConfig{
-		Networks: networks,
-		DB:       appDB,
+		NetworkManager: networkManager,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
@@ -78,9 +82,9 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	mockNetworkManager := network_mock.NewMockManagerInterface(mockCtrl)
 	mockNetworkManager.EXPECT().GetActiveNetworks().DoAndReturn(func() ([]*params.Network, error) {
-		active := make([]*params.Network, 0, len(networks))
-		for i := range networks {
-			active = append(active, &networks[i])
+		active := make([]*params.Network, 0, len(testNetworks))
+		for i := range testNetworks {
+			active = append(active, &testNetworks[i])
 		}
 		return active, nil
 	}).AnyTimes()

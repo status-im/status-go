@@ -33,11 +33,11 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
 	"github.com/status-im/status-go/pkg/services/communitytokens/communitytokensdatabase"
+	"github.com/status-im/status-go/pkg/services/networks"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/pkg/services/wallet/token/local-token-lists/default-lists"
@@ -81,7 +81,7 @@ type Manager struct {
 	settings                   *settings.Database
 	ethClientGetter            rpc.EthClientGetter
 	ContractMaker              *contracts.ContractMaker
-	networkManager             network.ManagerInterface
+	networkManager             networks.ManagerInterface
 	communityTokensDB          *communitytokensdatabase.Database
 	communityManager           *community.Manager
 	communityTokenImageBuilder CommunityTokenImageBuilder
@@ -100,7 +100,7 @@ func NewTokenManager(
 	walletDB *sql.DB,
 	ethClientGetter rpc.EthClientGetter,
 	communityManager *community.Manager,
-	networkManager network.ManagerInterface,
+	networkManager networks.ManagerInterface,
 	appDB *sql.DB,
 	communityTokenImageBuilder CommunityTokenImageBuilder,
 	walletFeed *event.Feed,
@@ -154,7 +154,7 @@ func NewTokenManager(
 
 }
 
-func getEnabledChains(networkManager network.ManagerInterface) ([]uint64, error) {
+func getEnabledChains(networkManager networks.ManagerInterface) ([]uint64, error) {
 	if networkManager == nil {
 		return walletcommon.AllChainIDsAsUint64(), nil
 	}
@@ -341,7 +341,7 @@ func (tm *Manager) startNetworksWatcher(stopCh <-chan struct{}) {
 		return
 	}
 
-	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](tm.networkManager.GetPublisher(), 10)
+	ch, unsubFn := pubsub.Subscribe[networks.EventActiveNetworksChanged](tm.networkManager.GetPublisher(), 10)
 
 	go func() {
 		defer panics.LogOnPanic()

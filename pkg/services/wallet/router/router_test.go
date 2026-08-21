@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/wallet/responses"
 	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/pkg/services/wallet/router/routes"
@@ -51,9 +52,12 @@ func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 func setupRouter(t *testing.T) (*Router, func()) {
 	db, cleanTmpDb := setupTestNetworkDB(t)
 
+	networkManager := networks.NewManager(db, nil)
+	require.NotNil(t, networkManager)
+	require.NoError(t, networkManager.InitEmbeddedNetworks(defaultNetworks))
+
 	config := rpc.ClientConfig{
-		Networks: defaultNetworks,
-		DB:       db,
+		NetworkManager: networkManager,
 	}
 	client, _ := rpc.NewClient(config)
 

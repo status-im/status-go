@@ -12,8 +12,6 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/walletdb"
-	"github.com/status-im/status-go/internal/rpc/network"
-	network_testutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
@@ -21,6 +19,8 @@ import (
 	"github.com/status-im/status-go/pkg/services/connector/chainutils"
 	mock_chainutils "github.com/status-im/status-go/pkg/services/connector/chainutils/mock"
 	persistence "github.com/status-im/status-go/pkg/services/connector/database"
+	"github.com/status-im/status-go/pkg/services/networks"
+	network_testutil "github.com/status-im/status-go/pkg/services/networks/testutil"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
@@ -59,12 +59,12 @@ type testState struct {
 	mockCtrl        *gomock.Controller
 	ethClientGetter *mock_chainutils.MockEthClientGetter
 	feeManager      *mock_chainutils.MockFeeManager
-	networkManager  *network.Manager
+	networkManager  *networks.Manager
 }
 
-func setupNetworkManager(t *testing.T, db *sql.DB) *network.Manager {
+func setupNetworkManager(t *testing.T, db *sql.DB) *networks.Manager {
 	t.Helper()
-	networkManager := network.NewManager(db, nil)
+	networkManager := networks.NewManager(db, nil)
 	require.NotNil(t, networkManager)
 
 	initNetworks := []params.Network{

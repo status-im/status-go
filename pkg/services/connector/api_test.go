@@ -8,10 +8,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/pkg/services/connector/commands"
 	persistence "github.com/status-im/status-go/pkg/services/connector/database"
 	"github.com/status-im/status-go/pkg/services/connector/walletconnect"
+	"github.com/status-im/status-go/pkg/services/networks"
 )
 
 func TestCallRPC_UntrustedConnection(t *testing.T) {
@@ -448,7 +448,7 @@ func TestNewAPI_WithRestoredSessions(t *testing.T) {
 	}))
 	require.NoError(t, persistence.UpsertWCSession(walletDb, "restore-topic-1", `{"session":"data"}`, 9999999999, "pairing1", dappURL, "symkey1", 100))
 
-	networkManager := network.NewManager(db, nil)
+	networkManager := networks.NewManager(db, nil)
 	service := NewService(
 		zap.NewNop(),
 		walletDb,

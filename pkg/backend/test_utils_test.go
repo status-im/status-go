@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/internal/platform"
-	networktestutil "github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/params"
+	networktestutil "github.com/status-im/status-go/pkg/services/networks/testutil"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
