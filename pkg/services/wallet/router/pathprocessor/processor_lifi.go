@@ -112,6 +112,7 @@ func (s *LiFiProcessor) fetchAndStoreQuote(params ProcessorInputParams) (*lifi.Q
 		ToAddress:          params.ToAddr,
 		AmountIn:           params.AmountIn,
 		SlippagePercentage: params.SlippagePercentage,
+		Order:              params.RouteOrder,
 	})
 	if err != nil {
 		return nil, createLiFiErrorResponse(err)

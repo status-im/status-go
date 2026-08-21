@@ -13,6 +13,13 @@ import (
 
 var NativeTokenAddress = walletcommon.ZeroAddress()
 
+// Route ordering accepted by the LI.FI API's `order` query parameter.
+const (
+	OrderRecommended = "RECOMMENDED"
+	OrderFastest     = "FASTEST"
+	OrderCheapest    = "CHEAPEST"
+)
+
 type QuoteParams struct {
 	FromChainID        uint64
 	ToChainID          uint64
@@ -22,6 +29,8 @@ type QuoteParams struct {
 	ToAddress          common.Address
 	AmountIn           *big.Int
 	SlippagePercentage float32
+	// Order is optional; when empty LI.FI applies its own default.
+	Order string
 }
 
 type ClientInterface interface {

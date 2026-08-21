@@ -55,7 +55,10 @@ type RouteInputParams struct {
 	ToChainID          uint64            `json:"toChainID"`   // TODO: remove since it can be inferred from the token key
 	GasFeeMode         fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
 	SlippagePercentage float32           `json:"slippagePercentage"`
-	TestnetMode        bool
+	// RouteOrder is optional and only meaningful for processors that can rank
+	// routes (currently LI.FI); empty means the provider's own default.
+	RouteOrder  string `json:"routeOrder"`
+	TestnetMode bool
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
 	Username  string       `json:"username"`

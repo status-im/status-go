@@ -2,6 +2,7 @@ package lifi
 
 import (
 	"encoding/json"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -48,4 +49,27 @@ func TestDecodeQuote(t *testing.T) {
 	require.Equal(t, "0xabcdef", quote.TransactionRequest.Data)
 	require.Equal(t, "0x30d40", quote.TransactionRequest.GasLimit)
 	require.Equal(t, uint64(1), quote.TransactionRequest.ChainID)
+}
+
+func TestQuoteQueryParamsOrder(t *testing.T) {
+	c := NewClient(1, Integrator, "")
+	base := QuoteParams{
+		FromChainID:        1,
+		ToChainID:          10,
+		FromToken:          common.HexToAddress("0x0000000000000000000000000000000000000001"),
+		ToToken:            common.HexToAddress("0x0000000000000000000000000000000000000002"),
+		FromAddress:        common.HexToAddress("0x0000000000000000000000000000000000000003"),
+		ToAddress:          common.HexToAddress("0x0000000000000000000000000000000000000004"),
+		AmountIn:           big.NewInt(1000),
+		SlippagePercentage: 0.5,
+	}
+
+	// omitted when unset, so LI.FI keeps its own default ordering
+	require.False(t, c.quoteQueryParams(base).Has("order"))
+
+	for _, order := range []string{OrderRecommended, OrderFastest, OrderCheapest} {
+		p := base
+		p.Order = order
+		require.Equal(t, order, c.quoteQueryParams(p).Get("order"))
+	}
 }

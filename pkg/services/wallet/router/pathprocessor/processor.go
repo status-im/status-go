@@ -63,6 +63,7 @@ type ProcessorInputParams struct {
 	PublicKey          string
 	PackID             *big.Int
 	SlippagePercentage float32
+	RouteOrder         string
 
 	// community related params
 	CommunityParams *requests.CommunityRouteInputParams
