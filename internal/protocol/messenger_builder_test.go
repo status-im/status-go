@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/ens"
@@ -102,7 +102,7 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnviron
 		assert.NoError(t, err)
 	})
 
-	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDb, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}

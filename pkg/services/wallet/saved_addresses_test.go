@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	multiAccCommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
 )
 
@@ -21,7 +21,7 @@ const (
 )
 
 func setupTestSavedAddressesDB(t *testing.T) (*SavedAddressesManager, func()) {
-	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
 	return &SavedAddressesManager{db}, func() {

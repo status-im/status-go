@@ -8,14 +8,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
 	w_common "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
 func setupCollectionDataDBTest(t *testing.T) (*CollectionDataDB, func()) {
-	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 	return NewCollectionDataDB(db), func() {
 		require.NoError(t, db.Close())

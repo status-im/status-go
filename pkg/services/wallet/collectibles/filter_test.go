@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/protocol/communities/token"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
@@ -20,7 +20,7 @@ import (
 )
 
 func setupTestFilterDB(t *testing.T) (db *sql.DB, close func()) {
-	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
 	return db, func() {

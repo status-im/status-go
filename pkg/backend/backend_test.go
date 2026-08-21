@@ -34,7 +34,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
@@ -52,7 +52,7 @@ func setupTestDB() (*sql.DB, func() error, error) {
 }
 
 func setupTestWalletDB() (*sql.DB, func() error, error) {
-	return testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "tests")
+	return testutils.SetupTestSQLDB(walletdb.DbInitializer{}, "tests")
 }
 
 func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {

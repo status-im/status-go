@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	protocolsqlite "github.com/status-im/status-go/internal/protocol/sqlite"
 	"github.com/status-im/status-go/internal/testutils"
 )
@@ -32,7 +32,7 @@ func setupAppDB(t *testing.T) *sql.DB {
 }
 
 func setupWalletDB(t *testing.T) *sql.DB {
-	db, cleanup, err := testutils.SetupTestSQLDB(walletdatabase.DbInitializer{}, "storage-stats-wallet-")
+	db, cleanup, err := testutils.SetupTestSQLDB(walletdb.DbInitializer{}, "storage-stats-wallet-")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, cleanup()) })
 	return db

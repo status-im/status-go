@@ -19,7 +19,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/rpc"
 	network_mock "github.com/status-im/status-go/internal/rpc/network/mock"
 	"github.com/status-im/status-go/internal/rpc/network/testutil"
@@ -42,7 +42,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	require.NoError(t, err)
 	defer accountsDb.Close()
 
-	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 	defer db.Close()
 

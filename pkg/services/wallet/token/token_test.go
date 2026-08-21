@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/contracts/snt"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	communitytoken "github.com/status-im/status-go/internal/protocol/communities/token"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	protocolsqlite "github.com/status-im/status-go/internal/protocol/sqlite"
@@ -41,7 +41,7 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDb, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
 	return &Manager{
@@ -65,7 +65,7 @@ func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
 	err = protocolsqlite.Migrate(appDB)
 	require.NoError(t, err)
 
-	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
 	accountsDB, err := accounts.NewDB(appDB)
@@ -214,7 +214,7 @@ func TestCommunityTokensPrivilegesAndSoulbound(t *testing.T) {
 	// community_tokens lives in the protocol migrations
 	require.NoError(t, protocolsqlite.Migrate(appDb))
 
-	walletDb, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDb, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 	defer func() { require.NoError(t, walletDb.Close()) }()
 

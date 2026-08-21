@@ -10,7 +10,7 @@ import (
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/testutils"
@@ -26,7 +26,7 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	walletDB, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	walletDB, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
 	walletSecrets := t_common.GetWalletSecretsConfigFromEnv()

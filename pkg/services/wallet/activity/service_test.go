@@ -17,7 +17,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
-	"github.com/status-im/status-go/internal/db/walletdatabase"
+	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/services/wallet/pendingtxtracker"
 	mock_pendingtxtracker "github.com/status-im/status-go/pkg/services/wallet/pendingtxtracker/mock"
@@ -63,7 +63,7 @@ type testState struct {
 }
 
 func setupTestService(tb testing.TB) (state testState) {
-	db, err := testutils.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	db, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(tb, err)
 
 	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
