@@ -1,4 +1,4 @@
-package pinnedcommunitiesassets
+package assets
 
 import "embed"
 

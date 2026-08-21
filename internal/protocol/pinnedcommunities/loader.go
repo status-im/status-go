@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	pinnedcommunitiesassets "github.com/status-im/status-go/pinned-communities"
+	"github.com/status-im/status-go/internal/protocol/pinnedcommunities/assets"
 )
 
 const RawPayloadHexSuffix = ".rawpayload.hex"
@@ -22,7 +22,7 @@ type Payload struct {
 
 // LoadEmbedded returns pinned communities shipped inside the binary.
 func LoadEmbedded() ([]Payload, error) {
-	return loadFromFS(pinnedcommunitiesassets.FS, ".")
+	return loadFromFS(assets.FS, ".")
 }
 
 // LoadFromDir reads all *.rawpayload.hex files and returns decoded payloads.
