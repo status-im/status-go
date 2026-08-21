@@ -3,12 +3,12 @@ package common
 import (
 	"os"
 
-	"github.com/status-im/status-go/internal/protocol/requests"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 )
 
-func GetWalletSecretsConfigFromEnv() *requests.WalletSecretsConfig {
-	return &requests.WalletSecretsConfig{
+func GetWalletConfigFromEnv() *params.WalletConfig {
+	return &params.WalletConfig{
 		StatusProxyStageName: os.Getenv("STATUS_BUILD_PROXY_STAGE_NAME"),
 		EthRpcProxyUser:      security.NewSensitiveString(os.Getenv("STATUS_BUILD_ETH_RPC_PROXY_USER")),
 		EthRpcProxyPassword:  security.NewSensitiveString(os.Getenv("STATUS_BUILD_ETH_RPC_PROXY_PASSWORD")),

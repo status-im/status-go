@@ -743,8 +743,8 @@ func (b *StatusBackend) updateAccountColorHashAndColorID(keyUID string, accounts
 	return multiAccount, nil
 }
 
-func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login, thirdpartyServicesEnabled bool) {
-	conf.Networks = networkdefaults.BuildDefaultNetworks(&request.WalletSecretsConfig, thirdpartyServicesEnabled)
+func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, walletConfig *params.WalletConfig, thirdpartyServicesEnabled bool) {
+	conf.Networks = networkdefaults.BuildDefaultNetworks(walletConfig, thirdpartyServicesEnabled)
 }
 
 func (b *StatusBackend) LoginAccount(request *requests.Login) error {
@@ -852,7 +852,7 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 		return errors.Wrap(err, "failed to load accountSettings")
 	}
 
-	b.overrideNetworks(b.config, request, accountSettings.ThirdpartyServicesEnabled)
+	b.overrideNetworks(b.config, &defaultCfg.WalletConfig, accountSettings.ThirdpartyServicesEnabled)
 
 	if request.APIConfig != nil {
 		overrideApiConfig(b.config, request.APIConfig)
