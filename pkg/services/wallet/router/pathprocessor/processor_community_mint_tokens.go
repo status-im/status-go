@@ -102,7 +102,7 @@ func (s *CommunityMintTokensProcessor) EstimateGas(params ProcessorInputParams, 
 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, createENSReleaseErrorResponse(err)
+		return 0, createCommunityMintTokensErrorResponse(err)
 	}
 
 	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)

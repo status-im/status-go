@@ -273,12 +273,12 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, createENSRegisterProcessorErrorResponse(err)
+		return 0, createSwapParaswapErrorResponse(err)
 	}
 
 	ethClient, err := s.ethClientGetter.EthClient(params.FromToken.ChainID)
 	if err != nil {
-		return 0, createENSRegisterProcessorErrorResponse(err)
+		return 0, createSwapParaswapErrorResponse(err)
 	}
 
 	msg := ethereum.CallMsg{
@@ -290,7 +290,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, createENSRegisterProcessorErrorResponse(err)
+		return 0, createSwapParaswapErrorResponse(err)
 	}
 
 	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
