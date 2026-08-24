@@ -10,6 +10,7 @@ extern void SetEventCallback(void *cb);
 import "C"
 import (
 	"encoding/json"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -25,6 +26,9 @@ type Handler func([]byte)
 
 // storing the current signal handler here
 var signalHandler Handler
+
+// signalHandlerMutex guards the process-wide Go signal handler.
+var signalHandlerMutex sync.RWMutex
 
 // All general log messages in this package should be routed through this logger.
 var logger = logutils.ZapLogger().Named("signal")
@@ -56,8 +60,11 @@ func send(typ string, event interface{}) {
 	callog.LogSignal(requestlog.GetRequestLogger(), typ, event)
 
 	// If a Go implementation of signal handler is set, let's use it.
-	if signalHandler != nil {
-		signalHandler(data)
+	signalHandlerMutex.RLock()
+	handler := signalHandler
+	signalHandlerMutex.RUnlock()
+	if handler != nil {
+		handler(data)
 	} else {
 		// ...and fallback to C implementation otherwise.
 		str := C.CString(string(data))
@@ -68,10 +75,14 @@ func send(typ string, event interface{}) {
 
 // SetHandler sets new handler for events.
 func SetHandler(handler Handler) {
+	signalHandlerMutex.Lock()
+	defer signalHandlerMutex.Unlock()
 	signalHandler = handler
 }
 
 func ResetHandler() {
+	signalHandlerMutex.Lock()
+	defer signalHandlerMutex.Unlock()
 	signalHandler = nil
 }
 
