@@ -35,7 +35,7 @@ functional_tests_marker_expr() {
 discover_tests() {
   local marker_expr
   marker_expr="$(functional_tests_marker_expr)"
-  pytest --collect-only -q -m "${marker_expr}" -c "${root_path}/pytest.ini" "$1"
+  pytest --collect-only -q -m "${marker_expr}" -c "${root_path}/pytest.ini" ${1:+"$1"} "${root_path}"
 }
 
 start_services() {
@@ -123,8 +123,13 @@ wait_for_services() {
 list_tests_and_confirm() {
   local selected_test="${1:+-k $1}"
   echo -e "${GRN}Discovering tests to be run...${RST}"
-  collected_output=$(discover_tests "$selected_test")
-  test_count=$(echo "$collected_output" | grep -c "^\s*<Function test_.*>$")
+  local rc=0
+  collected_output=$(discover_tests "$selected_test") || rc=$?
+  if [ "${rc}" -ne 0 ] && [ "${rc}" -ne 5 ]; then
+    echo -e "${RED}Test discovery failed (pytest exit ${rc})${RST}"
+    exit "${rc}"
+  fi
+  test_count=$(echo "$collected_output" | grep -c "^\s*<Function test_.*>$") || true
   if [ -z "$selected_test" ]; then
     if [ "$test_count" -eq "0" ]; then
       echo -e "${RED}No tests found!${RST}"
@@ -176,7 +181,8 @@ run_tests() {
     --log-cli-level="${FUNCTIONAL_TESTS_LOG_LEVEL}" \
     --docker_project_name="${project_name}" \
     --docker-image=${image_name} \
-    --logs-dir="${logs_path}" ${selected_test}
+    --logs-dir="${logs_path}" ${selected_test:+"$selected_test"} \
+    "${root_path}"
   exit_code=$?
 }
 
