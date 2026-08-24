@@ -96,10 +96,6 @@ func (s *CommunityMintTokensProcessor) PackTxInputData(params ProcessorInputPara
 }
 
 func (s *CommunityMintTokensProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		return 0, ErrNoEstimationFound
-	}
-
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, createCommunityMintTokensErrorResponse(err)

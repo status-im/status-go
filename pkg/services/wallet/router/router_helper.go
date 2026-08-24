@@ -68,10 +68,6 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 		return false, nil, nil
 	}
 
-	if params.TestsMode {
-		return true, params.AmountIn, nil
-	}
-
 	allowance, err := contract.Allowance(&bind.CallOpts{
 		Context: ctx,
 	}, params.FromAddr, *approvalContractAddress)
@@ -541,15 +537,14 @@ func (r *Router) updatePathFields(path *routes.Path, fetchedFees *fees.Suggested
 }
 
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
-	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, testsMode bool, testApprovalL1Fee uint64) (err error) {
+	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool) (err error) {
 	r.logger.Debug("evaluateAndUpdatePathDetails: starting",
 		zap.String("processor", path.ProcessorName),
 		zap.Uint64("fromChain", path.FromChain.ChainID),
 		zap.String("token", path.FromToken.Symbol),
 		zap.Bool("approvalRequired", path.ApprovalRequired),
 		zap.Bool("noBaseFee", noBaseFee),
-		zap.Bool("noPriorityFee", noPriorityFee),
-		zap.Bool("testsMode", testsMode))
+		zap.Bool("noPriorityFee", noPriorityFee))
 
 	r.updatePathFields(path, fetchedFees, noBaseFee, noPriorityFee)
 
@@ -561,27 +556,19 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 		path.FromChain.ChainID == walletCommon.BaseMainnet ||
 		path.FromChain.ChainID == walletCommon.BaseSepolia
 
-	if testsMode {
-		usedNonces[path.FromChain.ChainID] = usedNonces[path.FromChain.ChainID] + 1
-	}
-
 	if path.ApprovalRequired && needL1Fee {
-		if testsMode {
-			l1ApprovalFeeWei = big.NewInt(int64(testApprovalL1Fee))
-		} else {
-			l1ApprovalFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.ApprovalPackedData)
-			if err != nil {
-				r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for approval failed",
-					zap.String("processor", path.ProcessorName),
-					zap.Uint64("fromChain", path.FromChain.ChainID),
-					zap.Error(err))
-				return err
-			}
-			r.logger.Debug("evaluateAndUpdatePathDetails: approval L1 fee calculated",
+		l1ApprovalFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.ApprovalPackedData)
+		if err != nil {
+			r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for approval failed",
 				zap.String("processor", path.ProcessorName),
 				zap.Uint64("fromChain", path.FromChain.ChainID),
-				zap.Stringer("l1ApprovalFeeWei", l1ApprovalFeeWei))
+				zap.Error(err))
+			return err
 		}
+		r.logger.Debug("evaluateAndUpdatePathDetails: approval L1 fee calculated",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Stringer("l1ApprovalFeeWei", l1ApprovalFeeWei))
 	}
 
 	err = r.applyCustomFields(ctx, path, fetchedFees, usedNonces)
@@ -594,20 +581,18 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	}
 
 	if needL1Fee {
-		if !testsMode {
-			l1TxFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.TxPackedData)
-			if err != nil {
-				r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for tx failed",
-					zap.String("processor", path.ProcessorName),
-					zap.Uint64("fromChain", path.FromChain.ChainID),
-					zap.Error(err))
-				return err
-			}
-			r.logger.Debug("evaluateAndUpdatePathDetails: tx L1 fee calculated",
+		l1TxFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.TxPackedData)
+		if err != nil {
+			r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for tx failed",
 				zap.String("processor", path.ProcessorName),
 				zap.Uint64("fromChain", path.FromChain.ChainID),
-				zap.Stringer("l1TxFeeWei", l1TxFeeWei))
+				zap.Error(err))
+			return err
 		}
+		r.logger.Debug("evaluateAndUpdatePathDetails: tx L1 fee calculated",
+			zap.String("processor", path.ProcessorName),
+			zap.Uint64("fromChain", path.FromChain.ChainID),
+			zap.Stringer("l1TxFeeWei", l1TxFeeWei))
 	}
 
 	// calculate ETH fees

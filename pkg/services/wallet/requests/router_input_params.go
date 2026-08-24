@@ -1,8 +1,6 @@
 package requests
 
 import (
-	"math/big"
-
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -69,28 +67,6 @@ type RouteInputParams struct {
 
 	// Community related params
 	CommunityRouteInputParams *CommunityRouteInputParams `json:"communityRouteInputParams"`
-
-	// TODO: Remove two fields below once we implement a better solution for tests
-	// Currently used for tests only
-	TestsMode  bool
-	TestParams *RouterTestParams
-}
-
-type RouterTestParams struct {
-	TokenFrom             *tokentypes.Token
-	TokenPrices           map[string]float64
-	EstimationMap         map[string]Estimation // [processor-name, estimation]
-	BonderFeeMap          map[string]*big.Int   // [token-symbol, bonder-fee]
-	SuggestedFees         *fees.SuggestedFees
-	BaseFee               *big.Int
-	BalanceMap            map[string]*big.Int // [token-symbol, balance]
-	ApprovalGasEstimation uint64
-	ApprovalL1Fee         uint64
-}
-
-type Estimation struct {
-	Value uint64
-	Err   error
 }
 
 func (i *RouteInputParams) UseCommunityTransferDetails() bool {

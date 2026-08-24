@@ -71,15 +71,6 @@ func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte,
 }
 
 func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createERC1155ErrorResponse(err)

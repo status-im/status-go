@@ -65,10 +65,6 @@ func (s *CommunityRemoteBurnProcessor) PackTxInputData(params ProcessorInputPara
 }
 
 func (s *CommunityRemoteBurnProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		return 0, ErrNoEstimationFound
-	}
-
 	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createCommunityRemoteBurnErrorResponse(err)
