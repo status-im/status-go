@@ -7,7 +7,7 @@ import (
 const (
 	baseURL = "https://li.quest/v1"
 
-	Integrator = "status.app"
+	Integrator = "status-app"
 )
 
 type Client struct {
