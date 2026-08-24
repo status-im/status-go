@@ -128,9 +128,14 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// hopHTTPClient abstracts the HTTP client used for the Hop quote API so tests can substitute a fake.
+type hopHTTPClient interface {
+	DoGetRequest(ctx context.Context, url string, params netUrl.Values, options ...thirdparty.RequestOption) ([]byte, error)
+}
+
 type HopBridgeProcessor struct {
 	transactor      transactions.TransactorIface
-	httpClient      *thirdparty.HTTPClient
+	httpClient      hopHTTPClient
 	tokenManager    *token.Manager
 	contractMaker   *contracts.ContractMaker
 	ethClientGetter rpc.EthClientGetter

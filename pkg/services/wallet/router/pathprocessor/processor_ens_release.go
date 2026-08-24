@@ -24,7 +24,7 @@ type ENSReleaseProcessor struct {
 	contractMaker   *contracts.ContractMaker
 	ethClientGetter rpc.EthClientGetter
 	transactor      transactions.TransactorIface
-	ensResolver     *ensresolver.EnsResolver
+	ensResolver     ensResolverIface
 }
 
 func NewENSReleaseProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSReleaseProcessor {

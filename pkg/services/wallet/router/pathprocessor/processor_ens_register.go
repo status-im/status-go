@@ -26,7 +26,7 @@ type ENSRegisterProcessor struct {
 	contractMaker   *contracts.ContractMaker
 	ethClientGetter rpc.EthClientGetter
 	transactor      transactions.TransactorIface
-	ensResolver     *ensresolver.EnsResolver
+	ensResolver     ensResolverIface
 }
 
 func NewENSRegisterProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSRegisterProcessor {

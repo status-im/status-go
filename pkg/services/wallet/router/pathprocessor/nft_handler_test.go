@@ -13,9 +13,11 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
 
@@ -40,6 +42,28 @@ func TestBaseNFTHandler_Comprehensive(t *testing.T) {
 	amountOut, err := handler.CalculateAmountOut(params)
 	require.NoError(t, err)
 	assert.Equal(t, params.AmountIn, amountOut)
+
+	// Test EstimateGas through a mocked eth client
+	mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
+	params.FromChain = &mainnet
+	params.FromToken = makeToken(walletCommon.EthereumMainnet, "0x721")
+
+	mockRPCClient.EXPECT().EthClient(walletCommon.EthereumMainnet).Return(mockEthClient, nil)
+	mockEthClient.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(uint64(21000), nil)
+	estimation, err := handler.EstimateGas(params, []byte{}, "TestHandler")
+	require.NoError(t, err)
+	assert.Equal(t, uint64(float64(21000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+
+	// Test EstimateGas propagating an estimation error
+	mockRPCClient.EXPECT().EthClient(walletCommon.EthereumMainnet).Return(mockEthClient, nil)
+	mockEthClient.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(uint64(0), assert.AnError)
+	_, err = handler.EstimateGas(params, []byte{}, "TestHandler")
+	assert.Error(t, err)
+
+	// Test EstimateGas propagating an eth client getter error
+	mockRPCClient.EXPECT().EthClient(walletCommon.EthereumMainnet).Return(nil, assert.AnError)
+	_, err = handler.EstimateGas(params, []byte{}, "TestHandler")
+	assert.Error(t, err)
 }
 
 func TestSpecificHandlers_BuildTransactionV2(t *testing.T) {
