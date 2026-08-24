@@ -22,6 +22,7 @@ type mockNotificationSettings struct {
 	personalMentions   string
 	globalMentions     string
 	allMessages        string
+	contactRequests    string
 	messagePreview     int
 	hasExemption       bool
 	exMuteAllMessages  bool
@@ -35,8 +36,11 @@ func (m *mockNotificationSettings) GetGroupChats() (string, error)    { return m
 func (m *mockNotificationSettings) GetPersonalMentions() (string, error) {
 	return m.personalMentions, nil
 }
-func (m *mockNotificationSettings) GetGlobalMentions() (string, error)   { return m.globalMentions, nil }
-func (m *mockNotificationSettings) GetAllMessages() (string, error)      { return m.allMessages, nil }
+func (m *mockNotificationSettings) GetGlobalMentions() (string, error) { return m.globalMentions, nil }
+func (m *mockNotificationSettings) GetAllMessages() (string, error)    { return m.allMessages, nil }
+func (m *mockNotificationSettings) GetContactRequests() (string, error) {
+	return m.contactRequests, nil
+}
 func (m *mockNotificationSettings) GetMessagePreview() (int, error)      { return m.messagePreview, nil }
 func (m *mockNotificationSettings) HasExemption(id string) (bool, error) { return m.hasExemption, nil }
 func (m *mockNotificationSettings) GetExMuteAllMessages(id string) (bool, error) {
@@ -349,6 +353,34 @@ func TestShowMessageNotification_Exemptions(t *testing.T) {
 			globalMentions:   notifValueTurnOff,
 			hasExemption:     true,
 			exGlobalMentions: notifValueSendAlerts,
+		}
+		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
+		require.True(t, got)
+	})
+}
+
+func TestShowMessageNotification_OneToOneContactRequestsUseContactRequestSetting(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	pkHex := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+	chat := &Chat{ID: pkHex, ChatType: ChatTypeOneToOne, Active: true}
+	msg := common.NewMessage()
+	msg.ID, msg.ChatId, msg.Text, msg.From = "m1", chat.ID, "hello!", "0xabc"
+	msg.MessageType = protobuf.MessageType_ONE_TO_ONE
+	msg.ContactRequestState = common.ContactRequestStatePending
+
+	t.Run("contact requests off suppresses even when one-to-one chats are on", func(t *testing.T) {
+		settings := &mockNotificationSettings{
+			oneToOneChats:   notifValueSendAlerts,
+			contactRequests: notifValueTurnOff,
+		}
+		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
+		require.False(t, got)
+	})
+
+	t.Run("contact requests on allows even when one-to-one chats are off", func(t *testing.T) {
+		settings := &mockNotificationSettings{
+			oneToOneChats:   notifValueTurnOff,
+			contactRequests: notifValueSendAlerts,
 		}
 		got := showMessageNotification(settings, key.PublicKey, msg, chat, nil)
 		require.True(t, got)
