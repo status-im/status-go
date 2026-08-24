@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
 	communityToken "github.com/status-im/status-go/internal/protocol/communities/token"
@@ -71,6 +72,7 @@ type SuggestedRoutes struct {
 
 type Router struct {
 	rpcClient            *rpc.Client
+	contractMaker        contracts.ContractMakerIface
 	transactor           *transactions.Transactor
 	tokenManager         TokenManager
 	tokenBalancesFetcher TokenBalanceFetcher
@@ -112,6 +114,7 @@ func NewRouter(
 	logger := logutils.ZapLogger().Named("router")
 	return &Router{
 		rpcClient:            rpcClient,
+		contractMaker:        contracts.NewContractMaker(rpcClient),
 		transactor:           transactor,
 		tokenManager:         tokenManager,
 		tokenBalancesFetcher: tokenBalancesFetcher,

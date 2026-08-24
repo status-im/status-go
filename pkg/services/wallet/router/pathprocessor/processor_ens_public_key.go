@@ -27,7 +27,7 @@ type ENSPublicKeyProcessor struct {
 	contractMaker   *contracts.ContractMaker
 	ethClientGetter rpc.EthClientGetter
 	transactor      transactions.TransactorIface
-	ensResolver     *ensresolver.EnsResolver
+	ensResolver     ensResolverIface
 }
 
 func NewENSPublicKeyProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSPublicKeyProcessor {

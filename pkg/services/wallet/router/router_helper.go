@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/internal/contracts"
 	gaspriceproxy "github.com/status-im/status-go/internal/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/internal/contracts/hop"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
@@ -49,9 +48,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 		return false, nil, nil
 	}
 
-	contractMaker := contracts.NewContractMaker(r.rpcClient)
-
-	contract, err := contractMaker.NewERC20(params.FromChain.ChainID, params.FromToken.Address)
+	contract, err := r.contractMaker.NewERC20(params.FromChain.ChainID, params.FromToken.Address)
 	if err != nil {
 		r.logger.Error("requireApproval: failed to instantiate ERC20 contract",
 			zap.Uint64("chainId", params.FromChain.ChainID),
