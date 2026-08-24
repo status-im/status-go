@@ -8,6 +8,7 @@ tool (
 	github.com/status-im/goroutine-defer-guard/cmd/goroutine-defer-guard
 	github.com/wadey/gocovmerge
 	go.uber.org/mock/mockgen
+	google.golang.org/protobuf/cmd/protoc-gen-go
 )
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
