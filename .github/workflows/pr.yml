@@ -36,7 +36,7 @@ jobs:
       - name: Setup Protocol Buffer Compiler
         uses: arduino/setup-protoc@v3
         with:
-          version: '29.3'
+          version: '36.0'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache go-generate-fast
