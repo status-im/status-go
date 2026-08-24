@@ -101,15 +101,6 @@ func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 }
 
 func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, createENSRegisterProcessorErrorResponse(err)

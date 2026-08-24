@@ -39,17 +39,6 @@ type PathProcessorClearable interface {
 	Clear()
 }
 
-type ProcessorCommunityTokenParams struct {
-	Name               string
-	Symbol             string
-	TokenURI           string
-	Transferable       bool
-	RemoteSelfDestruct bool
-	Supply             *big.Int
-	OwnerTokenAddress  string
-	MasterTokenAddress string
-}
-
 type ProcessorInputParams struct {
 	FromChain *params.Network
 	ToChain   *params.Network
@@ -69,11 +58,4 @@ type ProcessorInputParams struct {
 
 	// community related params
 	CommunityParams *requests.CommunityRouteInputParams
-
-	// for testing purposes
-	TestsMode                 bool
-	TestEstimationMap         map[string]requests.Estimation // [bridge-name, estimation]
-	TestBonderFeeMap          map[string]*big.Int            // [token-symbol, bonder-fee]
-	TestApprovalGasEstimation uint64
-	TestApprovalL1Fee         uint64
 }

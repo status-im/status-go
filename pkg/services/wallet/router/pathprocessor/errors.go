@@ -15,7 +15,6 @@ var (
 	ErrContractNotFound            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-003"), Details: "contract not found"}
 	ErrNetworkNotFound             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-004"), Details: "network not found"}
 	ErrTokenNotFound               = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-005"), Details: "token not found"}
-	ErrNoEstimationFound           = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-006"), Details: "no estimation found"}
 	ErrNotAvailableForContractType = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-007"), Details: "not available for contract type"}
 	ErrNoBonderFeeFound            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-008"), Details: "no bonder fee found"}
 	ErrContractTypeNotSupported    = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-009"), Details: "contract type not supported"}

@@ -9,7 +9,6 @@ import (
 	netUrl "net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -219,9 +218,6 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, token *token
 }
 
 func (h *HopBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	if params.TestsMode {
-		return []byte{}, nil
-	}
 	_, contractType, err := hop.GetContractAddress(params.FromToken)
 	if err != nil {
 		return []byte{}, createBridgeHopErrorResponse(err)
@@ -260,15 +256,6 @@ func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputPara
 }
 
 func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[h.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	value := big.NewInt(0)
 	if params.FromToken.IsNative() {
 		value = params.AmountIn
@@ -388,23 +375,6 @@ func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs
 
 func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
 	bonderKey := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
-	if params.TestsMode {
-		if val, ok := params.TestBonderFeeMap[params.FromToken.Symbol]; ok {
-			res := new(big.Int).Sub(params.AmountIn, val)
-			bonderFee := &BonderFee{
-				AmountIn:                &bigint.BigInt{Int: params.AmountIn},
-				Slippage:                5,
-				AmountOutMin:            &bigint.BigInt{Int: res},
-				DestinationAmountOutMin: &bigint.BigInt{Int: res},
-				BonderFee:               &bigint.BigInt{Int: val},
-				EstimatedRecieved:       &bigint.BigInt{Int: res},
-				Deadline:                time.Now().Add(pathProcessorCommon.SevenDaysInSeconds).Unix(),
-			}
-			h.bonderFee.Store(bonderKey, bonderFee)
-			return val, walletCommon.ZeroBigIntValue(), nil
-		}
-		return nil, nil, ErrNoBonderFeeFound
-	}
 
 	hopChainsMap := map[uint64]string{
 		walletCommon.EthereumMainnet: "ethereum",

@@ -173,10 +173,6 @@ func (s *LiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.In
 }
 
 func (s *LiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	if params.TestsMode {
-		return []byte{}, nil
-	}
-
 	quote, err := s.fetchAndStoreQuote(params)
 	if err != nil {
 		return []byte{}, err
@@ -185,15 +181,6 @@ func (s *LiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, er
 }
 
 func (s *LiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	isNative := params.FromToken.IsNative()
 	value := big.NewInt(0)
 	if isNative {

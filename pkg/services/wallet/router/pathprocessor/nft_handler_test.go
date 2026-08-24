@@ -16,7 +16,6 @@ import (
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
-	"github.com/status-im/status-go/pkg/services/wallet/requests"
 	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
 
@@ -41,18 +40,6 @@ func TestBaseNFTHandler_Comprehensive(t *testing.T) {
 	amountOut, err := handler.CalculateAmountOut(params)
 	require.NoError(t, err)
 	assert.Equal(t, params.AmountIn, amountOut)
-
-	// Test EstimateGas with estimation map
-	params.TestsMode = true
-	params.TestEstimationMap = map[string]requests.Estimation{"TestHandler": {Value: 21000, Err: nil}}
-	estimation, err := handler.EstimateGas(params, []byte{}, "TestHandler")
-	require.NoError(t, err)
-	assert.Equal(t, uint64(21000), estimation)
-
-	// Test EstimateGas without estimation
-	params.TestEstimationMap = nil
-	_, err = handler.EstimateGas(params, []byte{}, "TestHandler")
-	assert.Equal(t, ErrNoEstimationFound, err)
 }
 
 func TestSpecificHandlers_BuildTransactionV2(t *testing.T) {
