@@ -22,7 +22,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&ref=refs/tags/v0.3.3&rev=259830c9cfa7dbad3bd2f792097ad3e180fb2e1c";
+    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=2fec23ad292b0f9d0924a2f1a69995d23b37822d";
   };
 
   outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
