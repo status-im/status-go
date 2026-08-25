@@ -65,6 +65,15 @@ func isPinnedBootstrapDisabledByEnv() bool {
 	}
 }
 
+func isSupportBotContactRequestDisabledByEnv() bool {
+	switch os.Getenv("STATUS_GO_DISABLE_SUPPORT_BOT_CONTACT_REQUEST") {
+	case "1", "true", "TRUE", "True", "yes", "YES", "Yes":
+		return true
+	default:
+		return false
+	}
+}
+
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
@@ -348,10 +357,11 @@ func buildMessengerOptions(
 ) ([]protocol.Option, error) {
 	personalService := personal.New()
 	enablePinnedBootstrap := !isPinnedBootstrapDisabledByEnv()
+	enableSupportBotContactRequest := !isSupportBotContactRequestDisabledByEnv()
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithEnablePinnedBootstrap(enablePinnedBootstrap),
-		protocol.WithEnableSupportBotContactRequest(true),
+		protocol.WithEnableSupportBotContactRequest(enableSupportBotContactRequest),
 		protocol.WithPushNotifications(),
 		protocol.WithDatabase(appDb),
 		protocol.WithWalletDatabase(walletDb),
