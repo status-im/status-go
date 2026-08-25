@@ -162,7 +162,7 @@ func (m *AccountsManager) deleteAccountFromKeystoreIfExists(address cryptotypes.
 	return err
 }
 
-// deleteKeystoreFileForAccountIfExists deletes the keystore file for an account if it exists
+// deleteKeystoreFileForAccountInternally deletes the keystore file for an account if it exists
 // if the account is a watch only account, it does nothing
 // if the account is non-operable or partially operable, it does nothing
 // if the account belongs to regular, not keycard migrated keypair:
