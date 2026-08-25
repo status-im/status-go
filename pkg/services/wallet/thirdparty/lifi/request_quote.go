@@ -53,6 +53,7 @@ func (c *Client) FetchQuote(ctx context.Context, p QuoteParams) (Quote, error) {
 	params.Add("fromAmount", p.AmountIn.String())
 	params.Add("slippage", strconv.FormatFloat(float64(p.SlippagePercentage)/100.0, 'f', -1, 64))
 	params.Add("integrator", c.integrator)
+	params.Add("fee", feeFraction)
 
 	options := []thirdparty.RequestOption{}
 	if c.apiKey != "" {

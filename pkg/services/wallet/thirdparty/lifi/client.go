@@ -7,7 +7,9 @@ import (
 const (
 	baseURL = "https://li.quest/v1"
 
-	Integrator = "status.app"
+	Integrator = "status-app"
+
+	feeFraction = "0.0062" // 0.62%
 )
 
 type Client struct {
