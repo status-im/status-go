@@ -808,7 +808,7 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 
 	err := b.ensureDBsOpened(acc, request.Password)
 	if err != nil {
-		return errors.Wrap(err, "failed to open database")
+		return errors.Wrap(asKeystoreResolutionError(err), "failed to open database")
 	}
 
 	// Fix any interrupted encryption-scheme migration/rekey before the keystore is used.
