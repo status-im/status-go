@@ -10,9 +10,17 @@ import (
 
 const (
 	supportBotNewUserMessage = "->"
+	defaultSupportBotChatKey = "zQ3shX8r9eRDTEQQhks4qciDunphxdY1w1KjvZ32Pn7dGdWTL"
 )
 
-var supportBotChatKey = os.Getenv("STATUS_SUPPORT_BOT_CHAT_KEY")
+var supportBotChatKey = supportBotChatKeyFromEnv()
+
+func supportBotChatKeyFromEnv() string {
+	if chatKey := os.Getenv("STATUS_SUPPORT_BOT_CHAT_KEY"); chatKey != "" {
+		return chatKey
+	}
+	return defaultSupportBotChatKey
+}
 
 func (m *Messenger) sendSupportBotContactRequest() error {
 	if m.shouldAbortSupportBotContactRequest() {
