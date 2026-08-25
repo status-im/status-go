@@ -22,10 +22,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&ref=refs/tags/v0.3.3&rev=259830c9cfa7dbad3bd2f792097ad3e180fb2e1c";
+    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=2fec23ad292b0f9d0924a2f1a69995d23b37822d";
+    # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the
+    # bindings; 0.24.1 is what logos-delivery builds with too.
+    nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nixpkgs-nimble }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -51,6 +54,7 @@
           (final: prev: {
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
+            nimble = nixpkgs-nimble.legacyPackages.${system}.nimble;
           })
         ];
       }
