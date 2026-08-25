@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +12,14 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/pkg/messaging"
 )
+
+func TestSupportBotChatKeyFromEnv(t *testing.T) {
+	t.Setenv("STATUS_SUPPORT_BOT_CHAT_KEY", testPK)
+	require.Equal(t, testPK, supportBotChatKeyFromEnv())
+
+	require.NoError(t, os.Unsetenv("STATUS_SUPPORT_BOT_CHAT_KEY"))
+	require.Equal(t, defaultSupportBotChatKey, supportBotChatKeyFromEnv())
+}
 
 func TestSendSupportBotContactRequest(t *testing.T) {
 	testCases := []struct {
