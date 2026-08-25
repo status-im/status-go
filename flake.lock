@@ -48,18 +48,17 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1783637210,
-        "narHash": "sha256-O5M45RPTtaKVYeiyB6LSBawqcBuAHwyhYbvk5HMyh/M=",
-        "ref": "refs/tags/v0.3.3",
-        "rev": "259830c9cfa7dbad3bd2f792097ad3e180fb2e1c",
-        "revCount": 84,
+        "lastModified": 1787680029,
+        "narHash": "sha256-GeS4OB312R+E6CHMYwZ6zJ4kMGloD1m3eRcz7qvtvek=",
+        "ref": "refs/heads/master",
+        "rev": "2fec23ad292b0f9d0924a2f1a69995d23b37822d",
+        "revCount": 105,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
       },
       "original": {
-        "ref": "refs/tags/v0.3.3",
-        "rev": "259830c9cfa7dbad3bd2f792097ad3e180fb2e1c",
+        "rev": "2fec23ad292b0f9d0924a2f1a69995d23b37822d",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
@@ -81,19 +80,35 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
+    "nixpkgs-nimble": {
       "locked": {
-        "lastModified": 1757590060,
-        "narHash": "sha256-EWwwdKLMZALkgHFyKW7rmyhxECO74+N+ZO5xTDnY/5c=",
+        "lastModified": 1788179007,
+        "narHash": "sha256-hn1oU2rue2SYK8dAr8+WNZWtbsz1S2W5mnHlSEuh3bo=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
+        "rev": "34ab99075ac4f7e40cf037eef32cb1c360bb85e9",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0ef228213045d2cdb5a169a95d63ded38670b293",
+        "rev": "34ab99075ac4f7e40cf037eef32cb1c360bb85e9",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1770464364,
+        "narHash": "sha256-z5NJPSBwsLf/OfD8WTmh79tlSU8XgIbwmk6qB1/TFzY=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "23d72dabcb3b12469f57b37170fcbc1789bd7457",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "23d72dabcb3b12469f57b37170fcbc1789bd7457",
         "type": "github"
       }
     },
@@ -117,7 +132,8 @@
       "inputs": {
         "logos-storage-nim": "logos-storage-nim",
         "nim-sds": "nim-sds",
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": "nixpkgs_3",
+        "nixpkgs-nimble": "nixpkgs-nimble"
       }
     }
   },
