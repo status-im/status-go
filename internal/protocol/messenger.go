@@ -77,8 +77,9 @@ const (
 
 // errors
 var (
-	ErrChatNotFoundError     = errors.New("Chat not found")
-	ErrThreadFeatureDisabled = errors.New("threads feature is disabled")
+	ErrChatNotFoundError              = errors.New("Chat not found")
+	ErrThreadFeatureDisabled          = errors.New("threads feature is disabled")
+	ErrThreadsNotSupportedForChatType = errors.New("threads are not supported for this chat type")
 )
 
 const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
@@ -2142,23 +2143,25 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if !m.featureFlags.Threads {
 		message.ThreadId = nil
 	} else if message.GetThreadId() != "" {
+		if !chat.SupportsThreads() {
+			return nil, ErrThreadsNotSupportedForChatType
+		}
+
 		message.ThreadMetadataCreationAuthorized = true
-		if chat.ChatType == ChatTypeCommunityChat {
-			_, err = m.persistence.ThreadByID(chat.ID, message.GetThreadId())
-			switch {
-			case err == nil:
-				message.ThreadMetadataCreationAuthorized = false
-			case errors.Is(err, common.ErrRecordNotFound):
-				allowed, permissionErr := m.senderCanCreateThread(chat, &m.identity.PublicKey)
-				if permissionErr != nil {
-					return nil, permissionErr
-				}
-				if !allowed {
-					return nil, errors.New("only admins can create threads in this community")
-				}
-			default:
-				return nil, err
+		_, err = m.persistence.ThreadByID(chat.ID, message.GetThreadId())
+		switch {
+		case err == nil:
+			message.ThreadMetadataCreationAuthorized = false
+		case errors.Is(err, common.ErrRecordNotFound):
+			allowed, permissionErr := m.senderCanCreateThread(chat, &m.identity.PublicKey)
+			if permissionErr != nil {
+				return nil, permissionErr
 			}
+			if !allowed {
+				return nil, errors.New("only admins can create threads in this community")
+			}
+		default:
+			return nil, err
 		}
 	}
 

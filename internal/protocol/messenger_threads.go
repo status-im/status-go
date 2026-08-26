@@ -16,6 +16,10 @@ func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 }
 
 func (m *Messenger) senderCanCreateThread(chat *Chat, sender *ecdsa.PublicKey) (bool, error) {
+	if !chat.SupportsThreads() {
+		return false, ErrThreadsNotSupportedForChatType
+	}
+
 	if chat.ChatType != ChatTypeCommunityChat {
 		return true, nil
 	}
@@ -104,7 +108,7 @@ func (m *Messenger) addThreadsToResponse(response *MessengerResponse, messages [
 			continue
 		}
 
-		chatID := message.GetChatId()
+		chatID := message.LocalChatID
 		if chatID == "" {
 			continue
 		}
