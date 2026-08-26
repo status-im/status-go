@@ -777,6 +777,9 @@ func (s *MessengerSyncWalletSuite) TestAddKeypairStoredToColdWalletSyncsKeypairT
 		AddKeypairStoredToColdWallet(kp.KeyUID, kp.DerivedFrom, kp.Name, kp.XPub, accsmanagementtypes.ColdWalletTypeLedger, gomock.Any(), gomock.Any()).
 		DoAndReturn(func(keyUID string, masterAddress string, name string, walletXPub string, coldWallet accsmanagementtypes.ColdWalletType,
 			walletAccounts []*accsmanagementtypes.Account, clock uint64) (*accsmanagementtypes.Keypair, error) {
+			// the accounts the messenger forwarded, not the ones captured above:
+			// otherwise a nil or wrong slice would still sync two accounts
+			s.Require().Equal(kp.Accounts, walletAccounts, "the messenger must forward the wallet accounts it was given")
 			kp.Clock = clock
 			for i, acc := range kp.Accounts {
 				acc.Position = int64(i)
