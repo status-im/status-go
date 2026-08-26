@@ -17,9 +17,14 @@ type SymbolPriceMap map[string]CurrencyPriceMap
 
 func (c *Client) FetchSimplePrice(ctx context.Context, ids []string, currencies []string) (SymbolPriceMap, error) {
 
+	vsCurrencies, convertCurrency := c.simplePriceCurrencies(currencies)
+
 	params := netUrl.Values{}
 	params.Add("ids", strings.Join(ids, ","))
-	params.Add("vs_currencies", strings.Join(currencies, ","))
+	params.Add("vs_currencies", strings.Join(vsCurrencies, ","))
+	if convertCurrency != "" {
+		params.Add(convertCurrencyParam, convertCurrency)
+	}
 	url := fmt.Sprintf(simplePriceURL, c.baseURL)
 	response, err := c.doGetRequestWithOptionalAuth(ctx, url, params)
 	if err != nil {
