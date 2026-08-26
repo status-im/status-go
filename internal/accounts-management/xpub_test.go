@@ -17,6 +17,27 @@ func (s *ManagerTestSuite) expectedWalletXPub() string {
 	return xpub
 }
 
+// storeDistinctSeedKeypair creates a keypair from its own mnemonic and stores its
+// master key, so each keypair in a test derives a different xpub. Sharing one
+// master would let a backfill read the wrong keypair's file undetected.
+func (s *ManagerTestSuite) storeDistinctSeedKeypair(keyUID string, clock uint64) (*accsmanagementtypes.Keypair, string) {
+	mnemonic, err := common.CreateRandomMnemonicWithDefaultLength()
+	s.Require().NoError(err)
+	master, err := generator.CreateAccountFromMnemonic(mnemonic, "")
+	s.Require().NoError(err)
+	s.Require().NoError(s.accManager.storeToKeystore(master, s.password))
+
+	xpub, err := generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletXPub)
+	s.Require().NoError(err)
+
+	return &accsmanagementtypes.Keypair{
+		KeyUID:      keyUID,
+		Type:        accsmanagementtypes.KeypairTypeSeed,
+		DerivedFrom: master.Address().Hex(),
+		Clock:       clock,
+	}, xpub
+}
+
 func (s *ManagerTestSuite) deriveTestAccountAtPath(path string) *accsmanagementtypes.Account {
 	_, derived, err := generator.CreateAndDeriveAccountsFromMnemonic(s.mnemonic, []string{path}, "")
 	s.Require().NoError(err)
@@ -211,8 +232,12 @@ func (s *ManagerTestSuite) TestGetVerifiedWalletAccountOnColdKeypairAccountFails
 	s.Require().ErrorIs(err, keystore.ErrKeystoreFileMissing,
 		"the keystore-file-missing error must surface so the app can route signing to the keycard instead")
 	s.Require().Nil(account, "no signing account may be returned for a cold keypair's account")
+	// The fallback writes nothing here because the cold keypair has no master file
+	// to derive from, not because it checks the cold-wallet flag:
+	// generatePartialAccountKey has no such check. If a master file were ever left
+	// on disk for a keypair flagged cold, this path would derive and write.
 	s.Require().Equal(0, s.countKeystoreFiles(),
-		"the partial-key fallback must not write any keystore file for a keypair still flagged cold")
+		"no keystore file is written, because the cold keypair has no master file to derive a child key from")
 }
 
 func (s *ManagerTestSuite) TestAddAccountsRejectsSecondDefaultChatAccountOnProfileKeypair() {
@@ -390,28 +415,28 @@ func (s *ManagerTestSuite) TestBackfillKeypairsXPubSkipsKeypairOnWrongPassword()
 
 func (s *ManagerTestSuite) TestBackfillKeypairsXPubJoinsErrorsAndContinuesPastFailures() {
 	_ = s.createAndStoreProfileKeypair()
-	xpub := s.expectedWalletXPub()
 
-	kpFail1 := &accsmanagementtypes.Keypair{KeyUID: "fail-1", Type: accsmanagementtypes.KeypairTypeSeed,
-		DerivedFrom: s.masterAccount.Address().Hex(), Clock: 1}
-	kpFail2 := &accsmanagementtypes.Keypair{KeyUID: "fail-2", Type: accsmanagementtypes.KeypairTypeSeed,
-		DerivedFrom: s.masterAccount.Address().Hex(), Clock: 2}
-	kpHealthy := &accsmanagementtypes.Keypair{KeyUID: "healthy-kp", Type: accsmanagementtypes.KeypairTypeSeed,
-		DerivedFrom: s.masterAccount.Address().Hex(), Clock: 3}
+	// each keypair has its own master key, so the expected xpubs differ and a
+	// backfill reading the wrong keystore file fails the pinned expectations
+	kpFail1, xpub1 := s.storeDistinctSeedKeypair("fail-1", 1)
+	kpFail2, xpub2 := s.storeDistinctSeedKeypair("fail-2", 2)
+	kpHealthy, xpubHealthy := s.storeDistinctSeedKeypair("healthy-kp", 3)
+	s.Require().NotEqual(xpub1, xpub2)
+	s.Require().NotEqual(xpub2, xpubHealthy)
 
 	s.persistence.EXPECT().GetActiveKeypairs().Return([]*accsmanagementtypes.Keypair{kpFail1, kpFail2, kpHealthy}, nil).Times(1)
-	s.persistence.EXPECT().UpdateKeypairXPub(kpFail1.KeyUID, xpub, accsmanagementtypes.ColdWalletTypeNone, uint64(1)).
+	s.persistence.EXPECT().UpdateKeypairXPub(kpFail1.KeyUID, xpub1, accsmanagementtypes.ColdWalletTypeNone, uint64(1)).
 		Return(errors.New("db failure 1")).Times(1)
-	s.persistence.EXPECT().UpdateKeypairXPub(kpFail2.KeyUID, xpub, accsmanagementtypes.ColdWalletTypeNone, uint64(2)).
+	s.persistence.EXPECT().UpdateKeypairXPub(kpFail2.KeyUID, xpub2, accsmanagementtypes.ColdWalletTypeNone, uint64(2)).
 		Return(errors.New("db failure 2")).Times(1)
-	s.persistence.EXPECT().UpdateKeypairXPub(kpHealthy.KeyUID, xpub, accsmanagementtypes.ColdWalletTypeNone, uint64(3)).
+	s.persistence.EXPECT().UpdateKeypairXPub(kpHealthy.KeyUID, xpubHealthy, accsmanagementtypes.ColdWalletTypeNone, uint64(3)).
 		Return(nil).Times(1)
 
 	err := s.accManager.BackfillKeypairsXPub(s.password)
 	s.Require().Error(err, "failed keypairs must surface in the returned error")
 	s.Require().ErrorContains(err, kpFail1.KeyUID, "the joined error must name the first failing keypair")
 	s.Require().ErrorContains(err, kpFail2.KeyUID, "the joined error must name the second failing keypair")
-	s.Require().Equal(xpub, kpHealthy.XPub,
+	s.Require().Equal(xpubHealthy, kpHealthy.XPub,
 		"a healthy keypair listed after failures must still be backfilled, else login-time backfill is silently incomplete")
 }
 

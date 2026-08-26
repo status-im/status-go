@@ -110,9 +110,15 @@ func TestAccountKeycardPairingRoundTrip(t *testing.T) {
 }
 
 func TestUpdateAccountKeycardPairingSetsAndClears(t *testing.T) {
+	const bystanderKeyUID = "0x000000000000000000000000000000000000000000000000000000000000beef"
+	const bystanderPairing = "bystander-pairing-must-not-change"
+
 	db, stop := setupTestDB(t)
 	defer stop()
 	require.NoError(t, db.SaveAccount(Account{KeyUID: keyUID, KDFIterations: dbsetup.ReducedKDFIterationsNumber}))
+	// a second account with a pairing of its own, so a write that loses its
+	// WHERE clause shows up as a changed bystander rather than passing silently
+	require.NoError(t, db.SaveAccount(Account{KeyUID: bystanderKeyUID, KeycardPairing: bystanderPairing, KDFIterations: dbsetup.ReducedKDFIterationsNumber}))
 
 	require.NoError(t, db.UpdateAccountKeycardPairing(keyUID, "843edb10045d329f4ecfac73fe66f13d"))
 	account, err := db.GetAccount(keyUID)
@@ -120,11 +126,21 @@ func TestUpdateAccountKeycardPairingSetsAndClears(t *testing.T) {
 	require.Equal(t, "843edb10045d329f4ecfac73fe66f13d", account.KeycardPairing,
 		"Expected UpdateAccountKeycardPairing to persist the pairing key because it is the only writer used when a keycard is paired post-creation")
 
+	bystander, err := db.GetAccount(bystanderKeyUID)
+	require.NoError(t, err)
+	require.Equal(t, bystanderPairing, bystander.KeycardPairing,
+		"Expected the other account's pairing to be untouched because the update must apply to the given keyUID only")
+
 	require.NoError(t, db.UpdateAccountKeycardPairing(keyUID, ""))
 	account, err = db.GetAccount(keyUID)
 	require.NoError(t, err)
 	require.Equal(t, "", account.KeycardPairing,
 		"Expected clearing the pairing to persist because unpairing must not leave a stale key behind")
+
+	bystander, err = db.GetAccount(bystanderKeyUID)
+	require.NoError(t, err)
+	require.Equal(t, bystanderPairing, bystander.KeycardPairing,
+		"Expected clearing one account's pairing to leave the other account's pairing in place")
 }
 
 func TestDatabase_GetAccountsCount(t *testing.T) {
