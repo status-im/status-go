@@ -22,6 +22,25 @@ func (s *ManagerTestSuite) setupProfileKeystore(storeMasterFile bool) {
 	}
 }
 
+// requireKeypairKeystoreFilesOpen opens the master file and every account file of
+// the keypair with the given password. A file count alone would pass on a wrong
+// child key or a file encrypted under a different password.
+func (s *ManagerTestSuite) requireKeypairKeystoreFilesOpen(mnemonic, password string, paths []string) {
+	master, err := generator.CreateAccountFromMnemonic(mnemonic, "")
+	s.Require().NoError(err)
+	restored, err := s.accManager.loadAccountInternally(master.Address(), password)
+	s.Require().NoError(err, "the restored master keystore file must decrypt with the given password")
+	s.Require().NotNil(restored)
+
+	_, derived, err := generator.CreateAndDeriveAccountsFromMnemonic(mnemonic, paths, "")
+	s.Require().NoError(err)
+	for _, path := range paths {
+		acc, err := s.accManager.loadAccountInternally(derived[path].Address(), password)
+		s.Require().NoError(err, "the restored keystore file for %s must decrypt with the given password", path)
+		s.Require().NotNil(acc)
+	}
+}
+
 // createColdSeedKeypair builds a non-profile seed keypair already migrated to a cold wallet,
 // derived from a fresh mnemonic so its KeyUID differs from the profile keypair's.
 func (s *ManagerTestSuite) createColdSeedKeypair() (mnemonic string, keypair *accsmanagementtypes.Keypair) {
@@ -97,11 +116,7 @@ func (s *ManagerTestSuite) TestMigrateColdWalletKeypairToAppRestoresKeystoreFile
 	s.Require().Equal(filesBefore+2, s.countKeystoreFiles(),
 		"keystore files must be recreated for the master key and every account path, else accounts stay unusable for signing")
 
-	master2, err := generator.CreateAccountFromMnemonic(mnemonic2, "")
-	s.Require().NoError(err)
-	restored, err := s.accManager.loadAccountInternally(master2.Address(), s.password)
-	s.Require().NoError(err, "restored master keystore file must decrypt with the provided password")
-	s.Require().NotNil(restored)
+	s.requireKeypairKeystoreFilesOpen(mnemonic2, s.password, []string{common.PathDefaultWalletAccount})
 }
 
 func (s *ManagerTestSuite) TestMigrateAlreadyMigratedKeypairSwitchesColdWalletTypeWithoutPassword() {
@@ -152,11 +167,33 @@ func (s *ManagerTestSuite) TestAddKeypairStoredToColdWalletPersistsLedgerKeypair
 
 	s.persistence.EXPECT().GetKeypairByKeyUID("ledger-kp-uid").Return(nil, accsmanagementtypes.ErrDbKeypairNotFound).Times(1)
 	s.persistence.EXPECT().GetPositionForNextNewAccount().Return(int64(4), nil).Times(1)
-	s.persistence.EXPECT().SaveOrUpdateKeypair(gomock.Any()).Return(nil).Times(1)
+	// capture what is handed to persistence: asserting only on the returned keypair
+	// would rely on it being the same object that was saved
+	var saved *accsmanagementtypes.Keypair
+	s.persistence.EXPECT().SaveOrUpdateKeypair(gomock.Any()).DoAndReturn(
+		func(kp *accsmanagementtypes.Keypair) error {
+			saved = kp
+			return nil
+		}).Times(1)
 
 	keypair, err := s.accManager.AddKeypairStoredToColdWallet("ledger-kp-uid", "0xmaster-address", "ledger-kp",
 		"ledger-wallet-xpub", accsmanagementtypes.ColdWalletTypeLedger, accounts, 9)
 	s.Require().NoError(err, "importing a ledger keypair with valid wallet-path accounts must succeed")
+
+	s.Require().NotNil(saved, "the keypair must reach persistence")
+	s.Require().Equal("ledger-kp-uid", saved.KeyUID, "the saved keypair must carry the given keyUID")
+	s.Require().Equal("ledger-kp", saved.Name, "the saved keypair must carry the given name")
+	s.Require().Equal(accsmanagementtypes.KeypairTypeSeed, saved.Type, "cold-wallet imports are persisted as seed keypairs")
+	s.Require().Equal("0xmaster-address", saved.DerivedFrom, "the saved keypair must carry the given master address")
+	s.Require().Equal("ledger-wallet-xpub", saved.XPub, "the saved keypair must carry the given xpub")
+	s.Require().Equal(accsmanagementtypes.ColdWalletTypeLedger, saved.ColdWallet, "the saved keypair must carry the given cold-wallet type")
+	s.Require().Equal(uint64(9), saved.Clock, "the saved keypair must carry the given clock")
+	s.Require().Len(saved.Accounts, 2, "both wallet accounts must be saved")
+	s.Require().Equal(int64(4), saved.Accounts[0].Position, "positions must be assigned sequentially from GetPositionForNextNewAccount")
+	s.Require().Equal(int64(5), saved.Accounts[1].Position, "positions must be assigned sequentially from GetPositionForNextNewAccount")
+	s.Require().Equal(accsmanagementtypes.AccountFullyOperable, saved.Accounts[0].Operable, "cold-wallet accounts must be forced fully operable")
+	s.Require().Equal(accsmanagementtypes.AccountFullyOperable, saved.Accounts[1].Operable, "cold-wallet accounts must be forced fully operable")
+
 	s.Require().Equal(accsmanagementtypes.KeypairTypeSeed, keypair.Type, "cold-wallet imports are persisted as seed keypairs")
 	s.Require().Equal("0xmaster-address", keypair.DerivedFrom, "the caller-supplied master address must be stored as DerivedFrom")
 	s.Require().Equal("ledger-wallet-xpub", keypair.XPub, "the caller-supplied wallet xpub must be stored for later no-password derivation")

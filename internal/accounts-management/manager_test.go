@@ -1020,4 +1020,8 @@ func (s *ManagerTestSuite) TestMigrateColdWalletKeypairToAppSkipsPasswordCheckWh
 	s.Require().Equal(coldKp.KeyUID, keyUID)
 	s.Require().Equal(filesBefore+2, s.countKeystoreFiles(),
 		"keystore files must be recreated for the master key and the account path even though the password could not be verified")
+
+	// the count alone would pass if the files were written under a different
+	// password, which would leave the migrated keypair unusable
+	s.requireKeypairKeystoreFilesOpen(mnemonic2, "never-verified-password", []string{common.PathDefaultWalletAccount})
 }
