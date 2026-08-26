@@ -9,9 +9,16 @@ import (
 )
 
 type MarketDataPersistenceInterface interface {
-	UpsertCryptocurrencies(data []Cryptocurrency) error
-	GetCryptocurrencies() ([]Cryptocurrency, error)
+	// UpsertCryptocurrencies stores the rows together with the currency their
+	// values are expressed in.
+	UpsertCryptocurrencies(data []Cryptocurrency, currency string) error
+	// GetCryptocurrencies returns only the rows stored for the given currency;
+	// rows left over from another currency are a cache miss, not data.
+	GetCryptocurrencies(currency string) ([]Cryptocurrency, error)
 	DeleteCryptocurrencies(ids []string) error
+	// DeleteCryptocurrenciesNotIn drops every row that is not expressed in the
+	// given currency, so a currency switch cannot leave stale values behind.
+	DeleteCryptocurrenciesNotIn(currency string) error
 }
 
 type Persistence struct {
@@ -25,7 +32,7 @@ func NewPersistance(db *sql.DB) *Persistence {
 	}
 }
 
-func (p *Persistence) UpsertCryptocurrencies(cryptos []Cryptocurrency) error {
+func (p *Persistence) UpsertCryptocurrencies(cryptos []Cryptocurrency, currency string) error {
 	p.dataMutex.Lock()
 	defer p.dataMutex.Unlock()
 	tx, err := p.db.Begin()
@@ -41,13 +48,14 @@ func (p *Persistence) UpsertCryptocurrencies(cryptos []Cryptocurrency) error {
 	}()
 
 	query := sq.Insert("market_data").
-		Columns("id", "symbol", "current_price", "market_cap", "total_volume", "price_change_percentage_24h").
+		Columns("id", "symbol", "current_price", "market_cap", "total_volume", "price_change_percentage_24h", "currency").
 		Suffix(`ON CONFLICT (id) DO UPDATE SET
 	        symbol = excluded.symbol,
 	        current_price = excluded.current_price,
 	        market_cap = excluded.market_cap,
 	        total_volume = excluded.total_volume,
-	        price_change_percentage_24h = excluded.price_change_percentage_24h`).
+	        price_change_percentage_24h = excluded.price_change_percentage_24h,
+	        currency = excluded.currency`).
 		RunWith(tx)
 
 	for _, crypto := range cryptos {
@@ -58,6 +66,7 @@ func (p *Persistence) UpsertCryptocurrencies(cryptos []Cryptocurrency) error {
 			crypto.MarketCap,
 			crypto.TotalVolume,
 			crypto.PriceChangePercentage24h,
+			normalizeCurrency(currency),
 		)
 	}
 
@@ -86,11 +95,25 @@ func (p *Persistence) DeleteCryptocurrencies(ids []string) error {
 	return nil
 }
 
-func (p *Persistence) GetCryptocurrencies() ([]Cryptocurrency, error) {
+func (p *Persistence) DeleteCryptocurrenciesNotIn(currency string) error {
+	p.dataMutex.Lock()
+	defer p.dataMutex.Unlock()
+	queryDelete := sq.Delete("market_data").
+		Where(sq.NotEq{"currency": normalizeCurrency(currency)}).
+		RunWith(p.db)
+	_, err := queryDelete.Exec()
+	if err != nil {
+		return fmt.Errorf("failed to delete records of other currencies: %w", err)
+	}
+	return nil
+}
+
+func (p *Persistence) GetCryptocurrencies(currency string) ([]Cryptocurrency, error) {
 	p.dataMutex.Lock()
 	defer p.dataMutex.Unlock()
 	query := sq.Select("id", "symbol", "current_price", "market_cap", "total_volume", "price_change_percentage_24h").
-		From("market_data")
+		From("market_data").
+		Where(sq.Eq{"currency": normalizeCurrency(currency)})
 
 	rows, err := query.RunWith(p.db).Query()
 	if err != nil {

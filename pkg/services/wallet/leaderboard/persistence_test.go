@@ -38,13 +38,13 @@ func TestMarketDataPersistenceTestSuite(t *testing.T) {
 }
 
 func (s *MarketDataPersistenceTestSuite) TestUpsertAndGetCryptocurrencies() {
-	cryptos, err := s.marketDataPersistence.GetCryptocurrencies()
+	cryptos, err := s.marketDataPersistence.GetCryptocurrencies(DefaultCurrency)
 	s.Require().NoError(err)
 	s.Require().Equal(0, len(cryptos))
 
-	err = s.marketDataPersistence.UpsertCryptocurrencies(mockCrypto)
+	err = s.marketDataPersistence.UpsertCryptocurrencies(mockCrypto, DefaultCurrency)
 	s.Require().NoError(err)
-	cryptos, err = s.marketDataPersistence.GetCryptocurrencies()
+	cryptos, err = s.marketDataPersistence.GetCryptocurrencies(DefaultCurrency)
 	s.Require().NoError(err)
 	s.Require().Equal(len(mockCrypto), len(cryptos))
 	for i, crypto := range cryptos {
@@ -53,16 +53,16 @@ func (s *MarketDataPersistenceTestSuite) TestUpsertAndGetCryptocurrencies() {
 }
 
 func (s *MarketDataPersistenceTestSuite) TestDeleteCryptocurrencies() {
-	err := s.marketDataPersistence.UpsertCryptocurrencies(mockCrypto)
+	err := s.marketDataPersistence.UpsertCryptocurrencies(mockCrypto, DefaultCurrency)
 	s.Require().NoError(err)
-	cryptos, err := s.marketDataPersistence.GetCryptocurrencies()
+	cryptos, err := s.marketDataPersistence.GetCryptocurrencies(DefaultCurrency)
 	s.Require().NoError(err)
 	s.Require().Equal(len(mockCrypto), len(cryptos))
 
 	err = s.marketDataPersistence.DeleteCryptocurrencies([]string{mockCrypto[0].ID})
 	s.Require().NoError(err)
 
-	cryptos, err = s.marketDataPersistence.GetCryptocurrencies()
+	cryptos, err = s.marketDataPersistence.GetCryptocurrencies(DefaultCurrency)
 	s.Require().NoError(err)
 	s.Require().Equal(len(mockCrypto)-1, len(cryptos))
 	for i, crypto := range cryptos {
