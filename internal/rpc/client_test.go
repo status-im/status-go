@@ -25,7 +25,6 @@ import (
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/networks"
 )
@@ -95,7 +94,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 		},
 	}
 
-	testNetworks = networkhelper.OverrideBasicAuth(
+	testNetworks = networks.OverrideBasicAuth(
 		testNetworks,
 		params.EmbeddedEthRpcProxyProviderType,
 		true,

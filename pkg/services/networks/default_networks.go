@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
 )
 
@@ -149,11 +148,11 @@ func setRPCs(networks []params.Network, walletConfig *params.WalletConfig) []par
 		"infura.io":  walletConfig.InfuraAPIKey,
 		"grove.city": walletConfig.PoktAPIKey,
 	}
-	networks = networkhelper.OverrideDirectProvidersAuth(networks, authTokens)
+	networks = overrideDirectProvidersAuth(networks, authTokens)
 
 	// Apply auth for new smart proxy
 	hasSmartProxyCredentials := !walletConfig.EthRpcProxyUser.Empty() && !walletConfig.EthRpcProxyPassword.Empty()
-	networks = networkhelper.OverrideBasicAuth(
+	networks = OverrideBasicAuth(
 		networks,
 		params.EmbeddedEthRpcProxyProviderType,
 		hasSmartProxyCredentials,
@@ -169,7 +168,7 @@ func BuildDefaultNetworks(walletConfig *params.WalletConfig, thirdpartyServicesE
 		defaultNetworks(proxyHost, thirdpartyServicesEnabled, walletConfig.EthRpcProxyUsePuzzleAuth),
 		walletConfig,
 	)
-	return networkhelper.WithCommunitiesSupported(networks)
+	return withCommunitiesSupported(networks)
 }
 
 func GetProxyChainAndNetworkName(chainID uint64) (string, string) {
