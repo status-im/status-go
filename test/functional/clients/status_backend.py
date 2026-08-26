@@ -23,6 +23,7 @@ from clients.services.ens import EnsService
 from clients.services.eth import EthService
 from clients.services.linkpreview import LinkPreviewService
 from clients.services.multiaccounts import MultiAccountsService
+from clients.services.networks import NetworksService
 from clients.services.newsfeed import NewsFeedService
 from clients.services.settings import SettingsService
 from clients.services.sharedurls import SharedURLsService
@@ -101,6 +102,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 SignalClient.connect(self)
 
             self.wallet_service = WalletService(self)
+            self.networks_service = NetworksService(self)
             self.wakuext_service = WakuextService(self)
             self.accounts_service = AccountService(self)
             self.newsfeed_service = NewsFeedService(self)
@@ -252,11 +254,11 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def add_anvil_network(self, **kwargs):
         # LoginAccount rebuilds the network list from defaults (status-im/status-go#6010, #5597), so a
         # paired device that signs in via login() never gets the Anvil chain and drops token-gated
-        # community messages. wallet_addEthereumChain (Upsert) keeps only USER providers, so add the
+        # community messages. networks_addEthereumChain (Upsert) keeps only USER providers, so add the
         # chain with a user provider — an embedded one is stripped, leaving the chain with no usable
         # provider, which fails as "could not find any enabled RPC providers for chain: 31337".
         network = self._build_anvil_network(provider_type="user", **kwargs)
-        return self.wallet_service.add_ethereum_chain(network)
+        return self.networks_service.add_ethereum_chain(network)
 
     def _set_proxy_credentials(self, data):
         if "STATUS_BUILD_PROXY_USER" not in os.environ:

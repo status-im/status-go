@@ -18,9 +18,6 @@ class WalletService(Service):
     def start_wallet(self):
         return self.rpc_request("startWallet")
 
-    def add_ethereum_chain(self, network: dict):
-        return self.rpc_request("addEthereumChain", [network])
-
     def get_derived_addresses_for_mnemonic(self, mnemonic: str, paths: list):
         params = [mnemonic, paths]
         return self.rpc_request("getDerivedAddressesForMnemonic", params)
@@ -57,11 +54,6 @@ class WalletService(Service):
     def sign_message(self, message: str, address: str, password: str):
         params = [message, address, password]
         return self.rpc_request("signMessage", params)
-
-    def get_ethereum_chain(
-        self,
-    ):
-        return self.rpc_request("getEthereumChains")
 
     def get_all_token_lists(
         self,
