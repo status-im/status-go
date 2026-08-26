@@ -36,11 +36,11 @@ type restartableMarketDataPersistence struct {
 	data     []Cryptocurrency
 }
 
-func (p *blockingMarketDataPersistence) UpsertCryptocurrencies([]Cryptocurrency) error {
+func (p *blockingMarketDataPersistence) UpsertCryptocurrencies([]Cryptocurrency, string) error {
 	return nil
 }
 
-func (p *blockingMarketDataPersistence) GetCryptocurrencies() ([]Cryptocurrency, error) {
+func (p *blockingMarketDataPersistence) GetCryptocurrencies(string) ([]Cryptocurrency, error) {
 	close(p.started)
 	<-p.release
 	return p.data, nil
@@ -50,11 +50,15 @@ func (p *blockingMarketDataPersistence) DeleteCryptocurrencies([]string) error {
 	return nil
 }
 
-func (p *restartableMarketDataPersistence) UpsertCryptocurrencies([]Cryptocurrency) error {
+func (p *blockingMarketDataPersistence) DeleteCryptocurrenciesNotIn(string) error {
 	return nil
 }
 
-func (p *restartableMarketDataPersistence) GetCryptocurrencies() ([]Cryptocurrency, error) {
+func (p *restartableMarketDataPersistence) UpsertCryptocurrencies([]Cryptocurrency, string) error {
+	return nil
+}
+
+func (p *restartableMarketDataPersistence) GetCryptocurrencies(string) ([]Cryptocurrency, error) {
 	attempt := <-p.attempts
 	close(attempt.started)
 	<-attempt.release
@@ -65,29 +69,34 @@ func (p *restartableMarketDataPersistence) DeleteCryptocurrencies([]string) erro
 	return nil
 }
 
+func (p *restartableMarketDataPersistence) DeleteCryptocurrenciesNotIn(string) error {
+	return nil
+}
+
 func NewMockFetcher(storage *DataStorage) *MockFetcher {
 	f := &MockFetcher{
 		storage: storage,
 	}
 	// Initialize data
-	f.storage.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
-	f.storage.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
+	f.storage.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
+	f.storage.UpdatePriceDataWithEtag(mockPriceData, "test-etag", DefaultCurrency)
 	return f
 }
 
 func (f *MockFetcher) FetchMarkets(ctx context.Context) error {
-	f.storage.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	f.storage.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
 	return nil
 }
 
 func (f *MockFetcher) FetchPrices(ctx context.Context) error {
-	f.storage.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
+	f.storage.UpdatePriceDataWithEtag(mockPriceData, "test-etag", DefaultCurrency)
 	return nil
 }
 
 func (f *MockFetcher) Start(ctx context.Context) {}
 func (f *MockFetcher) Stop()                     {}
 func (f *MockFetcher) StartRefreshLoops()        {}
+func (f *MockFetcher) RefreshNow()               {}
 
 func setupTestWalletDB(t *testing.T) (*sql.DB, func()) {
 	db, cleanup, err := testutils.SetupTestSQLDB(walletdb.DbInitializer{}, "wallet-tests")
@@ -180,7 +189,7 @@ func TestDataStorageStartDoesNotOverwriteFetchedData(t *testing.T) {
 
 	storage.StartAsync()
 	<-persistence.started
-	require.True(t, storage.UpdateCryptoDataWithEtag(fetchedData, "fresh-etag"))
+	require.True(t, storage.UpdateCryptoDataWithEtag(fetchedData, "fresh-etag", DefaultCurrency))
 
 	close(persistence.release)
 	storage.WaitForStart()
