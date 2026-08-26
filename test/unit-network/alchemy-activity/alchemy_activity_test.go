@@ -29,8 +29,8 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	walletDB, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
-	walletSecrets := t_common.GetWalletSecretsConfigFromEnv()
-	defaultNetworks := networkdefaults.BuildDefaultNetworks(walletSecrets, true)
+	walletConfig := t_common.GetWalletConfigFromEnv()
+	defaultNetworks := networkdefaults.BuildDefaultNetworks(walletConfig, true)
 	networkManager := network.NewManager(appDB, nil)
 	err = networkManager.InitEmbeddedNetworks(defaultNetworks)
 	require.NoError(t, err)

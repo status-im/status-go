@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
@@ -145,10 +144,10 @@ func defaultNetworks(proxyHost string, thirdpartyServicesEnabled bool, usePuzzle
 	return networks
 }
 
-func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConfig) []params.Network {
+func setRPCs(networks []params.Network, walletConfig *params.WalletConfig) []params.Network {
 	authTokens := map[string]security.SensitiveString{
-		"infura.io":  walletConfig.InfuraToken,
-		"grove.city": walletConfig.PoktToken,
+		"infura.io":  walletConfig.InfuraAPIKey,
+		"grove.city": walletConfig.PoktAPIKey,
 	}
 	networks = networkhelper.OverrideDirectProvidersAuth(networks, authTokens)
 
@@ -164,11 +163,11 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 	return networks
 }
 
-func BuildDefaultNetworks(walletSecretsConfig *requests.WalletSecretsConfig, thirdpartyServicesEnabled bool) []params.Network {
-	proxyHost := getProxyHost(walletSecretsConfig.EthRpcProxyUrl.Reveal(), walletSecretsConfig.StatusProxyStageName)
+func BuildDefaultNetworks(walletConfig *params.WalletConfig, thirdpartyServicesEnabled bool) []params.Network {
+	proxyHost := getProxyHost(walletConfig.EthRpcProxyUrl.Reveal(), walletConfig.StatusProxyStageName)
 	networks := setRPCs(
-		defaultNetworks(proxyHost, thirdpartyServicesEnabled, walletSecretsConfig.EthRpcProxyUsePuzzleAuth),
-		walletSecretsConfig,
+		defaultNetworks(proxyHost, thirdpartyServicesEnabled, walletConfig.EthRpcProxyUsePuzzleAuth),
+		walletConfig,
 	)
 	return networkhelper.WithCommunitiesSupported(networks)
 }
