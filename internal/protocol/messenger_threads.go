@@ -14,6 +14,27 @@ func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	return m.persistence.ThreadsByChatID(chatID)
 }
 
+func (m *Messenger) canCreateThread(chat *Chat) error {
+	if !chat.SupportsThreads() {
+		return ErrThreadsNotSupportedForChatType
+	}
+
+	if chat.ChatType != ChatTypeCommunityChat {
+		return nil
+	}
+
+	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	if !community.AllowsAllMembersToCreateThread() && !community.IsPrivilegedMember(&m.identity.PublicKey) {
+		return errors.New("only admins can create threads in this community")
+	}
+
+	return nil
+}
+
 // CreateThread creates thread metadata for an existing parent message in a chat.
 // The parent message must already be stored locally. Permission rules (admin-only
 // vs all-members) are enforced for community chats.
@@ -40,16 +61,8 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, threadErr
 	}
 
-	// Enforce community permission: only check on new thread creation
-	if chat.ChatType == ChatTypeCommunityChat {
-		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-		if err != nil {
-			return nil, err
-		}
-
-		if !community.AllowsAllMembersToCreateThread() && !community.IsPrivilegedMember(&m.identity.PublicKey) {
-			return nil, errors.New("only admins can create threads in this community")
-		}
+	if err := m.canCreateThread(chat); err != nil {
+		return nil, err
 	}
 
 	parentMsg, msgErr := m.persistence.MessageByID(parentMessageID)
@@ -94,7 +107,7 @@ func (m *Messenger) addThreadsToResponse(response *MessengerResponse, messages [
 			continue
 		}
 
-		chatID := message.GetChatId()
+		chatID := message.LocalChatID
 		if chatID == "" {
 			continue
 		}
