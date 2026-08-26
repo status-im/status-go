@@ -24,9 +24,14 @@ type GeckoMarketValues struct {
 
 func (c *Client) FetchCoinsMarkets(ctx context.Context, ids []string, currency string) ([]GeckoMarketValues, error) {
 
+	vsCurrency, convertCurrency := c.coinsMarketsCurrency(currency)
+
 	params := netUrl.Values{}
 	params.Add("ids", strings.Join(ids, ","))
-	params.Add("vs_currency", currency)
+	params.Add("vs_currency", vsCurrency)
+	if convertCurrency != "" {
+		params.Add(convertCurrencyParam, convertCurrency)
+	}
 	params.Add("order", "market_cap_desc")
 	params.Add("per_page", "250")
 	params.Add("page", "1")

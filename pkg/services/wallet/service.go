@@ -72,9 +72,10 @@ func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.
 	baseURL := leaderboard.GetMarketProxyUrl(config.UrlOverride.Reveal(), config.StageName)
 
 	return coingecko.NewClientWithParams(coingecko.Params{
-		URL:      baseURL,
-		User:     config.User,
-		Password: config.Password,
+		URL:           baseURL,
+		User:          config.User,
+		Password:      config.Password,
+		IsMarketProxy: true,
 	})
 }
 
