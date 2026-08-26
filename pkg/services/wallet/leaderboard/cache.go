@@ -27,6 +27,15 @@ func (c *PageCache) GetLastPage() LeaderboardPage {
 	return c.lastPage
 }
 
+// SetCurrency relabels the cached page, so updates pushed after a currency
+// change are tagged with the currency their values are actually in.
+func (c *PageCache) SetCurrency(currency string) {
+	c.dataMutex.Lock()
+	defer c.dataMutex.Unlock()
+
+	c.lastPage.Currency = currency
+}
+
 func (c *PageCache) UpdateLastPage(page *LeaderboardPage) {
 	c.dataMutex.Lock()
 	defer c.dataMutex.Unlock()

@@ -97,7 +97,7 @@ func TestProxyFetcherFetchPrices(t *testing.T) {
 	})
 
 	t.Run("ETag not modified", func(t *testing.T) {
-		storage.UpdatePriceDataWithEtag(mockPriceData, "existing-etag")
+		storage.UpdatePriceDataWithEtag(mockPriceData, "existing-etag", DefaultCurrency)
 		oldPriceData := storage.GetPriceData()
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
