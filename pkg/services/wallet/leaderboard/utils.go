@@ -7,7 +7,21 @@ import (
 
 const (
 	MarketProxyHostSuffix = "market.status.im"
+
+	// DefaultCurrency is what the proxy serves when no conversion is requested.
+	DefaultCurrency = "usd"
 )
+
+// normalizeCurrency brings a display currency code into the form the proxy
+// expects (lowercase). Clients send it in whatever case they keep it in:
+// status-desktop uppercases it, the settings DB stores it lowercase.
+func normalizeCurrency(currency string) string {
+	currency = strings.ToLower(strings.TrimSpace(currency))
+	if currency == "" {
+		return DefaultCurrency
+	}
+	return currency
+}
 
 // GetMarketProxyHost creates market proxy base URL based on stage name
 func GetMarketProxyHost(customUrl, stageName string) string {
