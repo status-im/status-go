@@ -32,6 +32,22 @@ type BasicCreds struct {
 	Password security.SensitiveString
 }
 
+// HTTPStatusError is returned when a request completed but the server answered
+// with a non-2xx status code. Use errors.As to reach it when a specific status
+// has to be handled - a 400 rejecting a query parameter, say - so that the
+// decision does not rest on the error message.
+type HTTPStatusError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *HTTPStatusError) Error() string {
+	if e.Body != "" {
+		return fmt.Sprintf("Status code: %d - %s", e.StatusCode, e.Body)
+	}
+	return fmt.Sprintf("HTTP request failed with status code: %d", e.StatusCode)
+}
+
 // HTTPClient represents an HTTP client with configurable options
 type HTTPClient struct {
 	client     *http.Client
@@ -196,11 +212,7 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 
 	// A non-2xx status code doesn't cause an error
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		if len(body) > 0 {
-			err = fmt.Errorf("Status code: %d - %s", resp.StatusCode, string(body))
-		} else {
-			err = fmt.Errorf("HTTP request failed with status code: %d", resp.StatusCode)
-		}
+		err = &HTTPStatusError{StatusCode: resp.StatusCode, Body: string(body)}
 		logutils.ZapLogger().Debug("GET request returned non-2xx status",
 			zap.String("url", url),
 			zap.Int("status", resp.StatusCode),
