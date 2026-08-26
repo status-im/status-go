@@ -86,7 +86,7 @@ func insertCryptoDataToDatabase(t *testing.T, db *sql.DB, cryptoData []Cryptocur
 	t.Helper()
 
 	persistence := NewPersistance(db)
-	err := persistence.UpsertCryptocurrencies(cryptoData)
+	err := persistence.UpsertCryptocurrencies(cryptoData, DefaultCurrency)
 	require.NoError(t, err)
 }
 
@@ -104,7 +104,7 @@ func TestGetLeaderboardPageErrors(t *testing.T) {
 	defer cleanup()
 	s := NewDataStorage(db)
 	s.Start()
-	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
 
 	{
 		_, err := s.GetLeaderboardPage(-1, 10, -1, "usd")
@@ -126,7 +126,7 @@ func TestGetLeaderboardPage(t *testing.T) {
 	db, cleanup := setupTestWalletDB(t)
 	defer cleanup()
 	s := NewDataStorage(db)
-	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
 
 	{
 		_, err := s.GetLeaderboardPage(0, 3, -1, "usd")
@@ -181,8 +181,8 @@ func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
 	db, cleanup := setupTestWalletDB(t)
 	defer cleanup()
 	s := NewDataStorage(db)
-	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
-	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
+	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag", DefaultCurrency)
 
 	{
 		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
@@ -203,8 +203,8 @@ func TestGetLeaderboardPagePrices(t *testing.T) {
 	db, cleanup := setupTestWalletDB(t)
 	defer cleanup()
 	s := NewDataStorage(db)
-	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
-	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
+	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag", DefaultCurrency)
 
 	{
 		rst, err := s.GetLeaderboardPage(2, 3, -1, "usd")
@@ -288,7 +288,7 @@ func TestGetLeaderboardPageDatabase(t *testing.T) {
 		require.Equal(t, 3, rst.TotalCount) // Only from database
 	}
 
-	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
 
 	{
 		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
@@ -330,7 +330,7 @@ func TestGetCombinedDataWithPriceUpdates(t *testing.T) {
 	defer cleanup()
 	s := NewDataStorage(db)
 
-	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
 	combined := s.GetCombinedData()
 	require.Equal(t, len(mockCrypto), len(combined))
 	require.Equal(t, mockCrypto[0].CurrentPrice, combined[0].CurrentPrice)
@@ -349,7 +349,7 @@ func TestGetCombinedDataWithPriceUpdates(t *testing.T) {
 			PercentChange24h: 10.0,
 		},
 	}
-	s.UpdatePriceDataWithEtag(priceDataWithUpdates, "price-etag")
+	s.UpdatePriceDataWithEtag(priceDataWithUpdates, "price-etag", DefaultCurrency)
 
 	combined = s.GetCombinedData()
 	require.Equal(t, len(mockCrypto), len(combined))
@@ -370,7 +370,7 @@ func TestGetCombinedDataWithPriceUpdates(t *testing.T) {
 	priceDataWithZeros := map[string]PriceData{
 		"ripple": {Price: 2.0},
 	}
-	s.UpdatePriceDataWithEtag(priceDataWithZeros, "price-etag-2")
+	s.UpdatePriceDataWithEtag(priceDataWithZeros, "price-etag-2", DefaultCurrency)
 
 	combined = s.GetCombinedData()
 	require.Equal(t, priceDataWithZeros["ripple"].Price, combined[3].CurrentPrice)
@@ -383,7 +383,7 @@ func TestGetLeaderboardPagePricesWithIDLookup(t *testing.T) {
 	db, cleanup := setupTestWalletDB(t)
 	defer cleanup()
 	s := NewDataStorage(db)
-	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag", DefaultCurrency)
 
 	priceDataWithIDs := map[string]PriceData{
 		"bitcoin": {
@@ -399,7 +399,7 @@ func TestGetLeaderboardPagePricesWithIDLookup(t *testing.T) {
 			PercentChange24h: 13.0,
 		},
 	}
-	s.UpdatePriceDataWithEtag(priceDataWithIDs, "price-etag")
+	s.UpdatePriceDataWithEtag(priceDataWithIDs, "price-etag", DefaultCurrency)
 
 	rst := s.GetLeaderboardPagePrices(LeaderboardPage{
 		Page:      1,

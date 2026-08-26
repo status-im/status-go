@@ -15,20 +15,32 @@ import (
 
 const DATA_STALE_THRESHOLD = 10 * time.Minute
 
-// DataStorage manages the storage and retrieval of market data
+// DataStorage manages the storage and retrieval of market data.
+//
+// It is the one owner of the invariant that the cached values, their ETags and
+// the persisted snapshot are all expressed in `currency`: only SetCurrency
+// changes it, and every write is checked against it first.
 type DataStorage struct {
-	// Data and synchronization
+	marketDataPersistence MarketDataPersistenceInterface
+
+	// dataMutex guards everything below it.
+	dataMutex             sync.RWMutex
 	cryptoData            []Cryptocurrency
 	cryptoDataInitialized bool
-	startMu               sync.Mutex
-	startDone             chan struct{}
-
-	marketDataPersistence MarketDataPersistenceInterface
 	priceData             PriceMap
-	dataMutex             sync.RWMutex
 	cryptoEtag            string
 	priceEtag             string
 	lastUpdateTime        time.Time
+	// currency is the display currency the cached values are expressed in.
+	// Everything held here - data, etags and the persisted snapshot - is only
+	// valid for this currency.
+	currency string
+
+	// startMu guards startDone. It stays separate from dataMutex because
+	// WaitForStart blocks on startDone until Start finishes, and Start needs
+	// dataMutex to do so.
+	startMu   sync.Mutex
+	startDone chan struct{}
 }
 
 type FingerprintData map[string]string // map[crypto_id]fingerprint
@@ -38,6 +50,7 @@ func NewDataStorage(walletDB *sql.DB) *DataStorage {
 	return &DataStorage{
 		priceData:             make(PriceMap),
 		marketDataPersistence: NewPersistance(walletDB),
+		currency:              DefaultCurrency,
 	}
 }
 
@@ -47,16 +60,56 @@ func (s *DataStorage) Start() {
 		s.dataMutex.RUnlock()
 		return
 	}
+	currency := normalizeCurrency(s.currency)
 	s.dataMutex.RUnlock()
 
-	cryptoData, _ := s.marketDataPersistence.GetCryptocurrencies()
+	// Only the snapshot persisted for the currently selected currency may be
+	// restored; a snapshot left over from another currency is a cache miss.
+	cryptoData, _ := s.marketDataPersistence.GetCryptocurrencies(currency)
 
 	s.dataMutex.Lock()
 	defer s.dataMutex.Unlock()
-	if !s.cryptoDataInitialized {
+	if !s.cryptoDataInitialized && normalizeCurrency(s.currency) == currency {
 		s.cryptoData = cryptoData
 		s.cryptoDataInitialized = true
 	}
+}
+
+// GetCurrency returns the display currency the cached data is expressed in.
+func (s *DataStorage) GetCurrency() string {
+	s.dataMutex.RLock()
+	defer s.dataMutex.RUnlock()
+	return normalizeCurrency(s.currency)
+}
+
+// SetCurrency switches the display currency. Because the cached values, the
+// persisted snapshot and the ETags are all currency-specific, a switch drops
+// every one of them so the next fetch is a full fetch in the new currency.
+// It reports whether the currency actually changed.
+func (s *DataStorage) SetCurrency(currency string) bool {
+	currency = normalizeCurrency(currency)
+
+	s.dataMutex.Lock()
+	if normalizeCurrency(s.currency) == currency {
+		s.dataMutex.Unlock()
+		return false
+	}
+
+	s.currency = currency
+	s.cryptoData = nil
+	s.cryptoDataInitialized = false
+	s.priceData = make(PriceMap)
+	s.cryptoEtag = ""
+	s.priceEtag = ""
+	s.lastUpdateTime = time.Time{}
+	persistence := s.marketDataPersistence
+	s.dataMutex.Unlock()
+
+	if err := persistence.DeleteCryptocurrenciesNotIn(currency); err != nil {
+		logutils.ZapLogger().Error("Market - error dropping data of the previous currency", zap.Error(err))
+	}
+
+	return true
 }
 
 func (s *DataStorage) StartAsync() {
@@ -81,9 +134,21 @@ func (s *DataStorage) WaitForStart() {
 	}
 }
 
-// UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically
-// Returns true if the data was actually updated
-func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag string) bool {
+// matchesCurrency reports whether a response fetched in fetchedIn still belongs
+// here. Fetching and storing are not one atomic step, so the display currency
+// can change while a request is in flight; storing such a response would label
+// one currency's values as another's, and would refresh the timestamp that
+// decides whether anything needs fetching at all.
+// Callers must hold dataMutex.
+func (s *DataStorage) matchesCurrency(fetchedIn string) bool {
+	return normalizeCurrency(fetchedIn) == normalizeCurrency(s.currency)
+}
+
+// UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically.
+// fetchedIn is the display currency the response was requested in; an update
+// that no longer matches the selected currency is dropped. It reports whether
+// the data was stored.
+func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag string, fetchedIn string) bool {
 	if data == nil {
 		return false
 	}
@@ -91,12 +156,16 @@ func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag strin
 	s.dataMutex.Lock()
 	defer s.dataMutex.Unlock()
 
+	if !s.matchesCurrency(fetchedIn) {
+		return false
+	}
+
 	s.cryptoDataInitialized = true
 	currentIds := s.extractCryptocurrencyIDs(s.cryptoData)
 	s.cryptoData = data
 	s.cryptoEtag = etag
 	s.lastUpdateTime = time.Now()
-	err := s.marketDataPersistence.UpsertCryptocurrencies(s.cryptoData)
+	err := s.marketDataPersistence.UpsertCryptocurrencies(s.cryptoData, s.currency)
 	if err != nil {
 		logutils.ZapLogger().Error("Market - error creating database snapshot", zap.Error(err))
 	}
@@ -136,15 +205,21 @@ func (s *DataStorage) IsDataStale() bool {
 	return time.Since(s.lastUpdateTime) > DATA_STALE_THRESHOLD
 }
 
-// UpdatePriceDataWithEtag updates both price data and etag atomically
-// Returns true if the data was actually updated
-func (s *DataStorage) UpdatePriceDataWithEtag(data PriceMap, etag string) bool {
+// UpdatePriceDataWithEtag updates both price data and etag atomically.
+// fetchedIn is the display currency the response was requested in; an update
+// that no longer matches the selected currency is dropped. It reports whether
+// the data was stored.
+func (s *DataStorage) UpdatePriceDataWithEtag(data PriceMap, etag string, fetchedIn string) bool {
 	if data == nil {
 		return false
 	}
 
 	s.dataMutex.Lock()
 	defer s.dataMutex.Unlock()
+
+	if !s.matchesCurrency(fetchedIn) {
+		return false
+	}
 
 	s.priceData = data
 	s.priceEtag = etag
