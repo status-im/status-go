@@ -1,4 +1,4 @@
-package network
+package networks
 
 // EventActiveNetworksChanged is emitted when networks are activated/deactivated. This includes Testnet mode change.
 type EventActiveNetworksChanged struct{}

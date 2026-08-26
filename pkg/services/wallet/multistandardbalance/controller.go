@@ -16,10 +16,10 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
+	"github.com/status-im/status-go/pkg/services/networks"
 	ac "github.com/status-im/status-go/pkg/services/wallet/activity/common"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/pendingtxtracker"
@@ -250,7 +250,7 @@ func (c *Controller) startNetworksWatcher() {
 		return
 	}
 
-	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
+	ch, unsubFn := pubsub.Subscribe[networks.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
 
 	go func() {
 		defer panics.LogOnPanic()

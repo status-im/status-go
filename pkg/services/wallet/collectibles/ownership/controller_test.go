@@ -19,11 +19,11 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/walletdb"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 	"github.com/status-im/status-go/pkg/services/wallet/collectibles/ownership"
 	mock_ownership "github.com/status-im/status-go/pkg/services/wallet/collectibles/ownership/mock"
@@ -419,7 +419,7 @@ func TestControllerNetworkEventsWatcher(t *testing.T) {
 	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{chain1, chain2}, nil).Times(1)
 
 	// Publish network change event
-	pubsub.Publish(networksPublisher, network.EventActiveNetworksChanged{})
+	pubsub.Publish(networksPublisher, networks.EventActiveNetworksChanged{})
 
 	// Check the old chain stays idle and the new chain reaches the updating state
 	require.Eventually(t, func() bool {
@@ -439,7 +439,7 @@ func TestControllerNetworkEventsWatcher(t *testing.T) {
 	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{chain1}, nil).Times(1)
 
 	// Publish network change event
-	pubsub.Publish(networksPublisher, network.EventActiveNetworksChanged{})
+	pubsub.Publish(networksPublisher, networks.EventActiveNetworksChanged{})
 
 	// Check that the remaining chain stays idle and the removed chain reaches the not available state
 	require.Eventually(t, func() bool {

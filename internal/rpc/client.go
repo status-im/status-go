@@ -4,7 +4,6 @@ package rpc
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"sync"
@@ -20,9 +19,9 @@ import (
 	chain "github.com/status-im/status-go/internal/rpc/chain"
 	ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/internal/rpc/chain/rpclimiter"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/version"
 )
 
@@ -54,7 +53,7 @@ func init() {
 type ClientInterface interface {
 	EthClientGetter
 	EthClientWithProvider(chainID uint64, provider string) (ethclient.EthClientInterface, error)
-	GetNetworkManager() *network.Manager
+	GetNetworkManager() networks.ManagerInterface
 }
 
 type EthClientGetter interface {
@@ -71,7 +70,7 @@ type Client struct {
 	rpsLimiterMutex    sync.RWMutex
 	limiterPerProvider map[string]*rpclimiter.RPCRpsLimiter
 
-	networkManager *network.Manager
+	networkManager networks.ManagerInterface
 
 	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
@@ -86,8 +85,7 @@ var verifProxyInitFn func(c *Client)
 
 // ClientConfig holds the configuration for initializing a new Client.
 type ClientConfig struct {
-	Networks          []params.Network
-	DB                *sql.DB
+	NetworkManager    networks.ManagerInterface
 	AccountsPublisher *pubsub.Publisher
 }
 
@@ -97,25 +95,18 @@ type ClientConfig struct {
 // reconnect to the server if connection is lost.
 func NewClient(config ClientConfig) (*Client, error) {
 	logger := logutils.ZapLogger().Named("rpcClient")
-	networkManager := network.NewManager(config.DB, config.AccountsPublisher)
-	if networkManager == nil {
-		return nil, errors.New("failed to create network manager")
-	}
-
-	err := networkManager.InitEmbeddedNetworks(config.Networks)
-	if err != nil {
-		logger.Error("Network manager failed to initialize", zap.Error(err))
-		return nil, err
+	if config.NetworkManager == nil {
+		return nil, errors.New("network manager is required")
 	}
 
 	c := Client{
-		networkManager:     networkManager,
+		networkManager:     config.NetworkManager,
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
 		accountsPublisher:  config.AccountsPublisher,
-		signalsTransmitter: NewSignalsTransmitter(networkManager.GetPublisher()),
+		signalsTransmitter: NewSignalsTransmitter(config.NetworkManager.GetPublisher()),
 	}
 
 	if verifProxyInitFn != nil {
@@ -129,7 +120,6 @@ func (c *Client) Start(ctx context.Context) {
 	if err := c.signalsTransmitter.Start(); err != nil {
 		c.logger.Error("Failed to start signals transmitter", zap.Error(err))
 	}
-	c.networkManager.Start()
 
 	if c.stopMonitoringFunc != nil {
 		c.logger.Warn("Blockchain health manager already started")
@@ -147,7 +137,6 @@ func (c *Client) Start(ctx context.Context) {
 
 func (c *Client) Stop() {
 	c.signalsTransmitter.Stop()
-	c.networkManager.Stop()
 
 	c.rpsLimiterMutex.Lock()
 	for key, limiter := range c.limiterPerProvider {
@@ -197,7 +186,7 @@ func (c *Client) GetHealthManagerFullStatus() healthmanager.BlockchainFullStatus
 	return c.healthMgr.GetFullStatus()
 }
 
-func (c *Client) GetNetworkManager() *network.Manager {
+func (c *Client) GetNetworkManager() networks.ManagerInterface {
 	return c.networkManager
 }
 

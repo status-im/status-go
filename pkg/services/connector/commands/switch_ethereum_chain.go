@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/pkg/services/connector/database"
+	"github.com/status-im/status-go/pkg/services/networks"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
@@ -22,11 +22,11 @@ var (
 )
 
 type SwitchEthereumChainCommand struct {
-	networkManager *network.Manager
+	networkManager *networks.Manager
 	db             *sql.DB
 }
 
-func NewSwitchEthereumChainCommand(db *sql.DB, networkManager *network.Manager) *SwitchEthereumChainCommand {
+func NewSwitchEthereumChainCommand(db *sql.DB, networkManager *networks.Manager) *SwitchEthereumChainCommand {
 	return &SwitchEthereumChainCommand{
 		db:             db,
 		networkManager: networkManager,

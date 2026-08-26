@@ -15,11 +15,11 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/internal/panics"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/pkg/services/connector/database"
 	"github.com/status-im/status-go/pkg/services/connector/walletconnect"
+	"github.com/status-im/status-go/pkg/services/networks"
 )
 
 const serviceName = "connector"
@@ -36,7 +36,7 @@ func NewService(
 	db *sql.DB,
 	ethClientGetter chainutils.EthClientGetter,
 	feeManager chainutils.FeeManager,
-	nm *network.Manager,
+	nm *networks.Manager,
 	config *Config) *Service {
 	s := &Service{
 		logger:          logger,
@@ -56,7 +56,7 @@ type Service struct {
 	db              *sql.DB
 	ethClientGetter chainutils.EthClientGetter
 	feeManager      chainutils.FeeManager
-	nm              *network.Manager
+	nm              *networks.Manager
 
 	// api stores a single API, to have the single *commands.ClientSideHandler instance.
 	// This is more of a workaround and should be refactored together with the services refactoring.

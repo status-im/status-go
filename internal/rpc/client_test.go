@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/networks"
 )
 
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
@@ -86,7 +87,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 		return providers
 	}
 
-	networks := []params.Network{
+	testNetworks := []params.Network{
 		{
 			ChainID:      1,
 			ChainName:    "foo",
@@ -94,23 +95,26 @@ func TestGetClientsUsingCache(t *testing.T) {
 		},
 	}
 
-	networks = networkhelper.OverrideBasicAuth(
-		networks,
+	testNetworks = networkhelper.OverrideBasicAuth(
+		testNetworks,
 		params.EmbeddedEthRpcProxyProviderType,
 		true,
 		security.NewSensitiveString(user),
 		security.NewSensitiveString(password))
 
+	networkManager := networks.NewManager(db, nil)
+	require.NotNil(t, networkManager)
+	require.NoError(t, networkManager.InitEmbeddedNetworks(testNetworks))
+
 	config := ClientConfig{
-		Networks: networks,
-		DB:       db,
+		NetworkManager: networkManager,
 	}
 
 	c, err := NewClient(config)
 	require.NoError(t, err)
 
 	// Networks from DB must pick up RpcProviders
-	chainClient, err := c.getClientUsingCache(networks[0].ChainID)
+	chainClient, err := c.getClientUsingCache(testNetworks[0].ChainID)
 	require.NoError(t, err)
 	require.NotNil(t, chainClient)
 
