@@ -1,4 +1,4 @@
-package networkdefaults
+package networks
 
 import (
 	"github.com/status-im/status-go/pkg/security"

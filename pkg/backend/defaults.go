@@ -16,8 +16,8 @@ import (
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/services/networks"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
@@ -300,7 +300,7 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
-		nodeConfig.Networks = networkdefaults.BuildDefaultNetworks(&nodeConfig.WalletConfig, request.ThirdpartyServicesEnabled)
+		nodeConfig.Networks = networks.BuildDefaultNetworks(&nodeConfig.WalletConfig, request.ThirdpartyServicesEnabled)
 	}
 
 	if request.NetworkID != nil {

@@ -58,12 +58,12 @@ import (
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/backend/node"
 	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/services/ens"
 	"github.com/status-im/status-go/pkg/services/ext"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/pairing/statecontrol"
 	"github.com/status-im/status-go/pkg/services/personal"
 	"github.com/status-im/status-go/pkg/services/typeddata"
@@ -744,7 +744,7 @@ func (b *StatusBackend) updateAccountColorHashAndColorID(keyUID string, accounts
 }
 
 func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, walletConfig *params.WalletConfig, thirdpartyServicesEnabled bool) {
-	conf.Networks = networkdefaults.BuildDefaultNetworks(walletConfig, thirdpartyServicesEnabled)
+	conf.Networks = networks.BuildDefaultNetworks(walletConfig, thirdpartyServicesEnabled)
 }
 
 func (b *StatusBackend) LoginAccount(request *requests.Login) error {
