@@ -310,18 +310,21 @@ func (s *MessengerSyncKeypairsAutoApplySuite) TestNonEmptyWireXPubAdoptedForUnkn
 	s.Require().Equal(wireXPub, dbKp.XPub, "a newly adopted keypair must store the wire xpub, otherwise no-password derivation is impossible on this device")
 }
 
-func (s *MessengerSyncKeypairsAutoApplySuite) TestNonEmptyWireXPubUpdatesStoredXPubOnKeypairUpdate() {
-	const storedXPub = "xpub6StoredBeforeTheSyncArrives"
-	const wireXPub = "xpub6NewerValueSentByThePairedDevice"
+func (s *MessengerSyncKeypairsAutoApplySuite) TestNonEmptyWireXPubBackfillsMissingStoredXPubOnKeypairUpdate() {
+	const wireXPub = "xpub6ValueSentByThePairedDevice"
 
+	// the xpub is derived at a fixed path from the keypair's master key, so two
+	// devices never hold two different non-empty values for it; the state that
+	// does occur is a device predating the xpub column, holding none
 	kp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
 	s.Require().NoError(err)
 	kp.Clock = 1
-	kp.XPub = storedXPub
+	kp.XPub = ""
 	for _, acc := range kp.Accounts {
 		acc.Operable = accsmanagementtypes.AccountFullyOperable
 	}
 	s.Require().NoError(s.m.settings.SaveOrUpdateKeypair(kp))
+	s.Require().Empty(s.dbKeypair(kp.KeyUID).XPub, "the keypair must start without an xpub, else the backfill proves nothing")
 
 	message := s.syncMessageFor(kp, 2, kp.Name, accsmanagementtypes.ColdWalletTypeNone)
 	message.Xpub = wireXPub
@@ -329,7 +332,7 @@ func (s *MessengerSyncKeypairsAutoApplySuite) TestNonEmptyWireXPubUpdatesStoredX
 	s.handleSync(message, false)
 
 	dbKp := s.dbKeypair(kp.KeyUID)
-	s.Require().Equal(wireXPub, dbKp.XPub, "a non-empty wire xpub must replace the stored one on keypair update")
+	s.Require().Equal(wireXPub, dbKp.XPub, "a keypair stored without an xpub must take the one a paired device sends")
 }
 
 func (s *MessengerSyncKeypairsAutoApplySuite) TestLedgerMigrationAdoptedVerbatimWhenAutoApplyEnabled() {
@@ -353,6 +356,9 @@ func (s *MessengerSyncKeypairsAutoApplySuite) TestTrezorMigrationAdoptedVerbatim
 	dbKp := s.dbKeypair(kp.KeyUID)
 	s.Require().Equal(accsmanagementtypes.ColdWalletTypeTrezor, dbKp.ColdWallet, "the wire cold wallet string must be stored verbatim")
 	s.Require().True(dbKp.MigratedToColdWallet(), "a trezor keypair must count as migrated to a cold wallet")
+	for _, acc := range dbKp.Accounts {
+		s.Require().Equal(accsmanagementtypes.AccountFullyOperable, acc.Operable, "accounts must stay operable after a trezor migration because no keystore is needed")
+	}
 }
 
 func (s *MessengerSyncKeypairsAutoApplySuite) TestUnknownColdWalletStringAdoptedVerbatimForUnknownKeypair() {
@@ -542,6 +548,14 @@ func (s *MessengerSyncKeypairsAutoApplySuite) TestAccountsPublisherEmitsAddedEve
 		}
 	default:
 		s.Require().FailNow("expected an AccountsAddedEvent because a keypair with wallet accounts arrived via sync")
+	}
+
+	// publishing happens before handleSyncKeypairInternal returns, so a second
+	// event would already be waiting here; a duplicate means duplicate balance work
+	select {
+	case <-addedCh:
+		s.Require().FailNow("expected exactly one AccountsAddedEvent, a second announces the same accounts twice")
+	default:
 	}
 
 	select {
