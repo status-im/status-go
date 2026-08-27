@@ -314,7 +314,6 @@ type testAccount struct {
 // test function to avoid faulty execution.
 func (s *ManagerTestSuite) SetupTest() {
 	ctrl := gomock.NewController(s.T())
-	defer ctrl.Finish()
 
 	var err error
 	s.accManager, err = NewAccountsManager(testutils.MustCreateTestLogger())
@@ -357,13 +356,6 @@ func (s *ManagerTestSuite) createAndStoreProfileKeypair() *accsmanagementtypes.K
 	s.persistence.EXPECT().GetPositionForNextNewAccount().Return(int64(0), nil).Times(1)
 
 	s.persistence.EXPECT().SaveOrUpdateKeypair(gomock.Any()).Return(nil).Times(1)
-
-	s.persistence.EXPECT().GetProfileKeypair().Return(
-		&accsmanagementtypes.Keypair{
-			KeyUID: s.masterAccount.KeyUID(),
-		},
-		nil,
-	).Times(1)
 
 	walletAccount := &accsmanagementtypes.AccountCreationDetails{
 		Path: common.PathDefaultWalletAccount,
@@ -873,13 +865,6 @@ func (s *ManagerTestSuite) TestCreateKeypairFromMnemonicAndStoreDoesNotWriteKeys
 				"a cold-created keypair must still store the wallet xpub, else every later no-password AddAccounts is accepted with no address validation")
 			return nil
 		},
-	).Times(1)
-
-	s.persistence.EXPECT().GetProfileKeypair().Return(
-		&accsmanagementtypes.Keypair{
-			KeyUID: s.masterAccount.KeyUID(),
-		},
-		nil,
 	).Times(1)
 
 	walletAccount := &accsmanagementtypes.AccountCreationDetails{
