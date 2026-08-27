@@ -11,6 +11,8 @@ import (
 var UnsupportedCollectibleChains = []uint64{
 	walletCommon.BSCMainnet,
 	walletCommon.BSCTestnet,
+	walletCommon.RobinhoodMainnet,
+	walletCommon.RobinhoodTestnet,
 	walletCommon.InkMainnet,
 	walletCommon.EthereumHoodi,
 	walletCommon.KatanaBokuto,

@@ -17,5 +17,7 @@ func TestUnsupportedCollectibleChains_sorted(t *testing.T) {
 func TestIsUnsupportedCollectibleChain(t *testing.T) {
 	require.True(t, IsUnsupportedCollectibleChain(walletCommon.InkMainnet))
 	require.True(t, IsUnsupportedCollectibleChain(walletCommon.BSCMainnet))
+	require.True(t, IsUnsupportedCollectibleChain(walletCommon.RobinhoodMainnet))
+	require.True(t, IsUnsupportedCollectibleChain(walletCommon.RobinhoodTestnet))
 	require.False(t, IsUnsupportedCollectibleChain(walletCommon.EthereumMainnet))
 }

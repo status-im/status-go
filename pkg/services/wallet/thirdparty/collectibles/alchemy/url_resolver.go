@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/status-im/status-go/pkg/security"
+	walletcollectibles "github.com/status-im/status-go/pkg/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
@@ -79,6 +80,9 @@ func (r *proxyURLResolver) IsChainSupported(chainID walletCommon.ChainID) bool {
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	id := uint64(chainID)
+	if walletcollectibles.IsUnsupportedCollectibleChain(id) {
+		return "", thirdparty.ErrChainIDNotSupported
+	}
 	host, ok := alchemyNFTDirectHosts[id]
 	if !ok {
 		return "", thirdparty.ErrChainIDNotSupported

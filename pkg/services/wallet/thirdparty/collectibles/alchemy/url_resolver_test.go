@@ -95,6 +95,8 @@ func TestDirectURLResolver_IsChainSupported(t *testing.T) {
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.InkSepolia)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaMainnet)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaBokuto)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.RobinhoodMainnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.RobinhoodTestnet)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(999999)))
 }
 
@@ -108,5 +110,7 @@ func TestProxyURLResolver_IsChainSupported(t *testing.T) {
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.InkSepolia)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaMainnet)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.KatanaBokuto)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.RobinhoodMainnet)))
+	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(walletCommon.RobinhoodTestnet)))
 	require.False(t, resolver.IsChainSupported(walletCommon.ChainID(999999)))
 }
