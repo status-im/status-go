@@ -108,6 +108,11 @@ func (s *LinkPreviewsTestSuite) Test_GetLinks() {
 			args:     "https://status.",
 			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
 		},
+		// A bare IP address has no registrable domain, so it is not unfurled.
+		{
+			args:     "https://192.168.0.100:9999/xyz",
+			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{}},
+		},
 		// URLs must include the sheme.
 		{
 			args:     "status.com",
@@ -171,16 +176,6 @@ func (s *LinkPreviewsTestSuite) Test_GetLinks() {
 			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
 				{
 					URL:               "https://status.im/test",
-					Permission:        URLUnfurlingAllowed,
-					IsStatusSharedURL: false,
-				},
-			}},
-		},
-		{
-			args: "https://192.168.0.100:9999/xyz",
-			expected: &URLsUnfurlPlan{URLs: []URLUnfurlingMetadata{
-				{
-					URL:               "https://192.168.0.100:9999/xyz",
 					Permission:        URLUnfurlingAllowed,
 					IsStatusSharedURL: false,
 				},
