@@ -571,8 +571,15 @@ func (r *RelayClient) reconnect() error {
 
 		r.logger.Info("successfully reconnected to relay")
 
+		// The handler re-subscribes to the active topics, and Subscribe blocks
+		// until readLoop delivers the relay's response. reconnect() itself runs
+		// on the readLoop goroutine, so calling the handler inline would leave
+		// nobody reading the socket: every re-subscribe would time out, the
+		// connection would be treated as broken, and the client would reconnect
+		// and deadlock again, forever. Hand it to its own goroutine so readLoop
+		// can resume immediately.
 		if handler != nil {
-			handler()
+			go handler()
 		}
 
 		return nil
