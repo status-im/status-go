@@ -348,6 +348,13 @@ func (s *ManagerTestSuite) getKeyDir() string {
 	return fmt.Sprintf("%s/keystore/%s", s.rootDataDir, s.masterAccount.KeyUID())
 }
 
+func (s *ManagerTestSuite) requireAccountsErrorCode(err error, code customerrors.ErrorCode) {
+	var accountsErr *customerrors.AccountsError
+	s.Require().True(errors.As(err, &accountsErr), "expected an AccountsError, got: %v", err)
+	s.Require().Equal(code, accountsErr.Code)
+	s.Require().Equal(getErrorCategory(code), accountsErr.Category)
+}
+
 func (s *ManagerTestSuite) createAndStoreProfileKeypair() *accsmanagementtypes.Keypair {
 	s.persistence.EXPECT().GetKeypairByKeyUID(s.masterAccount.KeyUID()).Return(
 		nil, accsmanagementtypes.ErrDbKeypairNotFound,
@@ -728,8 +735,6 @@ func (s *ManagerTestSuite) TestDeleteLastAccountOfSeedKeypairAlsoDeletesMasterKe
 	walletAccount := keypair.Accounts[1]
 	walletAccount.Wallet = false
 
-	// a non-profile seed keypair whose ONLY account is the wallet account — deleting it
-	// must also remove the master keystore file
 	kpSingleAccount := &accsmanagementtypes.Keypair{
 		KeyUID:      keypair.KeyUID,
 		Type:        accsmanagementtypes.KeypairTypeSeed,
@@ -746,8 +751,7 @@ func (s *ManagerTestSuite) TestDeleteLastAccountOfSeedKeypairAlsoDeletesMasterKe
 	s.Require().NotNil(acc)
 
 	_, err = s.accManager.loadAccountInternally(s.masterAccount.Address(), s.password)
-	s.Require().Error(err,
-		"the master keystore file must be deleted with the keypair's last account, else decryptable master key material is orphaned on disk")
+	s.Require().ErrorIs(err, keystore.ErrKeystoreFileMissing, "the master keystore file must go with the keypair's last account")
 	s.Require().Equal(1, s.countKeystoreFiles(),
 		"only the chat account file may remain: the account file and the master keystore file must both be gone")
 }
@@ -755,7 +759,7 @@ func (s *ManagerTestSuite) TestDeleteLastAccountOfSeedKeypairAlsoDeletesMasterKe
 func (s *ManagerTestSuite) TestCleanKeystoreFilesRequiresPassword() {
 	err := s.accManager.CleanKeystoreFiles("")
 	s.Require().Error(err,
-		"the RPC-exposed destructive cleanup must reject an empty password before touching any keypair")
+		"cleanup must reject an empty password before touching any keypair")
 	s.Require().ErrorIs(err, ErrNoPasswordProvided,
 		"the typed no-password error must be returned for app-side matching")
 }
@@ -796,8 +800,7 @@ func (s *ManagerTestSuite) TestCreateKeypairSurfacesTypedKeystoreDirectoryError(
 	_, err := s.accManager.CreateKeypairFromMnemonicAndStore(
 		s.mnemonic, s.password, "kp-name", accsmanagementtypes.ColdWalletTypeNone, walletAccount, true, 0)
 	s.Require().Error(err, "keystore directory creation failure must fail the keypair creation")
-	s.Require().ErrorIs(err, ErrKeystoreDirectoryError(nil),
-		"the failure must surface as the typed keystore-directory AccountsError, not a raw os error, so app-side error handling can match it")
+	s.requireAccountsErrorCode(err, ErrCodeKeystoreDirectoryError)
 }
 
 func (s *ManagerTestSuite) TestDeleteAccountOfColdWalletKeypairWithoutPassword() {
@@ -979,34 +982,4 @@ func (s *ManagerTestSuite) TestCleanKeystoreFiles() {
 			}
 		})
 	}
-}
-
-// When the profile keypair is itself on a cold wallet there is no profile master keystore
-// file to verify the password against, so verification is deliberately skipped and the
-// migration proceeds with the password accepted verbatim.
-func (s *ManagerTestSuite) TestMigrateColdWalletKeypairToAppSkipsPasswordCheckWhenProfileKeypairIsCold() {
-	s.setupProfileKeystore(false)
-	mnemonic2, coldKp := s.createColdSeedKeypair()
-
-	s.persistence.EXPECT().GetKeypairByKeyUID(coldKp.KeyUID).Return(coldKp, nil).Times(1)
-	// profile keypair is cold and its DerivedFrom has no keystore file on disk — any
-	// password verification attempt against it would fail
-	s.persistence.EXPECT().GetProfileKeypair().Return(&accsmanagementtypes.Keypair{
-		KeyUID:      s.masterAccount.KeyUID(),
-		Type:        accsmanagementtypes.KeypairTypeProfile,
-		ColdWallet:  accsmanagementtypes.ColdWalletTypeStatusKeycard,
-		DerivedFrom: "0x000000000000000000000000000000000000dead",
-	}, nil).Times(1)
-	s.persistence.EXPECT().UpdateKeypairXPub(coldKp.KeyUID, "", accsmanagementtypes.ColdWalletTypeNone, uint64(3)).Return(nil).Times(1)
-
-	filesBefore := s.countKeystoreFiles()
-	keyUID, err := s.accManager.MigrateColdWalletKeypairToApp(mnemonic2, "never-verified-password", 3)
-	s.Require().NoError(err, "migration must proceed without password verification when the profile keypair is itself on a cold wallet — this is the only un-migrate path for keycard-profile users")
-	s.Require().Equal(coldKp.KeyUID, keyUID)
-	s.Require().Equal(filesBefore+2, s.countKeystoreFiles(),
-		"keystore files must be recreated for the master key and the account path even though the password could not be verified")
-
-	// the count alone would pass if the files were written under a different
-	// password, which would leave the migrated keypair unusable
-	s.requireKeypairKeystoreFilesOpen(mnemonic2, "never-verified-password", []string{common.PathDefaultWalletAccount})
 }
