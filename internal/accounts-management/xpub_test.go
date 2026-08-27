@@ -5,6 +5,7 @@ import (
 	"os"
 
 	common "github.com/status-im/status-go/internal/accounts-management/common"
+	customerrors "github.com/status-im/status-go/internal/accounts-management/errors"
 	generator "github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
@@ -20,12 +21,12 @@ func (s *ManagerTestSuite) expectedWalletXPub() string {
 // storeDistinctSeedKeypair creates a keypair from its own mnemonic and stores its
 // master key, so each keypair in a test derives a different xpub. Sharing one
 // master would let a backfill read the wrong keypair's file undetected.
-func (s *ManagerTestSuite) storeDistinctSeedKeypair(keyUID string, clock uint64) (*accsmanagementtypes.Keypair, string) {
+func (s *ManagerTestSuite) storeDistinctSeedKeypair(keyUID string, clock uint64, password string) (*accsmanagementtypes.Keypair, string) {
 	mnemonic, err := common.CreateRandomMnemonicWithDefaultLength()
 	s.Require().NoError(err)
 	master, err := generator.CreateAccountFromMnemonic(mnemonic, "")
 	s.Require().NoError(err)
-	s.Require().NoError(s.accManager.storeToKeystore(master, s.password))
+	s.Require().NoError(s.accManager.storeToKeystore(master, password))
 
 	xpub, err := generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", common.PathWalletXPub)
 	s.Require().NoError(err)
@@ -202,7 +203,7 @@ func (s *ManagerTestSuite) TestGetVerifiedWalletAccountForPartiallyOperableAccou
 	s.Require().Equal(address, account.Address())
 }
 
-func (s *ManagerTestSuite) TestGetVerifiedWalletAccountOnColdKeypairAccountFailsWithoutKeystoreWrites() {
+func (s *ManagerTestSuite) TestGetVerifiedWalletAccountFailsWhenMasterKeystoreFileMissing() {
 	s.setupProfileKeystore(false)
 
 	mnemonic2, err := common.CreateRandomMnemonicWithDefaultLength()
@@ -222,22 +223,44 @@ func (s *ManagerTestSuite) TestGetVerifiedWalletAccountOnColdKeypairAccountFails
 	s.persistence.EXPECT().GetKeypairByKeyUID(master2.KeyUID()).Return(&accsmanagementtypes.Keypair{
 		KeyUID:      master2.KeyUID(),
 		Type:        accsmanagementtypes.KeypairTypeSeed,
-		ColdWallet:  accsmanagementtypes.ColdWalletTypeStatusKeycard,
 		DerivedFrom: master2.Address().Hex(),
 	}, nil).Times(1)
 
 	account, err := s.accManager.GetVerifiedWalletAccount(address, s.password)
 	s.Require().Error(err,
-		"signing via a cold keypair's account has no keystore file anywhere — the software-signing path must fail, not fabricate a key")
+		"with no keystore file for the account or its master key, the software-signing path must fail, not fabricate a key")
 	s.Require().ErrorIs(err, keystore.ErrKeystoreFileMissing,
-		"the keystore-file-missing error must surface so the app can route signing to the keycard instead")
-	s.Require().Nil(account, "no signing account may be returned for a cold keypair's account")
-	// The fallback writes nothing here because the cold keypair has no master file
-	// to derive from, not because it checks the cold-wallet flag:
-	// generatePartialAccountKey has no such check. If a master file were ever left
-	// on disk for a keypair flagged cold, this path would derive and write.
+		"the keystore-file-missing error must surface")
+	s.Require().Nil(account, "no signing account may be returned")
+	var accountsErr *customerrors.AccountsError
+	s.Require().ErrorAs(err, &accountsErr)
+	s.Require().Equal(master2.Address().Hex(), accountsErr.Context["address"],
+		"the missing file must be the master key's: the partial-account fallback was reached")
 	s.Require().Equal(0, s.countKeystoreFiles(),
-		"no keystore file is written, because the cold keypair has no master file to derive a child key from")
+		"the partial-account fallback has no master file to derive from, so nothing may be written")
+}
+
+func (s *ManagerTestSuite) TestGetVerifiedWalletAccountWrongPasswordDoesNotFallBackToDerivation() {
+	_ = s.createAndStoreProfileKeypair()
+
+	s.persistence.EXPECT().AddressExists(s.walletAddress).Return(true, nil).Times(1)
+	// no GetAccountByAddress expectation: a wrong password must never reach the partial-key fallback
+
+	account, err := s.accManager.GetVerifiedWalletAccount(s.walletAddress, "wrong-password")
+	s.Require().ErrorIs(err, keystore.ErrIncorrectPasswordProvided)
+	s.Require().Nil(account)
+	s.Require().Equal(3, s.countKeystoreFiles())
+}
+
+func (s *ManagerTestSuite) TestAddAccountsWithWrongPasswordRejectedBeforeSave() {
+	keypair := s.createAndStoreProfileKeypair()
+	acc := s.deriveTestAccountAtPath(common.PathWalletRoot + "/1")
+
+	s.persistence.EXPECT().GetKeypairByKeyUID(keypair.KeyUID).Return(keypair, nil).Times(1)
+
+	err := s.accManager.AddAccounts(keypair.KeyUID, []*accsmanagementtypes.Account{acc}, "wrong-password")
+	s.Require().ErrorIs(err, keystore.ErrIncorrectPasswordProvided)
+	s.Require().Equal(3, s.countKeystoreFiles(), "nothing may be written when the password did not open the master file")
 }
 
 func (s *ManagerTestSuite) TestAddAccountsRejectsSecondDefaultChatAccountOnProfileKeypair() {
@@ -278,7 +301,7 @@ func (s *ManagerTestSuite) TestAddAccountsRejectsDuplicateAddress() {
 	err := s.accManager.AddAccounts(keypair.KeyUID, []*accsmanagementtypes.Account{dup}, s.password)
 	s.Require().Error(err, "an account whose address already exists on the keypair must be rejected")
 	s.Require().ErrorIs(err, ErrAccountAlreadyAdded,
-		"the typed already-added error must be returned, else the duplicate row silently overwrites the stored account")
+		"the typed already-added error must be returned")
 }
 
 func (s *ManagerTestSuite) TestBackfillKeypairsXPub() {
@@ -368,7 +391,7 @@ func (s *ManagerTestSuite) TestAddAccountsWithPasswordToColdKeypairStillValidate
 	err := s.accManager.AddAccounts(keypair.KeyUID, []*accsmanagementtypes.Account{acc}, s.password)
 	s.Require().Error(err,
 		"even with a password, a cold keypair must validate the account address against the stored xpub")
-	s.Require().True(errors.Is(err, ErrAccountMismatch),
+	s.Require().ErrorIs(err, ErrAccountMismatch,
 		"the xpub-derived-address mismatch must surface as ErrAccountMismatch")
 }
 
@@ -395,32 +418,25 @@ func (s *ManagerTestSuite) TestAddAccountsWithoutPasswordToColdKeypairWithoutXPu
 }
 
 func (s *ManagerTestSuite) TestBackfillKeypairsXPubSkipsKeypairOnWrongPassword() {
-	_ = s.createAndStoreProfileKeypair()
+	s.setupProfileKeystore(false)
+	kpOtherPassword, _ := s.storeDistinctSeedKeypair("other-password-kp", 1, "other-password")
+	kpHealthy, xpubHealthy := s.storeDistinctSeedKeypair("healthy-kp", 2, s.password)
 
-	kpRegular := &accsmanagementtypes.Keypair{
-		KeyUID:      s.masterAccount.KeyUID(),
-		Type:        accsmanagementtypes.KeypairTypeProfile,
-		DerivedFrom: s.masterAccount.Address().Hex(),
-		Clock:       42,
-	}
+	s.persistence.EXPECT().GetActiveKeypairs().Return([]*accsmanagementtypes.Keypair{kpOtherPassword, kpHealthy}, nil).Times(1)
+	s.persistence.EXPECT().UpdateKeypairXPub(kpHealthy.KeyUID, xpubHealthy, accsmanagementtypes.ColdWalletTypeNone, uint64(2)).Return(nil).Times(1)
 
-	s.persistence.EXPECT().GetActiveKeypairs().Return([]*accsmanagementtypes.Keypair{kpRegular}, nil).Times(1)
-
-	err := s.accManager.BackfillKeypairsXPub("wrong-password")
-	s.Require().NoError(err,
-		"a keypair whose master keystore file does not open with the login password must be skipped, not fail the backfill — this runs on every login")
-	s.Require().Empty(kpRegular.XPub,
-		"no xpub may be recorded when the keystore file could not be decrypted")
+	err := s.accManager.BackfillKeypairsXPub(s.password)
+	s.Require().NoError(err, "a master file that does not open with the login password is skipped, not an error")
+	s.Require().Empty(kpOtherPassword.XPub, "no xpub may be recorded for the keypair whose file could not be decrypted")
+	s.Require().Equal(xpubHealthy, kpHealthy.XPub, "the keypair listed after the skipped one must still be backfilled")
 }
 
 func (s *ManagerTestSuite) TestBackfillKeypairsXPubJoinsErrorsAndContinuesPastFailures() {
 	_ = s.createAndStoreProfileKeypair()
 
-	// each keypair has its own master key, so the expected xpubs differ and a
-	// backfill reading the wrong keystore file fails the pinned expectations
-	kpFail1, xpub1 := s.storeDistinctSeedKeypair("fail-1", 1)
-	kpFail2, xpub2 := s.storeDistinctSeedKeypair("fail-2", 2)
-	kpHealthy, xpubHealthy := s.storeDistinctSeedKeypair("healthy-kp", 3)
+	kpFail1, xpub1 := s.storeDistinctSeedKeypair("fail-1", 1, s.password)
+	kpFail2, xpub2 := s.storeDistinctSeedKeypair("fail-2", 2, s.password)
+	kpHealthy, xpubHealthy := s.storeDistinctSeedKeypair("healthy-kp", 3, s.password)
 	s.Require().NotEqual(xpub1, xpub2)
 	s.Require().NotEqual(xpub2, xpubHealthy)
 
@@ -437,7 +453,7 @@ func (s *ManagerTestSuite) TestBackfillKeypairsXPubJoinsErrorsAndContinuesPastFa
 	s.Require().ErrorContains(err, kpFail1.KeyUID, "the joined error must name the first failing keypair")
 	s.Require().ErrorContains(err, kpFail2.KeyUID, "the joined error must name the second failing keypair")
 	s.Require().Equal(xpubHealthy, kpHealthy.XPub,
-		"a healthy keypair listed after failures must still be backfilled, else login-time backfill is silently incomplete")
+		"a healthy keypair listed after failures must still be backfilled")
 }
 
 func (s *ManagerTestSuite) TestMigrateKeypairToColdWalletBackfillsXPub() {
