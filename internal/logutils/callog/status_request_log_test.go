@@ -59,6 +59,16 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 			input:    `["{\"mnemonic\":\"a b c d\"}"]`,
 			expected: fmt.Sprintf(`["{\"mnemonic\":\"%s\"}"]`, redactionPlaceholder),
 		},
+		{
+			name:     "dek field in login request",
+			input:    `{"keyUid":"0x1234","dek":"8a9f7d2b6c1e4f3a5d8b9c0e2f4a6b8d0c2e4f6a8b0d2c4e6f8a0b2d4c6e8f0a"}`,
+			expected: fmt.Sprintf(`{"keyUid":"0x1234","dek":"%s"}`, redactionPlaceholder),
+		},
+		{
+			name:     "dek field in export response",
+			input:    `{"dek":"8a9f7d2b6c1e4f3a5d8b9c0e2f4a6b8d0c2e4f6a8b0d2c4e6f8a0b2d4c6e8f0a"}`,
+			expected: fmt.Sprintf(`{"dek":"%s"}`, redactionPlaceholder),
+		},
 	}
 
 	for _, tc := range testCases {

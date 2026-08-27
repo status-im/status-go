@@ -1241,6 +1241,38 @@ func getProfileEncryptionInfo(requestJSON string) string {
 	return string(respJSON)
 }
 
+// ExportProfileDEK returns the profile's data-encryption key given a valid credential
+// (the client-hashed password). Only valid for profiles on the DEK encryption scheme.
+func ExportProfileDEK(requestJSON string) string {
+	return callWithResponse(exportProfileDEK, requestJSON)
+}
+
+func exportProfileDEK(requestJSON string) string {
+	var request requests.ExportProfileDEK
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := request.Validate(); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	dek, err := statusBackend.ExportProfileDEK(request.KeyUID, request.Password)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(struct {
+		DEK string `json:"dek"`
+	}{DEK: dek})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
 // Deprecated: Use ConvertToKeycardAccountV2 instead.
 func ConvertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword string) string {
 	return convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword)

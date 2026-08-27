@@ -3,12 +3,18 @@ package backend
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"sync"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
+	"github.com/status-im/status-go/internal/protocol/requests"
 )
+
+var ErrProfileNotMigratedToDEK = errors.New("profile is not migrated to the DEK encryption scheme")
 
 // profileSecretCache remembers the unwrapped DEK of the profile bound to the current session.
 // The KEK itself is not stored — only its sha256 fingerprint, enough to re-verify an incoming password.
@@ -17,7 +23,9 @@ type profileSecretCache struct {
 	keyUID         string
 	kekFingerprint []byte
 	dekHex         string
-	dbKdfIter      int
+	dekClientHash  string // clientHashOf(dekHex); lets a client-hashed DEK act as the session credential, the only need to have a client-hashed DEK
+	// on the stauts-go side is to avoid updating those ~20 places on the client side and continue using the already established mechanism that is being used for passwords
+	dbKdfIter int
 
 	primaryFromPending bool // true when dekHex came from the pending envelope
 
@@ -51,7 +59,8 @@ func (b *StatusBackend) resolveProfileSecret(keyUID, password string, kdfIterati
 	if c.keyUID == keyUID && c.dekHex != "" {
 		fingerprint := sha256.Sum256([]byte(password))
 		if subtle.ConstantTimeCompare(fingerprint[:], c.kekFingerprint) == 1 ||
-			subtle.ConstantTimeCompare([]byte(password), []byte(c.dekHex)) == 1 {
+			subtle.ConstantTimeCompare([]byte(password), []byte(c.dekHex)) == 1 ||
+			(c.dekClientHash != "" && subtle.ConstantTimeCompare([]byte(password), []byte(c.dekClientHash)) == 1) {
 			resolved := resolvedProfileSecret{
 				secret:             c.dekHex,
 				dbKdfIter:          c.dbKdfIter,
@@ -101,6 +110,7 @@ func (b *StatusBackend) resolveProfileSecret(keyUID, password string, kdfIterati
 	c.keyUID = keyUID
 	c.kekFingerprint = fingerprint[:]
 	c.dekHex = primary
+	c.dekClientHash = clientHashOf(primary)
 	c.dbKdfIter = primaryIter
 	c.primaryFromPending = primaryFromPending
 	c.pendingDekHex = pendingDek
@@ -128,6 +138,7 @@ func (b *StatusBackend) clearProfileSecretCache() {
 	c.keyUID = ""
 	c.kekFingerprint = nil
 	c.dekHex = ""
+	c.dekClientHash = ""
 	c.dbKdfIter = 0
 	c.primaryFromPending = false
 	c.pendingDekHex = ""
@@ -135,6 +146,55 @@ func (b *StatusBackend) clearProfileSecretCache() {
 	c.dbAppOpenedWith = ""
 	c.dbWalletOpenedWith = ""
 	c.mu.Unlock()
+}
+
+// clientHashOf returns the client hashing convention of a secret: "0x" + lowercase hex keccak256.
+func clientHashOf(secret string) string {
+	return "0x" + hex.EncodeToString(ethcrypto.Keccak256([]byte(secret)))
+}
+
+// primeSecretCacheWithDEK caches the DEK directly from a client-supplied DEK (biometric login).
+func (b *StatusBackend) primeSecretCacheWithDEK(keyUID, dekHex string, dbKdfIter int) {
+	c := &b.secretCache
+	c.mu.Lock()
+	c.keyUID = keyUID
+	c.kekFingerprint = nil
+	c.dekHex = dekHex
+	c.dekClientHash = clientHashOf(dekHex)
+	c.dbKdfIter = dbKdfIter
+	c.primaryFromPending = false
+	c.pendingDekHex = ""
+	c.pendingDbKdfIter = 0
+	c.mu.Unlock()
+}
+
+// prepareDEKLogin prepares a DEK login request by caching the DEK and setting the password to the DEK.
+func (b *StatusBackend) prepareDEKLogin(request *requests.Login) error {
+	if !envelope.Exists(b.rootDataDir, request.KeyUID) {
+		return errors.New("dek login: profile is not on the DEK encryption scheme")
+	}
+	if envelope.PendingExists(b.rootDataDir, request.KeyUID) {
+		return errors.New("dek login: interrupted rekey pending, a password login is required")
+	}
+	iter, err := envelope.ReadDBKdfIterations(b.rootDataDir, request.KeyUID)
+	if err != nil {
+		return err
+	}
+	b.primeSecretCacheWithDEK(request.KeyUID, request.DEK, iter)
+	request.Password = request.DEK
+	return nil
+}
+
+// ExportProfileDEK returns the profile's DEK given a valid credential (the client-hashed password KEK, or the raw DEK or its client hash).
+func (b *StatusBackend) ExportProfileDEK(keyUID, password string) (string, error) {
+	resolved, err := b.resolveProfileSecret(keyUID, password, 0)
+	if err != nil {
+		return "", asKeystoreResolutionError(err)
+	}
+	if !resolved.migrated {
+		return "", ErrProfileNotMigratedToDEK
+	}
+	return resolved.secret, nil
 }
 
 // refreshSecretCacheKEK updates the cached KEK fingerprint after the envelope was re-wrapped with

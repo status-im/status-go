@@ -21,7 +21,7 @@ const (
 
 	pendingSuffix = ".pending" // used for deep rekey (when a new DEK is generated)
 
-	dekLength = 32 // DEK size in bytes
+	DekLength = 32 // DEK size in bytes
 
 	scryptN = 1 << 18
 	scryptP = 1
@@ -60,7 +60,7 @@ func PendingExists(rootDataDir, keyUID string) bool {
 
 // Generate creates a new random DEK and returns it as a lowercase hex string.
 func Generate() (string, error) {
-	dek := make([]byte, dekLength)
+	dek := make([]byte, DekLength)
 	if _, err := rand.Read(dek); err != nil {
 		return "", err
 	}
@@ -79,8 +79,8 @@ func WritePending(rootDataDir, keyUID, dekHex, kek string, dbKdfIterations int) 
 
 func writeToPath(path, keyUID, dekHex, kek string, dbKdfIterations int) error {
 	dek, err := hex.DecodeString(dekHex)
-	if err != nil || len(dek) != dekLength {
-		return fmt.Errorf("envelope: DEK must be %d hex-encoded bytes", dekLength)
+	if err != nil || len(dek) != DekLength {
+		return fmt.Errorf("envelope: DEK must be %d hex-encoded bytes", DekLength)
 	}
 
 	cryptoJSON, err := geth.EncryptDataV3(dek, []byte(kek), scryptN, scryptP)
@@ -130,11 +130,30 @@ func unwrapFromPath(path, kek string) (dekHex string, dbKdfIterations int, err e
 		// MAC mismatch (or any decrypt failure) means the KEK is wrong.
 		return "", 0, ErrInvalidKEK
 	}
-	if len(dek) != dekLength {
+	if len(dek) != DekLength {
 		return "", 0, fmt.Errorf("envelope: unexpected DEK length %d", len(dek))
 	}
 
 	return hex.EncodeToString(dek), file.DBKdfIterations, nil
+}
+
+// ReadDBKdfIterations returns the profile's database kdf_iter without needing the KEK
+// (the value is plaintext metadata in the wrapped-DEK file).
+func ReadDBKdfIterations(rootDataDir, keyUID string) (int, error) {
+	content, err := os.ReadFile(Path(rootDataDir, keyUID))
+	if err != nil {
+		return 0, err
+	}
+
+	var file wrappedKeyFile
+	if err := json.Unmarshal(content, &file); err != nil {
+		return 0, fmt.Errorf("envelope: malformed wrapped-DEK file: %w", err)
+	}
+	if file.Version != fileVersion {
+		return 0, fmt.Errorf("envelope: unsupported wrapped-DEK file version %d", file.Version)
+	}
+
+	return file.DBKdfIterations, nil
 }
 
 // Rewrap re-encrypts the profile's DEK with a new KEK, atomically replacing the wrapped-DEK file.
