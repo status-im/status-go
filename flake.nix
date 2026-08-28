@@ -23,9 +23,14 @@
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=2fec23ad292b0f9d0924a2f1a69995d23b37822d";
+    # logos-delivery pins the same nixpkgs rev as we do, so following is safe.
+    logos-delivery = {
+      url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=69fbffa3a0cfd862a2d04a4a0f57432063ecfba1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, logos-delivery }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -51,6 +56,11 @@
           (final: prev: {
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
+            # Postgres is only used by fleet store nodes; without this the
+            # library dlopens libpq at startup and a client node fails to start.
+            liblogosdelivery = logos-delivery.packages.${system}.liblogosdelivery.override {
+              enablePostgres = false;
+            };
           })
         ];
       }
