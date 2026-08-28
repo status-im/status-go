@@ -139,6 +139,47 @@ LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 
+# `logos-delivery` variables (liblogosdelivery, linked via logos-delivery-go-bindings).
+# Provide LOGOS_DELIVERY_LIB_DIR and LOGOS_DELIVERY_INC_DIR; the Nix shell sets
+# both from the flake input.
+ifdef LOGOS_DELIVERY_LIB_DIR
+ifndef LOGOS_DELIVERY_INC_DIR
+    $(error LOGOS_DELIVERY_INC_DIR must be provided when LOGOS_DELIVERY_LIB_DIR is set)
+endif
+LIBLOGOSDELIVERY ?= $(LOGOS_DELIVERY_LIB_DIR)/liblogosdelivery.$(LIB_EXT)
+CGO_CFLAGS+=-I$(LOGOS_DELIVERY_INC_DIR)
+CGO_LDFLAGS+=-L$(LOGOS_DELIVERY_LIB_DIR) -llogosdelivery
+endif
+
+# Built without Nix the same way libsds is.
+NIMBLE_LIB := $(CURDIR)/build/liblogosdelivery.$(LIB_EXT)
+
+.PHONY: liblogosdelivery-nimble statusgo-nim-delivery
+
+$(NIMBLE_LIB): | nimble.paths
+	LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
+		NIM_PARAMS="$$NIM_PARAMS -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)" \
+		$(NIMBLE) liblogosdelivery
+	@test -f $@ || (echo "ERROR: $@ was not produced" && exit 1)
+
+liblogosdelivery-nimble: $(NIMBLE_LIB) ##@build Build liblogosdelivery via the Go bindings' Nimble task
+
+# Temporary: builds libstatus.a linked against the Nimble-built liblogosdelivery,
+# so the Nix-free path can be exercised end to end. Folds into statusgo-library
+# once the delivery backend is wired in.
+statusgo-nim-delivery: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+statusgo-nim-delivery: STATUS_GO_LIBRARY_OUT ?= build/bin
+statusgo-nim-delivery: $(NIMBLE_LIB) generate statusgo-c-bindings $(LIBSDS) ##@build libstatus.a against the Nimble-built liblogosdelivery
+	CGO_CFLAGS="$(CGO_CFLAGS) -I$(CURDIR)/build" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(CURDIR)/build -llogosdelivery -Wl,-rpath,$(CURDIR)/build" \
+	go build \
+		-tags '$(BUILD_TAGS)' \
+		$(BUILD_FLAGS) \
+		-buildmode=c-archive \
+		-o $(STATUS_GO_LIBRARY_OUT)/libstatus.a \
+		"$(STATUS_GO_BINDINGS_PATH)/main.go"
+	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
+
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
 USE_TORRENT ?= false
@@ -163,6 +204,9 @@ endif
 LIBSTORAGE ?= $(LOGOS_STORAGE_LIB_DIR)/libstorage.$(LIB_EXT)
 
 RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
+ifdef LOGOS_DELIVERY_LIB_DIR
+    RUNTIME_LIB_DIRS := $(LOGOS_DELIVERY_LIB_DIR):$(RUNTIME_LIB_DIRS)
+endif
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage
