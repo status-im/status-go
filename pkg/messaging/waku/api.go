@@ -32,14 +32,15 @@ import (
 // (EventEnvelopeAvailable) and no longer decodes/polls — status-im/status-go#7464.)
 
 // Send publishes a pre-encoded payload to the messaging network. The payload
-// is expected to be already encoded for WakuMessage version=1 (see
-// transport/rfc26.Encode); this method just wraps it in a WakuMessage
-// envelope and hands it to the publish path. Returns the wire hash.
+// is expected to be already RFC26-encoded (see transport/rfc26.Encode); this
+// method just wraps it in a WakuMessage envelope and hands it to the publish
+// path. The `version` field is a wire label independent of that encoding, and
+// is advertised as 0. Returns the wire hash.
 //
 // ctx is accepted for symmetry with transport.MessagingAPI; the send queue
 // uses the waku instance's own lifecycle context.
 func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
-	var version uint32 = 1 // wire-format discriminator; v1 encryption is applied by the caller
+	var version uint32 = 0 // wire label only; the payload is RFC26-encoded by the caller
 	msg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      &version,
