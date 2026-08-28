@@ -22,7 +22,6 @@ in pkgs.buildGoModule {
 
   nativeBuildInputs = with pkgs; [
     mockgen
-    protoc-gen-go
     protobuf_36
   ];
 

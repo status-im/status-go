@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
 )
 
-//go:generate protoc --go_out=. ./protocol_message.proto
+//go:generate protoc "--go_prefix=go tool" --go_out=. ./protocol_message.proto
 
 const (
 	protocolVersion                = 1
