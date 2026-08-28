@@ -368,7 +368,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					Sender:              community.PrivateKey(),
 					SkipEncryptionLayer: true,
 					MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED,
-					PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+					PubsubTopic:         messagingtypes.DefaultShardPubsubTopic(),
 				}
 
 				_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
@@ -760,7 +760,7 @@ func (m *Messenger) handleCommunitySharedAddressesRequest(state *ReceivedMessage
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE,
-		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         messagingtypes.DefaultShardPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
 		ResendMethod:        common.ResendMethodSendPrivate,
 		Recipients:          []*ecdsa.PublicKey{signer},
@@ -1533,7 +1533,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		ResendType:          common.ResendTypeRawMessage,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         messagingtypes.DefaultShardPubsubTopic(),
 		Priority:            &messagingtypes.HighPriority,
 	}
 
@@ -1924,7 +1924,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		CommunityID:         community.ID(),
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+		PubsubTopic:         messagingtypes.DefaultShardPubsubTopic(),
 		ResendType:          common.ResendTypeRawMessage,
 		Priority:            &messagingtypes.HighPriority,
 	}
@@ -2080,7 +2080,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			CommunityID:         community.ID(),
 			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
-			PubsubTopic:         messagingtypes.DefaultNonProtectedPubsubTopic(),
+			PubsubTopic:         messagingtypes.DefaultShardPubsubTopic(),
 			ResendType:          common.ResendTypeRawMessage,
 			ResendMethod:        common.ResendMethodSendPrivate,
 			Recipients:          []*ecdsa.PublicKey{pk},
