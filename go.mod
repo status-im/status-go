@@ -8,6 +8,7 @@ tool (
 	github.com/status-im/goroutine-defer-guard/cmd/goroutine-defer-guard
 	github.com/wadey/gocovmerge
 	go.uber.org/mock/mockgen
+	google.golang.org/protobuf/cmd/protoc-gen-go
 )
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
@@ -259,7 +260,7 @@ require (
 	github.com/golangci/revgrep v0.5.2 // indirect
 	github.com/golangci/unconvert v0.0.0-20180507085042-28b1c447d1f4 // indirect
 	github.com/google/btree v1.0.1 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e // indirect

@@ -16,13 +16,12 @@ in pkgs.buildGoModule {
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
 
   # WARNING: Needs to be updated when go.mod is changed.
-  vendorHash = "sha256-JlN0oiZANaF95hZOYFEKSHtmu5CHtWLE3uKDSTnMpI4=";
+  vendorHash = "sha256-KTdd//keDwVjw1Jb9+Vt4zLoNx8Us4aHxP449HuROyM=";
 
   inherit meta version;
 
   nativeBuildInputs = with pkgs; [
     mockgen
-    protoc-gen-go
     protobuf_36
   ];
 
