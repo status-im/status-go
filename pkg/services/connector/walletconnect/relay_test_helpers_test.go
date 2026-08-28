@@ -20,6 +20,8 @@ type fakeRelayOpts struct {
 	forceDropAt   int32 // >0: close the N-th accepted connection immediately after upgrade
 	echoSubscribe bool  // reply to irn_subscribe with a fake "sub-id"
 	silentOnPing  bool  // do not respond to ping (used by heartbeat tests)
+	rejectStatus  int   // >0: refuse the upgrade with this HTTP status instead
+	rejectBody    string
 }
 
 // fakeRelay is an in-process WalletConnect IRN-like WebSocket server for relay tests.
@@ -40,6 +42,12 @@ func newFakeRelay(t *testing.T, opts fakeRelayOpts) *fakeRelay {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if fr.opts.rejectStatus > 0 {
+			atomic.AddInt32(&fr.accepted, 1)
+			w.WriteHeader(fr.opts.rejectStatus)
+			_, _ = w.Write([]byte(fr.opts.rejectBody))
+			return
+		}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
