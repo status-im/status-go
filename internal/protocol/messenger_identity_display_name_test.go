@@ -223,6 +223,13 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	displayName, err = s.m.settings.DisplayName()
 	s.Require().NoError(err)
 	s.Require().Equal("name with space", displayName)
+
+	// letters/digits of any script are accepted, length is counted in runes
+	err = s.m.SetDisplayName("Ђорђе Ћурчић 我的名字")
+	s.Require().NoError(err)
+	displayName, err = s.m.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().Equal("Ђорђе Ћурчић 我的名字", displayName)
 }
 
 func (s *MessengerProfileDisplayNameHandlerSuite) TestSetEmptyDisplayNameSkipsDupeCheck() {
