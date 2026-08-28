@@ -2275,8 +2275,8 @@ github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYti
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
 github.com/status-im/extkeys v1.4.0 h1:HiB/vQXZrGveZbGy3W6hI4T0CfCt0uP4xvGwjXL4cAQ=
 github.com/status-im/extkeys v1.4.0/go.mod h1:AZGS9vJKbME5tovNqYH/LrfHu8t9ad9nxl76fbLG5PY=
-github.com/status-im/go-generate-fast v0.0.0-20250916164518-c78009bcfa9e h1:GV7a03166mVZLUlfMBDbJOjfEB4A+iJ8rYvKlDUvOLA=
-github.com/status-im/go-generate-fast v0.0.0-20250916164518-c78009bcfa9e/go.mod h1:iktiTcPdK+nuL47hn+7UL12uIkgJYyOAh99jdA6ruGw=
+github.com/status-im/go-generate-fast v0.0.0-20260821115326-e0f0915e0942 h1:rEX4iH8jNbuwpyLDrRddVjC35Bcc/Ts6PG/ozSw+OyM=
+github.com/status-im/go-generate-fast v0.0.0-20260821115326-e0f0915e0942/go.mod h1:iktiTcPdK+nuL47hn+7UL12uIkgJYyOAh99jdA6ruGw=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3 h1:/73h1w1hUfb3wVyTlNrUIwahZxatgesCHa6lwO57C2M=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
 github.com/status-im/go-wallet-sdk v0.0.0-20260728092705-f70963a74b0e h1:EV0EVv9S/F1lRPcDhbw42X2m918FmPwO2GbWZhg1G/Y=
