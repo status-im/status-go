@@ -4,8 +4,10 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -207,8 +209,19 @@ func (r *RelayClient) dialRelay() (*websocket.Conn, error) {
 	q.Set("projectId", r.projectID)
 	u.RawQuery = q.Encode()
 
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
+		// gorilla collapses every non-101 upgrade response into the same opaque
+		// "bad handshake", which cannot distinguish a rejected token from a bad
+		// project id or a rate limit. Carry the status and a short body snippet
+		// instead. The URL itself must never be logged: it carries the auth JWT
+		// and the project id.
+		if resp != nil {
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			return nil, fmt.Errorf("dial relay: %w (relay responded %s: %s)",
+				err, resp.Status, truncate(strings.TrimSpace(string(body)), 200))
+		}
 		return nil, fmt.Errorf("dial relay: %w", err)
 	}
 	return conn, nil

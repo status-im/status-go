@@ -127,3 +127,18 @@ func TestReconnectedHandler_ResubscribeDoesNotDeadlockReadLoop(t *testing.T) {
 	}
 	_ = r.Close()
 }
+
+// gorilla reports every non-101 upgrade response as the same opaque
+// "websocket: bad handshake". The dial URL carries the auth JWT and the project
+// id, so it must never be logged, but the status code tells an operator whether
+// the relay rejected the credentials, the project, or rate-limited the client.
+func TestDialRelay_ReportsRejectedUpgradeStatus(t *testing.T) {
+	fr := newFakeRelay(t, fakeRelayOpts{rejectStatus: 401, rejectBody: "invalid jwt"})
+	r := newTestRelayClient(t, fr)
+
+	err := r.Connect()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "401", "dial error must carry the relay's HTTP status")
+	require.NotContains(t, err.Error(), "auth=", "dial error must not leak the auth JWT")
+	require.NotContains(t, err.Error(), "projectId", "dial error must not leak the project id")
+}
