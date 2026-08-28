@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/status-im/status-go/internal/protocol/identity/alias"
 )
@@ -22,7 +23,7 @@ const (
 )
 
 // Compiled regex pattern for validating display names
-var displayNameRegex = regexp.MustCompile(fmt.Sprintf("^[\\w-\\s]{%d,%d}$", MinDisplayNameLength, MaxDisplayNameLength))
+var displayNameRegex = regexp.MustCompile(`^[\p{L}\p{M}\p{N}_\-\s]+$`)
 
 func ValidateDisplayName(displayName *string) error {
 	name := strings.TrimSpace(*displayName)
@@ -32,11 +33,10 @@ func ValidateDisplayName(displayName *string) error {
 		return nil
 	}
 
-	if len(name) < MinDisplayNameLength || len(name) > MaxDisplayNameLength {
+	if l := utf8.RuneCountInString(name); l < MinDisplayNameLength || l > MaxDisplayNameLength {
 		return ErrInvalidDisplayNameLength
 	}
 
-	// Use pre-compiled regex to validate name format
 	if !displayNameRegex.MatchString(name) {
 		return ErrInvalidDisplayNameRegExp
 	}
