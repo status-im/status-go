@@ -100,10 +100,8 @@ func TestConnect_IsIdempotentWhenLive(t *testing.T) {
 	_ = r.Close()
 }
 
-// The reconnected handler mirrors Client.onReconnected: it re-subscribes to the
-// active topics over the freshly established connection. Subscribe is a
-// request/response call whose reply can only be delivered by readLoop, so the
-// handler must not be invoked on the readLoop goroutine itself.
+// The reconnected handler must not run on readLoop: it re-subscribes, and
+// Subscribe needs readLoop free to deliver the reply.
 func TestReconnectedHandler_ResubscribeDoesNotDeadlockReadLoop(t *testing.T) {
 	fr := newFakeRelay(t, fakeRelayOpts{echoSubscribe: true})
 	r := newTestRelayClient(t, fr)
@@ -128,10 +126,8 @@ func TestReconnectedHandler_ResubscribeDoesNotDeadlockReadLoop(t *testing.T) {
 	_ = r.Close()
 }
 
-// gorilla reports every non-101 upgrade response as the same opaque
-// "websocket: bad handshake". The dial URL carries the auth JWT and the project
-// id, so it must never be logged, but the status code tells an operator whether
-// the relay rejected the credentials, the project, or rate-limited the client.
+// A refused upgrade must name the relay's status, without leaking the
+// credentials the dial URL carries.
 func TestDialRelay_ReportsRejectedUpgradeStatus(t *testing.T) {
 	fr := newFakeRelay(t, fakeRelayOpts{rejectStatus: 401, rejectBody: "invalid jwt"})
 	r := newTestRelayClient(t, fr)

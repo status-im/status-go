@@ -211,11 +211,9 @@ func (r *RelayClient) dialRelay() (*websocket.Conn, error) {
 
 	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		// gorilla collapses every non-101 upgrade response into the same opaque
-		// "bad handshake", which cannot distinguish a rejected token from a bad
-		// project id or a rate limit. Carry the status and a short body snippet
-		// instead. The URL itself must never be logged: it carries the auth JWT
-		// and the project id.
+		// gorilla reports any non-101 response as "bad handshake". The status
+		// tells a rejected token from a bad project id or a rate limit. The URL
+		// carries the auth JWT and project id: keep it out of the error.
 		if resp != nil {
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
@@ -584,13 +582,8 @@ func (r *RelayClient) reconnect() error {
 
 		r.logger.Info("successfully reconnected to relay")
 
-		// The handler re-subscribes to the active topics, and Subscribe blocks
-		// until readLoop delivers the relay's response. reconnect() itself runs
-		// on the readLoop goroutine, so calling the handler inline would leave
-		// nobody reading the socket: every re-subscribe would time out, the
-		// connection would be treated as broken, and the client would reconnect
-		// and deadlock again, forever. Hand it to its own goroutine so readLoop
-		// can resume immediately.
+		// handler re-subscribes, and Subscribe blocks until readLoop delivers
+		// the relay's reply. reconnect runs on readLoop: never wait here.
 		if handler != nil {
 			go func() {
 				defer panics.LogOnPanic()
