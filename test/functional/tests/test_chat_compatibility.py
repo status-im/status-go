@@ -1,7 +1,21 @@
+import time
+
 import pytest
 
 from steps import messenger
 from utils.config import Config
+
+# A light client keeps topping up its filter subscription towards MaxPeersForFilter (3)
+# while the test fleet offers fewer servers, so it re-subscribes every ~5s. Let that
+# settle before the app starts creating filters, or the two collide inside one second
+# and the server's 1/s filter limit answers 429.
+LIGHT_SETTLE_SECONDS = 8
+
+
+def _settle(backend, is_light):
+    if is_light:
+        time.sleep(LIGHT_SETTLE_SECONDS)
+    return backend
 
 
 def pytest_generate_tests(metafunc):
@@ -30,15 +44,15 @@ class TestChatCompatibility:
 
     @pytest.fixture()
     def vut(self, backend_new_profile, vut_light):
-        return backend_new_profile("vut", waku_light_client=vut_light)
+        return _settle(backend_new_profile("vut", waku_light_client=vut_light), vut_light)
 
     @pytest.fixture()
     def peer(self, backend_new_profile, peer_image, peer_light):
-        return backend_new_profile("peer", image=peer_image, waku_light_client=peer_light)
+        return _settle(backend_new_profile("peer", image=peer_image, waku_light_client=peer_light), peer_light)
 
     @pytest.fixture()
     def third(self, backend_new_profile, peer_image, peer_light):
-        return backend_new_profile("third", image=peer_image, waku_light_client=peer_light)
+        return _settle(backend_new_profile("third", image=peer_image, waku_light_client=peer_light), peer_light)
 
     def test_one_to_one_compatibility(self, vut, peer):
         messenger.make_contacts(vut, peer)
