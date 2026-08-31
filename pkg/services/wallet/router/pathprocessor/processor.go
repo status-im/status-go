@@ -3,6 +3,7 @@ package pathprocessor
 //go:generate go tool mockgen -package=mock_pathprocessor -source=processor.go -destination=mock/processor.go
 
 import (
+	"context"
 	"math/big"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -39,15 +40,11 @@ type PathProcessorClearable interface {
 	Clear()
 }
 
-type ProcessorCommunityTokenParams struct {
-	Name               string
-	Symbol             string
-	TokenURI           string
-	Transferable       bool
-	RemoteSelfDestruct bool
-	Supply             *big.Int
-	OwnerTokenAddress  string
-	MasterTokenAddress string
+// ensResolverIface is the subset of ensresolver.EnsResolver used by the ENS processors,
+// so tests can substitute a fake.
+type ensResolverIface interface {
+	GetRegistrarAddress(ctx context.Context, chainID uint64) (common.Address, error)
+	Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error)
 }
 
 type ProcessorInputParams struct {
@@ -66,14 +63,8 @@ type ProcessorInputParams struct {
 	PublicKey          string
 	PackID             *big.Int
 	SlippagePercentage float32
+	RouteOrder         string
 
 	// community related params
 	CommunityParams *requests.CommunityRouteInputParams
-
-	// for testing purposes
-	TestsMode                 bool
-	TestEstimationMap         map[string]requests.Estimation // [bridge-name, estimation]
-	TestBonderFeeMap          map[string]*big.Int            // [token-symbol, bonder-fee]
-	TestApprovalGasEstimation uint64
-	TestApprovalL1Fee         uint64
 }

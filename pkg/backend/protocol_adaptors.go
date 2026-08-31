@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/internal/protocol/communities"
-	"github.com/status-im/status-go/internal/rpc/network"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/wallet/token"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 	"github.com/status-im/status-go/pkg/services/wallet/tokenbalances"
@@ -20,10 +20,10 @@ var _ communities.TokenManager = (*CommunitiesTokenManager)(nil)
 var _ communities.TokenBalanceManager = (*CommunitiesTokenBalanceManager)(nil)
 
 type CommunitiesNetworkManager struct {
-	networkManager *network.Manager
+	networkManager *networks.Manager
 }
 
-func NewCommunitiesNetworkManager(nm *network.Manager) *CommunitiesNetworkManager {
+func NewCommunitiesNetworkManager(nm *networks.Manager) *CommunitiesNetworkManager {
 	return &CommunitiesNetworkManager{networkManager: nm}
 }
 

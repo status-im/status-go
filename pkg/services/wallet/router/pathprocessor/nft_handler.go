@@ -57,15 +57,6 @@ func (h *BaseNFTHandler) CalculateAmountOut(params ProcessorInputParams) (*big.I
 }
 
 func (h *BaseNFTHandler) EstimateGas(params ProcessorInputParams, input []byte, handlerName string) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[handlerName]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	ethClient, err := h.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err

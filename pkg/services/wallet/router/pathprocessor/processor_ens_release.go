@@ -24,7 +24,7 @@ type ENSReleaseProcessor struct {
 	contractMaker   *contracts.ContractMaker
 	ethClientGetter rpc.EthClientGetter
 	transactor      transactions.TransactorIface
-	ensResolver     *ensresolver.EnsResolver
+	ensResolver     ensResolverIface
 }
 
 func NewENSReleaseProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSReleaseProcessor {
@@ -65,15 +65,6 @@ func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]by
 }
 
 func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, createENSReleaseErrorResponse(err)

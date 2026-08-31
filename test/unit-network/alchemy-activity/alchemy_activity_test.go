@@ -12,9 +12,8 @@ import (
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/rpc"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/testutils"
-	"github.com/status-im/status-go/params/networkdefaults"
+	"github.com/status-im/status-go/pkg/services/networks"
 	alchemymanager "github.com/status-im/status-go/pkg/services/wallet/activityfetcher/alchemy"
 	"github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
@@ -29,15 +28,14 @@ func setupAlchemyActivityManager(t *testing.T) *alchemymanager.Manager {
 	walletDB, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
-	walletSecrets := t_common.GetWalletSecretsConfigFromEnv()
-	defaultNetworks := networkdefaults.BuildDefaultNetworks(walletSecrets, true)
-	networkManager := network.NewManager(appDB, nil)
+	walletConfig := t_common.GetWalletConfigFromEnv()
+	defaultNetworks := networks.BuildDefaultNetworks(walletConfig, true)
+	networkManager := networks.NewManager(appDB, nil)
 	err = networkManager.InitEmbeddedNetworks(defaultNetworks)
 	require.NoError(t, err)
 
 	config := rpc.ClientConfig{
-		Networks: defaultNetworks,
-		DB:       appDB,
+		NetworkManager: networkManager,
 	}
 	rpcClient, err := rpc.NewClient(config)
 	require.NoError(t, err)

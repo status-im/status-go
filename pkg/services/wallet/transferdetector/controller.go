@@ -17,10 +17,10 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
+	"github.com/status-im/status-go/pkg/services/networks"
 
 	"go.uber.org/zap"
 )
@@ -156,7 +156,7 @@ func (c *Controller) startNetworksWatcher() {
 		return
 	}
 
-	ch, unsubFn := pubsub.Subscribe[network.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
+	ch, unsubFn := pubsub.Subscribe[networks.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
 
 	go func() {
 		defer panics.LogOnPanic()

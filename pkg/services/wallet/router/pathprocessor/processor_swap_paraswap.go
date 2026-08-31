@@ -245,10 +245,6 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 }
 
 func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	if params.TestsMode {
-		return []byte{}, nil
-	}
-
 	tx, err := s.fetchAndStoreTransaction(params)
 	if err != nil {
 		return []byte{}, createSwapParaswapErrorResponse(err)
@@ -257,15 +253,6 @@ func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]
 }
 
 func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	value := big.NewInt(0)
 	if params.FromToken.IsNative() {
 		value = params.AmountIn
@@ -273,12 +260,12 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
-		return 0, createENSRegisterProcessorErrorResponse(err)
+		return 0, createSwapParaswapErrorResponse(err)
 	}
 
 	ethClient, err := s.ethClientGetter.EthClient(params.FromToken.ChainID)
 	if err != nil {
-		return 0, createENSRegisterProcessorErrorResponse(err)
+		return 0, createSwapParaswapErrorResponse(err)
 	}
 
 	msg := ethereum.CallMsg{
@@ -290,7 +277,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		return 0, createENSRegisterProcessorErrorResponse(err)
+		return 0, createSwapParaswapErrorResponse(err)
 	}
 
 	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor

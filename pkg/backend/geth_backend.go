@@ -58,12 +58,12 @@ import (
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/backend/node"
 	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/services/ens"
 	"github.com/status-im/status-go/pkg/services/ext"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/pairing/statecontrol"
 	"github.com/status-im/status-go/pkg/services/personal"
 	"github.com/status-im/status-go/pkg/services/typeddata"
@@ -743,8 +743,8 @@ func (b *StatusBackend) updateAccountColorHashAndColorID(keyUID string, accounts
 	return multiAccount, nil
 }
 
-func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login, thirdpartyServicesEnabled bool) {
-	conf.Networks = networkdefaults.BuildDefaultNetworks(&request.WalletSecretsConfig, thirdpartyServicesEnabled)
+func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, walletConfig *params.WalletConfig, thirdpartyServicesEnabled bool) {
+	conf.Networks = networks.BuildDefaultNetworks(walletConfig, thirdpartyServicesEnabled)
 }
 
 func (b *StatusBackend) LoginAccount(request *requests.Login) error {
@@ -752,6 +752,7 @@ func (b *StatusBackend) LoginAccount(request *requests.Login) error {
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
+		b.clearProfileSecretCache()
 	}
 	if b.LocalPairingStateManager.IsPairing() {
 		if err == nil {
@@ -770,6 +771,12 @@ func (b *StatusBackend) LoginAccount(request *requests.Login) error {
 func (b *StatusBackend) loginAccount(request *requests.Login) error {
 	if err := request.Validate(); err != nil {
 		return err
+	}
+
+	if request.DEK != "" {
+		if err := b.prepareDEKLogin(request); err != nil {
+			return err
+		}
 	}
 
 	if request.Mnemonic != "" {
@@ -852,7 +859,7 @@ func (b *StatusBackend) loginAccount(request *requests.Login) error {
 		return errors.Wrap(err, "failed to load accountSettings")
 	}
 
-	b.overrideNetworks(b.config, request, accountSettings.ThirdpartyServicesEnabled)
+	b.overrideNetworks(b.config, &defaultCfg.WalletConfig, accountSettings.ThirdpartyServicesEnabled)
 
 	if request.APIConfig != nil {
 		overrideApiConfig(b.config, request.APIConfig)
@@ -1211,7 +1218,16 @@ func (b *StatusBackend) changeDatabasePasswordSerialized(keyUID, password, newPa
 		if !rekey {
 			// Fast path: nothing that is open (databases, keystore, node) changes.
 			if err := envelope.Rewrap(b.rootDataDir, keyUID, password, newPassword); err != nil {
-				return nil, err
+				if !errors.Is(err, envelope.ErrInvalidKEK) {
+					return nil, err
+				}
+				resolved, rerr := b.resolveProfileSecret(keyUID, password, 0)
+				if rerr != nil || !resolved.migrated {
+					return nil, err
+				}
+				if werr := envelope.Write(b.rootDataDir, keyUID, resolved.secret, newPassword, resolved.dbKdfIter); werr != nil {
+					return nil, werr
+				}
 			}
 			b.refreshSecretCacheKEK(keyUID, newPassword)
 			return nil, nil
@@ -1826,6 +1842,7 @@ func (b *StatusBackend) prepareSettings(request *requests.CreateAccount, mnemoni
 	if !restoreAccount {
 		s.Mnemonic = &mnemonic
 		s.MnemonicWasNotShown = true
+		s.SupportBotContactRequestState = settings.SupportBotContactRequestStatePendingNew
 	}
 
 	if request.WakuV2Fleet != "" {
@@ -2752,7 +2769,7 @@ func (b *StatusBackend) initProtocol() error {
 		MetricsEnabled:         b.prometheusMetrics != nil,
 		TokenManager:           NewCommunitiesTokenManager(b.statusNode.TokenManager()),
 		TokenBalanceManager:    NewCommunitiesTokenBalanceManager(b.statusNode.TokenBalancesFetcher(), b.statusNode.TokenBalancesStorage()),
-		NetworkManager:         NewCommunitiesNetworkManager(b.statusNode.RPCClient().GetNetworkManager()),
+		NetworkManager:         NewCommunitiesNetworkManager(b.statusNode.NetworkManager()),
 	}
 	err = st.InitProtocol(params)
 	if err != nil {

@@ -24,7 +24,6 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/logutils"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/services/typeddata"
 	"github.com/status-im/status-go/pkg/services/wallet/activity"
@@ -324,47 +323,6 @@ func (api *API) GetUnsupportedCollectibleChainIds(_ context.Context) ([]uint64, 
 /*
    Collectibles API End
 */
-
-// @deprecated: Custom networks not currently supported. Change settings using specific API functions.
-func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
-	logutils.ZapLogger().Debug("call to AddEthereumChain")
-	return api.s.rpcClient.GetNetworkManager().Upsert(&network)
-}
-
-// @deprecated: Custom networks not currently supported. Change settings using specific API functions.
-func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
-	logutils.ZapLogger().Debug("call to DeleteEthereumChain")
-	return api.s.rpcClient.GetNetworkManager().Delete(chainID)
-}
-
-func (api *API) SetChainUserRpcProviders(ctx context.Context, chainID uint64, rpcProviders []params.RpcProvider) error {
-	logutils.ZapLogger().Debug("call to SetChainUserRpcProviders")
-	return api.s.rpcClient.GetNetworkManager().SetUserRpcProviders(chainID, rpcProviders)
-}
-
-// Active chains are the ones that are available for selection across the whole application
-// Providers are expected to be accessed only for active chains.
-func (api *API) SetChainActive(ctx context.Context, chainID uint64, active bool) error {
-	logutils.ZapLogger().Debug("call to SetChainActive")
-	return api.s.rpcClient.GetNetworkManager().SetActive(chainID, active)
-}
-
-// Enabled chains are the ones taken into account when displaying balances, collectibles, activity, etc.
-func (api *API) SetChainEnabled(ctx context.Context, chainID uint64, enabled bool) error {
-	logutils.ZapLogger().Debug("call to SetChainEnabled")
-	return api.s.rpcClient.GetNetworkManager().SetEnabled(chainID, enabled)
-}
-
-// @deprecated: Combined networks are not used anymore, use GetFlatEthereumChains instead
-func (api *API) GetEthereumChains(ctx context.Context) ([]*network.CombinedNetwork, error) {
-	logutils.ZapLogger().Debug("call to GetEthereumChains")
-	return api.s.rpcClient.GetNetworkManager().GetCombinedNetworks()
-}
-
-func (api *API) GetFlatEthereumChains(ctx context.Context) ([]*params.Network, error) {
-	logutils.ZapLogger().Debug("call to GetFlatEthereumChains")
-	return api.s.rpcClient.GetNetworkManager().GetAll()
-}
 
 // @deprecated
 // FetchPrices fetches prices for a given token keys and currencies. If no tokens are provided, all tokens of interest are fetched.

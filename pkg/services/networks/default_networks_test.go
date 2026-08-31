@@ -1,4 +1,4 @@
-package networkdefaults
+package networks
 
 import (
 	"strings"
@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/wallet/common"
@@ -17,15 +16,13 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	infuraToken := security.NewSensitiveString("infura-token")
 	poktToken := security.NewSensitiveString("pokt-token")
 	stageName := "fast-n-bulbous"
-	request := &requests.CreateAccount{
-		WalletSecretsConfig: requests.WalletSecretsConfig{
-			InfuraToken:          infuraToken,
-			PoktToken:            poktToken,
-			StatusProxyStageName: stageName,
-		},
+	walletConfig := &params.WalletConfig{
+		InfuraAPIKey:         infuraToken,
+		PoktAPIKey:           poktToken,
+		StatusProxyStageName: stageName,
 	}
 
-	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig, true)
+	actualNetworks := BuildDefaultNetworks(walletConfig, true)
 
 	require.Len(t, actualNetworks, 31)
 	for _, n := range actualNetworks {

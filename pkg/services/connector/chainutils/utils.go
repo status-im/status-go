@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/status-im/status-go/internal/rpc/network"
+	"github.com/status-im/status-go/pkg/services/networks"
 )
 
 var (
@@ -15,10 +15,10 @@ var (
 
 // Implement DefaultChainIDGetter interface
 type NetworkManagerAdapter struct {
-	networkManager *network.Manager
+	networkManager *networks.Manager
 }
 
-func NewNetworkManagerAdapter(networkManager *network.Manager) *NetworkManagerAdapter {
+func NewNetworkManagerAdapter(networkManager *networks.Manager) *NetworkManagerAdapter {
 	return &NetworkManagerAdapter{
 		networkManager: networkManager,
 	}
@@ -29,7 +29,7 @@ func (a *NetworkManagerAdapter) GetDefaultChainID() (uint64, error) {
 }
 
 // GetSupportedChainIDs retrieves the chain IDs from the provided NetworkManager.
-func GetSupportedChainIDs(networkManager *network.Manager) ([]uint64, error) {
+func GetSupportedChainIDs(networkManager *networks.Manager) ([]uint64, error) {
 	activeNetworks, err := networkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func GetSupportedChainIDs(networkManager *network.Manager) ([]uint64, error) {
 	return chainIDs, nil
 }
 
-func GetDefaultChainID(networkManager *network.Manager) (uint64, error) {
+func GetDefaultChainID(networkManager *networks.Manager) (uint64, error) {
 	chainIDs, err := GetSupportedChainIDs(networkManager)
 	if err != nil {
 		return 0, err

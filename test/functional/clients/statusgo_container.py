@@ -63,6 +63,7 @@ class StatusGoContainer:
                 "GOCOVERDIR": "/coverage/binary",
                 "STATUS_ALLOW_FORCE_REEVAL": "1",
                 "STATUS_GO_DISABLE_PINNED_BOOTSTRAP": "1",
+                "STATUS_GO_DISABLE_SUPPORT_BOT_CONTACT_REQUEST": "1",
             },
             "volumes": {
                 coverage_path: {

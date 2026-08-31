@@ -1,4 +1,4 @@
-package networkhelper_test
+package networks
 
 import (
 	"reflect"
@@ -12,10 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/networks/testutil"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
@@ -40,7 +39,7 @@ func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {
 	}
 
 	// Call MergeProviders
-	mergedProviders := networkhelper.MergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders)
+	mergedProviders := mergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders)
 
 	expectedEmbeddedProvider1 := newProviders[0]
 	expectedEmbeddedProvider1.Enabled = false // Should retain Enabled: false
@@ -79,7 +78,7 @@ func TestOverrideBasicAuth(t *testing.T) {
 	// Test updating EmbeddedEthRpcProxyProviderType providers
 	user2 := security.NewSensitiveString(gofakeit.Username())
 	password2 := security.NewSensitiveString(gofakeit.LetterN(5))
-	updatedNetworks := networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, user2, password2)
+	updatedNetworks := OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, user2, password2)
 
 	// Verify the networks
 	for i, network := range updatedNetworks {
@@ -122,7 +121,7 @@ func TestOverrideBasicAuth_PuzzleProvidersLeftUntouched(t *testing.T) {
 	user := security.NewSensitiveString("u")
 	pass := security.NewSensitiveString("p")
 
-	updated := networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, user, pass)
+	updated := OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, true, user, pass)
 	require.Len(t, updated, 1)
 	for _, p := range updated[0].RpcProviders {
 		if p.AuthType == params.PuzzleAuth {
@@ -138,7 +137,7 @@ func TestOverrideBasicAuth_PuzzleProvidersLeftUntouched(t *testing.T) {
 		}
 	}
 
-	disabled := networkhelper.OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, false, user, pass)
+	disabled := OverrideBasicAuth(networks, params.EmbeddedEthRpcProxyProviderType, false, user, pass)
 	for _, p := range disabled[0].RpcProviders {
 		if p.AuthType == params.PuzzleAuth {
 			require.Equal(t, params.PuzzleAuth, p.AuthType)
@@ -174,8 +173,8 @@ func TestOverrideDirectProvidersAuth(t *testing.T) {
 		"example.com": security.NewSensitiveString(gofakeit.UUID()),
 	}
 
-	// Call OverrideDirectProvidersAuth
-	updatedNetworks := networkhelper.OverrideDirectProvidersAuth(networks, authTokens)
+	// Call overrideDirectProvidersAuth
+	updatedNetworks := overrideDirectProvidersAuth(networks, authTokens)
 
 	// Verify the networks have updated auth tokens correctly
 	for i, network := range updatedNetworks {

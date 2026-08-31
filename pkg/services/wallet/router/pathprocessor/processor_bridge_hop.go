@@ -9,7 +9,6 @@ import (
 	netUrl "net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -31,8 +30,8 @@ import (
 	hopL2OptimismBridge "github.com/status-im/status-go/internal/contracts/hop/l2Contracts/l2OptimismBridge"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
-	"github.com/status-im/status-go/internal/rpc/network"
 	"github.com/status-im/status-go/internal/transactions"
+	"github.com/status-im/status-go/pkg/services/networks"
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
@@ -129,17 +128,22 @@ func (bf *BonderFee) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// hopHTTPClient abstracts the HTTP client used for the Hop quote API so tests can substitute a fake.
+type hopHTTPClient interface {
+	DoGetRequest(ctx context.Context, url string, params netUrl.Values, options ...thirdparty.RequestOption) ([]byte, error)
+}
+
 type HopBridgeProcessor struct {
 	transactor      transactions.TransactorIface
-	httpClient      *thirdparty.HTTPClient
+	httpClient      hopHTTPClient
 	tokenManager    *token.Manager
 	contractMaker   *contracts.ContractMaker
 	ethClientGetter rpc.EthClientGetter
-	networkManager  network.ManagerInterface
+	networkManager  networks.ManagerInterface
 	bonderFee       *sync.Map // [fromChainName-toChainName]BonderFee
 }
 
-func NewHopBridgeProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager network.ManagerInterface) *HopBridgeProcessor {
+func NewHopBridgeProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *token.Manager, networkManager networks.ManagerInterface) *HopBridgeProcessor {
 	return &HopBridgeProcessor{
 		contractMaker:   contracts.NewContractMaker(ethClientGetter),
 		ethClientGetter: ethClientGetter,
@@ -219,9 +223,6 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, token *token
 }
 
 func (h *HopBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	if params.TestsMode {
-		return []byte{}, nil
-	}
 	_, contractType, err := hop.GetContractAddress(params.FromToken)
 	if err != nil {
 		return []byte{}, createBridgeHopErrorResponse(err)
@@ -260,15 +261,6 @@ func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputPara
 }
 
 func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[h.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
 	value := big.NewInt(0)
 	if params.FromToken.IsNative() {
 		value = params.AmountIn
@@ -388,23 +380,6 @@ func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs
 
 func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
 	bonderKey := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
-	if params.TestsMode {
-		if val, ok := params.TestBonderFeeMap[params.FromToken.Symbol]; ok {
-			res := new(big.Int).Sub(params.AmountIn, val)
-			bonderFee := &BonderFee{
-				AmountIn:                &bigint.BigInt{Int: params.AmountIn},
-				Slippage:                5,
-				AmountOutMin:            &bigint.BigInt{Int: res},
-				DestinationAmountOutMin: &bigint.BigInt{Int: res},
-				BonderFee:               &bigint.BigInt{Int: val},
-				EstimatedRecieved:       &bigint.BigInt{Int: res},
-				Deadline:                time.Now().Add(pathProcessorCommon.SevenDaysInSeconds).Unix(),
-			}
-			h.bonderFee.Store(bonderKey, bonderFee)
-			return val, walletCommon.ZeroBigIntValue(), nil
-		}
-		return nil, nil, ErrNoBonderFeeFound
-	}
 
 	hopChainsMap := map[uint64]string{
 		walletCommon.EthereumMainnet: "ethereum",

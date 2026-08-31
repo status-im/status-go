@@ -16,6 +16,7 @@ import (
 	statusRPC "github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/transactions/fake"
+	"github.com/status-im/status-go/pkg/services/networks"
 )
 
 func createDB(t *testing.T) (*sql.DB, func()) {
@@ -33,9 +34,12 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 
 	_ = client
 
+	networkManager := networks.NewManager(db, nil)
+	require.NotNil(t, networkManager)
+	require.NoError(t, networkManager.InitEmbeddedNetworks(nil))
+
 	config := statusRPC.ClientConfig{
-		Networks: nil,
-		DB:       db,
+		NetworkManager: networkManager,
 	}
 	rpcClient, err := statusRPC.NewClient(config)
 	require.NoError(t, err)

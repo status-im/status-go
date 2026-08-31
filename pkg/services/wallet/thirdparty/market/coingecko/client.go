@@ -33,6 +33,10 @@ type Client struct {
 	creds            *thirdparty.BasicCreds
 	coingeckoProKey  security.SensitiveString
 	coingeckoDemoKey security.SensitiveString
+
+	// isMarketProxy marks a client pointed at the Status market proxy, which
+	// understands convert_currency and normalizes vs_currency to usd.
+	isMarketProxy bool
 }
 
 type Params struct {
@@ -41,6 +45,9 @@ type Params struct {
 	Password            security.SensitiveString
 	CoingeckoAPIKey     security.SensitiveString
 	CoingeckoDemoAPIKey security.SensitiveString
+	// IsMarketProxy tells the client it talks to the Status market proxy
+	// rather than api.coingecko.com.
+	IsMarketProxy bool
 }
 
 func NewClientWithParams(params Params) *Client {
@@ -74,6 +81,7 @@ func NewClientWithParams(params Params) *Client {
 		creds:            creds,
 		coingeckoProKey:  params.CoingeckoAPIKey,
 		coingeckoDemoKey: params.CoingeckoDemoAPIKey,
+		isMarketProxy:    params.IsMarketProxy,
 	}
 }
 

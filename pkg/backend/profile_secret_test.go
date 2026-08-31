@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/accounts-management/keystore"
 	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 )
 
@@ -115,6 +116,89 @@ func TestResolveProfileSecretCacheIsPerProfile(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, resolved.migrated)
 	require.Equal(t, secretTestPassword, resolved.secret)
+}
+
+func TestResolveProfileSecretAcceptsClientHashedDEKWhenWarm(t *testing.T) {
+	b := newSecretTestBackend(t)
+
+	dek, err := envelope.Generate()
+	require.NoError(t, err)
+	require.NoError(t, envelope.Write(b.rootDataDir, secretTestKeyUID, dek, secretTestPassword, 3200))
+
+	// Cold: the client-hashed DEK is not a valid KEK.
+	_, err = b.resolveProfileSecret(secretTestKeyUID, clientHashOf(dek), 0)
+	require.ErrorIs(t, err, envelope.ErrInvalidKEK)
+
+	// Warm the cache with the real password; the client-hashed DEK then resolves.
+	_, err = b.resolveProfileSecret(secretTestKeyUID, secretTestPassword, 0)
+	require.NoError(t, err)
+	resolved, err := b.resolveProfileSecret(secretTestKeyUID, clientHashOf(dek), 0)
+	require.NoError(t, err)
+	require.True(t, resolved.migrated)
+	require.Equal(t, dek, resolved.secret)
+
+	// Cleared again: rejected again.
+	b.clearProfileSecretCache()
+	_, err = b.resolveProfileSecret(secretTestKeyUID, clientHashOf(dek), 0)
+	require.ErrorIs(t, err, envelope.ErrInvalidKEK)
+}
+
+func TestPrimeSecretCacheWithDEK(t *testing.T) {
+	b := newSecretTestBackend(t)
+
+	dek, err := envelope.Generate()
+	require.NoError(t, err)
+	require.NoError(t, envelope.Write(b.rootDataDir, secretTestKeyUID, dek, secretTestPassword, 3200))
+
+	b.primeSecretCacheWithDEK(secretTestKeyUID, dek, 3200)
+
+	// The raw DEK and its client hash both resolve from the primed cache.
+	resolved, err := b.resolveProfileSecret(secretTestKeyUID, dek, 0)
+	require.NoError(t, err)
+	require.True(t, resolved.migrated)
+	require.Equal(t, dek, resolved.secret)
+	require.Equal(t, 3200, resolved.dbKdfIter)
+
+	resolved, err = b.resolveProfileSecret(secretTestKeyUID, clientHashOf(dek), 0)
+	require.NoError(t, err)
+	require.Equal(t, dek, resolved.secret)
+
+	// No KEK is known for a primed session, so the real password takes the cold path,
+	// re-verifies against the envelope and restores the KEK fingerprint.
+	resolved, err = b.resolveProfileSecret(secretTestKeyUID, secretTestPassword, 0)
+	require.NoError(t, err)
+	require.Equal(t, dek, resolved.secret)
+
+	// Wrong values still fail.
+	_, err = b.resolveProfileSecret(secretTestKeyUID, "0xwrong", 0)
+	require.ErrorIs(t, err, envelope.ErrInvalidKEK)
+}
+
+func TestExportProfileDEK(t *testing.T) {
+	b := newSecretTestBackend(t)
+
+	// Legacy profile: the password must never be echoed back as a "DEK".
+	_, err := b.ExportProfileDEK(secretTestKeyUID, secretTestPassword)
+	require.ErrorIs(t, err, ErrProfileNotMigratedToDEK)
+
+	dek, err := envelope.Generate()
+	require.NoError(t, err)
+	require.NoError(t, envelope.Write(b.rootDataDir, secretTestKeyUID, dek, secretTestPassword, 3200))
+
+	// Correct KEK, cold.
+	exported, err := b.ExportProfileDEK(secretTestKeyUID, secretTestPassword)
+	require.NoError(t, err)
+	require.Equal(t, dek, exported)
+
+	// Session credential (client-hashed DEK), warm.
+	exported, err = b.ExportProfileDEK(secretTestKeyUID, clientHashOf(dek))
+	require.NoError(t, err)
+	require.Equal(t, dek, exported)
+
+	// Wrong KEK, cold: reported as an incorrect password.
+	b.clearProfileSecretCache()
+	_, err = b.ExportProfileDEK(secretTestKeyUID, "0xwrong")
+	require.ErrorIs(t, err, keystore.ErrIncorrectPasswordProvided)
 }
 
 func TestOpenDBWithCredsFallback(t *testing.T) {

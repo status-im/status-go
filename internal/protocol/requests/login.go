@@ -2,15 +2,19 @@ package requests
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
 	"strings"
 
+	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	"github.com/status-im/status-go/internal/crypto"
 )
 
 var (
 	ErrLoginInvalidKeyUID                   = errors.New("login: invalid key-uid")
 	ErrLoginInvalidKeycardWhisperPrivateKey = errors.New("login: invalid keycard whisper private key")
+	ErrLoginInvalidDEK                      = errors.New("login: DEK must be 32 hex-encoded bytes")
+	ErrLoginDEKMutuallyExclusive            = errors.New("login: DEK cannot be combined with password, mnemonic or keycard keys")
 )
 
 type Login struct {
@@ -40,6 +44,9 @@ type Login struct {
 	// - KeyUID is ignored and replaced with hash of the master public key
 	Mnemonic string `json:"mnemonic"`
 
+	// DEK is the profile's raw data-encryption key used for biometric login on profiles migrated to the DEK encryption scheme.
+	DEK string `json:"dek"`
+
 	WalletConfig
 	WalletSecretsConfig
 
@@ -61,6 +68,17 @@ func (c *Login) Validate() error {
 		if err != nil {
 			return ErrLoginInvalidKeycardWhisperPrivateKey
 		}
+	}
+
+	if c.DEK != "" {
+		if c.Password != "" || c.Mnemonic != "" || c.KeycardWhisperPrivateKey != "" {
+			return ErrLoginDEKMutuallyExclusive
+		}
+		dek, err := hex.DecodeString(c.DEK)
+		if err != nil || len(dek) != envelope.DekLength {
+			return ErrLoginInvalidDEK
+		}
+		c.DEK = hex.EncodeToString(dek)
 	}
 
 	return nil

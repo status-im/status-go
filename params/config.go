@@ -218,6 +218,7 @@ type WalletConfig struct {
 	AlchemyAPIKey         security.SensitiveString `json:"AlchemyAPIKey"`
 	InfuraAPIKey          security.SensitiveString `json:"InfuraAPIKey"`
 	InfuraAPIKeySecret    security.SensitiveString `json:"InfuraAPIKeySecret"`
+	PoktAPIKey            security.SensitiveString `json:"PoktAPIKey"`
 	CoingeckoAPIKey       security.SensitiveString `json:"CoingeckoAPIKey"`
 	CoingeckoDemoAPIKey   security.SensitiveString `json:"CoingeckoDemoAPIKey"`
 	MarketDataProxyConfig MarketDataProxyConfig    `json:"MarketDataProxyConfig"`

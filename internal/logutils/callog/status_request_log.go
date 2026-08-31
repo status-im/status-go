@@ -20,6 +20,7 @@ var sensitiveKeys = []string{
 	"password",
 	"newPassword",
 	"mnemonic",
+	"dek",
 	"poktToken",
 	"infuraToken",
 	"infuraSecret",

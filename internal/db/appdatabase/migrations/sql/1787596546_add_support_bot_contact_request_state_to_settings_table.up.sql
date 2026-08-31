@@ -1,0 +1,1 @@
+ALTER TABLE settings ADD COLUMN support_bot_contact_request_state INTEGER NOT NULL DEFAULT 0;

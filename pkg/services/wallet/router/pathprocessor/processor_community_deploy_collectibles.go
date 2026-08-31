@@ -74,10 +74,6 @@ func (s *CommunityDeployCollectiblesProcessor) PackTxInputData(params ProcessorI
 }
 
 func (s *CommunityDeployCollectiblesProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		return 0, ErrNoEstimationFound
-	}
-
 	ethClient, err := s.ethClientGetter.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, createCommunityDeployCollectiblesErrorResponse(err)

@@ -1,4 +1,4 @@
-package network
+package networks
 
 import (
 	"database/sql"
@@ -11,11 +11,10 @@ import (
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
-	"github.com/status-im/status-go/internal/rpc/network/db"
-	persistence "github.com/status-im/status-go/internal/rpc/network/db"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/pkg/pubsub"
+	"github.com/status-im/status-go/pkg/services/networks/db"
+	persistence "github.com/status-im/status-go/pkg/services/networks/db"
 )
 
 //go:generate go tool mockgen -package=mock -source=network.go -destination=mock/network.go
@@ -166,11 +165,11 @@ func (nm *Manager) InitEmbeddedNetworks(embeddedNetworks []params.Network) error
 		var updatedNetworks []params.Network
 		for _, newNetwork := range embeddedNetworks {
 			if existingNetwork, exists := currentNetworskMap[newNetwork.ChainID]; exists {
-				newNetwork.RpcProviders = networkhelper.GetUserProviders(existingNetwork.RpcProviders)
+				newNetwork.RpcProviders = getUserProviders(existingNetwork.RpcProviders)
 				newNetwork.Enabled = existingNetwork.Enabled
 				newNetwork.IsActive = existingNetwork.IsActive
 			} else {
-				newNetwork.RpcProviders = networkhelper.GetUserProviders(newNetwork.RpcProviders)
+				newNetwork.RpcProviders = getUserProviders(newNetwork.RpcProviders)
 			}
 			updatedNetworks = append(updatedNetworks, newNetwork)
 		}
@@ -201,19 +200,19 @@ func (nm *Manager) setEmbeddedFields(networks []*params.Network) {
 		if embeddedNetwork != nil {
 			network.IsDeactivatable = embeddedNetwork.IsDeactivatable
 			// Append embedded providers to the user providers
-			network.RpcProviders = networkhelper.ReplaceEmbeddedProviders(
+			network.RpcProviders = replaceEmbeddedProviders(
 				network.RpcProviders, embeddedNetwork.RpcProviders)
 		}
 	}
 
 	// CommunitiesSupported is derived (not persisted) and should always reflect the contract availability.
-	networkhelper.ApplyCommunitiesSupported(networks)
+	applyCommunitiesSupported(networks)
 }
 
 // networkWithoutEmbeddedProviders returns a copy of the given network without embedded RPC providers.
 func (nm *Manager) networkWithoutEmbeddedProviders(network *params.Network) *params.Network {
 	networkCopy := network.DeepCopy()
-	networkCopy.RpcProviders = networkhelper.GetUserProviders(network.RpcProviders)
+	networkCopy.RpcProviders = getUserProviders(network.RpcProviders)
 	return &networkCopy
 }
 
@@ -248,7 +247,7 @@ func (nm *Manager) Delete(chainID uint64) error {
 // SetUserRpcProviders updates user RPC providers, wrapped in a transaction.
 func (nm *Manager) SetUserRpcProviders(chainID uint64, userProviders []params.RpcProvider) error {
 	rpcPersistence := nm.networkPersistence.GetRpcPersistence()
-	return rpcPersistence.SetRpcProviders(chainID, networkhelper.GetUserProviders(userProviders))
+	return rpcPersistence.SetRpcProviders(chainID, getUserProviders(userProviders))
 }
 
 // SetActive updates the active status of a network

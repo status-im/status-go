@@ -180,7 +180,7 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 							zap.Int("paths", len(r.activeRoutes.Route)))
 						usedNonces := make(map[uint64]uint64)
 						for _, path := range r.activeRoutes.Route {
-							err = r.evaluateAndUpdatePathDetails(ctx, path, fees, usedNonces, noBaseFee, noPriorityFee, false, 0)
+							err = r.evaluateAndUpdatePathDetails(ctx, path, fees, usedNonces, noBaseFee, noPriorityFee)
 							if err != nil {
 								break
 							}

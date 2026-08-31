@@ -55,4 +55,10 @@ in rec {
 
   # Custom packages
   codecov-cli = callPackage ./pkgs/codecov-cli { };
+
+  # Not yet packaged in the pinned nixpkgs.
+  protobuf_36 = callPackage "${prev.path}/pkgs/development/libraries/protobuf/generic.nix" {
+    version = "36.0";
+    hash = "sha256-VGXFfqLm7IEJ9MQpMYhdVW5qPZbrYZ6q+0Y1TqQkjks=";
+  };
 }

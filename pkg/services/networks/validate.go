@@ -1,4 +1,4 @@
-package networkhelper
+package networks
 
 import (
 	"gopkg.in/go-playground/validator.v9"
@@ -6,7 +6,7 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-func GetValidator() *validator.Validate {
+func getValidator() *validator.Validate {
 	validate := validator.New()
 
 	// Register struct-level validation for RpcProvider

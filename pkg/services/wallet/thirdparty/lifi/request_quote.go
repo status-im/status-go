@@ -37,7 +37,7 @@ type Quote struct {
 	TransactionRequest TransactionRequest `json:"transactionRequest"`
 }
 
-func (c *Client) FetchQuote(ctx context.Context, p QuoteParams) (Quote, error) {
+func (c *Client) quoteQueryParams(p QuoteParams) netUrl.Values {
 	toChainID := p.ToChainID
 	if toChainID == 0 {
 		toChainID = p.FromChainID
@@ -53,6 +53,16 @@ func (c *Client) FetchQuote(ctx context.Context, p QuoteParams) (Quote, error) {
 	params.Add("fromAmount", p.AmountIn.String())
 	params.Add("slippage", strconv.FormatFloat(float64(p.SlippagePercentage)/100.0, 'f', -1, 64))
 	params.Add("integrator", c.integrator)
+	params.Add("fee", feeFraction)
+	// omitted when empty so LI.FI keeps applying its own default ordering
+	if p.Order != "" {
+		params.Add("order", p.Order)
+	}
+	return params
+}
+
+func (c *Client) FetchQuote(ctx context.Context, p QuoteParams) (Quote, error) {
+	params := c.quoteQueryParams(p)
 
 	options := []thirdparty.RequestOption{}
 	if c.apiKey != "" {

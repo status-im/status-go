@@ -6,9 +6,23 @@ ENV CC=clang
 ENV CXX=clang++
 
 RUN apt-get update \
-    && apt-get install -y git bash make cmake llvm clang protobuf-compiler build-essential pkg-config curl xz-utils jq unzip \
+    && apt-get install -y git bash make cmake llvm clang build-essential pkg-config curl xz-utils jq unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install protoc from pre-built binaries
+ARG PROTOC_VERSION=36.0
+RUN set -eu && \
+    DPKG_ARCH="$(dpkg --print-architecture)" && \
+    case "$DPKG_ARCH" in \
+    amd64) PROTOC_ARCH="x86_64" ;; \
+    arm64) PROTOC_ARCH="aarch_64" ;; \
+    *) echo "Unsupported architecture: $DPKG_ARCH" >&2; exit 1 ;; \
+    esac && \
+    curl -sSfL "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-${PROTOC_ARCH}.zip" -o /tmp/protoc.zip && \
+    unzip -q /tmp/protoc.zip -d /usr/local bin/protoc 'include/*' && \
+    rm /tmp/protoc.zip && \
+    protoc --version
 
 # Install Nim from pre-built binaries
 ARG NIM_VERSION=2.2.4
@@ -44,7 +58,6 @@ WORKDIR /go/src/github.com/status-im/status-go
 
 ADD go.mod go.sum ./
 RUN go mod download
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 
 ADD . .
 ARG cache_id='local'

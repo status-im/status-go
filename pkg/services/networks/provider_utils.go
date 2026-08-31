@@ -1,17 +1,17 @@
-package networkhelper
+package networks
 
 import (
 	"net/url"
 	"strings"
 
-	"github.com/status-im/status-go/internal/rpc/network/db"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/networks/db"
 )
 
-// MergeProvidersPreservingUsersAndEnabledState merges new embedded providers with the current ones,
+// mergeProvidersPreservingUsersAndEnabledState merges new embedded providers with the current ones,
 // preserving user-defined providers and maintaining the Enabled state.
-func MergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders []params.RpcProvider) []params.RpcProvider {
+func mergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders []params.RpcProvider) []params.RpcProvider {
 	// Create a map for quick lookup of the Enabled state by Name
 	enabledState := make(map[string]bool, len(currentProviders))
 	for _, provider := range currentProviders {
@@ -50,8 +50,8 @@ func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
 	return embeddedProviders
 }
 
-// GetUserProviders returns the user-defined providers from the list.
-func GetUserProviders(providers []params.RpcProvider) []params.RpcProvider {
+// getUserProviders returns the user-defined providers from the list.
+func getUserProviders(providers []params.RpcProvider) []params.RpcProvider {
 	userProviders := make([]params.RpcProvider, 0, len(providers))
 	for _, provider := range providers {
 		if provider.Type == params.UserProviderType {
@@ -61,10 +61,10 @@ func GetUserProviders(providers []params.RpcProvider) []params.RpcProvider {
 	return userProviders
 }
 
-// ReplaceEmbeddedProviders replaces embedded providers with new ones, retaining user-defined providers.
-func ReplaceEmbeddedProviders(currentProviders, newEmbeddedProviders []params.RpcProvider) []params.RpcProvider {
+// replaceEmbeddedProviders replaces embedded providers with new ones, retaining user-defined providers.
+func replaceEmbeddedProviders(currentProviders, newEmbeddedProviders []params.RpcProvider) []params.RpcProvider {
 	// Extract user-defined providers from the current list
-	userProviders := GetUserProviders(currentProviders)
+	userProviders := getUserProviders(currentProviders)
 	embeddedProviders := GetEmbeddedProviders(newEmbeddedProviders)
 
 	// Combine existing user-defined providers with the new embedded providers
@@ -74,7 +74,7 @@ func ReplaceEmbeddedProviders(currentProviders, newEmbeddedProviders []params.Rp
 // OverrideBasicAuth updates providers of the specified type in the given networks.
 // It sets the `Enabled` flag and configures the `AuthLogin` and `AuthPassword` for each matching provider.
 func OverrideBasicAuth(networks []params.Network, providerType params.RpcProviderType, enabled bool, user, password security.SensitiveString) []params.Network {
-	updatedNetworks := DeepCopyNetworks(networks)
+	updatedNetworks := deepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
 		network := &updatedNetworks[i]
@@ -96,7 +96,7 @@ func OverrideBasicAuth(networks []params.Network, providerType params.RpcProvide
 	return updatedNetworks
 }
 
-func DeepCopyNetworks(networks []params.Network) []params.Network {
+func deepCopyNetworks(networks []params.Network) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
 	for i, network := range networks {
 		updatedNetworks[i] = network.DeepCopy()
@@ -104,8 +104,8 @@ func DeepCopyNetworks(networks []params.Network) []params.Network {
 	return updatedNetworks
 }
 
-func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]security.SensitiveString) []params.Network {
-	updatedNetworks := DeepCopyNetworks(networks)
+func overrideDirectProvidersAuth(networks []params.Network, authTokens map[string]security.SensitiveString) []params.Network {
+	updatedNetworks := deepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
 		network := &updatedNetworks[i]

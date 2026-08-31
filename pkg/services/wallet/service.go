@@ -72,9 +72,10 @@ func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.
 	baseURL := leaderboard.GetMarketProxyUrl(config.UrlOverride.Reveal(), config.StageName)
 
 	return coingecko.NewClientWithParams(coingecko.Params{
-		URL:      baseURL,
-		User:     config.User,
-		Password: config.Password,
+		URL:           baseURL,
+		User:          config.User,
+		Password:      config.Password,
+		IsMarketProxy: true,
 	})
 }
 
@@ -311,7 +312,14 @@ func NewService(
 
 	routeExecutionManager := routeexecution.NewManager(db, feed, router, tokenManager, transactionManager)
 
-	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed)
+	// The settings DB is the source of truth for the display currency the
+	// leaderboard has to be fetched in. Guarded so a nil DB does not end up as
+	// a non-nil interface value.
+	var currencySource leaderboard.CurrencySource
+	if accountsDB != nil {
+		currencySource = accountsDB
+	}
+	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, db, feed, currencySource, accountsPublisher)
 
 	alchemyEthClientGetter := rpc.NewProviderChainClientGetter(common.SmartProxyAlchemy, rpcClient)
 	alchemyFetcherDb := activityfetcher_alchemy.NewPersistence(db)

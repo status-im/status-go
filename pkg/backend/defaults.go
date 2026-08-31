@@ -16,8 +16,8 @@ import (
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkdefaults"
 	"github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/services/networks"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
@@ -169,6 +169,10 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.InfuraAPIKey = request.InfuraToken
 	}
 
+	if !request.PoktToken.Empty() {
+		walletConfig.PoktAPIKey = request.PoktToken
+	}
+
 	if !request.InfuraSecret.Empty() {
 		walletConfig.InfuraAPIKeySecret = request.InfuraSecret
 	}
@@ -291,10 +295,12 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 		nodeConfig.LogEnabled = false
 	}
 
+	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
+
 	if request.TestOverrideNetworks != nil {
 		nodeConfig.Networks = request.TestOverrideNetworks
 	} else {
-		nodeConfig.Networks = networkdefaults.BuildDefaultNetworks(&request.WalletSecretsConfig, request.ThirdpartyServicesEnabled)
+		nodeConfig.Networks = networks.BuildDefaultNetworks(&nodeConfig.WalletConfig, request.ThirdpartyServicesEnabled)
 	}
 
 	if request.NetworkID != nil {
@@ -302,8 +308,6 @@ func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAc
 	} else {
 		nodeConfig.NetworkID = nodeConfig.Networks[0].ChainID
 	}
-
-	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}

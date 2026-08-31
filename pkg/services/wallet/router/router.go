@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/errors"
 	"github.com/status-im/status-go/internal/logutils"
 	communityToken "github.com/status-im/status-go/internal/protocol/communities/token"
@@ -71,6 +72,7 @@ type SuggestedRoutes struct {
 
 type Router struct {
 	rpcClient            *rpc.Client
+	contractMaker        contracts.ContractMakerIface
 	transactor           *transactions.Transactor
 	tokenManager         TokenManager
 	tokenBalancesFetcher TokenBalanceFetcher
@@ -112,6 +114,7 @@ func NewRouter(
 	logger := logutils.ZapLogger().Named("router")
 	return &Router{
 		rpcClient:            rpcClient,
+		contractMaker:        contracts.NewContractMaker(rpcClient),
 		transactor:           transactor,
 		tokenManager:         tokenManager,
 		tokenBalancesFetcher: tokenBalancesFetcher,
@@ -262,7 +265,7 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 
 		// update the path details
 		usedNonces := make(map[uint64]uint64)
-		err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee, false, 0)
+		err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee)
 		if err != nil {
 			r.logger.Error("setCustomTxDetails: evaluateAndUpdatePathDetails failed",
 				zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
@@ -427,7 +430,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 			} else {
 				usedNonces[path.FromChain.ChainID] = uint64(*path.TxNonce - 1)
 			}
-			err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee, false, 0)
+			err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee)
 			if err != nil {
 				r.logger.Error("ReevaluateRouterPath: evaluateAndUpdatePathDetails failed",
 					zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
@@ -732,20 +735,9 @@ func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *re
 		zap.String("uuid", input.Uuid),
 		zap.Uint64("fromChain", input.FromChainID),
 		zap.String("tokenKey", input.TokenKey),
-		zap.Stringer("addrFrom", input.AddrFrom),
-		zap.Bool("testsMode", input.TestsMode))
+		zap.Stringer("addrFrom", input.AddrFrom))
 
 	r.activeBalanceMap = sync.Map{}
-
-	if input.TestsMode {
-		for k, v := range input.TestParams.BalanceMap {
-			r.activeBalanceMap.Store(k, v)
-		}
-		r.logger.Debug("prepareBalanceMapForTokenOnChain: tests-mode balance map applied",
-			zap.String("uuid", input.Uuid),
-			zap.Int("entries", len(input.TestParams.BalanceMap)))
-		return
-	}
 
 	// check token existence
 	token := findToken(input.SendType, r.tokenManager, r.collectiblesManager, input.TokenKey)
@@ -861,6 +853,7 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 		FromAddr:           input.AddrFrom,
 		AmountIn:           input.AmountIn.ToInt(),
 		SlippagePercentage: input.SlippagePercentage,
+		RouteOrder:         input.RouteOrder,
 
 		Username:  input.Username,
 		PublicKey: input.PublicKey,
@@ -920,23 +913,11 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 		}
 	}
 
-	if input.TestsMode {
-		processorInputParams.TestsMode = input.TestsMode
-		processorInputParams.TestEstimationMap = input.TestParams.EstimationMap
-		processorInputParams.TestBonderFeeMap = input.TestParams.BonderFeeMap
-		processorInputParams.TestApprovalGasEstimation = input.TestParams.ApprovalGasEstimation
-		processorInputParams.TestApprovalL1Fee = input.TestParams.ApprovalL1Fee
-	}
-
 	return processorInputParams, err
 }
 
-func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputParams, chainID uint64) (fromToken *tokentypes.Token, toToken *tokentypes.Token) {
-	if testsMode {
-		fromToken = input.TestParams.TokenFrom
-	} else {
-		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesManager, input.TokenKey)
-	}
+func (r *Router) findFromAndToTokens(input *requests.RouteInputParams, chainID uint64) (fromToken *tokentypes.Token, toToken *tokentypes.Token) {
+	fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesManager, input.TokenKey)
 	if fromToken == nil {
 		return
 	}
@@ -953,8 +934,6 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		zap.Uint64("toChain", input.ToChainID))
 
 	var (
-		testsMode = input.TestsMode && input.TestParams != nil
-
 		usedNonces   = make(map[uint64]uint64)
 		usedNoncesMu sync.Mutex
 	)
@@ -983,7 +962,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		return
 	}
 
-	fromToken, toToken := r.findFromAndToTokens(testsMode, input, input.FromChainID)
+	fromToken, toToken := r.findFromAndToTokens(input, input.FromChainID)
 	if fromToken == nil {
 		r.logger.Error("resolveRoute: from token not found",
 			zap.String("uuid", input.Uuid),
@@ -1012,25 +991,20 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		noBaseFee     bool
 		noPriorityFee bool
 	)
-	if testsMode {
-		fetchedFees = input.TestParams.SuggestedFees
-		r.logger.Debug("resolveRoute: using test-mode suggested fees", zap.String("uuid", input.Uuid))
-	} else {
-		fetchedFees, noBaseFee, noPriorityFee, err = r.feesManager.SuggestedFees(ctx, input.FromChainID, r.lastInputParams.AddrFrom)
-		if err != nil {
-			r.logger.Error("resolveRoute: failed to fetch suggested fees",
-				zap.String("uuid", input.Uuid),
-				zap.Uint64("fromChain", input.FromChainID),
-				zap.Error(err))
-			err = errors.CreateErrorResponseFromError(fmt.Errorf("failed to fetch fees for from chain %d", input.FromChainID))
-			return
-		}
-		r.logger.Debug("resolveRoute: suggested fees fetched",
+	fetchedFees, noBaseFee, noPriorityFee, err = r.feesManager.SuggestedFees(ctx, input.FromChainID, r.lastInputParams.AddrFrom)
+	if err != nil {
+		r.logger.Error("resolveRoute: failed to fetch suggested fees",
 			zap.String("uuid", input.Uuid),
 			zap.Uint64("fromChain", input.FromChainID),
-			zap.Bool("noBaseFee", noBaseFee),
-			zap.Bool("noPriorityFee", noPriorityFee))
+			zap.Error(err))
+		err = errors.CreateErrorResponseFromError(fmt.Errorf("failed to fetch fees for from chain %d", input.FromChainID))
+		return
 	}
+	r.logger.Debug("resolveRoute: suggested fees fetched",
+		zap.String("uuid", input.Uuid),
+		zap.Uint64("fromChain", input.FromChainID),
+		zap.Bool("noBaseFee", noBaseFee),
+		zap.Bool("noPriorityFee", noPriorityFee))
 
 	for _, pProcessor := range r.pathProcessors {
 		// check if the processor is available for the send type
@@ -1188,30 +1162,26 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		txPackedData       []byte
 	)
 	if approvalRequired {
-		if processorInputParams.TestsMode {
-			approvalGasLimit = processorInputParams.TestApprovalGasEstimation
-		} else {
-			approvalPackedData, err = walletCommon.PackApprovalInputData(processorInputParams.AmountIn, &contractAddress)
-			if err != nil {
-				r.logger.Error("buildPath: PackApprovalInputData failed",
-					zap.String("uuid", input.Uuid),
-					zap.String("processor", pathProcessor.Name()),
-					zap.Error(err))
-				return nil, err
-			}
-			approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
-			if err != nil {
-				r.logger.Error("buildPath: estimateGasForApproval failed",
-					zap.String("uuid", input.Uuid),
-					zap.String("processor", pathProcessor.Name()),
-					zap.Error(err))
-				return nil, err
-			}
-			r.logger.Debug("buildPath: approval gas estimated",
+		approvalPackedData, err = walletCommon.PackApprovalInputData(processorInputParams.AmountIn, &contractAddress)
+		if err != nil {
+			r.logger.Error("buildPath: PackApprovalInputData failed",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pathProcessor.Name()),
-				zap.Uint64("approvalGasLimit", approvalGasLimit))
+				zap.Error(err))
+			return nil, err
 		}
+		approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
+		if err != nil {
+			r.logger.Error("buildPath: estimateGasForApproval failed",
+				zap.String("uuid", input.Uuid),
+				zap.String("processor", pathProcessor.Name()),
+				zap.Error(err))
+			return nil, err
+		}
+		r.logger.Debug("buildPath: approval gas estimated",
+			zap.String("uuid", input.Uuid),
+			zap.String("processor", pathProcessor.Name()),
+			zap.Uint64("approvalGasLimit", approvalGasLimit))
 	}
 
 	// Until we change the logic for Bridge to follow the same logic as for Swap (meaning first approval, then bridge tx) we have to provide txPackedData
@@ -1319,7 +1289,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		path.SetCommunityParams(communityParams)
 	}
 
-	err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+	err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, noBaseFee, noPriorityFee)
 	if err != nil {
 		r.logger.Error("buildPath: evaluateAndUpdatePathDetails failed",
 			zap.String("uuid", input.Uuid),
@@ -1444,24 +1414,18 @@ func (r *Router) makeSuggestedRoute(input *requests.RouteInputParams, route rout
 		zap.String("uuid", input.Uuid),
 		zap.Int("paths", len(route)))
 
-	var prices map[string]float64
-	if input.TestsMode {
-		prices = input.TestParams.TokenPrices
+	prices, errPrices := r.fetchPrices(input.SendType, []string{input.TokenKey, input.ToTokenKey})
+	// error while fetching prices should not block the route evaluation, don't return, just log the error
+	if errPrices != nil {
+		r.logger.Error("makeSuggestedRoute: error fetching prices (route still returned)",
+			zap.String("uuid", input.Uuid),
+			zap.String("fromToken", input.TokenKey),
+			zap.String("toToken", input.ToTokenKey),
+			zap.Error(errPrices))
 	} else {
-		var errPrices error
-		prices, errPrices = r.fetchPrices(input.SendType, []string{input.TokenKey, input.ToTokenKey})
-		// error while fetching prices should not block the route evaluation, don't return, just log the error
-		if errPrices != nil {
-			r.logger.Error("makeSuggestedRoute: error fetching prices (route still returned)",
-				zap.String("uuid", input.Uuid),
-				zap.String("fromToken", input.TokenKey),
-				zap.String("toToken", input.ToTokenKey),
-				zap.Error(errPrices))
-		} else {
-			r.logger.Debug("makeSuggestedRoute: prices fetched",
-				zap.String("uuid", input.Uuid),
-				zap.Int("priceEntries", len(prices)))
-		}
+		r.logger.Debug("makeSuggestedRoute: prices fetched",
+			zap.String("uuid", input.Uuid),
+			zap.Int("priceEntries", len(prices)))
 	}
 
 	suggestedRoutes = &SuggestedRoutes{

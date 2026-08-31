@@ -10,9 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/internal/rpc/network/testutil"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/services/networks/testutil"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 

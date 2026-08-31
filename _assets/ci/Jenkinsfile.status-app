@@ -58,7 +58,7 @@ pipeline {
             }
             stage('E2E') {
               steps { script {
-                triggerE2E('linux', 'x86_64', linux_x86_64.fullProjectName)
+                triggerE2E('linux', 'x86_64', linux_x86_64)
               } }
             }
           }
@@ -72,7 +72,7 @@ pipeline {
             }
             stage('E2E') {
               steps { script {
-                triggerE2E('windows', 'x86_64', windows_x86_64.fullProjectName)
+                triggerE2E('windows', 'x86_64', windows_x86_64)
               } }
             }
           }
@@ -118,13 +118,14 @@ def triggerJob(String platform, String arch) {
   )
 }
 
-def triggerE2E(String platform, String arch, String buildSource) {
+def triggerE2E(String platform, String arch, def packageBuild) {
   return build(
     job:        "status-app/systems/${platform}/${arch}/tests-e2e",
     parameters: jenkins.mapToParams([
-      BRANCH:          env.STATUS_APP_BRANCH,
-      BUILD_SOURCE:    buildSource,
-      TEST_SCOPE_FLAG: '-m=critical',
+      BRANCH:              env.STATUS_APP_BRANCH,
+      BUILD_SOURCE:        packageBuild.fullProjectName,
+      SOURCE_BUILD_NUMBER: packageBuild.number.toString(),
+      TEST_SCOPE_FLAG:     '-m=critical',
     ]),
     wait:       true,
     propagate:  true,
