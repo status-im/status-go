@@ -241,10 +241,7 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint
 
 		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
 
-		AdditionalAddressesForNativeToken: map[uint64][]common.Address{
-			walletcommon.ZkSyncMainnet: {walletcommon.ZkSyncETHTokenAddress()},
-			walletcommon.ZkSyncSepolia: {walletcommon.ZkSyncETHTokenAddress()},
-		},
+		AdditionalAddressesForNativeToken: walletcommon.AdditionalNativeTokenAddresses(),
 	}
 
 	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)
@@ -381,6 +378,7 @@ func (tm *Manager) Stop() {
 }
 
 func (tm *Manager) GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error) {
+	// Native-token aliases resolve to the canonical zero-address native token
 	if token, ok := tm.tokensManager.GetTokenByChainAddress(chainID, address); ok {
 		return &tokentypes.Token{Token: token}, nil
 	}
