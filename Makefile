@@ -127,6 +127,8 @@ else
     NIM_SDS_LIB_DIR := $(CURDIR)/build
     NIM_SDS_INC_DIR := $(CURDIR)/build
     NIM_SDS_BUILD_FROM_SOURCE := true
+    # Only this route needs Nimble; the Nix build has none on PATH.
+    NIMBLE_SETUP := nimble.paths
 endif
 
 # nimble.paths carries the --path set the compile needs: the packages sit
@@ -334,7 +336,7 @@ nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
 # The bindings own the build: they pin the nim-sds revision their C ABI matches
 # and their Nimble task delegates to nim-sds'. status-go only says where the
 # result goes.
-$(LIBSDS): | nimble.paths
+$(LIBSDS): | $(NIMBLE_SETUP)
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
 	$(NIMBLE_SDS_ENV) $(NIMBLE) libsds
