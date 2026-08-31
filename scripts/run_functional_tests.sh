@@ -138,7 +138,10 @@ if [[ "${FUNCTIONAL_TESTS_MARKER}" == "compatibility" ]]; then
    if [[ -z "${PEER_REFS}" ]]; then
       echo "${GRN}Fetching git tags to determine peer refs${RST}"
       git fetch --tags --quiet || true
-      PEER_REFS="$(git tag --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. '!seen[$1"."$2]++' | head -2 | paste -sd' ' -)"
+      # Only a release branch shares a line with its peers; develop is always ahead of all of them.
+      target_branch="${CHANGE_TARGET:-${BRANCH_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
+      own_minor="$(printf '%s' "${target_branch}" | sed -nE 's|^release/([0-9]+)\.([0-9]+)\..*|v\1.\2|p')"
+      PEER_REFS="$(git tag --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. -v own="${own_minor}" '$1"."$2 != own && !seen[$1"."$2]++' | head -2 | paste -sd' ' -)"
     fi
     if [[ -z "${PEER_REFS}" ]]; then
       echo -e "${RED}No peer refs available. Set PEER_REFS or PEER_IMAGES.${RST}"
