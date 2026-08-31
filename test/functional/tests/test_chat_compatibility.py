@@ -6,8 +6,13 @@ from utils.config import Config
 
 def pytest_generate_tests(metafunc):
     if "peer_image" in metafunc.fixturenames:
-        images = Config.peer_docker_images or ([Config.docker_image] if Config.docker_image else [])
-        ids = [(image.split(":")[-1] or "self") for image in images]
+        images, ids = [], []
+        for image in Config.peer_docker_images or []:
+            images.append(image)
+            ids.append(image.split(":")[-1] or "peer")
+        if Config.docker_image and Config.docker_image not in images:
+            images.append(Config.docker_image)
+            ids.append("self")
         metafunc.parametrize("peer_image", images, ids=ids)
 
 
@@ -23,6 +28,11 @@ def pytest_generate_tests(metafunc):
 )
 class TestChatCompatibility:
     """Cross-version chat smoke: vut (build under test) talks to peer (a released backend).
+
+    The peer set always includes the build under test itself (the "self" id), so the
+    mode matrix below is exercised same-version as well as cross-version. Nothing else
+    in the suite pairs a full node with a light one: the rpc tests parametrize a single
+    waku_light_client value across both sides.
 
     Each test runs in a full/light waku mode matrix: vut runs in the first mode,
     peer and third run in the second.
