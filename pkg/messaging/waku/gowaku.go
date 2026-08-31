@@ -343,7 +343,10 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	}
 
 	if !cfg.IsLightClient() {
-		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
+		opts = append(opts, node.WithWakuFilterFullNode(
+			filter.WithMaxSubscribers(20),
+			filter.WithFullNodeRateLimiter(15, 20),
+		))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
 	}
 
