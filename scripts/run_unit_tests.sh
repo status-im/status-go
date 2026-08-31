@@ -19,6 +19,12 @@ if [[ $UNIT_TEST_USE_DEVELOPMENT_LOGGER == 'false' ]]; then
   fi
 fi
 
+if [[ -z $BUILD_TAGS ]]; then
+  BUILD_TAGS="test_fast_kdf"
+else
+  BUILD_TAGS="${BUILD_TAGS} test_fast_kdf"
+fi
+
 if [[ -z "${UNIT_TEST_COUNT}" ]]; then
   UNIT_TEST_COUNT=1
 fi
