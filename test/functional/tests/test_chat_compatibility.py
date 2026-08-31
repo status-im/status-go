@@ -4,28 +4,44 @@ from steps import messenger
 from utils.config import Config
 
 
+# vut mode, peer mode. The peer mode applies to both the peer and the third backend.
+CLIENT_MODES = [(False, False), (False, True), (True, False), (True, True)]
+
+
+def _mode(is_light: bool) -> str:
+    return "light" if is_light else "full"
+
+
+def _peer_label(image: str) -> str:
+    return image.split(":")[-1].removeprefix("statusgo-peer-") or "peer"
+
+
 def pytest_generate_tests(metafunc):
-    if "peer_image" in metafunc.fixturenames:
-        images, ids = [], []
-        for image in Config.peer_docker_images or []:
-            images.append(image)
-            ids.append(image.split(":")[-1] or "peer")
-        if Config.docker_image and Config.docker_image not in images:
-            images.append(Config.docker_image)
-            ids.append("self")
-        metafunc.parametrize("peer_image", images, ids=ids)
+    """Expand each test into one case per peer backend, per waku mode pair.
+
+    Peer backends are the released images the test runner resolved, plus the build
+    under test itself ("self"). The image and the two modes are parametrized in a
+    single call so that one id can name both sides of the pairing; separate
+    parametrize calls would leave pytest to join their ids with a "-".
+    """
+    if "peer_image" not in metafunc.fixturenames:
+        return
+
+    peer_images = list(Config.peer_docker_images or [])
+    if Config.docker_image and Config.docker_image not in peer_images:
+        peer_images.append(Config.docker_image)
+
+    cases = []
+    for image in peer_images:
+        peer = "self" if image == Config.docker_image else _peer_label(image)
+        for vut_light, peer_light in CLIENT_MODES:
+            case_id = f"self-{_mode(vut_light)}__{peer}-{_mode(peer_light)}"
+            cases.append(pytest.param(image, vut_light, peer_light, id=case_id))
+
+    metafunc.parametrize(("peer_image", "vut_light", "peer_light"), cases)
 
 
 @pytest.mark.compatibility
-@pytest.mark.parametrize(
-    ("vut_light", "peer_light"),
-    [
-        pytest.param(False, False, id="full-full"),
-        pytest.param(False, True, id="full-light"),
-        pytest.param(True, False, id="light-full"),
-        pytest.param(True, True, id="light-light"),
-    ],
-)
 class TestChatCompatibility:
     """Cross-version chat smoke: vut (build under test) talks to peer (a released backend).
 
