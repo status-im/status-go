@@ -198,7 +198,7 @@ pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${pytest_marker_expr}" -c "${ro
   --codecov_dir="${binary_coverage_reports_path}" \
   --logs-dir="${logs_path}" \
   --junitxml="${test_results_path}/report.xml" \
-  ${root_path}
+  "${root_path}"
 exit_code=$?
 
 # Stop containers

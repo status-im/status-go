@@ -64,7 +64,8 @@ jobs:
           --docker-image="statusgo-local" \
           --waku-fleet=status.staging \
           --waku-fleets-config="" \
-          --logs-dir=test/functional/log
+          --logs-dir=test/functional/log \
+          test/functional
 
     - name: Test Report
       if: always()

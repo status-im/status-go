@@ -64,7 +64,8 @@ pytest \
   --docker_project_name="${project_name}" \
   --docker-image="${image_name}" \
   --benchmark-results-dir="${benchmark_results_path}" \
-  --junitxml="${test_results_path}/report.xml"
+  --junitxml="${test_results_path}/report.xml" \
+  "${root_path}"
 exit_code=$?
 
 # Stop containers
