@@ -141,6 +141,33 @@ func ZkSyncETHTokenAddress() common.Address {
 	return common.HexToAddress("0x000000000000000000000000000000000000800a")
 }
 
+// AdditionalNativeTokenAddresses maps chains to addresses of the chain's native token.
+// The canonical native token address is always the zero address.
+func AdditionalNativeTokenAddresses() map[uint64][]common.Address {
+	return map[uint64][]common.Address{
+		ZkSyncMainnet: {ZkSyncETHTokenAddress()},
+		ZkSyncSepolia: {ZkSyncETHTokenAddress()},
+	}
+}
+
+// IsNativeTokenAlias reports whether addr is a registered native-token alias on chainID
+func IsNativeTokenAlias(chainID uint64, addr common.Address) bool {
+	for _, alias := range AdditionalNativeTokenAddresses()[chainID] {
+		if alias == addr {
+			return true
+		}
+	}
+	return false
+}
+
+// NormalizeNativeTokenAddress maps a native-token alias to the canonical zero address.
+func NormalizeNativeTokenAddress(chainID uint64, addr common.Address) common.Address {
+	if IsNativeTokenAlias(chainID, addr) {
+		return ZeroAddress()
+	}
+	return addr
+}
+
 func ZeroAddress() common.Address {
 	return common.Address{}
 }
