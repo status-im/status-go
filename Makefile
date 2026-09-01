@@ -562,7 +562,7 @@ test-unit: ##@tests Run unit and integration tests
 
 test-single: test-unit-prep
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go test -v -tags '$(BUILD_TAGS)' $(PKG) -run '$(TEST)' $(if $(TESTIFY_M),-testify.m '$(TESTIFY_M)')
+	go test -v -tags '$(strip $(BUILD_TAGS) test_fast_kdf)' $(PKG) -run '$(TEST)' $(if $(TESTIFY_M),-testify.m '$(TESTIFY_M)')
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
