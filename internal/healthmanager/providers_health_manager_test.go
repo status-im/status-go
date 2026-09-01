@@ -288,6 +288,37 @@ func (s *ProvidersHealthManagerSuite) expectNoNotification(ch <-chan struct{}, t
 	}
 }
 
+// testDownDebounce is deliberately far longer than the waits the debounce tests perform between
+// updates. The debounce only has to outlast the test's own bookkeeping, and on a loaded CI agent a
+// 40ms wait can take several times that; with a short debounce the pending Down timer fires in the
+// middle of the scenario and the test reports a spurious notification. Claims about *when* a Down
+// lands are made by measuring elapsed time instead of sleeping for a hand-tuned fraction of it.
+const testDownDebounce = time.Second
+
+// expectNoPendingNotification fails if a notification is already queued. Emission is synchronous
+// inside Update, so checking that a given update emitted nothing needs no waiting at all and cannot
+// be tripped by a slow scheduler.
+func (s *ProvidersHealthManagerSuite) expectNoPendingNotification(ch <-chan struct{}) {
+	select {
+	case <-ch:
+		s.Fail("Unexpected chain status notification")
+	default:
+	}
+}
+
+// expectNotificationNoEarlierThan waits for a notification and fails if it arrived sooner than
+// minElapsed after start. Scheduling delays can only push the notification later, which passes.
+func (s *ProvidersHealthManagerSuite) expectNotificationNoEarlierThan(ch <-chan struct{}, start time.Time, minElapsed time.Duration) {
+	s.expectNotification(ch, minElapsed+5*time.Second)
+	s.GreaterOrEqual(time.Since(start), minElapsed, "chain status notification arrived before the debounce elapsed")
+}
+
+// expectNoNotificationPast fails if a notification arrives before deadline, plus a margin, so that
+// a timer which should have been stopped is observed past the moment it would have fired.
+func (s *ProvidersHealthManagerSuite) expectNoNotificationPast(ch <-chan struct{}, deadline time.Time) {
+	s.expectNoNotification(ch, time.Until(deadline)+200*time.Millisecond)
+}
+
 func downStatus(name string) []rpcstatus.RpcProviderCallStatus {
 	return []rpcstatus.RpcProviderCallStatus{{Name: name, Timestamp: time.Now(), Err: errors.New("critical error")}}
 }
@@ -297,7 +328,7 @@ func upStatus(name string) []rpcstatus.RpcProviderCallStatus {
 }
 
 func (s *ProvidersHealthManagerSuite) TestDownEmissionIsDebounced() {
-	s.phm.downDebounce = 150 * time.Millisecond
+	s.phm.downDebounce = testDownDebounce
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
 
@@ -305,30 +336,37 @@ func (s *ProvidersHealthManagerSuite) TestDownEmissionIsDebounced() {
 	s.expectNotification(ch, time.Second)
 	s.assertChainStatus(rpcstatus.StatusUp)
 
+	downAt := time.Now()
 	s.phm.Update(context.Background(), downStatus("Provider1"))
-	s.assertChainStatus(rpcstatus.StatusDown)
-	s.expectNoNotification(ch, 50*time.Millisecond)
 
-	s.expectNotification(ch, time.Second)
+	// The aggregated status flips right away; only the notification is deferred.
+	s.assertChainStatus(rpcstatus.StatusDown)
+	s.expectNoPendingNotification(ch)
+
+	s.expectNotificationNoEarlierThan(ch, downAt, testDownDebounce)
 	s.assertChainStatus(rpcstatus.StatusDown)
 
+	// A repeated Down is not a transition, so it arms nothing and emits nothing.
 	s.phm.Update(context.Background(), downStatus("Provider1"))
 	s.expectNoNotification(ch, 50*time.Millisecond)
 }
 
 func (s *ProvidersHealthManagerSuite) TestShortDownDoesNotEmit() {
-	s.phm.downDebounce = 300 * time.Millisecond
+	s.phm.downDebounce = testDownDebounce
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
 
 	s.phm.Update(context.Background(), upStatus("Provider1"))
 	s.expectNotification(ch, time.Second)
 
+	downAt := time.Now()
 	s.phm.Update(context.Background(), downStatus("Provider1"))
 	time.Sleep(50 * time.Millisecond)
 	s.phm.Update(context.Background(), upStatus("Provider1"))
+	s.expectNoPendingNotification(ch)
 
-	s.expectNoNotification(ch, 400*time.Millisecond)
+	// Watch past the moment the pending timer would have fired had the recovery not stopped it.
+	s.expectNoNotificationPast(ch, downAt.Add(testDownDebounce))
 	s.assertChainStatus(rpcstatus.StatusUp)
 }
 
@@ -349,7 +387,11 @@ func (s *ProvidersHealthManagerSuite) TestRecoveryEmitsImmediately() {
 }
 
 func (s *ProvidersHealthManagerSuite) TestDownDebounceResetsAfterSilentRecovery() {
-	s.phm.downDebounce = 120 * time.Millisecond
+	// Separates the two Down transitions far enough to tell their timers apart, while staying far
+	// below the debounce so a slow agent cannot let the first timer fire before the recovery stops it.
+	const silentGap = 200 * time.Millisecond
+
+	s.phm.downDebounce = testDownDebounce
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
 
@@ -357,36 +399,39 @@ func (s *ProvidersHealthManagerSuite) TestDownDebounceResetsAfterSilentRecovery(
 	s.expectNotification(ch, time.Second)
 
 	s.phm.Update(context.Background(), downStatus("Provider1"))
-	s.expectNoNotification(ch, 40*time.Millisecond)
+	time.Sleep(silentGap)
 
 	// This recovery does not emit (lastStatus is still Up), but must still stop the previous timer.
 	s.phm.Update(context.Background(), upStatus("Provider1"))
-	s.expectNoNotification(ch, 10*time.Millisecond)
+	s.expectNoPendingNotification(ch)
 
+	secondDownAt := time.Now()
 	s.phm.Update(context.Background(), downStatus("Provider1"))
-	// If the first timer was not stopped, we'd see a Down event too early here.
-	s.expectNoNotification(ch, 90*time.Millisecond)
-	s.expectNotification(ch, 200*time.Millisecond)
+
+	// Had the first timer survived the recovery, the Down would land a silentGap earlier than a
+	// full debounce after this second transition.
+	s.expectNotificationNoEarlierThan(ch, secondDownAt, testDownDebounce)
 	s.assertChainStatus(rpcstatus.StatusDown)
 }
 
 func (s *ProvidersHealthManagerSuite) TestPauseStopsPendingDownTimer() {
-	s.phm.downDebounce = 100 * time.Millisecond
+	s.phm.downDebounce = testDownDebounce
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
 
 	s.phm.Update(context.Background(), upStatus("Provider1"))
 	s.expectNotification(ch, time.Second)
 
+	downAt := time.Now()
 	s.phm.Update(context.Background(), downStatus("Provider1"))
-	s.expectNoNotification(ch, 30*time.Millisecond)
+	s.expectNoPendingNotification(ch)
 
 	s.phm.Pause()
-	s.expectNoNotification(ch, 150*time.Millisecond)
+	s.expectNoNotificationPast(ch, downAt.Add(testDownDebounce))
 }
 
 func (s *ProvidersHealthManagerSuite) TestResumeCoalescesPausedUpdates() {
-	s.phm.downDebounce = 80 * time.Millisecond
+	s.phm.downDebounce = testDownDebounce
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
 
@@ -394,14 +439,18 @@ func (s *ProvidersHealthManagerSuite) TestResumeCoalescesPausedUpdates() {
 	s.expectNotification(ch, time.Second)
 	s.assertChainStatus(rpcstatus.StatusUp)
 
+	pausedDownAt := time.Now()
 	s.phm.Pause()
 	s.phm.Update(context.Background(), downStatus("Provider1"))
-	s.expectNoNotification(ch, 120*time.Millisecond)
 
-	// Resume should emit one coalesced Down only after debounce.
+	// Nothing is armed while paused, so nothing fires even past a full debounce.
+	s.expectNoNotificationPast(ch, pausedDownAt.Add(testDownDebounce))
+
+	// Resume should emit one coalesced Down, and only after the debounce.
+	resumedAt := time.Now()
 	s.phm.Resume()
-	s.expectNoNotification(ch, 30*time.Millisecond)
-	s.expectNotification(ch, 200*time.Millisecond)
+	s.expectNoPendingNotification(ch)
+	s.expectNotificationNoEarlierThan(ch, resumedAt, testDownDebounce)
 	s.assertChainStatus(rpcstatus.StatusDown)
 }
 
