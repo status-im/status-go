@@ -4,8 +4,10 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -207,8 +209,17 @@ func (r *RelayClient) dialRelay() (*websocket.Conn, error) {
 	q.Set("projectId", r.projectID)
 	u.RawQuery = q.Encode()
 
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
+		// gorilla reports any non-101 response as "bad handshake". The status
+		// tells a rejected token from a bad project id or a rate limit. The URL
+		// carries the auth JWT and project id: keep it out of the error.
+		if resp != nil {
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			return nil, fmt.Errorf("dial relay: %w (relay responded %s: %s)",
+				err, resp.Status, truncate(strings.TrimSpace(string(body)), 200))
+		}
 		return nil, fmt.Errorf("dial relay: %w", err)
 	}
 	return conn, nil
@@ -571,8 +582,13 @@ func (r *RelayClient) reconnect() error {
 
 		r.logger.Info("successfully reconnected to relay")
 
+		// handler re-subscribes, and Subscribe blocks until readLoop delivers
+		// the relay's reply. reconnect runs on readLoop: never wait here.
 		if handler != nil {
-			handler()
+			go func() {
+				defer panics.LogOnPanic()
+				handler()
+			}()
 		}
 
 		return nil

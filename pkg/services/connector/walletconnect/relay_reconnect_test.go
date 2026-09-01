@@ -99,3 +99,42 @@ func TestConnect_IsIdempotentWhenLive(t *testing.T) {
 	waitAccepted(t, fr, 1)
 	_ = r.Close()
 }
+
+// The reconnected handler must not run on readLoop: it re-subscribes, and
+// Subscribe needs readLoop free to deliver the reply.
+func TestReconnectedHandler_ResubscribeDoesNotDeadlockReadLoop(t *testing.T) {
+	fr := newFakeRelay(t, fakeRelayOpts{echoSubscribe: true})
+	r := newTestRelayClient(t, fr)
+
+	subscribed := make(chan error, 1)
+	r.SetReconnectedHandler(func() {
+		_, err := r.Subscribe("session-topic")
+		subscribed <- err
+	})
+
+	require.NoError(t, r.Connect())
+	waitAccepted(t, fr, 1)
+
+	fr.DropNow()
+
+	select {
+	case err := <-subscribed:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("re-subscribe after reconnect never completed: readLoop cannot deliver the response while it is blocked inside the reconnected handler")
+	}
+	_ = r.Close()
+}
+
+// A refused upgrade must name the relay's status, without leaking the
+// credentials the dial URL carries.
+func TestDialRelay_ReportsRejectedUpgradeStatus(t *testing.T) {
+	fr := newFakeRelay(t, fakeRelayOpts{rejectStatus: 401, rejectBody: "invalid jwt"})
+	r := newTestRelayClient(t, fr)
+
+	err := r.Connect()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "401", "dial error must carry the relay's HTTP status")
+	require.NotContains(t, err.Error(), "auth=", "dial error must not leak the auth JWT")
+	require.NotContains(t, err.Error(), "projectId", "dial error must not leak the project id")
+}
