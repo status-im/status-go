@@ -1168,7 +1168,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 		From:        from3,
 	}))
 
-	reactions, err := p.EmojiReactionsByChatID(chatID, "", 1)
+	reactions, err := p.EmojiReactionsByChatID(chatID, "", "", 1, false)
 	require.NoError(t, err)
 	require.Len(t, reactions, 1)
 	require.Equal(t, id3, reactions[0].MessageId)
@@ -1177,11 +1177,65 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 	_, cursor, err := p.MessageByChatID(chatID, "", "", 1, false)
 	require.NoError(t, err)
 
-	reactions, err = p.EmojiReactionsByChatID(chatID, cursor, 2)
+	reactions, err = p.EmojiReactionsByChatID(chatID, "", cursor, 2, false)
 	require.NoError(t, err)
 	require.Len(t, reactions, 2)
 	require.Equal(t, id1, reactions[0].MessageId)
 	require.Equal(t, id1, reactions[1].MessageId)
+}
+
+func TestPersistenceEmojiReactionsThreads(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	chatID := testPublicChatID
+	threadID := "parent-message-id"
+
+	baseMessageID := "base-1"
+	threadMessageID := "thread-1"
+
+	require.NoError(t, insertMinimalMessage(p, baseMessageID))
+	require.NoError(t, insertMinimalThreadMessage(p, threadMessageID, threadID))
+
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
+			Clock:     1,
+			MessageId: baseMessageID,
+			ChatId:    chatID,
+			Emoji:     "\U0001F600",
+		},
+		LocalChatID: chatID,
+		From:        "from-1",
+	}))
+
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
+			Clock:     2,
+			MessageId: threadMessageID,
+			ChatId:    chatID,
+			Emoji:     "\U0001F601",
+		},
+		LocalChatID: chatID,
+		From:        "from-2",
+	}))
+
+	// A thread query returns only the thread's reactions.
+	reactions, err := p.EmojiReactionsByChatID(chatID, threadID, "", 10, true)
+	require.NoError(t, err)
+	require.Len(t, reactions, 1)
+	require.Equal(t, threadMessageID, reactions[0].MessageId)
+
+	// With threads enabled the base chat excludes thread reactions.
+	reactions, err = p.EmojiReactionsByChatID(chatID, "", "", 10, true)
+	require.NoError(t, err)
+	require.Len(t, reactions, 1)
+	require.Equal(t, baseMessageID, reactions[0].MessageId)
+
+	// With threads disabled thread messages are ordinary messages, so both come back.
+	reactions, err = p.EmojiReactionsByChatID(chatID, "", "", 10, false)
+	require.NoError(t, err)
+	require.Len(t, reactions, 2)
 }
 
 func openTestDB() (*sql.DB, error) {
@@ -1198,6 +1252,15 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 		ID:          id,
 		LocalChatID: testPublicChatID,
 		ChatMessage: &protobuf.ChatMessage{Text: "some-text"},
+		From:        testPK,
+	}})
+}
+
+func insertMinimalThreadMessage(p *sqlitePersistence, id string, threadID string) error {
+	return p.SaveMessages([]*common.Message{{
+		ID:          id,
+		LocalChatID: testPublicChatID,
+		ChatMessage: &protobuf.ChatMessage{Text: "some-text", ThreadId: &threadID},
 		From:        testPK,
 	}})
 }
