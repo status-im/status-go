@@ -1992,12 +1992,24 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
-func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
+func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, threadID string, currCursor string, limit int, threadsEnabled bool) ([]*EmojiReaction, error) {
 	cursorWhere := ""
 	if currCursor != "" {
 		cursorWhere = fmt.Sprintf("AND %s <= ?", cursor) //nolint: goconst
 	}
 	args := []interface{}{chatID, chatID}
+
+	// Mirrors MessageByChatID: the reaction window has to be drawn from the same set of messages
+	// the caller is paging through, otherwise thread replies crowd the base chat out of the
+	// subquery's LIMIT and their reactions silently stop loading (and vice versa).
+	var threadWhere string
+	if threadID != "" {
+		threadWhere = "AND m1.thread_id = ?"
+		args = append(args, threadID)
+	} else if threadsEnabled {
+		threadWhere = "AND (m1.thread_id IS NULL OR m1.thread_id = '')"
+	}
+
 	if currCursor != "" {
 		args = append(args, currCursor)
 	}
@@ -2030,10 +2042,10 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			e.local_chat_id = ?
 			AND
 			e.message_id IN
-			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id = ? %s
+			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id = ? %s %s
 			ORDER BY %s DESC LIMIT ?)
 			LIMIT 1000
-		`, cursorWhere, cursor)
+		`, threadWhere, cursorWhere, cursor)
 
 	rows, err := db.db.Query(
 		query,
