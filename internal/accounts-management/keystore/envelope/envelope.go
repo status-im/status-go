@@ -22,9 +22,6 @@ const (
 	pendingSuffix = ".pending" // used for deep rekey (when a new DEK is generated)
 
 	dekLength = 32 // DEK size in bytes
-
-	scryptN = 1 << 18
-	scryptP = 1
 )
 
 var ErrInvalidKEK = errors.New("envelope: invalid key-encryption key")
