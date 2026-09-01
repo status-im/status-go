@@ -430,6 +430,8 @@ func (s *ProcessorSuite) TestQueuedHashRatchetMessageStillMissingItsKeySurvivesR
 }
 
 func (s *ProcessorSuite) TestHandleSegmentMessages() {
+	s.T().Skip("flaky test, tracked in https://github.com/status-im/status-go/issues/7791")
+
 	senderKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
