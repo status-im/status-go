@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: wakuorg/nwaku:v0.38.1
+    image: quay.io/wakuorg/nwaku-pr:d46babd-logosdeliverynode
     entrypoint: [
       "/usr/bin/wakunode",
       "--discv5-discovery=true",
@@ -23,7 +23,7 @@ services:
       "--rest-admin",
       "--shard=32",
       "--shard=64",
-      # Lift the per-peer filter/lightpush rate limits well above nwaku's stock
+      # Lift the per-peer filter/lightpush rate limits well above the stock
       # defaults. A light client joining a community fans out many per-content-topic
       # filter subscribe requests at once; the stock filter limit (30/min) returns
       # 429, which go-waku turns into a long subscription backoff.
@@ -41,8 +41,8 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: wakuorg/nwaku:v0.38.1
-    # Publish the nwaku REST API (incl. Store API) on an ephemeral host port so
+    image: quay.io/wakuorg/nwaku-pr:d46babd-logosdeliverynode
+    # Publish the logos-delivery REST API (incl. Store API) on an ephemeral host port so
     # tests on the host can query it without colliding on shared CI hosts.
     # The actual host port is discovered at runtime via the Docker API
     # (see clients/logos_delivery.py), mirroring how the Anvil client works.
