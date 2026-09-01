@@ -363,6 +363,7 @@ func buildMessengerOptions(
 		protocol.WithEnablePinnedBootstrap(enablePinnedBootstrap),
 		protocol.WithEnableSupportBotContactRequest(enableSupportBotContactRequest),
 		protocol.WithPushNotifications(),
+		protocol.WithThreads(),
 		protocol.WithDatabase(appDb),
 		protocol.WithWalletDatabase(walletDb),
 		protocol.WithMultiAccounts(multiAccounts),
