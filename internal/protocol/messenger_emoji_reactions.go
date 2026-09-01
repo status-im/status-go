@@ -124,7 +124,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID string, messag
 	return &response, nil
 }
 
-func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*EmojiReaction, error) {
+func (m *Messenger) EmojiReactionsByChatID(chatID string, threadID string, cursor string, limit int) ([]*EmojiReaction, error) {
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 		})
 		return m.persistence.EmojiReactionsByChatIDs(chatIDs, cursor, limit)
 	}
-	return m.persistence.EmojiReactionsByChatID(chatID, cursor, limit)
+	return m.persistence.EmojiReactionsByChatID(chatID, threadID, cursor, limit, m.featureFlags.Threads)
 }
 
 func (m *Messenger) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*EmojiReaction, error) {
