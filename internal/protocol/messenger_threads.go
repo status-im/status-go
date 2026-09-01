@@ -15,6 +15,13 @@ func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	return m.persistence.ThreadsByChatID(chatID)
 }
 
+func (m *Messenger) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error) {
+	if !m.featureFlags.Threads {
+		return nil, ErrThreadFeatureDisabled
+	}
+	return m.persistence.ThreadsByChatIDs(chatIDs)
+}
+
 func (m *Messenger) senderCanCreateThread(chat *Chat, sender *ecdsa.PublicKey) (bool, error) {
 	if !chat.SupportsThreads() {
 		return false, ErrThreadsNotSupportedForChatType
