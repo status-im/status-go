@@ -959,6 +959,51 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	return threads, nil
 }
 
+// ThreadsByChatIDs returns the threads of several chats at once, so a client opening a section
+// does not have to issue one query per chat.
+func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error) {
+	threads := make([]*Thread, 0)
+	if len(chatIDs) == 0 {
+		return threads, nil
+	}
+
+	args := make([]interface{}, len(chatIDs))
+	for i, v := range chatIDs {
+		args[i] = v
+	}
+
+	// nolint: gosec
+	query := fmt.Sprintf(`
+		SELECT
+			threads.thread_id,
+			threads.chat_id,
+			threads.parent_message_id,
+			threads.name,
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
+		FROM threads
+		WHERE chat_id IN (%s)
+		ORDER BY chat_id ASC, name ASC`, strings.Repeat(",?", len(chatIDs))[1:])
+
+	rows, err := db.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		thread := &Thread{}
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		if err != nil {
+			return nil, err
+		}
+
+		threads = append(threads, thread)
+	}
+
+	return threads, nil
+}
+
 func (db sqlitePersistence) MessageByChatID(chatID string, threadID string, currCursor string, limit int, threadsEnabled bool) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
