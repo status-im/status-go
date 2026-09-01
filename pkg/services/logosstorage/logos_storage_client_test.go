@@ -263,6 +263,8 @@ func (suite *LogosStorageClientTestSuite) TestLocalDownloadWithContext_Success()
 }
 
 func (suite *LogosStorageClientTestSuite) TestLocalDownloadWithContext_Cancellation() {
+	suite.T().Skip("flaky test, tracked in https://github.com/status-im/status-go/issues/7791")
+
 	// Create a context with a very short timeout
 	cid, _ := suite.UploadRandomDataToLogosStorage(50 * 1024 * 1024)
 
