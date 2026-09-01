@@ -3892,7 +3892,7 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 	if err := m.persistence.SaveRequestToJoin(requestToJoin); err != nil {
 		return nil, nil, err
 	}
-	community.config.RequestedToJoinAt = uint64(time.Now().Unix())
+	community.config.RequestedToJoinAt = requestToJoin.Clock
 	community.AddRequestToJoin(requestToJoin)
 
 	// Save revealed addresses to our own table so that we can retrieve them later when editing
