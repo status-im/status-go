@@ -2,8 +2,9 @@
 
 package envelope
 
-// Reduced KEK derivation cost for unit test builds. Never set this tag for a shipped binary.
+// Minimum KEK derivation cost for unit test builds, matching go-ethereum's own
+// veryLightScryptN. Never set this tag for a shipped binary.
 const (
-	scryptN = 1 << 12
+	scryptN = 2
 	scryptP = 1
 )
