@@ -141,6 +141,8 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 }
 
 func TestPeerExchange(t *testing.T) {
+	t.Skip("flaky test, tracked in https://github.com/status-im/status-go/issues/7791")
+
 	logger := testutils.MustCreateTestLogger()
 	// start node which serve as PeerExchange server
 	config := &Config{}

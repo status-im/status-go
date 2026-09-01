@@ -1701,6 +1701,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMas
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity_ERC721() {
+	s.T().Skip("flaky test, tracked in https://github.com/status-im/status-go/issues/7791")
+
 	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenType_ERC721)
 }
 

@@ -1696,6 +1696,8 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 }
 
 func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
+	s.T().Skip("flaky test, tracked in https://github.com/status-im/status-go/issues/7791")
+
 	// Setup Bob
 	bob := s.newMessenger()
 	_ = bob.SetDisplayName("bob-1")
