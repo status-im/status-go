@@ -315,8 +315,17 @@ func (s *ProvidersHealthManagerSuite) expectNotificationNoEarlierThan(ch <-chan 
 
 // expectNoNotificationPast fails if a notification arrives before deadline, plus a margin, so that
 // a timer which should have been stopped is observed past the moment it would have fired.
+//
+// The margin is spent as a separate wait rather than folded into one timeout: if the caller is
+// already past the deadline, a single `time.Until(deadline)+margin` can be non-positive, and a
+// select whose timeout has expired picks at random between the two ready cases - so a notification
+// sitting in the buffer would be missed half the time and the check would pass vacuously.
 func (s *ProvidersHealthManagerSuite) expectNoNotificationPast(ch <-chan struct{}, deadline time.Time) {
-	s.expectNoNotification(ch, time.Until(deadline)+200*time.Millisecond)
+	s.expectNoPendingNotification(ch)
+	if remaining := time.Until(deadline); remaining > 0 {
+		s.expectNoNotification(ch, remaining)
+	}
+	s.expectNoNotification(ch, 200*time.Millisecond)
 }
 
 func downStatus(name string) []rpcstatus.RpcProviderCallStatus {
