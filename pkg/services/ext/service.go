@@ -352,6 +352,7 @@ func buildMessengerOptions(
 		protocol.WithCustomLogger(logger),
 		protocol.WithEnablePinnedBootstrap(enablePinnedBootstrap),
 		protocol.WithPushNotifications(),
+		protocol.WithThreads(),
 		protocol.WithDatabase(appDb),
 		protocol.WithWalletDatabase(walletDb),
 		protocol.WithMultiAccounts(multiAccounts),
