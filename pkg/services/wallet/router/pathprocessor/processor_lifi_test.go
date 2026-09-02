@@ -15,6 +15,7 @@ import (
 	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
@@ -64,7 +65,7 @@ func TestLiFiQuote(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{})
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -110,7 +111,7 @@ func TestLiFiBridgeAvailable(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{})
 	processor.lifiClient = client
 
 	// Bridge the same asset (USDC) across two different chains.
@@ -141,7 +142,7 @@ func TestLiFiBuySideUnsupported(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := mock_lifi.NewMockClientInterface(ctrl)
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{})
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -164,7 +165,7 @@ func TestLiFiErrors(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{})
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -217,7 +218,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		mockRPCClient := mock_rpcclient.NewMockClientInterface(ctrl)
 		mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
 
-		processor := NewLiFiProcessor(mockRPCClient, nil, nil)
+		processor := NewLiFiProcessor(mockRPCClient, nil, nil, security.SensitiveString{})
 		processor.lifiClient = client
 
 		fromToken, toToken := testLiFiTokens()
@@ -250,7 +251,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		mockRPCClient := mock_rpcclient.NewMockClientInterface(ctrl)
 		mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
 
-		processor := NewLiFiProcessor(mockRPCClient, nil, nil)
+		processor := NewLiFiProcessor(mockRPCClient, nil, nil, security.SensitiveString{})
 		processor.lifiClient = client
 
 		// Non-native from token: estimation reverts before approval, the quote's gas limit is used.
@@ -294,7 +295,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		mockRPCClient := mock_rpcclient.NewMockClientInterface(ctrl)
 		mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
 
-		processor := NewLiFiProcessor(mockRPCClient, nil, nil)
+		processor := NewLiFiProcessor(mockRPCClient, nil, nil, security.SensitiveString{})
 		processor.lifiClient = client
 
 		fromToken, toToken := testLiFiTokens()

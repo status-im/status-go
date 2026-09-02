@@ -112,6 +112,7 @@ type WalletSecretsConfig struct {
 	RaribleMainnetAPIKey security.SensitiveString `json:"raribleMainnetApiKey"`
 	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
 	AlchemyAPIKey        security.SensitiveString `json:"alchemyApiKey"`
+	LifiAPIKey           security.SensitiveString `json:"lifiApiKey"`
 
 	StatusProxyStageName string `json:"statusProxyStageName"`
 

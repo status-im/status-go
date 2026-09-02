@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/transactions"
 
 	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/wallet/async"
 	"github.com/status-im/status-go/pkg/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
@@ -108,7 +109,8 @@ func NewRouter(
 	tokenManager TokenManager,
 	tokenBalancesFetcher TokenBalanceFetcher,
 	marketManager *market.Manager,
-	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager) *Router {
+	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager,
+	lifiAPIKey security.SensitiveString) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
 	logger := logutils.ZapLogger().Named("router")
@@ -128,7 +130,7 @@ func NewRouter(
 			return paraswap.NewClientV5(chainID, pathprocessor.ParaswapPartnerID, walletCommon.ZeroAddress(), 0)
 		},
 		lifiClientFactory: func(chainID uint64) lifi.ClientInterface {
-			return lifi.NewClient(chainID, lifi.Integrator, "")
+			return lifi.NewClient(chainID, lifi.Integrator, lifiAPIKey.Reveal())
 		},
 		logger: logger,
 	}
