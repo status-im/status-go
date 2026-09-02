@@ -216,6 +216,7 @@ type WalletConfig struct {
 	RaribleMainnetAPIKey  security.SensitiveString `json:"RaribleMainnetAPIKey"`
 	RaribleTestnetAPIKey  security.SensitiveString `json:"RaribleTestnetAPIKey"`
 	AlchemyAPIKey         security.SensitiveString `json:"AlchemyAPIKey"`
+	LifiAPIKey            security.SensitiveString `json:"LifiAPIKey"`
 	InfuraAPIKey          security.SensitiveString `json:"InfuraAPIKey"`
 	InfuraAPIKeySecret    security.SensitiveString `json:"InfuraAPIKeySecret"`
 	PoktAPIKey            security.SensitiveString `json:"PoktAPIKey"`
