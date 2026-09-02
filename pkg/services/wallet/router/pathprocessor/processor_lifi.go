@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
+	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/lifi"
@@ -32,10 +33,10 @@ type LiFiProcessor struct {
 	quotes          sync.Map // [fromTokenKey-toTokenKey-amountIn, *lifi.Quote]
 }
 
-func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *LiFiProcessor {
+func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager, apiKey security.SensitiveString) *LiFiProcessor {
 	return &LiFiProcessor{
 		ethClientGetter: ethClientGetter,
-		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, lifi.Integrator, ""),
+		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, lifi.Integrator, apiKey.Reveal()),
 		tokenManager:    tokenManager,
 		transactor:      transactor,
 		quotes:          sync.Map{},

@@ -207,7 +207,7 @@ func NewService(
 			SearchProviders:            collectibleSearchProviders,
 		}
 
-		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags, config.WalletConfig.CommunityTokenDeployerOverrides)
+		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags, config.WalletConfig.CommunityTokenDeployerOverrides, config.WalletConfig.LifiAPIKey)
 
 		leaderboardConfig = leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
 
@@ -305,7 +305,7 @@ func NewService(
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, tokenBalancesFetcher, marketManager, collectibles,
-		collectiblesManager)
+		collectiblesManager, config.WalletConfig.LifiAPIKey)
 	for _, processor := range pathProcessors {
 		router.AddPathProcessor(processor)
 	}
@@ -373,6 +373,7 @@ func buildPathProcessors(
 	ensResolver *ensresolver.EnsResolver,
 	featureFlags *protocolCommon.FeatureFlags,
 	deployerOverrides map[uint64]ethCommon.Address,
+	lifiAPIKey security.SensitiveString,
 ) []pathprocessor.PathProcessor {
 	ret := make([]pathprocessor.PathProcessor, 0)
 
@@ -392,7 +393,7 @@ func buildPathProcessors(
 	// paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
 	// ret = append(ret, paraswap)
 
-	lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager)
+	lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager, lifiAPIKey)
 	ret = append(ret, lifi)
 
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)

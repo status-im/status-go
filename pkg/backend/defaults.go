@@ -181,6 +181,10 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		walletConfig.AlchemyAPIKey = request.AlchemyAPIKey
 	}
 
+	if !request.LifiAPIKey.Empty() {
+		walletConfig.LifiAPIKey = request.LifiAPIKey
+	}
+
 	if !request.MarketDataProxyUser.Empty() {
 		walletConfig.MarketDataProxyConfig.User = request.MarketDataProxyUser
 	}
