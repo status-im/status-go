@@ -14,6 +14,7 @@ const (
 
 type Client struct {
 	httpClient *thirdparty.HTTPClient
+	baseURL    string
 	chainID    uint64
 	integrator string
 	apiKey     string
@@ -22,6 +23,7 @@ type Client struct {
 func NewClient(chainID uint64, integrator string, apiKey string) *Client {
 	return &Client{
 		httpClient: thirdparty.NewHTTPClient(),
+		baseURL:    baseURL,
 		chainID:    chainID,
 		integrator: integrator,
 		apiKey:     apiKey,
@@ -30,4 +32,12 @@ func NewClient(chainID uint64, integrator string, apiKey string) *Client {
 
 func (c *Client) SetChainID(chainID uint64) {
 	c.chainID = chainID
+}
+
+func (c *Client) requestOptions() []thirdparty.RequestOption {
+	options := []thirdparty.RequestOption{}
+	if c.apiKey != "" {
+		options = append(options, thirdparty.WithHeader("x-lifi-api-key", c.apiKey))
+	}
+	return options
 }
