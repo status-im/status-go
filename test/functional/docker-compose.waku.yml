@@ -2,7 +2,7 @@ services:
   boot-1:
     image: quay.io/wakuorg/nwaku-pr:d46babd-logosdeliverynode
     entrypoint: [
-      "/usr/bin/wakunode",
+      "/usr/local/bin/logosdeliverynode",
       "--discv5-discovery=true",
       "--discv5-enr-auto-update=True",
       "--discv5-udp-port=9000",
@@ -49,7 +49,7 @@ services:
     ports:
       - "8645"
     entrypoint: [
-      "/usr/bin/wakunode",
+      "/usr/local/bin/logosdeliverynode",
       "--discv5-discovery=true",
       "--discv5-enr-auto-update=True",
       "--discv5-udp-port=9000",
