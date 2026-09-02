@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
+	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 )
 
 // mockNotificationSettings implements NotificationSettingsProvider for unit tests
@@ -519,6 +520,47 @@ func TestNewMessageNotification_Icons(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, notif.CommunityIcon)
 	})
+}
+
+func TestMessageNotifications_PreserveThreadID(t *testing.T) {
+	threadID := "thread-1"
+	message := common.NewMessage()
+	message.ID = "message-1"
+	message.ChatId = "chat-1"
+	message.Text = "hello"
+	message.WhisperTimestamp = 1000
+	message.ChatMessage.ThreadId = &threadID
+	chat := &Chat{ID: "chat-1", ChatType: ChatTypePrivateGroupChat, Active: true, Name: "Group"}
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	contact, err := contacts.BuildContactFromPublicKey(&key.PublicKey)
+	require.NoError(t, err)
+	contact.DisplayName = "Alice"
+
+	incoming, err := NewMessageNotification("message-1", message, chat, contact, nil,
+		func(id string) (string, error) { return id, nil },
+		int(settings.ProfilePicturesVisibilityEveryone), messagePreviewNameAndMessage)
+	require.NoError(t, err)
+	require.Equal(t, threadID, incoming.ThreadID)
+
+	outgoing := NewOutgoingMessageNotification("message-1", message, chat, nil, "Me", "", "me")
+	require.Equal(t, threadID, outgoing.ThreadID)
+
+	for _, notification := range []*localnotifications.Notification{incoming, outgoing} {
+		encoded, err := json.Marshal(notification)
+		require.NoError(t, err)
+		var payload map[string]interface{}
+		require.NoError(t, json.Unmarshal(encoded, &payload))
+		require.Equal(t, threadID, payload["threadId"])
+	}
+
+	unthreaded := NewOutgoingMessageNotification("message-2", common.NewMessage(), chat, nil, "Me", "", "me")
+	encoded, err := json.Marshal(unthreaded)
+	require.NoError(t, err)
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(encoded, &payload))
+	_, containsThreadID := payload["threadId"]
+	require.False(t, containsThreadID)
 }
 
 func TestNewPrivateGroupInviteNotification_ChatIcon(t *testing.T) {
