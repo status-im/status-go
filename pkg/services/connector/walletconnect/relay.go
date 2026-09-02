@@ -579,7 +579,10 @@ func (r *RelayClient) reconnect() error {
 		// and deadlock again, forever. Hand it to its own goroutine so readLoop
 		// can resume immediately.
 		if handler != nil {
-			go handler()
+			go func() {
+				defer panics.LogOnPanic()
+				handler()
+			}()
 		}
 
 		return nil
