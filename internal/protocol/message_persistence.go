@@ -53,10 +53,12 @@ var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE 
 var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
 
 type Thread struct {
-	ThreadID        string `json:"threadId"`
-	ChatID          string `json:"chatId"`
-	ParentMessageID string `json:"parentMessageId"`
-	Name            string `json:"name"`
+	ThreadID              string `json:"threadId"`
+	ChatID                string `json:"chatId"`
+	ParentMessageID       string `json:"parentMessageId"`
+	Name                  string `json:"name"`
+	UnviewedMessagesCount uint   `json:"unviewedMessagesCount"`
+	UnviewedMentionsCount uint   `json:"unviewedMentionsCount"`
 }
 
 func (db sqlitePersistence) buildMessagesQueryWithAdditionalFields(additionalSelectFields, whereAndTheRest string) string {
@@ -899,11 +901,22 @@ func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentM
 
 func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread, error) {
 	var thread Thread
-	err := db.db.QueryRow(`SELECT thread_id, chat_id, parent_message_id, name FROM threads WHERE thread_id = ? AND chat_id = ?`, threadID, chatID).Scan(
+	err := db.db.QueryRow(`
+		SELECT
+			threads.thread_id,
+			threads.chat_id,
+			threads.parent_message_id,
+			threads.name,
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
+		FROM threads
+		WHERE thread_id = ? AND chat_id = ?`, threadID, chatID).Scan(
 		&thread.ThreadID,
 		&thread.ChatID,
 		&thread.ParentMessageID,
 		&thread.Name,
+		&thread.UnviewedMessagesCount,
+		&thread.UnviewedMentionsCount,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, common.ErrRecordNotFound
@@ -916,7 +929,17 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 }
 
 func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
-	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name FROM threads WHERE chat_id = ? ORDER BY name ASC`, chatID)
+	rows, err := db.db.Query(`
+		SELECT
+			threads.thread_id,
+			threads.chat_id,
+			threads.parent_message_id,
+			threads.name,
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
+		FROM threads
+		WHERE chat_id = ?
+		ORDER BY name ASC`, chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -925,7 +948,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	threads := make([]*Thread, 0)
 	for rows.Next() {
 		thread := &Thread{}
-		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name)
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
 		if err != nil {
 			return nil, err
 		}
@@ -1056,6 +1079,23 @@ func (db sqlitePersistence) latestIncomingMessageClock(chatID string) (uint64, e
 			LIMIT 1
 		`, cursor),
 		chatID).Scan(&clock)
+	if err != nil {
+		return 0, err
+	}
+	return clock, nil
+}
+
+func (db sqlitePersistence) latestIncomingThreadMessageClock(chatID string, threadID string) (uint64, error) {
+	var clock uint64
+	err := db.db.QueryRow(`
+		SELECT
+			clock_value
+		FROM
+			user_messages
+		WHERE
+			local_chat_id = ? AND thread_id = ? AND outgoing_status = ''
+		ORDER BY clock_value DESC
+		LIMIT 1`, chatID, threadID).Scan(&clock)
 	if err != nil {
 		return 0, err
 	}
@@ -2552,11 +2592,11 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 		   SET unviewed_message_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0),
+		   WHERE local_chat_id = ? AND seen = 0 AND (thread_id IS NULL OR thread_id = '')),
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied) AND (thread_id IS NULL OR thread_id = '')),
                    highlight = 0
 		WHERE id = ?`, id, id, id)
 
@@ -2584,7 +2624,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		_ = tx.Rollback()
 	}()
 
-	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned) AND not(replied)`, chatID, clock)
+	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned) AND not(replied) AND (thread_id IS NULL OR thread_id = '')`, chatID, clock)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -2594,7 +2634,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		return 0, 0, err
 	}
 
-	mentionedOrRepliedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND (mentioned OR replied)`, chatID, clock)
+	mentionedOrRepliedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen = 0 AND clock_value <= ? AND (mentioned OR replied) AND (thread_id IS NULL OR thread_id = '')`, chatID, clock)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -2611,6 +2651,43 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return (seen + mentionedOrReplied), mentionedOrReplied, nil
+}
+
+func (db sqlitePersistence) MarkThreadRead(chatID string, threadID string, clock uint64) (int64, int64, error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	seenResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND thread_id = ? AND seen = 0 AND clock_value <= ? AND not(mentioned) AND not(replied)`, chatID, threadID, clock)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	seen, err := seenResult.RowsAffected()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	mentionedOrRepliedResult, err := tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND thread_id = ? AND seen = 0 AND clock_value <= ? AND (mentioned OR replied)`, chatID, threadID, clock)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	mentionedOrReplied, err := mentionedOrRepliedResult.RowsAffected()
 	if err != nil {
 		return 0, 0, err
 	}
@@ -2639,7 +2716,7 @@ func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
 
 	inVector := strings.Repeat("?, ", len(chatIDs)-1) + "?"
 
-	q := "UPDATE user_messages SET seen = 1 WHERE local_chat_id IN (%s) AND seen != 1"
+	q := "UPDATE user_messages SET seen = 1 WHERE local_chat_id IN (%s) AND seen != 1 AND (thread_id IS NULL OR thread_id = '')"
 	q = fmt.Sprintf(q, inVector)
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
@@ -2702,11 +2779,11 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
               	SET unviewed_message_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0),
+		   WHERE local_chat_id = ? AND seen = 0 AND (thread_id IS NULL OR thread_id = '')),
 		   unviewed_mentions_count =
 		   (SELECT COUNT(1)
 		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
+		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied) AND (thread_id IS NULL OR thread_id = '')),
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 	return countWithMentions + countNoMentions, countWithMentions, err
@@ -2755,7 +2832,7 @@ func (db sqlitePersistence) MarkMessageAsUnread(chatID string, messageID string)
 	// TODO : Reduce number of queries for getting (total unread messages, total messages with mention)
 	// The function expected result is a pair (total unread messages, total messages with mention)
 	// Currently a 2 step operation is needed to obtain this pair
-	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND NOT(seen)`, chatID)
+	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND NOT(seen) AND (thread_id IS NULL OR thread_id = '')`, chatID)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -2766,6 +2843,7 @@ func (db sqlitePersistence) MarkMessageAsUnread(chatID string, messageID string)
 			WHERE local_chat_id = ?
 			AND seen = 1
 			AND (mentioned OR replied)
+			AND (thread_id IS NULL OR thread_id = '')
 			AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)`, chatID, messageID)
 	if err != nil {
 		return 0, 0, err
@@ -2783,6 +2861,7 @@ func (db sqlitePersistence) MarkMessageAsUnread(chatID string, messageID string)
 			WHERE local_chat_id = ?
 			AND seen = 1
 			AND NOT(mentioned OR replied)
+			AND (thread_id IS NULL OR thread_id = '')
 			AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)`, chatID, messageID)
 	if err != nil {
 		return 0, 0, err
@@ -2861,8 +2940,8 @@ func (db sqlitePersistence) BlockContact(contact *contacts.Contact, isDesktopFun
 	_, err = tx.Exec(`
 		UPDATE chats
 		SET
-			unviewed_message_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id),
-			unviewed_mentions_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND (mentioned OR replied))`)
+			unviewed_message_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND (thread_id IS NULL OR thread_id = '')),
+			unviewed_mentions_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND (mentioned OR replied) AND (thread_id IS NULL OR thread_id = ''))`)
 	if err != nil {
 		return nil, err
 	}
