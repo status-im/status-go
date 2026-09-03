@@ -38,6 +38,7 @@ type Notification struct {
 	IsConversation      bool
 	IsGroupConversation bool
 	ConversationID      string
+	ThreadID            string
 	Timestamp           uint64
 	Author              NotificationAuthor
 	// CommunityIcon is the community avatar (data URI) for community chat/request notifications.
@@ -73,6 +74,7 @@ type notificationAlias struct {
 	IsConversation      bool               `json:"isConversation,omitempty"`
 	IsGroupConversation bool               `json:"isGroupConversation,omitempty"`
 	ConversationID      string             `json:"conversationId,omitempty"`
+	ThreadID            string             `json:"threadId,omitempty"`
 	Timestamp           uint64             `json:"timestamp,omitempty"`
 	Author              NotificationAuthor `json:"notificationAuthor,omitempty"`
 	CommunityIcon       string             `json:"communityIcon,omitempty"`
@@ -129,6 +131,7 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		IsConversation:      n.IsConversation,
 		IsGroupConversation: n.IsGroupConversation,
 		ConversationID:      n.ConversationID,
+		ThreadID:            n.ThreadID,
 		Timestamp:           n.Timestamp,
 		Author:              n.Author,
 		CommunityIcon:       n.CommunityIcon,
