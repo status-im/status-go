@@ -33,10 +33,10 @@ type LiFiProcessor struct {
 	quotes          sync.Map // [fromTokenKey-toTokenKey-amountIn, *lifi.Quote]
 }
 
-func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager, apiKey security.SensitiveString) *LiFiProcessor {
+func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager, apiKey security.SensitiveString, integrator string) *LiFiProcessor {
 	return &LiFiProcessor{
 		ethClientGetter: ethClientGetter,
-		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, lifi.Integrator, apiKey.Reveal()),
+		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, integrator, apiKey.Reveal()),
 		tokenManager:    tokenManager,
 		transactor:      transactor,
 		quotes:          sync.Map{},

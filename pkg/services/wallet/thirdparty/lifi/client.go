@@ -7,10 +7,21 @@ import (
 const (
 	baseURL = "https://li.quest/v1"
 
-	Integrator = "status-app"
+	IntegratorDev  = "status-app"
+	IntegratorProd = "status-app-prod"
+
+	// prodStageName matches WalletConfig.StatusProxyStageName as set by release builds.
+	prodStageName = "prod"
 
 	feeFraction = "0.0062" // 0.62%
 )
+
+func IntegratorForStage(stageName string) string {
+	if stageName == prodStageName {
+		return IntegratorProd
+	}
+	return IntegratorDev
+}
 
 type Client struct {
 	httpClient *thirdparty.HTTPClient

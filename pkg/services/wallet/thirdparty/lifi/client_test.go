@@ -10,6 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIntegratorForStage(t *testing.T) {
+	require.Equal(t, IntegratorProd, IntegratorForStage("prod"))
+	require.Equal(t, IntegratorDev, IntegratorForStage("test"))
+	require.Equal(t, IntegratorDev, IntegratorForStage(""))
+	require.Equal(t, IntegratorDev, IntegratorForStage("staging"))
+}
+
 // Keyed rate limits only apply to requests presenting the API key header, so
 // every endpoint has to carry it — not just /quote.
 func TestApiKeyHeaderAppliedToAllEndpoints(t *testing.T) {
@@ -33,7 +40,7 @@ func TestApiKeyHeaderAppliedToAllEndpoints(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			client := NewClient(1, Integrator, tc.apiKey)
+			client := NewClient(1, IntegratorDev, tc.apiKey)
 			client.baseURL = srv.URL
 
 			_, err := client.FetchTokensList(context.Background())

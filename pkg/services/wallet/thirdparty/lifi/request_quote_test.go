@@ -52,7 +52,7 @@ func TestDecodeQuote(t *testing.T) {
 }
 
 func TestQuoteQueryParamsOrder(t *testing.T) {
-	c := NewClient(1, Integrator, "")
+	c := NewClient(1, IntegratorDev, "")
 	base := QuoteParams{
 		FromChainID:        1,
 		ToChainID:          10,
