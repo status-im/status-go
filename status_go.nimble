@@ -20,13 +20,14 @@ srcDir = "internal/nimble/src"
 
 
 ### Dependencies
-requires "nim >= 2.2.4"
+# The chain pins the compiler exactly; nim-sds and the bindings agree on this.
+requires "nim == 2.2.6"
 
 # The bindings pin the nim-sds revision their C ABI matches, and it resolves
 # transitively. A pin there overrides anything named here, so this does not name
 # one; that changes when nim-sds publishes versioned tags and the bindings can
 # express a range instead.
-requires "https://github.com/logos-messaging/sds-go-bindings#c94172d"
+requires "https://github.com/logos-messaging/sds-go-bindings#ac2e2af7"
 
 
 ### Helpers

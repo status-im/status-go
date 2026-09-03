@@ -25,7 +25,7 @@ RUN set -eu && \
     protoc --version
 
 # Install Nim from pre-built binaries
-ARG NIM_VERSION=2.2.4
+ARG NIM_VERSION=2.2.6
 RUN set -eu && \
     DPKG_ARCH="$(dpkg --print-architecture)" && \
     case "$DPKG_ARCH" in \
@@ -49,7 +49,8 @@ RUN set -eu && \
 ENV PATH="/opt/nim/bin:${PATH}"
 
 # The nimble bundled with Nim cannot resolve nim-sds through the bindings.
-ARG NIMBLE_VERSION=0.24.1
+# The nightly build; the release predates the lock-file fixes the chain needs.
+ARG NIMBLE_CHANNEL=latest
 RUN set -eu && \
     case "$(dpkg --print-architecture)" in \
     amd64) NIMBLE_ARCH="linux_x64" ;; \
@@ -57,7 +58,7 @@ RUN set -eu && \
     *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
     esac; \
     curl -sSfL -o /tmp/nimble.tar.gz \
-    "https://github.com/nim-lang/nimble/releases/download/v${NIMBLE_VERSION}/nimble-${NIMBLE_ARCH}.tar.gz" && \
+    "https://github.com/nim-lang/nimble/releases/download/${NIMBLE_CHANNEL}/nimble-${NIMBLE_ARCH}.tar.gz" && \
     tar -xzf /tmp/nimble.tar.gz -C /opt/nim/bin && \
     rm /tmp/nimble.tar.gz && \
     chmod +x /opt/nim/bin/nimble && \
