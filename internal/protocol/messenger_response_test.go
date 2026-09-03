@@ -50,6 +50,34 @@ func TestMessengerResponseMergeMessages(t *testing.T) {
 
 }
 
+func TestMessengerResponseMergeThreads(t *testing.T) {
+	thread1 := &Thread{ThreadID: "thread-1", ChatID: "chat-1", Name: "First"}
+	modifiedThread1 := &Thread{ThreadID: "thread-1", ChatID: "chat-1", Name: "Renamed"}
+	thread2 := &Thread{ThreadID: "thread-2", ChatID: "chat-1", Name: "Second"}
+
+	response1 := &MessengerResponse{}
+	response1.AddThread(thread1)
+
+	response2 := &MessengerResponse{}
+	response2.AddThread(modifiedThread1)
+	response2.AddThread(thread2)
+
+	require.NoError(t, response1.Merge(response2))
+
+	require.Len(t, response1.Threads(), 2)
+	require.Equal(t, modifiedThread1, response1.threads[threadKey(modifiedThread1.ChatID, modifiedThread1.ThreadID)])
+	require.Equal(t, thread2, response1.threads[threadKey(thread2.ChatID, thread2.ThreadID)])
+}
+
+func TestMessengerResponseMarshalJSONIncludesThreads(t *testing.T) {
+	response := &MessengerResponse{}
+	response.AddThread(&Thread{ThreadID: "thread-1", ChatID: "chat-1", Name: "Thread"})
+
+	encoded, err := response.MarshalJSON()
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"threads"`)
+}
+
 func TestMessengerResponseMergeNotImplemented(t *testing.T) {
 	response1 := &MessengerResponse{}
 
