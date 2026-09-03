@@ -450,6 +450,19 @@ Notes:
 
 ---
 
+### wakuext_chatThreadsByChatIDs
+List threads for several chats at once, so a client opening a section does not have to issue one
+request per chat.
+
+**Params:** `[[chatId, ...]]`
+- `chatIds`: array of strings (communityId + chatUUID)
+
+**Result:** same shape as `wakuext_chatThreads`. Threads from all requested chats are returned in
+one flat list, ordered by `chatId` then `name`; use each thread's `chatId` to group them.
+Requested chats with no threads simply contribute nothing.
+
+---
+
 ### wakuext_leaveCommunity
 
 Leave a community.
