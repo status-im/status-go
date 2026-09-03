@@ -14,6 +14,8 @@ pipeline {
   }
 
   options {
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 90, unit: 'MINUTES')
     disableConcurrentBuilds()
     disableRestartFromStage()
     /* manage how many builds we keep */
@@ -32,6 +34,7 @@ pipeline {
 
   stages {
     stage('Build library') {
+      options { timeout(time: 60, unit: 'MINUTES') }
       steps {
         script {
           nix.flake("status-go-library")
