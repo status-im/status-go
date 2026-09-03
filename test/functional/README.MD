@@ -287,15 +287,15 @@ If you see some import issues, make sure that you have all requirements installe
 Make sure that you made `test-functional` source folder (Right click > Mark directory as > Source folder)
 
 
-## Apple Silicon (macOS): Waku fleet connection failures — disable Rosetta
+## Apple Silicon (macOS): logos-delivery fleet connection failures — disable Rosetta
 
-The `wakuorg/nwaku` fleet image is `amd64`-only, so on Apple Silicon it runs under emulation.
+The `quay.io/wakuorg/nwaku-pr` logos-delivery fleet image is `amd64`-only, so on Apple Silicon it runs under emulation.
 With Docker Desktop's **Rosetta** emulation enabled, the libp2p Noise handshake between the
-`status-go` nodes (go-libp2p) and the nwaku fleet nodes (nim-libp2p) fails, so the app nodes
+`status-go` nodes (go-libp2p) and the logos-delivery fleet nodes (nim-libp2p) fails, so the app nodes
 never connect to `boot-1`/`store`. Symptoms:
 
 - status-go logs: `failed to negotiate security protocol: ... chacha20poly1305: message authentication failed`
-- nwaku (boot-1/store) logs: `decryptWithAd failed tag authentication.`
+- logos-delivery (boot-1/store) logs: `decryptWithAd failed tag authentication.`
 - Tests that depend on the fleet (store/history sync, communities, anything store-backed) hang
   or fail, and the store node never receives messages.
 

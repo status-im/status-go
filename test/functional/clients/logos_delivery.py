@@ -3,7 +3,7 @@
 The transport that status-go currently runs on (and that backs the functional
 test fleet) is historically called "waku". The project term going forward is
 "logos delivery", so new code uses that name. The fleet store node exposes the
-nwaku REST API (`/store/v3/messages`); this client queries it so tests can
+logos-delivery REST API (`/store/v3/messages`); this client queries it so tests can
 assert that messages were actually persisted by the store node, instead of
 sleeping and hoping.
 """
@@ -19,7 +19,7 @@ from utils.config import Config
 
 logger = logging.getLogger(__name__)
 
-# Container port the nwaku store node serves its REST API on (mapped to an
+# Container port the logos-delivery store node serves its REST API on (mapped to an
 # ephemeral host port by docker-compose.waku.yml).
 STORE_REST_CONTAINER_PORT = "8645/tcp"
 
