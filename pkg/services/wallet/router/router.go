@@ -110,7 +110,7 @@ func NewRouter(
 	tokenBalancesFetcher TokenBalanceFetcher,
 	marketManager *market.Manager,
 	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager,
-	lifiAPIKey security.SensitiveString) *Router {
+	lifiAPIKey security.SensitiveString, lifiIntegrator string) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
 	logger := logutils.ZapLogger().Named("router")
@@ -130,7 +130,7 @@ func NewRouter(
 			return paraswap.NewClientV5(chainID, pathprocessor.ParaswapPartnerID, walletCommon.ZeroAddress(), 0)
 		},
 		lifiClientFactory: func(chainID uint64) lifi.ClientInterface {
-			return lifi.NewClient(chainID, lifi.Integrator, lifiAPIKey.Reveal())
+			return lifi.NewClient(chainID, lifiIntegrator, lifiAPIKey.Reveal())
 		},
 		logger: logger,
 	}
