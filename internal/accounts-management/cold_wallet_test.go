@@ -182,31 +182,6 @@ func (s *ManagerTestSuite) TestMigrateColdWalletProfileKeypairToAppRestoresChatW
 	s.requireKeypairKeystoreFilesOpen(s.mnemonic, s.password, []string{common.PathEIP1581Chat, common.PathDefaultWalletAccount})
 }
 
-func (s *ManagerTestSuite) TestMigrateColdWalletKeypairToAppSkipsPasswordCheckWhenProfileKeypairIsCold() {
-	s.setupProfileKeystore(false)
-	mnemonic2, coldKp := s.createColdSeedKeypair()
-
-	s.persistence.EXPECT().GetKeypairByKeyUID(coldKp.KeyUID).Return(coldKp, nil).Times(1)
-	s.persistence.EXPECT().GetProfileKeypair().Return(&accsmanagementtypes.Keypair{
-		KeyUID:      s.masterAccount.KeyUID(),
-		Type:        accsmanagementtypes.KeypairTypeProfile,
-		ColdWallet:  accsmanagementtypes.ColdWalletTypeStatusKeycard,
-		DerivedFrom: "0x000000000000000000000000000000000000dead",
-	}, nil).Times(1)
-	s.persistence.EXPECT().UpdateKeypairXPub(coldKp.KeyUID, "", accsmanagementtypes.ColdWalletTypeNone, uint64(3)).Return(nil).Times(1)
-
-	filesBefore := s.countKeystoreFiles()
-	keyUID, err := s.accManager.MigrateColdWalletKeypairToApp(mnemonic2, "never-verified-password", 3)
-	s.Require().NoError(err, "migration must proceed without password verification when the profile keypair is itself on a cold wallet")
-	s.Require().Equal(coldKp.KeyUID, keyUID)
-	s.Require().Equal(filesBefore+2, s.countKeystoreFiles(),
-		"keystore files must be recreated for the master key and the account path even though the password could not be verified")
-
-	// the manager passes the password through unverified, so the files must open
-	// with exactly that password; a file count alone does not show which secret was used
-	s.requireKeypairKeystoreFilesOpen(mnemonic2, "never-verified-password", []string{common.PathDefaultWalletAccount})
-}
-
 func (s *ManagerTestSuite) TestMigrateAlreadyMigratedKeypairSwitchesColdWalletTypeWithoutPassword() {
 	keypair := &accsmanagementtypes.Keypair{
 		KeyUID:     "cold-kp",

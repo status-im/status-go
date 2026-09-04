@@ -785,9 +785,8 @@ func (s *ManagerTestSuite) TestCreateKeypairSurfacesTypedKeystoreDirectoryError(
 		s.T().Skip("chmod-based write denial does not apply to root")
 	}
 	s.Require().NoError(os.Chmod(s.rootDataDir, 0o555))
-	defer func() {
-		s.Require().NoError(os.Chmod(s.rootDataDir, 0o755))
-	}()
+	t := s.T()
+	t.Cleanup(func() { require.NoError(t, os.Chmod(s.rootDataDir, 0o755)) })
 
 	s.persistence.EXPECT().GetKeypairByKeyUID(s.masterAccount.KeyUID()).Return(
 		nil, accsmanagementtypes.ErrDbKeypairNotFound,
