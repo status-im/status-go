@@ -678,19 +678,8 @@ func (s *MessengerSyncWalletSuite) pairOtherDevice() *Messenger {
 	}
 	err := otherDevice.SetInstallationMetadata(otherDevice.installationID, im)
 	s.Require().NoError(err)
-	response, err := otherDevice.SendPairInstallation(context.Background(), "", nil)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
 
-	_, err = WaitOnMessengerResponse(
-		s.m,
-		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
-		"installation not received",
-	)
-	s.Require().NoError(err)
-
-	_, err = s.m.EnableInstallation(otherDevice.installationID)
-	s.Require().NoError(err)
+	PairDevices(&s.Suite, otherDevice, s.m)
 
 	return otherDevice
 }
