@@ -387,6 +387,107 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().ErrorIs(err, ErrKeyFileAlreadyExists)
 }
 
+func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StoreRePairSkipsExistingKeysAndKeepsLocalAccount() {
+	pp := new(AccountPayload)
+	ppr, err := NewAccountPayloadLoader(pp, pms.config1)
+	pms.Require().NoError(err)
+	pms.Require().NoError(ppr.Load())
+
+	pb, err := NewPairingPayloadMarshaller(pp, pms.Logger).MarshalProtobuf()
+	pms.Require().NoError(err)
+
+	pp2 := new(AccountPayload)
+	pms.Require().NoError(NewPairingPayloadMarshaller(pp2, pms.Logger).UnmarshalProtobuf(pb))
+	storer, err := NewAccountPayloadStorer(pp2, pms.config2)
+	pms.Require().NoError(err)
+	pms.Require().NoError(storer.Store())
+
+	// the device now knows the account; rename it locally so the DB row is
+	// distinguishable from the wire payload on the second pass
+	localAcc, err := pms.config2.DB.GetAccount(keyUID)
+	pms.Require().NoError(err)
+	localAcc.Name = "locally renamed"
+	pms.Require().NoError(pms.config2.DB.SaveAccount(*localAcc))
+
+	pp3 := new(AccountPayload)
+	pms.Require().NoError(NewPairingPayloadMarshaller(pp3, pms.Logger).UnmarshalProtobuf(pb))
+	storer2, err := NewAccountPayloadStorer(pp3, pms.config2)
+	pms.Require().NoError(err)
+
+	keysBefore := getFiles(pms.T(), filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID))
+
+	err = storer2.Store()
+	pms.Require().NoError(err, "Expected re-pairing Store() to swallow ErrKeyFileAlreadyExists because the keystore dir for the keyUID already exists on this device")
+	pms.Require().True(storer2.exist, "Expected exist=true because the second Store() must flag the account as already known")
+
+	pms.Require().Equal("locally renamed", storer2.multiaccount.Name, "Expected the multiaccount to be replaced by the local DB row (not the wire payload) on re-pair")
+
+	keys := getFiles(pms.T(), filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID))
+	pms.Require().Len(keys, 2, "Expected the original two key files to be untouched by the re-pair")
+	pms.Require().Equal(keysBefore, keys, "Expected the key file CONTENT unchanged: an overwrite would keep the count at 2 while corrupting the local keys with the wire payload's")
+}
+
+func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_KeycardPairingSurvivesMarshalUnmarshalStore() {
+	acc := expected
+	acc.KeycardPairing = "keycard-pairing-info"
+	pp := &AccountPayload{
+		password:     "0x1234",
+		multiaccount: &acc,
+		keys:         make(map[string][]byte),
+	}
+
+	pb, err := NewPairingPayloadMarshaller(pp, pms.Logger).MarshalProtobuf()
+	pms.Require().NoError(err)
+
+	pp2 := new(AccountPayload)
+	pms.Require().NoError(NewPairingPayloadMarshaller(pp2, pms.Logger).UnmarshalProtobuf(pb))
+	pms.Require().Equal("keycard-pairing-info", pp2.multiaccount.KeycardPairing, "Expected KeycardPairing to survive the protobuf round-trip because the paired device needs it for keycard login")
+	pms.Require().Equal("0x1234", pp2.password, "Expected an already 0x-prefixed password to pass the keycard adjustment unchanged")
+
+	storer, err := NewAccountPayloadStorer(pp2, pms.config2)
+	pms.Require().NoError(err)
+	pms.Require().NoError(storer.Store())
+
+	storedAcc, err := pms.config2.DB.GetAccount(keyUID)
+	pms.Require().NoError(err)
+	pms.Require().Equal("keycard-pairing-info", storedAcc.KeycardPairing, "Expected the received KeycardPairing to be persisted because the new device must be able to keycard-login")
+}
+
+func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StoreSkipsStoringWhenLoggedInWithSameKeyUID() {
+	acc := expected
+	pp := &AccountPayload{multiaccount: &acc}
+
+	pms.config2.LoggedInKeyUID = keyUID
+	storer, err := NewAccountPayloadStorer(pp, pms.config2)
+	pms.Require().NoError(err)
+
+	err = storer.Store()
+	pms.Require().NoError(err, "Expected Store() to be a silent no-op because the receiver is already logged in with the payload's keyUID")
+	pms.Require().False(storer.exist, "Expected exist to stay false because the skip returns before the keystore check")
+
+	_, statErr := os.Stat(filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID))
+	pms.Require().True(os.IsNotExist(statErr), "Expected no keystore dir to be written because the logged-in user's own key material must not be overwritten by wire data")
+
+	storedAcc, dbErr := pms.config2.DB.GetAccount(keyUID)
+	pms.Require().NoError(dbErr)
+	pms.Require().Empty(storedAcc.KeyUID, "Expected no multiaccounts row to be saved because the logged-in user's account must not be clobbered by wire data")
+}
+
+func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StoreRejectsPayloadForDifferentKeyUIDWhenLoggedIn() {
+	acc := expected
+	pp := &AccountPayload{multiaccount: &acc}
+
+	pms.config2.LoggedInKeyUID = "0x1111111111111111111111111111111111111111111111111111111111111111"
+	storer, err := NewAccountPayloadStorer(pp, pms.config2)
+	pms.Require().NoError(err)
+
+	err = storer.Store()
+	pms.Require().ErrorIs(err, ErrLoggedInKeyUIDConflict, "Expected ErrLoggedInKeyUIDConflict because a foreign account's payload must not be stored under an active session")
+
+	_, statErr := os.Stat(filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID))
+	pms.Require().True(os.IsNotExist(statErr), "Expected no keystore dir to be written for the rejected foreign payload")
+}
+
 func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LockPayload() {
 	AESKey := make([]byte, 32)
 	_, err := rand.Read(AESKey)
