@@ -46,6 +46,7 @@ const (
 	seedKeypairMnemonic     = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 	profileKeypairMnemonic1 = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about about"
 	seedKeypairMnemonic1    = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about abandon"
+	testKeycardUID          = "a84599394887b742eed9a99d3834a797"
 	path0                   = "m/44'/60'/0'/0/0"
 	path1                   = "m/44'/60'/0'/0/1"
 	expectedKDFIterations   = 1024
@@ -646,7 +647,7 @@ func removeKeypairKeystoreFiles(t *testing.T, keystoreDir string, kp *accsmanage
 
 func convertProfileToKeycard(t *testing.T, b *backend.StatusBackend, account multiaccounts.Account, keycardPairing, oldPassword, keycardPassword string) {
 	account.KeycardPairing = keycardPairing
-	require.NoError(t, b.ConvertToKeycardAccount(account, settings.Settings{}, account.KeyUID, oldPassword, keycardPassword))
+	require.NoError(t, b.ConvertToKeycardAccount(account, settings.Settings{}, testKeycardUID, oldPassword, keycardPassword))
 }
 
 // startKeystoreFilesSenderServer stands in for StartUpKeystoreFilesSenderServer,
@@ -660,7 +661,8 @@ func (s *SyncDeviceSuite) startKeystoreFilesSenderServer(b *backend.StatusBacken
 
 	senderServer, err := MakeKeystoreFilesSenderServer(b, conf)
 	require.NoError(s.T(), err)
-	s.T().Cleanup(func() { require.NoError(s.T(), senderServer.Stop()) })
+	t := s.T()
+	t.Cleanup(func() { require.NoError(t, senderServer.Stop()) })
 	require.NoError(s.T(), senderServer.startSendingData())
 
 	connectionParams, err := senderServer.MakeConnectionParams()
