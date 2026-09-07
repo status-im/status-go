@@ -1,6 +1,9 @@
 #!/usr/bin/env groovy
 library 'status-jenkins-lib@v1.9.39'
 
+/* Options section can't access functions in objects. */
+def isPRBuild = utils.isPRBuild()
+
 pipeline {
   agent {
     docker {
@@ -44,7 +47,7 @@ pipeline {
     /* Prevent Jenkins jobs from running forever. Higher than tests-rpc: this job also
        builds the peer (old release) backends from source before running the tests. */
     timeout(time: 90, unit: 'MINUTES')
-    disableConcurrentBuilds()
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
     disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(

@@ -2,6 +2,9 @@
 // vim: ft=groovy
 library 'status-jenkins-lib@v1.9.39'
 
+/* Options section can't access functions in objects. */
+def isPRBuild = utils.isPRBuild()
+
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */
   agent { label "${params.AGENT_LABEL} && go-1.26" }
@@ -29,7 +32,7 @@ pipeline {
     ansiColor('xterm')
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 30, unit: 'MINUTES')
-    disableConcurrentBuilds()
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
     disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
@@ -78,21 +81,13 @@ pipeline {
       } }
     }
 
-    stage('Generate') {
+    stage('Build') {
       steps { script {
-        make('generate V=2')
-      } }
-    }
-
-    stage('Build Static Lib') {
-      steps { script {
-        make('statusgo-library V=2')
-      } }
-    }
-
-    stage('Build Shared Lib') {
-      steps { script {
-        make('statusgo-shared-library V=2')
+        /* One make invocation on purpose: `generate` and `statusgo-c-bindings` are
+         * prerequisites of every library target, and `generate` starts by wiping
+         * its own outputs (clean-generated), so separate invocations regenerate
+         * and rebuild the bindings once per target. */
+        make("${libTargets().join(' ')} V=2")
       } }
     }
 
@@ -129,7 +124,7 @@ def assembePath(List<String> extraPaths) {
       'C:/Windows/system32',
       'C:/Windows',
       'C:/ProgramData/scoop/apps/go/1.26.5/bin',
-      'C:/ProgramData/scoop/apps/nim/2.2.6/bin',
+      'C:/ProgramData/scoop/apps/nim/2.2.10/bin',
       'C:/ProgramData/scoop/apps/cmake/3.31.6/bin',
       'C:/ProgramData/scoop/apps/python/3.13.5',
       'C:/ProgramData/scoop/apps/python/3.13.5/Scripts',
@@ -150,6 +145,17 @@ def assembePath(List<String> extraPaths) {
     /* These Git Bash paths can't be checked with fileExists(). */
     return (['/mingw64/bin', '/usr/bin', '/bin'] + binPaths + extraPaths).join(';')
   }
+}
+
+/* Nothing on desktop platforms consumes the static libstatus.a — status-desktop
+ * links the shared library — so it is only built where the full zip gets
+ * published: releases and non-PR (develop/nightly) runs. */
+def libTargets() {
+  def targets = ['statusgo-shared-library']
+  if (params.RELEASE || !utils.isPRBuild()) {
+    targets = ['statusgo-library'] + targets
+  }
+  return targets
 }
 
 def make(target) {

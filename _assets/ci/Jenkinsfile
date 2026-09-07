@@ -48,17 +48,14 @@ pipeline {
         stage('iOS') { steps { script {
           ios = jenkins.Build('status-go/platforms/ios')
         } } }
-        stage('Android') { steps { script {
-          android = jenkins.Build('status-go/platforms/android')
-        } } }
-        stage('Linux') { steps { script {
+        stage('Linux and Android') { steps { script {
           linux = jenkins.Build('status-go/platforms/linux')
         } } }
         stage('MacOS') { steps { script {
-          linux = jenkins.Build('status-go/platforms/macos')
+          macos = jenkins.Build('status-go/platforms/macos')
         } } }
         stage('Windows') { steps { script {
-          linux = jenkins.Build('status-go/platforms/windows')
+          windows = jenkins.Build('status-go/platforms/windows')
         } } }
         stage('Docker') { steps { script {
           dock = jenkins.Build('status-go/platforms/docker')
@@ -70,7 +67,7 @@ pipeline {
       steps { script {
         sh "rm -fr ${env.RELEASE_DIR}"
         sh "mkdir ${env.RELEASE_DIR}"
-        [ios, android, linux].each { platformBuild ->
+        [ios, linux].each { platformBuild ->
           jenkins.copyArts(platformBuild)
         }
         dir(env.RELEASE_DIR) {

@@ -1,6 +1,9 @@
 #!/usr/bin/env groovy
 library 'status-jenkins-lib@v1.9.39'
 
+/* Options section can't access functions in objects. */
+def isPRBuild = utils.isPRBuild()
+
 pipeline {
   agent { label 'linux' }
 
@@ -26,7 +29,7 @@ pipeline {
     timestamps()
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 10, unit: 'MINUTES')
-    disableConcurrentBuilds()
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
     disableRestartFromStage()
     /* Go requires a certain directory structure */
     checkoutToSubdirectory('src/github.com/status-im/status-go')

@@ -1,6 +1,9 @@
 #!/usr/bin/env groovy
 library 'status-jenkins-lib@v1.9.39'
 
+/* Options section can't access functions in objects. */
+def isPRBuild = utils.isPRBuild()
+
 pipeline {
   agent { label "${params.AGENT_LABEL} && nix-2.24" }
 
@@ -27,7 +30,7 @@ pipeline {
     ansiColor('xterm')
     /* Prevent Jenkins jobs from running forever */
     timeout(time: 15, unit: 'MINUTES')
-    disableConcurrentBuilds()
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
     disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(

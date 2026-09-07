@@ -1,6 +1,9 @@
 #!/usr/bin/env groovy
 library 'status-jenkins-lib@v1.9.39'
 
+/* Options section can't access functions in objects. */
+def isPRBuild = utils.isPRBuild()
+
 pipeline {
   /* tests.Dockerfile pre-creates /home/jenkins/gomodcache owned by jenkins so the
      otherwise go fails with "mkdir .../gomodcache/cache: permission denied" */
@@ -61,7 +64,7 @@ pipeline {
     ansiColor('xterm')
     /* Prevent Jenkins jobs from running forever */
     timeout(time: getDefaultTimeout(), unit: 'MINUTES')
-    disableConcurrentBuilds()
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
     disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(

@@ -2,6 +2,12 @@
 // vim: ft=groovy
 library 'status-jenkins-lib@v1.9.39'
 
+/* Options section can't access functions in objects. */
+def isPRBuild = utils.isPRBuild()
+
+/* Public URLs for the build description; PKG_URL itself stays the Linux zip. */
+descLinks = [:]
+
 pipeline {
   agent {
     docker {
@@ -23,14 +29,19 @@ pipeline {
       defaultValue: false,
       description: 'Enable to create build for release.',
     )
+    booleanParam(
+      name: 'BUILD_ANDROID',
+      defaultValue: params.BUILD_ANDROID != null ? params.BUILD_ANDROID : true,
+      description: 'Also build the Android library after the Linux one (same container, shared checkout and codegen).',
+    )
   }
 
   options {
     timestamps()
     ansiColor('xterm')
-    /* Prevent Jenkins jobs from running forever */
-    timeout(time: 30, unit: 'MINUTES')
-    disableConcurrentBuilds()
+    /* Prevent Jenkins jobs from running forever. Covers Linux and Android. */
+    timeout(time: 45, unit: 'MINUTES')
+    disableConcurrentBuilds(abortPrevious: isPRBuild)
     disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
@@ -55,6 +66,12 @@ pipeline {
       version: env.VERSION,
       ext:     'zip',
     )
+    ANDROID_ARTIFACT = utils.pkgFilename(
+      name:    'status-go',
+      type:    'android',
+      version: env.VERSION,
+      ext:     'so',
+    )
     /* prevent sharing cache dir across different jobs */
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
     /* fixes nim cache collision */
@@ -63,61 +80,75 @@ pipeline {
 
   stages {
     stage('Setup') {
-        steps {
-          script {
-            if (!env.PLATFORM.startsWith('windows')) {
-                sh "mkdir -p \$(dirname ${REPO_SRC})"
-                sh "ln -s ${WORKSPACE} ${REPO_SRC}"
-              }
-          }
+      steps { /* Go needs to find status-go in GOPATH. */
+        sh "mkdir -p \$(dirname ${REPO_SRC})"
+        sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
-  }
+    }
 
     stage('Deps') {
       steps { script {
         nix.develop('make status-go-deps', pure: false)
+      } }
+    }
+
+    stage('Linux') {
+      stages {
+        stage('Build') {
+          steps { script {
+            /* One make invocation on purpose: `generate` and `statusgo-c-bindings`
+             * are prerequisites of every library target, and `generate` starts by
+             * wiping its own outputs (clean-generated), so separate invocations
+             * regenerate and rebuild the bindings once per target. */
+            nix.develop("make ${libTargets().join(' ')}", pure: false)
+          } }
+        }
+        stage('Archive') {
+          steps {
+            zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
+          }
+        }
+        stage('Upload') {
+          steps { script {
+            env.PKG_URL = s5cmd.upload(ARTIFACT)
+            descLinks.Linux = env.PKG_URL
+          } }
+        }
       }
     }
-  }
 
-    stage('Generate') {
-      steps { script {
-        nix.develop('make generate', pure: false)
+    /* Same container, same checkout, same nix shell as Linux; only the final
+     * cross-compile differs. Sequential, not parallel: both targets go through
+     * `generate` (which wipes and rewrites generated sources) and both write
+     * build/bin/libstatus.so. */
+    stage('Android') {
+      when { expression { params.BUILD_ANDROID } }
+      stages {
+        stage('Build') {
+          steps { script {
+            /* The Linux stage leaves libstatus.so as a symlink to libstatus.so.0;
+             * clear it so the Android output is a plain file the mv below can take. */
+            sh 'rm -f build/bin/libstatus.*'
+            nix.develop('make statusgo-android-library', pure: false, sandbox: true)
+            sh "mv build/bin/libstatus.so ${ANDROID_ARTIFACT}"
+          } }
+        }
+        stage('Archive') {
+          steps { script {
+            archiveArtifacts(ANDROID_ARTIFACT)
+          } }
+        }
+        stage('Upload') {
+          steps { script {
+            env.ANDROID_PKG_URL = s5cmd.upload(ANDROID_ARTIFACT)
+            descLinks.Android = env.ANDROID_PKG_URL
+          } }
+        }
       }
     }
-  }
-
-    stage('Build Static Lib') {
-        steps {
-            script {
-                nix.develop('make statusgo-library', pure: false)
-                }
-            }
-        }
-
-    stage('Build Shared Lib') {
-        steps {
-            script {
-                nix.develop('make statusgo-shared-library', pure: false)
-                }
-            }
-        }
-
-    stage('Archive') {
-        steps {
-          zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
-            }
-        }
-
-    stage('Upload') {
-        steps {
-            script {
-                env.PKG_URL = s5cmd.upload(ARTIFACT)
-            }
-        }
-    }
-} // stages
+  } // stages
   post {
+    always  { script { jenkins.setBuildDesc(descLinks) } }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
     cleanup {
@@ -127,3 +158,13 @@ pipeline {
   } // post
 } // pipeline
 
+/* Nothing on desktop platforms consumes the static libstatus.a — status-desktop
+ * links the shared library — so it is only built where the full zip gets
+ * published: releases and non-PR (develop/nightly) runs. */
+def libTargets() {
+  def targets = ['statusgo-shared-library']
+  if (params.RELEASE || !utils.isPRBuild()) {
+    targets = ['statusgo-library'] + targets
+  }
+  return targets
+}
