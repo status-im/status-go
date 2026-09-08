@@ -2,6 +2,7 @@ package pathprocessor
 
 import (
 	"context"
+	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -160,6 +161,15 @@ func (s *LiFiProcessor) GetProviderTool(params ProcessorInputParams) string {
 		return ""
 	}
 	return quote.Tool
+}
+
+// GetRouteExecutionDuration returns LI.FI's estimated time in seconds once the tx is included.
+func (s *LiFiProcessor) GetRouteExecutionDuration(params ProcessorInputParams) uint {
+	quote, err := s.getOrFetchQuote(params)
+	if err != nil || quote == nil || quote.Estimate.ExecutionDuration <= 0 {
+		return 0
+	}
+	return uint(math.Ceil(quote.Estimate.ExecutionDuration))
 }
 
 func (s *LiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {

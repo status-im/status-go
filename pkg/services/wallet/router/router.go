@@ -388,6 +388,10 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 				continue
 			}
 
+			if clearable, ok := pProcessor.(pathprocessor.PathProcessorClearable); ok {
+				clearable.Clear()
+			}
+
 			r.lastInputParamsMutex.Lock()
 			processorInputParams, err := r.CreateProcessorInputParams(r.lastInputParams, path.FromToken, path.ToToken, 0)
 			r.lastInputParamsMutex.Unlock()
@@ -1250,6 +1254,12 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		ApprovalContractAddress: &contractAddress,
 		ApprovalPackedData:      approvalPackedData,
 		ApprovalGasAmount:       approvalGasLimit,
+	}
+
+	if dp, ok := pathProcessor.(interface {
+		GetRouteExecutionDuration(pathprocessor.ProcessorInputParams) uint
+	}); ok {
+		path.RouteExecutionDuration = dp.GetRouteExecutionDuration(processorInputParams)
 	}
 
 	// processors that route through an underlying tool/exchange (e.g. LI.FI -> "1inch")
