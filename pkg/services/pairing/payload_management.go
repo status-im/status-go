@@ -180,7 +180,6 @@ func (rmm *RawMessagePayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 		if err != nil {
 			return err
 		}
-		rmm.payload.setting.SupportBotContactRequestState = settings.SupportBotContactRequestStateDone
 	}
 
 	rmm.payload.rawMessages = syncRawMessage.RawMessages
