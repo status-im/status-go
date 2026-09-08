@@ -454,12 +454,6 @@ var (
 		dBColumnName:   "auto_apply_keypair_migrations",
 		valueHandler:   BoolHandler,
 	}
-	SupportBotContactRequestState = SettingField{
-		reactFieldName:   "support-bot-contact-request-state",
-		dBColumnName:     "support_bot_contact_request_state",
-		valueHandler:     Int64Handler,
-		valueCastHandler: Float64ToInt64Handler,
-	}
 	URLUnfurlingMode = SettingField{
 		reactFieldName: "url-unfurling-mode",
 		dBColumnName:   "url_unfurling_mode",
@@ -568,7 +562,6 @@ var (
 		LastTokensUpdate,
 		ThirdpartyServicesEnabled,
 		AutoApplyKeypairMigrations,
-		SupportBotContactRequestState,
 	}
 )
 
