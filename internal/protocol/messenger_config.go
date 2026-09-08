@@ -109,10 +109,8 @@ type config struct {
 
 	onlineChecker func() bool
 
-	communitiesRekeyInterval       time.Duration
-	enablePinnedBootstrap          bool
-	enableSupportBotContactRequest bool
-	supportBotChatKey              string
+	communitiesRekeyInterval time.Duration
+	enablePinnedBootstrap    bool
 }
 
 func messengerDefaultConfig() config {
@@ -125,7 +123,6 @@ func messengerDefaultConfig() config {
 	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
 
 	c.tracer = trace.NewNoopTracer()
-	c.supportBotChatKey = supportBotChatKey
 
 	return c
 }
@@ -248,20 +245,6 @@ func WithClusterConfig(cc params.ClusterConfig) Option {
 func WithEnablePinnedBootstrap(enabled bool) Option {
 	return func(c *config) error {
 		c.enablePinnedBootstrap = enabled
-		return nil
-	}
-}
-
-func WithEnableSupportBotContactRequest(enabled bool) Option {
-	return func(c *config) error {
-		c.enableSupportBotContactRequest = enabled
-		return nil
-	}
-}
-
-func withSupportBotChatKey(chatKey string) Option {
-	return func(c *config) error {
-		c.supportBotChatKey = chatKey
 		return nil
 	}
 }

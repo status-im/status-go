@@ -688,15 +688,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			}
 		}()
 	}
-	if m.config.enableSupportBotContactRequest {
-		go func() {
-			defer panics.LogOnPanic()
-
-			if err := m.sendSupportBotContactRequest(); err != nil {
-				m.logger.Warn("failed to send support bot contact request", zap.Error(err))
-			}
-		}()
-	}
 
 	// Request any history missed while offline. The storenodes are resolved from
 	// the fleet inside the waku node at startup, so they are already configured

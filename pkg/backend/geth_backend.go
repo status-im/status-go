@@ -1842,7 +1842,6 @@ func (b *StatusBackend) prepareSettings(request *requests.CreateAccount, mnemoni
 	if !restoreAccount {
 		s.Mnemonic = &mnemonic
 		s.MnemonicWasNotShown = true
-		s.SupportBotContactRequestState = settings.SupportBotContactRequestStatePendingNew
 	}
 
 	if request.WakuV2Fleet != "" {
