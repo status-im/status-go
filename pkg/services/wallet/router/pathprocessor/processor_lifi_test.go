@@ -93,13 +93,26 @@ func TestLiFiQuote(t *testing.T) {
 	require.NotNil(t, amountOut)
 	require.Equal(t, testQuote.Estimate.ToAmount.Uint64(), amountOut.Uint64())
 
-	client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(testQuote, nil)
+	// with a warm cache (an earlier consumer of the same routing round already
+	// fetched), neither call re-quotes — the whole round shares a single fetch
 	contractAddress, err := processor.GetContractAddress(testInputParams)
 	require.NoError(t, err)
 	require.Equal(t, testQuote.Estimate.ApprovalAddress, contractAddress)
 
-	client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(testQuote, nil)
 	inputData, err := processor.PackTxInputData(testInputParams)
+	assert.NoError(t, err)
+	assert.Equal(t, testQuote.TransactionRequest.Data, hexutil.Encode(inputData))
+
+	// a cleared processor (new routing round, or the post-approval re-pack)
+	// fetches exactly once; the following consumer reuses that fetch
+	processor.Clear()
+	client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(testQuote, nil).Times(1)
+
+	contractAddress, err = processor.GetContractAddress(testInputParams)
+	require.NoError(t, err)
+	require.Equal(t, testQuote.Estimate.ApprovalAddress, contractAddress)
+
+	inputData, err = processor.PackTxInputData(testInputParams)
 	assert.NoError(t, err)
 	assert.Equal(t, testQuote.TransactionRequest.Data, hexutil.Encode(inputData))
 }
