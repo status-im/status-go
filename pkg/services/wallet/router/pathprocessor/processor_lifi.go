@@ -145,7 +145,7 @@ func (s *LiFiProcessor) getOrFetchQuote(params ProcessorInputParams) (*lifi.Quot
 }
 
 func (s *LiFiProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	quote, err := s.fetchAndStoreQuote(params)
+	quote, err := s.getOrFetchQuote(params)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -175,7 +175,7 @@ func (s *LiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.In
 }
 
 func (s *LiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	quote, err := s.fetchAndStoreQuote(params)
+	quote, err := s.getOrFetchQuote(params)
 	if err != nil {
 		return []byte{}, err
 	}
