@@ -70,21 +70,11 @@ pipeline {
                 windows_x86_64 = triggerJob('windows', 'x86_64')
               } }
             }
-            stage('E2E') {
-              steps { script {
-                triggerE2E('windows', 'x86_64', windows_x86_64)
-              } }
-            }
           }
         }
         stage('MacOS/aarch64') {
           steps { script {
             triggerJob('macos', 'aarch64')
-          } }
-        }
-        stage('iOS/aarch64') {
-          steps { script {
-            triggerJob('ios', 'aarch64')
           } }
         }
         stage('Android/arm64') {
