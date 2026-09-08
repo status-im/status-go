@@ -22,10 +22,11 @@ type TransactionRequest struct {
 }
 
 type Estimate struct {
-	FromAmount      *bigint.BigInt `json:"fromAmount"`
-	ToAmount        *bigint.BigInt `json:"toAmount"`
-	ToAmountMin     *bigint.BigInt `json:"toAmountMin"`
-	ApprovalAddress common.Address `json:"approvalAddress"`
+	FromAmount        *bigint.BigInt `json:"fromAmount"`
+	ToAmount          *bigint.BigInt `json:"toAmount"`
+	ToAmountMin       *bigint.BigInt `json:"toAmountMin"`
+	ApprovalAddress   common.Address `json:"approvalAddress"`
+	ExecutionDuration float64        `json:"executionDuration"`
 }
 
 type Quote struct {
