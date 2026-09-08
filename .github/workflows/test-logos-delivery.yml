@@ -62,28 +62,12 @@ jobs:
       - name: Start local fleet
         run: docker compose up --build --remove-orphans -d
 
-      - name: Wait for contract deployment and fleet discovery
+      - name: Wait for fleet discovery
         timeout-minutes: 10
         run: |
-          foundry_id=$(docker compose ps -aq foundry)
           scanner_id=$(docker compose ps -aq wakufleet-scanner)
-          test -n "$foundry_id"
           test -n "$scanner_id"
-          deadline=$((SECONDS + 540))
-          until docker exec "$foundry_id" sh -c \
-            'test -s /app/contracts/snt_addresses.json && test -s /app/contracts/communities_addresses.json && test -s /app/contracts/ens_addresses.json'; do
-            if [ "$(docker inspect --format '{{.State.Running}}' "$foundry_id")" != true ]; then
-              docker logs "$foundry_id"
-              echo '::error::Foundry exited before contract deployment completed.'
-              exit 1
-            fi
-            if (( SECONDS >= deadline )); then
-              echo '::error::Timed out waiting for contract deployment.'
-              exit 1
-            fi
-            sleep 2
-          done
-          scanner_exit_code=$(timeout "$((deadline - SECONDS + 1))" docker wait "$scanner_id")
+          scanner_exit_code=$(timeout 540 docker wait "$scanner_id")
           if [ "$scanner_exit_code" != 0 ]; then
             docker logs "$scanner_id"
             echo '::error::Waku fleet discovery failed.'
