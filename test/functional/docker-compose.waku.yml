@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: harbor.status.im/wakuorg/nwaku:v0.39.0-rc.2
+    image: ${WAKU_IMAGE:-harbor.status.im/wakuorg/nwaku:v0.39.0-rc.2}
     entrypoint: [
       "/usr/local/bin/logosdeliverynode",
       "--discv5-discovery=true",
@@ -41,8 +41,10 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: harbor.status.im/wakuorg/nwaku:v0.39.0-rc.2
+    image: 
     # Publish the logos-delivery REST API (incl. Store API) on an ephemeral host port so
+    image: ${WAKU_IMAGE:-harbor.status.im/wakuorg/nwaku:v0.39.0-rc.2}
+    # Publish the nwaku REST API (incl. Store API) on an ephemeral host port so
     # tests on the host can query it without colliding on shared CI hosts.
     # The actual host port is discovered at runtime via the Docker API
     # (see clients/logos_delivery.py), mirroring how the Anvil client works.

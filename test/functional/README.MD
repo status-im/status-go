@@ -56,6 +56,14 @@ Functional tests for status-go
    pytest -k test_logging
    ```
 
+### Nightly Logos Delivery compatibility tests
+
+The **Test Logos Delivery Nightly** GitHub Actions workflow runs daily at 04:00 UTC
+and supports **Run workflow** for on-demand runs. It always tests the latest
+`develop` commit against `quay.io/wakuorg/nwaku-pr:nightly-logosdeliverynode` in a
+local fleet, using the RPC suite with Logos Storage enabled. It does not run on
+pull requests. The schedule becomes active once the workflow is on the default branch.
+
 ### Running against a `status-backend` binary
 
 By default, tests will spawn containers with `status-backend` when and as needed.
