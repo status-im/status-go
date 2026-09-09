@@ -220,6 +220,24 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if len(bridgeMessage.Content) == 0 {
 			return errors.New("no bridge message content text")
 		}
+
+	case protobuf.ChatMessage_DISCORD_MESSAGE:
+		if message.Payload == nil {
+			return errors.New("no discord message content")
+		}
+		discordMessage := message.GetDiscordMessage()
+		if discordMessage == nil {
+			return errors.New("no discord message content")
+		}
+		if len(discordMessage.Id) == 0 {
+			return errors.New("no discord message id")
+		}
+		if discordMessage.Author == nil {
+			return errors.New("no discord message author")
+		}
+		if len(discordMessage.Content) == 0 {
+			return errors.New("no discord message content text")
+		}
 	}
 
 	if message.ContentType == protobuf.ChatMessage_AUDIO {

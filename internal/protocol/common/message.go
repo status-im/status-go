@@ -73,6 +73,13 @@ const (
 
 const EveryoneMentionTag = "0x00001"
 
+// Returned by PrepareContent when the content type declares a payload
+// that is missing, instead of dereferencing nil.
+var (
+	ErrMissingBridgeMessagePayload  = errors.New("bridge message payload is missing")
+	ErrMissingDiscordMessagePayload = errors.New("discord message payload is missing")
+)
+
 // GapParameters is the From and To indicating the missing period in chat history
 type GapParameters struct {
 	From uint32 `json:"from,omitempty"`
@@ -345,6 +352,8 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		ImageHeight        uint32                           `json:"imageHeight"`
 		AlbumImagesCount   uint32                           `json:"albumImagesCount"`
 		From               string                           `json:"from"`
+		DiscordMessage     *protobuf.DiscordMessage         `json:"discordMessage"`
+		BridgeMessage      *protobuf.BridgeMessage          `json:"bridgeMessage"`
 		PaymentRequestList []*protobuf.PaymentRequest       `json:"paymentRequests"`
 		Deleted            bool                             `json:"deleted,omitempty"`
 		DeletedForMe       bool                             `json:"deletedForMe,omitempty"`
@@ -373,6 +382,15 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	if aux.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE && aux.DiscordMessage != nil {
+		m.Payload = &protobuf.ChatMessage_DiscordMessage{DiscordMessage: aux.DiscordMessage}
+	}
+
+	if aux.ContentType == protobuf.ChatMessage_BRIDGE_MESSAGE && aux.BridgeMessage != nil {
+		m.Payload = &protobuf.ChatMessage_BridgeMessage{BridgeMessage: aux.BridgeMessage}
+	}
+
+	m.DiscordMessage = aux.DiscordMessage
 	m.PaymentRequests = aux.PaymentRequestList
 	m.ResponseTo = aux.ResponseTo
 	m.EnsName = aux.EnsName
@@ -559,9 +577,17 @@ func (m *Message) PrepareContent(identity string) error {
 	var parsedText ast.Node
 	switch m.ContentType {
 	case protobuf.ChatMessage_DISCORD_MESSAGE:
-		parsedText = markdown.Parse([]byte(m.GetDiscordMessage().Content), nil)
+		discordMessage := m.GetDiscordMessage()
+		if discordMessage == nil {
+			return ErrMissingDiscordMessagePayload
+		}
+		parsedText = markdown.Parse([]byte(discordMessage.Content), nil)
 	case protobuf.ChatMessage_BRIDGE_MESSAGE:
-		parsedText = markdown.Parse([]byte(m.GetBridgeMessage().Content), nil)
+		bridgeMessage := m.GetBridgeMessage()
+		if bridgeMessage == nil {
+			return ErrMissingBridgeMessagePayload
+		}
+		parsedText = markdown.Parse([]byte(bridgeMessage.Content), nil)
 	default:
 		parsedText = markdown.Parse([]byte(m.Text), nil)
 	}
