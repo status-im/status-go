@@ -25,6 +25,9 @@ const (
 	jwtTTL           = 86400 // 24 hours in seconds
 )
 
+// The relay allows 120s of leeway on iat and rejects a token from a fast clock.
+const jwtClockSkewLeeway = 90 * time.Second
+
 // Auth handles Ed25519 keypair management and DID-JWT signing for relay authentication.
 type Auth struct {
 	privateKey ed25519.PrivateKey
@@ -59,7 +62,7 @@ func (a *Auth) ClientID() string {
 // GenerateJWT creates a signed JWT for relay authentication.
 // aud should be the relay server URL (e.g. "wss://relay.walletconnect.com")
 func (a *Auth) GenerateJWT(aud string) (string, error) {
-	now := time.Now().Unix()
+	now := time.Now().Add(-jwtClockSkewLeeway).Unix()
 
 	// Generate random nonce as subject
 	nonce := make([]byte, 32)
