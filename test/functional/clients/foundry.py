@@ -9,13 +9,7 @@ import docker.errors
 import os
 
 from utils.config import Config
-from resources.constants import (
-    user_1,
-    ANVIL_NETWORK_ID,
-    SNT_ADDRESSES_CONTAINER_PATH,
-    COMMUNITIES_ADDRESSES_CONTAINER_PATH,
-    ENS_ADDRESSES_CONTAINER_PATH,
-)
+from resources.constants import user_1, ANVIL_NETWORK_ID
 from tenacity import retry, wait_fixed, stop_after_attempt
 
 
@@ -28,48 +22,34 @@ class Foundry:
         self.docker_project_name = Config.docker_project_name
         self.network_name = f"{self.docker_project_name}_default"
 
-        self.container_name = self.find_container_name()
+        container_name_prefix = f"{self.docker_project_name}-foundry"
+        self.container_name = self.find_container_name(self.network_name, container_name_prefix)
+
+        if not self.container_name:
+            raise Exception("Foundry container not found")
         self.container = self.docker_client.containers.get(self.container_name)
         self.wait_for_healthy()
 
     @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
-    def find_container_name(self):
-        # Include exited containers so deployment failures retain their original logs.
-        containers = self.docker_client.containers.list(
-            all=True,
-            filters={"label": [f"com.docker.compose.project={self.docker_project_name}", "com.docker.compose.service=foundry"]},
-        )
-        if not containers:
-            raise RuntimeError(f"Foundry container not found for project {self.docker_project_name}")
-        return containers[0].name
+    def find_container_name(self, network_name, searched_container):
+        network = self.docker_client.networks.get(network_name)
 
-    def wait_for_healthy(self, timeout=540):
-        """Wait for Anvil connectivity and startup contract deployment, once per session fixture."""
-        if self.container is None:
-            raise RuntimeError("Foundry container not found")
-        paths = (SNT_ADDRESSES_CONTAINER_PATH, COMMUNITIES_ADDRESSES_CONTAINER_PATH, ENS_ADDRESSES_CONTAINER_PATH)
-        check_deployment = " && ".join(f"test -s {path}" for path in paths)
-        start_time = time.monotonic()
-        while True:
-            self.container.reload()
-            if self.container.status in ("exited", "dead"):
-                exit_code = self.container.attrs.get("State", {}).get("ExitCode")
-                raise RuntimeError(f"Foundry deployment exited (code {exit_code}).\n{self.deployment_logs()}")
-            if self.container.status == "running" and self.is_connected() and self.container.exec_run(["sh", "-c", check_deployment]).exit_code == 0:
-                logging.info(f"Foundry contracts are ready after {time.monotonic() - start_time:.1f} seconds")
+        for container in network.containers:
+            container_name = container.name
+            if container_name is not None and searched_container in container_name:
+                return container_name
+
+        return None
+
+    def wait_for_healthy(self, timeout=10):
+        start_time = time.time()
+        while time.time() - start_time <= timeout:
+            if self.is_connected():
+                logging.info(f"Foundry is healthy after {time.time() - start_time} seconds")
                 return
-            remaining = timeout - (time.monotonic() - start_time)
-            if remaining <= 0:
-                raise TimeoutError(f"Foundry contracts were not ready after {timeout} seconds; expected {paths}.\n{self.deployment_logs()}")
-            time.sleep(min(2, remaining))
-
-    def deployment_logs(self):
-        if self.container is None:
-            return "Foundry container not found"
-        try:
-            return self.container.logs(tail=100).decode(errors="replace")
-        except docker.errors.DockerException as exc:
-            return f"Could not read Foundry logs: {exc}"
+            else:
+                time.sleep(0.1)
+        raise TimeoutError(f"Foundry was not healthy after {timeout} seconds")
 
     def is_connected(self):
         if not self.container:
