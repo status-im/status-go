@@ -56,12 +56,6 @@ Functional tests for status-go
    pytest -k test_logging
    ```
 
-The session-scoped `foundry_client` fixture waits up to nine minutes for Anvil
-connectivity and the SNT, Communities, and ENS deployment address files. This
-readiness check applies to local runs, Jenkins, and GitHub Actions. If Foundry
-exits or deployment times out, setup reports its recent container logs. A failed
-GitHub clone still requires fixing repository access; waiting cannot repair it.
-
 ### Nightly Logos Delivery compatibility tests
 
 The **Test Logos Delivery Nightly** GitHub Actions workflow runs daily at 04:00 UTC
