@@ -55,8 +55,11 @@ type CreateAccount struct {
 
 	LogLevel    *string `json:"logLevel"`
 	LogFilePath string  `json:"logFilePath"` // absolute path
-	LogEnabled  bool    `json:"logEnabled"`
-	LogToStderr bool    `json:"logToStderr"`
+
+	// Account creation logs in without a Login request, which carries this too.
+	WalletConnectProjectID string `json:"walletConnectProjectID"`
+	LogEnabled             bool   `json:"logEnabled"`
+	LogToStderr            bool   `json:"logToStderr"`
 
 	PreviewPrivacy bool `json:"previewPrivacy"`
 
