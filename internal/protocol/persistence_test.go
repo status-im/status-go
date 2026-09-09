@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -43,6 +44,94 @@ func TestSaveMessages(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, id, m.ID)
 	}
+}
+
+// TestBridgeMessageDuplicateMessageID pins down a corruption reproduced against a
+// live status-backend over JSON-RPC: sending two distinct bridge messages that
+// happen to carry the same bridgeMessage.messageID silently destroys both of them.
+//
+// Observed on the wire:
+//
+//	a) send messageID "dup-fixed-id" / content "attempt 1"
+//	   -> message 0x92d6c8c5..., bridgeMessage.content == "attempt 1"   (correct)
+//	b) send messageID "dup-fixed-id" / content "attempt 2"
+//	   -> a NEW message 0x70bdd257... is created, but its bridgeMessage
+//	      comes back as {} (empty)
+//	c) reading the chat back: 0x70bdd257... has contentType 18 and an empty
+//	   bridgeMessage payload (unrenderable), while the ORIGINAL 0x92d6c8c5...
+//	   has been rewritten to content "attempt 2".
+//
+// Mechanism (sqlitePersistence.SaveMessages): the user_messages row for the new
+// message is inserted unconditionally, then bridgeMessageExists(messageID) sees the
+// bridge_messages row belonging to the FIRST message, concludes "this is an edit",
+// runs updateBridgeMessageContent(messageID, content) — which rewrites the first
+// message's payload — and returns early, so saveBridgeMessage never inserts a
+// bridge_messages row for the new user_messages id. The read path's
+// "LEFT JOIN bridge_messages ON m1.id = bm.user_messages_id" then finds nothing and
+// hands back a zero-valued BridgeMessage.
+//
+// The guard is keyed on the wrong column. bridge_messages has
+// user_messages_id as its PRIMARY KEY (one payload per status message) while
+// message_id is a plain column with DEFAULT "" — it is the bridge's own foreign id,
+// used for reply threading, and is not an identity key. The guard was added in
+// c92107976 "fix: handle bridge message edits" to support applyEditMessage, which
+// re-saves the SAME common.Message.ID; distinguishing that case requires comparing
+// user_messages_id, not message_id.
+//
+// Expected behaviour, asserted below: each distinct status message keeps its own
+// bridge payload, and saving a second message never rewrites the first.
+//
+// EXPECTED TO FAIL until the persistence layer is fixed.
+func TestBridgeMessageDuplicateMessageID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	const duplicateBridgeMessageID = "dup-fixed-id"
+
+	saveBridge := func(statusMessageID, content string) error {
+		return p.SaveMessages([]*common.Message{{
+			ID:          statusMessageID,
+			LocalChatID: testPublicChatID,
+			From:        testPK,
+			ChatMessage: &protobuf.ChatMessage{
+				Text:        content,
+				ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+				ChatId:      testPublicChatID,
+				Payload: &protobuf.ChatMessage_BridgeMessage{
+					BridgeMessage: &protobuf.BridgeMessage{
+						BridgeName: "discord",
+						UserName:   "user1",
+						UserID:     "123",
+						Content:    content,
+						MessageID:  duplicateBridgeMessageID,
+					},
+				},
+			},
+		}})
+	}
+
+	require.NoError(t, saveBridge("status-message-1", "attempt 1"))
+	require.NoError(t, saveBridge("status-message-2", "attempt 2"))
+
+	// (1) the second message must keep its own payload
+	second, err := p.MessageByID("status-message-2")
+	require.NoError(t, err)
+	require.Equal(t, protobuf.ChatMessage_BRIDGE_MESSAGE, second.ContentType)
+	secondPayload := second.GetBridgeMessage()
+	require.NotNil(t, secondPayload, "second bridge message lost its payload entirely")
+	assert.Equal(t, "attempt 2", secondPayload.Content,
+		"second bridge message came back with an empty/incorrect payload; it is unrenderable in the client")
+	assert.Equal(t, "discord", secondPayload.BridgeName)
+	assert.Equal(t, duplicateBridgeMessageID, secondPayload.MessageID)
+
+	// (2) the first message must not be silently rewritten by an unrelated save
+	first, err := p.MessageByID("status-message-1")
+	require.NoError(t, err)
+	firstPayload := first.GetBridgeMessage()
+	require.NotNil(t, firstPayload)
+	assert.Equal(t, "attempt 1", firstPayload.Content,
+		"saving a different status message silently mutated an already-delivered message")
 }
 
 func TestMessagesByIDs(t *testing.T) {
