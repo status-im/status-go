@@ -101,6 +101,12 @@ func (c *Client) Pair(ctx context.Context, uri string) error {
 
 	c.mu.Lock()
 	c.pairingTopics[parsed.Topic] = parsed.SymKey
+	// Forget proposals for this topic so a redelivery is not dropped as a duplicate.
+	for id, pending := range c.pendingProposals {
+		if pending.PairingTopic == parsed.Topic {
+			delete(c.pendingProposals, id)
+		}
+	}
 	c.mu.Unlock()
 
 	c.relay.SetMessageHandler(func(topic, message string, tag int) {
