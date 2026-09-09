@@ -1751,6 +1751,30 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 	return nil
 }
 
+func clampNonNegative(n int64) uint64 {
+	if n < 0 {
+		return 0
+	}
+	return uint64(n)
+}
+
 func (w *Waku) Metrics() string {
-	return ""
+	if w == nil || w.bandwidthCounter == nil {
+		return formatBandwidthMetrics(0, 0)
+	}
+	totals := w.bandwidthCounter.GetBandwidthTotals()
+	return formatBandwidthMetrics(
+		clampNonNegative(totals.TotalIn),
+		clampNonNegative(totals.TotalOut),
+	)
+}
+
+func formatBandwidthMetrics(bytesIn, bytesOut uint64) string {
+	return fmt.Sprintf(
+		"# HELP waku_libp2p_bandwidth_bytes Cumulative libp2p Waku bytes reported by the process bandwidth counter.\n"+
+			"# TYPE waku_libp2p_bandwidth_bytes counter\n"+
+			"waku_libp2p_bandwidth_bytes{dir=\"in\"} %d\n"+
+			"waku_libp2p_bandwidth_bytes{dir=\"out\"} %d\n",
+		bytesIn, bytesOut,
+	)
 }

@@ -68,6 +68,38 @@ func TestNewRetrievesInitialDiscV5BootstrapNodes(t *testing.T) {
 	}
 }
 
+func TestBandwidthMetricsEmptyOnNewNode(t *testing.T) {
+	w, err := New(nil, nil, nil, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		w.cancel()
+		w.envelopeCache.Stop()
+		w.wg.Wait()
+	})
+
+	metrics := w.Metrics()
+	require.Contains(t, metrics, `waku_libp2p_bandwidth_bytes{dir="in"} 0`)
+	require.Contains(t, metrics, `waku_libp2p_bandwidth_bytes{dir="out"} 0`)
+}
+
+func TestMetricsRendersBandwidthCounters(t *testing.T) {
+	metrics := formatBandwidthMetrics(2000, 1000)
+	require.Contains(t, metrics, `waku_libp2p_bandwidth_bytes{dir="in"} 2000`)
+	require.Contains(t, metrics, `waku_libp2p_bandwidth_bytes{dir="out"} 1000`)
+}
+
+func TestBandwidthMetricsNilSafe(t *testing.T) {
+	var w *Waku
+	require.Contains(t, w.Metrics(), `waku_libp2p_bandwidth_bytes{dir="in"} 0`)
+	require.Contains(t, (&Waku{}).Metrics(), `waku_libp2p_bandwidth_bytes{dir="out"} 0`)
+}
+
+func TestClampNonNegative(t *testing.T) {
+	require.Equal(t, uint64(0), clampNonNegative(-1))
+	require.Equal(t, uint64(0), clampNonNegative(0))
+	require.Equal(t, uint64(42), clampNonNegative(42))
+}
+
 func TestWakuLifecycleState(t *testing.T) {
 	// New() alone is safe to call with nil params; Start()/Stop() are not used
 	// here because they initialise the SDS library (requires a full node

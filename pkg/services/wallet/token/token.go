@@ -207,7 +207,7 @@ func initialListIDsFromEmbedded() []string {
 func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint64, lastUpdate time.Time,
 	autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
 
-	wsdkFetcher := fetcher.New(fetcher.DefaultConfig())
+	wsdkFetcher := newCountingTokenFetcher(fetcher.New(fetcher.DefaultConfig()))
 
 	contentStore := NewContentStore(walletDB)
 

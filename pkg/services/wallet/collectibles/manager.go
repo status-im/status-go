@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/internal/contracts/ierc1155"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/metrics/httpbytes"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/pkg/services/media"
@@ -101,9 +102,9 @@ func NewManager(
 	return &Manager{
 		ethClientGetter: ethClientGetter,
 		providers:       providers,
-		httpClient: &http.Client{
+		httpClient: httpbytes.WrapClient(&http.Client{
 			Timeout: requestTimeout,
-		},
+		}),
 		collectiblesDataDB: NewCollectibleDataDB(db),
 		collectionsDataDB:  NewCollectionDataDB(db),
 		communityManager:   communityManager,

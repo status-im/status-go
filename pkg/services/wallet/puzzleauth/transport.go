@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/status-im/status-go/internal/metrics/httpbytes"
 )
 
 var retryStatusCodes = map[int]bool{
@@ -49,7 +51,7 @@ func NewTransport(origin string, base http.RoundTripper) *Transport {
 		base = http.DefaultTransport
 	}
 	return &Transport{
-		base:        base,
+		base:        httpbytes.Wrap(base),
 		authService: sharedAuthServiceForOrigin(origin),
 		maxRetries:  2, // original attempt + 2 retries after auth
 	}
