@@ -440,6 +440,92 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
 			},
 		},
+		{
+			Name:             "Valid discord message",
+			WhisperTimestamp: 2,
+			Valid:            true,
+			Message: &protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_DiscordMessage{
+					DiscordMessage: &protobuf.DiscordMessage{
+						Id:      "456",
+						Content: "some text",
+						Author: &protobuf.DiscordMessageAuthor{
+							Id:   "123",
+							Name: "mike",
+						},
+					},
+				},
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+			},
+		},
+		{
+			Name:             "Invalid discord message, missing payload",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: &protobuf.ChatMessage{
+				ChatId:      "a",
+				Text:        "",
+				Clock:       2,
+				Timestamp:   3,
+				ResponseTo:  "",
+				EnsName:     "",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+			},
+		},
+		{
+			Name:             "Invalid discord message, missing author",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: &protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_DiscordMessage{
+					DiscordMessage: &protobuf.DiscordMessage{
+						Id:      "456",
+						Content: "some text",
+					},
+				},
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+			},
+		},
+		{
+			Name:             "Invalid discord message, empty content and id",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: &protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_DiscordMessage{
+					DiscordMessage: &protobuf.DiscordMessage{
+						Id:      "",
+						Content: "",
+						Author: &protobuf.DiscordMessageAuthor{
+							Id:   "123",
+							Name: "mike",
+						},
+					},
+				},
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
