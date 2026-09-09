@@ -9,6 +9,7 @@ from collections import namedtuple
 
 import pytest
 from clients.api import ApiResponseError
+from clients.signals import SignalType
 from resources.constants import user_2
 from steps.keycard import assert_keystore_state, derive_chat_private_key, derive_keycard_password
 from utils import fake
@@ -100,19 +101,22 @@ class TestConvertKeycardProfileToRegular:
         accounts = backend.reinit_and_get_accounts()
         assert _keycard_pairing_of(accounts, ctx.key_uid) == "", "Expected the keycard pairing to be cleared on the multiaccount"
 
-        backend.login(ctx.key_uid, new_password)
-        signal = backend.wait_for_login()
-        assert signal["event"]["account"]["key-uid"] == ctx.key_uid
-        assert signal["event"]["account"].get("keycard-pairing", "") == "", "Expected the login event to carry no keycard pairing"
+        with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            backend.login(ctx.key_uid, new_password)
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == ctx.key_uid
+        assert exp.result["event"]["account"].get("keycard-pairing", "") == "", "Expected the login event to carry no keycard pairing"
         backend.wait_for_wakuext_ready(timeout=30)
 
         self._assert_regular(backend, ctx.kp0, new_password)
 
         backend.change_database_password(new_password, new_password + "x")
         backend.reinit_and_get_accounts()
-        backend.login(ctx.key_uid, new_password + "x")
-        signal = backend.wait_for_login()
-        assert signal["event"]["account"]["key-uid"] == ctx.key_uid, "Expected a normal password profile after the password change"
+        with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            backend.login(ctx.key_uid, new_password + "x")
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == ctx.key_uid, "Expected a normal password profile after the password change"
+        assert backend.accounts_service.get_keypair_by_key_uid(ctx.key_uid) is not None
 
     def test_stop_using_keycard_rejects_wrong_password(self, backend):
         ctx = self._put_profile_on_keycard(backend)
@@ -129,9 +133,11 @@ class TestConvertKeycardProfileToRegular:
             _keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ctx.pairing
         ), "Expected the pairing kept because the password check runs before it is cleared"
 
-        backend.login_with_keycard(ctx.key_uid, ctx.keycard_password, derive_chat_private_key(ctx.mnemonic))
-        signal = backend.wait_for_login()
-        assert signal["event"]["account"]["key-uid"] == ctx.key_uid, "Expected keycard login to keep working after a rejected conversion"
+        with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            backend.login_with_keycard(ctx.key_uid, ctx.keycard_password, derive_chat_private_key(ctx.mnemonic))
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == ctx.key_uid, "Expected keycard login to keep working after a rejected conversion"
+        assert backend.accounts_service.get_keypair_by_key_uid(ctx.key_uid) is not None
 
     def test_stop_using_keycard_rejects_unknown_mnemonic(self, backend):
         ctx = self._put_profile_on_keycard(backend)
@@ -146,9 +152,11 @@ class TestConvertKeycardProfileToRegular:
             _keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ctx.pairing
         ), "Expected the pairing kept because the mnemonic lookup fails first"
 
-        backend.login_with_keycard(ctx.key_uid, ctx.keycard_password, derive_chat_private_key(ctx.mnemonic))
-        signal = backend.wait_for_login()
-        assert signal["event"]["account"]["key-uid"] == ctx.key_uid
+        with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            backend.login_with_keycard(ctx.key_uid, ctx.keycard_password, derive_chat_private_key(ctx.mnemonic))
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == ctx.key_uid
+        assert backend.accounts_service.get_keypair_by_key_uid(ctx.key_uid) is not None
 
     def test_stop_using_keycard_accepts_whitespace_padded_mnemonic(self, backend):
         ctx = self._put_profile_on_keycard(backend)
