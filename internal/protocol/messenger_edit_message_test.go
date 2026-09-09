@@ -679,3 +679,27 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 	s.Require().Len(responseMessage.UnfurledStatusLinks.UnfurledStatusLinks, 1)
 	s.Require().False(responseMessage.New)
 }
+
+// A remote EditMessage can declare BRIDGE_MESSAGE while the local message it
+// targets carries no bridge payload, see #7774.
+func (s *MessengerEditMessageSuite) TestEditMessageBridgeContentTypeWithoutPayload() {
+	chat := CreateOneToOneChat("Our 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
+
+	message := buildTestMessage(*chat)
+	message.ID = "0x1"
+	s.Require().Nil(message.GetBridgeMessage())
+
+	editMessage := &protobuf.EditMessage{
+		Clock:       message.Clock + 1,
+		Text:        "edited text",
+		MessageId:   message.ID,
+		ChatId:      chat.ID,
+		ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+	}
+
+	var err error
+	s.Require().NotPanics(func() {
+		err = s.m.applyEditMessage(editMessage, message)
+	}, "applyEditMessage must not panic on a message without a bridge payload")
+	s.Require().ErrorIs(err, common.ErrMissingBridgeMessagePayload)
+}

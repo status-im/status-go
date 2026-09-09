@@ -679,3 +679,138 @@ func TestMarshalMessageJSON(t *testing.T) {
 
 	assertMarshalAndUnmarshalJSON(t, msg, "message ID='%s'", msg.ID)
 }
+
+// Payload shape sent over messaging_sendChatMessage, see #7774.
+const bridgeMessageJSON = `{
+	"chatId": "0x04c51631b3354242d5a56f044c3b7703bcc001e8c725c4706928b3fac3c2a12ec9019e1e224d487f5c893389405bcec998bc687307f290a569d6a97d24b711bca8",
+	"text": "",
+	"contentType": 18,
+	"bridgeMessage": {
+		"bridgeName": "discord",
+		"userName": "thedatabro",
+		"userAvatar": "",
+		"userID": "123",
+		"content": "Meme here",
+		"messageID": "456",
+		"parentMessageID": "789"
+	}
+}`
+
+const discordMessageJSON = `{
+	"chatId": "0x04c51631b3354242d5a56f044c3b7703bcc001e8c725c4706928b3fac3c2a12ec9019e1e224d487f5c893389405bcec998bc687307f290a569d6a97d24b711bca8",
+	"text": "",
+	"contentType": 12,
+	"discordMessage": {
+		"id": "456",
+		"type": "Default",
+		"timestamp": "2023-01-01T00:00:00Z",
+		"content": "Meme here",
+		"author": {
+			"id": "123",
+			"name": "thedatabro"
+		}
+	}
+}`
+
+func TestUnmarshalBridgeMessageJSON(t *testing.T) {
+	message := NewMessage()
+	require.NoError(t, json.Unmarshal([]byte(bridgeMessageJSON), message))
+
+	require.Equal(t, protobuf.ChatMessage_BRIDGE_MESSAGE, message.ContentType)
+
+	bridgeMessage := message.GetBridgeMessage()
+	require.NotNil(t, bridgeMessage, "bridgeMessage payload must survive JSON unmarshalling")
+	require.Equal(t, "discord", bridgeMessage.BridgeName)
+	require.Equal(t, "thedatabro", bridgeMessage.UserName)
+	require.Equal(t, "", bridgeMessage.UserAvatar)
+	require.Equal(t, "123", bridgeMessage.UserID)
+	require.Equal(t, "Meme here", bridgeMessage.Content)
+	require.Equal(t, "456", bridgeMessage.MessageID)
+	require.Equal(t, "789", bridgeMessage.ParentMessageID)
+}
+
+func TestUnmarshalDiscordMessageJSON(t *testing.T) {
+	message := NewMessage()
+	require.NoError(t, json.Unmarshal([]byte(discordMessageJSON), message))
+
+	require.Equal(t, protobuf.ChatMessage_DISCORD_MESSAGE, message.ContentType)
+
+	discordMessage := message.GetDiscordMessage()
+	require.NotNil(t, discordMessage, "discordMessage payload must survive JSON unmarshalling")
+	require.Equal(t, "456", discordMessage.Id)
+	require.Equal(t, "Meme here", discordMessage.Content)
+	require.NotNil(t, discordMessage.Author)
+	require.Equal(t, "thedatabro", discordMessage.Author.Name)
+}
+
+func TestMarshalBridgeMessageJSON(t *testing.T) {
+	msg := NewMessage()
+	msg.ID = "1"
+	msg.ContentType = protobuf.ChatMessage_BRIDGE_MESSAGE
+	msg.Payload = &protobuf.ChatMessage_BridgeMessage{
+		BridgeMessage: &protobuf.BridgeMessage{
+			BridgeName:      "discord",
+			UserName:        "thedatabro",
+			UserAvatar:      "",
+			UserID:          "123",
+			Content:         "Meme here",
+			MessageID:       "456",
+			ParentMessageID: "789",
+		},
+	}
+
+	assertMarshalAndUnmarshalJSON(t, msg, "message ID='%s'", msg.ID)
+}
+
+// Message also has a standalone DiscordMessage field, so the round trip is
+// not deeply equal; only the payload is asserted.
+func TestMarshalDiscordMessageJSON(t *testing.T) {
+	msg := NewMessage()
+	msg.ID = "1"
+	msg.ContentType = protobuf.ChatMessage_DISCORD_MESSAGE
+	msg.Payload = &protobuf.ChatMessage_DiscordMessage{
+		DiscordMessage: &protobuf.DiscordMessage{
+			Id:        "456",
+			Type:      "Default",
+			Timestamp: "2023-01-01T00:00:00Z",
+			Content:   "Meme here",
+			Author: &protobuf.DiscordMessageAuthor{
+				Id:   "123",
+				Name: "thedatabro",
+			},
+		},
+	}
+
+	rawJSON, err := json.Marshal(msg)
+	require.NoError(t, err)
+
+	var unmarshalled Message
+	require.NoError(t, json.Unmarshal(rawJSON, &unmarshalled))
+	require.Equal(t, msg.ContentType, unmarshalled.ContentType)
+	require.NotNil(t, unmarshalled.GetDiscordMessage())
+	require.Equal(t, msg.GetDiscordMessage().Id, unmarshalled.GetDiscordMessage().Id)
+	require.Equal(t, msg.GetDiscordMessage().Content, unmarshalled.GetDiscordMessage().Content)
+	require.Equal(t, msg.GetDiscordMessage().GetAuthor().Name, unmarshalled.GetDiscordMessage().GetAuthor().Name)
+}
+
+func TestPrepareContentBridgeMessageMissingPayload(t *testing.T) {
+	message := NewMessage()
+	message.ContentType = protobuf.ChatMessage_BRIDGE_MESSAGE
+
+	var err error
+	require.NotPanics(t, func() {
+		err = message.PrepareContent("")
+	}, "PrepareContent must not panic on a BRIDGE_MESSAGE without a payload")
+	require.Error(t, err)
+}
+
+func TestPrepareContentDiscordMessageMissingPayload(t *testing.T) {
+	message := NewMessage()
+	message.ContentType = protobuf.ChatMessage_DISCORD_MESSAGE
+
+	var err error
+	require.NotPanics(t, func() {
+		err = message.PrepareContent("")
+	}, "PrepareContent must not panic on a DISCORD_MESSAGE without a payload")
+	require.Error(t, err)
+}

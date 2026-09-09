@@ -381,7 +381,11 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 	if editMessage.ContentType != protobuf.ChatMessage_BRIDGE_MESSAGE {
 		message.Text = editMessage.Text
 	} else {
-		message.GetBridgeMessage().Content = editMessage.Text
+		bridgeMessage := message.GetBridgeMessage()
+		if bridgeMessage == nil {
+			return common.ErrMissingBridgeMessagePayload
+		}
+		bridgeMessage.Content = editMessage.Text
 	}
 
 	message.EditedAt = editMessage.Clock
