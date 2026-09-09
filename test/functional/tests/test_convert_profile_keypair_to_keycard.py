@@ -106,9 +106,10 @@ class TestConvertProfileKeypairToKeycard:
         accounts = backend.reinit_and_get_accounts()
         assert _keycard_pairing_of(accounts, key_uid) == pairing, "Expected the keycard pairing stored on the multiaccount"
 
-        backend.login_with_keycard(key_uid, keycard_password, derive_chat_private_key(mnemonic))
-        signal = backend.wait_for_login()
-        assert signal["event"]["account"]["key-uid"] == key_uid
+        with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            backend.login_with_keycard(key_uid, keycard_password, derive_chat_private_key(mnemonic))
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == key_uid
         backend.wait_for_wakuext_ready(timeout=30)
 
         kp2 = self._assert_on_keycard(backend, kp0, old_password, keycard_password)
@@ -160,9 +161,11 @@ class TestConvertProfileKeypairToKeycard:
         # The pairing is written before the password check (status-im/status-go#7698); this pins the current behaviour.
         assert _keycard_pairing_of(backend.reinit_and_get_accounts(), key_uid) == "bad-pairing"
 
-        backend.login(key_uid, old_password)
-        signal = backend.wait_for_login()
-        assert signal["event"]["account"]["key-uid"] == key_uid, "Expected password login to keep working because the keystore files still exist"
+        with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            backend.login(key_uid, old_password)
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == key_uid, "Expected password login to keep working because the keystore files still exist"
+        assert backend.accounts_service.get_keypair_by_key_uid(key_uid) is not None
 
     def test_convert_unknown_key_uid_is_rejected(self, backend):
         key_uid = backend.key_uid
@@ -192,8 +195,9 @@ class TestConvertProfileKeypairToKeycard:
             backend.login_with_mnemonic(key_uid, user_1.passphrase)
         assert "mnemonic does not match this account" in exp.result["event"].get("error", "")
 
-        backend.login_with_mnemonic(key_uid, mnemonic)
-        signal = backend.wait_for_login()
-        assert signal["event"]["account"]["key-uid"] == key_uid
+        with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            backend.login_with_mnemonic(key_uid, mnemonic)
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == key_uid
         backend.wait_for_wakuext_ready(timeout=30)
         self._assert_on_keycard(backend, kp0, old_password, keycard_password)
