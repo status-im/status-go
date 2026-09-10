@@ -26,6 +26,7 @@ import (
 	accsmanagementcommon "github.com/status-im/status-go/internal/accounts-management/common"
 	"github.com/status-im/status-go/internal/accounts-management/generator"
 	"github.com/status-im/status-go/internal/accounts-management/keystore"
+	"github.com/status-im/status-go/internal/accounts-management/keystore/envelope"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
@@ -838,6 +839,14 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, keypair.MigratedToColdWallet())
 
+	require.NoError(t, db.SaveSettingField(settings.Mnemonic, testContext.mnemonic))
+	// seeded true so the later assertion fails if the conversion stops clearing it;
+	// nothing sets this flag locally, so it would otherwise pass on the default
+	require.NoError(t, db.SaveSettingField(settings.ProfileMigrationNeeded, true))
+	seededMigrationNeeded, err := db.ProfileMigrationNeeded()
+	require.NoError(t, err)
+	require.True(t, seededMigrationNeeded, "precondition: the flag is set before the conversion")
+
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
 
@@ -865,6 +874,14 @@ func TestConvertAccount(t *testing.T) {
 		require.False(t, ok)
 	}
 
+	require.Zero(t, countKeystoreFilesForKeyUID(t, testContext.config.RootDataDir, testContext.profileKeypair.KeyUID),
+		"Expected zero keystore files after conversion because a keycard profile must leave no orphan key files on disk")
+
+	convertedMultiAcc, err := testContext.backend.multiaccountsDB.GetAccount(testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, "pairing", convertedMultiAcc.KeycardPairing,
+		"Expected the keycard pairing persisted to multiaccounts DB because desktop re-login resolves the pairing from it")
+
 	require.NoError(t, testContext.backend.Logout())
 	require.NoError(t, testContext.backend.StopNode())
 
@@ -888,6 +905,16 @@ func TestConvertAccount(t *testing.T) {
 	keypair, err = db1.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
 	require.True(t, keypair.MigratedToColdWallet())
+
+	storedMnemonic, err := db1.Mnemonic()
+	require.NoError(t, err)
+	require.Empty(t, storedMnemonic,
+		"Expected the mnemonic wiped from settings because the seed phrase must not remain in a keycard profile DB")
+
+	migrationNeeded, err := db1.ProfileMigrationNeeded()
+	require.NoError(t, err)
+	require.False(t, migrationNeeded,
+		"Expected ProfileMigrationNeeded false because the conversion completes the profile migration")
 
 	// Converting to a regular account
 	err = testContext.backend.ConvertToRegularAccount(testContext.mnemonic, keycardPassword, testPassword)
@@ -921,6 +948,11 @@ func TestConvertAccount(t *testing.T) {
 	keypair, err = db2.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
 	require.False(t, keypair.MigratedToColdWallet())
+
+	regularMultiAcc, err := testContext.backend.multiaccountsDB.GetAccount(testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+	require.Empty(t, regularMultiAcc.KeycardPairing,
+		"Expected the keycard pairing cleared from multiaccounts DB because a regular account must not be treated as keycard-paired")
 }
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {
@@ -1558,6 +1590,392 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	acc, err := backend.RestoreKeycardAccountAndLogin(request)
 	require.NoError(t, err)
 	require.NotNil(t, acc)
+
+	defer func() {
+		assert.NoError(t, backend.Logout())
+		assert.NoError(t, backend.StopNode())
+	}()
+
+	keycardKeyUID := exampleKeycardEvent["keyUid"].(string)
+
+	require.Equal(t, "785d52957b05482477728380d9b4bbb5dc9a8ed978ab4a4098e1a279c855d3c6", acc.KeycardPairing,
+		"Expected the pairing key resolved from the pairings file because prepareForKeycard looks it up by KeycardInstanceUID on desktop")
+
+	// read back from the database, not from the returned struct: the field is set
+	// before the account is saved, so the struct alone would not prove it persisted
+	storedAcc, err := backend.multiaccountsDB.GetAccount(acc.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, acc.KeycardPairing, storedAcc.KeycardPairing,
+		"Expected the pairing key persisted because the next login reads it from the multiaccounts database")
+
+	require.Zero(t, countKeystoreFilesForKeyUID(t, tmpdir, keycardKeyUID),
+		"Expected zero keystore files because a keycard restore must never write private keys to disk")
+
+	db, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(keycardKeyUID)
+	require.NoError(t, err)
+	require.Equal(t, accsmanagementtypes.ColdWalletTypeStatusKeycard, keypair.ColdWallet,
+		"Expected the restored profile keypair marked as status-keycard cold wallet because the restore request carried KeycardInstanceUID")
+}
+
+func countKeystoreFilesForKeyUID(t *testing.T, rootDataDir string, keyUID string) int {
+	_, absolutePath := DefaultKeystorePath(rootDataDir, keyUID)
+	entries, err := os.ReadDir(absolutePath)
+	if os.IsNotExist(err) {
+		return 0
+	}
+	require.NoError(t, err)
+	return len(entries)
+}
+
+func keycardTestRestoreRequest(tmpdir string) *requests.RestoreAccount {
+	pairingDataFile := path.Join(tmpdir, DefaultKeycardPairingDataFileRelativePath)
+	return &requests.RestoreAccount{
+		Keycard: &requests.KeycardData{
+			KeyUID:              "0x579324c53f347e18961c775a00ec13ed7d59a225b1859d5125ff36b450b8778d",
+			Address:             "0xbf9dE86774051537b2192Ce9c8d2496f129bA24b",
+			WhisperPrivateKey:   "5a42b4f15ff1a5da95d116442ce11a31e9020f562224bf60b1d8d3a99d90653d",
+			WhisperPublicKey:    "0x0441468c39b579259676350b9736b01cdadb740f67bfd022fa2b985123b1d66fc3191cfe73205e3d3d84148f0248f9a2978afeeda16d7c3db90bd2579f0de33459",
+			WhisperAddress:      "0xBa122B9c0Ef560813b5D2C0961094aC36289f846",
+			WalletPublicKey:     "0x04c16e7748f34e0ab2c9c13350d7872d928e942934dd8b8abd3fb12b8c742a5ee8cf0919731e800907068afec25f577bde3a9c534795e359ee48097e4e55f4aaca",
+			WalletAddress:       "0xB9E1998e1A8854887CA327D1aF5894B6CB0AC07D",
+			WalletRootAddress:   "0xFf59db9F2f97Db7104A906C390D33C342a1309C8",
+			Eip1581Address:      "0xA8d50f0B3bc581298446be8FBfF5c71684Ea6c01",
+			EncryptionPublicKey: "0x04c4b16f670b51702dc130673bf9c64ffd1f69383cef2127dfa05031b9b1359120f7342134af9a350465126a85e87cb003b7c4f93d2ba2ff98bb73277b119c7a87",
+		},
+		CreateAccount: requests.CreateAccount{
+			DisplayName:            "User-1",
+			Password:               "password123",
+			CustomizationColor:     "#ffffff",
+			RootDataDir:            tmpdir,
+			KeycardInstanceUID:     "a84599394887b742eed9a99d3834a797",
+			KeycardPairingDataFile: &pairingDataFile,
+		},
+	}
+}
+
+func TestRestoreKeycardAccountRejectedWhenKeycardNotInPairingsFile(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
+	backend.UpdateRootDataDir(tmpdir)
+	require.NoError(t, backend.OpenAccounts())
+
+	request := keycardTestRestoreRequest(tmpdir)
+
+	kp := wallet.NewKeycardPairings()
+	kp.SetKeycardPairingsFile(*request.KeycardPairingDataFile)
+	err := kp.SetPairingsJSONFileContent([]byte(`{"someOtherInstanceUID":{"key":"785d52957b05482477728380d9b4bbb5dc9a8ed978ab4a4098e1a279c855d3c6","index":1}}`))
+	require.NoError(t, err)
+
+	// the restore opens the databases before it reaches the pairings-file check,
+	// and StopNode does not close them
+	t.Cleanup(func() { _ = backend.Logout() })
+
+	_, err = backend.RestoreKeycardAccountAndLogin(request)
+	require.ErrorContains(t, err, "keycard not found in pairings file",
+		"Expected the restore to fail because the desktop pairing branch must reject a keycard absent from the pairings file")
+}
+
+func restoreSeedIntoKeycard(t *testing.T, tmpdir string, pairingKey string) (*StatusBackend, string, *multiaccounts.Account) {
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
+	backend.UpdateRootDataDir(tmpdir)
+	require.NoError(t, backend.OpenAccounts())
+
+	mnemonic, err := accsmanagementcommon.CreateRandomMnemonicWithDefaultLength()
+	require.NoError(t, err)
+
+	request := &requests.RestoreAccount{
+		Mnemonic: mnemonic,
+		CreateAccount: requests.CreateAccount{
+			DisplayName:        "User-1",
+			Password:           "password123",
+			CustomizationColor: "#ffffff",
+			RootDataDir:        tmpdir,
+			KeycardInstanceUID: "a84599394887b742eed9a99d3834a797",
+			KeycardPairingKey:  pairingKey,
+		},
+	}
+
+	acc, err := backend.RestoreAccountAndLogin(request)
+	require.NoError(t, err)
+	require.NotNil(t, acc)
+
+	return backend, mnemonic, acc
+}
+
+func TestRestoreSeedIntoKeycardUsesMobilePairingKey(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	backend, _, acc := restoreSeedIntoKeycard(t, tmpdir, "mobile-pairing-key")
+	defer func() {
+		assert.NoError(t, backend.Logout())
+		assert.NoError(t, backend.StopNode())
+	}()
+
+	require.Equal(t, "mobile-pairing-key", acc.KeycardPairing,
+		"Expected KeycardPairingKey copied to the account because mobile has no pairings file")
+
+	storedAcc, err := backend.multiaccountsDB.GetAccount(acc.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, "mobile-pairing-key", storedAcc.KeycardPairing,
+		"Expected the pairing key persisted because the next login reads it from the multiaccounts database")
+
+	require.Zero(t, countKeystoreFilesForKeyUID(t, tmpdir, acc.KeyUID),
+		"Expected zero keystore files because a keycard account must never write private keys to disk")
+
+	db, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(acc.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, accsmanagementtypes.ColdWalletTypeStatusKeycard, keypair.ColdWallet,
+		"Expected the keypair marked as status-keycard cold wallet because the restore request carried KeycardInstanceUID")
+}
+
+func TestRestoreSeedIntoKeycardStoresWalletXPubAtWalletXPubPath(t *testing.T) {
+	tmpdir := t.TempDir()
+
+	backend, mnemonic, acc := restoreSeedIntoKeycard(t, tmpdir, "mobile-pairing-key")
+	defer func() {
+		assert.NoError(t, backend.Logout())
+		assert.NoError(t, backend.StopNode())
+	}()
+
+	expectedXPub, err := generator.DeriveExtendedPublicKeyAtPath(mnemonic, "", accsmanagementcommon.PathWalletXPub)
+	require.NoError(t, err)
+
+	db, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(acc.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, expectedXPub, keypair.XPub,
+		"Expected the stored xpub derived at m/44'/60'/0' because accounts later derived from it must match the wallet account addresses")
+}
+
+func setupLoggedOutAccountWithEmptyProfileXPub(t *testing.T) *setupContext {
+	testContext := setupTestContext(t, testPassword, false, false, false)
+
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.RootDataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(request, testContext.mnemonic, nil, false)
+	require.NoError(t, err)
+
+	_, err = testContext.backend.appDB.Exec("UPDATE keypairs SET xpub = '' WHERE key_uid = ?", testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
+
+	return testContext
+}
+
+// setupLoggedOutKeycardProfileWithoutXPub converts the profile to a keycard and
+// clears its stored xpub, so nothing local can derive one and a login request is
+// the only possible source.
+func setupLoggedOutKeycardProfileWithoutXPub(t *testing.T) *setupContext {
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.RootDataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(request, testContext.mnemonic, nil, false)
+	require.NoError(t, err)
+
+	keycardAccount := *testContext.multiAcc
+	keycardAccount.KeycardPairing = "pairing"
+	require.NoError(t, testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{},
+		testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword))
+
+	_, err = testContext.backend.appDB.Exec("UPDATE keypairs SET xpub = '' WHERE key_uid = ?", testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
+
+	require.Zero(t, countKeystoreFilesForKeyUID(t, testContext.config.RootDataDir, testContext.profileKeypair.KeyUID),
+		"precondition: the conversion removed the keystore files, so nothing local can supply the xpub")
+
+	return testContext
+}
+
+func (s *setupContext) loginWithWalletXPub(t *testing.T, xpub string) error {
+	return s.backend.loginAccount(&requests.Login{
+		KeyUID:                   s.profileKeypair.KeyUID,
+		Password:                 testKeycardPassword,
+		KeycardWhisperPrivateKey: strings.TrimPrefix(s.chatPrivateKey, "0x"),
+		WalletXPub:               xpub,
+	})
+}
+
+func TestLoginStoresWalletXPubFromRequestWhenKeypairXPubMissing(t *testing.T) {
+	testContext := setupLoggedOutKeycardProfileWithoutXPub(t)
+
+	// the client reads this from the card and sends it at login
+	requestXPub, err := generator.DeriveExtendedPublicKeyAtPath(testContext.mnemonic, "", accsmanagementcommon.PathWalletXPub)
+	require.NoError(t, err)
+
+	require.NoError(t, testContext.loginWithWalletXPub(t, requestXPub))
+	defer func() {
+		assert.NoError(t, testContext.backend.Logout())
+		assert.NoError(t, testContext.backend.StopNode())
+	}()
+
+	db, err := accounts.NewDB(testContext.backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, requestXPub, keypair.XPub,
+		"Expected the request-provided xpub stored because a keycard profile has no keystore file to derive it from")
+}
+
+func TestLoginRejectsGarbageWalletXPub(t *testing.T) {
+	testContext := setupLoggedOutAccountWithEmptyProfileXPub(t)
+
+	err := testContext.backend.loginAccount(&requests.Login{
+		KeyUID:     testContext.profileKeypair.KeyUID,
+		Password:   testPassword,
+		WalletXPub: "not-an-extended-key",
+	})
+	defer func() {
+		_ = testContext.backend.Logout()
+		_ = testContext.backend.StopNode()
+	}()
+	require.ErrorContains(t, err, "invalid wallet xpub provided in the login request",
+		"Expected the login to abort because an unparseable xpub must not be stored on the keypair")
+
+	db, err := accounts.NewDB(testContext.backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+	require.Empty(t, keypair.XPub,
+		"Expected the stored xpub untouched because the rejected login must not persist the invalid value")
+}
+
+func TestLoginRejectsPrivateExtendedKeyAsWalletXPub(t *testing.T) {
+	testContext := setupLoggedOutAccountWithEmptyProfileXPub(t)
+
+	otherMnemonic, err := accsmanagementcommon.CreateRandomMnemonicWithDefaultLength()
+	require.NoError(t, err)
+	otherMasterAcc, err := generator.CreateAccountFromMnemonic(otherMnemonic, "")
+	require.NoError(t, err)
+	privateExtendedKey := otherMasterAcc.ExtendedKey().String()
+
+	err = testContext.backend.loginAccount(&requests.Login{
+		KeyUID:     testContext.profileKeypair.KeyUID,
+		Password:   testPassword,
+		WalletXPub: privateExtendedKey,
+	})
+	defer func() {
+		_ = testContext.backend.Logout()
+		_ = testContext.backend.StopNode()
+	}()
+	require.ErrorContains(t, err, "private extended key provided as the wallet xpub",
+		"Expected the login to abort because a private extended key in the xpub field would leak signing capability into the DB")
+
+	db, err := accounts.NewDB(testContext.backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+	require.Empty(t, keypair.XPub,
+		"Expected the stored xpub untouched because the rejected login must not persist the private key")
+}
+
+func TestKeycardReLoginViaLoginAccountAfterConversion(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.RootDataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(request, testContext.mnemonic, nil, false)
+	require.NoError(t, err)
+
+	keycardAccount := *testContext.multiAcc
+	keycardAccount.KeycardPairing = "pairing"
+	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword)
+	require.NoError(t, err)
+
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
+
+	c := make(chan interface{}, 10)
+	signal.SetHandler(func(data []byte) {
+		if strings.Contains(string(data), signal.EventLoggedIn) {
+			c <- struct{}{}
+		}
+	})
+	t.Cleanup(signal.ResetHandler)
+
+	err = testContext.backend.LoginAccount(&requests.Login{
+		KeyUID:                   testContext.profileKeypair.KeyUID,
+		Password:                 testKeycardPassword,
+		KeycardWhisperPrivateKey: strings.TrimPrefix(testContext.chatPrivateKey, "0x"),
+	})
+	require.NoError(t, err,
+		"Expected the modern login request path to succeed for a converted keycard account because this is every keycard user's next app launch")
+	defer func() {
+		assert.NoError(t, testContext.backend.Logout())
+		assert.NoError(t, testContext.backend.StopNode())
+	}()
+
+	select {
+	case <-c:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Expected EventLoggedIn within 5s because LoginAccount must signal a successful keycard login")
+	}
+
+	require.Zero(t, countKeystoreFilesForKeyUID(t, testContext.config.RootDataDir, testContext.profileKeypair.KeyUID),
+		"Expected zero keystore files because the keycard login must not rely on or recreate on-disk private keys")
+}
+
+func TestLostKeycardLoginWithMnemonicRecoversKeycardAccount(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.RootDataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(request, testContext.mnemonic, nil, false)
+	require.NoError(t, err)
+
+	genAcc, _, err := testContext.backend.generateAccount(testContext.mnemonic)
+	require.NoError(t, err)
+	_, derivedInfo, err := testContext.backend.generateDerivedAddresses(genAcc, paths)
+	require.NoError(t, err)
+	encryptionPublicKey := derivedInfo[accsmanagementcommon.PathEIP1581Encryption].PublicKey
+
+	keycardAccount := *testContext.multiAcc
+	keycardAccount.KeycardPairing = "pairing"
+	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, encryptionPublicKey)
+	require.NoError(t, err)
+
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
+
+	err = testContext.backend.loginAccount(&requests.Login{
+		KeyUID:   testContext.profileKeypair.KeyUID,
+		Mnemonic: testContext.mnemonic,
+	})
+	require.NoError(t, err,
+		"Expected seed-phrase login to succeed because it is the documented lost-keycard recovery route")
+	defer func() {
+		assert.NoError(t, testContext.backend.Logout())
+		assert.NoError(t, testContext.backend.StopNode())
+	}()
+
+	require.Equal(t, testContext.profileKeypair.KeyUID, testContext.backend.account.KeyUID,
+		"Expected the logged-in account to be the keycard account because the mnemonic replaces password and whisper key")
 }
 
 func TestDeleteMultiaccount(t *testing.T) {
@@ -1612,4 +2030,155 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 
 	testContext.backend.ConnectionChange("unknown-state", false)
 	assert.False(t, testContext.backend.connectionState.Offline)
+}
+
+const testKeycardPassword = "222222"
+
+func setupKeycardConvertedContext(t *testing.T) *setupContext {
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.RootDataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(request, testContext.mnemonic, nil, false)
+	require.NoError(t, err)
+
+	keycardAccount := *testContext.multiAcc
+	keycardAccount.KeycardPairing = "pairing"
+	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword)
+	require.NoError(t, err)
+
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
+
+	chatPrivKey := strings.TrimPrefix(testContext.chatPrivateKey, "0x")
+	require.NoError(t, testContext.backend.StartNodeWithKey(*testContext.multiAcc, testKeycardPassword, chatPrivKey, testContext.config))
+
+	t.Cleanup(func() {
+		assert.NoError(t, testContext.backend.Logout())
+		assert.NoError(t, testContext.backend.StopNode())
+	})
+
+	return testContext
+}
+
+func TestConvertToKeycardAccountRequiresMessenger(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
+	keycardAccount := *testContext.multiAcc
+	err := testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword)
+	require.ErrorContains(t, err, "cannot resolve messenger instance",
+		"Expected the conversion to be rejected because without a logged-in messenger no keypair migration can run")
+}
+
+func TestConvertToKeycardAccountRejectsWrongOldPassword(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.RootDataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(request, testContext.mnemonic, nil, false)
+	require.NoError(t, err)
+	// the test logs out mid-way and then reopens the databases to read the keypair
+	// back, so cleanup has to cover whichever state it ends in
+	t.Cleanup(func() {
+		_ = testContext.backend.Logout()
+		_ = testContext.backend.StopNode()
+	})
+
+	keyUID := testContext.profileKeypair.KeyUID
+	keystoreFilesBefore := countKeystoreFilesForKeyUID(t, testContext.config.RootDataDir, keyUID)
+	require.Greater(t, keystoreFilesBefore, 0,
+		"Expected keystore files before conversion because the profile keypair is password-based")
+
+	keycardAccount := *testContext.multiAcc
+	keycardAccount.KeycardPairing = "pairing"
+	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, keyUID, "wrong-password", testKeycardPassword)
+	require.ErrorIs(t, err, envelope.ErrInvalidKEK,
+		"Expected the conversion to fail on the key-encryption envelope because the old password is wrong")
+
+	masterAddress := types.HexToAddress(testContext.profileKeypair.DerivedFrom)
+	ok, err := testContext.backend.AccountsManager().VerifyAccountPassword(masterAddress, testPassword)
+	require.NoError(t, err,
+		"Expected the master keystore file to survive a failed conversion because deletion must come after password verification")
+	require.True(t, ok)
+
+	for _, acc := range testContext.profileKeypair.Accounts {
+		ok, err = testContext.backend.AccountsManager().VerifyAccountPassword(acc.Address, testPassword)
+		require.NoError(t, err,
+			"Expected every account keystore file to survive a failed conversion")
+		require.True(t, ok)
+	}
+
+	require.Equal(t, keystoreFilesBefore, countKeystoreFilesForKeyUID(t, testContext.config.RootDataDir, keyUID),
+		"Expected the keystore file count unchanged because a failed conversion must not delete keys")
+
+	require.NoError(t, testContext.backend.Logout())
+	require.NoError(t, testContext.backend.StopNode())
+
+	require.NoError(t, testContext.backend.VerifyDatabasePassword(keyUID, testPassword),
+		"Expected the DB password unchanged because ChangeDatabasePassword must not run after a failed conversion")
+
+	require.NoError(t, testContext.backend.ensureDBsOpened(*testContext.multiAcc, testPassword))
+	db, err := accounts.NewDB(testContext.backend.appDB)
+	require.NoError(t, err)
+
+	keypair, err := db.GetKeypairByKeyUID(keyUID)
+	require.NoError(t, err)
+	require.False(t, keypair.MigratedToColdWallet(),
+		"Expected the keypair to stay non-cold because the migration failed before flipping state")
+}
+
+func TestConvertToRegularAccountRejectsUnknownMnemonic(t *testing.T) {
+	testContext := setupKeycardConvertedContext(t)
+	keyUID := testContext.profileKeypair.KeyUID
+
+	otherMnemonic, err := accsmanagementcommon.CreateRandomMnemonicWithDefaultLength()
+	require.NoError(t, err)
+
+	err = testContext.backend.ConvertToRegularAccount(otherMnemonic, testKeycardPassword, testPassword)
+	require.ErrorIs(t, err, sql.ErrNoRows,
+		"Expected the convert-back to fail looking up the unknown keyUID, not for some earlier unrelated reason")
+
+	multiAccAfter, err := testContext.backend.multiaccountsDB.GetAccount(keyUID)
+	require.NoError(t, err)
+	require.Equal(t, "pairing", multiAccAfter.KeycardPairing,
+		"Expected the keycard pairing intact because an unknown mnemonic must not touch this profile")
+
+	require.Zero(t, countKeystoreFilesForKeyUID(t, testContext.config.RootDataDir, keyUID),
+		"Expected zero keystore files because a failed convert-back must not recreate keys")
+
+	db, err := accounts.NewDB(testContext.backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(keyUID)
+	require.NoError(t, err)
+	require.True(t, keypair.MigratedToColdWallet(),
+		"Expected the keypair to stay cold-wallet migrated because the convert-back failed before any mutation")
+}
+
+func TestConvertToRegularAccountAcceptsWhitespacePaddedMnemonic(t *testing.T) {
+	testContext := setupKeycardConvertedContext(t)
+	keyUID := testContext.profileKeypair.KeyUID
+
+	paddedMnemonic := "  " + strings.ReplaceAll(testContext.mnemonic, " ", "   ") + "  "
+	err := testContext.backend.ConvertToRegularAccount(paddedMnemonic, testKeycardPassword, testPassword)
+	require.NoError(t, err,
+		"Expected the convert-back to succeed because mnemonic whitespace must be normalized before derivation")
+
+	require.Greater(t, countKeystoreFilesForKeyUID(t, testContext.config.RootDataDir, keyUID), 0,
+		"Expected keystore files recreated because whitespace-padded mnemonics must be normalized and accepted")
+
+	require.NoError(t, testContext.backend.ensureDBsOpened(*testContext.multiAcc, testPassword))
+	db, err := accounts.NewDB(testContext.backend.appDB)
+	require.NoError(t, err)
+	keypair, err := db.GetKeypairByKeyUID(keyUID)
+	require.NoError(t, err)
+	require.False(t, keypair.MigratedToColdWallet(),
+		"Expected the keypair back to password-based because the padded mnemonic resolves to the same account")
 }
