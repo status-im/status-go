@@ -1,6 +1,8 @@
 #!/usr/bin/env groovy
 library 'status-jenkins-lib@v1.9.39'
 
+def isPRBuild = utils.isPRBuild()
+
 pipeline {
   agent {
     docker {
@@ -40,10 +42,11 @@ pipeline {
     disableRestartFromStage()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: getAmountToKeep(),
-      daysToKeepStr: '30',
-      artifactNumToKeepStr: getAmountToKeep(),
-      artifactDaysToKeepStr: '30',
+      numToKeepStr: '10',
+      daysToKeepStr: isPRBuild ? '14' : '30',
+      artifactNumToKeepStr: isPRBuild ? '1' : '10',
+      artifactDaysToKeepStr: isPRBuild ? '7' : '30',
+      removeLastBuild: isPRBuild,
     ))
   }
 
@@ -109,7 +112,3 @@ pipeline {
     }
   } // post
 } // pipeline
-
-def isDevelopJob() { env.JOB_BASE_NAME == 'tests-rpc-develop' }
-
-def getAmountToKeep() { isDevelopJob() ? '30' : '5' }

@@ -1,6 +1,8 @@
 #!/usr/bin/env groovy
 library 'status-jenkins-lib@v1.9.39'
 
+def isPRBuild = utils.isPRBuild()
+
 pipeline {
   agent {
     docker {
@@ -49,9 +51,10 @@ pipeline {
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: '10',
-      daysToKeepStr: '30',
-      artifactNumToKeepStr: '10',
-      artifactDaysToKeepStr: '30',
+      daysToKeepStr: isPRBuild ? '14' : '30',
+      artifactNumToKeepStr: isPRBuild ? '1' : '10',
+      artifactDaysToKeepStr: isPRBuild ? '7' : '30',
+      removeLastBuild: isPRBuild,
     ))
   }
 
