@@ -668,3 +668,137 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 
 	s.Require().True(haveSameElements(dbAccounts1, dbAccounts2, accounts.SameAccountsIncludingPosition))
 }
+
+func (s *MessengerSyncWalletSuite) pairOtherDevice() *Messenger {
+	otherDevice := s.anotherMessenger()
+
+	im := &messagingtypes.InstallationMetadata{
+		Name:       "alice's-other-device",
+		DeviceType: "alice's-other-device-type",
+	}
+	err := otherDevice.SetInstallationMetadata(otherDevice.installationID, im)
+	s.Require().NoError(err)
+
+	PairDevices(&s.Suite, otherDevice, s.m)
+
+	return otherDevice
+}
+
+func (s *MessengerSyncWalletSuite) saveSeedKeypairOn(m *Messenger, coldWallet accsmanagementtypes.ColdWalletType) *accsmanagementtypes.Keypair {
+	kp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
+	kp.Clock = 1
+	kp.ColdWallet = coldWallet
+	for _, acc := range kp.Accounts {
+		acc.Operable = accsmanagementtypes.AccountFullyOperable
+	}
+	s.Require().NoError(m.settings.SaveOrUpdateKeypair(kp))
+	return kp
+}
+
+func (s *MessengerSyncWalletSuite) waitForKeypairOn(otherDevice *Messenger) {
+	err := testutils.RetryWithBackOff(func() error {
+		response, err := otherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Keypairs) != 1 {
+			return errors.New("no sync keypair received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+}
+
+func (s *MessengerSyncWalletSuite) TestMigrateKeypairToColdWalletSyncsColdStateToPairedDevice() {
+	kp := s.saveSeedKeypairOn(s.m, accsmanagementtypes.ColdWalletTypeNone)
+	otherDevice := s.pairOtherDevice()
+	s.saveSeedKeypairOn(otherDevice, accsmanagementtypes.ColdWalletTypeNone)
+
+	s.accountsManagerMock.EXPECT().
+		MigrateKeypairToColdWallet(kp.KeyUID, "password", accsmanagementtypes.ColdWalletTypeStatusKeycard, gomock.Any()).
+		DoAndReturn(func(keyUID string, password string, coldWallet accsmanagementtypes.ColdWalletType, clock uint64) error {
+			return s.m.settings.UpdateKeypairXPub(keyUID, "", coldWallet, clock)
+		}).Times(1)
+
+	err := s.m.MigrateKeypairToColdWallet(context.Background(), kp.KeyUID, "password", accsmanagementtypes.ColdWalletTypeStatusKeycard)
+	s.Require().NoError(err)
+
+	s.waitForKeypairOn(otherDevice)
+
+	dbKp, err := otherDevice.settings.GetKeypairByKeyUID(kp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().Equal(accsmanagementtypes.ColdWalletTypeStatusKeycard, dbKp.ColdWallet,
+		"the paired device must learn the keypair signs via keycard now, or it will keep trying deleted keystore files")
+}
+
+func (s *MessengerSyncWalletSuite) TestMigrateColdWalletKeypairToAppSyncsRevertToPairedDevice() {
+	kp := s.saveSeedKeypairOn(s.m, accsmanagementtypes.ColdWalletTypeStatusKeycard)
+	otherDevice := s.pairOtherDevice()
+	s.saveSeedKeypairOn(otherDevice, accsmanagementtypes.ColdWalletTypeStatusKeycard)
+
+	s.accountsManagerMock.EXPECT().
+		MigrateColdWalletKeypairToApp("some mnemonic", "password", gomock.Any()).
+		DoAndReturn(func(mnemonic string, password string, clock uint64) (string, error) {
+			return kp.KeyUID, s.m.settings.UpdateKeypairXPub(kp.KeyUID, "", accsmanagementtypes.ColdWalletTypeNone, clock)
+		}).Times(1)
+
+	err := s.m.MigrateColdWalletKeypairToApp(context.Background(), "some mnemonic", "password")
+	s.Require().NoError(err)
+
+	s.waitForKeypairOn(otherDevice)
+
+	dbKp, err := otherDevice.settings.GetKeypairByKeyUID(kp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().Equal(accsmanagementtypes.ColdWalletTypeNone, dbKp.ColdWallet,
+		"the paired device must learn the keypair signs via keystore again, or its signing method stays keycard forever")
+}
+
+func (s *MessengerSyncWalletSuite) TestAddKeypairStoredToColdWalletSyncsKeypairToPairedDevice() {
+	otherDevice := s.pairOtherDevice()
+
+	kp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
+	kp.XPub = "xpub6LedgerColdWalletKeypair"
+	kp.ColdWallet = accsmanagementtypes.ColdWalletTypeLedger
+
+	s.accountsManagerMock.EXPECT().
+		AddKeypairStoredToColdWallet(kp.KeyUID, kp.DerivedFrom, kp.Name, kp.XPub, accsmanagementtypes.ColdWalletTypeLedger, gomock.Any(), gomock.Any()).
+		DoAndReturn(func(keyUID string, masterAddress string, name string, walletXPub string, coldWallet accsmanagementtypes.ColdWalletType,
+			walletAccounts []*accsmanagementtypes.Account, clock uint64) (*accsmanagementtypes.Keypair, error) {
+			// the accounts the messenger forwarded, not the ones captured above:
+			// otherwise a nil or wrong slice would still sync two accounts
+			s.Require().Equal(kp.Accounts, walletAccounts, "the messenger must forward the wallet accounts it was given")
+			kp.Clock = clock
+			for i, acc := range kp.Accounts {
+				acc.Position = int64(i)
+				acc.Operable = accsmanagementtypes.AccountFullyOperable
+			}
+			return kp, s.m.settings.SaveOrUpdateKeypair(kp)
+		}).Times(1)
+
+	returnedKp, err := s.m.AddKeypairStoredToColdWallet(kp.KeyUID, kp.DerivedFrom, kp.Name, kp.XPub, accsmanagementtypes.ColdWalletTypeLedger, kp.Accounts)
+	s.Require().NoError(err)
+
+	s.waitForKeypairOn(otherDevice)
+
+	dbKp, err := otherDevice.settings.GetKeypairByKeyUID(kp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().Equal(accsmanagementtypes.ColdWalletTypeLedger, dbKp.ColdWallet,
+		"the paired device must know the keypair lives on a ledger, there are no keystore files to fall back to")
+	s.Require().Equal(kp.XPub, dbKp.XPub,
+		"the xpub must survive the wire trip, password-less account derivation on the paired device depends on it")
+	s.Require().Equal(returnedKp.Name, dbKp.Name, "the keypair must arrive under the name it was created with")
+	s.Require().Equal(returnedKp.DerivedFrom, dbKp.DerivedFrom, "the master address must survive the wire trip")
+	s.Require().Equal(len(returnedKp.Accounts), len(dbKp.Accounts), "every ledger wallet account must reach the paired device")
+	for _, expected := range returnedKp.Accounts {
+		found := false
+		for _, got := range dbKp.Accounts {
+			if got.Address == expected.Address {
+				found = true
+				break
+			}
+		}
+		s.Require().True(found, "wallet account %s must exist on the paired device", expected.Address.Hex())
+	}
+}

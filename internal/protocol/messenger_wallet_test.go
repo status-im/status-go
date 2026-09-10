@@ -3,6 +3,7 @@ package protocol
 import (
 	"testing"
 
+	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 
@@ -194,4 +195,32 @@ func (s *WalletSuite) TestRemainingCapacity() {
 	s.Require().Error(err)
 	s.Require().Equal("no more watch-only accounts can be added", err.Error())
 	s.Require().Equal(0, capacity)
+}
+
+func (s *WalletSuite) saveColdSeedKeypairWithXPub() *accsmanagementtypes.Keypair {
+	kp, _, _, err := accounts.GetSeedImportedKeypair1ForTest()
+	s.Require().NoError(err)
+	kp.Clock = 1
+	kp.ColdWallet = accsmanagementtypes.ColdWalletTypeStatusKeycard
+	kp.XPub = "xpub6ColdWalletKeypairStoredXPub"
+	for _, acc := range kp.Accounts {
+		acc.Operable = accsmanagementtypes.AccountFullyOperable
+	}
+	s.Require().NoError(s.m.settings.SaveOrUpdateKeypair(kp))
+	return kp
+}
+
+func (s *WalletSuite) TestUpdateKeypairRoundTripsColdWalletStateOnRename() {
+	kp := s.saveColdSeedKeypairWithXPub()
+
+	dbKp, err := s.m.settings.GetKeypairByKeyUID(kp.KeyUID)
+	s.Require().NoError(err)
+	dbKp.Name = "Renamed Cold Keypair"
+	s.Require().NoError(s.m.UpdateKeypair(dbKp))
+
+	dbKp, err = s.m.settings.GetKeypairByKeyUID(kp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().Equal("Renamed Cold Keypair", dbKp.Name, "the rename itself must apply")
+	s.Require().Equal(accsmanagementtypes.ColdWalletTypeStatusKeycard, dbKp.ColdWallet, "renaming a keypair must not change its signing method")
+	s.Require().Equal(kp.XPub, dbKp.XPub, "renaming a keypair must not drop the stored xpub, password-less derivation depends on it")
 }
