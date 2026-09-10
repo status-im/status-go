@@ -80,8 +80,6 @@ func TestSaveMessages(t *testing.T) {
 //
 // Expected behaviour, asserted below: each distinct status message keeps its own
 // bridge payload, and saving a second message never rewrites the first.
-//
-// EXPECTED TO FAIL until the persistence layer is fixed.
 func TestBridgeMessageDuplicateMessageID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -132,6 +130,49 @@ func TestBridgeMessageDuplicateMessageID(t *testing.T) {
 	require.NotNil(t, firstPayload)
 	assert.Equal(t, "attempt 1", firstPayload.Content,
 		"saving a different status message silently mutated an already-delivered message")
+}
+
+// TestBridgeMessageEditSameStatusID is the counterpart of
+// TestBridgeMessageDuplicateMessageID: applyEditMessage re-saves the same
+// common.Message.ID, and that must still update the existing bridge payload
+// rather than insert a second row (user_messages_id is the PRIMARY KEY).
+func TestBridgeMessageEditSameStatusID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	saveBridge := func(content string) error {
+		return p.SaveMessages([]*common.Message{{
+			ID:          "status-message-1",
+			LocalChatID: testPublicChatID,
+			From:        testPK,
+			ChatMessage: &protobuf.ChatMessage{
+				Text:        content,
+				ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+				ChatId:      testPublicChatID,
+				Payload: &protobuf.ChatMessage_BridgeMessage{
+					BridgeMessage: &protobuf.BridgeMessage{
+						BridgeName: "discord",
+						UserName:   "user1",
+						UserID:     "123",
+						Content:    content,
+						MessageID:  "bridge-id-1",
+					},
+				},
+			},
+		}})
+	}
+
+	require.NoError(t, saveBridge("original"))
+	require.NoError(t, saveBridge("edited"))
+
+	got, err := p.MessageByID("status-message-1")
+	require.NoError(t, err)
+	payload := got.GetBridgeMessage()
+	require.NotNil(t, payload)
+	assert.Equal(t, "edited", payload.Content)
+	assert.Equal(t, "discord", payload.BridgeName)
+	assert.Equal(t, "bridge-id-1", payload.MessageID)
 }
 
 func TestMessagesByIDs(t *testing.T) {
