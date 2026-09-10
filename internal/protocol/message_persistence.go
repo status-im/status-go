@@ -2076,16 +2076,20 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 		}
 
 		if msg.ContentType == protobuf.ChatMessage_BRIDGE_MESSAGE {
-			// check updates first
+			// Edits re-save the same user_messages.id (PRIMARY KEY ON CONFLICT
+			// REPLACE). The Discord/bridge message_id is not unique — two
+			// distinct Status messages may carry the same foreign id.
 			var hasMessage bool
-			hasMessage, err = db.bridgeMessageExists(tx, msg.GetBridgeMessage().MessageID)
+			hasMessage, err = db.bridgeMessageExists(tx, msg.ID)
 			if err != nil {
 				return
 			}
 			if hasMessage {
-				// bridge message exists, this is edit
-				err = db.updateBridgeMessageContent(tx, msg.GetBridgeMessage().MessageID, msg.GetBridgeMessage().Content)
-				return
+				err = db.updateBridgeMessageContent(tx, msg.ID, msg.GetBridgeMessage().Content)
+				if err != nil {
+					return
+				}
+				continue
 			}
 
 			err = db.saveBridgeMessage(tx, msg.GetBridgeMessage(), msg.ID)
@@ -3546,20 +3550,20 @@ func (db sqlitePersistence) updateStatusMessagesWithResponse(tx *sql.Tx, statusM
 	return err
 }
 
-func (db sqlitePersistence) bridgeMessageExists(tx *sql.Tx, bridgeMessageID string) (exists bool, err error) {
-	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM bridge_messages WHERE message_id = ?)`, bridgeMessageID).Scan(&exists)
+func (db sqlitePersistence) bridgeMessageExists(tx *sql.Tx, userMessageID string) (exists bool, err error) {
+	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM bridge_messages WHERE user_messages_id = ?)`, userMessageID).Scan(&exists)
 	return exists, err
 }
 
-func (db sqlitePersistence) updateBridgeMessageContent(tx *sql.Tx, bridgeMessageID string, content string) error {
-	sql := "UPDATE bridge_messages SET content = ? WHERE message_id = ?"
+func (db sqlitePersistence) updateBridgeMessageContent(tx *sql.Tx, userMessageID string, content string) error {
+	sql := "UPDATE bridge_messages SET content = ? WHERE user_messages_id = ?"
 	stmt, err := tx.Prepare(sql)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(content, bridgeMessageID)
+	_, err = stmt.Exec(content, userMessageID)
 	return err
 }
 
