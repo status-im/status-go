@@ -42,6 +42,7 @@ func TestAccountsUpdate(t *testing.T) {
 	defer stop()
 	expected := Account{
 		KeyUID:             "string",
+		KeycardPairing:     "843edb10045d329f4ecfac73fe66f13d",
 		CustomizationColor: common.CustomizationColorBlue,
 		ColorHash:          ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
 		ColorID:            10,
@@ -84,6 +85,60 @@ func TestUpdateHasAcceptedTerms(t *testing.T) {
 	require.NoError(t, err)
 	expected.HasAcceptedTerms = false
 	require.Equal(t, &expected, account)
+}
+
+func TestAccountKeycardPairingRoundTrip(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	expected := Account{
+		Name:           "string",
+		KeyUID:         keyUID,
+		KeycardPairing: "cc9d96f9b65b551595f3cf7c531beacda24b4937cece7fef70f5236ee80a0808",
+		KDFIterations:  dbsetup.ReducedKDFIterationsNumber,
+	}
+	require.NoError(t, db.SaveAccount(expected))
+
+	account, err := db.GetAccount(keyUID)
+	require.NoError(t, err)
+	require.Equal(t, expected.KeycardPairing, account.KeycardPairing)
+
+	accounts, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Len(t, accounts, 1)
+	require.Equal(t, expected.KeycardPairing, accounts[0].KeycardPairing)
+}
+
+func TestUpdateAccountKeycardPairingSetsAndClears(t *testing.T) {
+	const bystanderKeyUID = "0x000000000000000000000000000000000000000000000000000000000000beef"
+	const bystanderPairing = "bystander-pairing-must-not-change"
+
+	db, stop := setupTestDB(t)
+	defer stop()
+	target := Account{Name: "target", KeyUID: keyUID, KDFIterations: dbsetup.ReducedKDFIterationsNumber, HasAcceptedTerms: true}
+	require.NoError(t, db.SaveAccount(target))
+	// a second account with a pairing of its own, so a write that loses its
+	// WHERE clause shows up as a changed bystander rather than passing silently
+	require.NoError(t, db.SaveAccount(Account{KeyUID: bystanderKeyUID, KeycardPairing: bystanderPairing, KDFIterations: dbsetup.ReducedKDFIterationsNumber}))
+
+	require.NoError(t, db.UpdateAccountKeycardPairing(keyUID, "843edb10045d329f4ecfac73fe66f13d"))
+	target.KeycardPairing = "843edb10045d329f4ecfac73fe66f13d"
+	account, err := db.GetAccount(keyUID)
+	require.NoError(t, err)
+	require.Equal(t, &target, account, "only keycardPairing may change on the target row")
+
+	bystander, err := db.GetAccount(bystanderKeyUID)
+	require.NoError(t, err)
+	require.Equal(t, bystanderPairing, bystander.KeycardPairing)
+
+	require.NoError(t, db.UpdateAccountKeycardPairing(keyUID, ""))
+	target.KeycardPairing = ""
+	account, err = db.GetAccount(keyUID)
+	require.NoError(t, err)
+	require.Equal(t, &target, account, "clearing must leave every other column of the target row alone")
+
+	bystander, err = db.GetAccount(bystanderKeyUID)
+	require.NoError(t, err)
+	require.Equal(t, bystanderPairing, bystander.KeycardPairing)
 }
 
 func TestDatabase_GetAccountsCount(t *testing.T) {
