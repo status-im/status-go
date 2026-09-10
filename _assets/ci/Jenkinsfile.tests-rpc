@@ -67,6 +67,30 @@ pipeline {
   }
 
   stages {
+    stage('Prepare nightly experiment') {
+      when { expression { isNightlyExperiment() } }
+      steps { script {
+        dir('nightly-report') { deleteDir() }
+        sh 'mkdir -p nightly-report'
+        writeFile(file: 'nightly-report/issue-report.json',
+                  text: '{"action":"not-run","message":"Reporting has not run; see console if credential binding fails."}\n')
+        sh 'git rev-parse HEAD > nightly-report/status-go-sha.txt'
+        echo 'GITHUB AUTHENTICATION TEST: this run will attempt to create a visible TEST issue in status-im/status-go.'
+      } }
+    }
+
+    stage('Resolve nightly image') {
+      when { expression { isNightlyExperiment() } }
+      steps { script {
+        env.NIGHTLY_IMAGE = 'quay.io/wakuorg/nwaku-pr:nightly-logosdeliverynode'
+        sh 'docker pull "$NIGHTLY_IMAGE"'
+        env.WAKU_IMAGE = sh(returnStdout: true,
+          script: 'docker image inspect "$NIGHTLY_IMAGE" --format \'{{index .RepoDigests 0}}\'').trim()
+        writeFile(file: 'nightly-report/delivery-image.txt', text: "${env.WAKU_IMAGE}\n")
+        echo "Testing Logos Delivery image: ${env.WAKU_IMAGE}"
+      } }
+    }
+
     stage('RPC Tests') {
       steps { script {
         withCredentials([
@@ -80,7 +104,10 @@ pipeline {
             passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
     ),
         ]) {
-          nix.develop('make test-functional USE_LOGOS_STORAGE=true', pure: false)
+          def overrides = isNightlyExperiment() ? ['FUNCTIONAL_TESTS_REPORT_CODECOV=false'] : []
+          withEnv(overrides) {
+            nix.develop('make test-functional USE_LOGOS_STORAGE=true', pure: false)
+          }
         }
       } }
     }
@@ -89,16 +116,30 @@ pipeline {
   post {
     always {
       script {
-        archiveArtifacts(
-          artifacts: 'test/functional/reports/*.xml, test/functional/logs/*.log, test/functional/coverage/coverage.html',
-          allowEmptyArchive: true,
-        )
-        junit(
-          testResults: 'test/functional/reports/*.xml',
-          skipOldReports: true,
-          skipPublishingChecks: true,
-          skipMarkingBuildUnstable: true,
-        )
+        try {
+          junit(
+            testResults: 'test/functional/reports/*.xml',
+            skipOldReports: true,
+            skipPublishingChecks: true,
+            skipMarkingBuildUnstable: true,
+          )
+        } finally {
+          try {
+            if (isNightlyExperiment()) {
+              stage('GitHub issue reporting') {
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                  reportNightlyIssues()
+                }
+              }
+            }
+          } finally {
+            archiveArtifacts(
+              artifacts: 'nightly-report/**, test/functional/reports/*.xml, ' +
+                         'test/functional/logs/*.log, test/functional/coverage/coverage.html',
+              allowEmptyArchive: true,
+            )
+          }
+        }
       }
     }
     success { script { github.notifyPR(true) } }
@@ -112,3 +153,36 @@ pipeline {
     }
   } // post
 } // pipeline
+
+// Temporary PR experiment: other branches retain the stable image and Codecov setting.
+def isNightlyExperiment() {
+  def branch = env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: params.BRANCH
+  // Some Pipeline jobs expose PR-123 as BRANCH_NAME and the source branch as BRANCH.
+  if (branch?.startsWith('PR-')) { branch = params.BRANCH }
+  return branch == 'ci/jenkins-logos-delivery-nightly'
+}
+
+def reportNightlyIssues() {
+  try {
+    withEnv(["NIGHTLY_BUILD_RESULT=${currentBuild.currentResult}"]) {
+      // Same username/token credential used by github.notify(), the notifyPR fallback,
+      // in status-jenkins-lib@v1.9.39 (vars/github.groovy).
+      withCredentials([usernamePassword(credentialsId: 'status-im-auto',
+        usernameVariable: 'GH_USERNAME', passwordVariable: 'GH_TOKEN')]) {
+        sh '''
+          set +x
+          python3 scripts/report_nightly_issues.py --mode auth-test
+        '''
+      }
+    }
+  } finally {
+    if (fileExists('nightly-report/issue-url.txt')) {
+      def issueUrl = readFile('nightly-report/issue-url.txt').trim()
+      currentBuild.description = "GitHub issue: ${issueUrl}"
+      echo "GITHUB ISSUE CREATED OR UPDATED: ${issueUrl}"
+    } else {
+      currentBuild.description = 'GitHub reporting: see nightly-report/issue-report.json artifact and console'
+      echo 'No issue URL recorded. See nightly-report/issue-report.json and the reporting stage output.'
+    }
+  }
+}
