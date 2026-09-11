@@ -1023,7 +1023,11 @@ func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReac
 }
 
 func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
-	return api.service.messenger.EmojiReactionsByChatID(chatID, cursor, limit)
+	return api.service.messenger.EmojiReactionsByChatID(chatID, "", cursor, limit)
+}
+
+func (api *PublicAPI) EmojiReactionsByChatIDV2(chatID, threadID, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
+	return api.service.messenger.EmojiReactionsByChatID(chatID, threadID, cursor, limit)
 }
 
 func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*protocol.EmojiReaction, error) {
