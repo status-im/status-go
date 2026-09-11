@@ -58,6 +58,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/collectibles/alchemy"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/collectibles/rarible"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/efp"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/market/coingecko"
 	"github.com/status-im/status-go/pkg/services/wallet/token"
 	"github.com/status-im/status-go/pkg/services/wallet/transfer"
@@ -207,7 +208,8 @@ func NewService(
 			SearchProviders:            collectibleSearchProviders,
 		}
 
-		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags, config.WalletConfig.CommunityTokenDeployerOverrides)
+		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags,
+			config.WalletConfig.CommunityTokenDeployerOverrides, config.WalletConfig.LifiAPIKey, lifi.IntegratorForStage(config.WalletConfig.StatusProxyStageName))
 
 		leaderboardConfig = leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
 
@@ -305,7 +307,7 @@ func NewService(
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, tokenBalancesFetcher, marketManager, collectibles,
-		collectiblesManager)
+		collectiblesManager, config.WalletConfig.LifiAPIKey, lifi.IntegratorForStage(config.WalletConfig.StatusProxyStageName))
 	for _, processor := range pathProcessors {
 		router.AddPathProcessor(processor)
 	}
@@ -373,6 +375,8 @@ func buildPathProcessors(
 	ensResolver *ensresolver.EnsResolver,
 	featureFlags *protocolCommon.FeatureFlags,
 	deployerOverrides map[uint64]ethCommon.Address,
+	lifiAPIKey security.SensitiveString,
+	lifiIntegrator string,
 ) []pathprocessor.PathProcessor {
 	ret := make([]pathprocessor.PathProcessor, 0)
 
@@ -392,7 +396,7 @@ func buildPathProcessors(
 	// paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
 	// ret = append(ret, paraswap)
 
-	lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager)
+	lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager, lifiAPIKey, lifiIntegrator)
 	ret = append(ret, lifi)
 
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)

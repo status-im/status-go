@@ -2,6 +2,7 @@ package pathprocessor
 
 import (
 	"context"
+	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
+	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/lifi"
@@ -32,10 +34,10 @@ type LiFiProcessor struct {
 	quotes          sync.Map // [fromTokenKey-toTokenKey-amountIn, *lifi.Quote]
 }
 
-func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager) *LiFiProcessor {
+func NewLiFiProcessor(ethClientGetter rpc.EthClientGetter, transactor transactions.TransactorIface, tokenManager *walletToken.Manager, apiKey security.SensitiveString, integrator string) *LiFiProcessor {
 	return &LiFiProcessor{
 		ethClientGetter: ethClientGetter,
-		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, lifi.Integrator, ""),
+		lifiClient:      lifi.NewClient(walletCommon.EthereumMainnet, integrator, apiKey.Reveal()),
 		tokenManager:    tokenManager,
 		transactor:      transactor,
 		quotes:          sync.Map{},
@@ -144,7 +146,7 @@ func (s *LiFiProcessor) getOrFetchQuote(params ProcessorInputParams) (*lifi.Quot
 }
 
 func (s *LiFiProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	quote, err := s.fetchAndStoreQuote(params)
+	quote, err := s.getOrFetchQuote(params)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -161,6 +163,15 @@ func (s *LiFiProcessor) GetProviderTool(params ProcessorInputParams) string {
 	return quote.Tool
 }
 
+// GetRouteExecutionDuration returns LI.FI's estimated time in seconds once the tx is included.
+func (s *LiFiProcessor) GetRouteExecutionDuration(params ProcessorInputParams) uint {
+	quote, err := s.getOrFetchQuote(params)
+	if err != nil || quote == nil || quote.Estimate.ExecutionDuration <= 0 {
+		return 0
+	}
+	return uint(math.Ceil(quote.Estimate.ExecutionDuration))
+}
+
 func (s *LiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	key := pathProcessorCommon.MakeKey(params.FromToken.Key(), params.ToToken.Key(), params.AmountIn)
 	quote, err := s.getQuote(key)
@@ -174,7 +185,7 @@ func (s *LiFiProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.In
 }
 
 func (s *LiFiProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	quote, err := s.fetchAndStoreQuote(params)
+	quote, err := s.getOrFetchQuote(params)
 	if err != nil {
 		return []byte{}, err
 	}

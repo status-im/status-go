@@ -4,6 +4,7 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/url"
 	"sync"
@@ -207,9 +208,27 @@ func (r *RelayClient) dialRelay() (*websocket.Conn, error) {
 	q.Set("projectId", r.projectID)
 	u.RawQuery = q.Encode()
 
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("dial relay: %w", err)
+		// gorilla collapses every non-101 answer into "bad handshake".
+		status, body := 0, ""
+		if resp != nil {
+			defer resp.Body.Close()
+			raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			status, body = resp.StatusCode, truncate(string(raw), 256)
+		}
+		failure := classifyDialFailure(status, body)
+		r.logger.Warn("relay handshake rejected",
+			zap.Int("status", status),
+			zap.String("class", failure.class),
+			zap.Bool("retryable", failure.retryable),
+			zap.String("body", body),
+			zap.Int("projectIdLen", len(r.projectID)))
+		if status != 0 {
+			return nil, fmt.Errorf("dial relay: %w (http %d %s, retryable=%t: %s)",
+				err, status, failure.class, failure.retryable, body)
+		}
+		return nil, fmt.Errorf("dial relay: %w (%s, retryable=%t)", err, failure.class, failure.retryable)
 	}
 	return conn, nil
 }

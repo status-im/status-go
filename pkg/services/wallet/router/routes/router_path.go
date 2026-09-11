@@ -47,6 +47,8 @@ type Path struct {
 	TxTokenFees     *hexutil.Big    // Token fees for the transaction - used for bridges (represent the difference between the amount in and the amount out, in selected token)
 	TxEstimatedTime uint            // Estimated time for the transaction in seconds
 
+	RouteExecutionDuration uint // Provider-reported time (in seconds) the route itself takes to execute once the tx is included (e.g. bridging); 0 when unknown or instant
+
 	TxFee   *hexutil.Big // fee for the transaction (includes tx fee only, doesn't include approval fees, l1 fees, l1 approval fees, token fees or bonders fees, in base unit of the chain eg. WEI for ETH or BNB)
 	TxL1Fee *hexutil.Big // L1 fee for the transaction - used for for transactions placed on L2 chains (in base unit of the chain eg. WEI for ETH or BNB)
 
@@ -110,6 +112,7 @@ func (p *Path) Copy() *Path {
 		TxGasFeeMode:               p.TxGasFeeMode,
 		TxGasAmount:                p.TxGasAmount,
 		TxEstimatedTime:            p.TxEstimatedTime,
+		RouteExecutionDuration:     p.RouteExecutionDuration,
 		ApprovalRequired:           p.ApprovalRequired,
 		ApprovalGasFeeMode:         p.ApprovalGasFeeMode,
 		ApprovalGasAmount:          p.ApprovalGasAmount,

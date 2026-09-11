@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
-	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
 type TransactionRequest struct {
@@ -23,10 +22,11 @@ type TransactionRequest struct {
 }
 
 type Estimate struct {
-	FromAmount      *bigint.BigInt `json:"fromAmount"`
-	ToAmount        *bigint.BigInt `json:"toAmount"`
-	ToAmountMin     *bigint.BigInt `json:"toAmountMin"`
-	ApprovalAddress common.Address `json:"approvalAddress"`
+	FromAmount        *bigint.BigInt `json:"fromAmount"`
+	ToAmount          *bigint.BigInt `json:"toAmount"`
+	ToAmountMin       *bigint.BigInt `json:"toAmountMin"`
+	ApprovalAddress   common.Address `json:"approvalAddress"`
+	ExecutionDuration float64        `json:"executionDuration"`
 }
 
 type Quote struct {
@@ -64,12 +64,7 @@ func (c *Client) quoteQueryParams(p QuoteParams) netUrl.Values {
 func (c *Client) FetchQuote(ctx context.Context, p QuoteParams) (Quote, error) {
 	params := c.quoteQueryParams(p)
 
-	options := []thirdparty.RequestOption{}
-	if c.apiKey != "" {
-		options = append(options, thirdparty.WithHeader("x-lifi-api-key", c.apiKey))
-	}
-
-	response, err := c.httpClient.DoGetRequest(ctx, baseURL+"/quote", params, options...)
+	response, err := c.httpClient.DoGetRequest(ctx, c.baseURL+"/quote", params, c.requestOptions()...)
 	if err != nil {
 		return Quote{}, err
 	}

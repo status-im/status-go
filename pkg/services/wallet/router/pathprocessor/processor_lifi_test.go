@@ -15,6 +15,7 @@ import (
 	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
@@ -64,7 +65,7 @@ func TestLiFiQuote(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -92,13 +93,26 @@ func TestLiFiQuote(t *testing.T) {
 	require.NotNil(t, amountOut)
 	require.Equal(t, testQuote.Estimate.ToAmount.Uint64(), amountOut.Uint64())
 
-	client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(testQuote, nil)
+	// with a warm cache (an earlier consumer of the same routing round already
+	// fetched), neither call re-quotes — the whole round shares a single fetch
 	contractAddress, err := processor.GetContractAddress(testInputParams)
 	require.NoError(t, err)
 	require.Equal(t, testQuote.Estimate.ApprovalAddress, contractAddress)
 
-	client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(testQuote, nil)
 	inputData, err := processor.PackTxInputData(testInputParams)
+	assert.NoError(t, err)
+	assert.Equal(t, testQuote.TransactionRequest.Data, hexutil.Encode(inputData))
+
+	// a cleared processor (new routing round, or the post-approval re-pack)
+	// fetches exactly once; the following consumer reuses that fetch
+	processor.Clear()
+	client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(testQuote, nil).Times(1)
+
+	contractAddress, err = processor.GetContractAddress(testInputParams)
+	require.NoError(t, err)
+	require.Equal(t, testQuote.Estimate.ApprovalAddress, contractAddress)
+
+	inputData, err = processor.PackTxInputData(testInputParams)
 	assert.NoError(t, err)
 	assert.Equal(t, testQuote.TransactionRequest.Data, hexutil.Encode(inputData))
 }
@@ -110,7 +124,7 @@ func TestLiFiBridgeAvailable(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 	processor.lifiClient = client
 
 	// Bridge the same asset (USDC) across two different chains.
@@ -141,7 +155,7 @@ func TestLiFiBuySideUnsupported(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := mock_lifi.NewMockClientInterface(ctrl)
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -164,7 +178,7 @@ func TestLiFiErrors(t *testing.T) {
 	client := mock_lifi.NewMockClientInterface(ctrl)
 	client.EXPECT().SetChainID(gomock.Any()).AnyTimes()
 
-	processor := NewLiFiProcessor(nil, nil, nil)
+	processor := NewLiFiProcessor(nil, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 	processor.lifiClient = client
 
 	fromToken, toToken := testLiFiTokens()
@@ -217,7 +231,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		mockRPCClient := mock_rpcclient.NewMockClientInterface(ctrl)
 		mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
 
-		processor := NewLiFiProcessor(mockRPCClient, nil, nil)
+		processor := NewLiFiProcessor(mockRPCClient, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 		processor.lifiClient = client
 
 		fromToken, toToken := testLiFiTokens()
@@ -250,7 +264,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		mockRPCClient := mock_rpcclient.NewMockClientInterface(ctrl)
 		mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
 
-		processor := NewLiFiProcessor(mockRPCClient, nil, nil)
+		processor := NewLiFiProcessor(mockRPCClient, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 		processor.lifiClient = client
 
 		// Non-native from token: estimation reverts before approval, the quote's gas limit is used.
@@ -294,7 +308,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		mockRPCClient := mock_rpcclient.NewMockClientInterface(ctrl)
 		mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
 
-		processor := NewLiFiProcessor(mockRPCClient, nil, nil)
+		processor := NewLiFiProcessor(mockRPCClient, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 		processor.lifiClient = client
 
 		fromToken, toToken := testLiFiTokens()

@@ -24,7 +24,7 @@ func (c *Client) FetchTokensList(ctx context.Context) ([]Token, error) {
 	params := netUrl.Values{}
 	params.Add("chains", strconv.FormatUint(c.chainID, 10))
 
-	response, err := c.httpClient.DoGetRequest(ctx, baseURL+"/tokens", params)
+	response, err := c.httpClient.DoGetRequest(ctx, c.baseURL+"/tokens", params, c.requestOptions()...)
 	if err != nil {
 		return nil, err
 	}

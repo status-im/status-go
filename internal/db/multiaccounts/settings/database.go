@@ -146,11 +146,10 @@ INSERT INTO settings (
   fleet,
   auto_refresh_tokens_enabled,
   thirdparty_services_enabled,
-  auto_apply_keypair_migrations,
-  support_bot_contact_request_state
+  auto_apply_keypair_migrations
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -183,7 +182,6 @@ INSERT INTO settings (
 		s.AutoRefreshTokensEnabled,
 		s.ThirdpartyServicesEnabled,
 		s.AutoApplyKeypairMigrations,
-		s.SupportBotContactRequestState,
 	)
 	if err != nil {
 		return err
@@ -402,8 +400,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
 		auto_refresh_tokens_enabled, last_tokens_update, backup_path,
-		thirdparty_services_enabled, messages_backup_enabled, auto_apply_keypair_migrations,
-		support_bot_contact_request_state
+		thirdparty_services_enabled, messages_backup_enabled, auto_apply_keypair_migrations
 	FROM
 		settings
 	WHERE
@@ -481,7 +478,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.ThirdpartyServicesEnabled,
 		&s.MessagesBackupEnabled,
 		&s.AutoApplyKeypairMigrations,
-		&s.SupportBotContactRequestState,
 	)
 
 	if err != nil {
@@ -768,11 +764,6 @@ func (db *Database) ProfileMigrationNeeded() (result bool, err error) {
 
 func (db *Database) AutoApplyKeypairMigrations() (result bool, err error) {
 	err = db.makeSelectRow(AutoApplyKeypairMigrations).Scan(&result)
-	return result, err
-}
-
-func (db *Database) SupportBotContactRequestState() (result int64, err error) {
-	err = db.makeSelectRow(SupportBotContactRequestState).Scan(&result)
 	return result, err
 }
 

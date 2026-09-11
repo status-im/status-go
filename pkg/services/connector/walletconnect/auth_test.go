@@ -95,8 +95,8 @@ func TestAuth_GenerateJWT_ValidPayload(t *testing.T) {
 
 	iat := int64(payload["iat"].(float64))
 	exp := int64(payload["exp"].(float64))
-	require.GreaterOrEqual(t, iat, before)
-	require.LessOrEqual(t, iat, after)
+	require.GreaterOrEqual(t, iat, before-int64(jwtClockSkewLeeway.Seconds()))
+	require.LessOrEqual(t, iat, after-int64(jwtClockSkewLeeway.Seconds()))
 	require.Equal(t, iat+86400, exp)
 }
 
@@ -193,4 +193,29 @@ func TestEncodeDidKey_DifferentKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEqual(t, didKey1, didKey2)
+}
+
+func TestAuth_GenerateJWT_BackdatesIat(t *testing.T) {
+	const wantBackdate = 90 * time.Second
+
+	auth, err := NewAuth()
+	require.NoError(t, err)
+
+	token, err := auth.GenerateJWT("wss://relay.walletconnect.com")
+	require.NoError(t, err)
+
+	parts := strings.Split(token, ".")
+	require.Len(t, parts, 3)
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	require.NoError(t, err)
+
+	var claims struct {
+		Iat int64 `json:"iat"`
+		Exp int64 `json:"exp"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &claims))
+
+	require.LessOrEqual(t, claims.Iat, time.Now().Unix()-int64(wantBackdate.Seconds())+1,
+		"iat must be backdated to absorb a fast client clock")
+	require.Equal(t, claims.Iat+jwtTTL, claims.Exp)
 }
