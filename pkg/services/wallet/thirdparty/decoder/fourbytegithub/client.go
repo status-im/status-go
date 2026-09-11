@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
+	"github.com/status-im/status-go/internal/metrics/httpbytes"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
@@ -32,7 +33,7 @@ type Client struct {
 }
 
 func NewClient() *Client {
-	return &Client{Client: &http.Client{Timeout: time.Minute}, URL: "https://raw.githubusercontent.com"}
+	return &Client{Client: httpbytes.WrapClient(&http.Client{Timeout: time.Minute}), URL: "https://raw.githubusercontent.com"}
 }
 
 func (c *Client) DoQuery(url string) (*http.Response, error) {

@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/metrics/httpbytes"
 )
 
 // Service manages puzzle authentication tokens
@@ -35,7 +36,7 @@ func NewService(origin string, httpClient *http.Client) *Service {
 	}
 	return &Service{
 		origin:     origin,
-		httpClient: httpClient,
+		httpClient: httpbytes.WrapClient(httpClient),
 	}
 }
 

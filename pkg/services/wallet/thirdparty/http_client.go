@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/metrics/httpbytes"
 	"github.com/status-im/status-go/pkg/security"
 )
 
@@ -137,6 +138,10 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 	for _, opt := range opts {
 		opt(client)
 	}
+	if client.client.Transport == nil {
+		client.client.Transport = http.DefaultTransport
+	}
+	client.client.Transport = httpbytes.Wrap(client.client.Transport)
 
 	return client
 }

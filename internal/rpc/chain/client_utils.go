@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/internal/metrics/httpbytes"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
@@ -23,6 +24,8 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 	headers := http.Header{}
 	headers.Set("User-Agent", rpcUserAgentName)
 
+	httpClient := httpbytes.WrapClient(&http.Client{})
+
 	// Set up authentication if needed
 	switch provider.AuthType {
 	case params.BasicAuth:
@@ -37,12 +40,11 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 		if err != nil {
 			return nil, fmt.Errorf("puzzle auth: invalid provider URL for %s: %w", provider.Name, err)
 		}
-		opts = append(opts, rpc.WithHTTPClient(puzzleauth.NewHTTPClient(origin)))
+		httpClient = puzzleauth.NewHTTPClient(origin)
 	default:
 		return nil, fmt.Errorf("unknown auth type: %s", provider.AuthType)
 	}
-
-	opts = append(opts, rpc.WithHeaders(headers))
+	opts = append(opts, rpc.WithHTTPClient(httpClient), rpc.WithHeaders(headers))
 
 	// Dial the RPC client
 	rpcClient, err := rpc.DialOptions(context.Background(), provider.URL.Reveal(), opts...)

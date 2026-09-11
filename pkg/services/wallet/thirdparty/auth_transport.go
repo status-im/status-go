@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/status-im/status-go/internal/metrics/httpbytes"
 	"github.com/status-im/status-go/pkg/security"
 )
 
@@ -40,7 +41,7 @@ func NewAuthTransport(httpClient *http.Client, auth AuthParams, providerID strin
 		httpClient = &http.Client{Timeout: time.Minute}
 	}
 	return &AuthTransport{
-		httpClient: httpClient,
+		httpClient: httpbytes.WrapClient(httpClient),
 		auth:       auth,
 		providerID: providerID,
 	}
