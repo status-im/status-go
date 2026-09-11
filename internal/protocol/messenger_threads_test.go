@@ -184,6 +184,38 @@ func (s *MessengerThreadsSuite) TestThreadsIncludeUnreadCounts() {
 	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
 }
 
+func (s *MessengerThreadsSuite) TestAddThreadsToResponseUsesLocalChatIDForOneToOneChats() {
+	receiver := s.m
+	sender := s.newMessenger()
+	receiver.featureFlags.Threads = true
+	sender.featureFlags.Threads = true
+
+	receiverChat := CreateOneToOneChat("sender", &sender.identity.PublicKey, receiver.getTimesource())
+	senderChat := CreateOneToOneChat("receiver", &receiver.identity.PublicKey, sender.getTimesource())
+	s.Require().NotEqual(receiverChat.ID, senderChat.ID)
+
+	threadID := "parent-id"
+	receivedReply := buildTestMessage(*senderChat)
+	receivedReply.ID = "reply-id"
+	receivedReply.Text = "Unread reply"
+	receivedReply.ChatMessage.Text = "Unread reply"
+	receivedReply.ChatMessage.ThreadId = &threadID
+	receivedReply.ResponseTo = threadID
+	receivedReply.LocalChatID = receiverChat.ID
+	receivedReply.Mentioned = true
+	receivedReply.Seen = false
+
+	s.Require().NoError(receiver.persistence.SaveMessages([]*common.Message{receivedReply}))
+
+	response := &MessengerResponse{}
+	s.Require().NoError(receiver.addThreadsToResponse(response, []*common.Message{receivedReply}))
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal(receiverChat.ID, response.Threads()[0].ChatID)
+	s.Require().Equal(threadID, response.Threads()[0].ThreadID)
+	s.Require().Equal(uint(1), response.Threads()[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), response.Threads()[0].UnviewedMentionsCount)
+}
+
 func (s *MessengerThreadsSuite) TestMessagesByThreadID() {
 	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -307,14 +339,14 @@ func (s *MessengerThreadsSuite) TestReceivedThreadReplyDoesNotIncrementParentUnr
 
 	sender := s.newMessenger()
 	sender.featureFlags.Threads = true
-	chatID := "thread-unread-public-chat"
+	chatID := "thread-unread-one-to-one-chat"
 
-	receiverChat := CreatePublicChat(chatID, receiver.getTimesource())
+	receiverChat := CreateOneToOneChat(chatID, &sender.identity.PublicKey, receiver.getTimesource())
 	s.Require().NoError(receiver.SaveChat(receiverChat))
 	_, err := receiver.Join(receiverChat)
 	s.Require().NoError(err)
 
-	senderChat := CreatePublicChat(chatID, sender.getTimesource())
+	senderChat := CreateOneToOneChat(chatID, &receiver.identity.PublicKey, sender.getTimesource())
 	s.Require().NoError(sender.SaveChat(senderChat))
 	_, err = sender.Join(senderChat)
 	s.Require().NoError(err)
@@ -522,14 +554,14 @@ func (s *MessengerThreadsSuite) TestThreadMessagesAreReceivedAndListedWhenThread
 
 	sender := s.newMessenger()
 	sender.featureFlags.Threads = true
-	chatID := "threads-disabled-public-chat"
+	chatID := "threads-disabled-one-to-one-chat"
 
-	receiverChat := CreatePublicChat(chatID, receiver.getTimesource())
+	receiverChat := CreateOneToOneChat(chatID, &sender.identity.PublicKey, receiver.getTimesource())
 	s.Require().NoError(receiver.SaveChat(receiverChat))
 	_, err := receiver.Join(receiverChat)
 	s.Require().NoError(err)
 
-	senderChat := CreatePublicChat(chatID, sender.getTimesource())
+	senderChat := CreateOneToOneChat(chatID, &receiver.identity.PublicKey, sender.getTimesource())
 	s.Require().NoError(sender.SaveChat(senderChat))
 	_, err = sender.Join(senderChat)
 	s.Require().NoError(err)

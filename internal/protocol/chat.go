@@ -35,6 +35,15 @@ type ChatType int
 
 type ChatContext string
 
+func (c *Chat) SupportsThreads() bool {
+	switch c.ChatType {
+	case ChatTypeOneToOne, ChatTypePrivateGroupChat, ChatTypeCommunityChat:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
 	ChatTypeOneToOne ChatType = iota + 1
 	ChatTypePublic
