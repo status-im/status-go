@@ -95,7 +95,7 @@ func (s *TestMessengerPrepareMessageSuite) testMessageContainsImage(testAlbum bo
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
 
-	retrievedMessages, _, err := s.p.MessageByChatID(s.chatID, "", 10)
+	retrievedMessages, _, err := s.p.MessageByChatID(s.chatID, "", "", 10, false)
 	s.Require().NoError(err)
 	if testAlbum {
 		s.Require().Len(retrievedMessages, 3)
@@ -163,7 +163,7 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_NoQuotedMessage_THEN_Retrie
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
 
-	retrievedMessages, _, err := s.p.MessageByChatID(s.chatID, "", 10)
+	retrievedMessages, _, err := s.p.MessageByChatID(s.chatID, "", "", 10, false)
 	s.Require().NoError(err)
 	s.Require().Equal(message2.ID, retrievedMessages[0].ID)
 	s.Require().Empty(retrievedMessages[0].ResponseTo)
@@ -189,7 +189,7 @@ func (s *TestMessengerPrepareMessageSuite) Test_WHEN_QuotedMessageDoesNotContain
 	s.Require().NoError(err)
 	s.Require().NoError(mediaServer.Start())
 
-	retrievedMessages, _, err := s.p.MessageByChatID(s.chatID, "", 10)
+	retrievedMessages, _, err := s.p.MessageByChatID(s.chatID, "", "", 10, false)
 	s.Require().NoError(err)
 	s.Require().Equal(message2.ID, retrievedMessages[0].ID)
 	s.Require().Equal(message1.ID, retrievedMessages[0].ResponseTo)

@@ -77,7 +77,8 @@ const (
 
 // errors
 var (
-	ErrChatNotFoundError = errors.New("Chat not found")
+	ErrChatNotFoundError     = errors.New("Chat not found")
+	ErrThreadFeatureDisabled = errors.New("threads feature is disabled")
 )
 
 const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
@@ -2147,6 +2148,29 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, ErrChatNotFoundError
 	}
 
+	if !m.featureFlags.Threads {
+		message.ThreadId = nil
+	} else if message.GetThreadId() != "" && chat.ChatType == ChatTypeCommunityChat {
+		threadExists := true
+		_, err = m.persistence.ThreadByID(chat.ID, message.GetThreadId())
+		if errors.Is(err, common.ErrRecordNotFound) {
+			threadExists = false
+		} else if err != nil {
+			return nil, err
+		}
+
+		if !threadExists {
+			community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+			if err != nil {
+				return nil, err
+			}
+
+			if !community.AllowsAllMembersToCreateThread() && !community.IsPrivilegedMember(&m.identity.PublicKey) {
+				return nil, errors.New("only admins can create threads in this community")
+			}
+		}
+	}
+
 	err = m.handleStandaloneChatIdentity(chat)
 	if err != nil {
 		return nil, err
@@ -2226,6 +2250,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	}
 
 	response.SetMessages(msg)
+	err = m.addThreadsToResponse(&response, msg)
+	if err != nil {
+		return nil, err
+	}
 	response.AddChat(chat)
 
 	m.logger.Debug("inside sendChatMessage",
@@ -3686,6 +3714,10 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		messagesByID[message.ID] = message
 	}
 	messageState.Response.SetMessages(messagesWithResponses)
+	err = m.addThreadsToResponse(messageState.Response, messagesWithResponses)
+	if err != nil {
+		return nil, err
+	}
 
 	notificationsEnabled, err := m.settings.GetAllowNotifications()
 	if err != nil {
@@ -3789,7 +3821,7 @@ func (m *Messenger) latestIncomingMessageClock(chatID string) (uint64, error) {
 	return m.persistence.latestIncomingMessageClock(chatID)
 }
 
-func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common.Message, string, error) {
+func (m *Messenger) MessageByChatID(chatID, threadID, cursor string, limit int) ([]*common.Message, string, error) {
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
 		return nil, "", err
@@ -3815,7 +3847,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 			return nil, "", err
 		}
 	} else {
-		msgs, nextCursor, err = m.persistence.MessageByChatID(chatID, cursor, limit)
+		msgs, nextCursor, err = m.persistence.MessageByChatID(chatID, threadID, cursor, limit, m.featureFlags.Threads)
 		if err != nil {
 			return nil, "", err
 		}

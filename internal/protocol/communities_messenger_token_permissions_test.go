@@ -502,7 +502,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 
-	bobMessages, _, err := s.bob.MessageByChatID(msg.ChatId, "", 10)
+	bobMessages, _, err := s.bob.MessageByChatID(msg.ChatId, "", "", 10)
 	s.Require().NoError(err)
 	s.Require().Len(bobMessages, 1)
 	s.Require().Equal(messages[0], bobMessages[0].Text)
@@ -591,12 +591,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 		s.bob,
 		func(r *MessengerResponse) bool {
 			// Bob should have all 3 messages
-			bobMessages, _, err = s.bob.MessageByChatID(msg.ChatId, "", 10)
+			bobMessages, _, err = s.bob.MessageByChatID(msg.ChatId, "", "", 10)
 			return err == nil && len(bobMessages) == 3
 		},
 		"not all 3 messages received",
 	)
-	bobMessages, _, err = s.bob.MessageByChatID(msg.ChatId, "", 10)
+	bobMessages, _, err = s.bob.MessageByChatID(msg.ChatId, "", "", 10)
 	for _, m := range bobMessages {
 		fmt.Printf("ID: %s\n", m.ID)
 	}
