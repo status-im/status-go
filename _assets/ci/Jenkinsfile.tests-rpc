@@ -52,7 +52,6 @@ pipeline {
 
   environment {
     PLATFORM = 'tests-rpc'
-    WAKU_IMAGE = 'quay.io/wakuorg/nwaku-pr:nightly-logosdeliverynode'
     PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
     /* Pass PR/commit/branch to codecov so uploads are associated with the PR. */
@@ -81,7 +80,6 @@ pipeline {
             passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
     ),
         ]) {
-          sh 'docker pull "$WAKU_IMAGE"'
           nix.develop('make test-functional USE_LOGOS_STORAGE=true', pure: false)
         }
       } }
@@ -91,11 +89,8 @@ pipeline {
   post {
     always {
       script {
-        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-          reportGithubIssues()
-        }
         archiveArtifacts(
-          artifacts: 'nightly-report/**, test/functional/reports/*.xml, test/functional/logs/*.log, test/functional/coverage/coverage.html',
+          artifacts: 'test/functional/reports/*.xml, test/functional/logs/*.log, test/functional/coverage/coverage.html',
           allowEmptyArchive: true,
         )
         junit(
@@ -117,32 +112,3 @@ pipeline {
     }
   } // post
 } // pipeline
-
-
-def reportGithubIssues() {
-  dir('nightly-report') { deleteDir() }
-  writeFile(file: 'nightly-report/issue-report.json',
-            text: '{"action":"not-run","message":"See console if credential binding fails."}\n')
-  try {
-    withEnv(["NIGHTLY_BUILD_RESULT=${currentBuild.currentResult}"]) {
-      // Same username/token credential used by github.notify(), the notifyPR fallback,
-      // in status-jenkins-lib@v1.9.39 (vars/github.groovy).
-      withCredentials([usernamePassword(credentialsId: 'status-im-auto',
-        usernameVariable: 'GH_USERNAME', passwordVariable: 'GH_TOKEN')]) {
-        sh '''
-          set +x
-          python3 scripts/report_nightly_issues.py --mode publish
-        '''
-      }
-    }
-  } finally {
-    if (fileExists('nightly-report/issue-url.txt')) {
-      def issueUrl = readFile('nightly-report/issue-url.txt').trim()
-      currentBuild.description = "GitHub issue: ${issueUrl}"
-      echo "GITHUB FAILURE ISSUE: ${issueUrl}"
-    } else {
-      currentBuild.description = 'GitHub reporting: see nightly-report/issue-report.json artifact and console'
-      echo 'No issue URL recorded. See nightly-report/issue-report.json and the reporting stage output.'
-    }
-  }
-}

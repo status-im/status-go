@@ -106,13 +106,13 @@ def failure_details(failures):
     return "\n\n".join(sections)
 
 
-def report(mode, report_dir, output_dir, environ=None, github_factory=GitHub):
+def report(report_dir, output_dir, environ=None, github_factory=GitHub):
     environ = os.environ if environ is None else environ
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     url_path = output / "issue-url.txt"
     url_path.unlink(missing_ok=True)
-    summary = {"mode": mode, "repository": REPOSITORY, "action": "pending", "issue_url": None}
+    summary = {"repository": REPOSITORY, "action": "pending", "issue_url": None}
     try:
         build_url = environ.get("BUILD_URL", "").rstrip("/") + "/"
         if build_url == "/":
@@ -139,10 +139,7 @@ def report(mode, report_dir, output_dir, environ=None, github_factory=GitHub):
         # Preserve the complete structured report as an artifact even for unusually large runs.
         if len(body) > 60000:
             body = body[:59000] + f"\n\nReport truncated. All failures: {build_url}artifact/nightly-report/issue-report.json\n"
-        (output / "issue-preview.md").write_text(f"# {title}\n\n{body}")
-        if mode == "preview":
-            summary["action"] = "preview"
-            return 0
+        (output / "issue-body.md").write_text(f"# {title}\n\n{body}")
         token = environ.get("GH_TOKEN", "")
         if not token:
             raise ValueError("No GitHub token bound. Check the existing status-im-auto Jenkins username/token credential.")
@@ -168,11 +165,10 @@ def report(mode, report_dir, output_dir, environ=None, github_factory=GitHub):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("preview", "publish"), default="preview")
     parser.add_argument("--report-dir", default="test/functional/reports")
     parser.add_argument("--output-dir", default="nightly-report")
     args = parser.parse_args()
-    return report(args.mode, args.report_dir, args.output_dir)
+    return report(args.report_dir, args.output_dir)
 
 
 if __name__ == "__main__":
