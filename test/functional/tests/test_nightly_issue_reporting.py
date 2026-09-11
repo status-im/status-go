@@ -5,7 +5,7 @@ import pytest
 pytestmark = pytest.mark.rpc
 
 
-@pytest.mark.parametrize("peer", ["sender", "receiver"])
+@pytest.mark.parametrize("peer", ["sender", "receiver", "relay"])
 def test_nightly_shared_assertion(peer):
     assert False, "Deliberate shared failure: nightly peer is offline"
 
@@ -25,3 +25,16 @@ def broken_nightly_setup():
 
 def test_nightly_setup_error(broken_nightly_setup):
     pass
+
+
+def test_nightly_repeated_store_timeout():
+    raise RuntimeError("Deliberate unique failure: store request timed out")
+
+
+@pytest.mark.parametrize("response", ["history", "messages"])
+def test_nightly_shared_response_error(response):
+    raise ValueError("Deliberate shared failure: malformed store response")
+
+
+def test_nightly_unique_delivery_assertion():
+    assert False, "Deliberate unique failure: delivery confirmation missing"
