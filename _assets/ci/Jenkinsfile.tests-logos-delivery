@@ -1,0 +1,111 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.39'
+
+// Dedicated Pipeline-from-SCM job targeting develop; no PR or push triggers.
+pipeline {
+  agent {
+    docker {
+      label 'linuxcontainer'
+      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
+      args '--volume=/nix:/nix ' +
+           '--volume=/etc/nix:/etc/nix ' +
+           '--volume=/var/run/docker.sock:/var/run/docker.sock ' +
+           '--network=host ' +
+           '--user jenkins'
+    }
+  }
+
+  triggers {
+    // Once per night, at a stable minute between 04:00 and 04:59 UTC.
+    cron('TZ=Etc/UTC\nH 4 * * *')
+  }
+
+  options {
+    timestamps()
+    timeout(time: 50, unit: 'MINUTES')
+    disableConcurrentBuilds()
+    disableRestartFromStage()
+    buildDiscarder(logRotator(
+      numToKeepStr: '10', daysToKeepStr: '14',
+      artifactNumToKeepStr: '1', artifactDaysToKeepStr: '7',
+    ))
+  }
+
+  environment {
+    WAKU_IMAGE = 'quay.io/wakuorg/nwaku-pr:nightly-logosdeliverynode'
+    FUNCTIONAL_TESTS_REPORT_CODECOV = 'false'
+    FUNCTIONAL_TESTS_LOG_LEVEL = 'INFO'
+    FUNCTIONAL_TESTS_CONTAINER_PREFIX = "${env.BUILD_TAG}"
+  }
+
+  stages {
+    stage('RPC Tests') {
+      steps { script {
+        withCredentials([usernamePassword(
+          credentialsId: 'api-proxy-devel',
+          usernameVariable: 'STATUS_BUILD_PROXY_USER',
+          passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD',
+        )]) {
+          sh 'docker pull "$WAKU_IMAGE"'
+          // Same generation and test runner as the regular RPC job.
+          nix.develop('make test-functional USE_LOGOS_STORAGE=true', pure: false)
+        }
+      } }
+    }
+  }
+
+  post {
+    always {
+      script {
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+          reportGithubIssues()
+        }
+        archiveArtifacts(
+          artifacts: 'nightly-report/**, test/functional/reports/*.xml, test/functional/logs/*.log, test/functional/coverage/coverage.html',
+          allowEmptyArchive: true,
+        )
+        junit(
+          testResults: 'test/functional/reports/*.xml',
+          skipOldReports: true,
+          skipPublishingChecks: true,
+          skipMarkingBuildUnstable: true,
+        )
+      }
+    }
+    cleanup {
+      sh '''
+        docker ps -a --filter "name=${FUNCTIONAL_TESTS_CONTAINER_PREFIX}" -q | xargs -r docker rm -f
+      '''
+      cleanWs()
+      dir(env.WORKSPACE_TMP) { deleteDir() }
+    }
+  }
+}
+
+def reportGithubIssues() {
+  dir('nightly-report') { deleteDir() }
+  writeFile(file: 'nightly-report/issue-report.json',
+            text: '{"action":"not-run","message":"See console if credential binding fails."}\n')
+  try {
+    withEnv(["NIGHTLY_BUILD_RESULT=${currentBuild.currentResult}"]) {
+      // Same username/token credential used by github.notify(), the notifyPR fallback,
+      // in status-jenkins-lib@v1.9.39 (vars/github.groovy).
+      withCredentials([usernamePassword(credentialsId: 'status-im-auto',
+        usernameVariable: 'GH_USERNAME', passwordVariable: 'GH_TOKEN')]) {
+        sh '''
+          set +x
+          python3 scripts/report_nightly_issues.py
+        '''
+      }
+    }
+  } finally {
+    if (fileExists('nightly-report/issue-url.txt')) {
+      def issueUrl = readFile('nightly-report/issue-url.txt').trim()
+      currentBuild.description = "GitHub issue: ${issueUrl}"
+      echo "GITHUB FAILURE ISSUE: ${issueUrl}"
+    } else {
+      currentBuild.description = 'GitHub reporting: see nightly-report/issue-report.json artifact and console'
+      echo 'No issue URL recorded. See nightly-report/issue-report.json and the reporting stage output.'
+    }
+  }
+}
