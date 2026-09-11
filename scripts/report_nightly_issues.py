@@ -128,6 +128,7 @@ def report(mode, report_dir, output_dir, environ=None, github_factory=GitHub):
         marker = f"<!-- logos-delivery-nightly:run:{hashlib.sha256(build_url.encode()).hexdigest()} -->"
         title = f"{TITLE_PREFIX} {datetime.now(timezone.utc):%d.%m.%Y}"
         body = (
+            "This issue was created automatically based on failing automated tests from the Logos Delivery nightly job.\n\n"
             f"{marker}\n\nJenkins build: {build_url}\n\n"
             f"Test report: {build_url}testReport/\n\n"
             f"Full failure details: {build_url}artifact/nightly-report/issue-report.json\n\n"
