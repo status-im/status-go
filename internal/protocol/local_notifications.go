@@ -151,6 +151,7 @@ type NotificationSettingsProvider interface {
 	GetGlobalMentions() (string, error)
 	GetAllMessages() (string, error)
 	GetMessagePreview() (int, error)
+	GetContactRequests() (string, error)
 	HasExemption(id string) (bool, error)
 	GetExMuteAllMessages(id string) (bool, error)
 	GetExPersonalMentions(id string) (string, error)
@@ -210,6 +211,14 @@ func showMessageNotification(settings NotificationSettingsProvider, publicKey ec
 
 	// 2. One-to-one chats
 	if chat.OneToOne() {
+		if message.ContactRequestState == common.ContactRequestStatePending {
+			val, err := settings.GetContactRequests()
+			if err == nil && !isNotificationAllowed(val) {
+				return false
+			}
+			return true
+		}
+
 		val, err := settings.GetOneToOneChats()
 		if err == nil && !isNotificationAllowed(val) {
 			return false
