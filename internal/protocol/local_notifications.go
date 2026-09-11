@@ -326,6 +326,7 @@ func NewOutgoingMessageNotification(id string, message *common.Message, chat *Ch
 		},
 		Timestamp:      message.WhisperTimestamp,
 		ConversationID: chat.ID,
+		ThreadID:       message.GetThreadId(),
 		Image:          "",
 		IsFromMe:       true,
 	}
@@ -393,6 +394,7 @@ func (n NotificationBody) toMessageNotification(id string, resolvePrimaryName fu
 		},
 		Timestamp:      n.Message.WhisperTimestamp,
 		ConversationID: n.Chat.ID,
+		ThreadID:       n.Message.GetThreadId(),
 		Image:          "",
 	}
 
