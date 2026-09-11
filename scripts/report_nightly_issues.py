@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 REPOSITORY = "status-im/status-go"
 API = f"https://api.github.com/repos/{REPOSITORY}"
 TITLE_PREFIX = "[Status functional tests using Logos Delivery nightly] - Failing tests"
-ASSIGNEES = ["igor-sirotin", "Ivansete-status"]
+ASSIGNEES = ["igor-sirotin"]
 
 
 def failed_tests(report_dir):
@@ -85,7 +85,7 @@ class GitHub:
         issue = self.request("POST", "/issues", {"title": title, "body": body, "assignees": ASSIGNEES})
         assigned = {user["login"].lower() for user in issue.get("assignees", [])}
         if not {user.lower() for user in ASSIGNEES}.issubset(assigned):
-            print(f"WARNING: GitHub did not assign both requested users. Check {issue['html_url']}", flush=True)
+            print(f"WARNING: GitHub did not assign the requested user. Check {issue['html_url']}", flush=True)
             return "created-assignment-incomplete", issue["html_url"]
         return "created", issue["html_url"]
 
