@@ -68,6 +68,7 @@ pipeline {
 
   stages {
     stage('RPC Tests') {
+      options { timeout(time: 45, unit: 'MINUTES') }
       steps { script {
         withCredentials([
           string(

@@ -65,6 +65,7 @@ pipeline {
 
   stages {
     stage('Setup') {
+      options { timeout(time: 5, unit: 'MINUTES') }
       when { expression { !env.PLATFORM.startsWith('windows') } }
       steps { script {
         sh "mkdir -p \$(dirname ${REPO_SRC})"
@@ -73,36 +74,42 @@ pipeline {
     }
 
     stage('Deps') {
+      options { timeout(time: 15, unit: 'MINUTES') }
       steps { script {
         make('status-go-deps V=2')
       } }
     }
 
     stage('Generate') {
+      options { timeout(time: 15, unit: 'MINUTES') }
       steps { script {
         make('generate V=2')
       } }
     }
 
     stage('Build Static Lib') {
+      options { timeout(time: 25, unit: 'MINUTES') }
       steps { script {
         make('statusgo-library V=2')
       } }
     }
 
     stage('Build Shared Lib') {
+      options { timeout(time: 25, unit: 'MINUTES') }
       steps { script {
         make('statusgo-shared-library V=2')
       } }
     }
 
     stage('Archive') {
+      options { timeout(time: 10, unit: 'MINUTES') }
       steps {
         zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
       }
     }
 
     stage('Upload') {
+      options { timeout(time: 10, unit: 'MINUTES') }
       steps { script {
         env.PKG_URL = s5cmd.upload(ARTIFACT)
       } }

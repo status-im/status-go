@@ -44,6 +44,7 @@ pipeline {
 
   stages {
     stage('Benchmark Tests') {
+      options { timeout(time: 40, unit: 'MINUTES') }
       steps {
         script {
           nix.develop('make benchmark', pure: false)
@@ -51,6 +52,7 @@ pipeline {
      }
    }
     stage('Push Results') {
+      options { timeout(time: 10, unit: 'MINUTES') }
       steps {
         sshagent(credentials: ['status-go-benchmarks-deploy-key']) {
           sh './scripts/push_benchmark.sh'
