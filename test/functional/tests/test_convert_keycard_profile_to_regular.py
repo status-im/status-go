@@ -1,8 +1,5 @@
 """Stop using a keycard for the profile keypair through ConvertToRegularAccountV2, driven with a mock pairing.
-
-The only keycard state observable on this branch is keypair.cold-wallet, keystore presence and
-multiaccounts.keycard-pairing: the keycards tables and their RPCs were dropped, so per-card rows are not assertable.
-"""
+The keycards tables and their RPCs were dropped, so the observable state is cold-wallet, keystore presence and the pairing."""
 
 import re
 from collections import namedtuple
@@ -11,31 +8,22 @@ import pytest
 from clients.api import ApiResponseError
 from clients.signals import SignalType
 from resources.constants import user_2
-from steps.keycard import assert_keystore_state, derive_chat_private_key, derive_keycard_password
+from steps.keycard import (
+    KEYCARD_UID,
+    KEYPAIR_FIELDS,
+    account_shape,
+    assert_keystore_state,
+    derive_chat_private_key,
+    derive_keycard_password,
+    fresh_profile_keypair,
+    keycard_pairing_of,
+    keypair_addresses,
+    mock_pairing,
+)
 from utils import fake
 
-KEYCARD_UID = "mock-keycard-uid"
-KEYPAIR_FIELDS = ("key-uid", "type", "name", "derived-from", "xpub")
 
 KeycardProfile = namedtuple("KeycardProfile", ["key_uid", "mnemonic", "old_password", "keycard_password", "pairing", "kp0"])
-
-
-def _pairing(key_uid, suffix=""):
-    return f"mock-pairing-{key_uid[:8]}{suffix}"
-
-
-def _addresses(keypair):
-    return [a["address"] for a in keypair["accounts"]] + [keypair["derived-from"]]
-
-
-def _account_shape(keypair):
-    return sorted((a["address"], a["path"], a["wallet"], a["chat"]) for a in keypair["accounts"])
-
-
-def _keycard_pairing_of(accounts, key_uid):
-    entry = next((a for a in accounts if a.get("key-uid") == key_uid), None)
-    assert entry is not None, f"Expected InitializeApplication to list the account {key_uid}"
-    return entry.get("keycard-pairing", "")
 
 
 @pytest.mark.rpc
@@ -46,23 +34,18 @@ class TestConvertKeycardProfileToRegular:
         return backend_new_profile("keycard-to-regular")
 
     def _put_profile_on_keycard(self, backend):
-        kp0 = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
-        assert kp0 is not None, "Expected the profile keypair to exist"
-        assert kp0["type"] == "profile"
-        assert kp0.get("cold-wallet", "") == "", "Expected a fresh profile keypair to not be on a cold wallet"
-        assert kp0.get("xpub", "").startswith("xpub"), "Expected a fresh profile keypair to carry its wallet xpub"
-        assert kp0["derived-from"], "Expected the profile keypair to carry its master address"
+        kp0 = fresh_profile_keypair(backend)
 
         keycard_password = derive_keycard_password(backend, backend.mnemonic)
         old_password = backend.password
-        pairing = _pairing(backend.key_uid)
+        pairing = mock_pairing(backend.key_uid)
         backend.convert_to_keycard_account_v2(backend.key_uid, pairing, KEYCARD_UID, old_password, keycard_password)
 
         kp = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
         assert kp["cold-wallet"] == "status-keycard", "Expected the setup to flag the profile keypair as keycard backed"
         assert kp["xpub"] == kp0["xpub"], "Expected the setup to keep the wallet xpub"
         # Keystore files are deleted, not re-encrypted: the keycard password must not resolve them either.
-        assert_keystore_state(backend, _addresses(kp), keycard_password, present=False)
+        assert_keystore_state(backend, keypair_addresses(kp), keycard_password, present=False)
 
         return KeycardProfile(backend.key_uid, backend.mnemonic, old_password, keycard_password, pairing, kp0)
 
@@ -71,10 +54,10 @@ class TestConvertKeycardProfileToRegular:
         assert kp.get("cold-wallet", "") == "", "Expected the profile keypair to be back on the app keystore"
         for field in KEYPAIR_FIELDS:
             assert kp.get(field) == kp0.get(field), f"Expected keypair field {field} to survive the reverse migration"
-        assert _account_shape(kp) == _account_shape(kp0), "Expected the profile accounts to be unchanged by the reverse migration"
+        assert account_shape(kp) == account_shape(kp0), "Expected the profile accounts to be unchanged by the reverse migration"
         for account in kp["accounts"]:
             assert account["operable"] == "fully", f"Expected {account['address']} fully operable after the reverse migration"
-        assert_keystore_state(backend, _addresses(kp), password, present=True)
+        assert_keystore_state(backend, keypair_addresses(kp), password, present=True)
         assert backend.accounts_service.verify_password(password) is True, "Expected verifyPassword to succeed with the new password"
         return kp
 
@@ -99,7 +82,7 @@ class TestConvertKeycardProfileToRegular:
         assert not settings.get("mnemonic"), "Expected the mnemonic to stay cleared because the conversion does not restore it"
 
         accounts = backend.reinit_and_get_accounts()
-        assert _keycard_pairing_of(accounts, ctx.key_uid) == "", "Expected the keycard pairing to be cleared on the multiaccount"
+        assert keycard_pairing_of(accounts, ctx.key_uid) == "", "Expected the keycard pairing to be cleared on the multiaccount"
 
         with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
             backend.login(ctx.key_uid, new_password)
@@ -127,10 +110,10 @@ class TestConvertKeycardProfileToRegular:
         kp = backend.accounts_service.get_keypair_by_key_uid(ctx.key_uid)
         assert kp["cold-wallet"] == "status-keycard", "Expected the keypair to stay on the keycard after a rejected conversion"
         assert kp["xpub"] == ctx.kp0["xpub"]
-        assert_keystore_state(backend, _addresses(kp), ctx.keycard_password, present=False)
-        assert_keystore_state(backend, _addresses(kp), ctx.old_password, present=False)
+        assert_keystore_state(backend, keypair_addresses(kp), ctx.keycard_password, present=False)
+        assert_keystore_state(backend, keypair_addresses(kp), ctx.old_password, present=False)
         assert (
-            _keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ctx.pairing
+            keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ctx.pairing
         ), "Expected the pairing kept because the password check runs before it is cleared"
 
         with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
@@ -147,9 +130,9 @@ class TestConvertKeycardProfileToRegular:
 
         kp = backend.accounts_service.get_keypair_by_key_uid(ctx.key_uid)
         assert kp["cold-wallet"] == "status-keycard", "Expected the keypair untouched by an unknown mnemonic"
-        assert_keystore_state(backend, _addresses(kp), ctx.keycard_password, present=False)
+        assert_keystore_state(backend, keypair_addresses(kp), ctx.keycard_password, present=False)
         assert (
-            _keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ctx.pairing
+            keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ctx.pairing
         ), "Expected the pairing kept because the mnemonic lookup fails first"
 
         with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
@@ -167,7 +150,7 @@ class TestConvertKeycardProfileToRegular:
 
         self._assert_regular(backend, ctx.kp0, new_password)
         assert (
-            _keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ""
+            keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ""
         ), "Expected the keycard pairing cleared after a padded-mnemonic conversion"
 
     def test_stop_using_keycard_on_regular_profile_is_rejected(self, backend):
@@ -179,5 +162,5 @@ class TestConvertKeycardProfileToRegular:
 
         kp = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
         assert kp.get("cold-wallet", "") == ""
-        assert_keystore_state(backend, _addresses(kp), backend.password, present=True)
-        assert _keycard_pairing_of(backend.reinit_and_get_accounts(), backend.key_uid) == "", "Expected no keycard pairing on a regular profile"
+        assert_keystore_state(backend, keypair_addresses(kp), backend.password, present=True)
+        assert keycard_pairing_of(backend.reinit_and_get_accounts(), backend.key_uid) == "", "Expected no keycard pairing on a regular profile"
