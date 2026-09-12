@@ -1,18 +1,10 @@
 """wakuext_signData refuses accounts whose key has moved to a cold wallet, because the card has to sign.
-
-The guard sits between the profile/watch-only refusal and the password check
-(internal/protocol/messenger_communities.go:1424-1437), and the suite only ever drove this call with
-regular accounts. These tests pin the refusal, its position in that order, and that one bad account
-fails the whole batch.
-"""
+The guard sits between the profile/watch-only refusal and the password check, and one refused account fails the whole batch."""
 
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import (
-    keypair_name,
-    user_1,
-    wallet_account_details_derivation,
-)
+from resources.constants import user_1
+from steps.cold_wallet import add_seed_keypair
 
 COLD_WALLET_ERROR = "signing a joining community request for accounts migrated to a cold wallet must be done with the cold wallet"
 PROFILE_OR_WATCH_ERROR = "cannot join a community using profile chat or watch-only account"
@@ -28,16 +20,8 @@ class TestSignDataColdWalletGuard:
         return backend_new_profile("sign-data-cold")
 
     def _add_seed_keypair(self, backend):
-        response = backend.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase,
-            backend.password,
-            keypair_name,
-            "",
-            wallet_account_details_derivation,
-        )
-        key_uid = response.get("key-uid")
-        assert key_uid, "Expected addKeypairViaSeedPhrase to return the created keypair"
-        return key_uid, response["accounts"][0]["address"]
+        keypair = add_seed_keypair(backend)
+        return keypair["key-uid"], keypair["accounts"][0]["address"]
 
     def _profile_account(self, backend, chat):
         kp = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
@@ -69,13 +53,12 @@ class TestSignDataColdWalletGuard:
         key_uid, address = self._add_seed_keypair(backend)
         backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
 
-        # A wrong password must still surface the cold-wallet refusal: the guard runs first, so the
-        # caller is told to use the card rather than that their password was wrong.
+        # The guard runs before the password check, so the caller is told to use the card, not that the password is wrong.
         with pytest.raises(ApiResponseError, match=COLD_WALLET_ERROR):
             self._sign(backend, [address], password="definitely-wrong")
 
     def test_sign_data_refuses_the_profile_chat_account(self, backend):
-        # The sibling guard, one branch earlier — a different refusal reached through the same call.
+        # The sibling guard one branch earlier, so the cold-wallet refusal is distinguishable from a blanket rejection.
         with pytest.raises(ApiResponseError, match=PROFILE_OR_WATCH_ERROR):
             self._sign(backend, [self._profile_account(backend, chat=True)])
 

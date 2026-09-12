@@ -1,20 +1,12 @@
 """signOnKeycard tells the client to route signing to the cold wallet instead of asking for a password.
-
-It is derived from the keypair, not the account, and it is set on two different signing surfaces with
-two different wire shapes: buildTransaction omits it when false, the router's signingDetails always
-sends it. These tests pin the true branch of buildTransaction, which nothing else drives.
-"""
+It is derived from the keypair, not the account; buildTransaction omits it when false, the router's signingDetails always sends it."""
 
 import json
 
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import (
-    ANVIL_NETWORK_ID,
-    keypair_name,
-    user_1,
-    wallet_account_details_derivation,
-)
+from resources.constants import ANVIL_NETWORK_ID, user_1
+from steps.cold_wallet import add_seed_keypair
 
 COLD_WALLET_TYPES = ("status-keycard", "ledger", "trezor")
 RECIPIENT = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
@@ -36,18 +28,8 @@ class TestSignOnKeycardFlag:
         return backend_new_profile("sign-on-keycard")
 
     def _add_seed_keypair(self, backend):
-        response = backend.accounts_service.add_keypair_via_seed_phrase(
-            user_1.passphrase,
-            backend.password,
-            keypair_name,
-            "",
-            wallet_account_details_derivation,
-        )
-        key_uid = response.get("key-uid")
-        assert key_uid, "Expected addKeypairViaSeedPhrase to return the created keypair"
-        assert response.get("cold-wallet", "") == "", "Expected a seed-imported keypair to start off any cold wallet"
-        address = response["accounts"][0]["address"]
-        return key_uid, address
+        keypair = add_seed_keypair(backend)
+        return keypair["key-uid"], keypair["accounts"][0]["address"]
 
     def _profile_wallet_address(self, backend):
         kp = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
@@ -102,6 +84,5 @@ class TestSignOnKeycardFlag:
         ), "Expected the profile account to stay password-signed while another keypair is on a card"
 
     def test_build_transaction_rejects_an_unknown_address(self, backend):
-        # Pins that the flag is read off a resolved account, not defaulted for an address the DB never saw.
         with pytest.raises(ApiResponseError, match="failed to resolve account"):
             self._build(backend, "0x" + "ab" * 20)
