@@ -185,6 +185,7 @@ class SignalClient:
         # Global ordered stream: (seq, signal_type, signal_dict)
         self._received_all: list[tuple[int, SignalType, dict]] = []
         self._should_stop = False
+        self._ws_open = threading.Event()
 
         # Public attribute for debugging/inspection in tests if needed.
         # Do NOT mutate it directly.
@@ -252,6 +253,7 @@ class SignalClient:
 
     def _on_open(self, ws):
         logging.debug(f"SignalClient [{self.url}]: websocket connection opened")
+        self._ws_open.set()
 
     def _connect(self):
         retry_delay = 0.5
@@ -276,9 +278,16 @@ class SignalClient:
 
     def connect(self):
         self._should_stop = False
+        self._ws_open.clear()
         websocket_thread = threading.Thread(target=self._connect)
         websocket_thread.daemon = True
         websocket_thread.start()
+
+    def wait_until_connected(self, timeout: float = 10.0):
+        # A signal emitted before the websocket is open is never delivered, so a caller that
+        # reconnects right before a request must not send it until the connection is up.
+        if not self._ws_open.wait(timeout):
+            raise TimeoutError(f"SignalClient [{self.url}]: websocket did not open within {timeout}s")
 
     def disconnect(self):
         self._should_stop = True
