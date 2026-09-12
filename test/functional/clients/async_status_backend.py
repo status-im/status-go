@@ -38,6 +38,11 @@ class AsyncStatusBackend:
         self._backend = backend
         self._router = SignalRouter()
         self._signal_client: Optional[AsyncSignalClient] = None
+        self._login_seq_mark = 0
+        backend._login_issued_hooks.append(self._mark_login)
+
+    def _mark_login(self) -> None:
+        self._login_seq_mark = self._router.seq
 
     # === Proxy properties to sync backend ===
 
@@ -246,8 +251,11 @@ class AsyncStatusBackend:
     async def wait_for_login(self, timeout: float = 60.0) -> dict:
         """Wait until the backend has completed login.
 
-        Async version of StatusBackend.wait_for_login().
+        Async version of StatusBackend.wait_for_login(): only a node.login published after the
+        sync backend issued its login request counts, and a re-login is never confirmed from RPC
+        state an earlier login left behind.
         """
+        mark = self._login_seq_mark
 
         def _apply_login_signal(signal_data: dict) -> None:
             if "error" in signal_data.get("event", {}):
@@ -261,7 +269,7 @@ class AsyncStatusBackend:
 
         # 1) Preferred path: wait for the `node.login` signal
         try:
-            signal = await self.wait_for_signal(SignalType.NODE_LOGIN, timeout=timeout, check_buffer=True)
+            signal = await self.wait_for_signal(SignalType.NODE_LOGIN, timeout=timeout, check_buffer=True, after_seq=mark)
             signal_data = signal.raw
             assert isinstance(signal_data, dict), f"Unexpected NODE_LOGIN signal payload type: {type(signal_data)}"
             _apply_login_signal(signal_data)
@@ -272,6 +280,12 @@ class AsyncStatusBackend:
         except asyncio.TimeoutError:
             logging.warning("NODE_LOGIN signal was not received in time; falling back to RPC polling")
 
+        if self._backend._logins_issued > 1:
+            raise TimeoutError(
+                f"Login did not complete: no new node.login signal arrived within {timeout}s. "
+                "RPC state cannot confirm a re-login, because an earlier login in this session already set it."
+            )
+
         # 2) Fallback path: poll RPC state until it reflects a logged-in account
         deadline = time.monotonic() + timeout
         last_error = None
@@ -279,9 +293,9 @@ class AsyncStatusBackend:
         while time.monotonic() < deadline:
             try:
                 # Check if signal arrived in buffer while we were polling
-                buffered = self._router.get_buffer_signals(SignalType.NODE_LOGIN)
+                buffered = [s for s in self._router.get_buffer_signals(SignalType.NODE_LOGIN) if s.seq > mark]
                 if buffered:
-                    signal_data = buffered[-1].raw
+                    signal_data = buffered[0].raw
                     _apply_login_signal(signal_data)
                     return signal_data
 
@@ -305,6 +319,8 @@ class AsyncStatusBackend:
                     }
                     _apply_login_signal(signal_data)
                     return signal_data
+            except AssertionError:
+                raise
             except Exception as e:
                 last_error = str(e)
 
