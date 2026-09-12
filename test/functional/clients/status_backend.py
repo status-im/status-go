@@ -429,6 +429,21 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self._mark_login_signal()
         return self.api_request_json(method, data)
 
+    def restore_keycard_account_and_login(
+        self, keycard: dict, keycard_instance_uid: str, keycard_pairing_key: str, password: str | None = None, **kwargs
+    ):
+        self._set_display_name(**kwargs)
+        method = "RestoreAccountAndLogin"
+        # The backend replaces whatever password is sent with the card's encryption public key, which
+        # becomes the database password; default to it so the caller's field matches what is stored.
+        data = self._create_account_request(password=keycard["encryptionPublicKey"] if password is None else password, **kwargs)
+        data["keycard"] = keycard
+        data["keycardInstanceUID"] = keycard_instance_uid
+        data["keycardPairingKey"] = keycard_pairing_key
+        self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
+        self._mark_login_signal()
+        return self.api_request_json(method, data)
+
     def login(self, key_uid, password: str, kdf_iterations=256000):
         self.password = password
         # Reconnect to signals before login to avoid missing node.login after logout.
