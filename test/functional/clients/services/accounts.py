@@ -91,9 +91,6 @@ class AccountService(Service):
         response = self.rpc_request("getKeypairByKeyUID", params)
         return response
 
-    def get_profile_keypair(self):
-        return next((kp for kp in self.get_account_keypairs() if kp.get("type") == "profile"), None)
-
     def update_account(self, account):
         params = [account]
         response = self.rpc_request("updateAccount", params)

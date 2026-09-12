@@ -450,6 +450,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         self.password = password
         SignalClient.disconnect(self)
         SignalClient.connect(self)
+        self.wait_until_connected()
+        self._mark_login_signal()
         data = {
             "password": password,
             "keyUid": key_uid,
@@ -465,6 +467,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def login_with_mnemonic(self, key_uid, mnemonic: str):
         SignalClient.disconnect(self)
         SignalClient.connect(self)
+        self.wait_until_connected()
+        self._mark_login_signal()
         data = {"password": "", "keyUid": key_uid, "kdfIterations": 0, "mnemonic": mnemonic}
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
