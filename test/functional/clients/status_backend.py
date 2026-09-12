@@ -45,11 +45,14 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 class StatusBackend(RpcClient, SignalClient, ApiClient):
     name: str = ""
     container: StatusBackendContainer | None = None
+    _login_signal_mark = 0
+    _logins_issued = 0
     _media_server_port_gen = itertools.count(constants.STATUS_MEDIA_SERVER_PORT, 1)
     _connector_ws_port_gen = itertools.count(constants.STATUS_CONNECTOR_WS_PORT, 1)
 
     def __init__(self, privileged=False, ipv6=USE_IPV6, **kwargs):
         self.temp_dir = None
+        self._login_issued_hooks = []
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
 
@@ -400,11 +403,21 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_custom_tokens(data, kwargs)
         return data
 
+    def _mark_login_signal(self):
+        # node.login signals are never dropped from the signal buffer, so wait_for_login() has to know
+        # which ones predate this login: without the mark it matches an earlier one and reports a
+        # failed login as successful. The async waiter marks its own router through the hooks.
+        self._login_signal_mark = len(self.received_signals.get(SignalType.NODE_LOGIN, []))
+        self._logins_issued += 1
+        for hook in self._login_issued_hooks:
+            hook()
+
     def create_account_and_login(self, password: str, **kwargs):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
         data = self._create_account_request(password=password, **kwargs)
         self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
+        self._mark_login_signal()
         return self.api_request_json(method, data)
 
     def restore_account_and_login(self, user=user_1, **kwargs):
@@ -413,6 +426,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._create_account_request(password=user.password, **kwargs)
         data["mnemonic"] = user.passphrase
         self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
+        self._mark_login_signal()
         return self.api_request_json(method, data)
 
     def login(self, key_uid, password: str, kdf_iterations=256000):
@@ -420,6 +434,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         # Reconnect to signals before login to avoid missing node.login after logout.
         SignalClient.disconnect(self)
         SignalClient.connect(self)
+        self.wait_until_connected()
+        self._mark_login_signal()
         method = "LoginAccount"
         data = {
             "password": self.password,
@@ -452,6 +468,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         occasionally missed by the websocket client. To keep tests stable we:
         - try to wait for `node.login` first
         - if it doesn't arrive, fall back to polling RPC state and extracting the same fields
+
+        Only signals and state produced by the login the caller just triggered count. Every login
+        method records the signal backlog depth first, and a re-login cannot be confirmed from RPC
+        state an earlier login left behind.
         """
 
         def _apply_login_signal(signal: dict):
@@ -465,14 +485,20 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid", "")
 
         # 1) Preferred path: wait for the `node.login` signal (race-safe with backlog).
+        mark = self._login_signal_mark
         try:
-            with self.expect_signal(SignalType.NODE_LOGIN, timeout=60, start="beginning") as exp:
+            with self.expect_signal(SignalType.NODE_LOGIN, timeout=60, start=mark) as exp:
                 pass
             signal = exp.result
             assert isinstance(signal, dict), f"Unexpected NODE_LOGIN signal payload type: {type(signal)}"
             _apply_login_signal(signal)
             return signal
         except TimeoutError:
+            if self._logins_issued > 1:
+                raise TimeoutError(
+                    "Login did not complete: no new node.login signal arrived within 60s. "
+                    "RPC state cannot confirm a re-login, because an earlier login in this session already set it."
+                )
             logging.warning("NODE_LOGIN signal was not received in time; falling back to RPC polling to confirm login")
 
         # 2) Fallback path: poll RPC state until it reflects a logged-in account.
@@ -485,9 +511,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         while time.monotonic() < deadline:
             try:
                 # If the signal arrived late while we were falling back, prefer it.
-                buffered = self.received_signals.get(SignalType.NODE_LOGIN, [])
+                buffered = self.received_signals.get(SignalType.NODE_LOGIN, [])[mark:]
                 if buffered:
-                    signal = buffered[-1]
+                    signal = buffered[0]
                     assert isinstance(signal, dict), f"Unexpected buffered NODE_LOGIN payload type: {type(signal)}"
                     _apply_login_signal(signal)
                     return signal
@@ -517,6 +543,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                     }
                     _apply_login_signal(signal)
                     return signal
+            except AssertionError:
+                raise
             except Exception as e:
                 last_error = str(e)
 

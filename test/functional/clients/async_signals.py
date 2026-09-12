@@ -112,6 +112,11 @@ class SignalRouter:
         self._cleanup_task: Optional[asyncio.Task[None]] = None
         self._started = False
 
+    @property
+    def seq(self) -> int:
+        """Sequence number of the last published signal."""
+        return self._seq
+
     async def start(self) -> None:
         """Start background cleanup task."""
         if self._started:
