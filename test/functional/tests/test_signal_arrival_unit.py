@@ -7,10 +7,12 @@ These push frames straight into the client, so they need no status-go backend.
 import json
 import time
 
+import pytest
+
 from clients.signals import SignalClient, SignalType
 
 # Wide enough to absorb scheduler jitter on a loaded CI box, narrow enough that a stamp taken
-# at read time (both stamps then ~equal) or at parse time cannot pass.
+# at read time (both stamps then ~equal) cannot pass.
 SLEEP_S = 0.3
 TOLERANCE_S = 0.15
 
@@ -23,6 +25,7 @@ def _new_message(message_id: str) -> dict:
     return {"messages": [{"id": message_id}]}
 
 
+@pytest.mark.rpc  # needs no backend; the marker only puts it in the lane CI actually runs
 class TestSignalArrivalTime:
     def test_stamp_is_taken_on_arrival_not_on_read(self):
         client = SignalClient("ws://localhost:0")
