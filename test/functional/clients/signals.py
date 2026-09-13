@@ -159,7 +159,7 @@ class SignalExpectation:
             while True:
                 received = self.signal_client._received_by_type[self.signal_type]
                 arrived = self.signal_client._arrived_by_type[self.signal_type]
-                candidates = list(zip(received[self._start_index :], arrived[self._start_index :]))
+                candidates = list(zip(received[self._start_index :], arrived[self._start_index :], strict=True))
 
                 if self.accept_fn is not None:
                     candidates = [(s, t) for s, t in candidates if self.accept_fn(s)]
@@ -252,11 +252,11 @@ class SignalClient:
     def received_with_arrival(self, signal_type: SignalType | str) -> list[tuple[float, dict]]:
         """Snapshot of every received signal of `signal_type` as (arrived_at, signal), oldest first.
 
-        `arrived_at` is time.monotonic() taken when the websocket frame reached this client.
+        `arrived_at` is time.monotonic() taken when the websocket client dispatched the frame to on_message.
         """
         signal_type = self._convert_signal_type(signal_type)
         with self._cond:
-            return list(zip(self._arrived_by_type[signal_type], self._received_by_type[signal_type]))
+            return list(zip(self._arrived_by_type[signal_type], self._received_by_type[signal_type], strict=True))
 
     def _on_error(self, ws, error):
         if self._should_stop:
@@ -348,7 +348,7 @@ class SignalClient:
             with backend.expect_signal(SignalType.MESSAGES_NEW) as exp:
                 sender.send_message(...)
             signal = exp.result
-            arrived_at = exp.arrived_at  # time.monotonic() when the matched signal reached this client
+            arrived_at = exp.arrived_at  # time.monotonic() when the matched signal was dispatched to this client
         """
         signal_type = self._convert_signal_type(signal_type)
         return SignalExpectation(
