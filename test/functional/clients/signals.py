@@ -116,6 +116,9 @@ class SignalExpectation:
 
         self.result: dict | list[dict] | None = None
         self.results: list[dict] | None = None
+        # time.monotonic() at which each matched signal arrived, index-aligned with `results`
+        self.arrival_times: list[float] | None = None
+        self.arrived_at: float | None = None
         self._start_index = 0
 
         filters_set = sum(1 for v in (accept_fn, pattern, predicate) if v is not None)
@@ -155,15 +158,18 @@ class SignalExpectation:
         with self.signal_client._cond:
             while True:
                 received = self.signal_client._received_by_type[self.signal_type]
-                candidates = received[self._start_index :]
+                arrived = self.signal_client._arrived_by_type[self.signal_type]
+                candidates = list(zip(received[self._start_index :], arrived[self._start_index :]))
 
                 if self.accept_fn is not None:
-                    candidates = [s for s in candidates if self.accept_fn(s)]
+                    candidates = [(s, t) for s, t in candidates if self.accept_fn(s)]
 
                 if len(candidates) >= self.count:
                     selected = candidates[: self.count]
-                    self.results = selected
-                    self.result = selected[0] if self.count == 1 else selected
+                    self.results = [s for s, _ in selected]
+                    self.arrival_times = [t for _, t in selected]
+                    self.result = self.results[0] if self.count == 1 else self.results
+                    self.arrived_at = self.arrival_times[0]
                     return False
 
                 remaining = deadline - time.time()
@@ -182,8 +188,11 @@ class SignalClient:
         self._cond = threading.Condition()
         self._seq = 0
         self._received_by_type: dict[SignalType, list[dict]] = {signal: [] for signal in SignalType}
-        # Global ordered stream: (seq, signal_type, signal_dict)
-        self._received_all: list[tuple[int, SignalType, dict]] = []
+        # time.monotonic() at arrival, index-aligned with _received_by_type; kept beside the
+        # payload rather than inside it so callers that compare whole signals are unaffected
+        self._arrived_by_type: dict[SignalType, list[float]] = {signal: [] for signal in SignalType}
+        # Global ordered stream: (seq, signal_type, signal_dict, arrived_at)
+        self._received_all: list[tuple[int, SignalType, dict, float]] = []
         self._should_stop = False
 
         # Public attribute for debugging/inspection in tests if needed.
@@ -197,6 +206,7 @@ class SignalClient:
             Path(SIGNALS_DIR).mkdir(parents=True, exist_ok=True)
 
     def on_message(self, ws, signal):
+        arrived_at = time.monotonic()
         try:
             signal_data = json.loads(signal)
         except Exception:
@@ -221,7 +231,8 @@ class SignalClient:
             self._seq += 1
             seq = self._seq
             self._received_by_type[signal_type].append(signal_data)
-            self._received_all.append((seq, signal_type, signal_data))
+            self._arrived_by_type[signal_type].append(arrived_at)
+            self._received_all.append((seq, signal_type, signal_data, arrived_at))
             self._cond.notify_all()
 
     # TODO: This is a temporary workaround until all tests are migrated to use SignalType enum
@@ -237,6 +248,15 @@ class SignalClient:
         with self._cond:
             signals = self._received_by_type.get(signal_type, [])
             return [signal.get("event") for signal in signals]
+
+    def received_with_arrival(self, signal_type: SignalType | str) -> list[tuple[float, dict]]:
+        """Snapshot of every received signal of `signal_type` as (arrived_at, signal), oldest first.
+
+        `arrived_at` is time.monotonic() taken when the websocket frame reached this client.
+        """
+        signal_type = self._convert_signal_type(signal_type)
+        with self._cond:
+            return list(zip(self._arrived_by_type[signal_type], self._received_by_type[signal_type]))
 
     def _on_error(self, ws, error):
         if self._should_stop:
@@ -328,6 +348,7 @@ class SignalClient:
             with backend.expect_signal(SignalType.MESSAGES_NEW) as exp:
                 sender.send_message(...)
             signal = exp.result
+            arrived_at = exp.arrived_at  # time.monotonic() when the matched signal reached this client
         """
         signal_type = self._convert_signal_type(signal_type)
         return SignalExpectation(
@@ -395,7 +416,7 @@ class SignalClient:
                             stream = self.signal_client._received_all
                             found = None
                             for i in range(pos, len(stream)):
-                                _seq, st, data = stream[i]
+                                _seq, st, data, _arrived_at = stream[i]
                                 if st == expected_type:
                                     found = (i, data)
                                     break
