@@ -3,6 +3,7 @@ package appdatabase
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"go.uber.org/zap"
@@ -22,6 +23,11 @@ import (
 )
 
 const nodeCfgMigrationDate = 1640111208
+
+const (
+	lastMigrationWithKeycardTables = 1779444743 // 1779444743_create_preferences
+	dropKeycardTablesMigration     = 1779877215 // 1779877215_drop_keycard_tables
+)
 
 var customSteps = []*sqlite.PostStep{
 	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
@@ -53,6 +59,13 @@ func doMigration(db *sql.DB) error {
 
 		// NodeConfig migration cannot be done with SQL
 		err = nodecfg.MigrateNodeConfig(db)
+		if err != nil {
+			return err
+		}
+	}
+
+	if lastMigration < dropKeycardTablesMigration {
+		err = backfillKeycardColdWallet(db, lastMigration)
 		if err != nil {
 			return err
 		}
@@ -461,5 +474,30 @@ func migrateWalletTransferFromToAddresses(sqlTx *sql.Tx) error {
 		}
 	}
 
+	return nil
+}
+
+// backfillKeycardColdWallet migrates up to the last version that still has the keycards table and marks
+// key pairs stored on a Keycard in keypairs.cold_wallet, which is the only place it is read from after the drop.
+func backfillKeycardColdWallet(db *sql.DB, lastMigration uint) error {
+	if lastMigration < lastMigrationWithKeycardTables {
+		err := migrations.MigrateTo(db, customSteps, lastMigrationWithKeycardTables)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err := db.Exec(`
+		UPDATE keypairs
+		SET cold_wallet = 'status-keycard'
+		WHERE cold_wallet = ''
+		  AND key_uid IN (
+		    SELECT key_uid
+		    FROM keycards
+		    WHERE keycard_uid IS NOT NULL AND keycard_uid != ''
+		  )`)
+	if err != nil {
+		return fmt.Errorf("failed to backfill keypairs.cold_wallet from keycards: %w", err)
+	}
 	return nil
 }

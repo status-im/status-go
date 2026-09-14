@@ -512,3 +512,94 @@ func columnExists(db *sql.DB, tableName string, columnName string) (bool, error)
 
 	return false, nil
 }
+
+func openParkedAppDB(t *testing.T, version uint) *sql.DB {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, migrationsprevnodecfg.Migrate(db))
+	require.NoError(t, nodecfg.MigrateNodeConfig(db))
+	require.NoError(t, migrations.MigrateTo(db, customSteps, version))
+	return db
+}
+
+func requireKeycardTablesDropped(t *testing.T, db *sql.DB) {
+	for _, table := range []string{"keycards", "keycards_accounts"} {
+		var count int
+		err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&count)
+		require.NoError(t, err)
+		require.Zero(t, count, "table %s should be dropped", table)
+	}
+}
+
+func keypairColdWallet(t *testing.T, db *sql.DB, keyUID string) string {
+	var value string
+	require.NoError(t, db.QueryRow(`SELECT cold_wallet FROM keypairs WHERE key_uid = ?`, keyUID).Scan(&value))
+	return value
+}
+
+// A 2.38.x profile is parked at lastMigrationWithKeycardTables, so a PostStep on that version would never run for it.
+func TestDoMigrationBackfillsColdWalletFor2_38Profile(t *testing.T) {
+	db := openParkedAppDB(t, lastMigrationWithKeycardTables)
+
+	_, err := db.Exec(`
+		INSERT INTO keypairs (key_uid, name, type, derived_from, cold_wallet) VALUES
+			('0xkeycard', 'On keycard', 'profile', '', ''),
+			('0xdevice', 'On device', 'seed', '', ''),
+			('0xledger', 'On ledger', 'seed', '', 'ledger'),
+			('0xempty', 'Bogus keycard uid', 'seed', '', '')`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO keycards (keycard_uid, keycard_name, keycard_locked, key_uid, position) VALUES
+			('kc-1', 'Card 1', 0, '0xkeycard', 0),
+			('kc-2', 'Card 2', 0, '0xledger', 1),
+			('', 'No uid', 0, '0xempty', 2)`)
+	require.NoError(t, err)
+
+	require.NoError(t, doMigration(db))
+
+	requireKeycardTablesDropped(t, db)
+	require.Equal(t, "status-keycard", keypairColdWallet(t, db, "0xkeycard"), "keypair with a keycard row must become a keycard cold wallet")
+	require.Equal(t, "", keypairColdWallet(t, db, "0xdevice"), "keypair without a keycard row must stay untouched")
+	require.Equal(t, "ledger", keypairColdWallet(t, db, "0xledger"), "an already set cold wallet type must not be overwritten")
+	require.Equal(t, "", keypairColdWallet(t, db, "0xempty"), "keycard rows with an empty uid must be ignored")
+}
+
+// A profile from before 1775586970_add_xpub_to_keypair has keycard rows but no cold_wallet column yet.
+func TestDoMigrationBackfillsColdWalletForProfileWithoutColdWalletColumn(t *testing.T) {
+	db := openParkedAppDB(t, 1722415278) // 1722415278_remove_incorrectly_added_keycards
+
+	exists, err := columnExists(db, "keypairs", "cold_wallet")
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	_, err = db.Exec(`INSERT INTO keypairs (key_uid, name, type, derived_from) VALUES ('0xkeycard', 'On keycard', 'profile', '')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO keycards (keycard_uid, keycard_name, keycard_locked, key_uid, position) VALUES ('kc-1', 'Card 1', 0, '0xkeycard', 0)`)
+	require.NoError(t, err)
+
+	require.NoError(t, doMigration(db))
+
+	requireKeycardTablesDropped(t, db)
+	require.Equal(t, "status-keycard", keypairColdWallet(t, db, "0xkeycard"))
+}
+
+func TestDoMigrationCreatesNewProfile(t *testing.T) {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, doMigration(db))
+	requireKeycardTablesDropped(t, db)
+}
+
+func TestDoMigrationOnMigratedProfileIsNoop(t *testing.T) {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, doMigration(db))
+	require.NoError(t, doMigration(db))
+}
