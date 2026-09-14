@@ -79,6 +79,7 @@ const (
 var (
 	ErrChatNotFoundError     = errors.New("Chat not found")
 	ErrThreadFeatureDisabled = errors.New("threads feature is disabled")
+	ErrThreadsNotSupportedForChatType = errors.New("threads are not supported for this chat type")
 )
 
 const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
@@ -2150,7 +2151,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 	if !m.featureFlags.Threads {
 		message.ThreadId = nil
-	} else if message.GetThreadId() != "" && chat.ChatType == ChatTypeCommunityChat {
+	} else if message.GetThreadId() != "" {
 		threadExists := true
 		_, err = m.persistence.ThreadByID(chat.ID, message.GetThreadId())
 		if errors.Is(err, common.ErrRecordNotFound) {
@@ -2160,13 +2161,8 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		}
 
 		if !threadExists {
-			community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-			if err != nil {
+			if err := m.canCreateThread(chat); err != nil {
 				return nil, err
-			}
-
-			if !community.AllowsAllMembersToCreateThread() && !community.IsPrivilegedMember(&m.identity.PublicKey) {
-				return nil, errors.New("only admins can create threads in this community")
 			}
 		}
 	}
