@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/protocol/common"
 )
 
@@ -136,6 +137,59 @@ func (s *MessengerThreadsSuite) TestThreadsByChatID() {
 	s.Require().Contains(threadIDs, "parent-2")
 	s.Require().Equal("First thread", threadIDs["parent-1"].Name)
 	s.Require().Equal("Second thread", threadIDs["parent-2"].Name)
+}
+
+func (s *MessengerThreadsSuite) TestThreadsByChatIDs() {
+	otherKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	thirdKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	chat1 := CreateOneToOneChat("test-user-1", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat1))
+	chat2 := CreateOneToOneChat("test-user-2", &otherKey.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat2))
+	chatWithoutThreads := CreateOneToOneChat("test-user-3", &thirdKey.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chatWithoutThreads))
+
+	parent1 := buildTestMessage(*chat1)
+	parent1.ID = "parent-1"
+	parent1.Text = "First thread"
+	parent1.ChatMessage.Text = "First thread"
+
+	parent2 := buildTestMessage(*chat2)
+	parent2.ID = "parent-2"
+	parent2.Text = "Second thread"
+	parent2.ChatMessage.Text = "Second thread"
+
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent1, parent2}))
+
+	_, err = s.m.CreateThread(chat1.ID, "parent-1")
+	s.Require().NoError(err)
+	_, err = s.m.CreateThread(chat2.ID, "parent-2")
+	s.Require().NoError(err)
+
+	threads, err := s.m.ThreadsByChatIDs([]string{chat1.ID, chat2.ID, chatWithoutThreads.ID})
+	s.Require().NoError(err)
+	s.Require().Len(threads, 2)
+
+	byChat := make(map[string]*Thread)
+	for _, thread := range threads {
+		byChat[thread.ChatID] = thread
+	}
+	s.Require().Equal("parent-1", byChat[chat1.ID].ThreadID)
+	s.Require().Equal("parent-2", byChat[chat2.ID].ThreadID)
+	s.Require().NotContains(byChat, chatWithoutThreads.ID)
+
+	// A chat that was never requested must not leak in.
+	threads, err = s.m.ThreadsByChatIDs([]string{chat1.ID})
+	s.Require().NoError(err)
+	s.Require().Len(threads, 1)
+	s.Require().Equal(chat1.ID, threads[0].ChatID)
+
+	threads, err = s.m.ThreadsByChatIDs(nil)
+	s.Require().NoError(err)
+	s.Require().Empty(threads)
 }
 
 func (s *MessengerThreadsSuite) TestThreadsIncludeUnreadCounts() {
