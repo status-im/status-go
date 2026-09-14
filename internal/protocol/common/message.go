@@ -245,6 +245,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		BridgeMessage            *protobuf.BridgeMessage          `json:"bridgeMessage,omitempty"`
 		PaymentRequests          []*protobuf.PaymentRequest       `json:"paymentRequests,omitempty"`
 		PinnedBy                 string                           `json:"pinnedBy,omitempty"`
+		ThreadID                 string                           `json:"threadId,omitempty"`
 	}
 	item := MessageStructType{
 		ID:                       m.ID,
@@ -287,6 +288,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContactVerificationState: m.ContactVerificationState,
 		PaymentRequests:          m.PaymentRequests,
 		PinnedBy:                 m.PinnedBy,
+		ThreadID:                 m.GetThreadId(),
 	}
 
 	if sticker := m.GetSticker(); sticker != nil {
@@ -336,6 +338,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		EnsName            string                           `json:"ensName"`
 		DisplayName        string                           `json:"displayName"`
 		ChatID             string                           `json:"chatId"`
+		ThreadID           string                           `json:"threadId"`
 		Sticker            *protobuf.StickerMessage         `json:"sticker"`
 		AudioDurationMs    uint64                           `json:"audioDurationMs"`
 		ParsedText         json.RawMessage                  `json:"parsedText"`
@@ -383,6 +386,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	m.From = aux.From
 	m.Deleted = aux.Deleted
 	m.DeletedForMe = aux.DeletedForMe
+	if aux.ThreadID != "" {
+		m.ThreadId = &aux.ThreadID
+	}
 	return nil
 }
 

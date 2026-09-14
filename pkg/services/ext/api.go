@@ -515,6 +515,10 @@ type ApplicationMessagesResponse struct {
 	Cursor   string            `json:"cursor"`
 }
 
+type ApplicationThreadsResponse struct {
+	Threads []*protocol.Thread `json:"threads"`
+}
+
 type MarkMessageSeenResponse struct {
 	Count                       uint64                                 `json:"count"`
 	CountWithMentions           uint64                                 `json:"countWithMentions"`
@@ -531,7 +535,7 @@ type ApplicationStatusUpdatesResponse struct {
 }
 
 func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
-	messages, cursor, err := api.service.messenger.MessageByChatID(chatID, cursor, limit)
+	messages, cursor, err := api.service.messenger.MessageByChatID(chatID, "", cursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -539,6 +543,33 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	return &ApplicationMessagesResponse{
 		Messages: messages,
 		Cursor:   cursor,
+	}, nil
+}
+
+func (api *PublicAPI) ChatMessagesV2(chatID, threadID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
+	messages, cursor, err := api.service.messenger.MessageByChatID(chatID, threadID, cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationMessagesResponse{
+		Messages: messages,
+		Cursor:   cursor,
+	}, nil
+}
+
+func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateThread(chatID, parentMessageID)
+}
+
+func (api *PublicAPI) ChatThreads(chatID string) (*ApplicationThreadsResponse, error) {
+	threads, err := api.service.messenger.ThreadsByChatID(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationThreadsResponse{
+		Threads: threads,
 	}, nil
 }
 

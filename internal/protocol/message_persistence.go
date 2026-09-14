@@ -52,6 +52,13 @@ var cursorField = cursor + " as cursor"
 var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE '%' || ? || '%' OR dm.content LIKE '%' || ? || '%')"
 var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
 
+type Thread struct {
+	ThreadID        string `json:"threadId"`
+	ChatID          string `json:"chatId"`
+	ParentMessageID string `json:"parentMessageId"`
+	Name            string `json:"name"`
+}
+
 func (db sqlitePersistence) buildMessagesQueryWithAdditionalFields(additionalSelectFields, whereAndTheRest string) string {
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	if additionalSelectFields != "" {
@@ -114,7 +121,8 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		mentioned,
 		replied,
     	discord_message_id,
-		payment_requests`
+		payment_requests,
+		thread_id`
 }
 
 func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
@@ -201,6 +209,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.mentioned,
 		m1.replied,
     COALESCE(m1.discord_message_id, ""),
+	COALESCE(m1.thread_id, ""),
     COALESCE(dm.author_id, ""),
     COALESCE(dm.type, ""),
     COALESCE(dm.timestamp, ""),
@@ -284,6 +293,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var contactRequestState sql.NullInt64
 	var contactVerificationState sql.NullInt64
 	var pinnedBy sql.NullString
+	var threadID sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
 	audio := &protobuf.AudioMessage{}
@@ -349,6 +359,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Mentioned,
 		&message.Replied,
 		&discordMessage.Id,
+		&threadID,
 		&discordMessage.Author.Id,
 		&discordMessage.Type,
 		&discordMessage.Timestamp,
@@ -425,6 +436,12 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if pinnedBy.Valid {
 		message.PinnedBy = pinnedBy.String
+	}
+
+	if threadID.Valid {
+		message.ThreadId = &threadID.String
+	} else {
+		message.ThreadId = nil
 	}
 
 	if quotedText.Valid {
@@ -613,6 +630,11 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		}
 	}
 
+	var serializedThreadID interface{}
+	if message.ThreadId != nil {
+		serializedThreadID = message.GetThreadId()
+	}
+
 	return []interface{}{
 		message.ID,
 		message.WhisperTimestamp,
@@ -663,6 +685,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.Replied,
 		discordMessage.Id,
 		serializedPaymentRequests,
+		serializedThreadID,
 	}, nil
 }
 
@@ -778,15 +801,158 @@ func (db sqlitePersistence) MessagesByResponseTo(responseTo string) ([]*common.M
 	return getMessagesFromScanRows(db, rows, false)
 }
 
-// MessageByChatID returns all messages for a given chatID in descending order.
-// Ordering is accomplished using two concatenated values: ClockValue and ID.
-// These two values are also used to compose a cursor which is returned to the result.
-func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, limit int) ([]*common.Message, string, error) {
+func normalizeThreadName(value string) string {
+	collapsed := strings.Join(strings.Fields(value), " ")
+	trimmed := strings.TrimSpace(collapsed)
+	if trimmed == "" {
+		return ""
+	}
+
+	runes := []rune(trimmed)
+	if len(runes) > 40 {
+		return string(runes[:40])
+	}
+
+	return trimmed
+}
+
+func (db sqlitePersistence) threadNameFromParent(tx *sql.Tx, threadID string) string {
+	parentMessage, err := db.messageByID(tx, threadID)
+	if err != nil {
+		return ""
+	}
+
+	return normalizeThreadName(parentMessage.Text)
+}
+
+// threadNameFromParentByID resolves the thread name from a stored parent message
+// without requiring a transaction. Returns empty string when the parent is absent.
+func (db sqlitePersistence) threadNameFromParentByID(parentMessageID string) string {
+	msg, err := db.MessageByID(parentMessageID)
+	if err != nil {
+		return ""
+	}
+
+	return normalizeThreadName(msg.Text)
+}
+
+func (db sqlitePersistence) upsertThread(tx *sql.Tx, threadID, chatID, parentMessageID, name string) error {
+	if threadID == "" || chatID == "" {
+		return nil
+	}
+
+	if parentMessageID == "" {
+		parentMessageID = threadID
+	}
+
+	var existingName string
+	err := tx.QueryRow(`SELECT name FROM threads WHERE thread_id = ? AND chat_id = ?`, threadID, chatID).Scan(&existingName)
+	switch {
+	case errors.Is(err, sql.ErrNoRows), errors.Is(err, common.ErrRecordNotFound):
+		_, err = tx.Exec(`INSERT INTO threads(thread_id, chat_id, parent_message_id, name) VALUES (?, ?, ?, ?)`, threadID, chatID, parentMessageID, name)
+		return err
+	case err != nil:
+		return err
+	}
+
+	if existingName == "" && name != "" {
+		_, err = tx.Exec(`UPDATE threads SET name = ? WHERE thread_id = ? AND chat_id = ?`, name, threadID, chatID)
+		return err
+	}
+
+	return nil
+}
+
+func (db sqlitePersistence) updateThreadNameFromParentIfNeeded(tx *sql.Tx, threadID, chatID, parentText string) error {
+	if threadID == "" || chatID == "" {
+		return nil
+	}
+
+	name := normalizeThreadName(parentText)
+	_, err := tx.Exec(
+		`UPDATE threads SET name = ? WHERE thread_id = ? AND chat_id = ? AND name = ?`,
+		name,
+		threadID,
+		chatID,
+		"",
+	)
+	return err
+}
+
+func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentMessageID string, name string) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+
+		_ = tx.Rollback()
+	}()
+
+	return db.upsertThread(tx, threadID, chatID, parentMessageID, name)
+}
+
+func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread, error) {
+	var thread Thread
+	err := db.db.QueryRow(`SELECT thread_id, chat_id, parent_message_id, name FROM threads WHERE thread_id = ? AND chat_id = ?`, threadID, chatID).Scan(
+		&thread.ThreadID,
+		&thread.ChatID,
+		&thread.ParentMessageID,
+		&thread.Name,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, common.ErrRecordNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &thread, nil
+}
+
+func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
+	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name FROM threads WHERE chat_id = ? ORDER BY name ASC`, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	threads := make([]*Thread, 0)
+	for rows.Next() {
+		thread := &Thread{}
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		threads = append(threads, thread)
+	}
+
+	return threads, nil
+}
+
+func (db sqlitePersistence) MessageByChatID(chatID string, threadID string, currCursor string, limit int, threadsEnabled bool) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
 	args := []interface{}{chatID}
+
+	var threadWhere string
+	if threadID != "" {
+		threadWhere = "AND m1.thread_id = ?"
+		args = append(args, threadID)
+	} else if threadsEnabled {
+		// If threads are enabled, we want to only fetch messages that are not part of any thread (i.e., top-level messages).
+		// If threads are disabled, then we are backwards compatible and messages in threads are treated as normal messages, so we don't filter them out.
+		threadWhere = "AND (m1.thread_id IS NULL OR m1.thread_id = '')"
+	}
+
 	if currCursor != "" {
 		args = append(args, currCursor)
 	}
@@ -795,9 +961,9 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	// This new column values can also be returned as a cursor for subsequent requests.
 	where := fmt.Sprintf(`
             WHERE
-                NOT(m1.hide) AND m1.local_chat_id = ? %s
+                NOT(m1.hide) AND m1.local_chat_id = ? %s %s
             ORDER BY cursor DESC
-            LIMIT ?`, cursorWhere)
+            LIMIT ?`, threadWhere, cursorWhere)
 
 	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
 	rows, err := db.db.Query(
@@ -1734,6 +1900,8 @@ func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf
 		false,                         // replied
 		"",                            // discord_message_id
 		serializedPaymentRequests,     // payment_requests
+		// TODO backup thread messages too
+		"", // thread_id
 	}, nil
 }
 
@@ -2073,6 +2241,19 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 		_, err = stmt.Exec(allValues...)
 		if err != nil {
 			return
+		}
+
+		err = db.updateThreadNameFromParentIfNeeded(tx, msg.ID, msg.LocalChatID, msg.Text)
+		if err != nil {
+			return
+		}
+
+		if msg.GetThreadId() != "" {
+			threadName := db.threadNameFromParent(tx, msg.GetThreadId())
+			err = db.upsertThread(tx, msg.GetThreadId(), msg.LocalChatID, msg.GetThreadId(), threadName)
+			if err != nil {
+				return
+			}
 		}
 
 		if msg.ContentType == protobuf.ChatMessage_BRIDGE_MESSAGE {

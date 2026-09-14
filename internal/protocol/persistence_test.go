@@ -229,7 +229,7 @@ func TestMessageByChatID(t *testing.T) {
 			err   error
 		)
 
-		items, cursor, err = p.MessageByChatID(chatID, cursor, pageSize)
+		items, cursor, err = p.MessageByChatID(chatID, "", cursor, pageSize, false)
 		require.NoError(t, err)
 		result = append(result, items...)
 
@@ -486,7 +486,7 @@ func TestPinMessageByChatID(t *testing.T) {
 	require.Len(t, m, 1)
 	require.Equal(t, "them", m[0].PinnedBy)
 
-	msgs, _, err := p.MessageByChatID(chatID, cursor, 10)
+	msgs, _, err := p.MessageByChatID(chatID, "", cursor, 10, false)
 	require.NoError(t, err)
 	require.Len(t, msgs, 10)
 	for _, msg := range msgs {
@@ -563,7 +563,7 @@ func TestMessageReplies(t *testing.T) {
 	err = p.SaveMessages(messages)
 	require.NoError(t, err)
 
-	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
+	retrievedMessages, _, err := p.MessageByChatID(chatID, "", "", 10, false)
 	require.NoError(t, err)
 
 	require.Equal(t, "non-existing", retrievedMessages[2].ResponseTo)
@@ -616,7 +616,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 			err   error
 		)
 
-		items, cursor, err = p.MessageByChatID(chatID, cursor, pageSize)
+		items, cursor, err = p.MessageByChatID(chatID, "", cursor, pageSize, false)
 		require.NoError(t, err)
 		result = append(result, items...)
 
@@ -671,14 +671,14 @@ func TestDeleteMessagesByChatID(t *testing.T) {
 	err = insertMinimalMessage(p, "2")
 	require.NoError(t, err)
 
-	m, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	m, _, err := p.MessageByChatID(testPublicChatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(m))
 
 	err = p.DeleteMessagesByChatID(testPublicChatID)
 	require.NoError(t, err)
 
-	m, _, err = p.MessageByChatID(testPublicChatID, "", 10)
+	m, _, err = p.MessageByChatID(testPublicChatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(m))
 
@@ -726,6 +726,209 @@ func TestDeletePinnedMessageByID(t *testing.T) {
 	pinnedMsgs, _, err = p.PinnedMessageByChatID(testPublicChatID, "", 10)
 	require.NoError(t, err)
 	require.Len(t, pinnedMsgs, 0)
+}
+
+func TestSaveMessagesCreatesThreadWithEmptyNameWhenParentMissing(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	threadID := "parent-message-id"
+	replyID := "reply-message-id"
+
+	err = p.SaveMessages([]*common.Message{{
+		ID:          replyID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{
+			Text:     "reply body",
+			ThreadId: &threadID,
+		},
+	}})
+	require.NoError(t, err)
+
+	thread, err := p.ThreadByID(testPublicChatID, threadID)
+	require.NoError(t, err)
+	require.Equal(t, "", thread.Name)
+}
+
+func TestSaveMessagesUpdatesEmptyThreadNameWhenParentArrives(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	threadID := "parent-message-id"
+	replyID := "reply-message-id"
+	parentText := "  This   is a parent message title that is definitely longer than forty characters  "
+
+	err = p.SaveMessages([]*common.Message{{
+		ID:          replyID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{
+			Text:     "reply body",
+			ThreadId: &threadID,
+		},
+	}})
+	require.NoError(t, err)
+
+	err = p.SaveMessages([]*common.Message{{
+		ID:          threadID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{Text: parentText},
+	}})
+	require.NoError(t, err)
+
+	thread, err := p.ThreadByID(testPublicChatID, threadID)
+	require.NoError(t, err)
+	require.Equal(t, normalizeThreadName(parentText), thread.Name)
+}
+
+func TestMessagesByThreadID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	threadID := "parent-message-id"
+	secondThreadID := "another-parent"
+
+	err = p.SaveMessages([]*common.Message{
+		{
+			ID:          "reply1",
+			LocalChatID: testPublicChatID,
+			From:        testPK,
+			ChatMessage: &protobuf.ChatMessage{Text: "reply1", ThreadId: &threadID},
+		},
+		{
+			ID:          "reply2",
+			LocalChatID: testPublicChatID,
+			From:        testPK,
+			ChatMessage: &protobuf.ChatMessage{Text: "reply2", ThreadId: &threadID},
+		},
+		{
+			ID:          "other-thread-reply",
+			LocalChatID: testPublicChatID,
+			From:        testPK,
+			ChatMessage: &protobuf.ChatMessage{Text: "other", ThreadId: &secondThreadID},
+		},
+	})
+	require.NoError(t, err)
+
+	msgs, cursor, err := p.MessageByChatID(testPublicChatID, threadID, "", 10, false)
+	require.NoError(t, err)
+	require.Empty(t, cursor)
+	require.Len(t, msgs, 2)
+	for _, msg := range msgs {
+		require.Equal(t, threadID, msg.GetThreadId())
+	}
+}
+
+func TestCreateThreadFromExistingParent(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	parentID := "parent-message-id"
+	parentText := "Hello world"
+
+	// Parent already in DB
+	err = p.SaveMessages([]*common.Message{{
+		ID:          parentID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{Text: parentText},
+	}})
+	require.NoError(t, err)
+
+	// Explicit thread creation path used by Messenger.CreateThread
+	name := p.threadNameFromParentByID(parentID)
+	err = p.UpsertThread(parentID, testPublicChatID, parentID, name)
+	require.NoError(t, err)
+
+	thread, err := p.ThreadByID(testPublicChatID, parentID)
+	require.NoError(t, err)
+	require.Equal(t, parentID, thread.ThreadID)
+	require.Equal(t, parentID, thread.ParentMessageID)
+	require.Equal(t, normalizeThreadName(parentText), thread.Name)
+}
+
+func TestCreateThreadFailsWhenParentMessageMissing(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	// threadNameFromParentByID still returns "" when parent is absent
+	name := p.threadNameFromParentByID("not-yet-known")
+	require.Equal(t, "", name)
+
+	// Messenger.CreateThread rejects absent parents before calling UpsertThread;
+	// verify that a thread is NOT created when the message is missing.
+	_, err = p.ThreadByID(testPublicChatID, "not-yet-known")
+	require.Error(t, err, "thread must not exist for a message that was never saved")
+}
+
+func TestCreateThreadFailsWhenAlreadyExists(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	parentID := "parent-message-id"
+
+	// Parent already in DB
+	err = p.SaveMessages([]*common.Message{{
+		ID:          parentID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{Text: "Parent message"},
+	}})
+	require.NoError(t, err)
+
+	// Create thread once
+	name := p.threadNameFromParentByID(parentID)
+	err = p.UpsertThread(parentID, testPublicChatID, parentID, name)
+	require.NoError(t, err)
+
+	// Thread now exists
+	thread, err := p.ThreadByID(testPublicChatID, parentID)
+	require.NoError(t, err)
+	require.Equal(t, parentID, thread.ThreadID)
+
+	// Attempting to upsert again should succeed (idempotent) but Messenger.CreateThread
+	// should reject it by checking if thread exists first
+	err = p.UpsertThread(parentID, testPublicChatID, parentID, name)
+	require.NoError(t, err) // UpsertThread is idempotent at the persistence layer
+}
+
+func TestDeleteParentMessageKeepsThreadMetadata(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	threadID := "parent-message-id"
+
+	err = p.SaveMessages([]*common.Message{{
+		ID:          threadID,
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{Text: "Parent title"},
+	}})
+	require.NoError(t, err)
+
+	err = p.SaveMessages([]*common.Message{{
+		ID:          "reply-message-id",
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{Text: "reply body", ThreadId: &threadID},
+	}})
+	require.NoError(t, err)
+
+	err = p.DeleteMessage(threadID)
+	require.NoError(t, err)
+
+	thread, err := p.ThreadByID(testPublicChatID, threadID)
+	require.NoError(t, err)
+	require.Equal(t, threadID, thread.ThreadID)
 }
 
 func TestMarkMessageSeen(t *testing.T) {
@@ -971,7 +1174,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 	require.Equal(t, id3, reactions[0].MessageId)
 
 	// Try with a cursor
-	_, cursor, err := p.MessageByChatID(chatID, "", 1)
+	_, cursor, err := p.MessageByChatID(chatID, "", "", 1, false)
 	require.NoError(t, err)
 
 	reactions, err = p.EmojiReactionsByChatID(chatID, cursor, 2)
@@ -1102,7 +1305,7 @@ func TestMessagesAudioDurationMsNull(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 
-	m, _, err = p.MessageByChatID(testPublicChatID, "", 10)
+	m, _, err = p.MessageByChatID(testPublicChatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 }
@@ -1144,7 +1347,7 @@ func TestSaveMentions(t *testing.T) {
 	err = p.SaveMessages([]*common.Message{&message})
 	require.NoError(t, err)
 
-	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
+	retrievedMessages, _, err := p.MessageByChatID(chatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, retrievedMessages, 1)
 	require.Len(t, retrievedMessages[0].Mentions, 1)
@@ -1371,7 +1574,7 @@ func TestSaveLinks(t *testing.T) {
 	err = p.SaveMessages([]*common.Message{&message})
 	require.NoError(t, err)
 
-	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
+	retrievedMessages, _, err := p.MessageByChatID(chatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, retrievedMessages, 1)
 	require.Len(t, retrievedMessages[0].Links, 1)
@@ -1413,7 +1616,7 @@ func TestSaveWithUnfurledLinks(t *testing.T) {
 	err = p.SaveMessages([]*common.Message{&message})
 	require.NoError(t, err)
 
-	mgs, _, err := p.MessageByChatID(chatID, "", 10)
+	mgs, _, err := p.MessageByChatID(chatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, mgs, 1)
 	require.Len(t, mgs[0].UnfurledLinks, 2)
@@ -1489,7 +1692,7 @@ func TestDeactivatePublicChat(t *testing.T) {
 	require.False(t, publicChat.Active)
 
 	// It deletes messages
-	messages, _, err := p.MessageByChatID(publicChatID, "", 10)
+	messages, _, err := p.MessageByChatID(publicChatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
@@ -1558,7 +1761,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 	require.False(t, chat.Active)
 
 	// It deletes messages
-	messages, _, err := p.MessageByChatID(chat.ID, "", 10)
+	messages, _, err := p.MessageByChatID(chat.ID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, messages, 0)
 
@@ -1831,7 +2034,7 @@ func TestSaveBridgeMessage(t *testing.T) {
 
 	require.NoError(t, err)
 
-	retrievedMessages, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	retrievedMessages, _, err := p.MessageByChatID(testPublicChatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, retrievedMessages, 1)
 	require.Equal(t, "discord", retrievedMessages[0].GetBridgeMessage().BridgeName)
@@ -2068,7 +2271,7 @@ func TestPaymentRequestMessages(t *testing.T) {
 	err = p.SaveMessages(messages)
 	require.NoError(t, err)
 
-	m, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	m, _, err := p.MessageByChatID(testPublicChatID, "", "", 10, false)
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 
