@@ -68,6 +68,11 @@ pipeline {
     PEER_REFS =                  "${params.PEER_REFS}"
     FUNCTIONAL_TESTS_LOG_LEVEL = "${params.FUNCTIONAL_TESTS_LOG_LEVEL}"
     FUNCTIONAL_TESTS_CONTAINER_PREFIX = "${env.BUILD_TAG}"
+    XDG_CONFIG_HOME      = "${env.WORKSPACE_TMP}/.config"
+    /* fixes nim cache collision */
+    XDG_CACHE_HOME       = "${env.WORKSPACE_TMP}/.cache"
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
   }
 
   stages {
