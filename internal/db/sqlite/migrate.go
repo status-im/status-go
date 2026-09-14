@@ -15,8 +15,11 @@ type CustomMigrationFunc func(tx *sql.Tx) error
 
 type PostStep struct {
 	Version         uint
-	CustomMigration CustomMigrationFunc
+	CustomMigration CustomMigrationFunc // runs after Version has been applied
 	RollBackVersion uint
+
+	PreMigrationVersion uint
+	PreMigration        CustomMigrationFunc // runs before Version is applied
 }
 
 func StatusMigrationTableName() string {
@@ -73,6 +76,17 @@ func Migrate(db *sql.DB, resources *bindata.AssetSource, options MigrateOptions)
 		return runRemainingMigrations(m, options.UntilVersion)
 	}
 
+	for _, step := range options.CustomSteps {
+		if step.PreMigration == nil {
+			continue
+		}
+		prevVersion, err := source.Prev(step.Version)
+		if err != nil || prevVersion != step.PreMigrationVersion {
+			return fmt.Errorf("custom step for version %d has PreMigration set but PreMigrationVersion %d is not the migration right before it",
+				step.Version, step.PreMigrationVersion)
+		}
+	}
+
 	sort.Slice(options.CustomSteps, func(i, j int) bool {
 		return options.CustomSteps[i].Version < options.CustomSteps[j].Version
 	})
@@ -101,12 +115,20 @@ func runCustomMigrations(m *migrate.Migrate, db *sql.DB, customSteps []*PostStep
 	for customIndex < len(customSteps) && (untilVersion == nil || customSteps[customIndex].Version <= *untilVersion) {
 		customStep := customSteps[customIndex]
 
+		if customStep.PreMigration != nil {
+			if err := runPreMigrationStep(db, customStep, m); err != nil {
+				return err
+			}
+		}
+
 		if err := m.Migrate(customStep.Version); err != nil && err != migrate.ErrNoChange {
 			return fmt.Errorf("failed to migrate to version %d: %w", customStep.Version, err)
 		}
 
-		if err := runCustomMigrationStep(db, customStep, m); err != nil {
-			return err
+		if customStep.CustomMigration != nil {
+			if err := runCustomMigrationStep(db, customStep, m); err != nil {
+				return err
+			}
 		}
 
 		customIndex++
@@ -114,16 +136,42 @@ func runCustomMigrations(m *migrate.Migrate, db *sql.DB, customSteps []*PostStep
 	return nil
 }
 
-func runCustomMigrationStep(db *sql.DB, customStep *PostStep, m *migrate.Migrate) error {
+// runPreMigrationStep brings the database up to PreMigrationVersion (never down) and runs PreMigration.
+// The database is left at PreMigrationVersion, so a failure here doesn't leave a half-applied step behind.
+func runPreMigrationStep(db *sql.DB, customStep *PostStep, m *migrate.Migrate) error {
+	currentVersion, err := getCurrentVersion(m, db)
+	if err != nil {
+		return err
+	}
 
+	if currentVersion < customStep.PreMigrationVersion {
+		if err := m.Migrate(customStep.PreMigrationVersion); err != nil && err != migrate.ErrNoChange {
+			return fmt.Errorf("failed to migrate to version %d: %w", customStep.PreMigrationVersion, err)
+		}
+	}
+
+	if err := runInTransaction(db, customStep.PreMigration); err != nil {
+		return fmt.Errorf("pre-migration step failed for version %d: %w", customStep.Version, err)
+	}
+	return nil
+}
+
+func runCustomMigrationStep(db *sql.DB, customStep *PostStep, m *migrate.Migrate) error {
+	if err := runInTransaction(db, customStep.CustomMigration); err != nil {
+		return rollbackCustomMigration(m, customStep, err)
+	}
+	return nil
+}
+
+func runInTransaction(db *sql.DB, fn CustomMigrationFunc) error {
 	sqlTx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	if err := customStep.CustomMigration(sqlTx); err != nil {
+	if err := fn(sqlTx); err != nil {
 		_ = sqlTx.Rollback()
-		return rollbackCustomMigration(m, customStep, err)
+		return err
 	}
 
 	if err := sqlTx.Commit(); err != nil {

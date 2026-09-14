@@ -512,3 +512,116 @@ func columnExists(db *sql.DB, tableName string, columnName string) (bool, error)
 
 	return false, nil
 }
+
+// TestDropKeycardTablesBackfillsColdWallet verifies that the pre-migration step
+// attached to 1779877215_drop_keycard_tables carries the "this keypair lives on
+// a Keycard" fact from the legacy `keycards` table into `keypairs.cold_wallet`,
+// which is the only place it is read from once the table is gone. The database
+// is deliberately parked at the version a 2.38.2 profile ships with.
+func TestDropKeycardTablesBackfillsColdWallet(t *testing.T) {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, migrationsprevnodecfg.Migrate(db))
+	require.NoError(t, nodecfg.MigrateNodeConfig(db))
+
+	// Migrate up to (and including) the migration right before the keycard tables are dropped.
+	require.NoError(t, migrations.MigrateTo(db, customSteps, 1779444743))
+
+	exists, err := columnExists(db, "keypairs", "cold_wallet")
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	_, err = db.Exec(`
+		INSERT INTO keypairs (key_uid, name, type, derived_from, cold_wallet) VALUES
+			('0xkeycard', 'On keycard', 'profile', '', ''),
+			('0xdevice', 'On device', 'seed', '', ''),
+			('0xledger', 'On ledger', 'seed', '', 'ledger'),
+			('0xempty', 'Bogus keycard uid', 'seed', '', '')`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO keycards (keycard_uid, keycard_name, keycard_locked, key_uid, position) VALUES
+			('kc-1', 'Card 1', 0, '0xkeycard', 0),
+			('kc-2', 'Card 2', 0, '0xledger', 1),
+			('', 'No uid', 0, '0xempty', 2)`)
+	require.NoError(t, err)
+
+	require.NoError(t, migrations.Migrate(db, customSteps))
+
+	for _, table := range []string{"keycards", "keycards_accounts"} {
+		var count int
+		err = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&count)
+		require.NoError(t, err)
+		require.Zero(t, count, "table %s should be dropped", table)
+	}
+
+	coldWallet := func(keyUID string) string {
+		var value string
+		require.NoError(t, db.QueryRow(`SELECT cold_wallet FROM keypairs WHERE key_uid = ?`, keyUID).Scan(&value))
+		return value
+	}
+
+	require.Equal(t, "status-keycard", coldWallet("0xkeycard"), "keypair with a keycard row must become a keycard cold wallet")
+	require.Equal(t, "", coldWallet("0xdevice"), "keypair without a keycard row must stay untouched")
+	require.Equal(t, "ledger", coldWallet("0xledger"), "an already set cold wallet type must not be overwritten")
+	require.Equal(t, "", coldWallet("0xempty"), "keycard rows with an empty uid must be ignored")
+}
+
+func TestPreMigrationStepFailureLeavesDropMigrationUnapplied(t *testing.T) {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, migrationsprevnodecfg.Migrate(db))
+	require.NoError(t, nodecfg.MigrateNodeConfig(db))
+	require.NoError(t, migrations.MigrateTo(db, customSteps, 1779444743))
+
+	failingSteps := []*sqlite.PostStep{{
+		Version:             1779877215,
+		PreMigrationVersion: 1779444743,
+		PreMigration: func(*sql.Tx) error {
+			return errors.New("failed to run pre-migration step")
+		},
+	}}
+	require.Error(t, migrations.Migrate(db, failingSteps))
+
+	var count int
+	require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'keycards'`).Scan(&count))
+	require.Equal(t, 1, count, "keycards must still exist when the pre-migration step fails")
+
+	version, _, err := sqlite.GetLastMigrationVersion(db, sqlite.StatusMigrationTableName())
+	require.NoError(t, err)
+	require.Equal(t, uint(1779444743), version)
+}
+
+func TestPreMigrationStepWithWrongVersionIsRejected(t *testing.T) {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, migrationsprevnodecfg.Migrate(db))
+	require.NoError(t, nodecfg.MigrateNodeConfig(db))
+	require.NoError(t, migrations.MigrateTo(db, customSteps, 1779444743))
+
+	preMigrationCalled := false
+	// Unset, the step's own version, and a real migration that isn't the one right before the step.
+	for _, preMigrationVersion := range []uint{0, 1779877215, 1775586970} {
+		steps := []*sqlite.PostStep{{
+			Version:             1779877215,
+			PreMigrationVersion: preMigrationVersion,
+			PreMigration: func(*sql.Tx) error {
+				preMigrationCalled = true
+				return nil
+			},
+		}}
+		err = migrations.Migrate(db, steps)
+		require.ErrorContains(t, err, "PreMigrationVersion", "PreMigrationVersion %d must be rejected", preMigrationVersion)
+	}
+	require.False(t, preMigrationCalled)
+
+	version, _, err := sqlite.GetLastMigrationVersion(db, sqlite.StatusMigrationTableName())
+	require.NoError(t, err)
+	require.Equal(t, uint(1779444743), version, "a rejected step must not advance the database")
+}
