@@ -3,6 +3,7 @@ package appdatabase
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"go.uber.org/zap"
@@ -27,6 +28,7 @@ var customSteps = []*sqlite.PostStep{
 	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
 	{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
+	{Version: 1779877215, PreMigrationVersion: 1779444743, PreMigration: backfillKeycardColdWalletFromKeycardTables},
 }
 
 var CurrentAppDBKeyUID string
@@ -461,5 +463,25 @@ func migrateWalletTransferFromToAddresses(sqlTx *sql.Tx) error {
 		}
 	}
 
+	return nil
+}
+
+// backfillKeycardColdWalletFromKeycardTables runs right before 1779877215_drop_keycard_tables.
+//
+// Before dropping the keycard tables, update the `cold_wallet` column for the key pairs
+// that had associated keycards befoire 1779877215_drop_keycard_tables migration.
+func backfillKeycardColdWalletFromKeycardTables(sqlTx *sql.Tx) error {
+	_, err := sqlTx.Exec(`
+		UPDATE keypairs
+		SET cold_wallet = 'status-keycard'
+		WHERE cold_wallet = ''
+		  AND key_uid IN (
+		    SELECT key_uid
+		    FROM keycards
+		    WHERE keycard_uid IS NOT NULL AND keycard_uid != ''
+		  )`)
+	if err != nil {
+		return fmt.Errorf("failed to backfill keypairs.cold_wallet from keycards: %w", err)
+	}
 	return nil
 }
