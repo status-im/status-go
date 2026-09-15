@@ -113,6 +113,12 @@ mock/
 mock.go
 *_mock_test.go
 
+# A checkout build with the default STATUSGO_BUILD_DIR writes its nim-sds
+# artifacts here.
+/.sds-build/
+# `nim c status_backend.nim` builds beside the source.
+/status_backend
+
 go.work
 go.work.sum
 
@@ -124,3 +130,6 @@ libs
 
 # CODEX (ChatGPT plugin)
 .codex
+nimble.develop
+nimble.paths
+nimbledeps

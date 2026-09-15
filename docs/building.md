@@ -29,7 +29,79 @@ directive or a SQL migration), and to generate the test-only mocks:
 - `make status-go-deps` - install required tools
 - `make generate` - compile protobuf files, build SQL migrations, generate mocks
 
-## Generated Go sources are committed
+## status-go as a nimble package
+
+status-go is also a [nimble](https://github.com/nim-lang/nimble) package
+(`statusgo.nimble`), so that Nim projects — status-desktop above all — can
+depend on it by revision and get both the Go sources that build `libstatus`
+and the `status_go` Nim wrapper that binds to it.
+
+### Layout
+
+- `statusgo.nimble` — the manifest. It is purely declarative and owns the
+  nim-sds pin: the Makefile derives `NIM_SDS_REPO` and `NIM_SDS_VERSION` from
+  its `requires` line, so the pin has a single source of truth.
+- `nimble.lock` — the resolution a status-go CHECKOUT builds against, and only
+  that. nimble ignores a dependency's lock, so a consumer's own lock is the
+  authority for the store copy; the two may legitimately name different
+  versions of the shared dependencies.
+- `statusgo.nims` — the build tasks. After a one-time `nimble setup`, run them
+  as `nim <task> statusgo.nims`:
+
+  | task | output |
+  |---|---|
+  | `libstatus` | static `libstatus.a` + shared `libsds` for the host |
+  | `libsds` | shared `libsds` for the host |
+  | `libsdsIos` | static `libsds` for iOS |
+  | `libsdsAndroid` | `libsds` for Android (needs `ARCH` and `ANDROID_NDK_ROOT`) |
+
+- `status_go.nim` + `status_go/impl.nim` — the Nim wrapper over the C API.
+  `import status_go` auto-links the artifacts the `libstatus` task places in
+  `build/bin`, plus the system libraries and frameworks the Go runtime needs.
+  Consumers that link their own flavour of the libraries (status-desktop links
+  the shared one it builds itself) compile with `-d:statusGoNoAutoLink`.
+- `status_backend.nim` — a Nim host for the status-backend HTTP server,
+  linking it through that same wrapper. Build it from a checkout:
+
+  ```shell
+  nim libstatus statusgo.nims
+  nim c status_backend.nim
+  ```
+
+The wrapper links `libstatus.a` statically and `libsds` as a shared library,
+with an rpath into `build/bin`. A fully static link is macOS-only: on Linux and
+Windows nim-sds's static `libsds` exports its whole Nim runtime, which collides
+with the runtime of the Nim program linking it. Only the Linux arm of the
+auto-link flags is verified; macOS and Windows are by inspection.
+
+The manifest declares no `srcDir`, so consumers get the whole tree on their
+import path and every root-level `*.nim` — `status_go.nim`, `status_backend.nim`
+— is an importable module name for them.
+
+### Building from a read-only copy
+
+A consumer resolves status-go into nimble's package store, which is a
+read-only copy of this tree, and builds it there. Nothing is written into the
+source tree: every output goes under one caller-chosen directory.
+
+| variable | meaning |
+|---|---|
+| `STATUSGO_BUILD_DIR` | (`statusgo.nims`) root of every output. Default: the package directory |
+| `STATUSGO_NIMBLE_PATHS` | (`statusgo.nims`) the `nimble.paths` to build against. Default: the one next to `statusgo.nims`. An embedder that has already resolved the graph points this at its own file |
+| `NIMFLAGS` | (`statusgo.nims`) forwarded to the nim-sds compiles |
+| `STATUS_GO_BUILD_DIR` | (Makefile) root of every library-target output; `STATUS_GO_BIN_DIR`, `STATUS_GO_BINDINGS_PATH`, `STATUS_GO_LIBRARY_OUT` and `STATUS_GO_STUB_BINDINGS_OUT` derive from it. Default: `./build` |
+| `GENERATE_PREREQ` | (Makefile) prerequisite of the library targets, `generate` by default. Pass `GENERATE_PREREQ=` to skip regeneration |
+
+Artifact layout under `STATUSGO_BUILD_DIR`:
+
+```
+build/bin/libstatus.*         the Go library and its generated header
+build/bin/statusgo-lib/       the generated cbindings entry point
+.sds-build/build/libsds.*     the nim-sds artifacts
+.sds-build/library/libsds.h   nim-sds's header contract
+```
+
+### Generated Go sources are committed
 
 Everything the LIBRARY targets need from `make generate` is committed, so the
 store copy builds with no generator toolchain anywhere near it:
@@ -45,7 +117,7 @@ Regenerate them with `make generate` from a checkout that has the toolchain
 `scripts/cleanup_generated_files.sh` sweeps only the untracked, test-only
 mocks.
 
-## Build values come from `-ldflags`
+### Build values come from `-ldflags`
 
 `pkg/version` and `pkg/sentry` take their build-time values as plain package
 variables set at link time (`BUILD_VARS_LDFLAGS` in the Makefile), not from

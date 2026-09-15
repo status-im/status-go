@@ -127,17 +127,15 @@ BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
 
-# Pin nim-sds revision here. Can be a tag (default) or commit hash.
-# v0.3.3 lives on the release/v0.3 branch: it carries the SDS retrieval-hint
-# provider required by the sds-go-bindings pin in go.mod, on the CamelCase FFI
-# ABI, with the causalHistory wire format kept backward-compatible with released
-# (v0.2.x) nodes. master/release-v0.4 moved to the snake_case CBOR ABI, which
-# these bindings do not link against, so we track release/v0.3.
-NIM_SDS_VERSION ?= v0.3.3
+# The pin lives in statusgo.nimble, the single source of truth also read by
+# nimble consumers: both the repository URL and the revision come from its
+# requires line, so flipping the pin needs no Makefile change.
+NIM_SDS_VERSION ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\3|p' $(GIT_ROOT)statusgo.nimble)
+NIM_SDS_REPO ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\1|p' $(GIT_ROOT)statusgo.nimble)
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
 # to guarantee a clean checkout on every build.
-NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
+NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
 ifeq ($(mkspecs),win32)
 	NIM_SDS_SOURCE_DIR := $(subst \,/,$(NIM_SDS_SOURCE_DIR))
@@ -387,11 +385,13 @@ USE_SYSTEM_NIM ?= 1
 .PHONY: clone-nim-sds
 clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@test -n "$(NIM_SDS_VERSION)" || { echo "ERROR: NIM_SDS_VERSION is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
+	@test -n "$(NIM_SDS_REPO)" || { echo "ERROR: NIM_SDS_REPO is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
-		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
+		git clone --recurse-submodules "$(NIM_SDS_REPO).git" "$(NIM_SDS_SOURCE_DIR)"; \
 	else \
-		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
+		cd "$(NIM_SDS_SOURCE_DIR)" && git remote set-url origin "$(NIM_SDS_REPO).git" && git fetch --tags origin; \
 	fi
 	cd "$(NIM_SDS_SOURCE_DIR)" && \
 		git switch --no-recurse-submodules --force --detach "$(NIM_SDS_VERSION)" && \
@@ -413,11 +413,12 @@ build-libsds: $(LIBSDS)
 
 
 ## Target-specific architecture mapping for libsds Android build
-# Note: nim-sds uses 'amd64' for both x86 and x86_64
+# The value reaches nim-sds as --cpu:, so these are Nim CPU names: 32-bit x86
+# is i386 there. Same mapping as statusgo.nims' libsdsAndroid task.
 build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
 	$(if $(filter arm,$(ARCH)),arm,\
-	$(if $(filter amd64,$(ARCH)),amd64,\
-	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
+	$(if $(filter amd64 x86_64,$(ARCH)),amd64,\
+	$(if $(filter x86,$(ARCH)),i386,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
 # The mobile targets name libsds by the target platform's extension: LIBSDS
 # carries the host one.
