@@ -522,6 +522,10 @@ endif
 	@echo "Shared library built:"
 	@ls -la $(STATUS_GO_BIN_DIR)/libstatus.*
 
+# The mobile library targets must be byte-reproducible for unchanged sources:
+# consumers rebuild dependents through a compare-before-copy contract
+# (status-desktop ADR 0003), and Go's link-time build ID varies run-to-run.
+# -buildid= strips it; the ID is unused in c-archive/c-shared artifacts.
 statusgo-android-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -537,8 +541,14 @@ statusgo-ios-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-ios ##
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
+		-ldflags="-buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
 		-o "$(STATUS_GO_BIN_DIR)/libstatus.a" "$(STATUS_GO_BINDINGS_PATH)/main.go"
+	@# Go's archive writer stamps real mtimes in the ar member headers; repack
+	@# with zeroed dates so unchanged sources yield a byte-identical archive
+	@# (the compare-before-copy contract above).
+	ZERO_AR_DATE=1 xcrun libtool -static -no_warning_for_no_symbols \
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.a.tmp" "$(STATUS_GO_BIN_DIR)/libstatus.a" && \
+		mv "$(STATUS_GO_BIN_DIR)/libstatus.a.tmp" "$(STATUS_GO_BIN_DIR)/libstatus.a"
 	@echo "iOS library built"
 	@file $(STATUS_GO_BIN_DIR)/libstatus.a
 
