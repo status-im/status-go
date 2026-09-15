@@ -149,6 +149,16 @@ proc changeDatabasePasswordV2*(paramsJSON: string): string =
   defer: go_shim.free(funcOut)
   return $funcOut
 
+proc getProfileEncryptionInfo*(paramsJSON: string): string =
+  var funcOut = go_shim.getProfileEncryptionInfo(paramsJSON.cstring)
+  defer: go_shim.free(funcOut)
+  return $funcOut
+
+proc exportProfileDEK*(paramsJSON: string): string =
+  var funcOut = go_shim.exportProfileDEK(paramsJSON.cstring)
+  defer: go_shim.free(funcOut)
+  return $funcOut
+
 proc validateMnemonic*(mnemonic: string): string =
   var funcOut = go_shim.validateMnemonic(mnemonic.cstring)
   defer: go_shim.free(funcOut)
@@ -382,6 +392,11 @@ proc inputConnectionStringForImportingKeypairsKeystores*(connectionString: strin
 
 proc loginAccount*(requestJson: string): string =
   var funcOut = go_shim.loginAccount(requestJson.cstring)
+  defer: go_shim.free(funcOut)
+  return $funcOut
+
+proc setProfileLogMaxBackups*(requestJson: string): string =
+  var funcOut = go_shim.setProfileLogMaxBackups(requestJson.cstring)
   defer: go_shim.free(funcOut)
   return $funcOut
 

@@ -26,10 +26,15 @@ license       = "MPL-2.0"
 # `nim c status_backend.nim`; the former `nimble install` bin contract returns
 # when nimble can materialize dependencies without building their binaries.
 
-# Interim fork pin: PR logos-messaging/nim-sds#85 head (the whole 6-patch
-# queue: ffi pin, NIMFLAGS forwarding, libsdsStaticMac localization,
-# installDirs whitelist, ZERO_AR_DATE, -fno-common). Moves to the
-# logos-messaging merge SHA when PR #85 lands. No explicit nim-ffi pin
-# needed: this sds revision pins ffi itself (#fb25f069, the CI-certified
-# 0.1.4).
-requires "https://github.com/alexjba/nim-sds.git#5c89d61f897b44b75f2f28978f9928960181cf95"
+# nim-sds pin: v0.3.3 — the tag status-go's own Makefile tracked before this
+# manifest became the single source of truth (NIM_SDS_VERSION derives from
+# this line). v0.3.3 lives on nim-sds release/v0.3: it carries the SDS
+# retrieval-hint provider required by the sds-go-bindings pin in go.mod, on
+# the CamelCase FFI ABI. master/release-v0.4 moved to the snake_case CBOR ABI,
+# which these bindings do not link against, so the pin must stay on the v0.3
+# line. Consumed from the fork branch `nimble-v0.3.3` (alexjba/nim-sds):
+# v0.3.3 + one commit that makes the release/v0.3 tree a nimble package (one
+# root manifest, library/ kept in store copies, NIMFLAGS forwarding, PR #85's
+# localized/reproducible static archives) — the library ABI is untouched.
+# Moves to an upstream tag when release/v0.3 carries that commit.
+requires "https://github.com/alexjba/nim-sds.git#a771a894fa4adfbaba1fa4af211c593623e07411"

@@ -87,6 +87,10 @@ proc logout*(): cstring {.importc: "Logout".}
 
 proc changeDatabasePasswordV2*(paramsJSON: cstring): cstring {.importc: "ChangeDatabasePasswordV2".}
 
+proc getProfileEncryptionInfo*(paramsJSON: cstring): cstring {.importc: "GetProfileEncryptionInfo".}
+
+proc exportProfileDEK*(paramsJSON: cstring): cstring {.importc: "ExportProfileDEK".}
+
 proc validateMnemonic*(mnemonic: cstring): cstring {.importc: "ValidateMnemonic".}
 
 proc getRandomMnemonic*(): cstring {.importc: "GetRandomMnemonic".}
@@ -186,6 +190,8 @@ proc getConnectionStringForExportingKeypairsKeystores*(configJSON: cstring) : cs
 proc inputConnectionStringForImportingKeypairsKeystores*(connectionString: cstring, configJSON: cstring) : cstring {.importc: "InputConnectionStringForImportingKeypairsKeystores".}
 
 proc loginAccount*(requestJSON: cstring): cstring {.importc: "LoginAccount".}
+
+proc setProfileLogMaxBackups*(requestJSON: cstring): cstring {.importc: "SetProfileLogMaxBackups".}
 
 proc createAccountAndLogin*(requestJSON: cstring): cstring {.importc: "CreateAccountAndLogin".}
 

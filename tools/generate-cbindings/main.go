@@ -54,6 +54,9 @@ func main() {
 	output += "C.free(param);\n"
 	output += "}\n"
 
+	// Run the status-backend HTTP server from library consumers
+	output += statusBackendRunServer
+
 	fmt.Println(output)
 }
 
