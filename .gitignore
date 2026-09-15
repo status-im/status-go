@@ -113,6 +113,10 @@ migrations.go
 cmd/status-backend/server/endpoints.go
 internal/protocol/messenger_handlers.go
 
+# A checkout build with the default STATUSGO_BUILD_DIR writes its nim-sds
+# artifacts here.
+/.sds-build/
+
 go.work
 go.work.sum
 
@@ -124,3 +128,6 @@ libs
 
 # CODEX (ChatGPT plugin)
 .codex
+nimble.develop
+nimble.paths
+nimbledeps

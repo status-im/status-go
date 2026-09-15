@@ -127,17 +127,12 @@ BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
 
-# nim-sds pin: the master line. master carries the snake_case JSON C ABI that
-# the sds-go-bindings pseudo-version in go.mod links against, and builds
-# through the package's own nimble tasks (it has no Makefile and no
-# nimbus-build-system). The branch `nimble-embed` of alexjba/nim-sds is
-# upstream master (logos-messaging/nim-sds 04441cb) plus only what embedding
-# needs: SDS_OUT_DIR for every output, library/sds_tasks.nims as a task entry
-# point that does not go through nimble, and the compiler pin aligned to nim
-# 2.2.10. Both variables move to the upstream repository and its tag once
-# that branch merges there.
-NIM_SDS_REPO ?= https://github.com/alexjba/nim-sds
-NIM_SDS_VERSION ?= d0bd6f914123d7cf4a2f0fd7e9f133f6be1f04c3
+# The pin lives in statusgo.nimble, the single source of truth also read by
+# nimble consumers: both the repository URL and the revision come from its
+# requires line, so flipping the pin needs no Makefile change. That line
+# documents the pin itself (nim-sds's master line, built by its nimble tasks).
+NIM_SDS_VERSION ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\3|p' $(GIT_ROOT)statusgo.nimble)
+NIM_SDS_REPO ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\1|p' $(GIT_ROOT)statusgo.nimble)
 
 # The nimble task that builds the host's shared libsds is named by platform.
 ifeq ($(detected_OS),Darwin)
@@ -150,7 +145,7 @@ endif
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy
 # to guarantee a clean checkout on every build.
-NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
+NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
 ifeq ($(mkspecs),win32)
 	NIM_SDS_SOURCE_DIR := $(subst \,/,$(NIM_SDS_SOURCE_DIR))
@@ -404,6 +399,8 @@ USE_SYSTEM_NIM ?= 1
 .PHONY: clone-nim-sds
 clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@test -n "$(NIM_SDS_VERSION)" || { echo "ERROR: NIM_SDS_VERSION is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
+	@test -n "$(NIM_SDS_REPO)" || { echo "ERROR: NIM_SDS_REPO is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
 		git clone "$(NIM_SDS_REPO).git" "$(NIM_SDS_SOURCE_DIR)"; \
@@ -437,6 +434,7 @@ build-libsds: $(LIBSDS)
 ## Target-specific task mapping for the libsds Android build
 # nim-sds has one nimble task per target CPU (each sets ARCH itself), so
 # status-go's ARCH picks the task. 32-bit x86 is i386 to Nim: libsdsAndroidX86.
+# statusgo.nims' libsdsAndroid task maps the same way.
 build-libsds-android: SDS_ANDROID_TASK = $(strip $(if $(filter arm64,$(ARCH)),libsdsAndroidArm64,\
 	$(if $(filter arm,$(ARCH)),libsdsAndroidArm,\
 	$(if $(filter amd64 x86_64,$(ARCH)),libsdsAndroidAmd64,\
