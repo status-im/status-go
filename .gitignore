@@ -104,19 +104,20 @@ report/results.xml
 
 
 # generated files
+#
+# Only the TEST-ONLY generators stay untracked. Everything the library build
+# needs (*.pb.go, bindata.go, migrations.go, the status-backend endpoint table
+# and the messenger handler table) is COMMITTED, so a consumer that resolves
+# status-go as a nimble dependency gets a complete, buildable tree in the
+# package store and needs neither protoc nor mockgen. See AGENTS.md,
+# "Generated files committed for nimble consumption".
 mock/
 mock.go
 *_mock_test.go
-*.pb.go
-bindata.go
-migrations.go
-cmd/status-backend/server/endpoints.go
-internal/protocol/messenger_handlers.go
-pkg/version/VERSION
-pkg/version/GIT_COMMIT
-pkg/sentry/SENTRY_CONTEXT_NAME
-pkg/sentry/SENTRY_CONTEXT_VERSION
-pkg/sentry/SENTRY_PRODUCTION
+# ...except this one: pkg/services/connector/commands/test_helpers.go is a
+# NON-test file, so the library build imports this mock package. It is
+# committed like the other generated sources the library build needs.
+!/pkg/services/connector/chainutils/mock/
 
 go.work
 go.work.sum
@@ -132,5 +133,3 @@ libs
 nimble.develop
 nimble.paths
 nimbledeps
-# scratch copy of the resolved nim-sds store package (see statusgo.nims)
-.sds-build
