@@ -15,9 +15,6 @@ sed -i '' '/# generated files/,/^$/ s/^/#/' .gitignore
 # Generate files
 make GO_GENERATE_FAST_RECACHE=true generate
 
-# Remove `-dirty` suffix from the generated version file
-sed -i '' 's/-dirty$//' pkg/version/VERSION
-
 # Commit
 git add .gitignore
 git add .

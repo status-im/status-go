@@ -46,6 +46,33 @@ for this build).
   `NIM_SDS_INC_DIR`; nothing is cloned or built then (this is what the Nix shell
   does).
 
+## Build values come from `-ldflags`
+
+`pkg/version` and `pkg/sentry` take their build-time values as plain package
+variables set at link time (`BUILD_VARS_LDFLAGS` in the Makefile), not from
+generated files:
+
+| linker variable | source |
+|---|---|
+| `pkg/version.version` | `STATUS_GO_VERSION`; defaults to `git describe --tags`, else `0.0.0-dev` |
+| `pkg/version.gitCommit` | `GIT_COMMIT`; defaults to `git rev-parse --short HEAD`, else `unknown` |
+| `pkg/sentry.defaultContextName` | `SENTRY_CONTEXT_NAME` |
+| `pkg/sentry.defaultContextVersion` | `SENTRY_CONTEXT_VERSION`; defaults to `STATUS_GO_VERSION` |
+| `pkg/sentry.production` | `SENTRY_PRODUCTION` |
+
+A package-store copy is not a git checkout, so the git-derived defaults fall
+back to the placeholders above; an embedder that knows the real version passes
+`STATUS_GO_VERSION` in. In the shipping configuration it does: status-desktop
+passes its OWN version, so `pkg/version.Version()` inside libstatus reports the
+app's version, not status-go's.
+
+Extra link flags belong in `GO_EXTRA_LDFLAGS`. Overriding `BUILD_FLAGS`
+replaces `BUILD_VARS_LDFLAGS` and leaves the build unstamped.
+
+The reproducibility flags (`-buildid=`, the `ZERO_AR_DATE` repack) are on the
+mobile targets only. The desktop targets do not get them: the desktop consumer
+gates a relink on the artifact existing, not on its bytes.
+
 ## Building with Docker
 
 ```shell
