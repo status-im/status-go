@@ -34,7 +34,7 @@ func setupRequestAccountsRequestIDChan(t *testing.T) <-chan string {
 	t.Helper()
 	requestIDCh := make(chan string, 1)
 	signal.SetHandler(signal.Handler(func(s []byte) {
-		var evt commands.EventType
+		var evt eventType
 		if err := json.Unmarshal(s, &evt); err != nil || evt.Type != signal.EventConnectorSendRequestAccounts {
 			return
 		}

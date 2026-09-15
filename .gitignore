@@ -104,14 +104,14 @@ report/results.xml
 
 
 # generated files
+#
+# Only the TEST-ONLY generated files stay untracked. Everything the library
+# build needs is COMMITTED, so a consumer that resolves status-go as a nimble
+# dependency gets a buildable tree and needs no generator toolchain. See
+# docs/building.md, "Generated Go sources are committed".
 mock/
 mock.go
 *_mock_test.go
-*.pb.go
-bindata.go
-migrations.go
-cmd/status-backend/server/endpoints.go
-internal/protocol/messenger_handlers.go
 pkg/version/VERSION
 pkg/version/GIT_COMMIT
 pkg/sentry/SENTRY_CONTEXT_NAME

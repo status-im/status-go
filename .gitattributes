@@ -1,0 +1,6 @@
+# The generated Go sources are committed (see docs/building.md). Mark them so
+# reviews collapse them instead of drowning in them.
+*.pb.go linguist-generated=true
+**/migrations.go linguist-generated=true
+**/bindata.go linguist-generated=true
+internal/protocol/messenger_handlers.go linguist-generated=true
