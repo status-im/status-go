@@ -54,6 +54,8 @@ func main() {
 	output += "C.free(param);\n"
 	output += "}\n"
 
+	output += statusBackendRunServer
+
 	fmt.Println(output)
 }
 

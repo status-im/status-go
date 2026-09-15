@@ -7,8 +7,22 @@ package main
 import  "C"
 import "unsafe"
 import mobile "github.com/status-im/status-go/mobile"
+import backendserver "github.com/status-im/status-go/cmd/status-backend/server"
 
 func main() {}
+`
+
+// statusBackendRunServer is appended verbatim, like Free: it wraps a package
+// other than mobile/, which the parser-based generation cannot reach. The call
+// blocks while serving and returns nil on clean shutdown.
+const statusBackendRunServer = `//export StatusBackendRunServer
+func StatusBackendRunServer(address *C.char) *C.char {
+	err := backendserver.Run(C.GoString(address))
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	return nil
+}
 `
 
 const intType = "int"
