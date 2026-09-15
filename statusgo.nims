@@ -146,11 +146,20 @@ proc runSdsTask(taskName: string, extraEnvFlags = "") =
     " " & extraEnvFlags & " " & getEnv("NIMFLAGS"))
   putEnv("SDS_OUT_DIR", sdsArtifactDir())
   mkDir sdsArtifactDir()
-  # sds.nims is nim-sds's committed task entry point; older copies (before the
-  # SDS_OUT_DIR commit) only have the manifest, which nim also accepts.
-  let entry =
-    if fileExists(sdsRoot / "sds.nims"): sdsRoot / "sds.nims"
-    else: sdsRoot / "sds.nimble"
+  # nim-sds's task entry point. An INSTALLED copy (the normal case here) only
+  # keeps library/sds_tasks.nims: nimble 0.22.3 strips root files that
+  # installDirs does not cover, and installFiles does not rescue them. A
+  # develop-linked checkout has both, and sds.nims is the conventional name
+  # there. `nim <task> sds.nimble` is NOT a fallback — nim answers "invalid
+  # command: libsdsDynamicLinux"; tasks only dispatch from a .nims.
+  var entry = sdsRoot / "library" / "sds_tasks.nims"
+  if not fileExists(entry):
+    entry = sdsRoot / "sds.nims"
+  if not fileExists(entry):
+    quit "the resolved nim-sds copy at " & sdsRoot & " has no task entry" &
+      " point (library/sds_tasks.nims or sds.nims). It predates the" &
+      " SDS_OUT_DIR contract these tasks build against — bump the nim-sds pin" &
+      " in statusgo.nimble."
   exec "nim " & taskName & " " & quoteShell(entry)
   # The header contract lives in nim-sds's SOURCE tree (library/libsds.h, a
   # committed file). Mirror it next to the artifacts so embedders read ONE

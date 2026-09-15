@@ -35,10 +35,10 @@ license       = "MPL-2.0"
 # the CamelCase FFI ABI. master/release-v0.4 moved to the snake_case CBOR ABI,
 # which these bindings do not link against, so the pin must stay on the v0.3
 # line. Consumed from the fork branch `nimble-v0.3.3` (alexjba/nim-sds):
-# v0.3.3 + two commits that make the release/v0.3 tree a nimble package (one
+# v0.3.3 + three commits that make the release/v0.3 tree a nimble package (one
 # root manifest, library/ kept in store copies, NIMFLAGS forwarding, PR #85's
 # localized/reproducible static archives) and keep every build output out of
 # its source tree (SDS_OUT_DIR + a committed sds.nims), so statusgo.nims can
 # build the read-only store copy IN PLACE — the library ABI is untouched.
 # Moves to an upstream tag when release/v0.3 carries those commits.
-requires "https://github.com/alexjba/nim-sds.git#425287aeb6786b88516426349dc762abe5b1f6cd"
+requires "https://github.com/alexjba/nim-sds.git#0f8dc8689b228910480ee7402248df254ddee2cd"

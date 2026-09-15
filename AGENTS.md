@@ -93,9 +93,9 @@ below were each learned the hard way; keep them.
   included: the compiled copy IS the resolved copy, so there is no second sds
   on the path to split type identities, and the resolution's own entry is the
   authority on the module layout (srcDir vs srcDir-hoisted).
-- nim-sds is invoked through its committed `sds.nims` (`sds.nimble` is
-  accepted as a fallback for copies predating it). The old `ln -sf sds.nimble
-  sds.nims` was itself a write into the sds tree.
+- nim-sds is invoked through `library/sds_tasks.nims` (a develop checkout also
+  has `sds.nims` at the root; both just include the manifest). The old
+  `ln -sf sds.nimble sds.nims` was itself a write into the sds tree.
 - The unpatched upstream sds at the current pin cannot produce a working
   macOS host static build: no NIMFLAGS forwarding (in-workspace builds get
   poisoned by parent-dir configs — chronicles defines break the ffi compile)
@@ -283,10 +283,15 @@ char ~32/33 of an ar line it's the header mtime, otherwise extract members
   undeclared root file from the store copy. A committed `sds.nims` (the task
   entry point that replaced the `ln -sf sds.nimble sds.nims` write into the
   source tree) therefore only reaches consumers because
-  `installFiles = @["sds.nims"]` was added next to it. Symptom without it:
-  the store copy has `sds.nimble` but no `sds.nims`. (`nim <task>
-  <pkg>.nimble` also works — nim runs a `.nimble` as nimscript — so
-  `statusgo.nims` keeps that as a fallback for older sds copies.)
+  `installFiles` does NOT rescue it: nimble resolves installDirs AND
+  installFiles relative to srcDir, and even spelled `../sds.nims` — which it
+  then finds, no "Missing file" warning — the file is not installed (verified
+  with a minimal package, and observed for real on the sds store copy). A
+  `.nims` INSIDE an installDirs directory does survive, so nim-sds's consumer
+  entry point is `library/sds_tasks.nims`. And there is no `.nimble` fallback:
+  `nim <task> <pkg>.nimble` answers "invalid command: <task>" — it only appears
+  to work when a `<pkg>.nims` sits next to the manifest, because nim loads that
+  as the project config and the tasks come from there.
 - **`file://` requires are legal only at top level or inside packages reached
   via `file://`** (`developfile.nim` refuses to LOAD a develop-linked package
   whose manifest has one: "'file://' requires are only allowed in top level
