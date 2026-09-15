@@ -29,14 +29,78 @@ directive or a SQL migration), and to generate the test-only mocks:
 - `make status-go-deps` - install required tools
 - `make generate` - compile protobuf files, build SQL migrations, generate mocks
 
-## Generated Go sources are committed
+## status-go as a nimble package
 
-Everything the LIBRARY targets need from `make generate` is committed, so the
-store copy builds with no generator toolchain anywhere near it:
+status-go is also a [nimble](https://github.com/nim-lang/nimble) package
+(`statusgo.nimble`), so that Nim projects — status-desktop above all — can
+depend on it by revision and get both the Go sources that build `libstatus`
+and the `status_go` Nim wrapper that binds to it.
+
+### Layout
+
+- `statusgo.nimble` — the manifest. It is purely declarative and owns the
+  nim-sds pin: the Makefile derives `NIM_SDS_REPO` and `NIM_SDS_VERSION` from
+  its `requires` line, so the pin has a single source of truth.
+- `nimble.lock` — the resolution a status-go CHECKOUT builds against, and only
+  that. nimble ignores a dependency's lock, so a consumer's own lock is the
+  authority for the store copy; the two may legitimately name different
+  versions of the shared dependencies.
+- `statusgo.nims` — the nim-sds build tasks. After a one-time `nimble setup`,
+  run them as `nim <task> statusgo.nims`:
+
+  | task | output |
+  |---|---|
+  | `libsds` | shared `libsds` for the host |
+  | `libsdsIos` | static `libsds` for iOS |
+  | `libsdsAndroid` | `libsds` for Android (needs `ARCH` and `ANDROID_NDK_ROOT`; runs nim-sds's per-CPU task) |
+
+  The Go library is still built by the Makefile: `make statusgo-shared-library
+  NIM_SDS_LIB_DIR=… NIM_SDS_INC_DIR=…` pointed at those artifacts.
+- `status_go.nim` + `status_go/impl.nim` — the Nim wrapper over the C API. It
+  declares the imports only; linking `libstatus` (and `libsds`, and the system
+  libraries the Go runtime needs) into the final executable is the consumer's
+  job, exactly as it was when the wrapper lived in status-desktop.
+
+The manifest declares no `srcDir`, so consumers get the whole tree on their
+import path and `status_go` is the importable module name.
+
+### Building from a read-only copy
+
+A consumer resolves status-go into nimble's package store, which is a
+read-only copy of this tree, and builds it there. Nothing is written into the
+source tree: every output goes under one caller-chosen directory.
+
+| variable | meaning |
+|---|---|
+| `STATUSGO_BUILD_DIR` | (`statusgo.nims`) root of every output. Default: the package directory |
+| `STATUSGO_NIMBLE_PATHS` | (`statusgo.nims`) the `nimble.paths` to build against. Default: the one next to `statusgo.nims`. An embedder that has already resolved the graph points this at its own file |
+| `NIM_PARAMS` | (`statusgo.nims`) appended last to the nim-sds compiles (the channel nim-sds's tasks read) |
+| `STATUS_GO_BUILD_DIR` | (Makefile) root of every library-target output; `STATUS_GO_BIN_DIR`, `STATUS_GO_BINDINGS_PATH`, `STATUS_GO_LIBRARY_OUT` and `STATUS_GO_STUB_BINDINGS_OUT` derive from it. Default: `./build` |
+| `GENERATE_PREREQ` | (Makefile) prerequisite of the library targets, `generate` by default. Pass `GENERATE_PREREQ=` to skip regeneration |
+
+Artifact layout under `STATUSGO_BUILD_DIR`:
+
+```
+.sds-build/build/libsds.*     the nim-sds artifacts (statusgo.nims)
+.sds-build/library/libsds.h   nim-sds's API header, library/libsds.h (statusgo.nims)
+```
+
+and under `STATUS_GO_BUILD_DIR`:
+
+```
+bin/libstatus.*               the Go library and its generated header
+bin/statusgo-lib/             the generated cbindings entry point
+```
+
+### Generated Go sources are committed
+
+Everything the LIBRARY targets and `status-backend` need from `make generate`
+is committed, so the store copy builds with no generator toolchain anywhere
+near it:
 
 `*.pb.go`, `bindata.go`, `migrations.go`,
-`cmd/status-backend/server/endpoints.go` and
-`internal/protocol/messenger_handlers.go`. The mocks are test-only and stay
+`internal/protocol/messenger_handlers.go` and, for `status-backend`,
+`cmd/status-backend/server/endpoints.go`. The mocks are test-only and stay
 untracked.
 
 Regenerate them with `make generate` from a checkout that has the toolchain
@@ -44,27 +108,7 @@ Regenerate them with `make generate` from a checkout that has the toolchain
 `make generate` and then `git diff --exit-code`, so drift fails the PR.
 `scripts/cleanup_generated_files.sh` sweeps only the untracked, test-only
 mocks.
-## Native dependency: libsds (nim-sds)
-
-Every build links `libsds`, built from [nim-sds](https://github.com/logos-messaging/nim-sds)
-by its own nimble tasks. Outside the Nix shell the only Nim-side prerequisite is
-[nimble](https://github.com/nim-lang/nimble/releases) 0.24.1 on `PATH`: nim-sds
-pins its compiler (`nim == 2.2.10`) and `nimble setup` materialises it into
-nimble's store, so no `nim` needs to be installed (and one on `PATH` is not used
-for this build).
-
-- `make build-libsds` clones the pinned revision (`NIM_SDS_REPO`, `NIM_SDS_VERSION`
-  in the Makefile) into `NIM_SDS_SOURCE_DIR` (default: `../nim-sds` next to this
-  checkout), runs `nimble setup` there and then the host's `libsdsDynamic<OS>` task
-  with `SDS_OUT_DIR` set to `NIM_SDS_LIB_DIR` (`<source dir>/build`). The header cgo
-  compiles against is `library/libsds.h` in the nim-sds tree (`NIM_SDS_INC_DIR`).
-- `make build-libsds-android ARCH=…` / `make build-libsds-ios` run the per-target
-  tasks the same way (`libsdsAndroid<Arch>`, `libsdsIOS`).
-- To link a prebuilt `libsds` instead, pass both `NIM_SDS_LIB_DIR` and
-  `NIM_SDS_INC_DIR`; nothing is cloned or built then (this is what the Nix shell
-  does).
-
-## Build values come from `-ldflags`
+### Build values come from `-ldflags`
 
 `pkg/version` and `pkg/sentry` take their build-time values as plain package
 variables set at link time (`BUILD_VARS_LDFLAGS` in the Makefile), not from
@@ -87,9 +131,25 @@ app's version, not status-go's.
 Extra link flags belong in `GO_EXTRA_LDFLAGS`. Overriding `BUILD_FLAGS`
 replaces `BUILD_VARS_LDFLAGS` and leaves the build unstamped.
 
-The reproducibility flags (`-buildid=`, the `ZERO_AR_DATE` repack) are on the
-mobile targets only. The desktop targets do not get them: the desktop consumer
-gates a relink on the artifact existing, not on its bytes.
+## Native dependency: libsds (nim-sds)
+
+Every build links `libsds`, built from [nim-sds](https://github.com/logos-messaging/nim-sds)
+by its own nimble tasks. Outside the Nix shell the only Nim-side prerequisite is
+[nimble](https://github.com/nim-lang/nimble/releases) 0.24.1 on `PATH`: nim-sds
+pins its compiler (`nim == 2.2.10`) and `nimble setup` materialises it into
+nimble's store, so no `nim` needs to be installed (and one on `PATH` is not used
+for this build).
+
+- `make build-libsds` clones the pinned revision (`NIM_SDS_REPO`, `NIM_SDS_VERSION`
+  in the Makefile) into `NIM_SDS_SOURCE_DIR` (default: `../nim-sds` next to this
+  checkout), runs `nimble setup` there and then the host's `libsdsDynamic<OS>` task
+  with `SDS_OUT_DIR` set to `NIM_SDS_LIB_DIR` (`<source dir>/build`). The header cgo
+  compiles against is `library/libsds.h` in the nim-sds tree (`NIM_SDS_INC_DIR`).
+- `make build-libsds-android ARCH=…` / `make build-libsds-ios` run the per-target
+  tasks the same way (`libsdsAndroid<Arch>`, `libsdsIOS`).
+- To link a prebuilt `libsds` instead, pass both `NIM_SDS_LIB_DIR` and
+  `NIM_SDS_INC_DIR`; nothing is cloned or built then (this is what the Nix shell
+  does).
 
 ## Building with Docker
 

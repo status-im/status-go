@@ -48,6 +48,11 @@ make status-go-deps        # install required Go tools
 make generate              # protobufs, SQL migration bindata, mocks (via go-generate-fast)
 ```
 
+Library builds write only under `STATUS_GO_BUILD_DIR` (default `./build`), and
+take `GENERATE_PREREQ=` to skip `make generate` — that is how a consumer builds
+a read-only copy of this tree (see `docs/building.md`, "status-go as a nimble
+package").
+
 Run the server: `./build/bin/status-backend --address=localhost:12345` (full JSON API on that port; see
 `cmd/status-backend/README.md` and `cmd/status-backend/API_REFERENCE.md`).
 

@@ -1,3 +1,7 @@
+# The Makefile sed-parses the requires line out of statusgo.nimble; a CRLF
+# checkout would put a \r inside a git revision.
+*.nimble text eol=lf
+
 # The generated Go sources are committed (see docs/building.md). Mark them so
 # reviews collapse them instead of drowning in them.
 *.pb.go linguist-generated=true
