@@ -25,7 +25,7 @@ RUN set -eu && \
     protoc --version
 
 # Install Nim from pre-built binaries
-ARG NIM_VERSION=2.2.4
+ARG NIM_VERSION=2.2.6
 RUN set -eu && \
     DPKG_ARCH="$(dpkg --print-architecture)" && \
     case "$DPKG_ARCH" in \
@@ -47,6 +47,22 @@ RUN set -eu && \
     /opt/nim/bin/nim --version
 
 ENV PATH="/opt/nim/bin:${PATH}"
+
+# The nimble bundled with Nim cannot resolve nim-sds through the bindings.
+# The nightly build; the release predates the lock-file fixes the chain needs.
+ARG NIMBLE_CHANNEL=latest
+RUN set -eu && \
+    case "$(dpkg --print-architecture)" in \
+    amd64) NIMBLE_ARCH="linux_x64" ;; \
+    arm64) NIMBLE_ARCH="linux_aarch64" ;; \
+    *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
+    esac; \
+    curl -sSfL -o /tmp/nimble.tar.gz \
+    "https://github.com/nim-lang/nimble/releases/download/${NIMBLE_CHANNEL}/nimble-${NIMBLE_ARCH}.tar.gz" && \
+    tar -xzf /tmp/nimble.tar.gz -C /opt/nim/bin && \
+    rm /tmp/nimble.tar.gz && \
+    chmod +x /opt/nim/bin/nimble && \
+    nimble --version
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
@@ -72,7 +88,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_i
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
-    && cp /go/src/github.com/status-im/nim-sds/build/libsds.so /tmp/status-runtime-libs/ \
+    && cp /go/src/github.com/status-im/status-go/build/libsds.so /tmp/status-runtime-libs/ \
     && if [ -f /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so ]; then \
     cp /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so /tmp/status-runtime-libs/; \
     fi

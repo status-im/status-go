@@ -1,0 +1,61 @@
+name: ci / nimble
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  # The chain pins the compiler exactly; nim-sds and the bindings agree on this.
+  NIM_VERSION: '2.2.6'
+
+jobs:
+  libsds:
+    name: 'libsds / ${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: ${{ env.NIM_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The Nimble bundled with Nim resolves installDirs against srcDir, so the
+      # installed nim-sds carries no library/ and libsds cannot be built.
+      - uses: nim-lang/setup-nimble-action@v1
+        with:
+          nimble-version: 'nightly'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report versions
+        shell: bash
+        run: |
+          nim --version | head -1
+          nimble --version | head -1
+
+      # Windows: nim-lsquic vendors boringssl, whose test paths overrun the
+      # 260-char limit from nimble's default temp directory.
+      - name: Shorten TEMP path for nimble
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\T | Out-Null
+          "TEMP=C:\T" >> $env:GITHUB_ENV
+          "TMP=C:\T"  >> $env:GITHUB_ENV
+
+      - name: Build libsds through the bindings
+        shell: bash
+        run: make build-libsds
+
+      - name: Check the built library
+        shell: bash
+        run: ls -l build/
