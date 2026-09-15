@@ -10,6 +10,11 @@ SENDER_ADDRESS=$6
 
 export GIT_HTTP_LOW_SPEED_LIMIT=1000
 export GIT_HTTP_LOW_SPEED_TIME=30
+# FIXME: hack fix for github asking auth on public resources
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=http.version
+export GIT_CONFIG_VALUE_0=HTTP/1.1
+export GIT_TERMINAL_PROMPT=0
 
 retry() {
   local max=$1; shift
