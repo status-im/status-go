@@ -49,13 +49,13 @@ Originally, we used semantic versioning with MAJOR version 1, incrementing the M
 
 Though we considered updating import paths ([PR #6557](https://github.com/status-im/status-go/pull/6557)), we ultimately chose not to, since this would add unnecessary complexity with few benefits.
 
-Additionally, we have removed generated files from the main repository ([PR #5878](https://github.com/status-im/status-go/pull/5878)), making the default branch not directly go-gettable. This is acceptable for our workflow, as status-go is not designed for direct third-party `go get` usage.
+Additionally, the test-only generated files are not committed ([PR #5878](https://github.com/status-im/status-go/pull/5878)), so the default branch is not directly go-gettable. The generated sources the library build needs are committed, so that consumers resolving status-go as a nimble dependency get a buildable tree (see [How to Build](building.md), "status-go as a nimble package"). This is acceptable for our workflow, as status-go is not designed for direct third-party `go get` usage.
 
 ## Final Decisions
 
 - **No `/v{MAJOR}` Suffix:** We do not add the `/v{MAJOR}` module path suffix, even for versions > 1.
 - **Fixed MAJOR Version:** We no longer bump the MAJOR version for breaking changes.
-- **Generated Files Not Committed:** The main branches do not include generated files.
+- **Only Build-Essential Generated Files Committed:** The main branches carry the generated sources the library build needs; the test-only mocks stay untracked.
 - **Intended Usage:** status-go is to be used as a shared library of Status apps, not as a general Go module.
 
 ## Using status-go as a Go Dependency (Workaround)

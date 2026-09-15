@@ -22,10 +22,28 @@ Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more detai
 
 ## Building with your IDE
 
-`status-go` can be build as a regular Go project, but requires to pre-generate some files first:
+`status-go` can be built as a regular Go project. The generated sources the
+library build needs are committed, so a plain `go build` works out of a fresh
+clone. To regenerate them (after changing a `.proto`, a `//go:generate`
+directive or a SQL migration), and to generate the test-only mocks:
 - `make status-go-deps` - install required tools
 - `make generate` - compile protobuf files, build SQL migrations, generate mocks
 
+## Generated Go sources are committed
+
+Everything the LIBRARY targets need from `make generate` is committed, so the
+store copy builds with no generator toolchain anywhere near it:
+
+`*.pb.go`, `bindata.go`, `migrations.go`,
+`cmd/status-backend/server/endpoints.go` and
+`internal/protocol/messenger_handlers.go`. The mocks are test-only and stay
+untracked.
+
+Regenerate them with `make generate` from a checkout that has the toolchain
+(protoc, mockgen, `go tool go-generate-fast`) and commit the diff. CI runs
+`make generate` and then `git diff --exit-code`, so drift fails the PR.
+`scripts/cleanup_generated_files.sh` sweeps only the untracked, test-only
+mocks.
 ## Native dependency: libsds (nim-sds)
 
 Every build links `libsds`, built from [nim-sds](https://github.com/logos-messaging/nim-sds)

@@ -38,7 +38,10 @@ make statusgo-shared-library
 make statusgo-android-library / make statusgo-ios-library
 ```
 
-To work in an IDE / build as a plain Go project, you must first generate sources:
+The generated sources the library build needs (`*.pb.go`, migration bindata,
+the endpoint/handler tables) are COMMITTED, so a plain `go build` works out of
+a fresh clone. `make generate` regenerates them plus the untracked test-only
+mocks, and needs the generator toolchain:
 
 ```shell
 make status-go-deps        # install required Go tools
