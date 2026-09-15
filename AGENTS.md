@@ -70,16 +70,32 @@ below were each learned the hard way; keep them.
 ## sds build engine (statusgo.nims)
 
 - **One rule: every sds task builds the nimble-resolved nim-sds copy** (from
-  `nimble.paths`) — no env override, no sibling convention, no cloning. A
-  resolved path outside the store (develop link) is built **in place**
-  (artifacts in `<checkout>/build`); a store copy (`…/pkgs2/sds-…`) is copied
-  to `.sds-build/` at the package root (wiped and re-copied each run, never
-  installed) and built there so the store stays pristine.
-- The scratch copy gets `chmod -R u+w` (store trees can be read-only) and a
-  **materialized `nimble.paths`** (this package's resolution minus sds
-  entries): nim-sds's own `config.nims` includes a sibling `nimble.paths`, so
-  the inner compile resolves deps even for sds revisions without NIMFLAGS
-  forwarding.
+  `nimble.paths`) — no env override, no sibling convention, no cloning. That
+  copy is built **IN PLACE**, whether it is a develop link or a read-only
+  store copy: since nim-sds `425287ae` every sds task writes exclusively under
+  `SDS_OUT_DIR`, so there is no `.sds-build/` scratch copy any more.
+- **Nothing is written into a source tree** — not this package's, not
+  nim-sds's. Three env vars are the entire contract (see the header of
+  `statusgo.nims`):
+  - `STATUSGO_BUILD_DIR` — root of every output. Default: this package's own
+    directory, which reproduces the historical checkout layout exactly
+    (`build/bin/libstatus.*`, `.sds-build/build/libsds.*`,
+    `.sds-build/library/libsds.h`). A consumer points it at its own build
+    directory and the same relative layout appears there.
+  - `STATUSGO_NIMBLE_PATHS` — the resolution to build against. Default: the
+    `nimble.paths` beside `statusgo.nims`. An embedder that already resolved
+    the graph points this at its own file instead of COPYING one next to a
+    store copy (which would be a write into the package store). If a nested
+    setup has to generate one and this package is a store copy, the generated
+    file lands in `STATUSGO_BUILD_DIR`, never in the store.
+  - `NIMFLAGS` — forwarded to the inner nim-sds compiles.
+- The resolution is passed to the inner sds compile **whole**, sds entry
+  included: the compiled copy IS the resolved copy, so there is no second sds
+  on the path to split type identities, and the resolution's own entry is the
+  authority on the module layout (srcDir vs srcDir-hoisted).
+- nim-sds is invoked through its committed `sds.nims` (`sds.nimble` is
+  accepted as a fallback for copies predating it). The old `ln -sf sds.nimble
+  sds.nims` was itself a write into the sds tree.
 - The unpatched upstream sds at the current pin cannot produce a working
   macOS host static build: no NIMFLAGS forwarding (in-workspace builds get
   poisoned by parent-dir configs — chronicles defines break the ffi compile)
@@ -87,6 +103,71 @@ below were each learned the hard way; keep them.
   unlocalized archive fails with 17 duplicate Nim-runtime symbols; verified).
   Both are fixed by the local nim-sds patch queue (upstream-bound); until it
   merges and the pin bumps, host-static flows need the patched checkout.
+
+## Generated files committed for nimble consumption
+
+A consumer that resolves status-go as a nimble dependency gets whatever the
+package store materialized — a plain checkout of this tree, with no generator
+toolchain anywhere near it, and read-only. So everything `go build` needs for
+the LIBRARY targets is committed:
+
+- `*.pb.go`, `bindata.go`, `migrations.go`,
+  `cmd/status-backend/server/endpoints.go`,
+  `internal/protocol/messenger_handlers.go`.
+- `pkg/services/connector/chainutils/mock/` — the one mock package a NON-test
+  file imports (`pkg/services/connector/commands/test_helpers.go`, which is
+  not a `_test.go`). Every other mock stays untracked and test-only. If that
+  import ever moves into a `_test.go` file, drop this directory again.
+
+Regenerate them with `make generate` from a checkout that has the toolchain
+(protoc, mockgen, `go tool go-generate-fast`) and commit the diff; treat a
+noisy diff as a signal that a generator version drifted.
+`scripts/cleanup_generated_files.sh` now only sweeps the untracked mocks — it
+must not delete committed sources.
+
+Library targets take `GENERATE_PREREQ=` to skip `make generate` entirely;
+`statusgo.nims` always passes it, because for a store copy `make generate`
+would try to write into the package store.
+
+## Link-time build values (no more go:generate + go:embed)
+
+`pkg/version` and `pkg/sentry` used to receive their values as
+`go:generate sh -c "… > FILE"` outputs read back with `go:embed`. That made a
+build WRITE into the source tree — the single worst offender for a read-only
+consumer — and it silently picked up whatever git repository happened to be
+ABOVE the build directory (a scratch copy inside status-desktop got the
+DESKTOP version stamped into `pkg/version/VERSION`).
+
+They are plain package vars set with `-ldflags -X` now
+(`BUILD_VARS_LDFLAGS` in the Makefile). Same inputs: `git describe --tags` and
+`git rev-parse --short HEAD` for the version pair (both `git -C $(GIT_ROOT)`
+and `2>/dev/null`, so a store copy gets the honest empty answer and falls back
+to `0.0.0-dev` / `unknown`), and the `SENTRY_CONTEXT_NAME`,
+`SENTRY_CONTEXT_VERSION`, `SENTRY_PRODUCTION` environment variables for the
+Sentry trio. Embedders that already set those env vars need no change.
+
+## Building from a read-only copy (the out-of-tree output directory)
+
+`STATUS_GO_BUILD_DIR` (default `$(GIT_ROOT)build`) is the root of every
+library-target output; `STATUS_GO_BIN_DIR`, `STATUS_GO_BINDINGS_PATH`,
+`STATUS_GO_LIBRARY_OUT` and `STATUS_GO_STUB_BINDINGS_OUT` all derive from it.
+
+The generated cbindings entry point is handed to `go build` as a FILE
+(`"$(STATUS_GO_BINDINGS_PATH)/main.go"`, the synthetic
+`command-line-arguments` package), not as an in-module package path, because
+with an out-of-tree output directory there is no in-module directory to name.
+**A `-overlay` mapping an in-module package path to the out-of-tree file does
+NOT work** (verified): the overlay does supply a `main.go` for a path that
+does not exist on disk, but this is a cgo package and cgo `chdir()`s into the
+real package directory first — `cgo: chdir …/build/bin/statusgo-lib: no such
+file or directory`. Only a committed placeholder directory would rescue that
+route, and a file argument needs none.
+
+Go itself writes nothing into the module during `go build` (module cache and
+build cache live elsewhere, `-mod=readonly` is the default). Verified on
+Linux: `md5sum` of every file in a `chmod -R a-w` copy of this tree is
+identical before and after `nim libsds statusgo.nims` +
+`make statusgo-shared-library` with `STATUS_GO_BUILD_DIR` outside the tree.
 
 ## Byte-reproducible library outputs (the compare-before-copy contract)
 
@@ -119,19 +200,20 @@ char ~32/33 of an ar line it's the header mtime, otherwise extract members
   Since issue 0007 statusgo.nimble pins nim-sds by `URL#hash`
   (alexjba/nim-sds = PR logos-messaging/nim-sds#85 head, the whole 6-patch
   queue; moves to the upstream merge SHA when the PR lands), sds resolves
-  into the shared store and builds via the `.sds-build/` scratch engine —
-  `vendor/nim-sds` is no longer needed by the default flow (it remains only
-  as a develop-mode artifact, issue 0009). The app-side statusgo pin
-  (file:// → `URL#hash`) is issue 0010's job.
+  into the shared store and is built IN PLACE there — `vendor/nim-sds` is no
+  longer needed by the default flow (it remains only as a develop-mode
+  artifact, issue 0009). The app-side statusgo pin (file:// → `URL#hash`) is
+  issue 0010's job.
 - The app's store lives OUT of tree (`~/.cache/status-desktop-nimbledeps`,
   `APP_NIMBLE_DIR` in the desktop Makefile): `nimble setup` builds dependency
   package binaries (dnsclient, via libp2p), and Nim's parent-dir config walk
   poisons in-tree builds with the app's `config.nims` (and, for nested git
   worktrees, with an enclosing checkout's — unfixable from inside the repo).
-- `vendor/status-go/nimble.paths` (what the statusgo.nims sds engine reads)
-  is a byte-for-byte COPY of the app's `nimble.paths`, derived by the desktop
-  and mobile Makefiles — never a second `nimble setup`. Entries are absolute,
-  so the copy is valid from any directory. The former per-status-go cache
+- The resolution the statusgo.nims sds engine reads is the app's OWN
+  `nimble.paths`, handed over through `STATUSGO_NIMBLE_PATHS` — never a second
+  `nimble setup`, and (since the no-scratch-copy change) never a copy placed
+  next to a store copy either. Entries are absolute, so the file is valid from
+  any directory. The former per-status-go cache
   (`~/.cache/statusgo-nimbledeps`) and its ~11-minute second solve are gone.
 - The app compiles the wrapper with `-d:statusGoNoAutoLink` (set in the app's
   `config.nims`): desktop links the shared libstatus/libsds it builds itself.
@@ -195,6 +277,16 @@ char ~32/33 of an ar line it's the header mtime, otherwise extract members
   srcDir that hoisting collapses. status-desktop counter-measure: the isaac
   path hack in config.nims points at whichever of `<entry>` /
   `<entry minus /src>` actually exists.
+- **`installDirs`/`installFiles` are a whitelist, and a root-level script
+  needs an explicit entry**: nim-sds declares `installDirs = @["library",
+  "src"]` so the FFI wrapper survives installation, which also strips every
+  undeclared root file from the store copy. A committed `sds.nims` (the task
+  entry point that replaced the `ln -sf sds.nimble sds.nims` write into the
+  source tree) therefore only reaches consumers because
+  `installFiles = @["sds.nims"]` was added next to it. Symptom without it:
+  the store copy has `sds.nimble` but no `sds.nims`. (`nim <task>
+  <pkg>.nimble` also works — nim runs a `.nimble` as nimscript — so
+  `statusgo.nims` keeps that as a fallback for older sds copies.)
 - **`file://` requires are legal only at top level or inside packages reached
   via `file://`** (`developfile.nim` refuses to LOAD a develop-linked package
   whose manifest has one: "'file://' requires are only allowed in top level

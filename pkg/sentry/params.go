@@ -1,31 +1,31 @@
 package sentry
 
 import (
-	_ "embed"
 	"os"
-	"strings"
 )
 
-//go:generate sh -c "echo $SENTRY_CONTEXT_NAME > SENTRY_CONTEXT_NAME"
-//go:generate sh -c "echo $SENTRY_CONTEXT_VERSION > SENTRY_CONTEXT_VERSION"
-//go:generate sh -c "echo $SENTRY_PRODUCTION > SENTRY_PRODUCTION"
-
-const productionEnvironment = "production"
-
+// defaultContextName, defaultContextVersion and production are set at LINK
+// time by the Makefile from the SENTRY_CONTEXT_NAME, SENTRY_CONTEXT_VERSION
+// and SENTRY_PRODUCTION environment variables:
+//
+//	-ldflags "-X github.com/status-im/status-go/pkg/sentry.defaultContextName=..."
+//
+// They used to be `go:generate sh -c "echo $VAR > FILE"` outputs read back
+// with go:embed, which made a build write into the source tree — impossible
+// for a consumer that builds the read-only nimble store copy of this tree in
+// place. Same env var names, same meaning; only the transport changed. The
+// empty defaults are what a plain `go build` gets: no Sentry context and a
+// non-production environment.
 var (
-	//go:embed SENTRY_CONTEXT_NAME
 	defaultContextName string
 
-	//go:embed SENTRY_CONTEXT_VERSION
 	defaultContextVersion string
 
-	//go:embed SENTRY_PRODUCTION
+	// production is "true"/"1" when the build is a production build.
 	production string
 )
 
-func init() {
-	production = strings.TrimSpace(production)
-}
+const productionEnvironment = "production"
 
 func DefaultContext() string {
 	return defaultContextName

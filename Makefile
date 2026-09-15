@@ -99,8 +99,34 @@ export GOPATH ?= $(HOME)/go
 export GOPROXY ?= https://proxy.golang.org|direct
 
 GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
+# 2>/dev/null: a consumer builds this tree from a nimble store copy, which is
+# not a git checkout (and must not pick up whatever repository happens to be
+# above it). Empty is then the honest answer; BUILD_VARS_LDFLAGS substitutes a
+# placeholder, and an embedder that knows the real version passes it in.
+GIT_COMMIT ?= $(shell git -C "$(GIT_ROOT)" rev-parse --short HEAD 2>/dev/null)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
+
+# Output directory. EVERY artifact of a library build goes here; a consumer
+# building a READ-ONLY copy of this tree (a nimble store copy) points it
+# outside the tree, so `go build` never has to write into the module. The
+# default is the historical build/ inside the checkout.
+STATUS_GO_BUILD_DIR ?= $(GIT_ROOT)build
+STATUS_GO_BIN_DIR ?= $(STATUS_GO_BUILD_DIR)/bin
+
+# The generated cbindings entry point (statusgo-lib/main.go) is written into
+# the output directory and handed to `go build` as a FILE, not as a package
+# path: with an out-of-tree output directory there is no in-module directory
+# to name, and nothing may be created inside the module to make one. Go builds
+# such a file as the synthetic `command-line-arguments` package, resolving
+# imports against the main module of the working directory (this tree), which
+# is what the static library target has always done.
+#
+# A -overlay mapping an in-module package path to the out-of-tree file was
+# tried first and does NOT work: the overlay happily supplies a main.go for a
+# path that does not exist on disk, but the package is a cgo package, and cgo
+# chdir()s into the real package directory before it runs ("chdir
+# .../build/bin/statusgo-lib: no such file or directory"). Only a committed
+# placeholder directory would have made that route work.
 
 BUILD_TAGS ?= gowaku_no_rln
 
@@ -241,8 +267,39 @@ endif
 
 # Common flags
 
-BUILD_FLAGS ?= -ldflags=""
+# Values that pkg/version and pkg/sentry used to receive as `go:generate sh -c
+# "… > FILE"` outputs read back with go:embed. Generating them WROTE into the
+# source tree, which a consumer building a read-only copy of this tree cannot
+# do, so they are plain package vars set at link time now. The inputs are
+# unchanged: git describe / git rev-parse for the version pair, and the
+# SENTRY_CONTEXT_NAME / SENTRY_CONTEXT_VERSION / SENTRY_PRODUCTION environment
+# variables (which embedders already set) for the Sentry trio.
+VERSION_PKG := github.com/status-im/status-go/pkg/version
+SENTRY_PKG := github.com/status-im/status-go/pkg/sentry
+STATUS_GO_VERSION ?= $(shell git -C "$(GIT_ROOT)" describe --tags 2>/dev/null)
+ifeq ($(strip $(STATUS_GO_VERSION)),)
+ STATUS_GO_VERSION := 0.0.0-dev
+endif
+ifeq ($(strip $(GIT_COMMIT)),)
+ STATUS_GO_GIT_COMMIT := unknown
+else
+ STATUS_GO_GIT_COMMIT := $(GIT_COMMIT)
+endif
+SENTRY_CONTEXT_VERSION ?= $(STATUS_GO_VERSION)
+BUILD_VARS_LDFLAGS := \
+	-X $(VERSION_PKG).version=$(STATUS_GO_VERSION) \
+	-X $(VERSION_PKG).gitCommit=$(STATUS_GO_GIT_COMMIT) \
+	-X $(SENTRY_PKG).defaultContextName=$(SENTRY_CONTEXT_NAME) \
+	-X $(SENTRY_PKG).defaultContextVersion=$(SENTRY_CONTEXT_VERSION) \
+	-X $(SENTRY_PKG).production=$(SENTRY_PRODUCTION)
+
+BUILD_FLAGS ?= -ldflags="$(BUILD_VARS_LDFLAGS)"
 BUILD_FLAGS_MOBILE ?=
+
+# Consumers that build from a materialized dependency copy have already been
+# handed a complete tree (the generated Go sources are committed) and have
+# neither protoc nor mockgen: they pass GENERATE_PREREQ= to skip the step.
+GENERATE_PREREQ ?= generate
 
 networkid ?= StatusChain
 
@@ -397,10 +454,10 @@ status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
 run-status-backend: $(LIBSDS)
-run-status-backend: generate
+run-status-backend: $(GENERATE_PREREQ)
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
+	go run -mod=mod -ldflags="$(BUILD_VARS_LDFLAGS)" ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -415,14 +472,17 @@ status-go-deps:
 # GOOS and GOARCH are essential to generate cbindings when cross compiling on macos
 GO_HOST_ENV = GOOS=$(shell go env GOHOSTOS) GOARCH=$(shell go env GOHOSTARCH)
 
-statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+# Global (not target-specific): every library target below names this path,
+# and the c-bindings target writes it.
+STATUS_GO_BINDINGS_PATH ?= $(STATUS_GO_BIN_DIR)/statusgo-lib
+
 statusgo-c-bindings:
 	@## tools/generate-cbindings/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
 	$(GO_HOST_ENV) go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= build/bin
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= build/bin/libstatus.h
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= $(STATUS_GO_BIN_DIR)
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= $(STATUS_GO_BIN_DIR)/libstatus.h
 statusgo-stub-bindings:
 	@## Generate stub bindings based on libstatus.h
 	mkdir -p $(STATUS_GO_STUB_BINDINGS_OUT)
@@ -430,9 +490,8 @@ statusgo-stub-bindings:
 		--header $(STATUS_GO_STUB_BINDINGS_HEADER) \
 		--out-dir $(STATUS_GO_STUB_BINDINGS_OUT)
 
-statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-library: generate
+statusgo-library: STATUS_GO_LIBRARY_OUT ?= $(STATUS_GO_BIN_DIR)
+statusgo-library: $(GENERATE_PREREQ)
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -444,7 +503,7 @@ statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-g
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
-statusgo-shared-library: generate
+statusgo-shared-library: $(GENERATE_PREREQ)
 statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
@@ -453,46 +512,46 @@ statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build st
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
-		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
-		./build/bin/statusgo-lib
+		-o $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 ifeq ($(detected_OS),Linux)
-	cd build/bin && \
+	cd $(STATUS_GO_BIN_DIR) && \
 	ls -lah . && \
 	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
-	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
+	ln -sf ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
-	@ls -la build/bin/libstatus.*
+	@ls -la $(STATUS_GO_BIN_DIR)/libstatus.*
 
 # The mobile library targets must be byte-reproducible for unchanged sources:
 # consumers rebuild dependents through a compare-before-copy contract
 # (status-desktop ADR 0003), and Go's link-time build ID varies run-to-run.
 # -buildid= strips it; the ID is unused in c-archive/c-shared artifacts.
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
-		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
+		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.so" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Android library built"
-	@file build/bin/libstatus.so
+	@file $(STATUS_GO_BIN_DIR)/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
-		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
+		-ldflags="-buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.a" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@# Go's archive writer stamps real mtimes in the ar member headers; repack
 	@# with zeroed dates so unchanged sources yield a byte-identical archive
 	@# (the compare-before-copy contract above).
 	ZERO_AR_DATE=1 xcrun libtool -static -no_warning_for_no_symbols \
-		-o "build/bin/libstatus.a.tmp" "build/bin/libstatus.a" && \
-		mv "build/bin/libstatus.a.tmp" "build/bin/libstatus.a"
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.a.tmp" "$(STATUS_GO_BIN_DIR)/libstatus.a" && \
+		mv "$(STATUS_GO_BIN_DIR)/libstatus.a.tmp" "$(STATUS_GO_BIN_DIR)/libstatus.a"
 	@echo "iOS library built"
-	@file build/bin/libstatus.a
+	@file $(STATUS_GO_BIN_DIR)/libstatus.a
 
 docker-image: SHELL := /bin/sh
 docker-image: BUILD_TARGET ?= cmd
