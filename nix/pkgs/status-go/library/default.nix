@@ -67,6 +67,8 @@ in pkgs.buildGoModule {
         LOGOS_STORAGE_INC_DIR="${pkgs.libstorage}/include" \
         STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
         STATUS_GO_LIBRARY_OUT="$out" \
+        STATUS_GO_VERSION="${version}" \
+        GIT_COMMIT="${version}" \
         CLEANUP_GENERATED_FILES=false \
         GO_GENERATE_CMD='go generate'
     runHook postBuild

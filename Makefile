@@ -99,7 +99,15 @@ export GOPATH ?= $(HOME)/go
 export GOPROXY ?= https://proxy.golang.org|direct
 
 GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
+# A consumer builds this tree from a nimble store copy, which is not a git
+# checkout and must not pick up whatever repository happens to be above it.
+# `git -C` answers from an ancestor repository, so the probes here and in
+# STATUS_GO_VERSION run only when this tree carries its own .git (a directory
+# in a clone, a file in a worktree). Empty is then the answer;
+# BUILD_VARS_LDFLAGS substitutes a placeholder, and an embedder that knows the
+# real version passes it in.
+GIT_ROOT_IS_CHECKOUT := $(wildcard $(GIT_ROOT).git)
+GIT_COMMIT ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" rev-parse --short HEAD 2>/dev/null))
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
@@ -255,7 +263,36 @@ endif
 
 # Common flags
 
-BUILD_FLAGS ?= -ldflags=""
+# Build values pkg/version and pkg/sentry take as plain package vars set at
+# LINK time, rather than generated files: generating them writes into the
+# source tree, which a consumer building a read-only copy of this tree cannot
+# do. Inputs: git describe / git rev-parse for the version pair, and the
+# SENTRY_CONTEXT_NAME / SENTRY_CONTEXT_VERSION / SENTRY_PRODUCTION environment
+# variables for the Sentry trio.
+VERSION_PKG := github.com/status-im/status-go/pkg/version
+SENTRY_PKG := github.com/status-im/status-go/pkg/sentry
+STATUS_GO_VERSION ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" describe --tags 2>/dev/null))
+ifeq ($(strip $(STATUS_GO_VERSION)),)
+ STATUS_GO_VERSION := 0.0.0-dev
+endif
+ifeq ($(strip $(GIT_COMMIT)),)
+ STATUS_GO_GIT_COMMIT := unknown
+else
+ STATUS_GO_GIT_COMMIT := $(GIT_COMMIT)
+endif
+SENTRY_CONTEXT_VERSION ?= $(STATUS_GO_VERSION)
+BUILD_VARS_LDFLAGS := \
+	-X $(VERSION_PKG).version=$(STATUS_GO_VERSION) \
+	-X $(VERSION_PKG).gitCommit=$(STATUS_GO_GIT_COMMIT) \
+	-X $(SENTRY_PKG).defaultContextName=$(SENTRY_CONTEXT_NAME) \
+	-X $(SENTRY_PKG).defaultContextVersion=$(SENTRY_CONTEXT_VERSION) \
+	-X $(SENTRY_PKG).production=$(SENTRY_PRODUCTION)
+
+# Extra link flags for the caller. They go in here, NOT in BUILD_FLAGS:
+# overriding BUILD_FLAGS wholesale replaces BUILD_VARS_LDFLAGS and silently
+# leaves the build unstamped.
+GO_EXTRA_LDFLAGS ?=
+BUILD_FLAGS ?= -ldflags="$(BUILD_VARS_LDFLAGS) $(GO_EXTRA_LDFLAGS)"
 BUILD_FLAGS_MOBILE ?=
 
 networkid ?= StatusChain
@@ -426,7 +463,7 @@ run-status-backend: $(LIBSDS)
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
+	go run -mod=mod -ldflags="$(BUILD_VARS_LDFLAGS)" ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -494,7 +531,7 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
+		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
 	@file build/bin/libstatus.so
@@ -505,7 +542,7 @@ statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-com
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
+		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
 	@echo "iOS library built"
 	@file build/bin/libstatus.a

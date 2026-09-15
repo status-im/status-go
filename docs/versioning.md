@@ -66,9 +66,8 @@ For rare cases where status-go needs to be used as an importable Go module (e.g.
    - Use the script `scripts/branch_version_generated.sh` to automate the process of creating a branch with generated files
    - This script:
      - Checks out a branch named `generated/{version}` based on the latest tag
-     - Un-gitignores generated files
+     - Un-gitignores the remaining untracked generated files
      - Runs code generation
-     - Fixes up the version file
      - Commits and pushes the result
 
 2. **Go Get from Commit Hash:**

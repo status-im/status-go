@@ -19,9 +19,3 @@ echo "Cleaning up generated files... (dry run: $DRY_RUN) "
 find . -path './vendor' -prune -o -type d -name 'mock' -exec $CMD {} +
 find . -path './vendor' -prune -o -type f -name 'mock.go' -exec $CMD {} +
 find . -path './vendor' -prune -o -type f -name '*_mock_test.go' -exec $CMD {} +
-
-$CMD ./pkg/version/VERSION
-$CMD ./pkg/version/GIT_COMMIT
-$CMD ./pkg/sentry/SENTRY_CONTEXT_NAME
-$CMD ./pkg/sentry/SENTRY_CONTEXT_VERSION
-$CMD ./pkg/sentry/SENTRY_PRODUCTION

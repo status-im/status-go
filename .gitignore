@@ -112,11 +112,6 @@ report/results.xml
 mock/
 mock.go
 *_mock_test.go
-pkg/version/VERSION
-pkg/version/GIT_COMMIT
-pkg/sentry/SENTRY_CONTEXT_NAME
-pkg/sentry/SENTRY_CONTEXT_VERSION
-pkg/sentry/SENTRY_PRODUCTION
 
 go.work
 go.work.sum
