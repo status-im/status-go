@@ -110,6 +110,19 @@ GIT_ROOT_IS_CHECKOUT := $(wildcard $(GIT_ROOT).git)
 GIT_COMMIT ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" rev-parse --short HEAD 2>/dev/null))
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
+# Output directory. EVERY artifact of a library build goes here; a consumer
+# building a READ-ONLY copy of this tree points it outside the tree, so
+# `go build` never has to write into the module.
+STATUS_GO_BUILD_DIR ?= $(GIT_ROOT)build
+STATUS_GO_BIN_DIR ?= $(STATUS_GO_BUILD_DIR)/bin
+
+# The generated cbindings entry point (statusgo-lib/main.go) is written into
+# the output directory and handed to `go build` as a FILE, not as a package
+# path: with an out-of-tree output directory there is no in-module directory to
+# name, and nothing may be created inside the module to make one. Go builds
+# such a file as the synthetic `command-line-arguments` package, resolving its
+# imports against the main module of the working directory (this tree).
+
 BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
@@ -148,8 +161,9 @@ else
 endif
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+# override: these must survive CGO_* passed as make command-line args (else -lsds is silently dropped).
+override CGO_CFLAGS += -I$(NIM_SDS_INC_DIR)
+override CGO_LDFLAGS += -L$(NIM_SDS_LIB_DIR) -lsds
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -178,8 +192,8 @@ RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage
-	CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
-	CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
+	override CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
+	override CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
 	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
 	LOGOS_STORAGE_BUILD_DEPS += $(LIBSTORAGE)
 endif
@@ -245,7 +259,7 @@ history-archive-help: ##@build Show history archive build/test toggles and env v
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
  # On Windows, use portable C implementations and add -Werror=implicit-function-declaration workaround
- CGO_CFLAGS+=-Wno-implicit-function-declaration
+ override CGO_CFLAGS += -Wno-implicit-function-declaration
 endif
 
 # Common flags
@@ -281,6 +295,11 @@ BUILD_VARS_LDFLAGS := \
 GO_EXTRA_LDFLAGS ?=
 BUILD_FLAGS ?= -ldflags="$(BUILD_VARS_LDFLAGS) $(GO_EXTRA_LDFLAGS)"
 BUILD_FLAGS_MOBILE ?=
+
+# Consumers that build from a materialized dependency copy have already been
+# handed a complete tree (the generated Go sources are committed) and have
+# neither protoc nor mockgen: they pass GENERATE_PREREQ= to skip the step.
+GENERATE_PREREQ ?= generate
 
 networkid ?= StatusChain
 
@@ -400,13 +419,23 @@ build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
 	$(if $(filter amd64,$(ARCH)),amd64,\
 	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
+# The mobile targets name libsds by the target platform's extension: LIBSDS
+# carries the host one.
 build-libsds-android: clone-nim-sds
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for Android" $(LIBSDS)
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=$(MAKE_SHELL)
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.so || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.so" && exit 1)
+endif
 
 build-libsds-ios: clone-nim-sds
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for iOS" $(LIBSDS)
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.a || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.a" && exit 1)
+endif
 
 clean-libsds:
 	@echo "Removing libsds"
@@ -424,7 +453,7 @@ status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
 run-status-backend: $(LIBSDS)
-run-status-backend: generate
+run-status-backend: $(GENERATE_PREREQ)
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go run -mod=mod -ldflags="$(BUILD_VARS_LDFLAGS)" ./cmd/status-backend --address localhost:${PORT}
@@ -442,14 +471,17 @@ status-go-deps:
 # GOOS and GOARCH are essential to generate cbindings when cross compiling on macos
 GO_HOST_ENV = GOOS=$(shell go env GOHOSTOS) GOARCH=$(shell go env GOHOSTARCH)
 
-statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+# Global (not target-specific): every library target below names this path,
+# and the c-bindings target writes it.
+STATUS_GO_BINDINGS_PATH ?= $(STATUS_GO_BIN_DIR)/statusgo-lib
+
 statusgo-c-bindings:
 	@## tools/generate-cbindings/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
 	$(GO_HOST_ENV) go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= build/bin
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= build/bin/libstatus.h
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= $(STATUS_GO_BIN_DIR)
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= $(STATUS_GO_BIN_DIR)/libstatus.h
 statusgo-stub-bindings:
 	@## Generate stub bindings based on libstatus.h
 	mkdir -p $(STATUS_GO_STUB_BINDINGS_OUT)
@@ -457,9 +489,8 @@ statusgo-stub-bindings:
 		--header $(STATUS_GO_STUB_BINDINGS_HEADER) \
 		--out-dir $(STATUS_GO_STUB_BINDINGS_OUT)
 
-statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-library: generate
+statusgo-library: STATUS_GO_LIBRARY_OUT ?= $(STATUS_GO_BIN_DIR)
+statusgo-library: $(GENERATE_PREREQ)
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -471,7 +502,7 @@ statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-g
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
-statusgo-shared-library: generate
+statusgo-shared-library: $(GENERATE_PREREQ)
 statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
@@ -480,36 +511,36 @@ statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build st
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
-		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
-		./build/bin/statusgo-lib
+		-o $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 ifeq ($(detected_OS),Linux)
-	cd build/bin && \
+	cd $(STATUS_GO_BIN_DIR) && \
 	ls -lah . && \
 	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
-	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
+	ln -sf ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
-	@ls -la build/bin/libstatus.*
+	@ls -la $(STATUS_GO_BIN_DIR)/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
-		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.so" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Android library built"
-	@file build/bin/libstatus.so
+	@file $(STATUS_GO_BIN_DIR)/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
-		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.a" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "iOS library built"
-	@file build/bin/libstatus.a
+	@file $(STATUS_GO_BIN_DIR)/libstatus.a
 
 docker-image: SHELL := /bin/sh
 docker-image: BUILD_TARGET ?= cmd
