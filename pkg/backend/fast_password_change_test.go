@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -260,9 +261,18 @@ func TestCreateAccountUsesDEKFromDayOne(t *testing.T) {
 	})
 	t.Cleanup(signal.ResetHandler)
 
+	var kdfDerivations atomic.Int64
+	envelope.SetKDFDerivationHookForTests(func() { kdfDerivations.Add(1) })
+	t.Cleanup(func() { envelope.SetKDFDerivationHookForTests(nil) })
+
 	account, err := testContext.backend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
 	<-c
+
+	// The DEK is primed into the session cache at creation, so the whole create+login flow performs
+	// exactly one envelope KEK derivation (the wrap) and no redundant unwrap of the file just written.
+	require.EqualValues(t, 1, kdfDerivations.Load())
+	envelope.SetKDFDerivationHookForTests(nil)
 
 	b := testContext.backend
 	require.True(t, envelope.Exists(b.rootDataDir, account.KeyUID))
