@@ -9,6 +9,8 @@ import (
 
 	"github.com/status-im/status-go/internal/contracts/hop"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
+	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/paraswap"
 	mock_paraswap "github.com/status-im/status-go/pkg/services/wallet/thirdparty/paraswap/mock"
 )
@@ -22,6 +24,30 @@ func TestTokenAvailableForBridgingViaHop(t *testing.T) {
 	require.True(t, r.TokenAvailableForBridgingViaHop(walletCommon.EthereumMainnet, contracts[0]))
 	require.True(t, r.TokenAvailableForBridgingViaHop(walletCommon.EthereumMainnet, walletCommon.ZeroAddress()))
 	require.False(t, r.TokenAvailableForBridgingViaHop(uint64(999999), contracts[0]))
+}
+
+// registeredProcessors builds the processor map the router consults to decide
+// whether a swap provider is enabled. Only presence matters for these tests.
+func registeredProcessors(names ...string) map[string]pathprocessor.PathProcessor {
+	processors := make(map[string]pathprocessor.PathProcessor, len(names))
+	for _, name := range names {
+		processors[name] = &pathprocessor.SwapParaswapProcessor{}
+	}
+	return processors
+}
+
+func TestIsChainSupportedForSwapViaParaswap_ProviderNotRegistered(t *testing.T) {
+	r := &Router{
+		pathProcessors: registeredProcessors(),
+		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
+			t.Fatal("paraswap client must not be created when the provider is not registered")
+			return nil
+		},
+	}
+
+	supported, err := r.IsChainSupportedForSwapViaParaswap(walletCommon.EthereumMainnet)
+	require.NoError(t, err)
+	require.False(t, supported)
 }
 
 func TestIsChainSupportedForSwapViaParaswap(t *testing.T) {
@@ -41,6 +67,7 @@ func TestIsChainSupportedForSwapViaParaswap(t *testing.T) {
 		Return(tokens, nil)
 
 	r := &Router{
+		pathProcessors: registeredProcessors(pathProcessorCommon.ProcessorSwapParaswapName),
 		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
 			require.Equal(t, requestedChainID, chainID)
 			return mockClient
@@ -55,6 +82,7 @@ func TestIsChainSupportedForSwapViaParaswap(t *testing.T) {
 		Return([]paraswap.Token{}, nil)
 
 	r = &Router{
+		pathProcessors: registeredProcessors(pathProcessorCommon.ProcessorSwapParaswapName),
 		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
 			return mockClient
 		},
@@ -75,6 +103,7 @@ func TestIsChainSupportedForSwapViaParaswap_Error(t *testing.T) {
 		Return(nil, errors.New("error fetching tokens list"))
 
 	r := &Router{
+		pathProcessors: registeredProcessors(pathProcessorCommon.ProcessorSwapParaswapName),
 		paraswapClientFactory: func(chainID uint64) paraswap.ClientInterface {
 			return mockClient
 		},
