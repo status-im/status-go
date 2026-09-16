@@ -1264,6 +1264,9 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 			CoingeckoAPIKey:      coingeckoAPIKey,
 			CoingeckoDemoAPIKey:  coingeckoDemoAPIKey,
 		},
+		WalletConfig: requests.WalletConfig{
+			EnableParaswapProvider: boolPtr(true),
+		},
 	}
 
 	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
@@ -1283,6 +1286,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	require.Equal(t, walletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 	require.Equal(t, walletConfig.CoingeckoAPIKey, coingeckoAPIKey)
 	require.Equal(t, walletConfig.CoingeckoDemoAPIKey, coingeckoDemoAPIKey)
+	require.True(t, walletConfig.EnableParaswapProvider)
 
 	require.NoError(t, testContext.backend.Logout())
 }
