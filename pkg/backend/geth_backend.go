@@ -2177,6 +2177,9 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 		if err := envelope.Write(b.rootDataDir, keyUID, dek, request.Password, sqlite.ReducedKDFIterationsNumber); err != nil {
 			return nil, err
 		}
+		// The DEK is known right here - prime the session cache so the login below resolves it
+		// without unwrapping the envelope file we just wrote (a second scrypt derivation).
+		b.primeSecretCacheWithDEK(keyUID, dek, request.Password, sqlite.ReducedKDFIterationsNumber)
 		// High-entropy DEK needs no key stretching
 		multiAccount.KDFIterations = sqlite.ReducedKDFIterationsNumber
 	}

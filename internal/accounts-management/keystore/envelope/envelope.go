@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	geth "github.com/status-im/status-go/internal/accounts-management/keystore/internal/geth"
 )
@@ -25,6 +26,26 @@ const (
 )
 
 var ErrInvalidKEK = errors.New("envelope: invalid key-encryption key")
+
+// kdfDerivationHook is test-only instrumentation registered via SetKDFDerivationHookForTests.
+var kdfDerivationHook atomic.Pointer[func()]
+
+// SetKDFDerivationHookForTests registers (or clears, with nil) a callback invoked once per KEK
+// derivation (wrap or unwrap), letting tests assert how many scrypt derivations a flow performs.
+// Test instrumentation only - never set in production code.
+func SetKDFDerivationHookForTests(hook func()) {
+	if hook == nil {
+		kdfDerivationHook.Store(nil)
+		return
+	}
+	kdfDerivationHook.Store(&hook)
+}
+
+func noteKDFDerivation() {
+	if hook := kdfDerivationHook.Load(); hook != nil {
+		(*hook)()
+	}
+}
 
 type wrappedKeyFile struct {
 	Version         int             `json:"version"`
@@ -80,6 +101,7 @@ func writeToPath(path, keyUID, dekHex, kek string, dbKdfIterations int) error {
 		return fmt.Errorf("envelope: DEK must be %d hex-encoded bytes", dekLength)
 	}
 
+	noteKDFDerivation()
 	cryptoJSON, err := geth.EncryptDataV3(dek, []byte(kek), scryptN, scryptP)
 	if err != nil {
 		return err
@@ -122,6 +144,7 @@ func unwrapFromPath(path, kek string) (dekHex string, dbKdfIterations int, err e
 		return "", 0, fmt.Errorf("envelope: unsupported wrapped-DEK file version %d", file.Version)
 	}
 
+	noteKDFDerivation()
 	dek, err := geth.DecryptDataV3(file.Crypto, kek)
 	if err != nil {
 		// MAC mismatch (or any decrypt failure) means the KEK is wrong.

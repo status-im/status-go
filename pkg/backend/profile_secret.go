@@ -137,6 +137,25 @@ func (b *StatusBackend) clearProfileSecretCache() {
 	c.mu.Unlock()
 }
 
+// primeSecretCacheWithDEK caches a DEK that is already known - right after wrapping a fresh DEK at
+// account creation. When kek is non-empty its fingerprint is stored too, letting that password resolve from the cache.
+func (b *StatusBackend) primeSecretCacheWithDEK(keyUID, dekHex, kek string, dbKdfIter int) {
+	c := &b.secretCache
+	c.mu.Lock()
+	c.keyUID = keyUID
+	c.kekFingerprint = nil
+	if kek != "" {
+		fingerprint := sha256.Sum256([]byte(kek))
+		c.kekFingerprint = fingerprint[:]
+	}
+	c.dekHex = dekHex
+	c.dbKdfIter = dbKdfIter
+	c.primaryFromPending = false
+	c.pendingDekHex = ""
+	c.pendingDbKdfIter = 0
+	c.mu.Unlock()
+}
+
 // refreshSecretCacheKEK updates the cached KEK fingerprint after the envelope was re-wrapped with
 // a new KEK (fast password change).
 func (b *StatusBackend) refreshSecretCacheKEK(keyUID, newKEK string) {
