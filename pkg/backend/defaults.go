@@ -158,6 +158,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		Enabled:                true,
 		EnableMercuryoProvider: true,
 		EnableParaswapProvider: boolOrDefault(walletRequest.EnableParaswapProvider, false),
+		EnableLiFiProvider:     boolOrDefault(walletRequest.EnableLiFiProvider, false),
 
 		TokensListsAutoRefreshCheckInterval: walletRequest.TokensListsAutoRefreshCheckInterval,
 		TokensListsAutoRefreshInterval:      walletRequest.TokensListsAutoRefreshInterval,
