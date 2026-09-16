@@ -140,6 +140,11 @@ func (r *Router) AddPathProcessor(processor pathprocessor.PathProcessor) {
 	r.pathProcessors[processor.Name()] = processor
 }
 
+func (r *Router) isProcessorRegistered(name string) bool {
+	_, ok := r.pathProcessors[name]
+	return ok
+}
+
 func (r *Router) Stop() {
 	r.scheduler.Stop()
 }
