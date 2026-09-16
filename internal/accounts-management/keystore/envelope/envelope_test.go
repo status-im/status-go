@@ -1,12 +1,15 @@
 package envelope
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	geth "github.com/status-im/status-go/internal/accounts-management/keystore/internal/geth"
 )
 
 const (
@@ -166,4 +169,71 @@ func TestRemove(t *testing.T) {
 
 func TestPathNaming(t *testing.T) {
 	require.Equal(t, filepath.Join("/data", testKeyUID+"-profile.kek"), Path("/data", testKeyUID))
+}
+
+// TestWriteRecordsScryptParams pins the KDF cost recorded in newly written envelopes: this KDF is
+// the profile's sole offline brute-force barrier, and its N caps the 128*N*r scrypt memory spike.
+func TestWriteRecordsScryptParams(t *testing.T) {
+	dir := t.TempDir()
+
+	dek, err := Generate()
+	require.NoError(t, err)
+	require.NoError(t, Write(dir, testKeyUID, dek, testKEK, 3200))
+
+	content, err := os.ReadFile(Path(dir, testKeyUID))
+	require.NoError(t, err)
+	var file wrappedKeyFile
+	require.NoError(t, json.Unmarshal(content, &file))
+
+	require.Equal(t, "scrypt", file.Crypto.KDF)
+	require.EqualValues(t, scryptN, file.Crypto.KDFParams["n"])
+	require.EqualValues(t, scryptP, file.Crypto.KDFParams["p"])
+}
+
+// TestUnwrapForeignScryptParams verifies that a file written under a different KDF cost than the
+// compiled constants still unwraps: the parameters live inside the file, so changing the constants
+// never invalidates existing envelopes.
+func TestUnwrapForeignScryptParams(t *testing.T) {
+	dir := t.TempDir()
+
+	dekHex, err := Generate()
+	require.NoError(t, err)
+	dek, err := hex.DecodeString(dekHex)
+	require.NoError(t, err)
+
+	const foreignN, foreignP = 4096, 6
+	cryptoJSON, err := geth.EncryptDataV3(dek, []byte(testKEK), foreignN, foreignP)
+	require.NoError(t, err)
+	content, err := json.Marshal(wrappedKeyFile{
+		Version:         fileVersion,
+		KeyUID:          testKeyUID,
+		DBKdfIterations: 3200,
+		Crypto:          cryptoJSON,
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(Path(dir, testKeyUID), content, 0600))
+
+	unwrapped, kdfIterations, err := Unwrap(dir, testKeyUID, testKEK)
+	require.NoError(t, err)
+	require.Equal(t, dekHex, unwrapped)
+	require.Equal(t, 3200, kdfIterations)
+
+	// A password change (Rewrap) of such a file keeps the DEK, moves it to the new KEK and
+	// re-writes the file with the currently compiled parameters.
+	require.NoError(t, Rewrap(dir, testKeyUID, testKEK, otherKEK))
+
+	unwrapped, kdfIterations, err = Unwrap(dir, testKeyUID, otherKEK)
+	require.NoError(t, err)
+	require.Equal(t, dekHex, unwrapped)
+	require.Equal(t, 3200, kdfIterations)
+
+	_, _, err = Unwrap(dir, testKeyUID, testKEK)
+	require.ErrorIs(t, err, ErrInvalidKEK)
+
+	content, err = os.ReadFile(Path(dir, testKeyUID))
+	require.NoError(t, err)
+	var rewritten wrappedKeyFile
+	require.NoError(t, json.Unmarshal(content, &rewritten))
+	require.EqualValues(t, scryptN, rewritten.Crypto.KDFParams["n"])
+	require.EqualValues(t, scryptP, rewritten.Crypto.KDFParams["p"])
 }
