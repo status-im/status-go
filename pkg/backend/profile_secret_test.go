@@ -150,7 +150,7 @@ func TestPrimeSecretCacheWithDEK(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, envelope.Write(b.rootDataDir, secretTestKeyUID, dek, secretTestPassword, 3200))
 
-	b.primeSecretCacheWithDEK(secretTestKeyUID, dek, 3200)
+	b.primeSecretCacheWithDEK(secretTestKeyUID, dek, "", 3200)
 
 	// The raw DEK and its client hash both resolve from the primed cache.
 	resolved, err := b.resolveProfileSecret(secretTestKeyUID, dek, 0)

@@ -144,10 +144,21 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	return nil
 }
 
+// boolOrDefault resolves an optional request flag: nil means "not specified",
+// in which case the provider default applies.
+func boolOrDefault(v *bool, def bool) bool {
+	if v == nil {
+		return def
+	}
+	return *v
+}
+
 func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.WalletSecretsConfig) params.WalletConfig {
 	walletConfig := params.WalletConfig{
 		Enabled:                true,
 		EnableMercuryoProvider: true,
+		EnableParaswapProvider: boolOrDefault(walletRequest.EnableParaswapProvider, false),
+		EnableLiFiProvider:     boolOrDefault(walletRequest.EnableLiFiProvider, false),
 
 		TokensListsAutoRefreshCheckInterval: walletRequest.TokensListsAutoRefreshCheckInterval,
 		TokensListsAutoRefreshInterval:      walletRequest.TokensListsAutoRefreshInterval,
