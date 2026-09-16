@@ -153,12 +153,18 @@ func clientHashOf(secret string) string {
 	return "0x" + hex.EncodeToString(ethcrypto.Keccak256([]byte(secret)))
 }
 
-// primeSecretCacheWithDEK caches the DEK directly from a client-supplied DEK (biometric login).
-func (b *StatusBackend) primeSecretCacheWithDEK(keyUID, dekHex string, dbKdfIter int) {
+// primeSecretCacheWithDEK caches a DEK that is already known - right after wrapping a fresh DEK at
+// account creation or directly from a client-supplied DEK (biometric login). When kek is non-empty its fingerprint is
+// stored too, letting that password resolve from the cache.
+func (b *StatusBackend) primeSecretCacheWithDEK(keyUID, dekHex, kek string, dbKdfIter int) {
 	c := &b.secretCache
 	c.mu.Lock()
 	c.keyUID = keyUID
 	c.kekFingerprint = nil
+	if kek != "" {
+		fingerprint := sha256.Sum256([]byte(kek))
+		c.kekFingerprint = fingerprint[:]
+	}
 	c.dekHex = dekHex
 	c.dekClientHash = clientHashOf(dekHex)
 	c.dbKdfIter = dbKdfIter
@@ -180,7 +186,7 @@ func (b *StatusBackend) prepareDEKLogin(request *requests.Login) error {
 	if err != nil {
 		return err
 	}
-	b.primeSecretCacheWithDEK(request.KeyUID, request.DEK, iter)
+	b.primeSecretCacheWithDEK(request.KeyUID, request.DEK, "", iter)
 	request.Password = request.DEK
 	return nil
 }
