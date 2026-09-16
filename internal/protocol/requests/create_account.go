@@ -110,6 +110,7 @@ type WalletConfig struct {
 
 	// Swap provider toggles
 	EnableParaswapProvider *bool `json:"enableParaswapProvider,omitempty"` // default: false
+	EnableLiFiProvider     *bool `json:"enableLiFiProvider,omitempty"`     // default: false
 }
 type WalletSecretsConfig struct {
 	PoktToken            security.SensitiveString `json:"poktToken"`

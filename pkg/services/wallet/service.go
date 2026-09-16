@@ -399,11 +399,14 @@ func buildPathProcessors(
 		ret = append(ret, paraswap)
 	}
 
-	lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager, lifiAPIKey, lifiIntegrator)
-	ret = append(ret, lifi)
+	if walletConfig.EnableLiFiProvider {
+		lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager, lifiAPIKey, lifiIntegrator)
+		ret = append(ret, lifi)
+	}
 
 	logutils.ZapLogger().Info("swap providers registered",
 		zap.Bool("paraswap", walletConfig.EnableParaswapProvider),
+		zap.Bool("lifi", walletConfig.EnableLiFiProvider),
 	)
 
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)

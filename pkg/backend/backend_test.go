@@ -1266,6 +1266,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		},
 		WalletConfig: requests.WalletConfig{
 			EnableParaswapProvider: boolPtr(true),
+			EnableLiFiProvider:     boolPtr(false),
 		},
 	}
 
@@ -1287,6 +1288,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	require.Equal(t, walletConfig.CoingeckoAPIKey, coingeckoAPIKey)
 	require.Equal(t, walletConfig.CoingeckoDemoAPIKey, coingeckoDemoAPIKey)
 	require.True(t, walletConfig.EnableParaswapProvider)
+	require.False(t, walletConfig.EnableLiFiProvider)
 
 	require.NoError(t, testContext.backend.Logout())
 }

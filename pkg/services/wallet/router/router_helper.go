@@ -742,6 +742,9 @@ func (r *Router) IsChainSupportedForSwapViaParaswap(chainID uint64) (bool, error
 
 // IsChainSupportedForSwapViaLiFi returns true if the chain is supported for swap via LI.FI, false otherwise.
 func (r *Router) IsChainSupportedForSwapViaLiFi(chainID uint64) (bool, error) {
+	if !r.isProcessorRegistered(pathProcessorCommon.ProcessorLiFiName) {
+		return false, nil
+	}
 	lifiClient := r.lifiClientFactory(chainID)
 	tokens, err := lifiClient.FetchTokensList(context.Background())
 	if err != nil {
