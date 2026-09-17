@@ -22,7 +22,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&ref=refs/tags/v0.3.3&rev=259830c9cfa7dbad3bd2f792097ad3e180fb2e1c";
+    # nim-sds master line (no submodules: master resolves its dependencies through nimble),
+    # on the branch that adds what embedders need; see NIM_SDS_VERSION in the Makefile.
+    # Moves to the upstream repository and tag once that branch merges there.
+    nim-sds.url = "git+https://github.com/alexjba/nim-sds?ref=nimble-embed&rev=d0bd6f914123d7cf4a2f0fd7e9f133f6be1f04c3";
   };
 
   outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
