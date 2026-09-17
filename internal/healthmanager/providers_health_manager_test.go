@@ -70,6 +70,11 @@ func (s *ProvidersHealthManagerSuite) TestInitialStatus() {
 	s.assertChainStatus(rpcstatus.StatusUnknown)
 }
 
+func (s *ProvidersHealthManagerSuite) TestDefaultDownDebounceIsSixtySeconds() {
+	phm := NewProvidersHealthManager(1)
+	s.Equal(60*time.Second, phm.downDebounce)
+}
+
 func (s *ProvidersHealthManagerSuite) TestUpdateProviderStatuses() {
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
