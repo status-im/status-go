@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/circuitbreaker"
-	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
@@ -69,20 +68,39 @@ func (o *Manager) applyCallStatuses(chainID walletCommon.ChainID, statuses []cir
 	o.recordChainOutcome(chainID, firstErr)
 }
 
+// setChainConnected reports up immediately and down only if no success arrives within downDebounce.
 func (o *Manager) setChainConnected(chainID walletCommon.ChainID, connected bool) {
 	if o.statuses == nil {
 		return
 	}
+	key := chainID.String()
+	o.downMu.Lock()
+	defer o.downMu.Unlock()
 	if connected {
-		o.stopDownTimer(chainID.String())
-		o.applyChainConnected(chainID, true)
+		if t := o.downTimers[key]; t != nil {
+			t.Stop()
+			delete(o.downTimers, key)
+		}
+		o.applyChainConnected(key, true)
 		return
 	}
-	o.armDownTimer(chainID)
+	if o.downTimers[key] != nil {
+		return
+	}
+	var t *time.Timer
+	t = time.AfterFunc(o.downDebounce, func() {
+		defer panics.LogOnPanic()
+		o.downMu.Lock()
+		defer o.downMu.Unlock()
+		if o.downTimers[key] == t {
+			delete(o.downTimers, key)
+			o.applyChainConnected(key, false)
+		}
+	})
+	o.downTimers[key] = t
 }
 
-func (o *Manager) applyChainConnected(chainID walletCommon.ChainID, connected bool) {
-	key := chainID.String()
+func (o *Manager) applyChainConnected(key string, connected bool) {
 	if v, ok := o.statuses.Load(key); ok {
 		v.(*connection.Status).SetIsConnected(connected)
 		return
@@ -96,39 +114,11 @@ func (o *Manager) applyChainConnected(chainID walletCommon.ChainID, connected bo
 	}
 }
 
-func (o *Manager) armDownTimer(chainID walletCommon.ChainID) {
-	key := chainID.String()
+// Stop cancels all pending down reports.
+func (o *Manager) Stop() {
 	o.downMu.Lock()
 	defer o.downMu.Unlock()
-	if o.downTimers == nil {
-		o.downTimers = make(map[string]*time.Timer)
-	}
-	if o.downTimers[key] != nil {
-		return
-	}
-	debounce := o.downDebounce
-	if debounce <= 0 {
-		debounce = healthmanager.DefaultDownDebounce
-	}
-	var t *time.Timer
-	t = time.AfterFunc(debounce, func() {
-		defer panics.LogOnPanic()
-		o.downMu.Lock()
-		if o.downTimers[key] != t {
-			o.downMu.Unlock()
-			return
-		}
-		delete(o.downTimers, key)
-		o.downMu.Unlock()
-		o.applyChainConnected(chainID, false)
-	})
-	o.downTimers[key] = t
-}
-
-func (o *Manager) stopDownTimer(key string) {
-	o.downMu.Lock()
-	defer o.downMu.Unlock()
-	if t, ok := o.downTimers[key]; ok {
+	for key, t := range o.downTimers {
 		t.Stop()
 		delete(o.downTimers, key)
 	}
