@@ -87,22 +87,33 @@ func NewManager(providers []thirdparty.MarketDataProvider, tokenManager TokenMan
 	}
 }
 
+// setIsConnected reports up immediately and down only if no success arrives within downDebounce.
 func (pm *Manager) setIsConnected(value bool) {
 	pm.IsConnectedLock.Lock()
 	defer pm.IsConnectedLock.Unlock()
 	pm.LastCheckedAt = time.Now().Unix()
 	if value {
 		pm.stopDownTimerLocked()
-		pm.emitConnectionLocked(true)
+		pm.emitLocked(true)
 		return
 	}
-	if !pm.IsConnected {
+	if !pm.IsConnected || pm.downTimer != nil {
 		return
 	}
-	pm.armDownTimerLocked()
+	var t *time.Timer
+	t = time.AfterFunc(pm.downDebounce, func() {
+		defer panics.LogOnPanic()
+		pm.IsConnectedLock.Lock()
+		defer pm.IsConnectedLock.Unlock()
+		if pm.downTimer == t {
+			pm.downTimer = nil
+			pm.emitLocked(false)
+		}
+	})
+	pm.downTimer = t
 }
 
-func (pm *Manager) emitConnectionLocked(value bool) {
+func (pm *Manager) emitLocked(value bool) {
 	if value == pm.IsConnected {
 		return
 	}
@@ -119,20 +130,11 @@ func (pm *Manager) emitConnectionLocked(value bool) {
 	pm.IsConnected = value
 }
 
-func (pm *Manager) armDownTimerLocked() {
-	if pm.downTimer != nil {
-		return
-	}
-	debounce := pm.downDebounce
-	if debounce <= 0 {
-		debounce = healthmanager.DefaultDownDebounce
-	}
-	var t *time.Timer
-	t = time.AfterFunc(debounce, func() {
-		defer panics.LogOnPanic()
-		pm.emitDownIfStillPending(t)
-	})
-	pm.downTimer = t
+// Stop cancels a pending down report.
+func (pm *Manager) Stop() {
+	pm.IsConnectedLock.Lock()
+	defer pm.IsConnectedLock.Unlock()
+	pm.stopDownTimerLocked()
 }
 
 func (pm *Manager) stopDownTimerLocked() {
@@ -140,16 +142,6 @@ func (pm *Manager) stopDownTimerLocked() {
 		pm.downTimer.Stop()
 		pm.downTimer = nil
 	}
-}
-
-func (pm *Manager) emitDownIfStillPending(t *time.Timer) {
-	pm.IsConnectedLock.Lock()
-	defer pm.IsConnectedLock.Unlock()
-	if pm.downTimer != t {
-		return
-	}
-	pm.downTimer = nil
-	pm.emitConnectionLocked(false)
 }
 
 func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(provider thirdparty.MarketDataProvider) (interface{}, error)) (interface{}, error) {

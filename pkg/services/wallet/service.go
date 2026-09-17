@@ -523,6 +523,8 @@ func (s *Service) Stop() error {
 	s.reader.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()
+	s.collectiblesManager.Stop()
+	s.marketManager.Stop()
 	s.tokenManager.Stop()
 	s.leaderboardService.Stop()
 	s.started = false

@@ -11,8 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 )
 
-// DefaultDownDebounce delays Down emission to suppress short provider blips
-// (DNS warmup, brief packet loss) while still reporting a lasting outage or geo-block.
+// DefaultDownDebounce delays Down emission to suppress short provider blips.
 const DefaultDownDebounce = 60 * time.Second
 
 type ProvidersHealthManager struct {
