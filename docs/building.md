@@ -26,6 +26,26 @@ Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more detai
 - `make status-go-deps` - install required tools
 - `make generate` - compile protobuf files, build SQL migrations, generate mocks
 
+## Native dependency: libsds (nim-sds)
+
+Every build links `libsds`, built from [nim-sds](https://github.com/logos-messaging/nim-sds)
+by its own nimble tasks. Outside the Nix shell the only Nim-side prerequisite is
+[nimble](https://github.com/nim-lang/nimble/releases) 0.24.1 on `PATH`: nim-sds
+pins its compiler (`nim == 2.2.10`) and `nimble setup` materialises it into
+nimble's store, so no `nim` needs to be installed (and one on `PATH` is not used
+for this build).
+
+- `make build-libsds` clones the pinned revision (`NIM_SDS_REPO`, `NIM_SDS_VERSION`
+  in the Makefile) into `NIM_SDS_SOURCE_DIR` (default: `../nim-sds` next to this
+  checkout), runs `nimble setup` there and then the host's `libsdsDynamic<OS>` task
+  with `SDS_OUT_DIR` set to `NIM_SDS_LIB_DIR` (`<source dir>/build`). The header cgo
+  compiles against is `library/libsds.h` in the nim-sds tree (`NIM_SDS_INC_DIR`).
+- `make build-libsds-android ARCH=…` / `make build-libsds-ios` run the per-target
+  tasks the same way (`libsdsAndroid<Arch>`, `libsdsIOS`).
+- To link a prebuilt `libsds` instead, pass both `NIM_SDS_LIB_DIR` and
+  `NIM_SDS_INC_DIR`; nothing is cloned or built then (this is what the Nix shell
+  does).
+
 ## Building with Docker
 
 ```shell

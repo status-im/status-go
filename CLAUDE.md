@@ -26,6 +26,9 @@ The messaging specifications Status implements are published at https://lip.logo
 
 Builds require CGO and native libraries (`libsds` (nim-sds) for SDS reliability, optionally `logos-storage`), so
 the Nix dev shell is strongly recommended — it provides the toolchain and pins the native dependencies.
+Outside Nix, `make build-libsds` builds `libsds` from nim-sds through its nimble tasks: install
+[nimble](https://github.com/nim-lang/nimble/releases) 0.24.1 (the only Nim-side prerequisite; it
+materialises the pinned Nim 2.2.10 into its own store, so no `nim` on `PATH` is needed).
 
 ```shell
 make shell                 # enter Nix dev shell (or: nix develop --extra-experimental-features 'nix-command flakes')
@@ -152,7 +155,8 @@ transport)**. Asynchronous results flow back to clients through the `signal` pac
 ## Conventions
 
 - Native dependencies: builds link against `libsds` (nim-sds) and optionally `logos-storage` (nim). The
-  `make` targets clone/build these; the `USE_LOGOS_STORAGE` toggle gates the storage path
+  `make` targets clone/build these (nim-sds through nimble 0.24.1, `NIM_SDS_REPO`/`NIM_SDS_VERSION` in the
+  Makefile pin it; logos-storage through nimbus-build-system); the `USE_LOGOS_STORAGE` toggle gates the storage path
   (`make storage-help` for details). Outside the Nix shell, missing C deps are the usual cause of build failures.
 - Generated files (protobuf, migration bindata, mocks) are committed — run `make generate` after changing
   `.proto`, `//go:generate` directives, or SQL migrations rather than editing generated output.
