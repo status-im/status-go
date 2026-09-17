@@ -302,7 +302,12 @@ func TestApplyCallStatuses_DoesNotChangeStateWhenAllIgnored(t *testing.T) {
 func TestApplyCallStatuses_AllFailuresSetDisconnected(t *testing.T) {
 	t.Parallel()
 	chainID := walletCommon.ChainID(1)
-	m := &Manager{statuses: &sync.Map{}, feed: new(event.Feed)}
+	m := &Manager{
+		statuses:     &sync.Map{},
+		feed:         new(event.Feed),
+		downDebounce: 20 * time.Millisecond,
+		downTimers:   make(map[string]*time.Timer),
+	}
 	m.statuses.Store(chainID.String(), connection.NewStatus())
 	m.statusNotifier = createStatusNotifier(m.statuses, m.feed)
 	now := time.Now()
@@ -310,7 +315,34 @@ func TestApplyCallStatuses_AllFailuresSetDisconnected(t *testing.T) {
 		{Name: "a", Err: errors.New("e1"), Timestamp: now, StartTime: now},
 	})
 	st := mustConnStatus(t, m.statuses, chainID)
-	assert.Equal(t, connection.StateValueDisconnected, st.GetStateValue())
+	assert.Equal(t, connection.StateValueUnknown, st.GetStateValue(), "collectibles down must be delayed")
+	require.Eventually(t, func() bool {
+		return st.GetStateValue() == connection.StateValueDisconnected
+	}, time.Second, 5*time.Millisecond)
+}
+
+func TestApplyCallStatuses_FailureThenSuccessCancelsDown(t *testing.T) {
+	t.Parallel()
+	chainID := walletCommon.ChainID(1)
+	m := &Manager{
+		statuses:     &sync.Map{},
+		feed:         new(event.Feed),
+		downDebounce: 40 * time.Millisecond,
+		downTimers:   make(map[string]*time.Timer),
+	}
+	m.statuses.Store(chainID.String(), connection.NewStatus())
+	m.statusNotifier = createStatusNotifier(m.statuses, m.feed)
+	now := time.Now()
+	m.applyCallStatuses(chainID, []circuitbreaker.FunctorCallStatus{
+		{Name: "a", Err: errors.New("e1"), Timestamp: now, StartTime: now},
+	})
+	m.applyCallStatuses(chainID, []circuitbreaker.FunctorCallStatus{
+		{Name: "b", Err: nil, Timestamp: now, StartTime: now},
+	})
+	st := mustConnStatus(t, m.statuses, chainID)
+	assert.Equal(t, connection.StateValueConnected, st.GetStateValue())
+	time.Sleep(80 * time.Millisecond)
+	assert.Equal(t, connection.StateValueConnected, st.GetStateValue(), "recovery before debounce must not emit collectibles down")
 }
 
 func TestApplyCallStatuses_SuccessWinsInMixedList(t *testing.T) {
