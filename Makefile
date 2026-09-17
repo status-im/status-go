@@ -106,15 +106,28 @@ BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
 
-# Pin nim-sds revision here. Can be a tag (default) or commit hash.
-# v0.3.3 lives on the release/v0.3 branch: it carries the SDS retrieval-hint
-# provider required by the sds-go-bindings pin in go.mod, on the CamelCase FFI
-# ABI, with the causalHistory wire format kept backward-compatible with released
-# (v0.2.x) nodes. master/release-v0.4 moved to the snake_case CBOR ABI, which
-# these bindings do not link against, so we track release/v0.3.
-NIM_SDS_VERSION ?= v0.3.3
+# nim-sds pin: the master line. master carries the snake_case JSON C ABI that
+# the sds-go-bindings pseudo-version in go.mod links against, and builds
+# through the package's own nimble tasks (it has no Makefile and no
+# nimbus-build-system). The branch `nimble-embed` of alexjba/nim-sds is
+# upstream master (logos-messaging/nim-sds 04441cb) plus only what embedding
+# needs: SDS_OUT_DIR for every output, library/sds_tasks.nims as a task entry
+# point that does not go through nimble, and the compiler pin aligned to nim
+# 2.2.10. Both variables move to the upstream repository and its tag once
+# that branch merges there.
+NIM_SDS_REPO ?= https://github.com/alexjba/nim-sds
+NIM_SDS_VERSION ?= d0bd6f914123d7cf4a2f0fd7e9f133f6be1f04c3
 
-# Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
+# The nimble task that builds the host's shared libsds is named by platform.
+ifeq ($(detected_OS),Darwin)
+ SDS_HOST := Mac
+else ifeq ($(detected_OS),Windows)
+ SDS_HOST := Windows
+else
+ SDS_HOST := Linux
+endif
+
+# Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy
 # to guarantee a clean checkout on every build.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
@@ -321,9 +334,13 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-# Flag needed by nim-based dependencies (e.g., nim-sds) that also use nimbus-build-system.
+# Flag for logos-storage-nim, which still builds through nimbus-build-system.
 # When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
-# enforces to use system-installed Nim.
+# enforces to use system-installed Nim. libsds no longer reads it: nim-sds
+# builds through its nimble tasks, and nimble (0.24.1) is the only Nim-side
+# prerequisite for it. The nim-sds manifest pins the compiler (nim == 2.2.10)
+# and `nimble setup` materialises it into nimble's store, so no nim on PATH
+# is needed for libsds, and a mismatching one there is never picked up.
 USE_SYSTEM_NIM ?= 1
 
 # libsds targets
@@ -333,21 +350,26 @@ clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
-		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
+		git clone "$(NIM_SDS_REPO).git" "$(NIM_SDS_SOURCE_DIR)"; \
 	else \
-		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
+		cd "$(NIM_SDS_SOURCE_DIR)" && git remote set-url origin "$(NIM_SDS_REPO).git" && git fetch --tags origin; \
 	fi
 	cd "$(NIM_SDS_SOURCE_DIR)" && \
-		git switch --no-recurse-submodules --force --detach "$(NIM_SDS_VERSION)" && \
-		git clean -fdx && \
-		git submodule update --init --recursive --force
+		git switch --force --detach "$(NIM_SDS_VERSION)" && \
+		git clean -fdx
 endif
 
+# `nimble setup` resolves nim-sds's lock (and the pinned compiler) into
+# nimble's store; the task then writes the library and its nimcache under
+# SDS_OUT_DIR, which is NIM_SDS_LIB_DIR. The API header cgo includes is the
+# hand-written library/libsds.h in the nim-sds tree (NIM_SDS_INC_DIR), not
+# the header Nim generates into the nimcache. -d:noSignalHandler (the Go
+# runtime owns signal handling in the process) is passed by the tasks
+# themselves.
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
+	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && SDS_OUT_DIR="$(NIM_SDS_LIB_DIR)" nimble libsdsDynamic$(SDS_HOST)
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -356,20 +378,34 @@ endif
 build-libsds: $(LIBSDS)
 
 
-## Target-specific architecture mapping for libsds Android build
-# Note: nim-sds uses 'amd64' for both x86 and x86_64
-build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
-	$(if $(filter arm,$(ARCH)),arm,\
-	$(if $(filter amd64,$(ARCH)),amd64,\
-	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
+## Target-specific task mapping for the libsds Android build
+# nim-sds has one nimble task per target CPU (each sets ARCH itself), so
+# status-go's ARCH picks the task. 32-bit x86 is i386 to Nim: libsdsAndroidX86.
+build-libsds-android: SDS_ANDROID_TASK = $(strip $(if $(filter arm64,$(ARCH)),libsdsAndroidArm64,\
+	$(if $(filter arm,$(ARCH)),libsdsAndroidArm,\
+	$(if $(filter amd64 x86_64,$(ARCH)),libsdsAndroidAmd64,\
+	$(if $(filter x86,$(ARCH)),libsdsAndroidX86,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
+# The mobile targets name libsds by the target platform's extension: LIBSDS
+# carries the host one.
 build-libsds-android: clone-nim-sds
-	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=$(MAKE_SHELL)
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@echo "Building nim-sds for Android: $(SDS_ANDROID_TASK)"
+	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" SDS_OUT_DIR="$(NIM_SDS_LIB_DIR)" nimble $(SDS_ANDROID_TASK)
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.so || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.so" && exit 1)
+endif
 
+# The iOS task reads the target CPU from ARCH, in Nim's naming (amd64 for the
+# x86_64 simulator), and the SDK from IOS_SDK_PATH.
+build-libsds-ios: SDS_IOS_ARCH = $(if $(filter x86_64,$(ARCH)),amd64,$(ARCH))
 build-libsds-ios: clone-nim-sds
-	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@echo "Building nim-sds for iOS"
+	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ARCH="$(SDS_IOS_ARCH)" IOS_SDK_PATH="$$(xcrun --sdk $(or $(IPHONE_SDK),iphoneos) --show-sdk-path)" SDS_OUT_DIR="$(NIM_SDS_LIB_DIR)" nimble libsdsIOS
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.a || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.a" && exit 1)
+endif
 
 clean-libsds:
 	@echo "Removing libsds"
