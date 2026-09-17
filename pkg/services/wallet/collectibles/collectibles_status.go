@@ -3,13 +3,16 @@ package collectibles
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/event"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/circuitbreaker"
+	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/connection"
@@ -70,6 +73,15 @@ func (o *Manager) setChainConnected(chainID walletCommon.ChainID, connected bool
 	if o.statuses == nil {
 		return
 	}
+	if connected {
+		o.stopDownTimer(chainID.String())
+		o.applyChainConnected(chainID, true)
+		return
+	}
+	o.armDownTimer(chainID)
+}
+
+func (o *Manager) applyChainConnected(chainID walletCommon.ChainID, connected bool) {
 	key := chainID.String()
 	if v, ok := o.statuses.Load(key); ok {
 		v.(*connection.Status).SetIsConnected(connected)
@@ -81,6 +93,44 @@ func (o *Manager) setChainConnected(chainID walletCommon.ChainID, connected bool
 		actual.(*connection.Status).SetIsConnected(connected)
 	} else {
 		o.updateStatusNotifier()
+	}
+}
+
+func (o *Manager) armDownTimer(chainID walletCommon.ChainID) {
+	key := chainID.String()
+	o.downMu.Lock()
+	defer o.downMu.Unlock()
+	if o.downTimers == nil {
+		o.downTimers = make(map[string]*time.Timer)
+	}
+	if o.downTimers[key] != nil {
+		return
+	}
+	debounce := o.downDebounce
+	if debounce <= 0 {
+		debounce = healthmanager.DefaultDownDebounce
+	}
+	var t *time.Timer
+	t = time.AfterFunc(debounce, func() {
+		defer panics.LogOnPanic()
+		o.downMu.Lock()
+		if o.downTimers[key] != t {
+			o.downMu.Unlock()
+			return
+		}
+		delete(o.downTimers, key)
+		o.downMu.Unlock()
+		o.applyChainConnected(chainID, false)
+	})
+	o.downTimers[key] = t
+}
+
+func (o *Manager) stopDownTimer(key string) {
+	o.downMu.Lock()
+	defer o.downMu.Unlock()
+	if t, ok := o.downTimers[key]; ok {
+		t.Stop()
+		delete(o.downTimers, key)
 	}
 }
 
