@@ -143,7 +143,7 @@ for this build).
 - `make build-libsds` clones the pinned revision (`NIM_SDS_REPO`, `NIM_SDS_VERSION`
   in the Makefile) into `NIM_SDS_SOURCE_DIR` (default: `../nim-sds` next to this
   checkout), runs `nimble setup` there and then the host's `libsdsDynamic<OS>` task
-  with `SDS_OUT_DIR` set to `NIM_SDS_LIB_DIR` (`<source dir>/build`). The header cgo
+  which writes to `NIM_SDS_LIB_DIR` (`<source dir>/build`). The header cgo
   compiles against is `library/libsds.h` in the nim-sds tree (`NIM_SDS_INC_DIR`).
 - `make build-libsds-android ARCH=…` / `make build-libsds-ios` run the per-target
   tasks the same way (`libsdsAndroid<Arch>`, `libsdsIOS`).
