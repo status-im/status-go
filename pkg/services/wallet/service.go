@@ -568,6 +568,8 @@ func (s *Service) stopBackgroundWorkers() {
 	s.multistandardBalanceController.Stop()
 	s.transferDetectorController.Stop()
 	s.collectibles.Stop()
+	s.collectiblesManager.Stop()
+	s.marketManager.Stop()
 	s.leaderboardService.Stop()
 	if s.cancelWalletServiceCtx != nil {
 		s.cancelWalletServiceCtx()

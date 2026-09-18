@@ -137,6 +137,13 @@ func (pm *Manager) Stop() {
 	pm.stopDownTimerLocked()
 }
 
+// SetDownDebounce overrides the down report debounce window.
+func (pm *Manager) SetDownDebounce(d time.Duration) {
+	pm.IsConnectedLock.Lock()
+	defer pm.IsConnectedLock.Unlock()
+	pm.downDebounce = d
+}
+
 func (pm *Manager) stopDownTimerLocked() {
 	if pm.downTimer != nil {
 		pm.downTimer.Stop()
