@@ -9,7 +9,7 @@ import std/[os, strutils]
 #
 # After a one-time `nimble setup`:
 #   nim libsds        statusgo.nims           # host shared libsds
-#   nim libsdsIos     statusgo.nims           # iOS static lib
+#   nim libsdsIos     statusgo.nims           # ARCH + IPHONE_SDK env
 #   nim libsdsAndroid statusgo.nims           # ARCH + ANDROID_NDK_ROOT env
 #
 # The Go library itself is built by the Makefile (statusgo-shared-library and
@@ -160,7 +160,20 @@ task libsds, "Build libsds for the host desktop platform":
     else: "libsdsDynamicWindows"
   runSdsTask(sdsTaskName, "-d:noSignalHandler")
 
-task libsdsIos, "Build libsds static library for iOS":
+task libsdsIos, "Build libsds static library for iOS (ARCH + IPHONE_SDK env)":
+  # Same contract as the Makefile's build-libsds-ios: nim-sds reads the target
+  # CPU from ARCH in Nim's naming (amd64 for the x86_64 simulator) and the SDK
+  # from IOS_SDK_PATH, which it defaults to the device SDK.
+  if getEnv("ARCH") == "x86_64":
+    putEnv("ARCH", "amd64")
+  if getEnv("IOS_SDK_PATH").len == 0:
+    var sdk = getEnv("IPHONE_SDK")
+    if sdk.len == 0:
+      sdk = "iphoneos"
+    let (sdkPath, exitCode) = gorgeEx("xcrun --sdk " & sdk & " --show-sdk-path")
+    if exitCode != 0:
+      quit "xcrun could not find the " & sdk & " SDK"
+    putEnv("IOS_SDK_PATH", sdkPath.strip())
   runSdsTask("libsdsIOS", "-d:noSignalHandler")
 
 task libsdsAndroid, "Build libsds for Android (ARCH + ANDROID_NDK_ROOT env)":
