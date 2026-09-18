@@ -22,9 +22,10 @@ license       = "MPL-2.0"
 # sds-go-bindings pseudo-version in go.mod links against (the bindings were
 # bumped to it on develop), built by the package's own nimble tasks. The
 # branch `nimble-embed` of alexjba/nim-sds is upstream master
-# (logos-messaging/nim-sds 04441cb) plus only what embedding needs: every
-# output under SDS_OUT_DIR, library/sds_tasks.nims as the task entry point
-# without nimble, and the compiler pin aligned to nim 2.2.10, which is what
-# lets statusgo.nims build a read-only store copy in place. Moves to the
+# (logos-messaging/nim-sds 04441cb) plus only what embedding needs: tasks
+# that locate their sources from the manifest (so they run from any
+# directory), library/sds_tasks.nims as the task entry point without nimble,
+# and a nim version range instead of an exact pin, which is what lets
+# statusgo.nims build a read-only store copy in place. Moves to the
 # upstream tag once that branch merges there.
-requires "https://github.com/alexjba/nim-sds.git#d0bd6f914123d7cf4a2f0fd7e9f133f6be1f04c3"
+requires "https://github.com/alexjba/nim-sds.git#2a6bf4d912d2df0bb2e9da8b5afcd5ba6fafb15c"

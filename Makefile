@@ -413,8 +413,8 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 endif
 
 # `nimble setup` resolves nim-sds's lock (and the pinned compiler) into
-# nimble's store; the task then writes the library and its nimcache under
-# SDS_OUT_DIR, which is NIM_SDS_LIB_DIR. The API header cgo includes is the
+# nimble's store; the task then writes the library to build/ under the
+# working directory, which is NIM_SDS_LIB_DIR. The API header cgo includes is the
 # hand-written library/libsds.h in the nim-sds tree (NIM_SDS_INC_DIR), not
 # the header Nim generates into the nimcache. -d:noSignalHandler (the Go
 # runtime owns signal handling in the process) is passed by the tasks
@@ -422,7 +422,7 @@ endif
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && SDS_OUT_DIR="$(NIM_SDS_LIB_DIR)" nimble libsdsDynamic$(SDS_HOST)
+	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && nimble libsdsDynamic$(SDS_HOST)
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -445,7 +445,7 @@ build-libsds-android: SDS_ANDROID_TASK = $(strip $(if $(filter arm64,$(ARCH)),li
 build-libsds-android: clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for Android: $(SDS_ANDROID_TASK)"
-	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" SDS_OUT_DIR="$(NIM_SDS_LIB_DIR)" nimble $(SDS_ANDROID_TASK)
+	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" nimble $(SDS_ANDROID_TASK)
 else
 	@test -f $(NIM_SDS_LIB_DIR)/libsds.so || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.so" && exit 1)
 endif
@@ -456,7 +456,7 @@ build-libsds-ios: SDS_IOS_ARCH = $(if $(filter x86_64,$(ARCH)),amd64,$(ARCH))
 build-libsds-ios: clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for iOS"
-	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ARCH="$(SDS_IOS_ARCH)" IOS_SDK_PATH="$$(xcrun --sdk $(or $(IPHONE_SDK),iphoneos) --show-sdk-path)" SDS_OUT_DIR="$(NIM_SDS_LIB_DIR)" nimble libsdsIOS
+	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ARCH="$(SDS_IOS_ARCH)" IOS_SDK_PATH="$$(xcrun --sdk $(or $(IPHONE_SDK),iphoneos) --show-sdk-path)" nimble libsdsIOS
 else
 	@test -f $(NIM_SDS_LIB_DIR)/libsds.a || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.a" && exit 1)
 endif

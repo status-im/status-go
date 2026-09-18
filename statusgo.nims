@@ -122,15 +122,15 @@ proc copyIfChanged(src, dst: string) =
 
 proc runSdsTask(taskName: string, extraParams = "") =
   ## Runs a nim-sds build task against the resolved nim-sds copy, IN PLACE —
-  ## including when that copy is read-only. nim-sds writes everything under
-  ## SDS_OUT_DIR, so no scratch copy of the package is needed.
+  ## including when that copy is read-only. nim-sds's tasks locate their
+  ## sources from its manifest and write to build/ under the working directory,
+  ## so no scratch copy of the package is needed.
   let sdsRoot = sdsPackageRoot()
   # NIM_PARAMS is what nim-sds's tasks append, last, to every inner `nim c`.
   # --skipParentCfg:on: the --path entries below are the whole resolution; a
   # nim.cfg or config.nims above the nim-sds copy would add a second one.
   putEnv("NIM_PARAMS", "--skipParentCfg:on" & depPathFlags() &
     " " & extraParams & " " & getEnv("NIM_PARAMS"))
-  putEnv("SDS_OUT_DIR", sdsArtifactDir())
   mkDir sdsArtifactDir()
   # nim-sds's task entry point: library/sds_tasks.nims includes the manifest
   # and dispatches its tasks without nimble. It ships with the package
@@ -139,9 +139,10 @@ proc runSdsTask(taskName: string, extraParams = "") =
   let entry = sdsRoot / "library" / "sds_tasks.nims"
   if not fileExists(entry):
     quit "the resolved nim-sds copy at " & sdsRoot & " has no" &
-      " library/sds_tasks.nims. It predates the SDS_OUT_DIR contract these" &
-      " tasks build against; bump the nim-sds pin in statusgo.nimble."
-  exec "nim " & taskName & " " & quoteShell(entry)
+      " library/sds_tasks.nims, the entry point these tasks build through;" &
+      " bump the nim-sds pin in statusgo.nimble."
+  withDir parentDir(sdsArtifactDir()):
+    exec "nim " & taskName & " " & quoteShell(entry)
   # The API header is the hand-written library/libsds.h in the nim-sds
   # package, what cgo compiles against; the libsds.h that --header leaves in
   # the nimcache is Nim's raw generated header, not the API. Mirror it next
