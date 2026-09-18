@@ -25,7 +25,7 @@
     # nim-sds master line (no submodules: master resolves its dependencies through nimble),
     # on the branch that adds what embedders need; see NIM_SDS_VERSION in the Makefile.
     # Moves to the upstream repository and tag once that branch merges there.
-    nim-sds.url = "git+https://github.com/alexjba/nim-sds?ref=nimble-embed&rev=d0bd6f914123d7cf4a2f0fd7e9f133f6be1f04c3";
+    nim-sds.url = "git+https://github.com/alexjba/nim-sds?ref=nimble-embed&rev=2a6bf4d912d2df0bb2e9da8b5afcd5ba6fafb15c";
   };
 
   outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
