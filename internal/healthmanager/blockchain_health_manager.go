@@ -100,6 +100,9 @@ func (b *BlockchainHealthManager) Stop() {
 	for _, cancel := range b.cancelFuncs {
 		cancel()
 	}
+	for _, phm := range b.providers {
+		phm.stopDownTimer()
+	}
 	clear(b.cancelFuncs)
 	clear(b.providers)
 

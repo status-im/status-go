@@ -352,6 +352,16 @@ func TestStop_CancelsPendingDown(t *testing.T) {
 	assert.Equal(t, connection.StateValueUnknown, mustConnStatus(t, m.statuses, chainID).GetStateValue(), "stop must cancel pending collectibles down")
 }
 
+func TestResetConnectionStatus_CancelsPendingDown(t *testing.T) {
+	t.Parallel()
+	chainID := walletCommon.ChainID(1)
+	m := newDebouncedStatusManager(chainID, 100*time.Millisecond)
+	failCall(m, chainID, errors.New("e1"))
+	m.ResetConnectionStatus()
+	time.Sleep(400 * time.Millisecond)
+	assert.Equal(t, connection.StateValueUnknown, mustConnStatus(t, m.statuses, chainID).GetStateValue(), "reset must cancel pending collectibles down")
+}
+
 func TestApplyCallStatuses_SuccessWinsInMixedList(t *testing.T) {
 	t.Parallel()
 	chainID := walletCommon.ChainID(1)
