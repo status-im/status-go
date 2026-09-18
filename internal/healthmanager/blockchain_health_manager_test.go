@@ -412,6 +412,25 @@ func (s *BlockchainHealthManagerSuite) TestPauseResumeSuppressesAndCoalescesProv
 	s.waitForUpdate(ch, rpcstatus.StatusDown, 400*time.Millisecond)
 }
 
+func (s *BlockchainHealthManagerSuite) TestStopCancelsPendingProviderDown() {
+	phm := newTestProvidersHealthManager(1)
+	phm.SetDownDebounce(100 * time.Millisecond)
+	s.Require().NoError(s.manager.RegisterProvidersHealthManager(s.ctx, phm))
+	ch := phm.Subscribe()
+	defer phm.Unsubscribe(ch)
+
+	phm.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{
+		{Name: "provider1", Timestamp: time.Now(), Err: errors.New("down")},
+	})
+	s.manager.Stop()
+
+	select {
+	case <-ch:
+		s.Fail("stop must cancel pending provider down")
+	case <-time.After(500 * time.Millisecond):
+	}
+}
+
 func TestBlockchainHealthManagerSuite(t *testing.T) {
 	suite.Run(t, new(BlockchainHealthManagerSuite))
 }

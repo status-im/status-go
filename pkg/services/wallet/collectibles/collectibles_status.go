@@ -23,6 +23,7 @@ const EventCollectiblesConnectionStatusChanged walletevent.EventType = "wallet-c
 // Reset connection status to trigger notifications
 // on the next status update
 func (o *Manager) ResetConnectionStatus() {
+	o.Stop()
 	o.statuses.Range(func(key, value interface{}) bool {
 		value.(*connection.Status).ResetStateValue()
 		return true
@@ -122,6 +123,13 @@ func (o *Manager) Stop() {
 		t.Stop()
 		delete(o.downTimers, key)
 	}
+}
+
+// SetDownDebounce overrides the down report debounce window.
+func (o *Manager) SetDownDebounce(d time.Duration) {
+	o.downMu.Lock()
+	defer o.downMu.Unlock()
+	o.downDebounce = d
 }
 
 func isCollectiblesIgnorableError(err error) bool {
