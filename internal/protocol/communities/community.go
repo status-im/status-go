@@ -103,6 +103,13 @@ type Community struct {
 	mediaServer media.MediaServerInterface
 }
 
+// CommunityMuteStatus contains the fields needed to expire a community mute.
+type CommunityMuteStatus struct {
+	ID       types.HexBytes
+	Muted    bool
+	MuteTill time.Time
+}
+
 type ReadonlyCommunity interface {
 	ID() types.HexBytes
 	IsControlNode() bool
