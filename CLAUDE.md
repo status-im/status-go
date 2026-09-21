@@ -38,7 +38,8 @@ make statusgo-shared-library
 make statusgo-android-library / make statusgo-ios-library
 ```
 
-To work in an IDE / build as a plain Go project, you must first generate sources:
+To work in an IDE / build as a plain Go project, you must first generate sources
+(the library targets generate their own copy outside the tree, see `docs/building.md`):
 
 ```shell
 make status-go-deps        # install required Go tools

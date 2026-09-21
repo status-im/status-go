@@ -22,10 +22,7 @@ Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more detai
 
 ## Building with your IDE
 
-`status-go` can be built as a regular Go project. The generated sources the
-library build needs are committed, so a plain `go build` works out of a fresh
-clone. To regenerate them (after changing a `.proto`, a `//go:generate`
-directive or a SQL migration), and to generate the test-only mocks:
+`status-go` can be build as a regular Go project, but requires to pre-generate some files first:
 - `make status-go-deps` - install required tools
 - `make generate` - compile protobuf files, build SQL migrations, generate mocks
 
@@ -76,7 +73,6 @@ source tree: every output goes under one caller-chosen directory.
 | `STATUSGO_NIMBLE_PATHS` | (`statusgo.nims`) the `nimble.paths` to build against. Default: the one next to `statusgo.nims`. An embedder that has already resolved the graph points this at its own file |
 | `NIM_PARAMS` | (`statusgo.nims`) appended last to the nim-sds compiles (the channel nim-sds's tasks read) |
 | `STATUS_GO_BUILD_DIR` | (Makefile) root of every library-target output; `STATUS_GO_BIN_DIR`, `STATUS_GO_BINDINGS_PATH`, `STATUS_GO_LIBRARY_OUT` and `STATUS_GO_STUB_BINDINGS_OUT` derive from it. Default: `./build` |
-| `GENERATE_PREREQ` | (Makefile) prerequisite of the library targets, `generate` by default. Pass `GENERATE_PREREQ=` to skip regeneration |
 
 Artifact layout under `STATUSGO_BUILD_DIR`:
 
@@ -91,6 +87,28 @@ and under `STATUS_GO_BUILD_DIR`:
 bin/libstatus.*               the Go library and its generated header
 bin/statusgo-lib/             the generated cbindings entry point
 ```
+
+### Generated Go sources are built outside the tree
+
+The generated sources are not committed. The LIBRARY targets
+(`statusgo-library`, `statusgo-shared-library`, `statusgo-android-library`,
+`statusgo-ios-library`) never generate into the tree either, so a checkout and
+the store copy build the same way:
+
+1. `make generate-overlay` runs `scripts/generate-overlay.sh`, which executes the
+   `//go:generate` directives the library needs (`protoc`, `go-bindata`, the
+   endpoint and handler tables) with their output redirected to
+   `$(STATUS_GO_BUILD_DIR)/generated/src/<package path>`, and writes
+   `$(STATUS_GO_BUILD_DIR)/generated/overlay.json`. It reruns only when a
+   `.proto`, `.sql`, template or generator changed.
+2. The targets pass `-overlay=.../overlay.json` to `go build`, which then sees
+   those files as if they sat in their package directories.
+
+This needs `protoc` on `PATH`; `protoc-gen-go` and `go-bindata` come from the
+module (`go tool`). The directives are the single source: the script rewrites
+only their output path and fails on a directive shape it does not know. Mocks
+and contract bindings are not part of the library and are left to
+`make generate`, which still generates in place for tests, linters and editors.
 
 ### Build values come from `-ldflags`
 

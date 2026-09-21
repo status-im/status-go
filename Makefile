@@ -304,10 +304,13 @@ GO_EXTRA_LDFLAGS ?=
 BUILD_FLAGS ?= -ldflags="$(BUILD_VARS_LDFLAGS) $(GO_EXTRA_LDFLAGS)"
 BUILD_FLAGS_MOBILE ?=
 
-# Consumers that build from a materialized dependency copy have already been
-# handed a complete tree (the generated Go sources are committed) and have
-# neither protoc nor mockgen: they pass GENERATE_PREREQ= to skip the step.
-GENERATE_PREREQ ?= generate
+# The library targets never generate into the tree: their generated sources
+# (protobufs, migration bindata, endpoint and handler tables) go under
+# STATUS_GO_BUILD_DIR and reach `go build` through -overlay, so a checkout and
+# a read-only copy of this tree (nimble's package store) build the same way.
+# `make generate` still generates in place, for tests, linters and editors.
+GO_OVERLAY_DIR := $(STATUS_GO_BUILD_DIR)/generated
+GO_OVERLAY_FLAG := -overlay="$(GO_OVERLAY_DIR)/overlay.json"
 
 networkid ?= StatusChain
 
@@ -477,7 +480,7 @@ status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
 run-status-backend: $(LIBSDS)
-run-status-backend: $(GENERATE_PREREQ)
+run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go run -mod=mod -ldflags="$(BUILD_VARS_LDFLAGS)" ./cmd/status-backend --address localhost:${PORT}
@@ -514,26 +517,26 @@ statusgo-stub-bindings:
 		--out-dir $(STATUS_GO_STUB_BINDINGS_OUT)
 
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= $(STATUS_GO_BIN_DIR)
-statusgo-library: $(GENERATE_PREREQ)
+statusgo-library: generate-overlay
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
 		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
+		$(BUILD_FLAGS) $(GO_OVERLAY_FLAG) \
 		-buildmode=c-archive \
 		-o $(STATUS_GO_LIBRARY_OUT)/libstatus.a \
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
-statusgo-shared-library: $(GENERATE_PREREQ)
+statusgo-shared-library: generate-overlay
 statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
  	go build \
 		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
+		$(BUILD_FLAGS) $(GO_OVERLAY_FLAG) \
 		-buildmode=c-shared \
 		-o $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
@@ -546,21 +549,21 @@ endif
 	@echo "Shared library built:"
 	@ls -la $(STATUS_GO_BIN_DIR)/libstatus.*
 
-statusgo-android-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate-overlay statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	go build $(GO_OVERLAY_FLAG) -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
 		-o "$(STATUS_GO_BIN_DIR)/libstatus.so" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Android library built"
 	@file $(STATUS_GO_BIN_DIR)/libstatus.so
 
-statusgo-ios-library: $(GENERATE_PREREQ) statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate-overlay statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	go build $(GO_OVERLAY_FLAG) -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
 		-o "$(STATUS_GO_BIN_DIR)/libstatus.a" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "iOS library built"
@@ -607,6 +610,15 @@ generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_HOST_ENV) $(GO_GENERATE_CMD) $(PACKAGES)
 	@$(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./pkg/services/logosstorage
+
+# Inputs of the directives scripts/generate-overlay.sh runs.
+GO_OVERLAY_INPUTS := scripts/generate-overlay.sh mobile/status.go \
+	$(shell find cmd/status-backend/server/parse-api tools/generate-handlers internal pkg \
+		-name '*.proto' -o -name '*.sql' -o -name '*_template.txt' -o -name 'template.txt' -o -name 'doc.go' -o -name 'main.go' 2>/dev/null)
+$(GO_OVERLAY_DIR)/overlay.json: $(GO_OVERLAY_INPUTS)
+	./scripts/generate-overlay.sh "$(GO_OVERLAY_DIR)"
+
+generate-overlay: $(GO_OVERLAY_DIR)/overlay.json ##@generate Generate the library's sources outside the tree, for -overlay
 
 generate-contracts:
 	go generate ./contracts
