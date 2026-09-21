@@ -30,6 +30,13 @@ async def _wait_for_keypair(device, key_uid, predicate, what, timeout=SYNC_TIMEO
     raise AssertionError(f"Second device never saw {what} for {key_uid} (last seen: {last})")
 
 
+def _sent_xpub(device, key_uid):
+    """The xpub the sending device holds, which is the value the other device has to end up with."""
+    xpub = device.backend.accounts_service.get_keypair_by_key_uid(key_uid)["xpub"]
+    assert xpub, "Expected the sending device to hold an xpub for the imported keypair"
+    return xpub
+
+
 @pytest.mark.rpc
 @pytest.mark.asyncio
 class TestColdWalletKeypairDeviceSync:
@@ -52,12 +59,13 @@ class TestColdWalletKeypairDeviceSync:
         key_uid = add_seed_keypair(primary.backend)["key-uid"]
         synced = await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("key-uid") == key_uid, "the imported keypair")
         assert synced.get("cold-wallet", "") == "", "Expected the keypair to arrive off any cold wallet"
-        before_xpub = synced["xpub"]
+        sent_xpub = _sent_xpub(primary, key_uid)
+        assert synced["xpub"] == sent_xpub, "Expected the import to sync the sender's xpub"
 
         primary.backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, primary.backend.password, "status-keycard")
 
         arrived = await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("cold-wallet") == "status-keycard", "the cold-wallet migration")
-        assert arrived["xpub"] == before_xpub, "Expected the xpub to survive the sync, since the second device cannot derive one"
+        assert arrived["xpub"] == sent_xpub, "Expected the xpub to survive the sync, since the second device cannot derive one"
         assert arrived["derived-from"] == synced["derived-from"]
         assert not any(
             keystore_present(secondary.backend, arrived).values()
@@ -84,9 +92,10 @@ class TestColdWalletKeypairDeviceSync:
         primary, secondary = await self._paired_devices(async_backend_new_profile, async_backend_factory)
 
         key_uid = add_seed_keypair(primary.backend)["key-uid"]
-        synced = await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("key-uid") == key_uid, "the imported keypair")
+        await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("key-uid") == key_uid, "the imported keypair")
+        sent_xpub = _sent_xpub(primary, key_uid)
 
         primary.backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, primary.backend.password, "ledger")
 
         arrived = await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("cold-wallet") == "ledger", "the ledger migration")
-        assert arrived["xpub"] == synced["xpub"], "Expected the xpub to survive a ledger migration as it does a keycard one"
+        assert arrived["xpub"] == sent_xpub, "Expected the xpub to survive a ledger migration as it does a keycard one"
