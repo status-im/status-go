@@ -623,7 +623,7 @@ GO_OVERLAY_INPUTS := scripts/generate-overlay.sh mobile/status.go \
 	$(shell find cmd/status-backend/server/parse-api tools/generate-handlers internal pkg \
 		-name '*.proto' -o -name '*.sql' -o -name '*_template.txt' -o -name 'template.txt' -o -name 'doc.go' -o -name 'main.go' 2>/dev/null)
 $(GO_OVERLAY_DIR)/overlay.json: $(GO_OVERLAY_INPUTS)
-	./scripts/generate-overlay.sh "$(GO_OVERLAY_DIR)"
+	bash ./scripts/generate-overlay.sh "$(GO_OVERLAY_DIR)"
 
 generate-overlay: $(GO_OVERLAY_DIR)/overlay.json ##@generate Generate the library's sources outside the tree, for -overlay
 
