@@ -115,13 +115,6 @@ BUILD_TAGS ?= gowaku_no_rln
 
 NIMBLE ?= nimble
 
-# Set NIMBLE_COMMIT to build Nimble at that commit and use it instead.
-ifdef NIMBLE_COMMIT
-    NIMBLE_BIN ?= $(HOME)/.nimble/nimble-$(NIMBLE_COMMIT)
-    NIMBLE := $(NIMBLE_BIN)/nimble
-    NIMBLE_INSTALL := $(NIMBLE)
-endif
-
 ifdef NIM_SDS_LIB_DIR
 ifdef NIM_SDS_INC_DIR
     # External lib/include approach (e.g. used in Nix)
@@ -335,10 +328,7 @@ USE_SYSTEM_NIM ?= 1
 
 .PHONY: nimble-deps
 
-$(NIMBLE_INSTALL):
-	./scripts/install_nimble.sh "$(NIMBLE_COMMIT)" "$(NIMBLE_BIN)"
-
-nimble.paths: status_go.nimble | $(NIMBLE_INSTALL)
+nimble.paths: status_go.nimble
 	$(NIMBLE) setup --localdeps -y
 
 nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
