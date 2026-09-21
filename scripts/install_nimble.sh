@@ -9,10 +9,14 @@ commit="$1"
 bin_dir="$2"
 
 exe=nimble
-[[ "${OS:-}" == "Windows_NT" ]] && exe=nimble.exe
+if [[ "${OS:-}" == "Windows_NT" ]]; then
+  exe=nimble.exe
+  bin_dir="$(cygpath -m "$bin_dir")"
+fi
 
 if [[ ! -x "$bin_dir/$exe" ]]; then
   src="$(mktemp -d)"
+  command -v cygpath >/dev/null && src="$(cygpath -m "$src")"
   trap 'rm -rf "$src"' EXIT
 
   git -C "$src" init -q

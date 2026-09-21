@@ -48,7 +48,6 @@ pipeline {
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
     /* Must match NIMBLE_COMMIT in .github/workflows/ci-nimble.yml */
     NIMBLE_COMMIT = '68ba20e753ba63d11fb8b60974e981afca376f97'
-    NIMBLE_BIN    = "${(env.USERPROFILE ?: env.HOME)?.replace('\\', '/')}/.nimble/nimble-${NIMBLE_COMMIT}"
     PATH     = "${assembePath([env.GOBIN])}"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
     VERSION  = sh(script: "./scripts/version.sh", returnStdout: true)
@@ -70,14 +69,6 @@ pipeline {
       steps { script {
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
-      } }
-    }
-
-    /* The Nimble bundled with scoop's Nim cannot install nim-sds. */
-    stage('Nimble') {
-      when { expression { env.PLATFORM.startsWith('windows') } }
-      steps { script {
-        make("install-nimble NIMBLE_COMMIT=${NIMBLE_COMMIT} NIMBLE_BIN=${NIMBLE_BIN}")
       } }
     }
 
@@ -157,8 +148,7 @@ def assembePath(List<String> extraPaths) {
     ]
     binPaths.each { dir -> if (!fileExists(dir)) { error("Missing PATH directory: '${dir}'") } }
     /* These Git Bash paths can't be checked with fileExists(). */
-    /* The pinned Nimble must shadow the one in scoop's Nim and shims. */
-    return ([env.NIMBLE_BIN, '/mingw64/bin', '/usr/bin', '/bin'] + binPaths + extraPaths).join(';')
+    return (['/mingw64/bin', '/usr/bin', '/bin'] + binPaths + extraPaths).join(';')
   }
 }
 
@@ -167,7 +157,7 @@ def make(target) {
     bat """
       call "C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
       REM Absolute path, because system32 precedes Git in PATH and also has a bash.exe once WSL is enabled.
-      "C:\\ProgramData\\scoop\\apps\\git\\current\\bin\\bash.exe" -c "make ${target} make=/bin/sh MINGW_PATH=C:/ProgramData/scoop/apps/msys2/current/mingw64"
+      "C:\\ProgramData\\scoop\\apps\\git\\current\\bin\\bash.exe" -c "make ${target} make=/bin/sh MINGW_PATH=C:/ProgramData/scoop/apps/msys2/current/mingw64 NIMBLE_COMMIT=${env.NIMBLE_COMMIT}"
     """
   } else { /* Use Nix for Linux/macOS. */
     nix.develop("make ${target}", pure: false)
