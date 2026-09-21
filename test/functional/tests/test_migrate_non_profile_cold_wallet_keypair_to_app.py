@@ -1,3 +1,6 @@
+"""The keycards tables and their RPCs were dropped, so the observable keycard state of a
+non-profile keypair is its cold-wallet type plus the absence of keystore files."""
+
 import copy
 import re
 
@@ -37,6 +40,16 @@ class TestMigrateNonProfileColdWalletKeypairToApp:
         kp = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
         assert kp is not None, "Expected the profile keypair to exist"
         return [a.get("address") for a in kp.get("accounts", [])]
+
+    def _keypair_fields(self, kp):
+        return {
+            "key-uid": kp["key-uid"],
+            "type": kp["type"],
+            "name": kp["name"],
+            "derived-from": kp["derived-from"],
+            "xpub": kp["xpub"],
+            "accounts": sorted((a["address"], a["path"]) for a in kp["accounts"] if not a.get("removed")),
+        }
 
     @pytest.mark.parametrize("cold_wallet_type", ["status-keycard", "ledger", "trezor"])
     def test_full_migrate_flow(self, backend, cold_wallet_type):
@@ -153,3 +166,105 @@ class TestMigrateNonProfileColdWalletKeypairToApp:
             assert (
                 resp is False
             ), f"Expected no keystore file for {address} because migrate-to-app with a wrong password must not write keystore files"
+
+    def test_migrate_to_app_preserves_keypair_fields(self, backend):
+        key_uid, addresses = self._add_seed_keypair(backend)
+        profile_xpub0 = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)["xpub"]
+
+        kp0 = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert kp0["type"] == "seed"
+        assert kp0.get("cold-wallet", "") == ""
+        assert kp0["xpub"] == user_1.wallet_xpub
+        assert kp0["derived-from"]
+        assert kp0["name"] == keypair_name
+        fields0 = self._keypair_fields(kp0)
+
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+
+        kp1 = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert self._keypair_fields(kp1) == fields0
+        assert kp1["xpub"] == user_1.wallet_xpub
+        assert kp1.get("cold-wallet") == "status-keycard"
+        for account in kp1["accounts"]:
+            if not account.get("removed"):
+                assert account.get("operable") == "fully"
+
+        keypairs = backend.accounts_service.get_account_keypairs()
+        assert len([kp for kp in keypairs if kp.get("key-uid") == key_uid]) == 1
+        accounts = backend.accounts_service.get_accounts()
+        account_addresses = {account.get("address", "").lower() for account in accounts}
+        assert all(account["address"].lower() in account_addresses for account in kp1["accounts"])
+
+        backend.accounts_service.migrate_non_profile_cold_wallet_keypair_to_app(user_1.passphrase, backend.password)
+
+        kp2 = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert self._keypair_fields(kp2) == fields0
+        assert kp2.get("cold-wallet", "") == ""
+        for account in kp2["accounts"]:
+            if not account.get("removed"):
+                assert account.get("operable") == "fully"
+        accounts = backend.accounts_service.get_accounts()
+        account_addresses = {account.get("address", "").lower() for account in accounts}
+        assert all(account["address"].lower() in account_addresses for account in kp2["accounts"])
+
+        profile_kp = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
+        assert profile_kp.get("cold-wallet", "") == ""
+        assert profile_kp["xpub"] == profile_xpub0
+        for address in self._profile_addresses(backend):
+            resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)
+            assert resp is True, f"Expected the profile keystore file for {address} to remain present"
+
+    def test_migrate_to_cold_wallet_with_empty_password_is_rejected(self, backend):
+        key_uid, addresses = self._add_seed_keypair(backend)
+
+        with pytest.raises(ApiResponseError, match=re.escape("no password provided")):
+            backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, "", "status-keycard")
+
+        kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert kp.get("cold-wallet", "") == ""
+        for address in addresses:
+            resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)
+            assert resp is True, f"Expected the keystore file for {address} to remain present"
+
+    def test_migrate_to_cold_wallet_with_wrong_password_is_rejected(self, backend):
+        key_uid, addresses = self._add_seed_keypair(backend)
+
+        with pytest.raises(ApiResponseError, match=re.escape("[keystore] incorrect password provided")):
+            backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, "definitely-wrong-password", "status-keycard")
+
+        kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert kp.get("cold-wallet", "") == ""
+        for address in addresses:
+            resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)
+            assert resp is True, f"Expected the keystore file for {address} to remain present"
+
+    def test_change_cold_wallet_type_without_password(self, backend):
+        key_uid, addresses = self._add_seed_keypair(backend)
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, "", "ledger")
+
+        kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert kp.get("cold-wallet") == "ledger"
+        for address in addresses:
+            resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)
+            assert resp is False, f"Expected no keystore file for {address} while using a cold wallet"
+
+        backend.accounts_service.migrate_non_profile_cold_wallet_keypair_to_app(user_1.passphrase, backend.password)
+        kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert kp.get("cold-wallet", "") == ""
+        for address in addresses:
+            resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)
+            assert resp is True, f"Expected the keystore file for {address} to be restored"
+
+    def test_migrate_to_app_twice_is_rejected(self, backend):
+        key_uid, addresses = self._add_seed_keypair(backend)
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_cold_wallet_keypair_to_app(user_1.passphrase, backend.password)
+
+        with pytest.raises(ApiResponseError, match=re.escape("keypair is not a cold wallet keypair")):
+            backend.accounts_service.migrate_non_profile_cold_wallet_keypair_to_app(user_1.passphrase, backend.password)
+
+        for address in addresses:
+            resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)
+            assert resp is True, f"Expected the keystore file for {address} to remain present"
