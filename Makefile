@@ -131,11 +131,11 @@ else
     NIMBLE_SETUP := nimble.paths
 endif
 
-# nimble.paths carries the --path set the compile needs: the packages sit
-# outside this tree, where Nim finds no ancestor config.nims.
+# nimble.paths carries every --path the compile needs, so configs above the
+# package (an embedding app's, for one) are skipped.
 NIMBLE_SDS_ENV = \
 	LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" \
-	NIM_PARAMS="$$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
