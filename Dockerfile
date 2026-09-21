@@ -25,7 +25,7 @@ RUN set -eu && \
     protoc --version
 
 # Install Nim from pre-built binaries
-ARG NIM_VERSION=2.2.6
+ARG NIM_VERSION=2.2.4
 RUN set -eu && \
     DPKG_ARCH="$(dpkg --print-architecture)" && \
     case "$DPKG_ARCH" in \
@@ -48,21 +48,13 @@ RUN set -eu && \
 
 ENV PATH="/opt/nim/bin:${PATH}"
 
-# The nimble bundled with Nim cannot resolve nim-sds through the bindings.
-# The nightly build; the release predates the lock-file fixes the chain needs.
-ARG NIMBLE_CHANNEL=latest
-RUN set -eu && \
-    case "$(dpkg --print-architecture)" in \
-    amd64) NIMBLE_ARCH="linux_x64" ;; \
-    arm64) NIMBLE_ARCH="linux_aarch64" ;; \
-    *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
-    esac; \
-    curl -sSfL -o /tmp/nimble.tar.gz \
-    "https://github.com/nim-lang/nimble/releases/download/${NIMBLE_CHANNEL}/nimble-${NIMBLE_ARCH}.tar.gz" && \
-    tar -xzf /tmp/nimble.tar.gz -C /opt/nim/bin && \
-    rm /tmp/nimble.tar.gz && \
-    chmod +x /opt/nim/bin/nimble && \
-    nimble --version
+# Nimble supplies nim-sds' pinned Nim; the one above builds logos-storage.
+# Must match NIMBLE_COMMIT in ci-nimble.yml.
+ARG NIMBLE_COMMIT=68ba20e753ba63d11fb8b60974e981afca376f97
+COPY scripts/install_nimble.sh /tmp/install_nimble.sh
+RUN /tmp/install_nimble.sh "$NIMBLE_COMMIT" /opt/nimble/bin && rm /tmp/install_nimble.sh
+
+ENV PATH="/opt/nimble/bin:${PATH}"
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''

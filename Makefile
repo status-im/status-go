@@ -326,7 +326,11 @@ USE_SYSTEM_NIM ?= 1
 
 # libsds targets
 
-.PHONY: nimble-deps
+.PHONY: nimble-deps install-nimble
+
+install-nimble: ##@build Build Nimble at NIMBLE_COMMIT into NIMBLE_BIN
+	@test -n "$(NIMBLE_COMMIT)" -a -n "$(NIMBLE_BIN)" || (echo "Error: NIMBLE_COMMIT and NIMBLE_BIN are required" && exit 1)
+	./scripts/install_nimble.sh "$(NIMBLE_COMMIT)" "$(NIMBLE_BIN)"
 
 nimble.paths: status_go.nimble
 	$(NIMBLE) setup --localdeps -y

@@ -46,6 +46,9 @@ pipeline {
     GOPATH   = "${WORKSPACE_TMP}/go"
     GOBIN    = "${WORKSPACE_TMP}/go/bin"
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
+    /* Must match NIMBLE_COMMIT in .github/workflows/ci-nimble.yml */
+    NIMBLE_COMMIT = '68ba20e753ba63d11fb8b60974e981afca376f97'
+    NIMBLE_BIN    = "${(env.USERPROFILE ?: env.HOME)?.replace('\\', '/')}/.nimble/nimble-${NIMBLE_COMMIT}"
     PATH     = "${assembePath([env.GOBIN])}"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
     VERSION  = sh(script: "./scripts/version.sh", returnStdout: true)
@@ -59,8 +62,6 @@ pipeline {
     GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
-    /* nim-sds source directory */
-    NIM_SDS_SOURCE_DIR = "${env.WORKSPACE_TMP}/nim-sds"
   }
 
   stages {
@@ -69,6 +70,14 @@ pipeline {
       steps { script {
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
+      } }
+    }
+
+    /* The Nimble bundled with scoop's Nim cannot install nim-sds. */
+    stage('Nimble') {
+      when { expression { env.PLATFORM.startsWith('windows') } }
+      steps { script {
+        make("install-nimble NIMBLE_COMMIT=${NIMBLE_COMMIT} NIMBLE_BIN=${NIMBLE_BIN}")
       } }
     }
 
@@ -148,7 +157,8 @@ def assembePath(List<String> extraPaths) {
     ]
     binPaths.each { dir -> if (!fileExists(dir)) { error("Missing PATH directory: '${dir}'") } }
     /* These Git Bash paths can't be checked with fileExists(). */
-    return (['/mingw64/bin', '/usr/bin', '/bin'] + binPaths + extraPaths).join(';')
+    /* The pinned Nimble must shadow the one in scoop's Nim and shims. */
+    return ([env.NIMBLE_BIN, '/mingw64/bin', '/usr/bin', '/bin'] + binPaths + extraPaths).join(';')
   }
 }
 
