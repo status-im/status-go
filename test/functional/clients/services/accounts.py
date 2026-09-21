@@ -106,6 +106,21 @@ class AccountService(Service):
         response = self.rpc_request("migrateNonProfileColdWalletKeypairToApp", params)
         return response
 
+    def make_seed_phrase_keypair_fully_operable(self, mnemonic, password):
+        params = [mnemonic, password]
+        response = self.rpc_request("makeSeedPhraseKeypairFullyOperable", params)
+        return response
+
+    def make_partially_operable_accouts_fully_operable(self, password):
+        params = [password]
+        response = self.rpc_request("makePartiallyOperableAccoutsFullyOperable", params)
+        return response
+
+    def clean_keystore_files(self, password):
+        params = [password]
+        response = self.rpc_request("cleanKeystoreFiles", params)
+        return response
+
     def get_random_mnemonic(self):
         response = self.rpc_request("getRandomMnemonic", [])
         return response
