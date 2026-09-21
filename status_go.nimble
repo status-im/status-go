@@ -27,7 +27,7 @@ requires "nim == 2.2.6"
 # transitively. A pin there overrides anything named here, so this does not name
 # one; that changes when nim-sds publishes versioned tags and the bindings can
 # express a range instead.
-requires "https://github.com/logos-messaging/sds-go-bindings#ac2e2af7"
+requires "https://github.com/logos-messaging/sds-go-bindings#e422b7dd"
 
 
 ### Helpers

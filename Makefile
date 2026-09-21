@@ -328,7 +328,7 @@ USE_SYSTEM_NIM ?= 1
 
 .PHONY: nimble-deps
 
-nimble.paths:
+nimble.paths: status_go.nimble
 	$(NIMBLE) setup --localdeps -y
 
 nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
