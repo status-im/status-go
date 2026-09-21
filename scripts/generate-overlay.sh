@@ -49,7 +49,7 @@ while IFS= read -r hit; do
 	file=${hit%%:*}
 	cmd=${hit#*://go:generate }
 	run_directive "$root/${file#./}" "$cmd"
-done < <(cd "$root" && grep -r --include='*.go' '^//go:generate ' . |
+done < <(cd "$root" && grep -r --include='*.go' --exclude-dir=vendor '^//go:generate ' . |
 	grep -v -e 'mockgen' -e 'abigen' -e '/contracts/' | sort)
 
 # {"Replace": {"<tree>/<path>.go": "<out-dir>/src/<path>.go"}}
