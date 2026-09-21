@@ -137,10 +137,11 @@ replaces `BUILD_VARS_LDFLAGS` and leaves the build unstamped.
 
 Every build links `libsds`, built from [nim-sds](https://github.com/logos-messaging/nim-sds)
 by its own nimble tasks. Outside the Nix shell the only Nim-side prerequisite is
-[nimble](https://github.com/nim-lang/nimble/releases) 0.24.1 on `PATH`: nim-sds
-pins its compiler (`nim == 2.2.10`) and `nimble setup` materialises it into
-nimble's store, so no `nim` needs to be installed (and one on `PATH` is not used
-for this build).
+[nimble](https://github.com/nim-lang/nimble/releases) on `PATH`. Standalone
+nimble 0.24.1 materialises a compiler into its own store, so no `nim` needs to
+be installed. Any nimble from 0.22.2 works too when a Nim the nim-sds manifest
+accepts is on `PATH` (it is reused, not downloaded): that is what the Windows
+CI uses, the scoop `nim` 2.2.10 package with the nimble it bundles.
 
 - `make build-libsds` clones the pinned revision (`NIM_SDS_REPO`, `NIM_SDS_VERSION`
   in the Makefile) into `NIM_SDS_SOURCE_DIR` (default: `../nim-sds` next to this

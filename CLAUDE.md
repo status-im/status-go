@@ -27,8 +27,9 @@ The messaging specifications Status implements are published at https://lip.logo
 Builds require CGO and native libraries (`libsds` (nim-sds) for SDS reliability, optionally `logos-storage`), so
 the Nix dev shell is strongly recommended — it provides the toolchain and pins the native dependencies.
 Outside Nix, `make build-libsds` builds `libsds` from nim-sds through its nimble tasks: install
-[nimble](https://github.com/nim-lang/nimble/releases) 0.24.1 (the only Nim-side prerequisite; it
-materialises the pinned Nim 2.2.10 into its own store, so no `nim` on `PATH` is needed).
+[nimble](https://github.com/nim-lang/nimble/releases) (the only Nim-side prerequisite: 0.24.1
+standalone materialises a compiler into its own store; any nimble from 0.22.2 works with a
+suitable `nim` on `PATH`, which it reuses).
 
 ```shell
 make shell                 # enter Nix dev shell (or: nix develop --extra-experimental-features 'nix-command flakes')

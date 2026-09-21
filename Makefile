@@ -391,11 +391,18 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 # Flag for logos-storage-nim, which still builds through nimbus-build-system.
 # When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
 # enforces to use system-installed Nim. libsds no longer reads it: nim-sds
-# builds through its nimble tasks, and nimble (0.24.1) is the only Nim-side
-# prerequisite for it. The nim-sds manifest pins the compiler (nim == 2.2.10)
-# and `nimble setup` materialises it into nimble's store, so no nim on PATH
-# is needed for libsds, and a mismatching one there is never picked up.
+# builds through its nimble tasks, and nimble is the Nim-side prerequisite:
+# 0.24.1 standalone materialises a compiler into its store; any nimble from
+# 0.22.2 works with a Nim the nim-sds manifest accepts on PATH, and reuses it.
 USE_SYSTEM_NIM ?= 1
+
+# -y: nimble 0.22.2 (bundled with Nim 2.2.10) asks questions during setup.
+# On Windows nimble fetches packages with `git submodule update`, a shell
+# script: it must find Git's own sed first, or a foreign sed on PATH breaks it.
+ifeq ($(detected_OS),Windows)
+ GIT_TOOLS_ENV = PATH="$$(r=$$(cd "$$(git --exec-path)/../../.." && pwd); echo "$${r%/}/usr/bin"):$$PATH"
+endif
+NIMBLE_SETUP = $(GIT_TOOLS_ENV) nimble -y setup
 
 # libsds targets
 
@@ -425,7 +432,7 @@ endif
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && nimble libsdsDynamic$(SDS_HOST)
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE_SETUP) && nimble libsdsDynamic$(SDS_HOST)
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -448,7 +455,7 @@ build-libsds-android: SDS_ANDROID_TASK = $(strip $(if $(filter arm64,$(ARCH)),li
 build-libsds-android: clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for Android: $(SDS_ANDROID_TASK)"
-	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" nimble $(SDS_ANDROID_TASK)
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE_SETUP) && ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" nimble $(SDS_ANDROID_TASK)
 else
 	@test -f $(NIM_SDS_LIB_DIR)/libsds.so || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.so" && exit 1)
 endif
@@ -459,7 +466,7 @@ build-libsds-ios: SDS_IOS_ARCH = $(if $(filter x86_64,$(ARCH)),amd64,$(ARCH))
 build-libsds-ios: clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds for iOS"
-	cd "$(NIM_SDS_SOURCE_DIR)" && nimble setup && ARCH="$(SDS_IOS_ARCH)" IOS_SDK_PATH="$$(xcrun --sdk $(or $(IPHONE_SDK),iphoneos) --show-sdk-path)" nimble libsdsIOS
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE_SETUP) && ARCH="$(SDS_IOS_ARCH)" IOS_SDK_PATH="$$(xcrun --sdk $(or $(IPHONE_SDK),iphoneos) --show-sdk-path)" nimble libsdsIOS
 else
 	@test -f $(NIM_SDS_LIB_DIR)/libsds.a || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.a" && exit 1)
 endif
