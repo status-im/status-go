@@ -199,6 +199,12 @@ func (api *API) IsChainSupportedForSwapViaLiFi(ctx context.Context, chainID uint
 	return api.s.router.IsChainSupportedForSwapViaLiFi(chainID)
 }
 
+// IsChainSupportedForSwapViaRelay returns true if the chain is supported for swap via Relay, false otherwise.
+func (api *API) IsChainSupportedForSwapViaRelay(ctx context.Context, chainID uint64) (bool, error) {
+	logutils.ZapLogger().Debug("call to check if chain is supported for swap via Relay")
+	return api.s.router.IsChainSupportedForSwapViaRelay(chainID)
+}
+
 func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get discover token")
 	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)

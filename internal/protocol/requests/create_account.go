@@ -111,6 +111,7 @@ type WalletConfig struct {
 	// Swap provider toggles
 	EnableParaswapProvider *bool `json:"enableParaswapProvider,omitempty"` // default: false
 	EnableLiFiProvider     *bool `json:"enableLiFiProvider,omitempty"`     // default: false
+	EnableRelayProvider    *bool `json:"enableRelayProvider,omitempty"`    // default: false
 }
 type WalletSecretsConfig struct {
 	PoktToken            security.SensitiveString `json:"poktToken"`
@@ -120,6 +121,7 @@ type WalletSecretsConfig struct {
 	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
 	AlchemyAPIKey        security.SensitiveString `json:"alchemyApiKey"`
 	LifiAPIKey           security.SensitiveString `json:"lifiApiKey"`
+	RelayAPIKey          security.SensitiveString `json:"relayApiKey"`
 
 	StatusProxyStageName string `json:"statusProxyStageName"`
 

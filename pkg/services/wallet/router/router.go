@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/paraswap"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/relay"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
@@ -86,6 +87,7 @@ type Router struct {
 
 	paraswapClientFactory func(chainID uint64) paraswap.ClientInterface
 	lifiClientFactory     func(chainID uint64) lifi.ClientInterface
+	relayClientFactory    func(chainID uint64) relay.ClientInterface
 
 	activeBalanceMap sync.Map // map[string]*big.Int
 
@@ -110,7 +112,8 @@ func NewRouter(
 	tokenBalancesFetcher TokenBalanceFetcher,
 	marketManager *market.Manager,
 	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager,
-	lifiAPIKey security.SensitiveString, lifiIntegrator string) *Router {
+	lifiAPIKey security.SensitiveString, lifiIntegrator string,
+	relayAPIKey security.SensitiveString, relayReferrer string) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
 	logger := logutils.ZapLogger().Named("router")
@@ -131,6 +134,9 @@ func NewRouter(
 		},
 		lifiClientFactory: func(chainID uint64) lifi.ClientInterface {
 			return lifi.NewClient(chainID, lifiIntegrator, lifiAPIKey.Reveal())
+		},
+		relayClientFactory: func(chainID uint64) relay.ClientInterface {
+			return relay.NewClient(chainID, relayReferrer, relayAPIKey.Reveal())
 		},
 		logger: logger,
 	}

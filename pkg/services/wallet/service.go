@@ -54,6 +54,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/routeexecution"
 	"github.com/status-im/status-go/pkg/services/wallet/router"
 	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
+	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 	activityfetcher_alchemy "github.com/status-im/status-go/pkg/services/wallet/thirdparty/activity/alchemy"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/collectibles/alchemy"
@@ -61,6 +62,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/efp"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/market/coingecko"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/relay"
 	"github.com/status-im/status-go/pkg/services/wallet/token"
 	"github.com/status-im/status-go/pkg/services/wallet/transfer"
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
@@ -307,7 +309,8 @@ func NewService(
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, tokenBalancesFetcher, marketManager, collectibles,
-		collectiblesManager, config.WalletConfig.LifiAPIKey, lifi.IntegratorForStage(config.WalletConfig.StatusProxyStageName))
+		collectiblesManager, config.WalletConfig.LifiAPIKey, lifi.IntegratorForStage(config.WalletConfig.StatusProxyStageName),
+		config.WalletConfig.RelayAPIKey, relay.ReferrerForStage(config.WalletConfig.StatusProxyStageName))
 	for _, processor := range pathProcessors {
 		router.AddPathProcessor(processor)
 	}
@@ -368,6 +371,51 @@ func NewService(
 	}, nil
 }
 
+func buildSwapPathProcessors(
+	rpcClient rpc.EthClientGetter,
+	transactor transactions.TransactorIface,
+	tokenManager *token.Manager,
+	walletConfig *params.WalletConfig,
+) []pathprocessor.PathProcessor {
+	var (
+		processor pathprocessor.PathProcessor
+		ignored   []string
+	)
+
+	switch {
+	case walletConfig.EnableRelayProvider:
+		processor = pathprocessor.NewRelayProcessor(rpcClient, transactor, tokenManager,
+			walletConfig.RelayAPIKey, relay.ReferrerForStage(walletConfig.StatusProxyStageName))
+		if walletConfig.EnableLiFiProvider {
+			ignored = append(ignored, pathProcessorCommon.ProcessorLiFiName)
+		}
+		if walletConfig.EnableParaswapProvider {
+			ignored = append(ignored, pathProcessorCommon.ProcessorSwapParaswapName)
+		}
+	case walletConfig.EnableLiFiProvider:
+		processor = pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager,
+			walletConfig.LifiAPIKey, lifi.IntegratorForStage(walletConfig.StatusProxyStageName))
+		if walletConfig.EnableParaswapProvider {
+			ignored = append(ignored, pathProcessorCommon.ProcessorSwapParaswapName)
+		}
+	case walletConfig.EnableParaswapProvider:
+		processor = pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
+	}
+
+	if processor == nil {
+		logutils.ZapLogger().Warn("no swap provider enabled")
+		return nil
+	}
+
+	if len(ignored) > 0 {
+		logutils.ZapLogger().Warn("no fallback support for more than one swap/bridge provider, ignoring lower priority providers",
+			zap.String("enabled", processor.Name()),
+			zap.Strings("ignored", ignored))
+	}
+	logutils.ZapLogger().Info("swap provider enabled", zap.String("provider", processor.Name()))
+	return []pathprocessor.PathProcessor{processor}
+}
+
 func buildPathProcessors(
 	rpcClient *rpc.Client,
 	transactor *transactions.Transactor,
@@ -378,8 +426,6 @@ func buildPathProcessors(
 ) []pathprocessor.PathProcessor {
 	ret := make([]pathprocessor.PathProcessor, 0)
 	deployerOverrides := walletConfig.CommunityTokenDeployerOverrides
-	lifiAPIKey := walletConfig.LifiAPIKey
-	lifiIntegrator := lifi.IntegratorForStage(walletConfig.StatusProxyStageName)
 
 	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
 	ret = append(ret, transfer)
@@ -390,24 +436,8 @@ func buildPathProcessors(
 	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
 	ret = append(ret, erc1155Transfer)
 
-	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.GetNetworkManager())
-	ret = append(ret, hop)
-
-	// Swap providers are opt-in via WalletConfig
-	if walletConfig.EnableParaswapProvider {
-		paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
-		ret = append(ret, paraswap)
-	}
-
-	if walletConfig.EnableLiFiProvider {
-		lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager, lifiAPIKey, lifiIntegrator)
-		ret = append(ret, lifi)
-	}
-
-	logutils.ZapLogger().Info("swap providers registered",
-		zap.Bool("paraswap", walletConfig.EnableParaswapProvider),
-		zap.Bool("lifi", walletConfig.EnableLiFiProvider),
-	)
+	// Bridging is served by the swap provider (Relay or LI.FI); the Hop bridge is not an option.
+	ret = append(ret, buildSwapPathProcessors(rpcClient, transactor, tokenManager, walletConfig)...)
 
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)
 	ret = append(ret, ensRegister)
