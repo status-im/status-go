@@ -446,6 +446,57 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_wallet_secrets(data)
         return self.api_request_json(method, data)
 
+    def login_with_keycard(self, key_uid, password: str, keycard_whisper_private_key: str, kdf_iterations=0, wallet_xpub=None):
+        self.password = password
+        SignalClient.disconnect(self)
+        SignalClient.connect(self)
+        self.wait_until_connected()
+        self._mark_login_signal()
+        data = {
+            "password": password,
+            "keyUid": key_uid,
+            "kdfIterations": kdf_iterations,
+            "keycardWhisperPrivateKey": keycard_whisper_private_key,
+        }
+        if wallet_xpub is not None:
+            data["walletXPub"] = wallet_xpub
+        data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
+        return self.api_request_json("LoginAccount", data)
+
+    def login_with_mnemonic(self, key_uid, mnemonic: str):
+        SignalClient.disconnect(self)
+        SignalClient.connect(self)
+        self.wait_until_connected()
+        self._mark_login_signal()
+        data = {"password": "", "keyUid": key_uid, "kdfIterations": 0, "mnemonic": mnemonic}
+        data = self._set_proxy_credentials(data)
+        data = self._set_wallet_secrets(data)
+        return self.api_request_json("LoginAccount", data)
+
+    def convert_to_keycard_account_v2(self, key_uid, keycard_pairing: str, keycard_uid: str, old_password: str, new_password: str, **kwargs):
+        data = {
+            "account": {"key-uid": key_uid, "keycard-pairing": keycard_pairing, "kdfIterations": 0},
+            "settings": {},
+            "keycardUID": keycard_uid,
+            "oldPassword": old_password,
+            "newPassword": new_password,
+        }
+        response = self.api_request_json("ConvertToKeycardAccountV2", data, **kwargs)
+        self.password = new_password
+        return response
+
+    def convert_to_regular_account_v2(self, mnemonic: str, curr_password: str, new_password: str, **kwargs):
+        data = {"mnemonic": mnemonic, "currPassword": curr_password, "newPassword": new_password}
+        response = self.api_request_json("ConvertToRegularAccountV2", data, **kwargs)
+        self.password = new_password
+        return response
+
+    def reinit_and_get_accounts(self):
+        # InitializeApplication is the only HTTP surface that exposes multiaccounts.keycard-pairing.
+        self.logout()
+        return self.init_status_backend().get("accounts", [])
+
     def logout(self, **kwargs):
         method = "Logout"
         try:
