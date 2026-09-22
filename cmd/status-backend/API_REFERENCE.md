@@ -363,6 +363,33 @@ Same as `wakuext_chatMessages`, but also can get thread history.
 
 ---
 
+### wakuext_emojiReactionsByChatID (deprecated)
+
+Read emoji reactions for a chat. Equivalent to `wakuext_emojiReactionsByChatIDV2` with an empty `threadId`.
+
+**Params:** `[chatId, cursor, limit]`
+- `chatId`: string (communityId + chatUUID)
+- `cursor`: string (empty string for first page)
+- `limit`: number
+
+---
+
+### wakuext_emojiReactionsByChatIDV2
+
+Same as `wakuext_emojiReactionsByChatID`, but also can get reactions on thread messages.
+
+Reactions are selected from the same window of messages `wakuext_chatMessagesV2` would return for
+the same `chatId`/`threadId`/`cursor`/`limit`, so pass the cursor that was used to fetch the
+messages being rendered.
+
+**Params:** `[chatId, threadId, cursor, limit]`
+- `chatId`: string (communityId + chatUUID)
+- `threadId`: string (leave empty to get the reactions of a chat)
+- `cursor`: string (empty string for first page)
+- `limit`: number
+
+---
+
 ### wakuext_createThread
 
 Explicitly create a thread from an existing parent message. The parent message must already be stored locally (i.e. it was previously received or sent).
