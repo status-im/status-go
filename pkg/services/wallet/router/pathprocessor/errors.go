@@ -54,6 +54,12 @@ var (
 	ErrIncorrectSignatureFormat = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-042"), Details: "incorrect signature length: got %d, want %d"}
 	ErrTransactionNotFound      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-043"), Details: "transaction not found"}
 	ErrLiFiCustomError          = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-044"), Details: "LiFi custom error"}
+	ErrRelayCustomError         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-045"), Details: "Relay custom error"}
+	ErrNoRoutesFound            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-046"), Details: "no routes found"}
+	ErrNoQuotesAvailable        = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-047"), Details: "no quotes available"}
+	ErrSlippageExceeded         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-048"), Details: "slippage tolerance exceeded"}
+	ErrAmountTooLow             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-049"), Details: "amount too low"}
+	ErrAmountTooHigh            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-050"), Details: "amount too high"}
 )
 
 func createErrorResponse(processorName string, err error) error {
@@ -88,6 +94,8 @@ func createErrorResponse(processorName string, err error) error {
 		customErrResp = ErrSwapParaswapCustomError
 	case pathProcessorCommon.ProcessorLiFiName:
 		customErrResp = ErrLiFiCustomError
+	case pathProcessorCommon.ProcessorRelayName:
+		customErrResp = ErrRelayCustomError
 	case pathProcessorCommon.ProcessorENSRegisterName:
 		customErrResp = ErrENSRegisterCustomError
 	case pathProcessorCommon.ProcessorENSReleaseName:
@@ -121,6 +129,7 @@ func IsCustomError(err error) bool {
 		ErrBridgeHopCustomError,
 		ErrSwapParaswapCustomError,
 		ErrLiFiCustomError,
+		ErrRelayCustomError,
 		ErrENSRegisterCustomError,
 		ErrENSReleaseCustomError,
 		ErrENSPublicKeyCustomError,

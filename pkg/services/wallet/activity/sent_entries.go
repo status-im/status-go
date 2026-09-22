@@ -256,9 +256,8 @@ func getSentActivityType(path *routes.Path, isApproval bool) ac.Type {
 		return ac.BridgeAT
 	case pathProcessorCommon.ProcessorSwapParaswapName:
 		return ac.SwapAT
-	case pathProcessorCommon.ProcessorLiFiName:
-		// LI.FI serves both swaps and bridges through one processor; a cross-chain
-		// path is a bridge, a same-chain path is a swap.
+	case pathProcessorCommon.ProcessorLiFiName,
+		pathProcessorCommon.ProcessorRelayName:
 		if isCrossChainPath(path) {
 			return ac.BridgeAT
 		}

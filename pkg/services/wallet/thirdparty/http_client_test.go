@@ -445,3 +445,21 @@ func TestDoWithExponentialBackoff_WithBody(t *testing.T) {
 	require.GreaterOrEqual(t, attempts, 2)
 	resp.Body.Close()
 }
+
+func TestHTTPClient_PostRequestOptions(t *testing.T) {
+	var receivedHeader, receivedContentType string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeader = r.Header.Get("x-api-key")
+		receivedContentType = r.Header.Get("Content-Type")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"message":"bad","errorCode":"AMOUNT_TOO_LOW"}`))
+	}))
+	defer srv.Close()
+
+	client := NewHTTPClient()
+	body, err := client.DoPostRequest(context.Background(), srv.URL, map[string]interface{}{"a": 1}, nil, WithHeader("x-api-key", "secret"))
+	require.NoError(t, err) // non-2xx bodies are returned verbatim (Paraswap relies on this)
+	require.Equal(t, "secret", receivedHeader)
+	require.Equal(t, "application/json", receivedContentType)
+	require.JSONEq(t, `{"message":"bad","errorCode":"AMOUNT_TOO_LOW"}`, string(body))
+}
