@@ -34,7 +34,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	dAppPermissionGranted := false
 
 	signal.SetHandler(signal.Handler(func(s []byte) {
-		var evt commands.EventType
+		var evt eventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
 
@@ -167,7 +167,7 @@ func TestForwardedRPCs(t *testing.T) {
 	_, err = state.api.CallRPC(state.ctx, requestJson)
 	assert.Equal(t, commands.ErrDAppIsNotPermittedByUser, err)
 
-	err = commands.PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
+	err = persistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)
 
 	state.ethClientGetter.EXPECT().
@@ -196,7 +196,7 @@ func TestRequestAccountsAfterPermissionsRevokeTest(t *testing.T) {
 	dAppPermissionGranted := false
 
 	signal.SetHandler(signal.Handler(func(s []byte) {
-		var evt commands.EventType
+		var evt eventType
 		err := json.Unmarshal(s, &evt)
 		assert.NoError(t, err)
 

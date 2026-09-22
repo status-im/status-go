@@ -26,6 +26,10 @@ The messaging specifications Status implements are published at https://lip.logo
 
 Builds require CGO and native libraries (`libsds` (nim-sds) for SDS reliability, optionally `logos-storage`), so
 the Nix dev shell is strongly recommended — it provides the toolchain and pins the native dependencies.
+Outside Nix, `make build-libsds` builds `libsds` from nim-sds through its nimble tasks: install
+[nimble](https://github.com/nim-lang/nimble/releases) (the only Nim-side prerequisite: 0.24.1
+standalone materialises a compiler into its own store; any nimble from 0.22.2 works with a
+suitable `nim` on `PATH`, which it reuses).
 
 ```shell
 make shell                 # enter Nix dev shell (or: nix develop --extra-experimental-features 'nix-command flakes')
@@ -35,12 +39,18 @@ make statusgo-shared-library
 make statusgo-android-library / make statusgo-ios-library
 ```
 
-To work in an IDE / build as a plain Go project, you must first generate sources:
+To work in an IDE / build as a plain Go project, you must first generate sources
+(the library targets generate their own copy outside the tree, see `docs/building.md`):
 
 ```shell
 make status-go-deps        # install required Go tools
 make generate              # protobufs, SQL migration bindata, mocks (via go-generate-fast)
 ```
+
+Library builds write only under `STATUS_GO_BUILD_DIR` (default `./build`), and
+take `GENERATE_PREREQ=` to skip `make generate` — that is how a consumer builds
+a read-only copy of this tree (see `docs/building.md`, "status-go as a nimble
+package").
 
 Run the server: `./build/bin/status-backend --address=localhost:12345` (full JSON API on that port; see
 `cmd/status-backend/README.md` and `cmd/status-backend/API_REFERENCE.md`).
@@ -152,7 +162,8 @@ transport)**. Asynchronous results flow back to clients through the `signal` pac
 ## Conventions
 
 - Native dependencies: builds link against `libsds` (nim-sds) and optionally `logos-storage` (nim). The
-  `make` targets clone/build these; the `USE_LOGOS_STORAGE` toggle gates the storage path
+  `make` targets clone/build these (nim-sds through nimble 0.24.1, `NIM_SDS_REPO`/`NIM_SDS_VERSION` in the
+  Makefile pin it; logos-storage through nimbus-build-system); the `USE_LOGOS_STORAGE` toggle gates the storage path
   (`make storage-help` for details). Outside the Nix shell, missing C deps are the usual cause of build failures.
 - Generated files (protobuf, migration bindata, mocks) are committed — run `make generate` after changing
   `.proto`, `//go:generate` directives, or SQL migrations rather than editing generated output.
