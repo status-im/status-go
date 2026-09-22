@@ -11,6 +11,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"go.uber.org/zap"
+
 	accsmanagement "github.com/status-im/status-go/internal/accounts-management"
 	accsmanagementtypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
@@ -23,7 +25,6 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/tokenbalances"
 	"github.com/status-im/status-go/pkg/services/wallet/transferdetector"
 
-	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -208,8 +209,7 @@ func NewService(
 			SearchProviders:            collectibleSearchProviders,
 		}
 
-		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags,
-			config.WalletConfig.CommunityTokenDeployerOverrides, config.WalletConfig.LifiAPIKey, lifi.IntegratorForStage(config.WalletConfig.StatusProxyStageName))
+		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags, &config.WalletConfig)
 
 		leaderboardConfig = leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
 
@@ -374,11 +374,12 @@ func buildPathProcessors(
 	tokenManager *token.Manager,
 	ensResolver *ensresolver.EnsResolver,
 	featureFlags *protocolCommon.FeatureFlags,
-	deployerOverrides map[uint64]ethCommon.Address,
-	lifiAPIKey security.SensitiveString,
-	lifiIntegrator string,
+	walletConfig *params.WalletConfig,
 ) []pathprocessor.PathProcessor {
 	ret := make([]pathprocessor.PathProcessor, 0)
+	deployerOverrides := walletConfig.CommunityTokenDeployerOverrides
+	lifiAPIKey := walletConfig.LifiAPIKey
+	lifiIntegrator := lifi.IntegratorForStage(walletConfig.StatusProxyStageName)
 
 	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
 	ret = append(ret, transfer)
@@ -392,12 +393,21 @@ func buildPathProcessors(
 	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.GetNetworkManager())
 	ret = append(ret, hop)
 
-	// disable paraswap, todo: put it back after testing
-	// paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
-	// ret = append(ret, paraswap)
+	// Swap providers are opt-in via WalletConfig
+	if walletConfig.EnableParaswapProvider {
+		paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
+		ret = append(ret, paraswap)
+	}
 
-	lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager, lifiAPIKey, lifiIntegrator)
-	ret = append(ret, lifi)
+	if walletConfig.EnableLiFiProvider {
+		lifi := pathprocessor.NewLiFiProcessor(rpcClient, transactor, tokenManager, lifiAPIKey, lifiIntegrator)
+		ret = append(ret, lifi)
+	}
+
+	logutils.ZapLogger().Info("swap providers registered",
+		zap.Bool("paraswap", walletConfig.EnableParaswapProvider),
+		zap.Bool("lifi", walletConfig.EnableLiFiProvider),
+	)
 
 	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)
 	ret = append(ret, ensRegister)
@@ -513,6 +523,8 @@ func (s *Service) Stop() error {
 	s.reader.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()
+	s.collectiblesManager.Stop()
+	s.marketManager.Stop()
 	s.tokenManager.Stop()
 	s.leaderboardService.Stop()
 	s.started = false
@@ -556,6 +568,8 @@ func (s *Service) stopBackgroundWorkers() {
 	s.multistandardBalanceController.Stop()
 	s.transferDetectorController.Stop()
 	s.collectibles.Stop()
+	s.collectiblesManager.Stop()
+	s.marketManager.Stop()
 	s.leaderboardService.Stop()
 	if s.cancelWalletServiceCtx != nil {
 		s.cancelWalletServiceCtx()

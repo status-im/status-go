@@ -62,14 +62,55 @@ func (s *MarketTestSuite) TestEventOnNetworkError() {
 	customErr := errors.New("dial tcp: lookup optimism-goerli.infura.io: no such host")
 	priceProviderWithError := NewMockPriceProviderWithError(ctrl, customErr)
 	manager := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
+	manager.downDebounce = 200 * time.Millisecond
 
 	_, err := manager.FetchPrices(s.tokensKeys, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
-	event, ok := s.feedSub.WaitForEvent(500 * time.Millisecond)
-	s.Require().True(ok, "expected an event, but none was received")
+	_, ok := s.feedSub.WaitForEvent(100 * time.Millisecond)
+	s.Require().False(ok, "network errors must not emit market down before downDebounce")
 
-	// THEN
-	s.Require().Equal(event.Type, EventMarketStatusChanged)
+	event, ok := s.feedSub.WaitForEvent(2 * time.Second)
+	s.Require().True(ok, "expected a delayed down event")
+	s.Require().Equal(EventMarketStatusChanged, event.Type)
+	s.Require().Equal("down", event.Message)
+}
+
+func (s *MarketTestSuite) TestNetworkErrorThenRecoveryCancelsDown() {
+	ctrl := gomock.NewController(s.T())
+	defer ctrl.Finish()
+
+	failing := NewMockPriceProviderWithError(ctrl, errors.New("dial tcp: lookup api.coingecko.com: no such host"))
+	okProvider := NewMockPriceProvider(ctrl)
+	okProvider.SetMockPrices(mockPrices)
+
+	failingManager := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{failing}, s.feedSub.GetFeed())
+	failingManager.downDebounce = 100 * time.Millisecond
+	_, err := failingManager.FetchPrices(testTokensKeys, s.currencies)
+	s.Require().Error(err)
+
+	failingManager.providers = []thirdparty.MarketDataProvider{okProvider}
+	_, err = failingManager.FetchPrices(testTokensKeys, s.currencies)
+	s.Require().NoError(err)
+
+	_, ok := s.feedSub.WaitForEvent(500 * time.Millisecond)
+	s.Require().False(ok, "recovery before debounce must not emit market down")
+	s.Require().True(failingManager.IsConnected)
+}
+
+func (s *MarketTestSuite) TestStopCancelsPendingDown() {
+	ctrl := gomock.NewController(s.T())
+	defer ctrl.Finish()
+
+	failing := NewMockPriceProviderWithError(ctrl, errors.New("dial tcp: lookup api.coingecko.com: no such host"))
+	manager := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{failing}, s.feedSub.GetFeed())
+	manager.downDebounce = 100 * time.Millisecond
+	_, err := manager.FetchPrices(testTokensKeys, s.currencies)
+	s.Require().Error(err)
+
+	manager.Stop()
+	_, ok := s.feedSub.WaitForEvent(500 * time.Millisecond)
+	s.Require().False(ok, "stop must cancel pending market down")
+	s.Require().True(manager.IsConnected)
 }
 
 func TestMarketTestSuite(t *testing.T) {

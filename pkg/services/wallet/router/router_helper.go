@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/requests"
 	"github.com/status-im/status-go/pkg/services/wallet/router/fees"
 	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
+	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/router/routes"
 	"github.com/status-im/status-go/pkg/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
@@ -727,6 +728,9 @@ func (r *Router) TokenAvailableForBridgingViaHop(chainID uint64, address common.
 
 // IsChainSupportedForSwapViaParaswap returns true if the chain is supported for swap via Paraswap, false otherwise.
 func (r *Router) IsChainSupportedForSwapViaParaswap(chainID uint64) (bool, error) {
+	if !r.isProcessorRegistered(pathProcessorCommon.ProcessorSwapParaswapName) {
+		return false, nil
+	}
 	paraswapClient := r.paraswapClientFactory(chainID)
 	tokens, err := paraswapClient.FetchTokensList(context.Background())
 	if err != nil {
@@ -738,6 +742,9 @@ func (r *Router) IsChainSupportedForSwapViaParaswap(chainID uint64) (bool, error
 
 // IsChainSupportedForSwapViaLiFi returns true if the chain is supported for swap via LI.FI, false otherwise.
 func (r *Router) IsChainSupportedForSwapViaLiFi(chainID uint64) (bool, error) {
+	if !r.isProcessorRegistered(pathProcessorCommon.ProcessorLiFiName) {
+		return false, nil
+	}
 	lifiClient := r.lifiClientFactory(chainID)
 	tokens, err := lifiClient.FetchTokensList(context.Background())
 	if err != nil {

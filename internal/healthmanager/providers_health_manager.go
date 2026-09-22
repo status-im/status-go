@@ -12,7 +12,7 @@ import (
 )
 
 // DefaultDownDebounce delays Down emission to suppress short provider blips.
-const DefaultDownDebounce = 30 * time.Second
+const DefaultDownDebounce = 60 * time.Second
 
 type ProvidersHealthManager struct {
 	mu                  sync.RWMutex

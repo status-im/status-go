@@ -227,6 +227,8 @@ type WalletConfig struct {
 
 	StatusProxyStageName     string                   `json:"StatusProxyStageName"`
 	EnableMercuryoProvider   bool                     `json:"EnableMercuryoProvider"`
+	EnableParaswapProvider   bool                     `json:"EnableParaswapProvider"`
+	EnableLiFiProvider       bool                     `json:"EnableLiFiProvider"`
 	EthRpcProxyUrl           security.SensitiveString `json:"EthRpcProxyUrl"`
 	EthRpcProxyUser          security.SensitiveString `json:"EthRpcProxyUser"`
 	EthRpcProxyPassword      security.SensitiveString `json:"EthRpcProxyPassword"`
@@ -264,6 +266,8 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Enabled                             bool                      `json:"Enabled"`
 		EnableMercuryoProvider              bool                      `json:"EnableMercuryoProvider"`
+		EnableParaswapProvider              bool                      `json:"EnableParaswapProvider"`
+		EnableLiFiProvider                  bool                      `json:"EnableLiFiProvider"`
 		TokensListsAutoRefreshInterval      int                       `json:"TokensListsAutoRefreshInterval"`
 		TokensListsAutoRefreshCheckInterval int                       `json:"TokensListsAutoRefreshCheckInterval"`
 		MulticallOverrides                  map[uint64]common.Address `json:"MulticallOverrides"`
@@ -272,6 +276,8 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	}{
 		Enabled:                             wc.Enabled,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
+		EnableParaswapProvider:              wc.EnableParaswapProvider,
+		EnableLiFiProvider:                  wc.EnableLiFiProvider,
 		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
 		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
 		MulticallOverrides:                  wc.MulticallOverrides,
