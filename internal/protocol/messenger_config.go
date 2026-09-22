@@ -214,6 +214,13 @@ func WithPushNotifications() func(c *config) error {
 	}
 }
 
+func WithThreads() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.Threads = true
+		return nil
+	}
+}
+
 func WithPushNotificationServer(server PushNotificationServer) func(c *config) error {
 	return func(c *config) error {
 		c.pushNotificationServer = server
