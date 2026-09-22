@@ -573,6 +573,17 @@ func (api *PublicAPI) ChatThreads(chatID string) (*ApplicationThreadsResponse, e
 	}, nil
 }
 
+func (api *PublicAPI) ChatThreadsByChatIDs(chatIDs []string) (*ApplicationThreadsResponse, error) {
+	threads, err := api.service.messenger.ThreadsByChatIDs(chatIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationThreadsResponse{
+		Threads: threads,
+	}, nil
+}
+
 func (api *PublicAPI) MessageByMessageID(messageID string) (*common.Message, error) {
 	return api.service.messenger.MessageByID(messageID)
 }
