@@ -21,6 +21,8 @@ func TestPlainError(t *testing.T) {
 		common.ProcessorTransferName,
 		common.ProcessorBridgeHopName,
 		common.ProcessorSwapParaswapName,
+		common.ProcessorLiFiName,
+		common.ProcessorRelayName,
 		common.ProcessorERC721Name,
 		common.ProcessorERC1155Name,
 		common.ProcessorENSRegisterName,
@@ -96,6 +98,11 @@ func TestCustomErrors(t *testing.T) {
 			err:      ErrTransferCustomError,
 			expected: true,
 		},
+		{
+			name:     "relay custom error",
+			err:      ErrRelayCustomError,
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -103,4 +110,11 @@ func TestCustomErrors(t *testing.T) {
 			require.Equal(t, tt.expected, IsCustomError(tt.err))
 		})
 	}
+}
+
+func TestRelayCustomErrorCode(t *testing.T) {
+	ppErrResp := createErrorResponse(common.ProcessorRelayName, errors.New("boom"))
+	castPPErrResp := ppErrResp.(*s_errors.ErrorResponse)
+	require.Equal(t, s_errors.ErrorCode("WPP-045"), castPPErrResp.Code)
+	require.Equal(t, "boom", castPPErrResp.Details)
 }
