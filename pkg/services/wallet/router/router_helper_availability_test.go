@@ -15,6 +15,8 @@ import (
 	mock_lifi "github.com/status-im/status-go/pkg/services/wallet/thirdparty/lifi/mock"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/paraswap"
 	mock_paraswap "github.com/status-im/status-go/pkg/services/wallet/thirdparty/paraswap/mock"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/relay"
+	mock_relay "github.com/status-im/status-go/pkg/services/wallet/thirdparty/relay/mock"
 )
 
 func TestTokenAvailableForBridgingViaHop(t *testing.T) {
@@ -175,5 +177,71 @@ func TestIsChainSupportedForSwapViaLiFi_Error(t *testing.T) {
 		},
 	}
 	_, err := r.IsChainSupportedForSwapViaLiFi(walletCommon.EthereumMainnet)
+	require.Error(t, err)
+}
+
+func TestIsChainSupportedForSwapViaRelay_ProviderNotRegistered(t *testing.T) {
+	r := &Router{
+		pathProcessors: registeredProcessors(),
+		relayClientFactory: func(chainID uint64) relay.ClientInterface {
+			t.Fatal("relay client must not be created when the provider is not registered")
+			return nil
+		},
+	}
+
+	supported, err := r.IsChainSupportedForSwapViaRelay(walletCommon.EthereumMainnet)
+	require.NoError(t, err)
+	require.False(t, supported)
+}
+
+func TestIsChainSupportedForSwapViaRelay(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	requestedChainID := walletCommon.EthereumMainnet
+
+	mockClient := mock_relay.NewMockClientInterface(ctrl)
+	r := &Router{
+		pathProcessors: registeredProcessors(pathProcessorCommon.ProcessorRelayName),
+		relayClientFactory: func(chainID uint64) relay.ClientInterface {
+			require.Equal(t, requestedChainID, chainID)
+			return mockClient
+		},
+	}
+
+	testCases := []struct {
+		name     string
+		chains   []relay.Chain
+		expected bool
+	}{
+		{"supported", []relay.Chain{{ID: walletCommon.OptimismMainnet}, {ID: requestedChainID, DepositEnabled: true}}, true},
+		{"chain missing", []relay.Chain{{ID: walletCommon.OptimismMainnet, DepositEnabled: true}}, false},
+		{"deposits disabled", []relay.Chain{{ID: requestedChainID, DepositEnabled: false}}, false},
+		{"chain disabled", []relay.Chain{{ID: requestedChainID, DepositEnabled: true, Disabled: true}}, false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockClient.EXPECT().FetchChains(gomock.Any()).Return(tc.chains, nil)
+			supported, err := r.IsChainSupportedForSwapViaRelay(requestedChainID)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, supported)
+		})
+	}
+}
+
+func TestIsChainSupportedForSwapViaRelay_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock_relay.NewMockClientInterface(ctrl)
+	mockClient.EXPECT().FetchChains(gomock.Any()).Return(nil, errors.New("error fetching chains"))
+
+	r := &Router{
+		pathProcessors: registeredProcessors(pathProcessorCommon.ProcessorRelayName),
+		relayClientFactory: func(chainID uint64) relay.ClientInterface {
+			return mockClient
+		},
+	}
+	_, err := r.IsChainSupportedForSwapViaRelay(walletCommon.EthereumMainnet)
 	require.Error(t, err)
 }

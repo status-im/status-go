@@ -753,3 +753,22 @@ func (r *Router) IsChainSupportedForSwapViaLiFi(chainID uint64) (bool, error) {
 
 	return len(tokens) > 0, nil
 }
+
+// IsChainSupportedForSwapViaRelay returns true if the chain is supported for swap via Relay, false otherwise.
+func (r *Router) IsChainSupportedForSwapViaRelay(chainID uint64) (bool, error) {
+	if !r.isProcessorRegistered(pathProcessorCommon.ProcessorRelayName) {
+		return false, nil
+	}
+	relayClient := r.relayClientFactory(chainID)
+	chains, err := relayClient.FetchChains(context.Background())
+	if err != nil {
+		return false, err
+	}
+
+	for _, chain := range chains {
+		if chain.ID == chainID {
+			return chain.DepositEnabled && !chain.Disabled, nil
+		}
+	}
+	return false, nil
+}

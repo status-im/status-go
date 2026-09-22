@@ -159,6 +159,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 		EnableMercuryoProvider: true,
 		EnableParaswapProvider: boolOrDefault(walletRequest.EnableParaswapProvider, false),
 		EnableLiFiProvider:     boolOrDefault(walletRequest.EnableLiFiProvider, false),
+		EnableRelayProvider:    boolOrDefault(walletRequest.EnableRelayProvider, false),
 
 		TokensListsAutoRefreshCheckInterval: walletRequest.TokensListsAutoRefreshCheckInterval,
 		TokensListsAutoRefreshInterval:      walletRequest.TokensListsAutoRefreshInterval,
@@ -194,6 +195,10 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 
 	if !request.LifiAPIKey.Empty() {
 		walletConfig.LifiAPIKey = request.LifiAPIKey
+	}
+
+	if !request.RelayAPIKey.Empty() {
+		walletConfig.RelayAPIKey = request.RelayAPIKey
 	}
 
 	if !request.MarketDataProxyUser.Empty() {

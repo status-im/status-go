@@ -275,7 +275,8 @@ func (c *HTTPClient) DoGetRequestWithEtag(ctx context.Context, url string, param
 	return c.doGetRequest(ctx, url, params, allOptions...)
 }
 
-func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[string]interface{}, creds *BasicCreds) ([]byte, error) {
+// DoPostRequest sends a JSON body and returns the response body verbatim, regardless of the status code
+func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[string]interface{}, creds *BasicCreds, options ...RequestOption) ([]byte, error) {
 	jsonData, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -292,6 +293,11 @@ func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[s
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
+
+	mods := &requestModifiers{}
+	for _, option := range options {
+		option(req, mods)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
