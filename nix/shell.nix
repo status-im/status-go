@@ -8,7 +8,7 @@ in pkgs.mkShell {
   name = "status-go-shell";
 
   buildInputs = with pkgs; [
-    git jq which gcc rustc cargo openjdk openssl nim go
+    git jq which gcc rustc cargo openjdk openssl nim nimble go
     golangci-lint go-junit-report gopls
     protobuf_36 gotestsum
     libsds libstorage

@@ -1,0 +1,58 @@
+name: ci / nimble
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  # Pinned rather than a channel: nightly moves under us.
+  NIMBLE_COMMIT: '68ba20e753ba63d11fb8b60974e981afca376f97'
+
+jobs:
+  libsds:
+    name: 'libsds / ${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # No compiler here: Nimble resolves the one `requires` names. Installing
+      # one also puts its bundled Nimble on PATH (nim-lang/nimble#1840).
+      - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
+        with:
+          nimble-version: ${{ env.NIMBLE_COMMIT }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # boringssl test paths overrun the 260-char limit from the default temp.
+      - name: Shorten TEMP path for nimble
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\T | Out-Null
+          "TEMP=C:\T" >> $env:GITHUB_ENV
+          "TMP=C:\T"  >> $env:GITHUB_ENV
+
+      - name: Cache Nim dependencies
+        uses: actions/cache@v4
+        with:
+          # nimbinaries is global; without it the bootstrap grabs the newest Nim.
+          path: |
+            nimbledeps
+            ~/.nimble/nimbinaries
+          key: nimbledeps-${{ matrix.os }}-${{ env.NIMBLE_COMMIT }}-${{ hashFiles('status_go.nimble') }}
+
+      - name: Build libsds through the bindings
+        shell: bash
+        run: make build-libsds
+
+      - name: Check the built library
+        shell: bash
+        run: ls -l build/

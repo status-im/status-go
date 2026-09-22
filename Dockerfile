@@ -48,6 +48,14 @@ RUN set -eu && \
 
 ENV PATH="/opt/nim/bin:${PATH}"
 
+# Nimble supplies nim-sds' pinned Nim; the one above builds logos-storage.
+# Must match NIMBLE_COMMIT in ci-nimble.yml.
+ARG NIMBLE_COMMIT=68ba20e753ba63d11fb8b60974e981afca376f97
+COPY scripts/install_nimble.sh /tmp/install_nimble.sh
+RUN /tmp/install_nimble.sh "$NIMBLE_COMMIT" /opt/nimble/bin && rm /tmp/install_nimble.sh
+
+ENV PATH="/opt/nimble/bin:${PATH}"
+
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
 ARG build_target='cmd'
@@ -72,7 +80,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_i
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
-    && cp /go/src/github.com/status-im/nim-sds/build/libsds.so /tmp/status-runtime-libs/ \
+    && cp /go/src/github.com/status-im/status-go/build/libsds.so /tmp/status-runtime-libs/ \
     && if [ -f /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so ]; then \
     cp /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so /tmp/status-runtime-libs/; \
     fi
