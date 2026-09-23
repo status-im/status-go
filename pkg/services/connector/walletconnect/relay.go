@@ -591,13 +591,12 @@ func (r *RelayClient) readLoop() {
 	}
 }
 
-// reconnect attempts to reconnect to the relay with exponential backoff.
+// reconnect redials the relay with exponential backoff until it connects or the client is closed.
 func (r *RelayClient) reconnect() error {
 	backoff := relayReconnectBackoff
 	maxBackoff := relayReconnectMaxBackoff
-	maxAttempts := 10
 
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	for attempt := 1; ; attempt++ {
 		r.logger.Info("reconnect attempt", zap.Int("attempt", attempt), zap.Duration("backoff", backoff))
 
 		r.mu.Lock()
@@ -655,5 +654,4 @@ func (r *RelayClient) reconnect() error {
 
 		return nil
 	}
-	return fmt.Errorf("failed to reconnect after %d attempts", maxAttempts)
 }
