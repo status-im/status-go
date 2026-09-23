@@ -566,6 +566,16 @@ func (api *PublicAPI) StartThreadFromNewMessage(ctx context.Context, request *re
 	return api.service.messenger.StartThreadFromNewMessage(ctx, request)
 }
 
+// ChatThreadSummariesByParentMessageIDs returns thread-card data for a page of parent messages.
+func (api *PublicAPI) ChatThreadSummariesByParentMessageIDs(chatID string, parentMessageIDs []string, participantsPreviewLimit int) (*ApplicationThreadsResponse, error) {
+	threads, err := api.service.messenger.ThreadSummariesByParentMessageIDs(chatID, parentMessageIDs, participantsPreviewLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationThreadsResponse{Threads: threads}, nil
+}
+
 func (api *PublicAPI) ChatThreads(chatID string) (*ApplicationThreadsResponse, error) {
 	threads, err := api.service.messenger.ThreadsByChatID(chatID)
 	if err != nil {
