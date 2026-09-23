@@ -75,3 +75,42 @@ func TestService_PauseIsResponsiveWhileRelayReconnects(t *testing.T) {
 
 	requireLifecycleCall(t, "Pause", s.Pause)
 }
+
+func setRelayRetryForTest(t *testing.T, initial, maxBackoff time.Duration) {
+	t.Helper()
+	oldInitial, oldMax := relayRetryInitial, relayRetryMax
+	relayRetryInitial, relayRetryMax = initial, maxBackoff
+	t.Cleanup(func() { relayRetryInitial, relayRetryMax = oldInitial, oldMax })
+}
+
+func TestService_RetriesRelayConnectAfterResume(t *testing.T) {
+	setRelayRetryForTest(t, 20*time.Millisecond, 100*time.Millisecond)
+	relay := relaytest.New(t, relaytest.Reject)
+	s := setupServiceWithSession(t, relay)
+
+	require.NoError(t, s.Start())
+	require.NoError(t, s.Pause())
+	require.NoError(t, s.Resume())
+	time.Sleep(100 * time.Millisecond)
+	require.Zero(t, relay.Subscribes())
+
+	relay.SetMode(relaytest.Healthy)
+	require.Eventually(t, func() bool { return relay.Subscribes() >= 1 }, 3*time.Second, 10*time.Millisecond,
+		"session was not re-subscribed once the relay came back")
+}
+
+func TestService_StopsRelayRetriesOnPause(t *testing.T) {
+	setRelayRetryForTest(t, 20*time.Millisecond, 100*time.Millisecond)
+	relay := relaytest.New(t, relaytest.Reject)
+	s := setupServiceWithSession(t, relay)
+
+	require.NoError(t, s.Start())
+	require.NoError(t, s.Pause())
+	require.NoError(t, s.Resume())
+	time.Sleep(100 * time.Millisecond)
+	requireLifecycleCall(t, "Pause", s.Pause)
+
+	relay.SetMode(relaytest.Healthy)
+	require.Never(t, func() bool { return relay.Subscribes() > 0 }, 300*time.Millisecond, 10*time.Millisecond,
+		"relay retries kept running after Pause")
+}

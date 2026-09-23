@@ -24,6 +24,12 @@ import (
 
 const serviceName = "connector"
 
+// Backoff between attempts to reach the relay for restored sessions.
+var (
+	relayRetryInitial = time.Second
+	relayRetryMax     = time.Minute
+)
+
 type Config struct {
 	WSEnabled bool
 	WSHost    string
