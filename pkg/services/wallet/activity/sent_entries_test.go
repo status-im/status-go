@@ -29,3 +29,24 @@ func TestGetSentActivityTypeForSwapBridgeProcessors(t *testing.T) {
 		require.Equal(t, ac.ApproveAT, getSentActivityType(crossChain, true), name)
 	}
 }
+
+func TestGetSentSwapProvider(t *testing.T) {
+	for _, name := range []string{
+		pathProcessorCommon.ProcessorRelayName,
+		pathProcessorCommon.ProcessorLiFiName,
+		pathProcessorCommon.ProcessorSwapParaswapName,
+	} {
+		provider := getSentSwapProvider(&routes.Path{ProcessorName: name})
+		require.NotNil(t, provider, name)
+		require.Equal(t, name, *provider)
+	}
+
+	for _, name := range []string{
+		pathProcessorCommon.ProcessorTransferName,
+		pathProcessorCommon.ProcessorBridgeHopName,
+		pathProcessorCommon.ProcessorERC721Name,
+		"",
+	} {
+		require.Nil(t, getSentSwapProvider(&routes.Path{ProcessorName: name}), name)
+	}
+}
