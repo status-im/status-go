@@ -127,3 +127,34 @@ func TestReconnectedHandler_ResubscribeDoesNotDeadlockReadLoop(t *testing.T) {
 	}
 	_ = r.Close()
 }
+
+// While readLoop keeps retrying an unreachable relay, a caller must get an error
+// after relayReconnectWait instead of waiting for the whole backoff loop.
+func TestCall_FailsFastWhileRelayIsUnreachable(t *testing.T) {
+	oldWait := relayReconnectWait
+	relayReconnectWait = 200 * time.Millisecond
+	defer func() { relayReconnectWait = oldWait }()
+
+	fr := newFakeRelay(t, fakeRelayOpts{echoSubscribe: true})
+	r := newTestRelayClient(t, fr)
+	defer func() { _ = r.Close() }()
+
+	require.NoError(t, r.Connect())
+	waitAccepted(t, fr, 1)
+
+	fr.rejectNew.Store(true)
+	fr.DropNow()
+	require.Eventually(t, func() bool { return r.getConn() == nil }, 2*time.Second, 5*time.Millisecond)
+
+	published := make(chan error, 1)
+	go func() {
+		published <- r.Publish("session-topic", "payload", 1108)
+	}()
+
+	select {
+	case err := <-published:
+		require.Error(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("Publish blocked while readLoop was retrying an unreachable relay")
+	}
+}

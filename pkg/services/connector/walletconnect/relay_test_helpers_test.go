@@ -30,7 +30,8 @@ type fakeRelay struct {
 	mu          sync.Mutex
 	currentConn *websocket.Conn
 
-	accepted int32
+	accepted  int32
+	rejectNew atomic.Bool // answer new handshakes with 503, as an unreachable relay would
 }
 
 func newFakeRelay(t *testing.T, opts fakeRelayOpts) *fakeRelay {
@@ -40,6 +41,10 @@ func newFakeRelay(t *testing.T, opts fakeRelayOpts) *fakeRelay {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if fr.rejectNew.Load() {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return

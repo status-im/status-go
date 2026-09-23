@@ -29,6 +29,7 @@ var (
 	relayWriteDeadline = 10 * time.Second
 	relayReadDeadline  = 60 * time.Second
 	relayPingInterval  = 30 * time.Second
+	relayReconnectWait = 5 * time.Second // how long a call waits for an in-flight reconnect
 )
 
 // truncate safely truncates a string to a maximum length, adding "..." if truncated.
