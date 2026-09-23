@@ -211,6 +211,7 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 			sender:         &d.RouteInputParams.AddrFrom,
 			recipient:      &d.RouteInputParams.AddrTo,
 			transferType:   getTransferTypeFromSentTx(d.Path.FromToken, d.Path.ProcessorName),
+			swapProvider:   getSentSwapProvider(d.Path),
 			//contractAddress:  // TODO: Handle community contract deployment
 			//communityID:
 		}
@@ -264,6 +265,17 @@ func getSentActivityType(path *routes.Path, isApproval bool) ac.Type {
 		return ac.SwapAT
 	}
 	return ac.UnknownAT
+}
+
+// getSentSwapProvider names the swap/bridge provider a path went through (its processor name),
+// so the client can attribute the entry without matching contract addresses; nil for plain
+// transfers and the Hop bridge.
+func getSentSwapProvider(path *routes.Path) *string {
+	if path == nil || !wCommon.IsProcessorSwap(path.ProcessorName) {
+		return nil
+	}
+	name := path.ProcessorName
+	return &name
 }
 
 // isCrossChainPath reports whether the path moves funds between two different chains.
