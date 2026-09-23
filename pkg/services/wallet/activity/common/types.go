@@ -147,6 +147,7 @@ type EntryData struct {
 	CommunityID               *string              `json:"communityId,omitempty"`
 	InteractedContractAddress *eth.Address         `json:"interactedContractAddress,omitempty"`
 	ApprovalSpender           *eth.Address         `json:"approvalSpender,omitempty"`
+	SwapProvider              *string              `json:"swapProvider,omitempty"` // router processor name (Relay, LiFi, Paraswap) for swaps/bridges/approvals sent through it
 
 	IsNew *bool `json:"isNew,omitempty"`
 
