@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/pkg/services/connector/walletconnect/relaytest"
 )
 
 func TestCall_SingleFlightReconnect(t *testing.T) {
@@ -157,4 +159,30 @@ func TestCall_FailsFastWhileRelayIsUnreachable(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("Publish blocked while readLoop was retrying an unreachable relay")
 	}
+}
+
+// A relay that stays unreachable for longer than any fixed number of attempts
+// must still be picked up again once it comes back.
+func TestReadLoop_KeepsReconnectingUntilRelayComesBack(t *testing.T) {
+	oldBackoff, oldMax := relayReconnectBackoff, relayReconnectMaxBackoff
+	relayReconnectBackoff, relayReconnectMaxBackoff = 5*time.Millisecond, 20*time.Millisecond
+	defer func() { relayReconnectBackoff, relayReconnectMaxBackoff = oldBackoff, oldMax }()
+
+	relay := relaytest.New(t, relaytest.Healthy)
+	r, err := NewRelayClient("test")
+	require.NoError(t, err)
+	r.url = relay.URL()
+	defer func() { _ = r.Close() }()
+
+	require.NoError(t, r.Connect())
+	relay.SetMode(relaytest.Reject)
+	relay.DropAll()
+	require.Eventually(t, func() bool { return relay.Rejected() >= 15 }, 5*time.Second, 5*time.Millisecond,
+		"readLoop stopped redialing")
+
+	relay.SetMode(relaytest.Healthy)
+	require.Eventually(t, func() bool {
+		_, err := r.Subscribe("session-topic")
+		return err == nil
+	}, 10*time.Second, 50*time.Millisecond, "relay client never reconnected after the relay came back")
 }

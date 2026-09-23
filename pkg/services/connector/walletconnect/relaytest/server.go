@@ -32,6 +32,7 @@ type Server struct {
 	mode       atomic.Int32
 	subscribes atomic.Int32
 	held       atomic.Int32
+	rejected   atomic.Int32
 
 	ln  net.Listener
 	srv *http.Server
@@ -75,6 +76,9 @@ func (s *Server) DropAll() {
 // Subscribes counts answered irn_subscribe requests.
 func (s *Server) Subscribes() int32 { return s.subscribes.Load() }
 
+// Rejected counts handshakes answered with 503 in Reject mode.
+func (s *Server) Rejected() int32 { return s.rejected.Load() }
+
 // Held counts connections swallowed in Blackhole mode.
 func (s *Server) Held() int32 { return s.held.Load() }
 
@@ -112,6 +116,7 @@ func (l gateListener) Accept() (net.Conn, error) {
 
 func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	if Mode(s.mode.Load()) == Reject {
+		s.rejected.Add(1)
 		http.Error(w, "unavailable", http.StatusServiceUnavailable)
 		return
 	}

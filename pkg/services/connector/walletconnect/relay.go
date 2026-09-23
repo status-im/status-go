@@ -33,6 +33,9 @@ var (
 	relayReadDeadline  = 60 * time.Second
 	relayPingInterval  = 30 * time.Second
 	relayReconnectWait = 5 * time.Second // how long a call waits for an in-flight reconnect
+
+	relayReconnectBackoff    = time.Second // first pause before readLoop redials
+	relayReconnectMaxBackoff = time.Minute
 )
 
 // truncate safely truncates a string to a maximum length, adding "..." if truncated.
@@ -590,8 +593,8 @@ func (r *RelayClient) readLoop() {
 
 // reconnect attempts to reconnect to the relay with exponential backoff.
 func (r *RelayClient) reconnect() error {
-	backoff := 1 * time.Second
-	maxBackoff := 60 * time.Second
+	backoff := relayReconnectBackoff
+	maxBackoff := relayReconnectMaxBackoff
 	maxAttempts := 10
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
