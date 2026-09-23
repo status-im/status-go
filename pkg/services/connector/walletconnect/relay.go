@@ -1,11 +1,13 @@
 package walletconnect
 
 import (
+	"context"
 	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/url"
 	"sync"
 	"time"
@@ -115,10 +117,12 @@ type RelayClient struct {
 	logger              *zap.Logger
 	projectID           string
 	auth                *Auth
-	done                chan struct{}  // signals shutdown
-	disconnectRequested bool           // true if Close() was called intentionally
-	connectedOnce       bool           // true after first successful Connect(); avoids cold-start dial from call()
-	wg                  sync.WaitGroup // tracks active goroutines
+	done                chan struct{} // signals shutdown
+	dialCtx             context.Context
+	cancelDial          context.CancelFunc // aborts an in-flight dial on Close
+	disconnectRequested bool               // true if Close() was called intentionally
+	connectedOnce       bool               // true after first successful Connect(); avoids cold-start dial from call()
+	wg                  sync.WaitGroup     // tracks active goroutines
 
 	writeMu      sync.Mutex // serializes writes (gorilla/websocket requires it)
 	reconnectMu  sync.Mutex // serializes reconnect attempts made by readLoop
@@ -133,14 +137,17 @@ func NewRelayClient(projectID string) (*RelayClient, error) {
 		return nil, fmt.Errorf("create auth: %w", err)
 	}
 
+	dialCtx, cancelDial := context.WithCancel(context.Background())
 	return &RelayClient{
-		url:       relayURL,
-		pending:   make(map[string]chan *jsonRPCResponse),
-		logger:    logutils.ZapLogger(),
-		projectID: projectID,
-		auth:      auth,
-		done:      make(chan struct{}),
-		connSet:   make(chan struct{}),
+		dialCtx:    dialCtx,
+		cancelDial: cancelDial,
+		url:        relayURL,
+		pending:    make(map[string]chan *jsonRPCResponse),
+		logger:     logutils.ZapLogger(),
+		projectID:  projectID,
+		auth:       auth,
+		done:       make(chan struct{}),
+		connSet:    make(chan struct{}),
 	}, nil
 }
 
@@ -221,7 +228,22 @@ func (r *RelayClient) dialRelay() (*websocket.Conn, error) {
 	q.Set("projectId", r.projectID)
 	u.RawQuery = q.Encode()
 
-	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	// gorilla stops a handshake on context deadlines only, not on cancellation,
+	// so Close closes the socket itself to abort a handshake the relay never answers.
+	var stopWatch func() bool
+	dialer := *websocket.DefaultDialer
+	dialer.NetDialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		netConn, err := (&net.Dialer{}).DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		stopWatch = context.AfterFunc(r.dialCtx, func() { _ = netConn.Close() })
+		return netConn, nil
+	}
+	conn, resp, err := dialer.DialContext(r.dialCtx, u.String(), nil)
+	if stopWatch != nil {
+		stopWatch()
+	}
 	if err != nil {
 		// gorilla collapses every non-101 answer into "bad handshake".
 		status, body := 0, ""
@@ -296,6 +318,12 @@ func (r *RelayClient) Connect() error {
 	if r.getConn() != nil {
 		return nil
 	}
+	r.mu.Lock()
+	closed := r.disconnectRequested
+	r.mu.Unlock()
+	if closed {
+		return fmt.Errorf("disconnect requested")
+	}
 
 	conn, err := r.dialRelay()
 	if err != nil {
@@ -336,6 +364,7 @@ func (r *RelayClient) Close() error {
 
 	r.closeOnce.Do(func() {
 		close(r.done)
+		r.cancelDial()
 	})
 
 	var err error

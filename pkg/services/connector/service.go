@@ -79,14 +79,15 @@ func (s *Service) GetClient() *walletconnect.Client {
 	return s.wcClient.Load()
 }
 
-func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) {
+// restoreActiveWCSessions loads active sessions into wcClient and reports how many it restored.
+func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) int {
 	activeSessions, err := persistence.SelectActiveWCSessions(s.db, time.Now().Unix())
 	if err != nil {
 		s.logger.Error("failed to load active WC sessions", zap.Error(err))
-		return
+		return 0
 	}
 	if len(activeSessions) == 0 {
-		return
+		return 0
 	}
 	restored := make([]walletconnect.RestoredSession, 0, len(activeSessions))
 	for _, session := range activeSessions {
@@ -97,9 +98,18 @@ func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) {
 	}
 	wcClient.RestoreSessions(restored)
 	s.logger.Info("restored WalletConnect sessions", zap.Int("count", len(restored)))
-	if err := wcClient.ConnectAndResubscribe(); err != nil {
-		s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
-	}
+	return len(restored)
+}
+
+// connectRestoredSessions reaches the relay in the background: Start and Resume
+// run on the client's UI thread and must not wait for the network.
+func (s *Service) connectRestoredSessions(wcClient *walletconnect.Client) {
+	go func() {
+		defer panics.LogOnPanic()
+		if err := wcClient.ConnectAndResubscribe(); err != nil {
+			s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
+		}
+	}()
 }
 
 // initWCClient creates wcClient when nil. Safe to call without holding s.mu (uses atomic.Pointer).
@@ -117,7 +127,7 @@ func (s *Service) initWCClient() {
 		return
 	}
 
-	s.restoreActiveWCSessions(wcClient)
+	restored := s.restoreActiveWCSessions(wcClient)
 
 	wcClient.SetSessionDeleteHandler(func(topic string) {
 		s.logger.Info("received wc_sessionDelete", zap.String("topic", topic))
@@ -136,6 +146,10 @@ func (s *Service) initWCClient() {
 
 	if !s.wcClient.CompareAndSwap(nil, wcClient) {
 		_ = wcClient.Close()
+		return
+	}
+	if restored > 0 {
+		s.connectRestoredSessions(wcClient)
 	}
 }
 
