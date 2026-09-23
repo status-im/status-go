@@ -29,6 +29,7 @@ type Config struct {
 	WSHost    string
 	WSPort    int
 	ProjectID string
+	RelayURL  string // empty means the public WalletConnect relay
 }
 
 func NewService(
@@ -107,7 +108,7 @@ func (s *Service) initWCClient() {
 		return
 	}
 
-	wcClient, err := walletconnect.NewClient(s.config.ProjectID)
+	wcClient, err := walletconnect.NewClient(s.config.ProjectID, walletconnect.WithRelayURL(s.config.RelayURL))
 	if err != nil {
 		s.logger.Error("failed to create WalletConnect client", zap.Error(err))
 		return

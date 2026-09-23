@@ -63,11 +63,26 @@ type clientHandlers struct {
 	onSessionDelete   func(topic string)
 }
 
+// ClientOption configures a Client.
+type ClientOption func(*RelayClient)
+
+// WithRelayURL points the client at a relay other than the public one.
+func WithRelayURL(url string) ClientOption {
+	return func(r *RelayClient) {
+		if url != "" {
+			r.url = url
+		}
+	}
+}
+
 // NewClient creates a new WalletConnect client.
-func NewClient(projectID string) (*Client, error) {
+func NewClient(projectID string, opts ...ClientOption) (*Client, error) {
 	relay, err := NewRelayClient(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("create relay client: %w", err)
+	}
+	for _, opt := range opts {
+		opt(relay)
 	}
 
 	c := &Client{
