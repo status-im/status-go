@@ -4,6 +4,7 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -104,6 +105,9 @@ type MessageHandler func(topic, message string, tag int)
 
 // ReconnectedHandler is called after a successful reconnection.
 type ReconnectedHandler func()
+
+// ErrRelayClosed is returned by Connect once the relay client has been closed.
+var ErrRelayClosed = errors.New("relay client closed: disconnect requested")
 
 // RelayClient implements the WalletConnect IRN relay protocol over WebSocket.
 type RelayClient struct {
@@ -322,7 +326,7 @@ func (r *RelayClient) Connect() error {
 	closed := r.disconnectRequested
 	r.mu.Unlock()
 	if closed {
-		return fmt.Errorf("disconnect requested")
+		return ErrRelayClosed
 	}
 
 	conn, err := r.dialRelay()
@@ -335,7 +339,7 @@ func (r *RelayClient) Connect() error {
 	case r.disconnectRequested:
 		r.mu.Unlock()
 		_ = conn.Close()
-		return fmt.Errorf("disconnect requested")
+		return ErrRelayClosed
 	case r.conn != nil:
 		r.mu.Unlock()
 		_ = conn.Close()

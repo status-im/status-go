@@ -46,6 +46,9 @@ type pairingContext struct {
 // Client handles WalletConnect protocol operations via the relay.
 type Client struct {
 	relay                  Relay
+	doneOnce               sync.Once
+	closeOnce              sync.Once
+	done                   chan struct{} // closed by Close
 	logger                 *zap.Logger
 	mu                     sync.Mutex
 	handlers               *clientHandlers
@@ -436,7 +439,18 @@ func (c *Client) Publish(topic, message string, tag int) error {
 }
 
 // Close closes the relay connection.
+// Done is closed when the client is closed.
+func (c *Client) Done() <-chan struct{} {
+	return c.doneCh()
+}
+
+func (c *Client) doneCh() chan struct{} {
+	c.doneOnce.Do(func() { c.done = make(chan struct{}) })
+	return c.done
+}
+
 func (c *Client) Close() error {
+	c.closeOnce.Do(func() { close(c.doneCh()) })
 	return c.relay.Close()
 }
 

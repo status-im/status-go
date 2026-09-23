@@ -108,12 +108,25 @@ func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) int {
 }
 
 // connectRestoredSessions reaches the relay in the background: Start and Resume
-// run on the client's UI thread and must not wait for the network.
+// run on the client's UI thread and must not wait for the network. It retries
+// with backoff until it connects or wcClient is closed.
 func (s *Service) connectRestoredSessions(wcClient *walletconnect.Client) {
 	go func() {
 		defer panics.LogOnPanic()
-		if err := wcClient.ConnectAndResubscribe(); err != nil {
-			s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
+		backoff := relayRetryInitial
+		for {
+			err := wcClient.ConnectAndResubscribe()
+			if err == nil || errors.Is(err, walletconnect.ErrRelayClosed) {
+				return
+			}
+			s.logger.Warn("failed to connect relay for restored WC sessions, retrying",
+				zap.Duration("in", backoff), zap.Error(err))
+			select {
+			case <-time.After(backoff):
+			case <-wcClient.Done():
+				return
+			}
+			backoff = min(backoff*2, relayRetryMax)
 		}
 	}()
 }
