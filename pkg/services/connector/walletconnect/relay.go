@@ -107,6 +107,7 @@ type ReconnectedHandler func()
 type RelayClient struct {
 	url                 string
 	conn                *websocket.Conn
+	connSet             chan struct{} // closed and replaced whenever a new conn is installed
 	mu                  sync.Mutex
 	pending             map[string]chan *jsonRPCResponse
 	messageHandler      MessageHandler
@@ -120,7 +121,7 @@ type RelayClient struct {
 	wg                  sync.WaitGroup // tracks active goroutines
 
 	writeMu      sync.Mutex // serializes writes (gorilla/websocket requires it)
-	reconnectMu  sync.Mutex // serializes reconnect attempts
+	reconnectMu  sync.Mutex // serializes reconnect attempts made by readLoop
 	readLoopOnce sync.Once  // starts readLoop at most once per RelayClient lifetime
 	closeOnce    sync.Once  // closes r.done at most once (Close idempotent)
 }
@@ -139,6 +140,7 @@ func NewRelayClient(projectID string) (*RelayClient, error) {
 		projectID: projectID,
 		auth:      auth,
 		done:      make(chan struct{}),
+		connSet:   make(chan struct{}),
 	}, nil
 }
 
@@ -161,7 +163,14 @@ func (r *RelayClient) markBroken(conn *websocket.Conn) {
 	r.mu.Unlock()
 }
 
-// ensureConnected reconnects when r.conn is nil; concurrent callers serialize and share the result.
+// setConnLocked installs conn and wakes callers waiting in acquireConn. Requires r.mu.
+func (r *RelayClient) setConnLocked(conn *websocket.Conn) {
+	r.conn = conn
+	close(r.connSet)
+	r.connSet = make(chan struct{})
+}
+
+// ensureConnected reconnects when r.conn is nil. Only readLoop runs it.
 func (r *RelayClient) ensureConnected() error {
 	r.reconnectMu.Lock()
 	defer r.reconnectMu.Unlock()
@@ -171,26 +180,29 @@ func (r *RelayClient) ensureConnected() error {
 	return r.reconnect()
 }
 
-// acquireConn returns a live conn. It reconnects if a previous Connect() succeeded;
-// returns "not connected" if Connect() was never called.
+// acquireConn returns a live conn. While readLoop reconnects it waits up to
+// relayReconnectWait for the new conn; returns "not connected" if Connect() was never called.
 func (r *RelayClient) acquireConn() (*websocket.Conn, error) {
-	if conn := r.getConn(); conn != nil {
-		return conn, nil
+	timeout := time.NewTimer(relayReconnectWait)
+	defer timeout.Stop()
+	for {
+		r.mu.Lock()
+		conn, connSet, everConnected := r.conn, r.connSet, r.connectedOnce
+		r.mu.Unlock()
+		if conn != nil {
+			return conn, nil
+		}
+		if !everConnected {
+			return nil, fmt.Errorf("not connected")
+		}
+		select {
+		case <-connSet:
+		case <-timeout.C:
+			return nil, fmt.Errorf("relay unavailable: reconnect in progress")
+		case <-r.done:
+			return nil, fmt.Errorf("relay client shutting down")
+		}
 	}
-	r.mu.Lock()
-	everConnected := r.connectedOnce
-	r.mu.Unlock()
-	if !everConnected {
-		return nil, fmt.Errorf("not connected")
-	}
-	if err := r.ensureConnected(); err != nil {
-		return nil, fmt.Errorf("reconnect: %w", err)
-	}
-	conn := r.getConn()
-	if conn == nil {
-		return nil, fmt.Errorf("connection lost after reconnect")
-	}
-	return conn, nil
 }
 
 // dialRelay opens a new WebSocket to r.url with auth query parameters.
@@ -301,7 +313,7 @@ func (r *RelayClient) Connect() error {
 		_ = conn.Close()
 		return nil
 	}
-	r.conn = conn
+	r.setConnLocked(conn)
 	r.connectedOnce = true
 	r.mu.Unlock()
 
@@ -583,7 +595,7 @@ func (r *RelayClient) reconnect() error {
 			_ = conn.Close()
 			return nil
 		}
-		r.conn = conn
+		r.setConnLocked(conn)
 		handler := r.reconnectedHandler
 		r.mu.Unlock()
 
