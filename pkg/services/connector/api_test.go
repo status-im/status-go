@@ -457,6 +457,7 @@ func TestNewAPI_WithRestoredSessions(t *testing.T) {
 		networkManager,
 		&Config{},
 	)
+	t.Cleanup(func() { _ = service.Stop() })
 
 	require.NotNil(t, service.api)
 	require.NotNil(t, service.GetClient())
