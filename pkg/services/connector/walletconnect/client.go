@@ -54,9 +54,11 @@ type Client struct {
 	handlers               *clientHandlers
 	pendingProposals       map[string]*pairingContext // key = fmt.Sprintf("%d", jsonRpcId)
 	pendingRequests        map[int64]chan *JSONRPCResponse
-	pendingSessionRequests map[int64]string  // requestID -> topic; tracks in-flight wc_sessionRequests for deduplication
-	pairingTopics          map[string]string // topic -> pairing symKey (hex), set on Pair()
-	activeSessions         map[string]string // topic -> session symKey (hex), set on ApproveSession
+	pendingSessionRequests map[int64]string    // requestID -> topic; tracks in-flight wc_sessionRequests for deduplication
+	answeredProposals      map[string]struct{} // approved or rejected; the relay may deliver them again
+	answeredRequests       map[int64]struct{}  // responded to or rejected; the relay may deliver them again
+	pairingTopics          map[string]string   // topic -> pairing symKey (hex), set on Pair()
+	activeSessions         map[string]string   // topic -> session symKey (hex), set on ApproveSession
 }
 
 type clientHandlers struct {
@@ -95,6 +97,8 @@ func NewClient(projectID string, opts ...RelayOption) (*Client, error) {
 		pendingProposals:       make(map[string]*pairingContext),
 		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
 		pendingSessionRequests: make(map[int64]string),
+		answeredProposals:      make(map[string]struct{}),
+		answeredRequests:       make(map[int64]struct{}),
 		pairingTopics:          make(map[string]string),
 		activeSessions:         make(map[string]string),
 	}
@@ -330,14 +334,16 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		}
 		c.mu.Lock()
 		_, alreadyPending := c.pendingProposals[requestID]
-		if !alreadyPending {
+		_, answered := c.answeredProposals[requestID]
+		if !alreadyPending && !answered {
 			c.pendingProposals[requestID] = ctx
 		}
 		handler := c.handlers.onSessionProposal
 		c.mu.Unlock()
 
-		if alreadyPending {
-			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID))
+		if alreadyPending || answered {
+			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID),
+				zap.Bool("answered", answered))
 			return
 		}
 
@@ -349,7 +355,8 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 	case "wc_sessionRequest":
 		c.mu.Lock()
 		_, alreadyPendingReq := c.pendingSessionRequests[msgID]
-		if !alreadyPendingReq {
+		_, answeredReq := c.answeredRequests[msgID]
+		if !alreadyPendingReq && !answeredReq {
 			c.pendingSessionRequests[msgID] = topic
 		}
 		handler := c.handlers.onSessionRequest
@@ -357,8 +364,9 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 
 		// Deduplicate: relay may deliver the same request both via FetchMessages
 		// and via an irn_subscription push
-		if alreadyPendingReq {
-			c.logger.Info("wc_sessionRequest duplicate ignored", zap.String("topic", topic), zap.Int64("msgID", msgID))
+		if alreadyPendingReq || answeredReq {
+			c.logger.Info("wc_sessionRequest duplicate ignored", zap.String("topic", topic), zap.Int64("msgID", msgID),
+				zap.Bool("answered", answeredReq))
 			return
 		}
 
@@ -515,6 +523,7 @@ func (c *Client) ApproveSession(ctx context.Context, proposalID string, meta Ses
 	c.mu.Lock()
 	c.activeSessions[keys.SessionTopic] = keys.SessionSymKeyHex
 	delete(c.pendingProposals, proposalID)
+	c.answeredProposals[proposalID] = struct{}{}
 	c.mu.Unlock()
 
 	if err := c.sendSessionSettle(keys, &proposal, namespaces, expiry); err != nil {
@@ -635,6 +644,7 @@ func (c *Client) RespondToWCSessionRequest(topic string, requestID int64, result
 	}
 	c.mu.Lock()
 	delete(c.pendingSessionRequests, requestID)
+	c.answeredRequests[requestID] = struct{}{}
 	c.mu.Unlock()
 	return nil
 }
@@ -672,6 +682,7 @@ func (c *Client) RejectWCSessionRequest(topic string, requestID int64, code int,
 	}
 	c.mu.Lock()
 	delete(c.pendingSessionRequests, requestID)
+	c.answeredRequests[requestID] = struct{}{}
 	c.mu.Unlock()
 	return nil
 }
@@ -709,6 +720,7 @@ func (c *Client) RejectSession(proposalID string) error {
 	}
 	c.mu.Lock()
 	delete(c.pendingProposals, proposalID)
+	c.answeredProposals[proposalID] = struct{}{}
 	c.mu.Unlock()
 	return nil
 }
