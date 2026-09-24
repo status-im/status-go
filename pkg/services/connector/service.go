@@ -24,11 +24,18 @@ import (
 
 const serviceName = "connector"
 
+// Backoff between attempts to reach the relay for restored sessions.
+var (
+	relayRetryInitial = time.Second
+	relayRetryMax     = time.Minute
+)
+
 type Config struct {
 	WSEnabled bool
 	WSHost    string
 	WSPort    int
 	ProjectID string
+	RelayURL  string // empty means the public WalletConnect relay
 }
 
 func NewService(
@@ -78,14 +85,15 @@ func (s *Service) GetClient() *walletconnect.Client {
 	return s.wcClient.Load()
 }
 
-func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) {
+// restoreActiveWCSessions loads active sessions into wcClient and reports how many it restored.
+func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) int {
 	activeSessions, err := persistence.SelectActiveWCSessions(s.db, time.Now().Unix())
 	if err != nil {
 		s.logger.Error("failed to load active WC sessions", zap.Error(err))
-		return
+		return 0
 	}
 	if len(activeSessions) == 0 {
-		return
+		return 0
 	}
 	restored := make([]walletconnect.RestoredSession, 0, len(activeSessions))
 	for _, session := range activeSessions {
@@ -96,9 +104,31 @@ func (s *Service) restoreActiveWCSessions(wcClient *walletconnect.Client) {
 	}
 	wcClient.RestoreSessions(restored)
 	s.logger.Info("restored WalletConnect sessions", zap.Int("count", len(restored)))
-	if err := wcClient.ConnectAndResubscribe(); err != nil {
-		s.logger.Warn("failed to connect relay for restored WC sessions", zap.Error(err))
-	}
+	return len(restored)
+}
+
+// connectRestoredSessions reaches the relay in the background: Start and Resume
+// run on the client's UI thread and must not wait for the network. It retries
+// with backoff until it connects or wcClient is closed.
+func (s *Service) connectRestoredSessions(wcClient *walletconnect.Client) {
+	go func() {
+		defer panics.LogOnPanic()
+		backoff := relayRetryInitial
+		for {
+			err := wcClient.ConnectAndResubscribe()
+			if err == nil || errors.Is(err, walletconnect.ErrRelayClosed) {
+				return
+			}
+			s.logger.Warn("failed to connect relay for restored WC sessions, retrying",
+				zap.Duration("in", backoff), zap.Error(err))
+			select {
+			case <-time.After(backoff):
+			case <-wcClient.Done():
+				return
+			}
+			backoff = min(backoff*2, relayRetryMax)
+		}
+	}()
 }
 
 // initWCClient creates wcClient when nil. Safe to call without holding s.mu (uses atomic.Pointer).
@@ -107,7 +137,7 @@ func (s *Service) initWCClient() {
 		return
 	}
 
-	wcClient, err := walletconnect.NewClient(s.config.ProjectID)
+	wcClient, err := walletconnect.NewClient(s.config.ProjectID, walletconnect.WithRelayURL(s.config.RelayURL))
 	if err != nil {
 		s.logger.Error("failed to create WalletConnect client", zap.Error(err))
 		return
@@ -116,7 +146,7 @@ func (s *Service) initWCClient() {
 		return
 	}
 
-	s.restoreActiveWCSessions(wcClient)
+	restored := s.restoreActiveWCSessions(wcClient)
 
 	wcClient.SetSessionDeleteHandler(func(topic string) {
 		s.logger.Info("received wc_sessionDelete", zap.String("topic", topic))
@@ -135,6 +165,10 @@ func (s *Service) initWCClient() {
 
 	if !s.wcClient.CompareAndSwap(nil, wcClient) {
 		_ = wcClient.Close()
+		return
+	}
+	if restored > 0 {
+		s.connectRestoredSessions(wcClient)
 	}
 }
 
