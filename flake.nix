@@ -73,6 +73,7 @@
       libtkl = pkgs.libtkl;
       status-go-mobile-android = statusGo.mobile.android {};
       status-go-mobile-ios = statusGo.mobile.ios {};
+      status-go-backend = statusGo.backend;
     });
   };
 }

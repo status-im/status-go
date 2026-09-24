@@ -38,6 +38,13 @@ pipeline {
         }
       }
     }
+    stage('Build backend') {
+      steps {
+        script {
+          nix.flake("status-go-backend")
+        }
+      }
+    }
   }
 
   post {

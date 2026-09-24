@@ -33,4 +33,7 @@ in rec {
   library = pkgs.callPackage ./library {
     inherit pkgs meta version;
   };
+  backend = pkgs.callPackage ./backend {
+    inherit self pkgs meta version;
+  };
 }
