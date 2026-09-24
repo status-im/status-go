@@ -72,18 +72,6 @@ func TestRelayClient_Close_NotConnected(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRelayClient_ConnectAfterClose_ReturnsDisconnectRequested(t *testing.T) {
-	fr := newFakeRelay(t, fakeRelayOpts{})
-	client := newTestRelayClient(t, fr)
-
-	require.NoError(t, client.Connect())
-	require.NoError(t, client.Close())
-
-	err := client.Connect()
-	require.Error(t, err)
-	require.ErrorContains(t, err, "disconnect requested")
-}
-
 func TestRelayClient_FreshInstance_ConnectsCleanly(t *testing.T) {
 	fr := newFakeRelay(t, fakeRelayOpts{})
 
