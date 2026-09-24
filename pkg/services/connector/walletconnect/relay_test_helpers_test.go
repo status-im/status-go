@@ -19,7 +19,6 @@ import (
 type fakeRelayOpts struct {
 	forceDropAt   int32 // >0: close the N-th accepted connection immediately after upgrade
 	echoSubscribe bool  // reply to irn_subscribe with a fake "sub-id"
-	silentOnPing  bool  // do not respond to ping (used by heartbeat tests)
 }
 
 // fakeRelay is an in-process WalletConnect IRN-like WebSocket server for relay tests.
@@ -30,7 +29,8 @@ type fakeRelay struct {
 	mu          sync.Mutex
 	currentConn *websocket.Conn
 
-	accepted int32
+	accepted  int32
+	rejectNew atomic.Bool // answer new handshakes with 503, as an unreachable relay would
 }
 
 func newFakeRelay(t *testing.T, opts fakeRelayOpts) *fakeRelay {
@@ -40,6 +40,10 @@ func newFakeRelay(t *testing.T, opts fakeRelayOpts) *fakeRelay {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if fr.rejectNew.Load() {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
@@ -48,9 +52,6 @@ func newFakeRelay(t *testing.T, opts fakeRelayOpts) *fakeRelay {
 		if fr.opts.forceDropAt > 0 && n == fr.opts.forceDropAt {
 			_ = conn.Close()
 			return
-		}
-		if fr.opts.silentOnPing {
-			conn.SetPingHandler(func(string) error { return nil })
 		}
 		fr.mu.Lock()
 		fr.currentConn = conn
