@@ -96,6 +96,12 @@ pipeline {
       } }
     }
 
+    stage('Build Backend') {
+      steps { script {
+        make('status-backend')
+      } }
+    }
+
     stage('Archive') {
       steps {
         zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
