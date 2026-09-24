@@ -51,6 +51,8 @@ func newTestClient(relay Relay) *Client {
 		pendingProposals:       make(map[string]*pairingContext),
 		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
 		pendingSessionRequests: make(map[int64]string),
+		answeredProposals:      make(map[string]struct{}),
+		answeredRequests:       make(map[int64]struct{}),
 		pairingTopics:          make(map[string]string),
 		activeSessions:         make(map[string]string),
 	}
@@ -1174,6 +1176,48 @@ func TestClient_HandleRelayMessage_SessionProposal_Deduplicate(t *testing.T) {
 	_, exists := client.pendingProposals["100"]
 	client.mu.Unlock()
 	require.True(t, exists)
+}
+
+// The relay redelivers stored messages after a re-subscribe, so a proposal the
+// user already answered must not surface again.
+func TestClient_HandleRelayMessage_SessionProposal_IgnoredAfterReject(t *testing.T) {
+	_, relay, client := newMockClient(t)
+	addPairingTopic(client, "topic", testSymKey)
+
+	callCount := 0
+	client.SetSessionProposalHandler(func(_ string) { callCount++ })
+
+	encrypted := encryptMsg(t, testSymKey, "wc_sessionPropose", 100, map[string]any{
+		"proposer": map[string]any{"publicKey": "abcd1234"},
+	})
+	client.handleRelayMessage("topic", encrypted, tagSessionPropose)
+
+	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionProposeReject).Return(nil)
+	require.NoError(t, client.RejectSession("100"))
+
+	client.handleRelayMessage("topic", encrypted, tagSessionPropose)
+
+	require.Equal(t, 1, callCount, "a proposal redelivered after it was answered must be ignored")
+}
+
+func TestClient_HandleRelayMessage_SessionRequest_IgnoredAfterResponse(t *testing.T) {
+	_, relay, client := newMockClient(t)
+	addActiveSession(client, "topic", testSymKey)
+
+	callCount := 0
+	client.SetSessionRequestHandler(func(_, _ string) { callCount++ })
+
+	encrypted := encryptMsg(t, testSymKey, "wc_sessionRequest", 456, map[string]any{
+		"request": map[string]any{"method": "personal_sign"},
+	})
+	client.handleRelayMessage("topic", encrypted, tagSessionRequest)
+
+	relay.EXPECT().Publish("topic", gomock.Any(), tagSessionRequestResponse).Return(nil)
+	require.NoError(t, client.RespondToWCSessionRequest("topic", 456, "0xsignature"))
+
+	client.handleRelayMessage("topic", encrypted, tagSessionRequest)
+
+	require.Equal(t, 1, callCount, "a request redelivered after it was answered must be ignored")
 }
 
 // --- wc_sessionRequest deduplication ---

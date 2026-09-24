@@ -45,6 +45,8 @@ type Server struct {
 	held       atomic.Int32
 	aborted    atomic.Int32
 	rejected   atomic.Int32
+	acks       atomic.Int32
+	pushID     atomic.Int64
 
 	ln      net.Listener
 	srv     *http.Server
@@ -53,6 +55,8 @@ type Server struct {
 	mu    sync.Mutex
 	conns []net.Conn
 	ws    map[*websocket.Conn]struct{}
+
+	writeMu sync.Mutex // gorilla allows one writer per connection
 }
 
 // New starts a relay in the given mode and stops it when the test ends.
@@ -106,6 +110,24 @@ func (s *Server) Held() int32 { return s.held.Load() }
 
 // Aborted counts connections swallowed in Blackhole mode that the client closed.
 func (s *Server) Aborted() int32 { return s.aborted.Load() }
+
+// Acks counts responses the client sent to pushed irn_subscription messages.
+func (s *Server) Acks() int32 { return s.acks.Load() }
+
+// Push sends an irn_subscription message on topic to every open connection.
+func (s *Server) Push(topic, message string) {
+	id := s.pushID.Add(1)
+	msg := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"irn_subscription","params":{"id":"sub-id","data":{"topic":%q,"message":%q,"publishedAt":0,"tag":1000}}}`,
+		id, topic, message)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	for c := range s.ws {
+		_ = c.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		_ = c.WriteMessage(websocket.TextMessage, []byte(msg))
+	}
+}
 
 func (s *Server) close() {
 	select {
@@ -190,8 +212,13 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			ID     json.RawMessage `json:"id"`
 			Method string          `json:"method"`
+			Result json.RawMessage `json:"result"`
 		}
 		if json.Unmarshal(msg, &req) != nil || len(req.ID) == 0 {
+			continue
+		}
+		if req.Method == "" && len(req.Result) > 0 {
+			s.acks.Add(1)
 			continue
 		}
 		s.requests.Add(1)
@@ -204,8 +231,11 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 			result = `"sub-id"`
 		}
 		resp := fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"result":%s}`, req.ID, result)
+		s.writeMu.Lock()
 		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-		if conn.WriteMessage(websocket.TextMessage, []byte(resp)) != nil {
+		err = conn.WriteMessage(websocket.TextMessage, []byte(resp))
+		s.writeMu.Unlock()
+		if err != nil {
 			return
 		}
 	}

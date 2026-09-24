@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/connector/walletconnect/relaytest"
 )
 
-// Contract tests: one per rule C1–C13 of RELAY_SPEC.md, black-box through the
+// Contract tests: one per rule C1–C14 of RELAY_SPEC.md, black-box through the
 // Relay API and relaytest.
 
 // prompt bounds anything the contract calls "at once" or "promptly"; generous
@@ -392,4 +392,21 @@ func TestRelay_C13_MissedHeartbeatMarksTheConnectionLost(t *testing.T) {
 		t.Fatal("expected a redial after the heartbeat went unanswered")
 	}
 	require.GreaterOrEqual(t, relay.Accepted(), int32(2))
+}
+
+func TestRelay_C14_EverySubscriptionMessageIsAcknowledged(t *testing.T) {
+	relay, r := newContractClient(t, relaytest.Healthy)
+	var delivered atomic.Int32
+	r.SetMessageHandler(func(topic, message string, _ int) {
+		if topic == "session-topic" && message == "payload" {
+			delivered.Add(1)
+		}
+	})
+	require.NoError(t, r.Connect())
+
+	relay.Push("session-topic", "payload")
+
+	require.Eventually(t, func() bool { return delivered.Load() == 1 }, prompt, 5*time.Millisecond)
+	require.Eventually(t, func() bool { return relay.Acks() == 1 }, prompt, 5*time.Millisecond,
+		"an unacknowledged message is redelivered by the relay after every re-subscribe")
 }
