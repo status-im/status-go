@@ -652,11 +652,11 @@ func (r *RelayClient) read(conn *relayConn) {
 			r.lost(conn)
 			return
 		}
-		r.dispatch(msg)
+		r.dispatch(conn, msg)
 	}
 }
 
-func (r *RelayClient) dispatch(msg []byte) {
+func (r *RelayClient) dispatch(conn *relayConn, msg []byte) {
 	var resp jsonRPCResponse
 	if err := json.Unmarshal(msg, &resp); err != nil {
 		r.logger.Debug("failed to parse relay message as response",
@@ -667,6 +667,14 @@ func (r *RelayClient) dispatch(msg []byte) {
 
 	var notif jsonRPCNotification
 	if err := json.Unmarshal(msg, &notif); err == nil && notif.Method == "irn_subscription" && notif.Params.Data.Topic != "" {
+		// The relay keeps an unacknowledged message and delivers it again on
+		// every re-subscribe.
+		if len(resp.ID) > 0 {
+			ack := fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"result":true}`, resp.ID)
+			if err := r.writeMessage(conn, []byte(ack)); err != nil {
+				r.logger.Debug("failed to acknowledge relay message", zap.Error(err))
+			}
+		}
 		if handler := r.messageHandler.Load(); handler != nil && *handler != nil {
 			(*handler)(notif.Params.Data.Topic, notif.Params.Data.Message, notif.Params.Data.Tag)
 		}
