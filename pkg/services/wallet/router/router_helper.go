@@ -3,8 +3,10 @@ package router
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"slices"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -726,49 +728,131 @@ func (r *Router) TokenAvailableForBridgingViaHop(chainID uint64, address common.
 	return slices.Contains(hopContracts, address)
 }
 
-// IsChainSupportedForSwapViaParaswap returns true if the chain is supported for swap via Paraswap, false otherwise.
-func (r *Router) IsChainSupportedForSwapViaParaswap(chainID uint64) (bool, error) {
+const swapSupportTTL = 10 * time.Minute
+
+type cachedChainSupport struct {
+	supported bool
+	fetchedAt time.Time
+}
+
+func (r *Router) chainSupportCached(provider string, chainID uint64, fetch func() (bool, error)) (bool, error) {
+	key := fmt.Sprintf("%s:%d", provider, chainID)
+
+	r.swapSupportMutex.Lock()
+	defer r.swapSupportMutex.Unlock()
+
+	if cached, ok := r.swapSupportByChain[key]; ok && time.Since(cached.fetchedAt) < swapSupportTTL {
+		return cached.supported, nil
+	}
+
+	supported, err := fetch()
+	if err != nil {
+		return false, err
+	}
+	if r.swapSupportByChain == nil {
+		r.swapSupportByChain = make(map[string]cachedChainSupport)
+	}
+	r.swapSupportByChain[key] = cachedChainSupport{supported: supported, fetchedAt: time.Now()}
+	return supported, nil
+}
+
+// isChainSupportedForSwapViaParaswap returns true if the chain is supported for swap via Paraswap, false otherwise.
+func (r *Router) isChainSupportedForSwapViaParaswap(chainID uint64) (bool, error) {
 	if !r.isProcessorRegistered(pathProcessorCommon.ProcessorSwapParaswapName) {
 		return false, nil
 	}
-	paraswapClient := r.paraswapClientFactory(chainID)
-	tokens, err := paraswapClient.FetchTokensList(context.Background())
-	if err != nil {
-		return false, err
-	}
-
-	return len(tokens) > 0, nil
+	return r.chainSupportCached(pathProcessorCommon.ProcessorSwapParaswapName, chainID, func() (bool, error) {
+		tokens, err := r.paraswapClientFactory(chainID).FetchTokensList(context.Background())
+		if err != nil {
+			return false, err
+		}
+		return len(tokens) > 0, nil
+	})
 }
 
-// IsChainSupportedForSwapViaLiFi returns true if the chain is supported for swap via LI.FI, false otherwise.
-func (r *Router) IsChainSupportedForSwapViaLiFi(chainID uint64) (bool, error) {
+// isChainSupportedForSwapViaLiFi returns true if the chain is supported for swap via LI.FI, false otherwise.
+func (r *Router) isChainSupportedForSwapViaLiFi(chainID uint64) (bool, error) {
 	if !r.isProcessorRegistered(pathProcessorCommon.ProcessorLiFiName) {
 		return false, nil
 	}
-	lifiClient := r.lifiClientFactory(chainID)
-	tokens, err := lifiClient.FetchTokensList(context.Background())
-	if err != nil {
-		return false, err
-	}
-
-	return len(tokens) > 0, nil
+	return r.chainSupportCached(pathProcessorCommon.ProcessorLiFiName, chainID, func() (bool, error) {
+		tokens, err := r.lifiClientFactory(chainID).FetchTokensList(context.Background())
+		if err != nil {
+			return false, err
+		}
+		return len(tokens) > 0, nil
+	})
 }
 
-// IsChainSupportedForSwapViaRelay returns true if the chain is supported for swap via Relay, false otherwise.
-func (r *Router) IsChainSupportedForSwapViaRelay(chainID uint64) (bool, error) {
+type relaySupportedChains struct {
+	supported map[uint64]bool // chain id -> deposits enabled and not disabled
+	fetchedAt time.Time
+}
+
+// relaySupportedChains returns Relay's chain list for the API host serving chainID (mainnet or testnet).
+func (r *Router) relaySupportedChains(chainID uint64) (map[uint64]bool, error) {
+	testnet := walletCommon.SupportedTestNetworks[chainID]
+
+	r.swapSupportMutex.Lock()
+	defer r.swapSupportMutex.Unlock()
+
+	if cached, ok := r.relayChainsByHost[testnet]; ok && time.Since(cached.fetchedAt) < swapSupportTTL {
+		return cached.supported, nil
+	}
+
+	chains, err := r.relayClientFactory(chainID).FetchChains(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	supported := make(map[uint64]bool, len(chains))
+	for _, chain := range chains {
+		supported[chain.ID] = chain.DepositEnabled && !chain.Disabled
+	}
+	if r.relayChainsByHost == nil {
+		r.relayChainsByHost = make(map[bool]relaySupportedChains)
+	}
+	r.relayChainsByHost[testnet] = relaySupportedChains{supported: supported, fetchedAt: time.Now()}
+	return supported, nil
+}
+
+// isChainSupportedForSwapViaRelay returns true if the chain is supported for swap via Relay, false otherwise.
+func (r *Router) isChainSupportedForSwapViaRelay(chainID uint64) (bool, error) {
 	if !r.isProcessorRegistered(pathProcessorCommon.ProcessorRelayName) {
 		return false, nil
 	}
-	relayClient := r.relayClientFactory(chainID)
-	chains, err := relayClient.FetchChains(context.Background())
+	supported, err := r.relaySupportedChains(chainID)
 	if err != nil {
 		return false, err
 	}
+	return supported[chainID], nil
+}
 
-	for _, chain := range chains {
-		if chain.ID == chainID {
-			return chain.DepositEnabled && !chain.Disabled, nil
-		}
+// isChainSupportedForSwap returns true if the chain is supported for enabled swap provider, false otherwise.
+func (r *Router) isChainSupportedForSwap(chainID uint64) (bool, error) {
+	switch {
+	case r.isProcessorRegistered(pathProcessorCommon.ProcessorRelayName):
+		return r.isChainSupportedForSwapViaRelay(chainID)
+	case r.isProcessorRegistered(pathProcessorCommon.ProcessorLiFiName):
+		return r.isChainSupportedForSwapViaLiFi(chainID)
+	case r.isProcessorRegistered(pathProcessorCommon.ProcessorSwapParaswapName):
+		return r.isChainSupportedForSwapViaParaswap(chainID)
 	}
 	return false, nil
+}
+
+// GetChainsSupportedForSwap calls isChainSupportedForSwap for a batch of chains in one call.
+// Returns a map of "<chainID>:<supported>".
+func (r *Router) GetChainsSupportedForSwap(chainIDs []uint64) map[uint64]bool {
+	result := make(map[uint64]bool, len(chainIDs))
+	for _, chainID := range chainIDs {
+		supported, err := r.isChainSupportedForSwap(chainID)
+		if err != nil {
+			r.logger.Debug("GetChainsSupportedForSwap: provider lookup failed",
+				zap.Uint64("chainId", chainID),
+				zap.Error(err))
+			continue
+		}
+		result[chainID] = supported
+	}
+	return result
 }
