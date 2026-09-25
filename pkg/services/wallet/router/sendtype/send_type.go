@@ -124,7 +124,7 @@ func (s SendType) IsAvailableBetween(fromChainID, toChainID uint64) bool {
 }
 
 func (s SendType) IsAvailableFor(chainID uint64) bool {
-	// Check if the swap is supported via paraswap is done on the client side via `IsChainSupportedForSwapViaParaswap` endpoint.
+	// Whether a chain is supported for swap is checked on the client side via the `GetChainsSupportedForSwap` endpoint.
 	// Basically if this request https://api.paraswap.io/tokens/CHAIN-ID returns the list (no error), means the chain is supported.
 	// For now these are supported chains via paraswap:
 	// 1, 10, 56, 100, 130, 137, 146, 8453, 42161, 43114
