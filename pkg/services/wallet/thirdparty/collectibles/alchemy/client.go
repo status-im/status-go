@@ -216,7 +216,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	queryParams["withMetadata"] = []string{"true"}
 	queryParams["orderBy"] = []string{"transferTime"}
 	queryParams["pageSize"] = []string{fmt.Sprintf("%d", getNFTsForOwnerPageSize)}
-	queryParams["excludeFilters"] = []string{"SPAM"}
+	queryParams["excludeFilters[]"] = []string{"SPAM"}
 
 	if len(cursor) > 0 {
 		queryParams["pageKey"] = []string{cursor}
