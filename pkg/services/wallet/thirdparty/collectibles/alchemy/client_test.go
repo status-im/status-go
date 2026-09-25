@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -238,14 +239,19 @@ func newTestClient(baseURL string) *Client {
 
 var testOwner = common.HexToAddress("0x1234567890123456789012345678901234567890")
 
-func TestFetchOwnedAssetsSendsExcludeFilters(t *testing.T) {
-	var called atomic.Bool
+// Alchemy reads the filter list only from the array form excludeFilters[] and
+// ignores a plain excludeFilters parameter.
+func TestFetchOwnedAssetsExcludesSpam(t *testing.T) {
+	const ownedNFTs = 3
+	const spamNFTs = 1
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called.Store(true)
 		assert.Equal(t, "/getNFTsForOwner", r.URL.Path)
-		assert.Equal(t, "SPAM", r.URL.Query().Get("excludeFilters"))
-		makeNFTResponse(t, w, 1, "")
+		count := ownedNFTs
+		if slices.Contains(r.URL.Query()["excludeFilters[]"], "SPAM") {
+			count -= spamNFTs
+		}
+		makeNFTResponse(t, w, count, "")
 	}))
 	defer server.Close()
 
@@ -253,9 +259,7 @@ func TestFetchOwnedAssetsSendsExcludeFilters(t *testing.T) {
 		context.Background(), w_common.ChainID(w_common.EthereumMainnet), testOwner, "", thirdparty.FetchNoLimit,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, assets)
-	assert.True(t, called.Load())
-	assert.Len(t, assets.Items, 1)
+	assert.Len(t, assets.Items, ownedNFTs-spamNFTs)
 	assert.Empty(t, assets.NextCursor)
 }
 
