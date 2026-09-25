@@ -410,3 +410,18 @@ func TestRelay_C14_EverySubscriptionMessageIsAcknowledged(t *testing.T) {
 	require.Eventually(t, func() bool { return relay.Acks() == 1 }, prompt, 5*time.Millisecond,
 		"an unacknowledged message is redelivered by the relay after every re-subscribe")
 }
+
+func TestRelay_C15_AHandshakeTheRelayNeverAnswersIsRedialed(t *testing.T) {
+	fastRedial(t)
+	setTunable(t, &relayDialTimeout, 50*time.Millisecond)
+	relay, r := newContractClient(t, relaytest.Healthy)
+	require.NoError(t, r.Connect())
+	loseConnection(t, relay, relaytest.Blackhole)
+
+	require.Eventually(t, func() bool { return relay.Held() >= 3 }, 2*time.Second, 5*time.Millisecond,
+		"a hanging handshake blocked the next redial")
+
+	relay.SetMode(relaytest.Healthy)
+	require.Eventually(t, func() bool { _, err := r.Subscribe("session-topic"); return err == nil },
+		2*time.Second, 20*time.Millisecond, "the client did not reconnect once the relay answered")
+}

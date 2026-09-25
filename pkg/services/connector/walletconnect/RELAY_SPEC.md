@@ -53,7 +53,8 @@ the refactor and are tested black-box through `relaytest`.
 | C11 | A call whose request is written but gets no response fails after 30s with "relay call timeout". |
 | C12 | A failed write marks the connection lost; the call parks and is written once more on the next connection (C6/C7 apply). |
 | C13 | A missed heartbeat (no pong within `relayReadDeadline`) or a failed ping marks the connection lost. |
-| C14 | Every `irn_subscription` message is acknowledged on the connection it arrived on; the relay delivers unacknowledged messages again after every re-subscribe. |
+| C14 | Every `irn_subscription` message is acknowledged on the connection it arrived on; the relay delivers unacknowledged messages again after every re-subscribe. The ack is sent before the message is handled, so a request still unanswered when the app restarts is not delivered again; the dApp sees it time out. |
+| C15 | One dial, handshake included, gives up after `relayDialTimeout` (10s), so a relay that accepts TCP and never answers still gets redialed with backoff. |
 
 ## States
 
