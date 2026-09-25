@@ -652,9 +652,20 @@ func TestClient_resubscribeTopics_SubscribeError(t *testing.T) {
 
 	relay.EXPECT().Subscribe(gomock.Any()).Return("", fmt.Errorf("subscribe failed")).Times(2)
 
-	require.NotPanics(t, func() {
-		client.resubscribeTopics("session", []string{"topic1", "topic2"})
-	})
+	err := client.resubscribeTopics("session", []string{"topic1", "topic2"})
+	require.ErrorContains(t, err, "topic1")
+	require.ErrorContains(t, err, "topic2")
+}
+
+func TestClient_ConnectAndResubscribe_SubscribeError(t *testing.T) {
+	_, relay, client := newMockClient(t)
+	addActiveSession(client, "topic", testSymKey)
+
+	relay.EXPECT().SetMessageHandler(gomock.Any())
+	relay.EXPECT().Connect().Return(nil)
+	relay.EXPECT().Subscribe("topic").Return("", fmt.Errorf("subscribe timed out"))
+
+	require.Error(t, client.ConnectAndResubscribe(), "a failed subscription must keep the restored-session retry going")
 }
 
 func TestClient_RejectSession_Success(t *testing.T) {

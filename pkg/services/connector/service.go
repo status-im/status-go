@@ -146,7 +146,7 @@ func (s *Service) initWCClient() {
 		return
 	}
 
-	restored := s.restoreActiveWCSessions(wcClient)
+	s.restoreActiveWCSessions(wcClient)
 
 	wcClient.SetSessionDeleteHandler(func(topic string) {
 		s.logger.Info("received wc_sessionDelete", zap.String("topic", topic))
@@ -165,10 +165,15 @@ func (s *Service) initWCClient() {
 
 	if !s.wcClient.CompareAndSwap(nil, wcClient) {
 		_ = wcClient.Close()
-		return
 	}
-	if restored > 0 {
-		s.connectRestoredSessions(wcClient)
+}
+
+// markStartedLocked starts the relay connection for restored sessions together
+// with the service, so Stop and Pause always own the retry worker.
+func (s *Service) markStartedLocked() {
+	s.started = true
+	if c := s.wcClient.Load(); c != nil && c.HasRestoredSessions() {
+		s.connectRestoredSessions(c)
 	}
 }
 
@@ -198,7 +203,7 @@ func (s *Service) Start() error {
 	}
 
 	if !s.config.WSEnabled {
-		s.started = true
+		s.markStartedLocked()
 		return nil
 	}
 
@@ -232,7 +237,7 @@ func (s *Service) Start() error {
 			s.logger.Error("connector server closed with error", zap.Error(err))
 		}
 	}()
-	s.started = true
+	s.markStartedLocked()
 	s.paused = false
 	return nil
 }

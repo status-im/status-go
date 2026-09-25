@@ -3,6 +3,7 @@ package walletconnect
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -830,18 +831,21 @@ func (c *Client) onReconnected() {
 		pairingTopics = append(pairingTopics, topic)
 	}
 	c.mu.Unlock()
-	c.resubscribeTopics("session", sessionTopics)
-	c.resubscribeTopics("pairing", pairingTopics)
+	_ = c.resubscribeTopics("session", sessionTopics)
+	_ = c.resubscribeTopics("pairing", pairingTopics)
 }
 
-func (c *Client) resubscribeTopics(label string, topics []string) {
+func (c *Client) resubscribeTopics(label string, topics []string) error {
+	var errs []error
 	for _, topic := range topics {
 		if _, err := c.relay.Subscribe(topic); err != nil {
 			c.logger.Error("failed to re-subscribe", zap.String("type", label), zap.String("topic", topic), zap.Error(err))
+			errs = append(errs, fmt.Errorf("subscribe %s topic %s: %w", label, topic, err))
 		} else {
 			c.logger.Info("re-subscribed", zap.String("type", label), zap.String("topic", topic))
 		}
 	}
+	return errors.Join(errs...)
 }
 
 // RestoredSession holds topic and symKey for session restoration from DB.
@@ -868,8 +872,14 @@ func (c *Client) ConnectAndResubscribe() error {
 	}
 	c.mu.Unlock()
 
-	c.resubscribeTopics("session", topics)
-	return nil
+	return c.resubscribeTopics("session", topics)
+}
+
+// HasRestoredSessions reports whether the client holds sessions to reconnect.
+func (c *Client) HasRestoredSessions() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.activeSessions) > 0
 }
 
 // RestoreSessions populates activeSessions from database. Call on startup after a restart.
