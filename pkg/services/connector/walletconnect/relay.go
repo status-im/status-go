@@ -35,6 +35,7 @@ var (
 	relayPingInterval  = 30 * time.Second
 	relayReconnectWait = 5 * time.Second // how long a call waits for an in-flight reconnect
 	relayCallTimeout   = 30 * time.Second
+	relayDialTimeout   = 10 * time.Second // bounds one dial, including a handshake the relay never answers
 
 	relayReconnectBackoff    = time.Second // first pause before a redial
 	relayReconnectMaxBackoff = time.Minute
@@ -312,7 +313,7 @@ func (l *relayLoop) exec(c relayCommand) {
 		if !l.m.first {
 			r.logger.Info("reconnect attempt", zap.Int("attempt", l.m.attempt), zap.Duration("backoff", l.m.delay))
 		}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), relayDialTimeout)
 		l.dialing, l.dialCancel = true, cancel
 		r.wg.Add(1)
 		go r.dial(ctx)

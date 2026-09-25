@@ -114,3 +114,20 @@ func TestService_StopsRelayRetriesOnPause(t *testing.T) {
 	require.Never(t, func() bool { return relay.Subscribes() > 0 }, 300*time.Millisecond, 10*time.Millisecond,
 		"relay retries kept running after Pause")
 }
+
+func TestService_ConnectsRestoredSessionsOnlyOnStart(t *testing.T) {
+	relay := relaytest.New(t, relaytest.Healthy)
+	s := setupServiceWithSession(t, relay)
+	// Recreate the client as NewService would, now that it points at the test relay.
+	if c := s.wcClient.Swap(nil); c != nil {
+		_ = c.Close()
+	}
+	s.initWCClient()
+
+	require.Never(t, func() bool { return relay.Accepted() > 0 }, 200*time.Millisecond, 10*time.Millisecond,
+		"the relay was dialed before Start")
+
+	require.NoError(t, s.Start())
+	require.Eventually(t, func() bool { return relay.Subscribes() >= 1 }, 3*time.Second, 10*time.Millisecond,
+		"restored session was not subscribed after Start")
+}
