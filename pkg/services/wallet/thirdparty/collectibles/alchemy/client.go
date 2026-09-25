@@ -223,7 +223,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 		pageSize = limit
 	}
 	queryParams["pageSize"] = []string{fmt.Sprintf("%d", pageSize)}
-	queryParams["excludeFilters"] = []string{"SPAM"}
+	queryParams["excludeFilters[]"] = []string{"SPAM"}
 
 	if len(cursor) > 0 {
 		queryParams["pageKey"] = []string{cursor}
