@@ -89,6 +89,11 @@ type Router struct {
 	lifiClientFactory     func(chainID uint64) lifi.ClientInterface
 	relayClientFactory    func(chainID uint64) relay.ClientInterface
 
+	// swap chain-support
+	swapSupportMutex   sync.Mutex
+	swapSupportByChain map[string]cachedChainSupport // "<provider>:<chainID>"
+	relayChainsByHost  map[bool]relaySupportedChains // per API host (mainnet/testnet)
+
 	activeBalanceMap sync.Map // map[string]*big.Int
 
 	activeRoutesMutex sync.Mutex
