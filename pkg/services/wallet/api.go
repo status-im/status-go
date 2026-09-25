@@ -187,22 +187,10 @@ func (api *API) TokenAvailableForBridgingViaHop(ctx context.Context, chainID uin
 	return api.s.router.TokenAvailableForBridgingViaHop(chainID, address)
 }
 
-// IsChainSupportedForSwapViaParaswap returns true if the chain is supported for swap via Paraswap, false otherwise.
-func (api *API) IsChainSupportedForSwapViaParaswap(ctx context.Context, chainID uint64) (bool, error) {
-	logutils.ZapLogger().Debug("call to check if chain is supported for swap via Paraswap")
-	return api.s.router.IsChainSupportedForSwapViaParaswap(chainID)
-}
-
-// IsChainSupportedForSwapViaLiFi returns true if the chain is supported for swap via LI.FI, false otherwise.
-func (api *API) IsChainSupportedForSwapViaLiFi(ctx context.Context, chainID uint64) (bool, error) {
-	logutils.ZapLogger().Debug("call to check if chain is supported for swap via LI.FI")
-	return api.s.router.IsChainSupportedForSwapViaLiFi(chainID)
-}
-
-// IsChainSupportedForSwapViaRelay returns true if the chain is supported for swap via Relay, false otherwise.
-func (api *API) IsChainSupportedForSwapViaRelay(ctx context.Context, chainID uint64) (bool, error) {
-	logutils.ZapLogger().Debug("call to check if chain is supported for swap via Relay")
-	return api.s.router.IsChainSupportedForSwapViaRelay(chainID)
+// GetChainsSupportedForSwap reports which of the given chains the active swap provider supports.
+func (api *API) GetChainsSupportedForSwap(ctx context.Context, chainIDs []uint64) map[uint64]bool {
+	logutils.ZapLogger().Debug("call to check which chains are supported for swap", zap.Int("count", len(chainIDs)))
+	return api.s.router.GetChainsSupportedForSwap(chainIDs)
 }
 
 func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
