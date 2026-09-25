@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync/atomic"
 	"testing"
 
@@ -237,13 +238,12 @@ func newTestClient(baseURL string) *Client {
 
 var testOwner = common.HexToAddress("0x1234567890123456789012345678901234567890")
 
-func TestFetchOwnedAssetsSendsPageSizeAndExcludeFilters(t *testing.T) {
+func TestFetchOwnedAssetsSendsExcludeFilters(t *testing.T) {
 	var called atomic.Bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called.Store(true)
 		assert.Equal(t, "/getNFTsForOwner", r.URL.Path)
-		assert.Equal(t, "500", r.URL.Query().Get("pageSize"))
 		assert.Equal(t, "SPAM", r.URL.Query().Get("excludeFilters"))
 		makeNFTResponse(t, w, 1, "")
 	}))
@@ -256,6 +256,44 @@ func TestFetchOwnedAssetsSendsPageSizeAndExcludeFilters(t *testing.T) {
 	require.NotNil(t, assets)
 	assert.True(t, called.Load())
 	assert.Len(t, assets.Items, 1)
+	assert.Empty(t, assets.NextCursor)
+}
+
+// Alchemy documents pageSize max 100. With orderBy set, the testnet backend
+// answers 500 for a larger pageSize once the owner holds more than 100 NFTs.
+func TestFetchOwnedAssetsStaysWithinProviderPageSizeLimit(t *testing.T) {
+	const alchemyMaxPageSize = 100
+	const ownedNFTs = 250
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pageSize, err := strconv.Atoi(r.URL.Query().Get("pageSize"))
+		if err != nil {
+			pageSize = alchemyMaxPageSize
+		}
+		if r.URL.Query().Get("orderBy") != "" && pageSize > alchemyMaxPageSize {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		offset := 0
+		if key := r.URL.Query().Get("pageKey"); key != "" {
+			offset, err = strconv.Atoi(key)
+			require.NoError(t, err)
+		}
+		count := min(pageSize, ownedNFTs-offset)
+		nextPageKey := ""
+		if offset+count < ownedNFTs {
+			nextPageKey = strconv.Itoa(offset + count)
+		}
+		makeNFTResponse(t, w, count, nextPageKey)
+	}))
+	defer server.Close()
+
+	assets, err := newTestClient(server.URL).FetchAllAssetsByOwner(
+		context.Background(), w_common.ChainID(w_common.ArbitrumSepolia), testOwner, "", thirdparty.FetchNoLimit,
+	)
+	require.NoError(t, err)
+	assert.Len(t, assets.Items, ownedNFTs)
 	assert.Empty(t, assets.NextCursor)
 }
 

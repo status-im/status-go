@@ -22,7 +22,7 @@ import (
 const nftMetadataBatchLimit = 100
 const contractMetadataBatchLimit = 100
 const fetchNoLimitMaxPages = 10
-const getNFTsForOwnerPageSize = 500
+const getNFTsForOwnerPageSize = 100 // Alchemy documents 100 as the max page size
 
 type Params struct {
 	IsProxy        bool
