@@ -22,7 +22,7 @@ import (
 const nftMetadataBatchLimit = 100
 const contractMetadataBatchLimit = 100
 const fetchNoLimitMaxPages = 10
-const getNFTsForOwnerPageSize = 500
+const getNFTsForOwnerPageSize = 100 // Alchemy documents 100 as the max page size
 
 type Params struct {
 	IsProxy        bool
@@ -216,7 +216,7 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	queryParams["withMetadata"] = []string{"true"}
 	queryParams["orderBy"] = []string{"transferTime"}
 	queryParams["pageSize"] = []string{fmt.Sprintf("%d", getNFTsForOwnerPageSize)}
-	queryParams["excludeFilters"] = []string{"SPAM"}
+	queryParams["excludeFilters[]"] = []string{"SPAM"}
 
 	if len(cursor) > 0 {
 		queryParams["pageKey"] = []string{cursor}
