@@ -104,6 +104,9 @@ func filterOwnedCollectibles(ctx context.Context, db *sql.DB, chainIDs []wcommon
 
 	q = q.Where(qConditions)
 
+	// Deterministic order so LIMIT/OFFSET pages don't overlap or skip rows.
+	q = q.OrderBy("ownership.chain_id", "ownership.contract_address", "ownership.token_id")
+
 	q = q.Limit(uint64(limit))
 	q = q.Offset(uint64(offset))
 
