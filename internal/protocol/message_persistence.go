@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/markdown"
 
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -46,8 +47,8 @@ ON 	      m1.id = pm.message_id AND pm.pinned = 1
 
 var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)`
 
-var cursor = "substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id"
-var cursorField = cursor + " as cursor"
+const cursor = "substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id"
+const cursorField = cursor + " as cursor"
 
 var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE '%' || ? || '%' OR dm.content LIKE '%' || ? || '%')"
 var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
@@ -66,7 +67,10 @@ func (db sqlitePersistence) buildMessagesQuery(whereAndTheRest string) string {
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFields() string {
-	return `id,
+	return userMessagesAllFields
+}
+
+const userMessagesAllFields = `id,
     		whisper_timestamp,
     		source,
     		text,
@@ -115,10 +119,8 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		replied,
     	discord_message_id,
 		payment_requests`
-}
 
-func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
-	return `
+const userMessagesProtobufFields = `
 			m1.id,
     		m1.whisper_timestamp,
 			m1.clock_value,
@@ -152,7 +154,6 @@ func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
 			e.source,
 			e.emoji
 		`
-}
 
 // keep the same order as in tableUserMessagesScanAllFields
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
@@ -724,8 +725,7 @@ func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error)
 		idsArgs = append(idsArgs, id)
 	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "SELECT id FROM user_messages WHERE id IN (" + inVector + ")" // nolint: gosec
+	query := sqlutil.In("SELECT id FROM user_messages WHERE id IN (%s)", len(ids))
 	rows, err := db.db.Query(query, idsArgs...)
 	if err != nil {
 		return nil, err
@@ -754,10 +754,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 		idsArgs = append(idsArgs, id)
 	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-
-	// nolint: gosec
-	where := fmt.Sprintf("WHERE NOT(m1.hide) AND m1.id IN (%s)", inVector)
+	where := sqlutil.In("WHERE NOT(m1.hide) AND m1.id IN (%s)", len(ids))
 	query := db.buildMessagesQuery(where)
 	rows, err := db.db.Query(query, idsArgs...)
 	if err != nil {
@@ -1317,16 +1314,14 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 // with their non-retracted emoji reactions in a single query, and assembles them into
 // protobuf-backed structures suitable for backups.
 func (db sqlitePersistence) AllMessagesForBackup() ([]*protobuf.BackedUpMessage, error) {
-	fields := db.tableUserMessagesProtobufFields()
-	//nolint: gosec
-	query := fmt.Sprintf(`SELECT %s
+	query := `SELECT ` + userMessagesProtobufFields + `
 			FROM user_messages m1
             LEFT JOIN pin_messages pm
                 ON pm.message_id = m1.id AND pm.pinned = 1
 			LEFT JOIN emoji_reactions e
 			  ON e.message_id = m1.id AND NOT(e.retracted)
 			WHERE NOT(m1.hide) AND (discord_message_id IS NULL OR discord_message_id == '')
-			ORDER BY m1.local_chat_id, m1.id, e.clock_value`, fields)
+			ORDER BY m1.local_chat_id, m1.id, e.clock_value`
 
 	rows, err := db.db.Query(query)
 	if err != nil {
@@ -1489,9 +1484,7 @@ func (db sqlitePersistence) saveBackedUpMessages(messages []*protobuf.BackedUpMe
 		_ = tx.Rollback()
 	}()
 
-	allFields := db.tableUserMessagesAllFields()
-	valuesVector := strings.Repeat("?, ", db.tableUserMessagesAllFieldsCount()-1) + "?"
-	query := "INSERT OR REPLACE INTO user_messages(" + allFields + ") VALUES (" + valuesVector + ")" //nolint: gosec
+	query := sqlutil.In("INSERT OR REPLACE INTO user_messages("+userMessagesAllFields+") VALUES (%s)", db.tableUserMessagesAllFieldsCount())
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return err
@@ -1747,9 +1740,7 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 		args[i] = id
 	}
 
-	inVector := strings.Repeat("?, ", len(chatIDs)-1) + "?"
-	//nolint:gosec
-	query := fmt.Sprintf(`
+	query := sqlutil.In(`
     SELECT
         m1.local_chat_id,
         m1.whisper_timestamp,
@@ -1757,7 +1748,7 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
     FROM user_messages m1
     WHERE m1.local_chat_id IN (%s)
     GROUP BY m1.local_chat_id
-`, inVector)
+`, len(chatIDs))
 
 	rows, err := db.db.Query(query, args...)
 	if err != nil {
@@ -1785,15 +1776,7 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
 func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
-	cursorWhere := ""
-	if currCursor != "" {
-		cursorWhere = fmt.Sprintf("AND %s <= ?", cursor) //nolint: goconst
-	}
-	args := []interface{}{chatID, chatID}
-	if currCursor != "" {
-		args = append(args, currCursor)
-	}
-	args = append(args, limit)
+	args := []interface{}{chatID, chatID, currCursor, currCursor, limit}
 	// NOTE: We match against local_chat_id for security reasons.
 	// As a user could potentially send an emoji reaction for a one to
 	// one/group chat that has no access to.
@@ -1804,8 +1787,7 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 	// Jakubgs: Returning the whole list seems like a real overkill.
 	// This will get very heavy in threads that have loads of reactions on loads of messages.
 	// A more sensible response would just include a count and a bool telling you if you are in the list.
-	// nolint: gosec
-	query := fmt.Sprintf(`
+	query := `
 			SELECT
 			    e.clock_value,
 			    e.source,
@@ -1822,10 +1804,10 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			e.local_chat_id = ?
 			AND
 			e.message_id IN
-			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id = ? %s
-			ORDER BY %s DESC LIMIT ?)
+			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id = ? AND (? = '' OR ` + cursor + ` <= ?)
+			ORDER BY ` + cursor + ` DESC LIMIT ?)
 			LIMIT 1000
-		`, cursorWhere, cursor)
+		`
 
 	rows, err := db.db.Query(
 		query,
@@ -1960,22 +1942,15 @@ func (db sqlitePersistence) EmojiReactionExistsOnMessage(chatID string, messageI
 // EmojiReactionsByChatIDs returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
 func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor string, limit int) ([]*EmojiReaction, error) {
-	cursorWhere := ""
-	if currCursor != "" {
-		cursorWhere = fmt.Sprintf("AND %s <= ?", cursor) //nolint: goconst
-	}
 	chatsLen := len(chatIDs)
-	args := make([]interface{}, chatsLen*2)
-	for i, v := range chatIDs {
-		args[i] = v
+	args := make([]interface{}, 0, chatsLen*2+3)
+	for _, v := range chatIDs {
+		args = append(args, v)
 	}
-	for i, v := range chatIDs {
-		args[chatsLen+i] = v
+	for _, v := range chatIDs {
+		args = append(args, v)
 	}
-	if currCursor != "" {
-		args = append(args, currCursor)
-	}
-	args = append(args, limit)
+	args = append(args, currCursor, currCursor, limit)
 	// NOTE: We match against local_chat_id for security reasons.
 	// As a user could potentially send an emoji reaction for a one to
 	// one/group chat that has no access to.
@@ -1986,8 +1961,7 @@ func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor
 	// Jakubgs: Returning the whole list seems like a real overkill.
 	// This will get very heavy in threads that have loads of reactions on loads of messages.
 	// A more sensible response would just include a count and a bool telling you if you are in the list.
-	// nolint: gosec
-	query := fmt.Sprintf(`
+	query := sqlutil.In(`
 			SELECT
 			    e.clock_value,
 			    e.source,
@@ -2001,13 +1975,13 @@ func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor
 				emoji_reactions e
 			WHERE NOT(e.retracted)
 			AND
-			e.local_chat_id IN %s
+			e.local_chat_id IN (%s)
 			AND
 			e.message_id IN
-			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id IN %s %s
-			ORDER BY %s DESC LIMIT ?)
+			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id IN (%s) AND (? = '' OR `+cursor+` <= ?)
+			ORDER BY `+cursor+` DESC LIMIT ?)
 			LIMIT 1000
-		`, "(?"+strings.Repeat(",?", chatsLen-1)+")", "(?"+strings.Repeat(",?", chatsLen-1)+")", cursorWhere, cursor)
+		`, chatsLen, chatsLen)
 
 	rows, err := db.db.Query(
 		query,
@@ -2053,9 +2027,7 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 		_ = tx.Rollback()
 	}()
 
-	allFields := db.tableUserMessagesAllFields()
-	valuesVector := strings.Repeat("?, ", db.tableUserMessagesAllFieldsCount()-1) + "?"
-	query := "INSERT INTO user_messages(" + allFields + ") VALUES (" + valuesVector + ")" // nolint: gosec
+	query := sqlutil.In("INSERT INTO user_messages("+userMessagesAllFields+") VALUES (%s)", db.tableUserMessagesAllFieldsCount())
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
@@ -2127,9 +2099,8 @@ func (db sqlitePersistence) buildPinMessageQueries() (*insertPinMessagesQueries,
 	queries.selectStmt = "SELECT clock_value FROM pin_messages WHERE id = ?"
 
 	// insert
-	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by`
-	insertValues := strings.Repeat("?, ", strings.Count(allInsertFields, ",")) + "?"
-	insertQuery := "INSERT INTO pin_messages(" + allInsertFields + ") VALUES (" + insertValues + ")" // nolint: gosec
+	const allInsertFields = `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by`
+	insertQuery := sqlutil.In("INSERT INTO pin_messages("+allInsertFields+") VALUES (%s)", strings.Count(allInsertFields, ",")+1)
 	insertStmt, err := tx.Prepare(insertQuery)
 	if err != nil {
 		return nil, err
@@ -2251,7 +2222,6 @@ func (db sqlitePersistence) DeleteMessages(ids []string) (err error) {
 	for _, id := range ids {
 		idsArgs = append(idsArgs, id)
 	}
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -2265,12 +2235,12 @@ func (db sqlitePersistence) DeleteMessages(ids []string) (err error) {
 		err = errors.Join(err, tx.Rollback())
 	}()
 
-	_, err = tx.Exec("DELETE FROM user_messages WHERE id IN ("+inVector+")", idsArgs...) // nolint: gosec
+	_, err = tx.Exec(sqlutil.In("DELETE FROM user_messages WHERE id IN (%s)", len(ids)), idsArgs...)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.Exec("DELETE FROM pin_messages WHERE message_id IN ("+inVector+")", idsArgs...) // nolint: gosec
+	_, err = tx.Exec(sqlutil.In("DELETE FROM pin_messages WHERE message_id IN (%s)", len(ids)), idsArgs...)
 
 	return err
 }
@@ -2494,8 +2464,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		idsArgs = append(idsArgs, id)
 	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	q := "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND (mentioned OR replied) AND id IN (" + inVector + ")" // nolint: gosec
+	q := sqlutil.In("UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND (mentioned OR replied) AND id IN (%s)", len(ids))
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return 0, 0, err
@@ -2507,7 +2476,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		return 0, 0, err
 	}
 
-	q = "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND NOT(mentioned) AND NOT(replied) AND id IN (" + inVector + ")" // nolint: gosec
+	q = sqlutil.In("UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND NOT(mentioned) AND NOT(replied) AND id IN (%s)", len(ids))
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return 0, 0, err
@@ -3534,8 +3503,7 @@ func (db sqlitePersistence) FindStatusMessageIDForBridgeMessageID(messageID stri
 }
 
 func (db sqlitePersistence) updateStatusMessagesWithResponse(tx *sql.Tx, statusMessagesToUpdate []string, responseValue string) error {
-	sql := "UPDATE user_messages SET response_to = ? WHERE id IN (?" + strings.Repeat(",?", len(statusMessagesToUpdate)-1) + ")" //nolint: gosec
-	stmt, err := tx.Prepare(sql)
+	stmt, err := tx.Prepare(sqlutil.In("UPDATE user_messages SET response_to = ? WHERE id IN (%s)", len(statusMessagesToUpdate)))
 	if err != nil {
 		return err
 	}

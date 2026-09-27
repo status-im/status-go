@@ -535,8 +535,8 @@ func TestGetTokensOfInterestForActiveNetworksMode_AddsCrossChainAndMandatoryToke
 	}
 
 	const (
-		bscNativeTokenCrossChainID = "bsc-native"   // nolint: gosec
-		bscUsdcTokenCrossChainID   = "usd-coin-bsc" // nolint: gosec
+		bscNativeTokenCrossChainID = "bsc-native"
+		bscUsdcTokenCrossChainID   = "usd-coin-bsc"
 	)
 	for crossChainID, count := range expectedCrossChainIDs {
 		switch crossChainID {

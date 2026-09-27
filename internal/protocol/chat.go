@@ -2,9 +2,10 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"math/rand"
+	"math/big"
 	"strings"
 	"time"
 
@@ -29,6 +30,14 @@ var chatColors = []string{
 	"#7cda00", // green
 	"#51d0f0", // light-blue
 	"#d37ef4", // purple
+}
+
+func randomChatColor() string {
+	index, err := rand.Int(rand.Reader, big.NewInt(int64(len(chatColors))))
+	if err != nil {
+		return chatColors[0]
+	}
+	return chatColors[index.Int64()]
 }
 
 type ChatType int
@@ -517,7 +526,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 func createCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource, populateMembers bool) *Chat {
 	color := orgChat.Identity.Color
 	if color == "" {
-		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
+		color = randomChatColor()
 	}
 
 	timestamp := timesource.GetCurrentTime()
@@ -616,7 +625,7 @@ func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
 		Timestamp:                int64(timestamp),
 		Joined:                   int64(timestamp),
 		ReadMessagesAtClockValue: 0,
-		Color:                    chatColors[rand.Intn(len(chatColors))], // nolint: gosec
+		Color:                    randomChatColor(),
 		ChatType:                 ChatTypePublic,
 		Members:                  []ChatMember{},
 	}
@@ -628,7 +637,7 @@ func CreateGroupChat(timesource common.TimeSource) Chat {
 
 	return Chat{
 		Active:                   true,
-		Color:                    chatColors[rand.Intn(len(chatColors))], // nolint: gosec
+		Color:                    randomChatColor(),
 		Timestamp:                int64(timestamp),
 		ReadMessagesAtClockValue: 0,
 		SyncedTo:                 synced,

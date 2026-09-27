@@ -259,10 +259,8 @@ func (db *Database) processRows(rows *sql.Rows) ([]*accsmanagementtypes.Keypair,
 // If `includeRemoved` is true and `keyUID` is empty, then all keypairs will be returned (regardless how they are flagged).
 func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) ([]*accsmanagementtypes.Keypair, error) {
 	var (
-		rows           *sql.Rows
-		err            error
-		mainQueryWhere string
-		subQueryWhere  string
+		rows *sql.Rows
+		err  error
 	)
 	if tx == nil {
 		tx, err = db.db.Begin()
@@ -278,21 +276,7 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 		}()
 	}
 
-	if keyUID != "" {
-		mainQueryWhere = "WHERE k.key_uid = ?"
-		if !includeRemoved {
-			mainQueryWhere += " AND k.removed = 0"
-		}
-	} else if !includeRemoved {
-		mainQueryWhere = "WHERE k.removed = 0"
-	}
-
-	if !includeRemoved {
-		subQueryWhere = "WHERE removed = 0"
-	}
-
-	query := fmt.Sprintf( // nolint: gosec
-		`
+	query := `
 		SELECT
 			k.*,
 			ka.address,
@@ -320,13 +304,15 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 				SELECT *
 				FROM
 					keypairs_accounts
-				%s
+				WHERE
+					? OR removed = 0
 			) AS ka
 		ON
 			k.key_uid = ka.key_uid
-		%s
+		WHERE
+			(? OR k.key_uid = ?) AND (? OR k.removed = 0)
 		ORDER BY
-			ka.position`, subQueryWhere, mainQueryWhere)
+			ka.position`
 
 	stmt, err := tx.Prepare(query)
 	if err != nil {
@@ -334,11 +320,7 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 	}
 	defer stmt.Close()
 
-	if keyUID != "" {
-		rows, err = stmt.Query(keyUID)
-	} else {
-		rows, err = stmt.Query()
-	}
+	rows, err = stmt.Query(includeRemoved, keyUID == "", keyUID, includeRemoved)
 	if err != nil {
 		return nil, err
 	}
@@ -371,22 +353,12 @@ func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string, includeRemoved
 // If `includeRemoved` is true and `address` is zero address, then all accounts will be returned (regardless how they are flagged).
 func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemoved bool) ([]*accsmanagementtypes.Account, error) {
 	var (
-		rows  *sql.Rows
-		err   error
-		where string
+		rows *sql.Rows
+		err  error
 	)
 	filterByAddress := address.String() != zeroAddress
-	if filterByAddress {
-		where = "WHERE ka.address = ?"
-		if !includeRemoved {
-			where += " AND ka.removed = 0"
-		}
-	} else if !includeRemoved {
-		where = "WHERE ka.removed = 0"
-	}
 
-	query := fmt.Sprintf( // nolint: gosec
-		`
+	query := `
 		SELECT
 			k.*,
 			ka.address,
@@ -413,34 +385,25 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemove
 			keypairs k
 		ON
 			ka.key_uid = k.key_uid
-		%s
+		WHERE
+			(? OR ka.address = ?) AND (? OR ka.removed = 0)
 		ORDER BY
-			ka.position`, where)
+			ka.position`
+	args := []interface{}{!filterByAddress, address, includeRemoved}
 
 	if tx == nil {
-		if filterByAddress {
-			rows, err = db.db.Query(query, address)
-		} else {
-			rows, err = db.db.Query(query)
-		}
-		if err != nil {
-			return nil, err
-		}
+		rows, err = db.db.Query(query, args...)
 	} else {
-		stmt, err := tx.Prepare(query)
+		var stmt *sql.Stmt
+		stmt, err = tx.Prepare(query)
 		if err != nil {
 			return nil, err
 		}
 		defer stmt.Close()
-
-		if filterByAddress {
-			rows, err = stmt.Query(address)
-		} else {
-			rows, err = stmt.Query()
-		}
-		if err != nil {
-			return nil, err
-		}
+		rows, err = stmt.Query(args...)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	defer rows.Close()
@@ -677,29 +640,15 @@ func updateKeypairLastUsedIndex(tx *sql.Tx, keyUID string, index uint64, clock u
 	if tx == nil {
 		return errDbTransactionIsNil
 	}
-	var (
-		err      error
-		setClock string
-	)
-	if updateKeypairClock {
-		setClock = ", clock = ?"
-	}
 
-	query := fmt.Sprintf( // nolint: gosec
-		`
+	_, err := tx.Exec(`
 		UPDATE
 				keypairs
 			SET
-				last_used_derivation_index = ?
-				%s
+				last_used_derivation_index = ?,
+				clock = CASE WHEN ? THEN ? ELSE clock END
 			WHERE
-				key_uid = ?`, setClock)
-
-	if setClock != "" {
-		_, err = tx.Exec(query, index, clock, keyUID)
-	} else {
-		_, err = tx.Exec(query, index, keyUID)
-	}
+				key_uid = ?`, index, updateKeypairClock, clock, keyUID)
 
 	return err
 }

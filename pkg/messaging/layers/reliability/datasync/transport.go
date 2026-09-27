@@ -2,9 +2,10 @@ package datasync
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"math"
-	"math/rand"
+	"math/big"
 	"time"
 
 	"github.com/status-im/mvds/protobuf"
@@ -87,5 +88,13 @@ func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload *protobu
 // at which a message should be sent.
 // We randomize it a bit so that not all messages are sent on the same epoch
 func CalculateSendTime(count uint64, time int64) int64 {
-	return time + int64(uint64(math.Exp2(float64(count-1)))*backoffInterval*currentOffsetToSecond()) + int64(rand.Intn(30)) // nolint: gosec
+	return time + int64(uint64(math.Exp2(float64(count-1)))*backoffInterval*currentOffsetToSecond()) + randomJitter(30)
+}
+
+func randomJitter(bound int64) int64 {
+	jitter, err := rand.Int(rand.Reader, big.NewInt(bound))
+	if err != nil {
+		return 0
+	}
+	return jitter.Int64()
 }

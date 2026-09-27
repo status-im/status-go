@@ -1,10 +1,9 @@
 package common
 
 import (
-	crand "crypto/rand"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	mrand "math/rand"
 	"regexp"
 	"strings"
 
@@ -29,27 +28,13 @@ func ContainsOnlyZeros(data []byte) bool {
 // where true randomness does not really matter, but it is very important to have
 // a unique nonce for every message.
 func GenerateSecureRandomData(length int) ([]byte, error) {
-	x := make([]byte, length)
-	y := make([]byte, length)
 	res := make([]byte, length)
-
-	_, err := crand.Read(x)
+	_, err := rand.Read(res)
 	if err != nil {
 		return nil, err
-	} else if !ValidateDataIntegrity(x, length) {
-		return nil, errors.New("crypto/rand failed to generate secure random data")
-	}
-	_, err = mrand.Read(y) // nolint: gosec
-	if err != nil {
-		return nil, err
-	} else if !ValidateDataIntegrity(y, length) {
-		return nil, errors.New("math/rand failed to generate secure random data")
-	}
-	for i := 0; i < length; i++ {
-		res[i] = x[i] ^ y[i]
 	}
 	if !ValidateDataIntegrity(res, length) {
-		return nil, errors.New("failed to generate secure random data")
+		return nil, errors.New("crypto/rand failed to generate secure random data")
 	}
 	return res, nil
 }
