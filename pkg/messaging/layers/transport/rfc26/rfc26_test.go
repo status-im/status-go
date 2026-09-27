@@ -173,7 +173,7 @@ func singlePaddingTest(t *testing.T, padSize int) {
 		Key:     keyInfo,
 	}
 
-	_, err = crand.Read(p.Padding) // nolint: gosec
+	_, err = crand.Read(p.Padding)
 	require.NoError(t, err)
 
 	encodedPayload, err := p.encode()
@@ -199,12 +199,12 @@ func TestPadding(t *testing.T) {
 	}
 
 	for i := 0; i < 256; i++ {
-		n := mrand.Intn(256*254) + 256 // nolint: gosec
+		n := mrand.Intn(256*254) + 256 //nolint:gosec // test data, weak randomness is fine
 		singlePaddingTest(t, n)
 	}
 
 	for i := 0; i < 256; i++ {
-		n := mrand.Intn(256*1024) + 256*256 // nolint: gosec
+		n := mrand.Intn(256*1024) + 256*256 //nolint:gosec // test data, weak randomness is fine
 		singlePaddingTest(t, n)
 	}
 }

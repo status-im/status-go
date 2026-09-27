@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/status-im/migrate/v4"
@@ -24,6 +25,14 @@ type PostStep struct {
 
 func StatusMigrationTableName() string {
 	return "status_go_" + sqlcipher.DefaultMigrationsTable
+}
+
+func quoteIdentifier(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+func TableQuery(format string, table string) string {
+	return fmt.Sprintf(format, quoteIdentifier(table))
 }
 
 type MigrateOptions struct {
@@ -272,7 +281,7 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 
 	if exists {
 		dirty := false
-		row = tx.QueryRow(fmt.Sprintf("SELECT version, dirty FROM %s", migrationTableName))
+		row = tx.QueryRow(TableQuery("SELECT version, dirty FROM %s", migrationTableName))
 		err = row.Scan(&storedVersion, &dirty)
 		if err != nil && err != sql.ErrNoRows {
 			return err
@@ -281,13 +290,11 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 			return fmt.Errorf("cannot update migration table version; current table %s is dirty at version %d", migrationTableName, storedVersion)
 		}
 	} else {
-		createTable := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);`, migrationTableName)
-		_, err = tx.Exec(createTable)
+		_, err = tx.Exec(TableQuery(`CREATE TABLE IF NOT EXISTS %s (version uint64, dirty bool);`, migrationTableName))
 		if err != nil {
 			return err
 		}
-		createIndex := fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);`, migrationTableName)
-		_, err = tx.Exec(createIndex)
+		_, err = tx.Exec(TableQuery(`CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);`, migrationTableName))
 		if err != nil {
 			return err
 		}
@@ -296,15 +303,12 @@ func UpdateMigrationTableVersion(db *sql.DB, migrationTableName string, assetNam
 	targetVersion := getMaxMigrationVersion(assetNames, maxVersion)
 	storedVersionMissing := storedVersion > 0 && !migrationVersionPresent(assetNames, storedVersion)
 	if targetVersion > 0 && (targetVersion > storedVersion || storedVersionMissing) {
-		// #nosec G201 -- migrationTableName is a trusted constant, not user input
-		deleteQuery := fmt.Sprintf("DELETE FROM %s", migrationTableName)
-		_, err = tx.Exec(deleteQuery)
+		_, err = tx.Exec(TableQuery("DELETE FROM %s", migrationTableName))
 		if err != nil {
 			return err
 		}
 
-		insertVersion := fmt.Sprintf(`INSERT INTO %s (version, dirty)`, migrationTableName) + `VALUES (?, ?)`
-		_, err = tx.Exec(insertVersion, targetVersion, false)
+		_, err = tx.Exec(TableQuery("INSERT INTO %s (version, dirty) VALUES (?, ?)", migrationTableName), targetVersion, false)
 		if err != nil {
 			return err
 		}

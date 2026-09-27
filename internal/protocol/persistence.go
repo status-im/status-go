@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -15,6 +14,7 @@ import (
 	"github.com/mat/besticon/besticon"
 
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/protocol/common"
@@ -903,14 +903,6 @@ func extractImageTypes(images map[string]*protobuf.IdentityImage) []string {
 	return uniqueImageTypes
 }
 
-func generatePlaceholders(count int) string {
-	placeholders := make([]string, count)
-	for i := 0; i < count; i++ {
-		placeholders[i] = "?"
-	}
-	return strings.Join(placeholders, ", ")
-}
-
 func (db sqlitePersistence) UpdateContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (clockUpdated, imagesUpdated bool, err error) {
 	if chatIdentity.Clock == 0 {
 		return false, false, errors.New("clock value unset")
@@ -933,7 +925,7 @@ func (db sqlitePersistence) UpdateContactChatIdentity(contactID string, chatIden
 
 	query := "DELETE FROM chat_identity_contacts WHERE contact_id = ?"
 	if len(extractedImageTypes) > 0 {
-		query += " AND image_type NOT IN (" + generatePlaceholders(len(extractedImageTypes)) + ")"
+		query = sqlutil.In("DELETE FROM chat_identity_contacts WHERE contact_id = ? AND image_type NOT IN (%s)", len(extractedImageTypes))
 	}
 
 	stmt, err := tx.Prepare(query)

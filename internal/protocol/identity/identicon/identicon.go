@@ -1,7 +1,7 @@
 package identicon
 
 import (
-	"crypto/md5" // nolint: gosec
+	"crypto/md5" //nolint:gosec // non-cryptographic hash; identicons are derived from it and must stay stable
 	"image/color"
 
 	"github.com/lucasb-eyer/go-colorful"
@@ -18,7 +18,7 @@ type Identicon struct {
 }
 
 func generate(key string) Identicon {
-	hash := md5.Sum([]byte(key)) // nolint: gosec
+	hash := md5.Sum([]byte(key)) //nolint:gosec // see import comment
 	return Identicon{
 		convertPatternToBinarySwitch(generatePatternFromHash(hash)),
 		getColorFromHash(hash),

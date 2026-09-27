@@ -2,7 +2,8 @@ package processor
 
 import (
 	"crypto/ecdsa"
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"sync"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -52,7 +53,10 @@ func (e *EphemeralKeysManager) GetRandom() (*ecdsa.PrivateKey, error) {
 }
 
 func (e *EphemeralKeysManager) getRandom() *ecdsa.PrivateKey {
-	k := rand.Intn(len(e.keys)) //nolint: gosec
+	k := 0
+	if index, err := rand.Int(rand.Reader, big.NewInt(int64(len(e.keys)))); err == nil {
+		k = int(index.Int64())
+	}
 	for _, key := range e.keys {
 		if k == 0 {
 			return key

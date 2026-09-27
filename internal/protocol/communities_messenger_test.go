@@ -3548,7 +3548,7 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories() {
 	data, err := json.Marshal(exportedDiscordData)
 	s.Require().NoError(err)
 
-	err = os.WriteFile(tmpFile.Name(), data, 0666) // nolint: gosec
+	err = os.WriteFile(tmpFile.Name(), data, 0600)
 	s.Require().NoError(err)
 
 	files := make([]string, 0)
@@ -3582,7 +3582,7 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_With
 	data, err := json.Marshal(exportedDiscordData)
 	s.Require().NoError(err)
 
-	err = os.WriteFile(tmpFile.Name(), data, 0666) // nolint: gosec
+	err = os.WriteFile(tmpFile.Name(), data, 0600)
 	s.Require().NoError(err)
 
 	files := make([]string, 0)
@@ -4480,7 +4480,7 @@ func (s *MessengerCommunitiesSuite) fetchImage(fullURL string) ([]byte, error) {
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				MinVersion:         tls.VersionTLS12,
-				InsecureSkipVerify: true, // nolint: gosec
+				InsecureSkipVerify: true, //nolint:gosec // test server uses a self-signed certificate
 			},
 		},
 	}

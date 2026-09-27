@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -150,9 +150,7 @@ func (p *SQLiteHashRatchetPersistence) DeleteMessages(ids [][]byte) error {
 	for _, id := range ids {
 		idsArgs = append(idsArgs, id)
 	}
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-
-	_, err := p.db.Exec("DELETE FROM hash_ratchet_encrypted_messages WHERE hash IN ("+inVector+")", idsArgs...) // nolint: gosec
+	_, err := p.db.Exec(sqlutil.In("DELETE FROM hash_ratchet_encrypted_messages WHERE hash IN (%s)", len(ids)), idsArgs...)
 
 	return err
 }

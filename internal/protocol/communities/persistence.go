@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
-	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	"github.com/status-im/status-go/internal/protocol/communities/token"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -74,7 +74,6 @@ type EncryptionKeysRequestRecord struct {
 	requestedCount uint
 }
 
-const OR = " OR "
 const communitiesBaseQuery = `
 	SELECT
 		c.id, c.private_key, c.control_node, c.description, c.joined, c.joined_at, c.last_opened_at, c.spectated, c.verified, c.muted, c.muted_till,
@@ -941,46 +940,34 @@ func (p *Persistence) SaveWakuMessage(message *messagingtypes.ReceivedMessage) e
 	return err
 }
 
-func wakuMessageTimestampQuery(topics []messagingtypes.ContentTopic) string {
-	query := " FROM waku_messages WHERE "
-	for i, topic := range topics {
-		query += `topic = "` + topic.String() + `"`
-		if i < len(topics)-1 {
-			query += OR
-		}
+func wakuMessageTopicsQuery(selectClause string, topics []messagingtypes.ContentTopic) (string, []interface{}) {
+	args := make([]interface{}, 0, len(topics))
+	for _, topic := range topics {
+		args = append(args, topic.String())
 	}
-	return query
+	return sqlutil.In(selectClause+" FROM waku_messages WHERE topic IN (%s)", len(topics)), args
 }
 
 func (p *Persistence) GetOldestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
 	var timestamp sql.NullInt64
-	query := "SELECT MIN(timestamp)"
-	query += wakuMessageTimestampQuery(topics)
-	err := p.db.QueryRow(query).Scan(&timestamp)
+	query, args := wakuMessageTopicsQuery("SELECT MIN(timestamp)", topics)
+	err := p.db.QueryRow(query, args...).Scan(&timestamp)
 	return uint64(timestamp.Int64), err
 }
 
 func (p *Persistence) GetLatestWakuMessageTimestamp(topics []messagingtypes.ContentTopic) (uint64, error) {
 	var timestamp sql.NullInt64
-	query := "SELECT MAX(timestamp)"
-	query += wakuMessageTimestampQuery(topics)
-	err := p.db.QueryRow(query).Scan(&timestamp)
+	query, args := wakuMessageTopicsQuery("SELECT MAX(timestamp)", topics)
+	err := p.db.QueryRow(query, args...).Scan(&timestamp)
 	return uint64(timestamp.Int64), err
 }
 
 func (p *Persistence) GetWakuMessagesByFilterTopic(topics []messagingtypes.ContentTopic, from uint64, to uint64) ([]messagingtypes.ReceivedMessage, error) {
+	query, args := wakuMessageTopicsQuery("SELECT sig, timestamp, topic, payload, padding, hash, third_party_id", topics)
+	query += " AND timestamp >= ? AND timestamp < ?"
+	args = append(args, from, to)
 
-	query := "SELECT sig, timestamp, topic, payload, padding, hash, third_party_id FROM waku_messages WHERE timestamp >= " + fmt.Sprint(from) + " AND timestamp < " + fmt.Sprint(to) + " AND (" //nolint: gosec
-
-	for i, topic := range topics {
-		query += `topic = "` + topic.String() + `"`
-		if i < len(topics)-1 {
-			query += OR
-		}
-	}
-	query += ")"
-
-	rows, err := p.db.Query(query)
+	rows, err := p.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1881,9 +1868,7 @@ func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*messaging
 		idsArgs = append(idsArgs, k.KeyID)
 	}
 
-	inVector := strings.Repeat("?, ", len(keys)-1) + "?"
-
-	query := "SELECT DISTINCT(community_id) FROM encrypted_community_description_missing_keys WHERE key_id IN (" + inVector + ")" // nolint: gosec
+	query := sqlutil.In("SELECT DISTINCT(community_id) FROM encrypted_community_description_missing_keys WHERE key_id IN (%s)", len(keys))
 
 	var communityIDs []interface{}
 	rows, err := tx.Query(query, idsArgs...)
@@ -1904,9 +1889,7 @@ func (p *Persistence) InvalidateDecryptedCommunityCacheForKeys(keys []*messaging
 		return nil
 	}
 
-	inVector = strings.Repeat("?, ", len(communityIDs)-1) + "?"
-
-	query = "DELETE FROM encrypted_community_description_cache WHERE community_id IN (" + inVector + ")" //nolint: gosec
+	query = sqlutil.In("DELETE FROM encrypted_community_description_cache WHERE community_id IN (%s)", len(communityIDs))
 	_, err = tx.Exec(query, communityIDs...)
 
 	return err
@@ -2067,8 +2050,7 @@ func (p *Persistence) GetCommunityRequestsToJoinRevealedAddresses(communityID []
 func (p *Persistence) GetEncryptionKeyRequests(communityID []byte, channelIDs map[string]struct{}) (map[string]*EncryptionKeysRequestRecord, error) {
 	result := map[string]*EncryptionKeysRequestRecord{}
 
-	//nolint:gosec
-	query := "SELECT channel_id, requested_at, requested_count FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id IN (?" + strings.Repeat(",?", len(channelIDs)-1) + ")"
+	query := sqlutil.In("SELECT channel_id, requested_at, requested_count FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id IN (%s)", len(channelIDs))
 
 	args := make([]interface{}, 0, len(channelIDs)+1)
 	args = append(args, communityID)
@@ -2128,8 +2110,7 @@ func (p *Persistence) PruneEncryptionKeyRequests(communityID cryptotypes.HexByte
 	}
 
 	// Delete entries that do not match the channelIDs list
-	//nolint:gosec
-	deleteQuery := "DELETE FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id NOT IN (?" + strings.Repeat(",?", len(channelIDs)-1) + ")"
+	deleteQuery := sqlutil.In("DELETE FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id NOT IN (%s)", len(channelIDs))
 	args := make([]interface{}, 0, len(channelIDs)+1)
 	args = append(args, communityID)
 	for _, channelID := range channelIDs {
