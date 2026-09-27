@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	currenciesURL = "https://api.mercuryo.io/v1.6/lib/currencies" // nolint: gosec
+	currenciesURL = "https://api.mercuryo.io/v1.6/lib/currencies"
 )
 
 type Token struct {

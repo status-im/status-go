@@ -3,28 +3,30 @@ package protocol
 import (
 	"database/sql"
 	"fmt"
-	"strings"
+
+	"github.com/status-im/status-go/internal/db/sqlutil"
 )
 
 const selectTimestampsQuery = "SELECT whisper_timestamp FROM user_messages WHERE %s whisper_timestamp >= ? AND whisper_timestamp <= ?"
 const selectCountQuery = "SELECT COUNT(*) FROM user_messages WHERE %s whisper_timestamp >= ? AND whisper_timestamp <= ?"
 
-func querySeveralChats(chatIDs []string) string {
-	if len(chatIDs) == 0 {
-		return ""
+func chatsPeriodQuery(query string, chatIDs []string, startTimestamp uint64, endTimestamp uint64) (string, []interface{}) {
+	args := make([]interface{}, 0, len(chatIDs)+2)
+	chatsFilter := ""
+	if len(chatIDs) > 0 {
+		chatsFilter = sqlutil.In("local_chat_id IN (%s) AND", len(chatIDs))
+		for _, chatID := range chatIDs {
+			args = append(args, chatID)
+		}
 	}
-
-	var conditions []string
-	for _, chatID := range chatIDs {
-		conditions = append(conditions, fmt.Sprintf("local_chat_id = '%s'", chatID))
-	}
-	return fmt.Sprintf("(%s) AND", strings.Join(conditions, " OR "))
+	args = append(args, startTimestamp, endTimestamp)
+	return fmt.Sprintf(query, chatsFilter), args
 }
 
 func (db sqlitePersistence) SelectMessagesTimestampsForChatsByPeriod(chatIDs []string, startTimestamp uint64, endTimestamp uint64) ([]uint64, error) {
-	query := fmt.Sprintf(selectTimestampsQuery, querySeveralChats(chatIDs))
+	query, args := chatsPeriodQuery(selectTimestampsQuery, chatIDs, startTimestamp, endTimestamp)
 
-	rows, err := db.db.Query(query, startTimestamp, endTimestamp)
+	rows, err := db.db.Query(query, args...)
 	if err != nil {
 		return []uint64{}, err
 	}
@@ -49,10 +51,10 @@ func (db sqlitePersistence) SelectMessagesTimestampsForChatsByPeriod(chatIDs []s
 }
 
 func (db sqlitePersistence) SelectMessagesCountForChatsByPeriod(chatIDs []string, startTimestamp uint64, endTimestamp uint64) (int, error) {
-	query := fmt.Sprintf(selectCountQuery, querySeveralChats(chatIDs))
+	query, args := chatsPeriodQuery(selectCountQuery, chatIDs, startTimestamp, endTimestamp)
 
 	var count int
-	if err := db.db.QueryRow(query, startTimestamp, endTimestamp).Scan(&count); err != nil {
+	if err := db.db.QueryRow(query, args...).Scan(&count); err != nil {
 		if err == sql.ErrNoRows {
 			return 0, nil
 		}

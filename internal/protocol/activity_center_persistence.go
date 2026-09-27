@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	"github.com/status-im/status-go/internal/protocol/common"
 )
 
@@ -102,8 +103,7 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 			args = append(args, id)
 		}
 
-		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-		query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, deleted = 1, updated_at = ? WHERE id IN (" + inVector + ")" // nolint: gosec
+		query := sqlutil.In("UPDATE activity_center_notifications SET read = 1, dismissed = 1, deleted = 1, updated_at = ? WHERE id IN (%s)", len(ids))
 		_, err = tx.Exec(query, args...)
 		return matchNotifications, err
 	}
@@ -510,7 +510,7 @@ type activityCenterQueryParams struct {
 	activityCenterTypes []ActivityCenterType
 }
 
-func (db sqlitePersistence) prepareQueryConditionsAndArgs(params activityCenterQueryParams) ([]interface{}, string) {
+func (db sqlitePersistence) activityCenterQuery(selectClause string, params activityCenterQueryParams) ([]interface{}, string) {
 	var args []interface{}
 	var conditions []string
 
@@ -528,8 +528,7 @@ func (db sqlitePersistence) prepareQueryConditionsAndArgs(params activityCenterQ
 	}
 
 	if len(ids) != 0 {
-		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-		conditions = append(conditions, fmt.Sprintf("a.id IN (%s)", inVector))
+		conditions = append(conditions, sqlutil.In("a.id IN (%s)", len(ids)))
 		for _, id := range ids {
 			args = append(args, id)
 		}
@@ -557,8 +556,7 @@ func (db sqlitePersistence) prepareQueryConditionsAndArgs(params activityCenterQ
 	}
 
 	if len(activityCenterTypes) > 0 {
-		inVector := strings.Repeat("?, ", len(activityCenterTypes)-1) + "?"
-		conditions = append(conditions, fmt.Sprintf("a.notification_type IN (%s)", inVector))
+		conditions = append(conditions, sqlutil.In("a.notification_type IN (%s)", len(activityCenterTypes)))
 		for _, activityCenterType := range activityCenterTypes {
 			args = append(args, activityCenterType)
 		}
@@ -566,20 +564,17 @@ func (db sqlitePersistence) prepareQueryConditionsAndArgs(params activityCenterQ
 
 	conditions = append(conditions, "NOT a.deleted")
 
-	var conditionsString string
+	query := selectClause
 	if len(conditions) > 0 {
-		conditionsString = " WHERE " + strings.Join(conditions, " AND ")
+		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	return args, conditionsString
+	return args, query
 }
 
 func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activityCenterQueryParams) (string, []*ActivityCenterNotification, error) {
-	args, conditionsString := db.prepareQueryConditionsAndArgs(params)
-
-	query := fmt.Sprintf(selectActivityCenterNotificationsQuery+`
-		%s
-		ORDER BY cursor DESC`, conditionsString)
+	args, query := db.activityCenterQuery(selectActivityCenterNotificationsQuery, params)
+	query += " ORDER BY cursor DESC"
 
 	if params.limit != 0 {
 		args = append(args, params.limit)
@@ -602,8 +597,7 @@ func (db sqlitePersistence) buildActivityCenterNotificationsCountQuery(isAccepte
 		activityCenterTypes: activityCenterTypes,
 	}
 
-	args, conditionsString := db.prepareQueryConditionsAndArgs(params)
-	query := fmt.Sprintf(`SELECT COUNT(1) FROM activity_center_notifications a %s`, conditionsString)
+	args, query := db.activityCenterQuery(`SELECT COUNT(1) FROM activity_center_notifications a`, params)
 
 	return db.db.QueryRow(query, args...)
 }
@@ -672,11 +666,8 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 		idsArgs = append(idsArgs, id)
 	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	// nolint: gosec
 	rows, err := db.db.Query(
-		selectActivityCenterNotificationsQuery+`
-		WHERE a.id IN (`+inVector+`) AND NOT a.deleted`, idsArgs...)
+		sqlutil.In(selectActivityCenterNotificationsQuery+` WHERE a.id IN (%s) AND NOT a.deleted`, len(ids)), idsArgs...)
 
 	if err != nil {
 		return nil, err
@@ -697,7 +688,6 @@ func (db sqlitePersistence) GetActivityCenterNotificationByTypeAuthorAndChatID(a
 	if len(chatID) == 0 {
 		return nil, nil
 	}
-	// nolint: gosec
 	query := selectActivityCenterNotificationsQuery + `
 		WHERE a.notification_type = ?
 			AND a.author = ?
@@ -821,7 +811,6 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsDeleted(ids []types.H
 		return emptyNotifications, nil
 	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 	args := make([]interface{}, 0, len(ids)+1)
 	args = append(args, updatedAt)
 	for _, id := range ids {
@@ -844,10 +833,7 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsDeleted(ids []types.H
 		_ = tx.Rollback()
 	}()
 
-	// nolint: gosec
-	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE id IN (%s) AND NOT deleted`,
-		allFieldsForTableActivityCenterNotification,
-		inVector)
+	query := sqlutil.In(`SELECT `+allFieldsForTableActivityCenterNotification+` FROM activity_center_notifications WHERE id IN (%s) AND NOT deleted`, len(ids))
 	rows, err := tx.Query(query, args[1:]...)
 	if err != nil {
 		return nil, err
@@ -860,7 +846,7 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsDeleted(ids []types.H
 		return nil, err
 	}
 
-	update := "UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" //nolint: gosec
+	update := sqlutil.In("UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id IN (%s) AND NOT deleted", len(ids))
 	_, err = tx.Exec(update, args...)
 	if err != nil {
 		return nil, err
@@ -935,8 +921,7 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 		_ = tx.Rollback()
 	}()
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE id IN (" + inVector + ") AND not deleted" // nolint: gosec
+	query := sqlutil.In("UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE id IN (%s) AND not deleted", len(ids))
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return err
@@ -961,7 +946,7 @@ func (db sqlitePersistence) DismissActivityCenterNotificationsByCommunity(commun
 		_ = tx.Rollback()
 	}()
 
-	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE community_id = ? AND notification_type IN (?, ?, ?, ?) AND NOT deleted" // nolint: gosec
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE community_id = ? AND notification_type IN (?, ?, ?, ?) AND NOT deleted"
 	_, err = tx.Exec(query, updatedAt, communityID,
 		ActivityCenterNotificationTypeCommunityRequest, ActivityCenterNotificationTypeCommunityKicked, ActivityCenterNotificationTypeCommunityBanned, ActivityCenterNotificationTypeCommunityUnbanned)
 	if err != nil {
@@ -1009,13 +994,9 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(c
 		args = append(args, chatID)
 	}
 
-	inVector := strings.Repeat("?, ", chatIDsCount-1) + "?"
-
-	// nolint: gosec
-	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications
+	query := sqlutil.In(`SELECT `+allFieldsForTableActivityCenterNotification+` FROM activity_center_notifications
 		WHERE chat_id IN (%s)
-		AND NOT deleted`,
-		allFieldsForTableActivityCenterNotification, inVector)
+		AND NOT deleted`, chatIDsCount)
 	rows, err := tx.Query(query, args[1:]...)
 	if err != nil {
 		return nil, err
@@ -1033,26 +1014,24 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(c
 
 	// Dismiss everything except mentions and replies.
 	dismissArgs := append(args, ActivityCenterNotificationTypeMention, ActivityCenterNotificationTypeReply)
-	// nolint: gosec
-	_, err = tx.Exec(fmt.Sprintf(`
+	_, err = tx.Exec(sqlutil.In(`
 		UPDATE activity_center_notifications
 		SET read = 1, dismissed = 1, updated_at = ?
 		WHERE chat_id IN (%s)
 		AND NOT deleted
-		AND notification_type NOT IN (?, ?)`, inVector), dismissArgs...)
+		AND notification_type NOT IN (?, ?)`, chatIDsCount), dismissArgs...)
 	if err != nil {
 		return nil, err
 	}
 
 	// Mark mentions and replies as read without dismissing them.
 	readArgs := append(args, ActivityCenterNotificationTypeMention, ActivityCenterNotificationTypeReply)
-	// nolint: gosec
-	_, err = tx.Exec(fmt.Sprintf(`
+	_, err = tx.Exec(sqlutil.In(`
 		UPDATE activity_center_notifications
 		SET read = 1, updated_at = ?
 		WHERE chat_id IN (%s)
 		AND NOT deleted
-		AND notification_type IN (?, ?)`, inVector), readArgs...)
+		AND notification_type IN (?, ?)`, chatIDsCount), readArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -1198,8 +1177,7 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 		updateNotifications = append(updateNotifications, n)
 	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	query := sqlutil.In("UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (%s) AND NOT deleted", len(ids))
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return nil, err
@@ -1309,8 +1287,7 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexB
 		_ = tx.Rollback()
 	}()
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	query := sqlutil.In("UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE id IN (%s) AND NOT deleted", len(ids))
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return err
@@ -1344,9 +1321,7 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.He
 		args = append(args, id)
 	}
 
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	// nolint: gosec
-	query := fmt.Sprintf("SELECT %s FROM activity_center_notifications WHERE id IN (%s) AND NOT deleted", allFieldsForTableActivityCenterNotification, inVector)
+	query := sqlutil.In("SELECT "+allFieldsForTableActivityCenterNotification+" FROM activity_center_notifications WHERE id IN (%s) AND NOT deleted", len(ids))
 
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -1377,7 +1352,7 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.He
 		return notifications, nil
 	}
 
-	query = "UPDATE activity_center_notifications SET read = 0, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	query = sqlutil.In("UPDATE activity_center_notifications SET read = 0, updated_at = ? WHERE id IN (%s) AND NOT deleted", len(ids))
 	_, err = tx.Exec(query, args...)
 	if err != nil {
 		return nil, err

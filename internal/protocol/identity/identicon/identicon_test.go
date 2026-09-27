@@ -1,7 +1,7 @@
 package identicon
 
 import (
-	"crypto/md5" // nolint: gosec
+	"crypto/md5" //nolint:gosec // mirrors the non-cryptographic hash used by identicon.go
 	"reflect"
 	"testing"
 )
@@ -22,7 +22,7 @@ var GeneratedBitmap = []byte{
 	0, 1, 0, 1, 0,
 }
 
-var GeneratedHash = md5.Sum([]byte("Culona")) // nolint: gosec
+var GeneratedHash = md5.Sum([]byte("Culona")) //nolint:gosec // see import comment
 
 func TestItGeneratesAPatternFromAListOfBytes(t *testing.T) {
 	pattern := generatePatternFromHash(GeneratedHash)

@@ -2037,7 +2037,7 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			connIdx := rand.Intn(len(connections)) // nolint: gosec
+			connIdx := rand.Intn(len(connections)) //nolint:gosec // test data, weak randomness is fine
 			testContext.backend.ConnectionChange(connections[connIdx], false)
 		}()
 	}

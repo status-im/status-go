@@ -3,12 +3,12 @@ package pushnotificationserver
 import (
 	"crypto/ecdsa"
 	"database/sql"
-	"strings"
 
 	"github.com/golang/protobuf/proto"
 	sqlite3 "github.com/mutecomm/go-sqlcipher/v4"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
@@ -88,9 +88,7 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeys(publicKe
 		publicKeyArgs = append(publicKeyArgs, pk)
 	}
 
-	inVector := strings.Repeat("?, ", len(publicKeys)-1) + "?"
-
-	rows, err := p.db.Query(`SELECT public_key,registration FROM push_notification_server_registrations WHERE registration IS NOT NULL AND public_key IN (`+inVector+`)`, publicKeyArgs...) // nolint: gosec
+	rows, err := p.db.Query(sqlutil.In(`SELECT public_key,registration FROM push_notification_server_registrations WHERE registration IS NOT NULL AND public_key IN (%s)`, len(publicKeys)), publicKeyArgs...)
 	if err != nil {
 		return nil, err
 	}

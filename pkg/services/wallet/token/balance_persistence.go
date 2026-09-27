@@ -3,15 +3,14 @@ package token
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
@@ -124,20 +123,18 @@ func (p *balanceStorage) getCachedBalancesByChain(accounts []common.Address, tok
 		return ret, nil
 	}
 
-	accountStrings := make([]string, len(accounts))
-	for i, account := range accounts {
-		accountStrings[i] = fmt.Sprintf("'%s'", account.Hex())
+	args := make([]interface{}, 0, len(accounts)+2*len(tokens))
+	for _, account := range accounts {
+		args = append(args, account.Hex())
+	}
+	for _, token := range tokens {
+		args = append(args, token.Address.Hex())
+	}
+	for _, token := range tokens {
+		args = append(args, token.ChainID)
 	}
 
-	tokenAddressStrings := make([]string, len(tokens))
-	chainIDStrings := make([]string, len(tokens))
-	for i, token := range tokens {
-		tokenAddressStrings[i] = fmt.Sprintf("'%s'", token.Address.Hex())
-		chainIDStrings[i] = fmt.Sprintf("%d", token.ChainID)
-	}
-
-	//nolint: gosec
-	query := `
+	query := sqlutil.In(`
 	SELECT
 		chain_id,
 		user_address,
@@ -146,11 +143,11 @@ func (p *balanceStorage) getCachedBalancesByChain(accounts []common.Address, tok
 	FROM
 		token_balances
 	WHERE
-		user_address IN (` + strings.Join(accountStrings, ",") + `)
-		AND token_address IN (` + strings.Join(tokenAddressStrings, ",") + `)
-		AND chain_id IN (` + strings.Join(chainIDStrings, ",") + `)`
+		user_address IN (%s)
+		AND token_address IN (%s)
+		AND chain_id IN (%s)`, len(accounts), len(tokens), len(tokens))
 
-	rows, err := p.walletDB.Query(query)
+	rows, err := p.walletDB.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

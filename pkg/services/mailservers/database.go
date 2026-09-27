@@ -5,8 +5,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"strings"
 
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -179,10 +179,8 @@ func (d *Database) SetTopics(filters messagingtypes.ChatFilters) (err error) {
 			topicsArgs = append(topicsArgs, ct)
 		}
 
-		inVector := strings.Repeat("?, ", len(contentTopics)-1) + "?"
-
 		// Delete topics
-		query := "DELETE FROM mailserver_topics WHERE pubsub_topic = ? AND topic NOT IN (" + inVector + ")" // nolint: gosec
+		query := sqlutil.In("DELETE FROM mailserver_topics WHERE pubsub_topic = ? AND topic NOT IN (%s)", len(contentTopics))
 		_, err = tx.Exec(query, topicsArgs...)
 	}
 
