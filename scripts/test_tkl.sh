@@ -29,3 +29,7 @@ if [ "$#" -eq 0 ]; then
   set -- ./pkg/services/wallet/token/...
 fi
 go test -race="$race" -tags 'tkl gowaku_no_rln' "$@"
+# Resolve the optional module for the goroutine guard as well as tests.
+GOFLAGS="${GOFLAGS:-} -tags=tkl,gowaku_no_rln,lint" \
+  go tool goroutine-defer-guard -test=false \
+  -target github.com/status-im/status-go/internal/panics.LogOnPanic ./pkg/services/wallet/token/...
