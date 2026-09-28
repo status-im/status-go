@@ -99,6 +99,7 @@ type CreateAccount struct {
 }
 type WalletConfig struct {
 	TokenListsUseNim                    bool `json:"tokenListsUseNim"`                    // requires the tkl build tag
+	TokenListsShadow                    bool `json:"tokenListsShadow"`                    // bounded diagnostics; requires TokenListsUseNim
 	TokensListsAutoRefreshInterval      int  `json:"tokensListsAutoRefreshInterval"`      // in seconds
 	TokensListsAutoRefreshCheckInterval int  `json:"tokensListsAutoRefreshCheckInterval"` // in seconds
 	MarketDataFullDataRefreshInterval   int  `json:"marketDataFullDataRefreshInterval"`   // in seconds
