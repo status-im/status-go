@@ -423,6 +423,53 @@ For community chats, the caller must be a privileged member (admin/owner) unless
 
 ---
 
+### wakuext_startThreadFromNewMessage
+
+Create a new thread and send its first message in one call. The backend first
+sends a plain-text thread root, creates the thread from that root, then sends
+the supplied message as the root's first reply.
+
+**Params:**
+```json
+[{
+  "message": {
+    "chatId": "<chatId>",
+    "text": "The first full message in the thread",
+    "contentType": 1,
+    "ensName": "alice.eth",
+    "linkPreviews": [],
+    "statusLinkPreviews": []
+  },
+  "threadName": "Optional thread name"
+}]
+```
+
+- `message` is required and must include `chatId`.
+- `threadName` is optional. When omitted or blank, the thread root uses the
+  supplied message text.
+- The root text collapses whitespace and is limited to the first 40 Unicode
+  characters. The same normalized text becomes the thread name.
+- The supplied message must not include `threadId` or `responseTo`; the backend
+  sets both to the generated root message ID.
+- The result contains both sent messages and the created thread metadata.
+
+For community chats, the caller must be a privileged member (admin/owner) unless
+the community has "create threads for all members" enabled.
+
+The two sends are sequential, not transactional. If sending the first reply
+fails after the root was sent, the root remains in the chat and is already a
+created thread.
+
+**Errors:**
+- `"start-thread-from-new-message: invalid message"` — request or message is missing.
+- `"start-thread-from-new-message: invalid chat id"` — `message.chatId` is missing.
+- `"start-thread-from-new-message: thread id must be empty"` — caller supplied `threadId`.
+- `"start-thread-from-new-message: response to must be empty"` — caller supplied `responseTo`.
+- `"thread name or message text is required"` — neither source produces root text.
+- The existing thread feature, chat type, and community-permission errors also apply.
+
+---
+
 ### wakuext_chatThreads
 
 List threads for a chat.

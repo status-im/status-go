@@ -562,6 +562,10 @@ func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*prot
 	return api.service.messenger.CreateThread(chatID, parentMessageID)
 }
 
+func (api *PublicAPI) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.StartThreadFromNewMessage(ctx, request)
+}
+
 func (api *PublicAPI) ChatThreads(chatID string) (*ApplicationThreadsResponse, error) {
 	threads, err := api.service.messenger.ThreadsByChatID(chatID)
 	if err != nil {
