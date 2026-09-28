@@ -7,6 +7,7 @@ import (
 	"errors"
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
@@ -25,7 +26,7 @@ func (m *Manager) UpsertCustom(ctx context.Context, row *types.Token, persist fu
 	token := tkl.Token{ChainID: row.ChainID, Address: row.Address.Hex(), Name: row.Name, Symbol: row.Symbol, Decimals: uint8(row.Decimals), Custom: true}
 	// The existing SQL schema stores these fields only. Do not publish metadata
 	// that would be lost on the next bootstrap.
-	return m.mutateCustom(ctx, func() (tkl.Mutation, error) {
+	return m.mutateCustom(ctx, row.Key(), &token, func() (tkl.Mutation, error) {
 		mutation, err := m.handle.CustomValidateUpsert(token)
 		if errors.Is(err, tkl.ValidationFailed) {
 			// Discovery stores metadata even when it is not catalogue-eligible.
@@ -45,10 +46,10 @@ func (m *Manager) DeleteCustom(ctx context.Context, key string, persist func(con
 	if persist == nil {
 		return tkl.InvalidArgument
 	}
-	return m.mutateCustom(ctx, func() (tkl.Mutation, error) { return m.handle.CustomValidateDelete(key) }, func(ctx context.Context, _ tkl.Mutation) error { return persist(ctx) })
+	return m.mutateCustom(ctx, key, nil, func() (tkl.Mutation, error) { return m.handle.CustomValidateDelete(key) }, func(ctx context.Context, _ tkl.Mutation) error { return persist(ctx) })
 }
 
-func (m *Manager) mutateCustom(ctx context.Context, prepare func() (tkl.Mutation, error), persist func(context.Context, tkl.Mutation) error) error {
+func (m *Manager) mutateCustom(ctx context.Context, key string, row *tkl.Token, prepare func() (tkl.Mutation, error), persist func(context.Context, tkl.Mutation) error) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.handle == nil || (m.refreshIO != nil && m.refreshIO.closing) {
@@ -72,7 +73,11 @@ func (m *Manager) mutateCustom(ctx context.Context, prepare func() (tkl.Mutation
 	}
 	mutation, err := prepare()
 	if errors.Is(err, tkl.NotFound) {
-		return persist(ctx, tkl.Mutation{})
+		if err := persist(ctx, tkl.Mutation{}); err != nil {
+			return err
+		}
+		m.shadowCustom(key, row)
+		return nil
 	}
 	if err != nil {
 		return err
@@ -91,6 +96,7 @@ func (m *Manager) mutateCustom(ctx context.Context, prepare func() (tkl.Mutation
 		m.customResync.Store(&mutation)
 		logutils.ZapLogger().Error("catalogue publish failed after custom write", zap.Error(err))
 	}
+	m.shadowCustom(key, row)
 	// Custom SQL writes did not emit token-list refresh events in the SDK.
 	return nil
 }
@@ -126,6 +132,7 @@ func (m *Manager) resyncCustom() error {
 	}
 	if err == nil {
 		m.customResync.Store(nil)
+		m.captureShadow()
 	}
 	return err
 }
@@ -133,6 +140,10 @@ func (m *Manager) resyncCustom() error {
 // updateCustomMirror transfers just the affected token across the ABI. The
 // snapshot's containers are copied so concurrent readers keep an immutable view.
 func (m *Manager) updateCustomMirror(key string, revision uint64) error {
+	var started time.Time
+	if m.shadow != nil {
+		started = time.Now()
+	}
 	old := m.mirror.Load()
 	// Bootstrap, recovery, aliases and non-default priority can change ordering
 	// beyond this key. Preserve the core's complete ordering in those cases.
@@ -171,6 +182,9 @@ func (m *Manager) updateCustomMirror(key string, revision uint64) error {
 	next.byChain[chain] = replaceCustomToken(old.byChain[chain], id, token)
 	if len(next.byChain[chain]) == 0 {
 		delete(next.byChain, chain)
+	}
+	if !started.IsZero() {
+		next.buildTime = time.Since(started)
 	}
 	m.mirror.Store(&next)
 	return nil
