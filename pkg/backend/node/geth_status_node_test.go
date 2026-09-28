@@ -20,10 +20,16 @@ func TestStatusNodeStart(t *testing.T) {
 	testStatusNodeStart(t, false)
 }
 
+func TestStatusNodeStopAfterCatalogueSetupFailure(t *testing.T) {
+	testStatusNodeStopAfterCatalogueSetupFailure(t, false)
+}
+
 func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T, useNim bool) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
 	config.Networks = testutil.MinimalActiveNetworks()
+	// Reject before initServices, in both tagged and ordinary builds.
+	config.WalletConfig.TokenListsShadow = true
 	config.WalletConfig.TokenListsUseNim = useNim
 	n := New(nil, nil, testutils.MustCreateTestLogger())
 	app, wallet, cleanup, err := setupTestDBs()
@@ -31,7 +37,11 @@ func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T, useNim bool) {
 	defer func() { require.NoError(t, cleanup()) }()
 	n.appDB, n.walletDB = app, wallet
 	defer func() { require.NoError(t, n.StopMediaServer()) }()
-	require.ErrorContains(t, n.Start(config), "TokenListsUseNim requires a build with the tkl tag")
+	if useNim {
+		require.ErrorContains(t, n.Start(config), "TokenListsUseNim requires a build with the tkl tag")
+	} else {
+		require.ErrorContains(t, n.Start(config), "TokenListsShadow requires TokenListsUseNim")
+	}
 	require.Nil(t, n.timeSourceSrvc)
 	require.NotPanics(t, func() { require.NoError(t, n.Stop()) })
 	require.False(t, n.IsRunning())
@@ -43,6 +53,7 @@ func testStatusNodeStart(t *testing.T, useNim bool) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
 	config.WalletConfig.TokenListsUseNim = useNim
+	config.WalletConfig.TokenListsShadow = useNim
 
 	// StatusNode startup creates TokenManager, which requires at least one active network.
 	config.Networks = testutil.MinimalActiveNetworks()

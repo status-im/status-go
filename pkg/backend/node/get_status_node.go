@@ -485,7 +485,7 @@ func (n *StatusNode) createTokenManager() error {
 
 	n.tokenManager, err = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
 		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
-		autoRefreshInterval, autoRefreshCheckInterval, token.ManagerOptions{UseNim: n.config.WalletConfig.TokenListsUseNim})
+		autoRefreshInterval, autoRefreshCheckInterval, token.ManagerOptions{UseNim: n.config.WalletConfig.TokenListsUseNim, Shadow: n.config.WalletConfig.TokenListsShadow})
 	if err != nil {
 		return err
 	}

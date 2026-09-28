@@ -29,9 +29,11 @@ type RefreshOptions struct {
 	Persist func(context.Context, []tkl.ListContent) error
 	// Persist successful checks, including 304s, so restart preserves the next
 	// due time. Automatic successes are spaced by RefreshInterval, not CheckInterval.
-	OnSuccess       func(context.Context, time.Time) error
-	OnChange        func(tkl.Change)
-	OnError         func(error)
+	OnSuccess func(context.Context, time.Time) error
+	OnChange  func(tkl.Change)
+	OnError   func(error)
+	// OnShadow runs on a bounded, drained worker, outside the writer mutex.
+	OnShadow        func(context.Context, ShadowSnapshot)
 	Now             func() time.Time
 	RefreshInterval time.Duration
 	CheckInterval   time.Duration
@@ -320,9 +322,13 @@ func (m *Manager) refresh(ctx context.Context, force bool) error {
 		}
 		change, err := m.handle.RefreshCommit(plan.ID, now)
 		if err == nil {
+			m.shadowWrites(report.Writes)
+		}
+		if err == nil {
 			err = m.rebuild()
 		}
 		if err == nil {
+			m.captureShadow()
 			if r.options.OnSuccess != nil {
 				err = r.options.OnSuccess(callCtx, time.Unix(now, 0).UTC())
 			}

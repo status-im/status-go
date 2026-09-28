@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
@@ -34,7 +35,8 @@ type snapshot struct {
 	aliases        map[string]string
 	addressAliases map[identity]identity
 	// Lazy list cache; accessed only with Manager.mu held.
-	lists []*types.TokenList
+	lists     []*types.TokenList
+	buildTime time.Duration
 }
 
 // Manager owns one C handle. Writes, mirror rebuilds and lazy list reads are
@@ -46,6 +48,7 @@ type Manager struct {
 	load      func(context.Context) (tkl.Bootstrap, error)
 	mirror    atomic.Pointer[snapshot]
 	refreshIO *refreshRuntime
+	shadow    *shadowState
 	// Policy changes must go through this facade under mu, updating both the
 	// core and these inputs before rebuilding/publishing a new snapshot.
 	policy           tkl.Policy
@@ -82,6 +85,9 @@ func New(config tkl.Config, load func(context.Context) (tkl.Bootstrap, error), o
 	policy.NativeAliases = append([]tkl.Identity(nil), policy.NativeAliases...)
 	policy.NativeTokens = append([]tkl.Token(nil), policy.NativeTokens...)
 	m := &Manager{handle: h, load: load, policy: policy, refreshIO: refresh}
+	if refresh != nil && refresh.options.OnShadow != nil {
+		m.shadow = newShadow(config, refresh)
+	}
 	return m, nil
 }
 
@@ -107,7 +113,11 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 		return err
 	}
 	m.started, m.notify = true, notify
-	return m.startRefresh(ctx, autoRefresh)
+	if err := m.startRefresh(ctx, autoRefresh); err != nil {
+		return err
+	}
+	m.captureShadow()
+	return nil
 }
 
 // ensureLoaded runs under mu and is also used by configuration writes before Start.
@@ -124,12 +134,16 @@ func (m *Manager) ensureLoaded(ctx context.Context) error {
 			return err
 		}
 		m.loaded = true
+		m.shadowLoaded(bootstrap)
 	}
 	if m.hasPendingChains {
 		if _, err := m.handle.SetChains(m.pendingChains); err != nil {
 			return err
 		}
 		m.hasPendingChains = false
+		if m.shadow != nil && !m.shadow.disabled {
+			m.shadow.config.Chains = append([]uint64(nil), m.pendingChains...)
+		}
 	}
 	return nil
 }
@@ -167,6 +181,7 @@ func (m *Manager) Stop() error {
 	err := m.handle.Destroy()
 	m.handle = nil
 	m.mirror.Store(nil)
+	m.shadow = nil
 	return err
 }
 
@@ -189,6 +204,10 @@ func (m *Manager) SetChains(chains []uint64) error {
 	if err := m.rebuild(); err != nil {
 		return err
 	}
+	if m.shadow != nil && !m.shadow.disabled {
+		m.shadow.config.Chains = append([]uint64(nil), chains...)
+	}
+	m.captureShadow()
 	if after := m.mirror.Load(); before == nil || before.revision != after.revision {
 		m.notifyChange(change)
 	}
@@ -197,6 +216,10 @@ func (m *Manager) SetChains(chains []uint64) error {
 
 // rebuild is called with mu held, so every bulk page belongs to one revision.
 func (m *Manager) rebuild() error {
+	var started time.Time
+	if m.shadow != nil {
+		started = time.Now()
+	}
 	revision := m.handle.Revision()
 	if old := m.mirror.Load(); old != nil && old.revision == revision {
 		return nil
@@ -229,6 +252,9 @@ func (m *Manager) rebuild() error {
 			next.aliases[key] = types.TokenKey(alias.ChainID, common.Address{})
 			next.addressAliases[identity{alias.ChainID, common.HexToAddress(alias.Address)}] = identity{alias.ChainID, common.Address{}}
 		}
+	}
+	if !started.IsZero() {
+		next.buildTime = time.Since(started)
 	}
 	m.mirror.Store(next)
 	return nil
