@@ -472,3 +472,62 @@ func TestAssetAnimation(t *testing.T) {
 		})
 	}
 }
+
+func TestAssetStillImage(t *testing.T) {
+	const pngURL = "https://res.cloudinary.com/alchemyapi/image/upload/convert-png/eth-mainnet/png"
+	const cachedURL = "https://nft-cdn.alchemy.com/eth-mainnet/cached"
+	const originalURL = "https://example.com/original.png"
+	const cachedSize = int64(9247003)
+
+	testCases := []struct {
+		name          string
+		image         Image
+		expectedURL   string
+		expectedSize  int64
+		expectedAnimo string
+	}{
+		{
+			name:         "uses the png render when the provider has one",
+			image:        Image{ImageURL: pngURL, ContentType: "image/png", CachedAnimationURL: cachedURL, Size: cachedSize},
+			expectedURL:  pngURL,
+			expectedSize: 0,
+		},
+		{
+			// Alchemy leaves pngUrl empty for assets it hasn't rendered, e.g. on testnets.
+			name:         "falls back to the cached still when there is no png render",
+			image:        Image{ContentType: "image/png", CachedAnimationURL: cachedURL, Size: cachedSize},
+			expectedURL:  cachedURL,
+			expectedSize: cachedSize,
+		},
+		{
+			name:         "falls back to the cached asset when its content type is missing",
+			image:        Image{CachedAnimationURL: cachedURL, OriginalAnimationURL: originalURL, Size: cachedSize},
+			expectedURL:  cachedURL,
+			expectedSize: cachedSize,
+		},
+		{
+			name:         "falls back to the original asset when nothing is cached",
+			image:        Image{OriginalAnimationURL: originalURL},
+			expectedURL:  originalURL,
+			expectedSize: 0,
+		},
+		{
+			name:          "leaves a video in the animation slot only",
+			image:         Image{ContentType: "video/mp4", CachedAnimationURL: cachedURL, Size: cachedSize},
+			expectedURL:   "",
+			expectedSize:  0,
+			expectedAnimo: cachedURL,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asset := Asset{Image: tc.image, Raw: Raw{RawMetadata: RawMetadata{}}}
+
+			data := asset.toCollectiblesData(thirdparty.CollectibleUniqueID{})
+			assert.Equal(t, tc.expectedURL, data.ImageURL)
+			assert.Equal(t, tc.expectedSize, data.ImageSize)
+			assert.Equal(t, tc.expectedAnimo, data.AnimationURL)
+		})
+	}
+}
