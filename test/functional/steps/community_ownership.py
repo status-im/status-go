@@ -216,7 +216,7 @@ def wait_until_member_sees_community_clock(
     delay: int = 2,
     spectate: bool = True,
 ) -> dict:
-    """Poll a live store fetch until *backend* sees the community at clock >= *min_clock*; return it."""
+    """Poll a live store fetch (falling back to the local database) until *backend* sees the community at clock >= *min_clock*; return it."""
     community: Optional[dict] = None
     member_clock: Optional[int] = None
     for attempt in range(attempts):
@@ -231,6 +231,15 @@ def wait_until_member_sees_community_clock(
         except ApiResponseError as exc:
             logger.debug(f"fetch_community failed (attempt {attempt + 1}): {exc}")
             community = None
+
+        # The live fetch only returns a description newer than the local one, so it yields
+        # nothing once the member already got the update via relay/filter or SDS recovery.
+        if not isinstance(community, dict):
+            try:
+                community = messenger.fetch_community(backend, community_id, wait_for_response=True, try_database=True)
+            except ApiResponseError as exc:
+                logger.debug(f"database fetch_community failed (attempt {attempt + 1}): {exc}")
+                community = None
 
         member_clock = community.get("clock") if isinstance(community, dict) else None
         owner_clock = _community_clock(reference_backend, community_id, try_database=True) if reference_backend is not None else None
