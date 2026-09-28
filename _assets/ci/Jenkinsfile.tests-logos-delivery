@@ -36,6 +36,8 @@ pipeline {
     FUNCTIONAL_TESTS_REPORT_CODECOV = 'false'
     FUNCTIONAL_TESTS_LOG_LEVEL = 'INFO'
     FUNCTIONAL_TESTS_CONTAINER_PREFIX = "${env.BUILD_TAG}"
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
   }
 
   stages {
@@ -88,8 +90,6 @@ def reportGithubIssues() {
             text: '{"action":"not-run","message":"See console if credential binding fails."}\n')
   try {
     withEnv(["NIGHTLY_BUILD_RESULT=${currentBuild.currentResult}"]) {
-      // Same username/token credential used by github.notify(), the notifyPR fallback,
-      // in status-jenkins-lib@v1.9.39 (vars/github.groovy).
       withCredentials([usernamePassword(credentialsId: 'status-im-auto',
         usernameVariable: 'GH_USERNAME', passwordVariable: 'GH_TOKEN')]) {
         sh '''
