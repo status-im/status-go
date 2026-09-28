@@ -41,10 +41,11 @@ type snapshot struct {
 // serialized; hot token reads only load an immutable Go index. All reads return
 // caller-owned values.
 type Manager struct {
-	mu     sync.Mutex
-	handle *tkl.Handle
-	load   func(context.Context) (tkl.Bootstrap, error)
-	mirror atomic.Pointer[snapshot]
+	mu        sync.Mutex
+	handle    *tkl.Handle
+	load      func(context.Context) (tkl.Bootstrap, error)
+	mirror    atomic.Pointer[snapshot]
+	refreshIO *refreshRuntime
 	// Policy changes must go through this facade under mu, updating both the
 	// core and these inputs before rebuilding/publishing a new snapshot.
 	policy           tkl.Policy
@@ -57,9 +58,20 @@ type Manager struct {
 
 var _ manager.Manager = (*Manager)(nil)
 
-func New(config tkl.Config, load func(context.Context) (tkl.Bootstrap, error)) (*Manager, error) {
+func New(config tkl.Config, load func(context.Context) (tkl.Bootstrap, error), options ...RefreshOptions) (*Manager, error) {
 	if load == nil {
 		return nil, errors.New("bootstrap loader is required")
+	}
+	if len(options) > 1 {
+		return nil, errors.New("only one refresh configuration is allowed")
+	}
+	var refresh *refreshRuntime
+	if len(options) == 1 {
+		var err error
+		refresh, err = newRefreshRuntime(options[0])
+		if err != nil {
+			return nil, err
+		}
 	}
 	h, err := tkl.Create(config)
 	if err != nil {
@@ -69,17 +81,17 @@ func New(config tkl.Config, load func(context.Context) (tkl.Bootstrap, error)) (
 	policy.SkippedKeys = append([]string(nil), policy.SkippedKeys...)
 	policy.NativeAliases = append([]tkl.Identity(nil), policy.NativeAliases...)
 	policy.NativeTokens = append([]tkl.Token(nil), policy.NativeTokens...)
-	m := &Manager{handle: h, load: load, policy: policy}
+	m := &Manager{handle: h, load: load, policy: policy, refreshIO: refresh}
 	return m, nil
 }
 
 func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struct{}) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.handle == nil {
+	if m.handle == nil || (m.refreshIO != nil && m.refreshIO.closing) {
 		return tkl.Closed
 	}
-	if autoRefresh {
+	if autoRefresh && m.refreshIO == nil {
 		return ErrRefreshUnavailable
 	}
 	if m.started {
@@ -111,29 +123,49 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 		return err
 	}
 	m.started, m.notify = true, notify
-	return nil
+	return m.startRefresh(ctx, autoRefresh)
 }
 
 func (m *Manager) Stop() error {
+	// This cancellation function is immutable from construction. Cancel before
+	// waiting for the writer lock so context-aware SQL can release that lock.
+	if r := m.refreshIO; r != nil {
+		r.stop()
+	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.handle == nil {
+		m.mu.Unlock()
 		return nil
 	}
+	if r := m.refreshIO; r != nil {
+		if r.closing {
+			m.mu.Unlock()
+			<-r.done
+			return nil
+		}
+		r.closing = true
+		if r.detachParent != nil {
+			r.detachParent()
+		}
+		if r.cancel != nil {
+			r.cancel()
+		}
+		m.mu.Unlock()
+		r.workers.Wait()
+		m.mu.Lock()
+		defer close(r.done)
+	}
+	defer m.mu.Unlock()
 	err := m.handle.Destroy()
 	m.handle = nil
 	m.mirror.Store(nil)
 	return err
 }
 
-func (m *Manager) EnableAutoRefresh(context.Context) error  { return ErrRefreshUnavailable }
-func (m *Manager) TriggerRefresh(context.Context) error     { return ErrRefreshUnavailable }
-func (m *Manager) DisableAutoRefresh(context.Context) error { return nil }
-
 func (m *Manager) SetChains(chains []uint64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.handle == nil {
+	if m.handle == nil || (m.refreshIO != nil && m.refreshIO.closing) {
 		return tkl.Closed
 	}
 	if !m.started {
@@ -142,19 +174,15 @@ func (m *Manager) SetChains(chains []uint64) error {
 		return nil
 	}
 	before := m.mirror.Load()
-	if _, err := m.handle.SetChains(chains); err != nil {
+	change, err := m.handle.SetChains(chains)
+	if err != nil {
 		return err
 	}
 	if err := m.rebuild(); err != nil {
 		return err
 	}
 	if after := m.mirror.Load(); before == nil || before.revision != after.revision {
-		if m.notify != nil {
-			select {
-			case m.notify <- struct{}{}:
-			default:
-			}
-		}
+		m.notifyChange(change)
 	}
 	return nil
 }

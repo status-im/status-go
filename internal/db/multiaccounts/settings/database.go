@@ -227,16 +227,20 @@ func (db *Database) makeSelectString(setting SettingField) (string, error) {
 }
 
 func (db *Database) saveSetting(setting SettingField, value interface{}) error {
+	return db.saveSettingContext(context.Background(), setting, value)
+}
+
+func (db *Database) saveSettingContext(ctx context.Context, setting SettingField, value interface{}) error {
 	query := "UPDATE settings SET %s = ? WHERE synthetic_id = 'id'"
 	query = fmt.Sprintf(query, setting.GetDBName())
 
-	update, err := db.db.Prepare(query)
+	update, err := db.db.PrepareContext(ctx, query)
 	if err != nil {
 		return err
 	}
 	defer update.Close()
 
-	result, err := update.Exec(value)
+	result, err := update.ExecContext(ctx, value)
 	if err != nil {
 		return err
 	}
@@ -814,6 +818,16 @@ func (db *Database) LastTokensUpdate() (result time.Time, err error) {
 		result = lastTokensUpdate.Time
 	}
 	return
+}
+
+// SaveLastTokensUpdate is the cancellable write for the local-only refresh
+// timestamp. It preserves the normal notifier and subscriber notifications.
+func (db *Database) SaveLastTokensUpdate(ctx context.Context, value time.Time) error {
+	if err := db.saveSettingContext(ctx, LastTokensUpdate, value); err != nil {
+		return err
+	}
+	db.postChangesToSubscribers(&SyncSettingField{LastTokensUpdate, value})
+	return nil
 }
 
 func (db *Database) BackupPath() (result string, err error) {
