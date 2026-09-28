@@ -98,7 +98,7 @@ func TestCustomWritesDoNotNotifyRefreshObservers(t *testing.T) {
 		OnChange: func(tkl.Change) { signals++ },
 	})
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	for i := 1; i <= 20; i++ {
 		row := &types.Token{ChainID: 1, Address: common.HexToAddress(fmt.Sprintf("0x%x", i)), Symbol: "CUSTOM", Decimals: 18}
@@ -113,7 +113,7 @@ func TestCustomWritesDoNotNotifyRefreshObservers(t *testing.T) {
 func TestCustomUpdatesKeepUnchangedMirrorEntries(t *testing.T) {
 	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	before := m.mirror.Load()
 	row := &types.Token{ChainID: 1, Address: common.HexToAddress("0x1234"), Symbol: "CUSTOM", Decimals: 18}
@@ -161,12 +161,13 @@ func TestDurableCustomWriteRecoversOnRead(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 			require.NoError(t, err)
-			defer m.Stop()
+			defer func() { _ = m.Stop() }()
 			require.NoError(t, m.Start(context.Background(), false, nil))
 			row := &types.Token{ChainID: 1, Address: common.HexToAddress("0x1234"), Symbol: "DURABLE", Decimals: 18}
 			writes := 0
-			err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) {
-				return m.handle.CustomValidateUpsert(tkl.Token{ChainID: row.ChainID, Address: row.Address.Hex(), Symbol: row.Symbol, Decimals: 18})
+			token := tkl.Token{ChainID: row.ChainID, Address: row.Address.Hex(), Symbol: row.Symbol, Decimals: 18}
+			err = m.mutateCustom(context.Background(), row.Key(), &token, func() (tkl.Mutation, error) {
+				return m.handle.CustomValidateUpsert(token)
 			}, func(_ context.Context, mutation tkl.Mutation) error {
 				writes++
 				// Inject a native commit failure after the durable write, without
@@ -185,7 +186,7 @@ func TestDurableCustomWriteRecoversOnRead(t *testing.T) {
 func TestCustomMirrorConcurrentReads(t *testing.T) {
 	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	var readers sync.WaitGroup
 	for i := 0; i < 4; i++ {
@@ -218,7 +219,7 @@ func TestCustomMirrorMatchesCorePolicy(t *testing.T) {
 		t.Run(fmt.Sprint(policy), func(t *testing.T) {
 			m, err := New(tkl.Config{Chains: []uint64{1}, Policy: policy, InitialLists: []tkl.ListContent{{ID: "curated", Format: tkl.StandardFormat, Body: body}}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 			require.NoError(t, err)
-			defer m.Stop()
+			defer func() { _ = m.Stop() }()
 			require.NoError(t, m.Start(context.Background(), false, nil))
 			for _, addr := range []string{"0x1234", "0x5678"} {
 				row := &types.Token{ChainID: 1, Address: common.HexToAddress(addr), Symbol: "CUSTOM", Decimals: 18}
@@ -245,11 +246,11 @@ func TestCustomMirrorMatchesCorePolicy(t *testing.T) {
 func TestCustomMirrorFailureAfterNativeCommitRecovers(t *testing.T) {
 	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	row := tkl.Token{ChainID: 1, Address: common.HexToAddress("0x1234").Hex(), Symbol: "DURABLE", Decimals: 18}
 	writes := 0
-	err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) {
+	err = m.mutateCustom(context.Background(), convertToken(row).Key(), &row, func() (tkl.Mutation, error) {
 		mutation, err := m.handle.CustomValidateUpsert(row)
 		// Leave the native proposal intact, but make the host's lookup fail.
 		mutation.Key = "invalid"
@@ -269,12 +270,12 @@ func TestDurableCustomRecoveryBeforeChainChange(t *testing.T) {
 		t.Run(fmt.Sprint(start), func(t *testing.T) {
 			m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 			require.NoError(t, err)
-			defer m.Stop()
+			defer func() { _ = m.Stop() }()
 			if start {
 				require.NoError(t, m.Start(context.Background(), false, nil))
 			}
 			row := tkl.Token{ChainID: 1, Address: common.HexToAddress("0x1234").Hex(), Symbol: "DURABLE", Decimals: 18}
-			err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) { return m.handle.CustomValidateUpsert(row) }, func(_ context.Context, mutation tkl.Mutation) error {
+			err = m.mutateCustom(context.Background(), convertToken(row).Key(), &row, func() (tkl.Mutation, error) { return m.handle.CustomValidateUpsert(row) }, func(_ context.Context, mutation tkl.Mutation) error {
 				_, err := m.handle.CustomAbort(mutation.ID)
 				return err
 			})
@@ -285,7 +286,7 @@ func TestDurableCustomRecoveryBeforeChainChange(t *testing.T) {
 			_, ok := m.GetTokenByChainAddress(1, common.HexToAddress(row.Address))
 			require.True(t, ok)
 			// Failed publication of a durable delete must recover as well.
-			err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) {
+			err = m.mutateCustom(context.Background(), convertToken(row).Key(), nil, func() (tkl.Mutation, error) {
 				return m.handle.CustomValidateDelete(types.TokenKey(1, common.HexToAddress(row.Address)))
 			}, func(_ context.Context, mutation tkl.Mutation) error {
 				_, err := m.handle.CustomAbort(mutation.ID)
