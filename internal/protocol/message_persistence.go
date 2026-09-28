@@ -805,6 +805,8 @@ func (db sqlitePersistence) MessagesByResponseTo(responseTo string) ([]*common.M
 	return getMessagesFromScanRows(db, rows, false)
 }
 
+const maxThreadNameLength = 50
+
 func normalizeThreadName(value string) string {
 	collapsed := strings.Join(strings.Fields(value), " ")
 	trimmed := strings.TrimSpace(collapsed)
@@ -814,7 +816,7 @@ func normalizeThreadName(value string) string {
 
 	graphemes := uniseg.NewGraphemes(trimmed)
 	for count := 0; graphemes.Next(); count++ {
-		if count == 50 {
+		if count == maxThreadNameLength {
 			start, _ := graphemes.Positions()
 			return trimmed[:start]
 		}

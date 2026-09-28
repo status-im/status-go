@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -26,6 +27,23 @@ func (s *MessengerThreadsSuite) SetupTest() {
 	s.MessengerBaseTestSuite.SetupTest()
 	// Enable threads feature for tests
 	s.m.featureFlags.Threads = true
+}
+
+func (s *MessengerThreadsSuite) createJoinedOneToOneThreadChat() *Chat {
+	receiver := s.newMessenger()
+	receiver.featureFlags.Threads = true
+
+	receiverChat := CreateOneToOneChat("thread-sender", &s.m.identity.PublicKey, receiver.getTimesource())
+	s.Require().NoError(receiver.SaveChat(receiverChat))
+	_, err := receiver.Join(receiverChat)
+	s.Require().NoError(err)
+
+	senderChat := CreateOneToOneChat("thread-receiver", &receiver.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(senderChat))
+	_, err = s.m.Join(senderChat)
+	s.Require().NoError(err)
+
+	return senderChat
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadRequiresParentMessage() {
@@ -89,6 +107,130 @@ func (s *MessengerThreadsSuite) TestCreateThreadSucceedsWithExistingParent() {
 	s.Require().Equal("parent-id", thread.ParentMessageID)
 	// Name should be normalized from parent text (trimmed to 40 chars)
 	s.Require().Equal("This is a test thread message", thread.Name)
+}
+
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageWithExplicitName() {
+	chat := s.createJoinedOneToOneThreadChat()
+
+	message := buildTestMessage(*chat)
+	message.Text = "Full message in the new thread"
+	message.ChatMessage.Text = message.Text
+
+	response, err := s.m.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{
+		Message:    message,
+		ThreadName: "  A custom\nthread name  ",
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 2)
+	s.Require().Len(response.Threads(), 1)
+
+	thread := response.Threads()[0]
+	s.Require().Equal("A custom thread name", thread.Name)
+
+	var root *common.Message
+	for _, responseMessage := range response.Messages() {
+		if responseMessage.ID == thread.ThreadID {
+			root = responseMessage
+			break
+		}
+	}
+	s.Require().NotNil(root)
+	s.Require().Equal("A custom thread name", root.Text)
+	s.Require().Equal(protobuf.ChatMessage_TEXT_PLAIN, root.ContentType)
+	s.Require().Empty(root.GetThreadId())
+	s.Require().Empty(root.ResponseTo)
+
+	s.Require().Equal(thread.ThreadID, message.GetThreadId())
+	s.Require().Equal(thread.ThreadID, message.ResponseTo)
+
+	threadMessages, cursor, err := s.m.MessageByChatID(chat.ID, thread.ThreadID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Empty(cursor)
+	s.Require().Len(threadMessages, 1)
+	s.Require().Equal(message.ID, threadMessages[0].ID)
+}
+
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageUsesNormalizedMessageTextWhenNameOmitted() {
+	chat := s.createJoinedOneToOneThreadChat()
+
+	message := buildTestMessage(*chat)
+	message.Text = "  " + strings.Repeat("é", 51) + "  "
+	message.ChatMessage.Text = message.Text
+
+	response, err := s.m.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{Message: message})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+
+	expectedRootText := strings.Repeat("é", maxThreadNameLength)
+	thread := response.Threads()[0]
+	s.Require().Equal(expectedRootText, thread.Name)
+	for _, responseMessage := range response.Messages() {
+		if responseMessage.ID == thread.ThreadID {
+			s.Require().Equal(expectedRootText, responseMessage.Text)
+			return
+		}
+	}
+	s.T().Fatal("thread root message was not returned")
+}
+
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessagePreservesReplyPreviews() {
+	chat := s.createJoinedOneToOneThreadChat()
+
+	message := buildTestMessage(*chat)
+	message.Text = "First message with previews"
+	message.ChatMessage.Text = message.Text
+	message.EnsName = "alice.eth"
+	message.LinkPreviews = []common.LinkPreview{{
+		Type:  protobuf.UnfurledLink_LINK,
+		URL:   "https://example.com",
+		Title: "Example",
+	}}
+	message.StatusLinkPreviews = []common.StatusLinkPreview{{
+		URL: "https://status.app/u/alice",
+		Contact: &common.StatusContactLinkPreview{
+			PublicKey:   crypto.PubkeyToHex(&s.m.identity.PublicKey),
+			DisplayName: "Alice",
+		},
+	}}
+
+	response, err := s.m.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{Message: message})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+
+	threadID := response.Threads()[0].ThreadID
+	threadMessages, cursor, err := s.m.MessageByChatID(chat.ID, threadID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Empty(cursor)
+	s.Require().Len(threadMessages, 1)
+
+	reply := threadMessages[0]
+	s.Require().Equal(message.ID, reply.ID)
+	s.Require().Len(reply.UnfurledLinks, 1)
+	s.Require().Equal("https://example.com", reply.UnfurledLinks[0].Url)
+	s.Require().Equal("Example", reply.UnfurledLinks[0].Title)
+	s.Require().NotNil(reply.UnfurledStatusLinks)
+	s.Require().Len(reply.UnfurledStatusLinks.UnfurledStatusLinks, 1)
+	statusPreview := reply.UnfurledStatusLinks.UnfurledStatusLinks[0]
+	s.Require().Equal("https://status.app/u/alice", statusPreview.Url)
+	s.Require().NotNil(statusPreview.GetContact())
+	s.Require().Equal("Alice", statusPreview.GetContact().DisplayName)
+}
+
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageRequiresThreadNameOrMessageText() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	message := buildTestMessage(*chat)
+	message.Text = " \n "
+	message.ChatMessage.Text = message.Text
+
+	_, err := s.m.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{Message: message})
+	s.Require().EqualError(err, "thread name or message text is required")
+
+	messages, cursor, err := s.m.MessageByChatID(chat.ID, "", "", 10)
+	s.Require().NoError(err)
+	s.Require().Empty(cursor)
+	s.Require().Empty(messages)
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadFailsWhenAlreadyExists() {
@@ -605,6 +747,65 @@ func (s *MessengerThreadsSuite) TestReceivedThreadReplyDoesNotIncrementParentUnr
 	thread, err := receiver.persistence.ThreadByID(receiverChat.ID, parentID)
 	s.Require().NoError(err)
 	s.Require().Equal(parentID, thread.ThreadID)
+}
+
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThreadMetadata() {
+	receiver := s.m
+	sender := s.newMessenger()
+	receiver.featureFlags.Threads = true
+	sender.featureFlags.Threads = true
+	chatID := "start-thread-from-new-message-one-to-one-chat"
+
+	receiverChat := CreateOneToOneChat(chatID, &sender.identity.PublicKey, receiver.getTimesource())
+	s.Require().NoError(receiver.SaveChat(receiverChat))
+	_, err := receiver.Join(receiverChat)
+	s.Require().NoError(err)
+
+	senderChat := CreateOneToOneChat(chatID, &receiver.identity.PublicKey, sender.getTimesource())
+	s.Require().NoError(sender.SaveChat(senderChat))
+	_, err = sender.Join(senderChat)
+	s.Require().NoError(err)
+
+	message := buildTestMessage(*senderChat)
+	message.Text = "First message in the new thread"
+	message.ChatMessage.Text = message.Text
+
+	senderResponse, err := sender.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{
+		Message:    message,
+		ThreadName: "New thread",
+	})
+	s.Require().NoError(err)
+	s.Require().Len(senderResponse.Threads(), 1)
+
+	threadID := senderResponse.Threads()[0].ThreadID
+	_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
+		var receivedRoot, receivedReply bool
+		for _, receivedMessage := range response.Messages() {
+			switch receivedMessage.ID {
+			case threadID:
+				receivedRoot = true
+			case message.ID:
+				receivedReply = true
+			}
+		}
+		return receivedRoot && receivedReply
+	}, "thread root and first reply not received")
+	s.Require().NoError(err)
+
+	thread, err := receiver.persistence.ThreadByID(receiverChat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal("New thread", thread.Name)
+
+	receivedReply, err := receiver.MessageByID(message.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(threadID, receivedReply.GetThreadId())
+	s.Require().Equal(threadID, receivedReply.ResponseTo)
+
+	threadMessages, cursor, err := receiver.MessageByChatID(receiverChat.ID, threadID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Empty(cursor)
+	s.Require().Len(threadMessages, 1)
+	s.Require().Equal(message.ID, threadMessages[0].ID)
 }
 
 func (s *MessengerThreadsSuite) TestMarkThreadReadClearsOnlyThreadMessages() {
