@@ -11,8 +11,9 @@ import (
 
 func TestTokenCatalogueLoginConfig(t *testing.T) {
 	var request requests.Login
-	require.NoError(t, json.Unmarshal([]byte(`{"tokenListsUseNim":true}`), &request))
+	require.NoError(t, json.Unmarshal([]byte(`{"tokenListsUseNim":true,"tokenListsShadow":true}`), &request))
 	config := buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 	require.True(t, config.TokenListsUseNim)
+	require.True(t, config.TokenListsShadow)
 	require.False(t, buildWalletConfig(&requests.WalletConfig{}, &requests.WalletSecretsConfig{}).TokenListsUseNim)
 }

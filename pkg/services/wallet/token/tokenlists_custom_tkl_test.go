@@ -61,7 +61,7 @@ func TestTKLCustomCommunityPersistence(t *testing.T) {
 	defer cleanup()
 	facade, err := newTKLReadManager(m, []uint64{1}, time.Time{})
 	require.NoError(t, err)
-	defer facade.Stop()
+	defer func() { _ = facade.Stop() }()
 	m.tokensManager = facade
 	testCustomCommunityPersistence(t, m)
 }

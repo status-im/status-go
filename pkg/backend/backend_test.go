@@ -1326,6 +1326,7 @@ func testWalletConfigOnLoginAccount(t *testing.T, useNim bool) {
 		},
 		WalletConfig: requests.WalletConfig{
 			TokenListsUseNim:       useNim,
+			TokenListsShadow:       useNim,
 			EnableParaswapProvider: boolPtr(true),
 			EnableLiFiProvider:     boolPtr(false),
 			EnableRelayProvider:    boolPtr(true),
@@ -1344,6 +1345,7 @@ func testWalletConfigOnLoginAccount(t *testing.T, useNim bool) {
 
 	walletConfig := testContext.backend.config.WalletConfig
 	require.Equal(t, useNim, walletConfig.TokenListsUseNim)
+	require.Equal(t, useNim, walletConfig.TokenListsShadow)
 	if useNim {
 		require.NotNil(t, testContext.backend.statusNode.TokenManager().CataloguePausable())
 	}
