@@ -237,22 +237,16 @@ func TestFilterOwnedCollectibles(t *testing.T) {
 	require.Equal(t, expectedIDs, filterIDs)
 }
 
-// TestFilterOwnedCollectiblesPagingIsDeterministic pins the pagination contract of
-// filterOwnedCollectibles: consecutive LIMIT/OFFSET pages must not overlap or skip rows,
-// and the result must be sorted by (chain_id, contract_address, token_id), regardless of
-// the order rows were inserted/stored in, or of which owner address happens to hold which
-// contract.
+// Pages read with LIMIT/OFFSET cover the owned set exactly once, in
+// (chain_id, contract_address, token_id) order.
 func TestFilterOwnedCollectiblesPagingIsDeterministic(t *testing.T) {
 	db, close := setupTestFilterDB(t)
 	defer close()
 
 	oDB := ownership.NewOwnershipDB(db)
 
-	// Two owners, chosen so ownerLexLow < ownerLexHigh as raw address bytes: the
-	// covering index on (chain_id, owner_address, contract_address, token_id) makes
-	// SQLite naturally group rows by owner within a chain. Giving the
-	// lexicographically-low owner the high contract address (and vice versa) makes
-	// that per-owner grouping disagree with the required (chain, contract, token) order.
+	// The lower owner address holds the higher contract, so grouping by owner
+	// would break the expected order.
 	ownerLexLow := common.HexToAddress("0x1111")
 	ownerLexHigh := common.HexToAddress("0x9999")
 
@@ -274,8 +268,6 @@ func TestFilterOwnedCollectiblesPagingIsDeterministic(t *testing.T) {
 		}
 	}
 
-	// chain low: the lex-low owner holds the HIGH contract, the lex-high owner holds the
-	// LOW contract, so per-owner index grouping and per-contract sort order disagree.
 	lexLowOnChainLow := []thirdparty.CollectibleIDBalance{
 		newBalance(chainLow, contractHigh, 1),
 		newBalance(chainLow, contractHigh, 2),
@@ -284,8 +276,6 @@ func TestFilterOwnedCollectiblesPagingIsDeterministic(t *testing.T) {
 		newBalance(chainLow, contractLow, 1),
 		newBalance(chainLow, contractLow, 2),
 	}
-	// chain high: also split across owners/contracts, unscrambled relative to the
-	// chain-low case, so this test doesn't rely on a single lucky arrangement.
 	lexLowOnChainHigh := []thirdparty.CollectibleIDBalance{
 		newBalance(chainHigh, contractLow, 5),
 	}
@@ -337,12 +327,8 @@ func TestFilterOwnedCollectiblesPagingIsDeterministic(t *testing.T) {
 		gotIDs = append(gotIDs, page...)
 	}
 
-	// (a) concatenated pages equal the full set, no duplicates, no misses.
 	require.Equal(t, expectedIDs, gotIDs, "pages must concatenate to the full, non-overlapping set")
 
-	// (b) the returned order is sorted by (chain_id, contract_address, token_id). This is
-	// the assertion that pins the contract even if SQLite happens to return sorted rows
-	// for other reasons (e.g. a DISTINCT implementation that sorts internally).
 	require.True(t, sort.SliceIsSorted(gotIDs, func(i, j int) bool {
 		a, b := gotIDs[i], gotIDs[j]
 		if a.ContractID.ChainID != b.ContractID.ChainID {
