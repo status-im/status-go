@@ -17,3 +17,8 @@ func TestTokenManagerStartStopIdempotent(t *testing.T) {
 	m.Stop()
 	m.Stop()
 }
+
+func TestShadowRequiresNim(t *testing.T) {
+	_, err := NewTokenManager(nil, nil, nil, nil, nil, nil, nil, nil, nil, 0, 0, ManagerOptions{Shadow: true})
+	require.ErrorContains(t, err, "requires TokenListsUseNim")
+}
