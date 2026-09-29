@@ -2206,6 +2206,19 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
+	if m.featureFlags.Threads && receivedMessage.GetThreadId() != "" {
+		_, err = m.persistence.ThreadByID(chat.ID, receivedMessage.GetThreadId())
+		switch {
+		case err == nil:
+		case errors.Is(err, common.ErrRecordNotFound):
+			receivedMessage.ThreadMetadataCreationAuthorized, err = m.senderCanCreateThread(chat, receivedMessage.SigPubKey)
+			if err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
 
 	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(receivedMessage.WhisperTimestamp), state.Response); err != nil {
 		return err

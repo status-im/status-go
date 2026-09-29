@@ -103,6 +103,8 @@ func (m Messages) GetClock(i int) uint64 {
 type Message struct {
 	*protobuf.ChatMessage
 
+	ThreadMetadataCreationAuthorized bool `json:"-"`
+
 	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
 	ID string `json:"id"`
 	// WhisperTimestamp is a timestamp of a Whisper envelope.
