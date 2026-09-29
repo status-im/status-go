@@ -2,9 +2,9 @@ package protocol
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -226,6 +226,22 @@ func (s *MessengerThreadsSuite) TestThreadsByChatIDs() {
 	threads, err = s.m.ThreadsByChatIDs(nil)
 	s.Require().NoError(err)
 	s.Require().Empty(threads)
+}
+
+func (s *MessengerThreadsSuite) TestThreadsByChatIDsBatchesAndGloballyOrdersResults() {
+	chatIDs := make([]string, 0, 1000)
+	chatIDs = append(chatIDs, "chat-z")
+	for i := 0; i < 998; i++ {
+		chatIDs = append(chatIDs, fmt.Sprintf("chat-middle-%03d", i))
+	}
+	chatIDs = append(chatIDs, "chat-a")
+
+	s.Require().NoError(s.m.persistence.UpsertThread("thread-z", "chat-z", "parent-z", "Zeta"))
+	s.Require().NoError(s.m.persistence.UpsertThread("thread-a", "chat-a", "parent-a", "Alpha"))
+
+	threads, err := s.m.ThreadsByChatIDs(chatIDs)
+	s.Require().NoError(err)
+	s.Require().Equal([]string{"chat-a", "chat-z"}, []string{threads[0].ChatID, threads[1].ChatID})
 }
 
 func (s *MessengerThreadsSuite) TestThreadsIncludeUnreadCounts() {

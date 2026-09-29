@@ -455,7 +455,7 @@ List threads for several chats at once, so a client opening a section does not h
 request per chat.
 
 **Params:** `[[chatId, ...]]`
-- `chatIds`: array of strings (communityId + chatUUID)
+- `chatIds`: array of chat identifier strings
 
 **Result:** same shape as `wakuext_chatThreads`. Threads from all requested chats are returned in
 one flat list, ordered by `chatId` then `name`; use each thread's `chatId` to group them.
