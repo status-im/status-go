@@ -54,12 +54,13 @@ var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE 
 var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
 
 type Thread struct {
-	ThreadID              string `json:"threadId"`
-	ChatID                string `json:"chatId"`
-	ParentMessageID       string `json:"parentMessageId"`
-	Name                  string `json:"name"`
-	UnviewedMessagesCount uint   `json:"unviewedMessagesCount"`
-	UnviewedMentionsCount uint   `json:"unviewedMentionsCount"`
+	ThreadID                 string `json:"threadId"`
+	ChatID                   string `json:"chatId"`
+	ParentMessageID          string `json:"parentMessageId"`
+	Name                     string `json:"name"`
+	ReadMessagesAtClockValue uint64 `json:"readMessagesAtClockValue"`
+	UnviewedMessagesCount    uint   `json:"unviewedMessagesCount"`
+	UnviewedMentionsCount    uint   `json:"unviewedMentionsCount"`
 }
 
 func (db sqlitePersistence) buildMessagesQueryWithAdditionalFields(additionalSelectFields, whereAndTheRest string) string {
@@ -922,14 +923,17 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 			threads.chat_id,
 			threads.parent_message_id,
 			threads.name,
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
+			threads.read_messages_at_clock_value,
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
-		WHERE thread_id = ? AND chat_id = ?`, threadID, chatID).Scan(
+		LEFT JOIN chats ON chats.id = threads.chat_id
+		WHERE thread_id = ? AND chat_id = ?`, ChatTypeOneToOne, threadID, chatID).Scan(
 		&thread.ThreadID,
 		&thread.ChatID,
 		&thread.ParentMessageID,
 		&thread.Name,
+		&thread.ReadMessagesAtClockValue,
 		&thread.UnviewedMessagesCount,
 		&thread.UnviewedMentionsCount,
 	)
@@ -946,15 +950,24 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	rows, err := db.db.Query(`
 		SELECT
-			threads.thread_id,
-			threads.chat_id,
-			threads.parent_message_id,
-			threads.name,
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
-		FROM threads
-		WHERE chat_id = ?
-		ORDER BY name ASC`, chatID)
+			t.thread_id,
+			t.chat_id,
+			t.parent_message_id,
+			t.name,
+			t.read_messages_at_clock_value,
+			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) THEN 1 END),
+			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) AND (um.mentioned OR um.replied OR chats.type = ?) THEN 1 END)
+		FROM threads t
+		LEFT JOIN user_messages parent
+			ON parent.id = t.parent_message_id
+		LEFT JOIN chats
+			ON chats.id = t.chat_id
+		LEFT JOIN user_messages um
+			ON um.local_chat_id = t.chat_id
+			AND um.thread_id = t.thread_id
+		WHERE t.chat_id = ?
+		GROUP BY t.thread_id, t.chat_id, t.parent_message_id, t.name, t.read_messages_at_clock_value, chats.type
+		ORDER BY COALESCE(parent.clock_value, 0) DESC, t.thread_id DESC`, ChatTypeOneToOne, chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -963,7 +976,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	threads := make([]*Thread, 0)
 	for rows.Next() {
 		thread := &Thread{}
-		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
 		if err != nil {
 			return nil, err
 		}
@@ -2642,7 +2655,7 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 	return
 }
 
-func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int64, error) {
+func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (seenCount, mentionedOrRepliedCount int64, err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return 0, 0, err
@@ -2690,7 +2703,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 	return (seen + mentionedOrReplied), mentionedOrReplied, nil
 }
 
-func (db sqlitePersistence) MarkThreadRead(chatID string, threadID string, clock uint64) (int64, int64, error) {
+func (db sqlitePersistence) MarkThreadRead(chatID string, threadID string, clock uint64) (seenCount, mentionedOrRepliedCount int64, err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return 0, 0, err
@@ -2724,10 +2737,15 @@ func (db sqlitePersistence) MarkThreadRead(chatID string, threadID string, clock
 		return 0, 0, err
 	}
 
+	_, err = tx.Exec(`UPDATE threads SET read_messages_at_clock_value = MAX(read_messages_at_clock_value, ?) WHERE thread_id = ? AND chat_id = ?`, clock, threadID, chatID)
+	if err != nil {
+		return 0, 0, err
+	}
+
 	return (seen + mentionedOrReplied), mentionedOrReplied, nil
 }
 
-func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
+func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err

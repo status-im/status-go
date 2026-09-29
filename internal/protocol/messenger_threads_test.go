@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 )
@@ -217,6 +218,51 @@ func (s *MessengerThreadsSuite) TestThreadsIncludeUnreadCounts() {
 	s.Require().NoError(err)
 	s.Require().Equal(uint(1), thread.UnviewedMessagesCount)
 	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
+}
+
+func (s *MessengerThreadsSuite) TestThreadUnreadCountsIgnoreInvisibleRepliesAndCountOneToOneRepliesAsMentions() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parent := buildTestMessage(*chat)
+	parent.ID = "parent-id"
+	parent.Text = "Parent"
+	parent.ChatMessage.Text = "Parent"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+
+	_, err := s.m.CreateThread(chat.ID, parent.ID)
+	s.Require().NoError(err)
+
+	threadID := parent.ID
+	newReply := func(id string) *common.Message {
+		reply := buildTestMessage(*chat)
+		reply.ID = id
+		reply.Seen = false
+		reply.ChatMessage.ThreadId = &threadID
+		return reply
+	}
+
+	visible := newReply("visible")
+	hidden := newReply("hidden")
+	deleted := newReply("deleted")
+	deleted.Deleted = true
+	deletedForMe := newReply("deleted-for-me")
+	deletedForMe.DeletedForMe = true
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{visible, hidden, deleted, deletedForMe}))
+
+	_, err = s.m.persistence.db.Exec(`UPDATE user_messages SET hide = 1 WHERE id = ?`, hidden.ID)
+	s.Require().NoError(err)
+
+	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(1), thread.UnviewedMessagesCount)
+	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
+
+	threads, err := s.m.ThreadsByChatID(chat.ID)
+	s.Require().NoError(err)
+	s.Require().Len(threads, 1)
+	s.Require().Equal(uint(1), threads[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), threads[0].UnviewedMentionsCount)
 }
 
 func (s *MessengerThreadsSuite) TestMessagesByThreadID() {
@@ -483,7 +529,7 @@ func (s *MessengerThreadsSuite) TestMarkThreadReadClearsOnlyThreadMessages() {
 	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
 	s.Require().NoError(err)
 	s.Require().Equal(uint(2), thread.UnviewedMessagesCount)
-	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
+	s.Require().Equal(uint(2), thread.UnviewedMentionsCount)
 
 	response, err := s.m.MarkThreadRead(context.Background(), chat.ID, threadID)
 	s.Require().NoError(err)
@@ -505,8 +551,84 @@ func (s *MessengerThreadsSuite) TestMarkThreadReadClearsOnlyThreadMessages() {
 
 	thread, err = s.m.persistence.ThreadByID(chat.ID, threadID)
 	s.Require().NoError(err)
+	s.Require().Equal(olderUnreadReply.Clock, thread.ReadMessagesAtClockValue)
 	s.Require().Equal(uint(0), thread.UnviewedMessagesCount)
 	s.Require().Equal(uint(0), thread.UnviewedMentionsCount)
+}
+
+func (s *MessengerThreadsSuite) TestThreadReadWatermarkMarksOutOfOrderReplySeen() {
+	chat := CreatePublicChat("thread-read-watermark", s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	threadID := "parent-id"
+	s.Require().NoError(s.m.persistence.UpsertThread(threadID, chat.ID, threadID, ""))
+	_, _, err := s.m.persistence.MarkThreadRead(chat.ID, threadID, 10)
+	s.Require().NoError(err)
+
+	senderKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contact, err := contacts.BuildContactFromPublicKey(&senderKey.PublicKey)
+	s.Require().NoError(err)
+
+	state := s.m.buildMessageState()
+	state.CurrentMessageState = &CurrentMessageState{
+		MessageID:        "delayed-thread-reply",
+		WhisperTimestamp: 10,
+		Contact:          contact,
+		PublicKey:        &senderKey.PublicKey,
+	}
+
+	err = s.m.HandleChatMessage(context.Background(), state, &protobuf.ChatMessage{
+		ChatId:      chat.ID,
+		Clock:       10,
+		Timestamp:   10,
+		Text:        "delayed reply",
+		MessageType: protobuf.MessageType_PUBLIC_GROUP,
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+		ThreadId:    &threadID,
+	}, nil, false)
+	s.Require().NoError(err)
+	s.Require().Len(state.Response.Messages(), 1)
+	s.Require().True(state.Response.Messages()[0].Seen)
+}
+
+func (s *MessengerThreadsSuite) TestSyncThreadReadCreatesPlaceholderWithWatermark() {
+	chat := CreatePublicChat("thread-read-sync", s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	threadID := "parent-id"
+	state := s.m.buildMessageState()
+	err := s.m.HandleSyncThreadMessagesRead(context.Background(), state, &protobuf.SyncThreadMessagesRead{
+		ChatId:   chat.ID,
+		ThreadId: threadID,
+		Clock:    10,
+	}, nil)
+	s.Require().NoError(err)
+	s.Require().Len(state.Response.Threads(), 1)
+
+	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(10), thread.ReadMessagesAtClockValue)
+	s.Require().Equal("", thread.Name)
+
+	s.Require().NoError(s.m.persistence.UpsertThread(threadID, chat.ID, threadID, "Parent"))
+	thread, err = s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal("Parent", thread.Name)
+	s.Require().Equal(uint64(10), thread.ReadMessagesAtClockValue)
+
+	state = s.m.buildMessageState()
+	err = s.m.HandleSyncThreadMessagesRead(context.Background(), state, &protobuf.SyncThreadMessagesRead{
+		ChatId:   chat.ID,
+		ThreadId: threadID,
+		Clock:    9,
+	}, nil)
+	s.Require().NoError(err)
+	s.Require().Empty(state.Response.Threads())
+
+	thread, err = s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(10), thread.ReadMessagesAtClockValue)
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadValidatesEmptyParams() {

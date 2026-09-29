@@ -203,6 +203,12 @@ message SyncChatMessagesRead {
   string id = 2;
 }
 
+message SyncThreadMessagesRead {
+  uint64 clock = 1;
+  string chat_id = 2;
+  string thread_id = 3;
+}
+
 message SyncActivityCenterRead {
   uint64 clock = 1;
   repeated bytes ids = 2;

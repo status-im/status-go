@@ -805,6 +805,39 @@ func (m *Messenger) HandleSyncChatMessagesRead(ctx context.Context, state *Recei
 	return nil
 }
 
+func (m *Messenger) HandleSyncThreadMessagesRead(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncThreadMessagesRead, statusMessage *common.StatusMessage) error {
+	if _, ok := m.allChats.Load(message.ChatId); !ok {
+		return ErrChatNotFound
+	}
+
+	thread, err := m.persistence.ThreadByID(message.ChatId, message.ThreadId)
+	if errors.Is(err, common.ErrRecordNotFound) {
+		err = m.persistence.UpsertThread(message.ThreadId, message.ChatId, message.ThreadId, "")
+		if err != nil {
+			return err
+		}
+		thread = nil
+	} else if err != nil {
+		return err
+	}
+
+	if thread != nil && thread.ReadMessagesAtClockValue > message.Clock {
+		return nil
+	}
+
+	err = m.markThreadRead(message.ChatId, message.ThreadId, message.Clock, false)
+	if err != nil {
+		return err
+	}
+
+	thread, err = m.persistence.ThreadByID(message.ChatId, message.ThreadId)
+	if err != nil {
+		return err
+	}
+	state.Response.AddThread(thread)
+	return nil
+}
+
 func (m *Messenger) handlePinMessage(pinner *contacts.Contact, whisperTimestamp uint64, response *MessengerResponse, message *protobuf.PinMessage, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
 
@@ -1925,6 +1958,14 @@ func (m *Messenger) handleDeleteMessage(ctx context.Context, state *ReceivedMess
 			return err
 		}
 
+		if threadID := messageToDelete.GetThreadId(); threadID != "" {
+			thread, err := m.persistence.ThreadByID(chat.ID, threadID)
+			if err != nil && !errors.Is(err, common.ErrRecordNotFound) {
+				return err
+			}
+			state.Response.AddThread(thread)
+		}
+
 		// we shouldn't sync deleted notification here,
 		// as the same user on different devices will receive the same message(DeleteMessage) ?
 		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
@@ -2133,8 +2174,17 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		return err // matchChatEntity returns a descriptive error message
 	}
 
-	if chat.ReadMessagesAtClockValue >= receivedMessage.Clock {
+	if receivedMessage.GetThreadId() == "" && chat.ReadMessagesAtClockValue >= receivedMessage.Clock {
 		receivedMessage.Seen = true
+	}
+	if receivedMessage.GetThreadId() != "" {
+		thread, err := m.persistence.ThreadByID(chat.ID, receivedMessage.GetThreadId())
+		if err != nil && !errors.Is(err, common.ErrRecordNotFound) {
+			return err
+		}
+		if thread != nil && thread.ReadMessagesAtClockValue >= receivedMessage.Clock {
+			receivedMessage.Seen = true
+		}
 	}
 
 	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, chat)
@@ -3044,7 +3094,7 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 }
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
-	if message.GetThreadId() != "" {
+	if m.featureFlags.Threads && message.GetThreadId() != "" {
 		return
 	}
 
