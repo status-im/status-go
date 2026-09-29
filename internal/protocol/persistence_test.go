@@ -30,6 +30,13 @@ func TestTableUserMessagesAllFieldsCount(t *testing.T) {
 	require.Equal(t, expected, db.tableUserMessagesAllFieldsCount())
 }
 
+func TestNormalizeThreadNameDoesNotSplitGraphemeClusters(t *testing.T) {
+	const familyEmoji = "👨‍👩‍👧‍👦"
+	input := strings.Repeat("a", 49) + familyEmoji + "x"
+
+	require.Equal(t, strings.Repeat("a", 49)+familyEmoji, normalizeThreadName(input))
+}
+
 func TestSaveMessages(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -858,7 +865,7 @@ func TestDeletePinnedMessageByID(t *testing.T) {
 	require.Len(t, pinnedMsgs, 0)
 }
 
-func TestSaveMessagesCreatesThreadWithEmptyNameWhenParentMissing(t *testing.T) {
+func TestSaveMessagesDoesNotCreateThreadFromThreadID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -877,12 +884,52 @@ func TestSaveMessagesCreatesThreadWithEmptyNameWhenParentMissing(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
+	_, err = p.ThreadByID(testPublicChatID, threadID)
+	require.ErrorIs(t, err, common.ErrRecordNotFound)
+}
+
+func TestMessageByIDHandlesNilThreadID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	err = p.SaveMessages([]*common.Message{{
+		ID:          "message-id",
+		LocalChatID: testPublicChatID,
+		From:        testPK,
+		ChatMessage: &protobuf.ChatMessage{Text: "message body"},
+	}})
+	require.NoError(t, err)
+
+	message, err := p.MessageByID("message-id")
+	require.NoError(t, err)
+	require.Nil(t, message.ThreadId)
+}
+
+func TestSaveMessagesCreatesAuthorizedThread(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	threadID := "parent-message-id"
+	err = p.SaveMessages([]*common.Message{{
+		ID:                               "reply-message-id",
+		LocalChatID:                      testPublicChatID,
+		From:                             testPK,
+		ThreadMetadataCreationAuthorized: true,
+		ChatMessage: &protobuf.ChatMessage{
+			Text:     "reply body",
+			ThreadId: &threadID,
+		},
+	}})
+	require.NoError(t, err)
+
 	thread, err := p.ThreadByID(testPublicChatID, threadID)
 	require.NoError(t, err)
 	require.Equal(t, "", thread.Name)
 }
 
-func TestSaveMessagesUpdatesEmptyThreadNameWhenParentArrives(t *testing.T) {
+func TestSaveMessagesUpdatesEmptyThreadNameOnlyWhenEnabled(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
@@ -902,15 +949,27 @@ func TestSaveMessagesUpdatesEmptyThreadNameWhenParentArrives(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
-	err = p.SaveMessages([]*common.Message{{
+	err = p.UpsertThread(threadID, testPublicChatID, threadID, "")
+	require.NoError(t, err)
+
+	parentMessage := &common.Message{
 		ID:          threadID,
 		LocalChatID: testPublicChatID,
 		From:        testPK,
 		ChatMessage: &protobuf.ChatMessage{Text: parentText},
-	}})
+	}
+
+	err = p.SaveMessages([]*common.Message{parentMessage})
 	require.NoError(t, err)
 
 	thread, err := p.ThreadByID(testPublicChatID, threadID)
+	require.NoError(t, err)
+	require.Equal(t, "", thread.Name)
+
+	err = p.SaveMessagesWithThreadNameUpdates([]*common.Message{parentMessage})
+	require.NoError(t, err)
+
+	thread, err = p.ThreadByID(testPublicChatID, threadID)
 	require.NoError(t, err)
 	require.Equal(t, normalizeThreadName(parentText), thread.Name)
 }
@@ -1043,6 +1102,9 @@ func TestDeleteParentMessageKeepsThreadMetadata(t *testing.T) {
 		From:        testPK,
 		ChatMessage: &protobuf.ChatMessage{Text: "Parent title"},
 	}})
+	require.NoError(t, err)
+
+	err = p.UpsertThread(threadID, testPublicChatID, threadID, "Parent title")
 	require.NoError(t, err)
 
 	err = p.SaveMessages([]*common.Message{{

@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/lib/pq"
+	"github.com/rivo/uniseg"
 
 	"github.com/status-im/markdown"
 
@@ -208,8 +209,8 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.contact_verification_status,
 		m1.mentioned,
 		m1.replied,
-    COALESCE(m1.discord_message_id, ""),
-	COALESCE(m1.thread_id, ""),
+		COALESCE(m1.discord_message_id, ""),
+		m1.thread_id,
     COALESCE(dm.author_id, ""),
     COALESCE(dm.type, ""),
     COALESCE(dm.timestamp, ""),
@@ -808,9 +809,12 @@ func normalizeThreadName(value string) string {
 		return ""
 	}
 
-	runes := []rune(trimmed)
-	if len(runes) > 40 {
-		return string(runes[:40])
+	graphemes := uniseg.NewGraphemes(trimmed)
+	for count := 0; graphemes.Next(); count++ {
+		if count == 50 {
+			start, _ := graphemes.Positions()
+			return trimmed[:start]
+		}
 	}
 
 	return trimmed
@@ -868,8 +872,19 @@ func (db sqlitePersistence) updateThreadNameFromParentIfNeeded(tx *sql.Tx, threa
 		return nil
 	}
 
+	var hasUnnamedThread bool
+	err := tx.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM threads WHERE thread_id = ? AND chat_id = ? AND name = ?)`,
+		threadID,
+		chatID,
+		"",
+	).Scan(&hasUnnamedThread)
+	if err != nil || !hasUnnamedThread {
+		return err
+	}
+
 	name := normalizeThreadName(parentText)
-	_, err := tx.Exec(
+	_, err = tx.Exec(
 		`UPDATE threads SET name = ? WHERE thread_id = ? AND chat_id = ? AND name = ?`,
 		name,
 		threadID,
@@ -916,7 +931,12 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 }
 
 func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
-	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name FROM threads WHERE chat_id = ? ORDER BY name ASC`, chatID)
+	rows, err := db.db.Query(`
+		SELECT t.thread_id, t.chat_id, t.parent_message_id, t.name
+		FROM threads t
+		LEFT JOIN user_messages m ON m.id = t.parent_message_id
+		WHERE t.chat_id = ?
+		ORDER BY COALESCE(m.clock_value, 0) DESC, t.thread_id DESC`, chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -931,6 +951,9 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 		}
 
 		threads = append(threads, thread)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return threads, nil
@@ -2207,7 +2230,15 @@ func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor
 
 	return result, nil
 }
-func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error) {
+func (db sqlitePersistence) SaveMessages(messages []*common.Message) error {
+	return db.saveMessages(messages, false)
+}
+
+func (db sqlitePersistence) SaveMessagesWithThreadNameUpdates(messages []*common.Message) error {
+	return db.saveMessages(messages, true)
+}
+
+func (db sqlitePersistence) saveMessages(messages []*common.Message, updateThreadNames bool) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
@@ -2243,12 +2274,14 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 			return
 		}
 
-		err = db.updateThreadNameFromParentIfNeeded(tx, msg.ID, msg.LocalChatID, msg.Text)
-		if err != nil {
-			return
+		if updateThreadNames {
+			err = db.updateThreadNameFromParentIfNeeded(tx, msg.ID, msg.LocalChatID, msg.Text)
+			if err != nil {
+				return
+			}
 		}
 
-		if msg.GetThreadId() != "" {
+		if msg.ThreadMetadataCreationAuthorized && msg.GetThreadId() != "" {
 			threadName := db.threadNameFromParent(tx, msg.GetThreadId())
 			err = db.upsertThread(tx, msg.GetThreadId(), msg.LocalChatID, msg.GetThreadId(), threadName)
 			if err != nil {

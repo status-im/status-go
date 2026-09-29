@@ -355,7 +355,7 @@ Read message history for a chat.
 
 Same as `wakuext_chatMessages`, but also can get thread history.
 
-**Params:** `[chatId, threadId cursor, limit]`
+**Params:** `[chatId, threadId, cursor, limit]`
 - `chatId`: string (communityId + chatUUID)
 - `threadId`: string (leave empty to get the history of a chat)
 - `cursor`: string (empty string for first page)

@@ -2141,23 +2141,23 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 	if !m.featureFlags.Threads {
 		message.ThreadId = nil
-	} else if message.GetThreadId() != "" && chat.ChatType == ChatTypeCommunityChat {
-		threadExists := true
-		_, err = m.persistence.ThreadByID(chat.ID, message.GetThreadId())
-		if errors.Is(err, common.ErrRecordNotFound) {
-			threadExists = false
-		} else if err != nil {
-			return nil, err
-		}
-
-		if !threadExists {
-			community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-			if err != nil {
+	} else if message.GetThreadId() != "" {
+		message.ThreadMetadataCreationAuthorized = true
+		if chat.ChatType == ChatTypeCommunityChat {
+			_, err = m.persistence.ThreadByID(chat.ID, message.GetThreadId())
+			switch {
+			case err == nil:
+				message.ThreadMetadataCreationAuthorized = false
+			case errors.Is(err, common.ErrRecordNotFound):
+				allowed, permissionErr := m.senderCanCreateThread(chat, &m.identity.PublicKey)
+				if permissionErr != nil {
+					return nil, permissionErr
+				}
+				if !allowed {
+					return nil, errors.New("only admins can create threads in this community")
+				}
+			default:
 				return nil, err
-			}
-
-			if !community.AllowsAllMembersToCreateThread() && !community.IsPrivilegedMember(&m.identity.PublicKey) {
-				return nil, errors.New("only admins can create threads in this community")
 			}
 		}
 	}
@@ -4071,6 +4071,10 @@ func (m *Messenger) filterOutHiddenChatMessages(messages []*common.Message) ([]*
 }
 
 func (m *Messenger) SaveMessages(messages []*common.Message) error {
+	if m.featureFlags.Threads {
+		return m.persistence.SaveMessagesWithThreadNameUpdates(messages)
+	}
+
 	return m.persistence.SaveMessages(messages)
 }
 

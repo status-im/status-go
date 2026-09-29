@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
 	"errors"
 
@@ -12,6 +13,19 @@ func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 		return nil, ErrThreadFeatureDisabled
 	}
 	return m.persistence.ThreadsByChatID(chatID)
+}
+
+func (m *Messenger) senderCanCreateThread(chat *Chat, sender *ecdsa.PublicKey) (bool, error) {
+	if chat.ChatType != ChatTypeCommunityChat {
+		return true, nil
+	}
+
+	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+	if err != nil {
+		return false, err
+	}
+
+	return community.AllowsAllMembersToCreateThread() || (sender != nil && community.IsPrivilegedMember(sender)), nil
 }
 
 // CreateThread creates thread metadata for an existing parent message in a chat.
@@ -40,16 +54,12 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, threadErr
 	}
 
-	// Enforce community permission: only check on new thread creation
-	if chat.ChatType == ChatTypeCommunityChat {
-		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-		if err != nil {
-			return nil, err
-		}
-
-		if !community.AllowsAllMembersToCreateThread() && !community.IsPrivilegedMember(&m.identity.PublicKey) {
-			return nil, errors.New("only admins can create threads in this community")
-		}
+	allowed, err := m.senderCanCreateThread(chat, &m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, errors.New("only admins can create threads in this community")
 	}
 
 	parentMsg, msgErr := m.persistence.MessageByID(parentMessageID)

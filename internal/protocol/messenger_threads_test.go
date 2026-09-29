@@ -4,9 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
 )
 
 type MessengerThreadsSuite struct {
@@ -31,6 +34,34 @@ func (s *MessengerThreadsSuite) TestCreateThreadRequiresParentMessage() {
 	_, err := s.m.CreateThread(chat.ID, "non-existent-parent")
 	s.Require().Error(err)
 	s.Require().Contains(err.Error(), "parent message not found")
+}
+
+func (s *MessengerThreadsSuite) TestSenderCanCreateThreadRequiresPrivilegedCommunityMember() {
+	communityResponse, err := s.m.CreateCommunity(&requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:        "test community",
+		Color:       "#ffffff",
+		Description: "test community description",
+	}, false)
+	s.Require().NoError(err)
+
+	community := communityResponse.Communities()[0]
+	chatResponse, err := s.m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
+		Identity:    &protobuf.ChatIdentity{DisplayName: "test chat"},
+	})
+	s.Require().NoError(err)
+	chat := chatResponse.Chats()[0]
+
+	allowed, err := s.m.senderCanCreateThread(chat, &s.m.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().True(allowed)
+
+	nonMember, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	allowed, err = s.m.senderCanCreateThread(chat, &nonMember.PublicKey)
+	s.Require().NoError(err)
+	s.Require().False(allowed)
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadSucceedsWithExistingParent() {
@@ -108,11 +139,13 @@ func (s *MessengerThreadsSuite) TestThreadsByChatID() {
 	parent1.ID = "parent-1"
 	parent1.Text = "First thread"
 	parent1.ChatMessage.Text = "First thread"
+	parent1.Clock = 1
 
 	parent2 := buildTestMessage(*chat)
 	parent2.ID = "parent-2"
 	parent2.Text = "Second thread"
 	parent2.ChatMessage.Text = "Second thread"
+	parent2.Clock = 2
 
 	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent1, parent2}))
 
@@ -126,6 +159,8 @@ func (s *MessengerThreadsSuite) TestThreadsByChatID() {
 	threads, err := s.m.ThreadsByChatID(chat.ID)
 	s.Require().NoError(err)
 	s.Require().Len(threads, 2)
+	s.Require().Equal("parent-2", threads[0].ThreadID)
+	s.Require().Equal("parent-1", threads[1].ThreadID)
 
 	// Verify thread data
 	threadIDs := make(map[string]*Thread)
