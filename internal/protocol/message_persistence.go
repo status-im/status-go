@@ -998,39 +998,74 @@ func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error
 		return threads, nil
 	}
 
-	args := make([]interface{}, len(chatIDs))
-	for i, v := range chatIDs {
-		args[i] = v
+	uniqueChatIDs := make([]string, 0, len(chatIDs))
+	seenChatIDs := make(map[string]struct{}, len(chatIDs))
+	for _, chatID := range chatIDs {
+		if _, seen := seenChatIDs[chatID]; seen {
+			continue
+		}
+		seenChatIDs[chatID] = struct{}{}
+		uniqueChatIDs = append(uniqueChatIDs, chatID)
 	}
 
-	// nolint: gosec
-	query := fmt.Sprintf(`
-		SELECT
-			threads.thread_id,
-			threads.chat_id,
-			threads.parent_message_id,
-			threads.name,
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
-		FROM threads
-		WHERE chat_id IN (%s)
-		ORDER BY chat_id ASC, name ASC`, strings.Repeat(",?", len(chatIDs))[1:])
+	const maxSQLiteHostParameters = 999
+	for start := 0; start < len(uniqueChatIDs); start += maxSQLiteHostParameters {
+		end := start + maxSQLiteHostParameters
+		if end > len(uniqueChatIDs) {
+			end = len(uniqueChatIDs)
+		}
 
-	rows, err := db.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+		batch := uniqueChatIDs[start:end]
+		args := make([]interface{}, len(batch))
+		for i, chatID := range batch {
+			args[i] = chatID
+		}
 
-	for rows.Next() {
-		thread := &Thread{}
-		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		// nolint: gosec
+		query := fmt.Sprintf(`
+			SELECT
+				threads.thread_id,
+				threads.chat_id,
+				threads.parent_message_id,
+				threads.name,
+				(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
+				(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
+			FROM threads
+			WHERE chat_id IN (%s)`, strings.Repeat(",?", len(batch))[1:])
+
+		rows, err := db.db.Query(query, args...)
 		if err != nil {
 			return nil, err
 		}
 
-		threads = append(threads, thread)
+		for rows.Next() {
+			thread := &Thread{}
+			err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+
+			threads = append(threads, thread)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if err := rows.Close(); err != nil {
+			return nil, err
+		}
 	}
+
+	sort.Slice(threads, func(i, j int) bool {
+		if threads[i].ChatID != threads[j].ChatID {
+			return threads[i].ChatID < threads[j].ChatID
+		}
+		if threads[i].Name != threads[j].Name {
+			return threads[i].Name < threads[j].Name
+		}
+		return threads[i].ThreadID < threads[j].ThreadID
+	})
 
 	return threads, nil
 }
