@@ -20,6 +20,14 @@ tkl_build_id="$("${tkl_sha256[@]}" "$NIM_TKL_LIB_DIR/libtkl.a" "$NIM_TKL_INC_DIR
 export CGO_CFLAGS="${CGO_CFLAGS:-} -I$NIM_TKL_INC_DIR -DTKL_BUILD_ID=0x$tkl_build_id"
 export CGO_LDFLAGS="${CGO_LDFLAGS:-} -L$NIM_TKL_LIB_DIR"
 export GOWORK=off
+# Only the final shared library applies the private token-library export policy.
+if [ "${TKL_HIDE_EXPORTS:-0}" = 1 ]; then
+  case "$(go env GOOS)" in
+    darwin) export CGO_LDFLAGS="$CGO_LDFLAGS -Wl,-unexported_symbols_list,$repo/scripts/tkl-unexported-macos.txt" ;;
+    linux) export CGO_LDFLAGS="$CGO_LDFLAGS -Wl,--version-script=$repo/scripts/tkl-private-linux.map" ;;
+    *) echo "Unsupported libstatus export policy platform" >&2; exit 1 ;;
+  esac
+fi
 cd "$repo"
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   [ "$#" -gt 0 ] || { echo "Usage: bash scripts/tkl_env.sh <command> [args...]" >&2; exit 1; }
