@@ -69,6 +69,41 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessage() {
 	s.Require().ErrorContains(err, "can't find chat")
 }
 
+func (s *MessengerRemoveMessageSuite) TestDeleteThreadReplyAddsUpdatedThreadToResponse() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	threadID := "parent-id"
+	s.Require().NoError(s.m.persistence.UpsertThread(threadID, chat.ID, threadID, "Parent"))
+
+	reply := buildTestMessage(*chat)
+	reply.ID = "thread-reply"
+	reply.From = "sender"
+	reply.Seen = false
+	reply.ChatMessage.ThreadId = &threadID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{reply}))
+
+	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(1), thread.UnviewedMessagesCount)
+
+	state := &ReceivedMessageState{Response: &MessengerResponse{}}
+	err = s.m.handleDeleteMessage(context.Background(), state, &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
+			Clock:       reply.Clock + 1,
+			MessageType: reply.MessageType,
+			MessageId:   reply.ID,
+			ChatId:      chat.ID,
+		},
+		From: reply.From,
+	})
+	s.Require().NoError(err)
+	s.Require().Len(state.Response.Threads(), 1)
+	s.Require().Equal(threadID, state.Response.Threads()[0].ThreadID)
+	s.Require().Equal(uint(0), state.Response.Threads()[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(0), state.Response.Threads()[0].UnviewedMentionsCount)
+}
+
 func (s *MessengerRemoveMessageSuite) TestDeleteMessagePreviousLastMessage() {
 	theirMessenger := s.newMessenger()
 

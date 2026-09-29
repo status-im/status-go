@@ -1,0 +1,1 @@
+ALTER TABLE threads ADD COLUMN read_messages_at_clock_value INT DEFAULT 0;

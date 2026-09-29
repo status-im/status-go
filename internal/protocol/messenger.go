@@ -4249,6 +4249,34 @@ func (m *Messenger) syncChatMessagesRead(ctx context.Context, chatID string, clo
 	return err
 }
 
+func (m *Messenger) syncThreadMessagesRead(ctx context.Context, chatID, threadID string, clock uint64, rawMessageHandler RawMessageHandler) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	_, chat := m.getLastClockWithRelatedChat()
+
+	syncMessage := &protobuf.SyncThreadMessagesRead{
+		Clock:    clock,
+		ChatId:   chatID,
+		ThreadId: threadID,
+	}
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_SYNC_THREAD_MESSAGES_READ,
+		ResendType:  common.ResendTypeDataSync,
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
+	return err
+}
+
 func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool) error {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
@@ -4280,6 +4308,19 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 	return m.persistence.SaveChats([]*Chat{chat})
+}
+
+func (m *Messenger) markThreadRead(chatID, threadID string, clock uint64, shouldBeSynced bool) error {
+	_, _, err := m.persistence.MarkThreadRead(chatID, threadID, clock)
+	if err != nil {
+		return err
+	}
+
+	if shouldBeSynced {
+		return m.syncThreadMessagesRead(context.Background(), chatID, threadID, clock, m.dispatchMessage)
+	}
+
+	return nil
 }
 
 func (m *Messenger) MarkAllRead(ctx context.Context, chatID string) (*MessengerResponse, error) {
@@ -4319,9 +4360,12 @@ func (m *Messenger) MarkThreadRead(ctx context.Context, chatID string, threadID 
 		return nil, ErrChatNotFoundError
 	}
 
-	clock, _ := m.latestIncomingThreadMessageClock(chatID, threadID)
+	clock, err := m.latestIncomingThreadMessageClock(chatID, threadID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
 	if clock != 0 {
-		_, _, err := m.persistence.MarkThreadRead(chatID, threadID, clock)
+		err = m.markThreadRead(chatID, threadID, clock, true)
 		if err != nil {
 			return nil, err
 		}
