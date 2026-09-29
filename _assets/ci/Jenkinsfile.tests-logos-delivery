@@ -32,7 +32,7 @@ pipeline {
   }
 
   environment {
-    WAKU_IMAGE = 'quay.io/wakuorg/nwaku-pr:nightly-logosdeliverynode'
+    WAKU_IMAGE = 'quay.io/wakuorg/nwaku-pr:nightly'
     FUNCTIONAL_TESTS_REPORT_CODECOV = 'false'
     FUNCTIONAL_TESTS_LOG_LEVEL = 'INFO'
     FUNCTIONAL_TESTS_CONTAINER_PREFIX = "${env.BUILD_TAG}"
