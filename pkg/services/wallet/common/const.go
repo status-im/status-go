@@ -3,6 +3,7 @@ package common
 import (
 	"math/big"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -406,57 +407,81 @@ var sntAddressesByChainID = map[uint64]common.Address{
 	LineaSepolia:    common.HexToAddress("0x4f3b44bdddb0e2f94a85d75294d0a38e211be6a8"),
 }
 
-func allMandatoryTokens() map[uint64][]common.Address {
-	allAddresses := make(map[uint64][]common.Address)
-
-	for chainID, address := range ethAddressesByChainID {
-		allAddresses[chainID] = append(allAddresses[chainID], address)
-	}
-	for chainID, address := range bnbAddressesByChainID {
-		allAddresses[chainID] = append(allAddresses[chainID], address)
-	}
-	for chainID, address := range daiAddressesByChainID {
-		allAddresses[chainID] = append(allAddresses[chainID], address)
-	}
-	for chainID, address := range usdsAddressesByChainID {
-		allAddresses[chainID] = append(allAddresses[chainID], address)
-	}
-	for chainID, address := range usdcEVMAddressesByChainID {
-		allAddresses[chainID] = append(allAddresses[chainID], address)
-	}
-	for chainID, address := range usdcBSCAddressesByChainID {
-		allAddresses[chainID] = append(allAddresses[chainID], address)
-	}
-	for chainID, address := range sntAddressesByChainID {
-		allAddresses[chainID] = append(allAddresses[chainID], address)
-	}
-
-	return allAddresses
+// mandatoryTokenData is built once; the token lists it derives from are package-level constants.
+type mandatoryTokenData struct {
+	byChainID map[uint64][]common.Address
+	keys      []string
+	byKey     map[string]struct{}
+	byRef     map[tokenRef]struct{}
 }
 
-func MandatoryTokens() []string {
-	allAddresses := allMandatoryTokens()
-	mandatoryTokens := make([]string, 0)
-	for chainID, addresses := range allAddresses {
-		for _, address := range addresses {
-			mandatoryTokens = append(mandatoryTokens, types.TokenKey(chainID, address))
+type tokenRef struct {
+	chainID uint64
+	address common.Address
+}
+
+var (
+	mandatoryOnce sync.Once
+	mandatory     mandatoryTokenData
+)
+
+func mandatoryTokens() *mandatoryTokenData {
+	mandatoryOnce.Do(func() {
+		byChainID := make(map[uint64][]common.Address)
+		for _, list := range []map[uint64]common.Address{
+			ethAddressesByChainID,
+			bnbAddressesByChainID,
+			daiAddressesByChainID,
+			usdsAddressesByChainID,
+			usdcEVMAddressesByChainID,
+			usdcBSCAddressesByChainID,
+			sntAddressesByChainID,
+		} {
+			for chainID, address := range list {
+				byChainID[chainID] = append(byChainID[chainID], address)
+			}
 		}
-	}
-	return mandatoryTokens
+		keys := make([]string, 0, len(byChainID)*7)
+		byKey := make(map[string]struct{}, len(byChainID)*7)
+		byRef := make(map[tokenRef]struct{}, len(byChainID)*7)
+		for chainID, addresses := range byChainID {
+			for _, address := range addresses {
+				key := types.TokenKey(chainID, address)
+				keys = append(keys, key)
+				byKey[key] = struct{}{}
+				byRef[tokenRef{chainID, address}] = struct{}{}
+			}
+		}
+		mandatory = mandatoryTokenData{byChainID: byChainID, keys: keys, byKey: byKey, byRef: byRef}
+	})
+	return &mandatory
+}
+
+// MandatoryTokens returns the keys of every mandatory token on every chain. The slice is shared
+// and must not be modified by callers.
+func MandatoryTokens() []string {
+	return mandatoryTokens().keys
+}
+
+// IsMandatoryToken reports whether key names a mandatory token.
+func IsMandatoryToken(key string) bool {
+	_, ok := mandatoryTokens().byKey[key]
+	return ok
+}
+
+// IsMandatoryTokenAddress is IsMandatoryToken without formatting a key.
+func IsMandatoryTokenAddress(chainID uint64, address common.Address) bool {
+	_, ok := mandatoryTokens().byRef[tokenRef{chainID, address}]
+	return ok
 }
 
 func MandatoryTokensByChainID(chainID uint64) []string {
-	allAddresses := allMandatoryTokens()
-	mandatoryTokens := make([]string, 0)
-	for cID, addresses := range allAddresses {
-		if cID != chainID {
-			continue
-		}
-		for _, address := range addresses {
-			mandatoryTokens = append(mandatoryTokens, types.TokenKey(cID, address))
-		}
+	addresses := mandatoryTokens().byChainID[chainID]
+	keys := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		keys = append(keys, types.TokenKey(chainID, address))
 	}
-	return mandatoryTokens
+	return keys
 }
 
 func SkippedTokenKeys() []string {
