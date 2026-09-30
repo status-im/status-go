@@ -19,7 +19,7 @@ pipeline {
 
   options {
     /* Prevent Jenkins jobs from running forever */
-    timeout(time: 40, unit: 'MINUTES')
+    timeout(time: 30, unit: 'MINUTES')
     ansiColor('xterm')
     disableRestartFromStage()
     disableConcurrentBuilds()
