@@ -439,12 +439,18 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 
 // RecordOwnSend marks that the user posted a chat message here; call after UpdateFromMessage.
 // System messages emitted on the user's behalf (contact requests, mutual-state and group events) do not count.
+// Uses the authored timestamp, not the receipt time, so a late-delivered paired-device message
+// does not move the chat to the top of the recency ranking.
 func (c *Chat) RecordOwnSend(message *common.Message) {
 	if !isUserComposedMessage(message) {
 		return
 	}
-	if c.Timestamp > c.LastOwnMessageTimestamp {
-		c.LastOwnMessageTimestamp = c.Timestamp
+	timestamp := int64(message.Timestamp)
+	if timestamp == 0 {
+		timestamp = c.Timestamp
+	}
+	if timestamp > c.LastOwnMessageTimestamp {
+		c.LastOwnMessageTimestamp = timestamp
 	}
 }
 

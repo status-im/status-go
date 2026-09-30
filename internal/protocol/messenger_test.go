@@ -307,7 +307,7 @@ func (s *MessengerSuite) TestSendPublic() {
 	s.Require().Equal(clock+1, chat.LastClockValue, "it correctly sets the last-clock-value")
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Greater(chat.LastOwnMessageTimestamp, int64(0), "it records the own send")
-	s.Require().Equal(chat.Timestamp, chat.LastOwnMessageTimestamp, "own send timestamp matches the chat timestamp")
+	s.Require().Equal(int64(outputMessage.Timestamp), chat.LastOwnMessageTimestamp, "own send timestamp is the authored timestamp")
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Equal(chat.LastOwnMessageTimestamp, response.Chats()[0].LastOwnMessageTimestamp)
 	savedChat, err := s.m.persistence.Chat(chat.ID)
@@ -526,7 +526,7 @@ func (s *MessengerSuite) TestRetrieveOwnDevicePublic() {
 	s.Require().Len(response.Chats(), 1)
 	actualChat := response.Chats()[0]
 	s.Require().Greater(actualChat.LastOwnMessageTimestamp, int64(0))
-	s.Require().Equal(actualChat.Timestamp, actualChat.LastOwnMessageTimestamp)
+	s.Require().Equal(int64(response.Messages()[0].Timestamp), actualChat.LastOwnMessageTimestamp)
 
 	savedChat, err := s.m.persistence.Chat(chat.ID)
 	s.Require().NoError(err)
