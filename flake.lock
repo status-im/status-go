@@ -50,7 +50,7 @@
       "locked": {
         "lastModified": 1790768833,
         "narHash": "sha256-Ec6hup+ZWwX25V957CLo49G9nlcWUZfewAfFM/s3WY0=",
-        "ref": "refs/heads/release/v0.3",
+        "ref": "refs/tags/v0.3.4",
         "rev": "d317821fe2737de44cf993cef608e110c2b94660",
         "revCount": 85,
         "submodules": true,
@@ -58,7 +58,7 @@
         "url": "https://github.com/logos-messaging/nim-sds"
       },
       "original": {
-        "ref": "refs/heads/release/v0.3",
+        "ref": "refs/tags/v0.3.4",
         "rev": "d317821fe2737de44cf993cef608e110c2b94660",
         "submodules": true,
         "type": "git",
