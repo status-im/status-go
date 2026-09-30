@@ -62,6 +62,8 @@ func createRelayErrorResponse(err error) error {
 			return ErrAmountTooLow
 		case "AMOUNT_TOO_HIGH":
 			return ErrAmountTooHigh
+		case "UNSUPPORTED_CURRENCY":
+			return ErrUnsupportedCurrency
 		}
 	}
 	return createErrorResponse(pathProcessorCommon.ProcessorRelayName, err)

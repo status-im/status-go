@@ -60,6 +60,7 @@ var (
 	ErrSlippageExceeded         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-048"), Details: "slippage tolerance exceeded"}
 	ErrAmountTooLow             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-049"), Details: "amount too low"}
 	ErrAmountTooHigh            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-050"), Details: "amount too high"}
+	ErrUnsupportedCurrency      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-051"), Details: "unsupported currency"}
 )
 
 func createErrorResponse(processorName string, err error) error {
