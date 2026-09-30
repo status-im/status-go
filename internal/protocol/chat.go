@@ -438,7 +438,7 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 }
 
 // RecordOwnSend marks that the user posted a chat message here; call after UpdateFromMessage.
-// System messages emitted on the user's behalf (contact requests, mutual-state and group events) do not count.
+// Only user-composed content types count; system, contact-request and bridged messages do not.
 // Uses the authored timestamp, not the receipt time, so a late-delivered paired-device message
 // does not move the chat to the top of the recency ranking.
 func (c *Chat) RecordOwnSend(message *common.Message) {
@@ -454,19 +454,19 @@ func (c *Chat) RecordOwnSend(message *common.Message) {
 	}
 }
 
+// isUserComposedMessage reports whether the content type is one the user composes from the chat input.
 func isUserComposedMessage(message *common.Message) bool {
 	switch message.ContentType {
-	case protobuf.ChatMessage_CONTACT_REQUEST,
-		protobuf.ChatMessage_IDENTITY_VERIFICATION,
-		protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP,
-		protobuf.ChatMessage_SYSTEM_MESSAGE_GAP,
-		protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE,
-		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT,
-		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED,
-		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED:
-		return false
+	case protobuf.ChatMessage_TEXT_PLAIN,
+		protobuf.ChatMessage_EMOJI,
+		protobuf.ChatMessage_STICKER,
+		protobuf.ChatMessage_IMAGE,
+		protobuf.ChatMessage_AUDIO,
+		protobuf.ChatMessage_TRANSACTION_COMMAND,
+		protobuf.ChatMessage_COMMUNITY:
+		return true
 	}
-	return true
+	return false
 }
 
 func (c *Chat) UpdateFirstMessageTimestamp(timestamp uint32) bool {

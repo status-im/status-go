@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 type ChatTestSuite struct {
@@ -238,4 +239,34 @@ func (s *ChatTestSuite) TestGetChatContextFromChatType() {
 	}
 
 	s.Require().Equal(GetChatContextFromChatType(chat.ChatType), privateChat)
+}
+
+func (s *ChatTestSuite) TestRecordOwnSendCountsOnlyUserComposedTypes() {
+	cases := []struct {
+		contentType protobuf.ChatMessage_ContentType
+		counted     bool
+	}{
+		{protobuf.ChatMessage_TEXT_PLAIN, true},
+		{protobuf.ChatMessage_IMAGE, true},
+		{protobuf.ChatMessage_STICKER, true},
+		{protobuf.ChatMessage_COMMUNITY, true},
+		{protobuf.ChatMessage_CONTACT_REQUEST, false},
+		{protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE, false},
+		{protobuf.ChatMessage_BRIDGE_MESSAGE, false},
+		{protobuf.ChatMessage_UNKNOWN_CONTENT_TYPE, false},
+	}
+	for _, tc := range cases {
+		chat := &Chat{}
+		message := common.NewMessage()
+		message.ContentType = tc.contentType
+		message.Timestamp = 42
+
+		chat.RecordOwnSend(message)
+
+		if tc.counted {
+			s.Require().Equal(int64(42), chat.LastOwnMessageTimestamp, tc.contentType.String())
+		} else {
+			s.Require().Equal(int64(0), chat.LastOwnMessageTimestamp, tc.contentType.String())
+		}
+	}
 }
