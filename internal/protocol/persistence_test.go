@@ -1244,12 +1244,19 @@ func TestSaveChat(t *testing.T) {
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
 	chat.LastMessage = common.NewMessage()
+	chat.LastOwnMessageTimestamp = 1234567890
 	err = p.SaveChat(*chat)
 	require.NoError(t, err)
 
 	retrievedChat, err := p.Chat(chat.ID)
 	require.NoError(t, err)
 	require.Equal(t, chat, retrievedChat)
+	require.Equal(t, int64(1234567890), retrievedChat.LastOwnMessageTimestamp)
+
+	chats, err := p.Chats()
+	require.NoError(t, err)
+	require.Len(t, chats, 1)
+	require.Equal(t, int64(1234567890), chats[0].LastOwnMessageTimestamp)
 }
 
 func TestSaveMentions(t *testing.T) {

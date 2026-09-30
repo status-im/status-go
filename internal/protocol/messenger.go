@@ -2190,6 +2190,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return err
 		}
+		chat.RecordOwnSend(message)
 
 		err := m.persistence.SaveMessages([]*common.Message{message})
 		if err != nil {

@@ -137,8 +137,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, muted_till, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, muted_till, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload, last_own_message_timestamp)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -181,6 +181,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.ReadMessagesAtClockValue,
 		chat.ReceivedInvitationAdmin,
 		imagePayload,
+		chat.LastOwnMessageTimestamp,
 	)
 
 	if err != nil {
@@ -280,7 +281,8 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			contacts.alias,
 			chats.highlight,
 			chats.received_invitation_admin,
-			chats.image_payload
+			chats.image_payload,
+			chats.last_own_message_timestamp
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
 		ORDER BY chats.timestamp DESC
 	`)
@@ -334,6 +336,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.Highlight,
 			&chat.ReceivedInvitationAdmin,
 			&imagePayload,
+			&chat.LastOwnMessageTimestamp,
 		)
 
 		if err != nil {
@@ -449,7 +452,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			synced_from,
 			synced_to,
 			first_message_timestamp,
-			image_payload
+			image_payload,
+			last_own_message_timestamp
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -480,6 +484,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&syncedTo,
 		&firstMessageTimestamp,
 		&imagePayload,
+		&chat.LastOwnMessageTimestamp,
 	)
 	switch err {
 	case sql.ErrNoRows:

@@ -96,6 +96,8 @@ type Chat struct {
 
 	// Timestamp indicates the last time this chat has received/sent a message
 	Timestamp int64 `json:"timestamp"`
+	// LastOwnMessageTimestamp is the last time the user posted a chat message here from any of their devices
+	LastOwnMessageTimestamp int64 `json:"lastOwnMessageTimestamp"`
 	// LastClockValue indicates the last clock value to be used when sending messages
 	LastClockValue uint64 `json:"lastClockValue"`
 	// DeletedAtClockValue indicates the clock value at time of deletion, messages
@@ -433,6 +435,32 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 		c.LastClockValue = message.Clock
 	}
 	return nil
+}
+
+// RecordOwnSend marks that the user posted a chat message here; call after UpdateFromMessage.
+// System messages emitted on the user's behalf (contact requests, mutual-state and group events) do not count.
+func (c *Chat) RecordOwnSend(message *common.Message) {
+	if !isUserComposedMessage(message) {
+		return
+	}
+	if c.Timestamp > c.LastOwnMessageTimestamp {
+		c.LastOwnMessageTimestamp = c.Timestamp
+	}
+}
+
+func isUserComposedMessage(message *common.Message) bool {
+	switch message.ContentType {
+	case protobuf.ChatMessage_CONTACT_REQUEST,
+		protobuf.ChatMessage_IDENTITY_VERIFICATION,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_GAP,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED:
+		return false
+	}
+	return true
 }
 
 func (c *Chat) UpdateFirstMessageTimestamp(timestamp uint32) bool {
