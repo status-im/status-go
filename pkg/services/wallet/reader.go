@@ -241,7 +241,7 @@ func (r *Reader) balancesToTokensByAddress(addresses []common.Address, allTokens
 
 	for _, address := range addresses {
 		for _, token := range allTokens {
-			isMandatoryToken := slices.Contains(walletcommon.MandatoryTokens(), token.Key())
+			isMandatoryToken := walletcommon.IsMandatoryTokenAddress(token.ChainID, token.Address)
 
 			_, ok := balances[token.ChainID][address][token.Address]
 			hasError := !ok
@@ -300,10 +300,9 @@ func (r *Reader) GetLastTokenUpdateTimestamps() map[common.Address]int64 {
 func isCachedToken(cachedTokens map[common.Address][]tokentypes.StorageToken, address common.Address, token *tokentypes.Token) bool {
 	if tokens, ok := cachedTokens[address]; ok {
 		for _, t := range tokens {
-			if types.TokenKey(t.TokenChainID, t.TokenAddress) != token.Key() {
-				continue
+			if t.TokenChainID == token.ChainID && t.TokenAddress == token.Address {
+				return true
 			}
-			return true
 		}
 	}
 	return false
