@@ -32,7 +32,7 @@ func TestGetBalances_ERC20NeverFetched_MissingTokenNotInMap(t *testing.T) {
 	assert.False(t, ok, "token should be absent when ERC20 balances were never fetched")
 }
 
-func TestGetBalances_ERC20Fetched_MissingTokenReturnsZero(t *testing.T) {
+func TestGetBalances_ERC20Fetched_MissingTokenIsUnknown(t *testing.T) {
 	storage := multistandardbalance.NewStorageMemory()
 	adapter := tokenbalances.NewStorageMultistandardBalance(storage)
 
@@ -56,8 +56,8 @@ func TestGetBalances_ERC20Fetched_MissingTokenReturnsZero(t *testing.T) {
 	assert.Equal(t, 0, knownBalance.Cmp(big.NewInt(42)))
 
 	missingBalance, ok := balances[chainID][account][missingToken.Address]
-	require.True(t, ok, "missing token should be present as zero after fetch")
-	assert.Equal(t, 0, missingBalance.Cmp(big.NewInt(0)))
+	require.True(t, ok, "a token the fetch did not answer for is present after fetch")
+	assert.Nil(t, missingBalance, "an unanswered token has no value, it is not a zero balance")
 }
 
 func TestGetBalances_NativeNeverFetched_NotInMap(t *testing.T) {
