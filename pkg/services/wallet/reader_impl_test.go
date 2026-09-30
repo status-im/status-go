@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -703,5 +704,174 @@ func TestReader_ColdReloadEdgeDoesNotSurviveRestart(t *testing.T) {
 	case ev := <-events:
 		t.Fatalf("a cold reload edge must not survive Stop/Start, got %q immediately", ev.Type)
 	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+// The fetch keeps zero balances, so the live storage reports a token the batch
+// did not answer for as present with a nil value. The reader must not turn that
+// into a zero while it has a persisted balance for the token.
+func TestMergeFetchedBalances_UnansweredTokenKeepsCachedValue(t *testing.T) {
+	account := testAccAddress1
+	chainID := uint64(4663)
+	held := common.HexToAddress("0xfbe42ef178bf43b51f51699f1974f6b0aad4beb2")
+	neverHeld := common.HexToAddress("0x2e8c31162b855a2ffa90f6f8634643ad6f111e18")
+	answered := common.HexToAddress("0x5f604fba1162193a4388a5dfa56f556f3e133cc2")
+
+	cached := map[uint64]map[common.Address]map[common.Address]*big.Int{
+		chainID: {account: {held: big.NewInt(10_000), answered: big.NewInt(7)}},
+	}
+	fetched := map[uint64]map[common.Address]map[common.Address]*big.Int{
+		chainID: {account: {held: nil, neverHeld: nil, answered: big.NewInt(9)}},
+	}
+
+	merged := mergeFetchedBalances(cached, fetched)
+
+	assert.Equal(t, 0, merged[chainID][account][held].Cmp(big.NewInt(10_000)), "unanswered held token keeps the cached balance")
+	assert.Equal(t, 0, merged[chainID][account][answered].Cmp(big.NewInt(9)), "an answered token takes the live balance")
+	value, present := merged[chainID][account][neverHeld]
+	assert.True(t, present, "an unanswered token without a cached balance stays present")
+	assert.Nil(t, value, "... with no value, so it reads as zero rather than as an error")
+}
+
+func TestGetCachedBalances_UnansweredTokenKeepsCachedBalance(t *testing.T) {
+	reader, tokenManager, tokenBalancesStorage, mockCtrl := setupReader(t)
+	defer mockCtrl.Finish()
+
+	account := common.HexToAddress("0x946a89180365d054677d10b1a73235c0bee6734f")
+	chainID := uint64(4663)
+	chainIDs := []uint64{chainID}
+	addresses := []common.Address{account}
+
+	heldToken := &tokenTypes.Token{
+		Token: &wsdktypes.Token{
+			Address:  common.HexToAddress("0xfbe42ef178bf43b51f51699f1974f6b0aad4beb2"),
+			Symbol:   "4663",
+			Decimals: 18,
+			ChainID:  chainID,
+		},
+	}
+	allTokens := []*tokenTypes.Token{heldToken}
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
+		account: {
+			{
+				TokenAddress: heldToken.Address,
+				TokenChainID: chainID,
+				RawBalance:   "10000000000000000000000",
+				Balance:      big.NewFloat(10_000),
+			},
+		},
+	}
+	// fetched, but the batch did not answer for this token
+	storageBalances := map[uint64]map[common.Address]map[common.Address]*big.Int{
+		chainID: {account: {heldToken.Address: nil}},
+	}
+
+	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(gomock.Any()).Return(allTokens, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(storageBalances, nil)
+
+	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
+	require.NoError(t, err)
+	require.Len(t, tokens[account], 1)
+	assert.Equal(t, "10000000000000000000000", tokens[account][0].RawBalance)
+	assert.False(t, tokens[account][0].HasError)
+}
+
+func TestGetCachedBalances_UnansweredNeverHeldMandatoryTokenReadsZero(t *testing.T) {
+	reader, tokenManager, tokenBalancesStorage, mockCtrl := setupReader(t)
+	defer mockCtrl.Finish()
+
+	account := testAccAddress1
+	chainID := walletcommon.OptimismMainnet
+	addresses := []common.Address{account}
+
+	var mandatoryERC20 common.Address
+	for _, key := range walletcommon.MandatoryTokensByChainID(chainID) {
+		address := common.HexToAddress(strings.SplitN(key, "-", 2)[1])
+		if address != tokenbalances.NativeTokenAddress {
+			mandatoryERC20 = address
+			break
+		}
+	}
+	require.NotEqual(t, common.Address{}, mandatoryERC20, "expected a mandatory ERC20 on the chain")
+
+	mandatoryToken := &tokenTypes.Token{
+		Token: &wsdktypes.Token{Address: mandatoryERC20, Symbol: "MANDATORY", Decimals: 18, ChainID: chainID},
+	}
+	allTokens := []*tokenTypes.Token{mandatoryToken}
+	storageBalances := map[uint64]map[common.Address]map[common.Address]*big.Int{
+		chainID: {account: {mandatoryERC20: nil}},
+	}
+
+	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{account: {}}, nil)
+	tokenManager.EXPECT().GetTokensByKeys(gomock.Any()).Return(allTokens, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(storageBalances, nil)
+
+	tokens, err := reader.GetCachedBalances([]uint64{chainID}, addresses)
+	require.NoError(t, err)
+	require.Len(t, tokens[account], 1)
+	// never held and not answered: a zero, not an endless loading state (status-app#21224)
+	assert.Equal(t, "0", tokens[account][0].RawBalance)
+	assert.False(t, tokens[account][0].HasError)
+}
+
+func TestReader_RefreshKeepsCachedBalanceForUnansweredToken(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
+	tokenBalancesStorage := mock_tokenbalances.NewMockStorage(mockCtrl)
+	balancePublisher := pubsub.NewPublisher()
+	reader := NewReader(tokenManager, nil, &event.Feed{}, balancePublisher, tokenBalancesStorage, pubsub.NewPublisher())
+
+	require.NoError(t, reader.Start())
+	defer reader.Stop()
+
+	account := testAccAddress1
+	chainID := uint64(4663)
+	key := multistandardbalance.BalancesKey{ChainID: chainID, Account: account}
+	heldToken := &tokenTypes.Token{
+		Token: &wsdktypes.Token{
+			Address:  common.HexToAddress("0xfbe42ef178bf43b51f51699f1974f6b0aad4beb2"),
+			Symbol:   "4663",
+			Decimals: 18,
+			ChainID:  chainID,
+		},
+	}
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
+		account: {{
+			TokenAddress: heldToken.Address,
+			TokenChainID: chainID,
+			RawBalance:   "10000000000000000000000",
+			Balance:      big.NewFloat(10_000),
+		}},
+	}
+
+	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
+	tokenManager.EXPECT().GetTokensByChains([]uint64{chainID}).Return([]*tokenTypes.Token{heldToken}, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), []common.Address{account}).Return(
+		map[uint64]map[common.Address]map[common.Address]*big.Int{chainID: {account: {heldToken.Address: nil}}}, nil,
+	)
+	cacheSaved := make(chan map[common.Address][]tokenTypes.StorageToken, 1)
+	tokenManager.EXPECT().CacheBalances(gomock.Any()).DoAndReturn(func(tokens map[common.Address][]tokenTypes.StorageToken) error {
+		cacheSaved <- tokens
+		return nil
+	})
+
+	pubsub.Publish(balancePublisher, multistandardbalance.EventBalanceFetchFinished{
+		Key:            key,
+		ResultType:     multistandardfetcher.ResultTypeERC20,
+		BalanceChanged: true,
+		OldState:       multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched},
+		NewState:       multistandardbalance.State{FetchedAt: time.Now().Unix()},
+	})
+
+	select {
+	case saved := <-cacheSaved:
+		require.Len(t, saved[account], 1)
+		assert.Equal(t, "10000000000000000000000", saved[account][0].RawBalance, "the persisted balance survives a round that did not answer for the token")
+		assert.False(t, saved[account][0].HasError)
+	case <-time.After(time.Second):
+		t.Fatal("expected UI cache refresh after the fetch event")
 	}
 }

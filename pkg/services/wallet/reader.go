@@ -340,6 +340,13 @@ func (r *Reader) refreshBalanceCache(ctx context.Context, chainIDs []uint64, add
 		return
 	}
 
+	// A token the fetch did not answer for keeps its last persisted balance.
+	if cachedBalances, cacheErr := tokensToBalancesPerChain(cachedTokens); cacheErr != nil {
+		logutils.ZapLogger().Error("failed to read cached balances, unanswered tokens read as zero", zap.Error(cacheErr))
+	} else {
+		balances = mergeFetchedBalances(cachedBalances, balances)
+	}
+
 	tokens := r.balancesToTokensByAddress(addresses, allTokens, balances, cachedTokens)
 
 	err = r.tokenManager.CacheBalances(tokens)
@@ -407,6 +414,9 @@ func (r *Reader) GetCachedBalances(chainIDs []uint64, addresses []common.Address
 	return r.balancesToTokensByAddress(addresses, allTokens, balances, cachedTokens), nil
 }
 
+// mergeFetchedBalances overlays the live balances on the persisted ones. A live
+// entry with a nil balance (fetched, but the fetch did not answer for that
+// token) does not replace a persisted value.
 func mergeFetchedBalances(cached, fetched map[uint64]map[common.Address]map[common.Address]*big.Int) map[uint64]map[common.Address]map[common.Address]*big.Int {
 	if fetched == nil {
 		return cached
@@ -423,6 +433,13 @@ func mergeFetchedBalances(cached, fetched map[uint64]map[common.Address]map[comm
 				cached[chainID][account] = make(map[common.Address]*big.Int)
 			}
 			for tokenAddress, balance := range tokens {
+				// nil = fetched but not answered for this token: keep the cached
+				// value; without one the entry stays nil and reads as zero.
+				if balance == nil {
+					if _, known := cached[chainID][account][tokenAddress]; known {
+						continue
+					}
+				}
 				cached[chainID][account][tokenAddress] = balance
 			}
 		}
