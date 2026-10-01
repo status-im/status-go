@@ -216,18 +216,22 @@ def wait_until_member_sees_community_clock(
     delay: int = 2,
     spectate: bool = True,
 ) -> dict:
-    """Poll a live store fetch until *backend* sees the community at clock >= *min_clock*; return it."""
+    """Poll *backend*'s local community until its clock matches the expected one."""
     community: Optional[dict] = None
     member_clock: Optional[int] = None
+    owner_clock: Optional[int] = None
     for attempt in range(attempts):
         if spectate:
             try:
                 backend.wakuext_service.spectate_community(community_id)
             except ApiResponseError as exc:
                 logger.debug(f"spectate_community failed (attempt {attempt + 1}): {exc}")
-
         try:
-            community = messenger.fetch_community(backend, community_id, wait_for_response=True, try_database=False)
+            messenger.fetch_community(backend, community_id, wait_for_response=True, try_database=False)
+        except ApiResponseError as exc:
+            logger.debug(f"fetch_community failed (attempt {attempt + 1}): {exc}")
+        try:
+            community = messenger.fetch_community(backend, community_id, wait_for_response=True, try_database=True)
         except ApiResponseError as exc:
             logger.debug(f"fetch_community failed (attempt {attempt + 1}): {exc}")
             community = None
@@ -236,13 +240,22 @@ def wait_until_member_sees_community_clock(
         owner_clock = _community_clock(reference_backend, community_id, try_database=True) if reference_backend is not None else None
         logger.info(
             f"community-clock scan {attempt + 1}/{attempts}: member_clock={member_clock} "
-            f"owner_clock={owner_clock} (waiting for member_clock >= {min_clock})"
+            f"owner_clock={owner_clock} (waiting for member_clock >= {min_clock}"
+            f"{'' if reference_backend is None else ' and member_clock == owner_clock'})"
         )
-        if isinstance(community, dict) and member_clock is not None and member_clock >= min_clock:
+        if (
+            isinstance(community, dict)
+            and member_clock is not None
+            and member_clock >= min_clock
+            and (reference_backend is None or member_clock == owner_clock)
+        ):
             return community
         time.sleep(delay)
 
-    raise AssertionError(f"Member never reached community clock >= {min_clock} after {attempts} attempts; " f"last member_clock={member_clock}.")
+    raise AssertionError(
+        f"Member never reached expected community clock after {attempts} attempts; "
+        f"last member_clock={member_clock}, last owner_clock={owner_clock}, min_clock={min_clock}."
+    )
 
 
 def assert_new_owner_receives_owner_permission(
