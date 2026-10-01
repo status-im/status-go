@@ -31,6 +31,7 @@ func TestServiceShouldTriggerLoadFetchIfNotCachedSkipsWhenLoaderExists(t *testin
 	storage := mock_ownership.NewMockOwnershipStorage(ctrl)
 	storage.EXPECT().GetOwnershipUpdateTimestamp(gomock.Any(), gomock.Any()).Return(ownership.InvalidTimestamp, nil).AnyTimes()
 	storage.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil, nil, nil).AnyTimes()
+	storage.EXPECT().Upsert(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil, nil).AnyTimes()
 
 	accountsProvider := mock_ownership.NewMockAccountsProvider(ctrl)
 	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{types.Address(address)}, nil).AnyTimes()
