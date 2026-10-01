@@ -2,6 +2,7 @@ package ownership
 
 import (
 	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -498,4 +499,52 @@ func TestUpsertKeepsRowsNotInTheBatch(t *testing.T) {
 	ts, err := oDB.GetOwnershipUpdateTimestamp(owner, chainID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1000), ts, "an upsert is not a completed load")
+}
+
+// Production databases are file-backed with a multi-connection pool. The TEMP
+// staging tables are connection-local, so every statement that touches them must
+// run on the transaction's connection. With staging done through the pooled
+// *sql.DB this fails within a few iterations (UNIQUE constraint on the cache, or
+// "no such table"), because readers steal the connection between statements.
+func TestUpdateAndUpsertUnderConcurrentReads(t *testing.T) {
+	db, cleanup, err := testutils.SetupTestSQLDB(walletdb.DbInitializer{}, "ownership-pool")
+	require.NoError(t, err)
+	defer func() { require.NoError(t, cleanup()) }()
+	db.SetMaxOpenConns(2)
+	db.SetMaxIdleConns(2)
+	oDB := NewOwnershipDB(db)
+
+	chainID := w_common.ChainID(1)
+	owner := common.HexToAddress("0x1234")
+	owned := generateTestCollectibles(chainID, 0, 40)
+
+	stop := make(chan struct{})
+	var readers sync.WaitGroup
+	for r := 0; r < 2; r++ {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					_, _ = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID}, []common.Address{owner}, 0, 1000)
+				}
+			}
+		}()
+	}
+
+	for i := 0; i < 300; i++ {
+		_, _, _, err := oDB.Update(chainID, owner, owned[:20+i%20], int64(1000+i))
+		require.NoError(t, err, "Update iteration %d", i)
+		_, _, err = oDB.Upsert(chainID, owner, owned[20:])
+		require.NoError(t, err, "Upsert iteration %d", i)
+	}
+	close(stop)
+	readers.Wait()
+
+	ids, err := oDB.GetOwnedCollectibles([]w_common.ChainID{chainID}, []common.Address{owner}, 0, 1000)
+	require.NoError(t, err)
+	require.Len(t, ids, 40)
 }

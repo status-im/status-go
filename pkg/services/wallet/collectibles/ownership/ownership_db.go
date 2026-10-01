@@ -56,8 +56,10 @@ const collectiblesOwnershipColumns = "token_id, owner_address, balance"
 const ownershipTimestampColumns = "owner_address, chain_id, timestamp"
 const selectOwnershipTimestampColumns = "timestamp"
 
+// The TEMP tables are connection-local, so this must run on the same connection
+// as the statements that read them: pass the transaction, not the pooled *sql.DB.
 func insertTmpOwnership(
-	db *sql.DB,
+	db sqlite.StatementExecutor,
 	chainID w_common.ChainID,
 	ownerAddress common.Address,
 	balances []thirdparty.CollectibleIDBalance,
@@ -371,14 +373,7 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 
 	uuid := fmt.Sprintf("%d_%s", chainID, ownerAddress.Hex())
 
-	err = insertTmpOwnership(o.db, chainID, ownerAddress, balances, uuid)
-	if err != nil {
-		return
-	}
-
-	var (
-		tx *sql.Tx
-	)
+	var tx *sql.Tx
 	tx, err = o.db.Begin()
 	if err != nil {
 		return
@@ -386,10 +381,18 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
+		}
+		if err != nil {
+			_ = tx.Rollback()
 			return
 		}
-		_ = tx.Rollback()
+		logOwnershipChanges(chainID, ownerAddress, len(balances), removedIDs, insertedIDs)
 	}()
+
+	err = insertTmpOwnership(tx, chainID, ownerAddress, balances, uuid)
+	if err != nil {
+		return
+	}
 
 	// Compare tmp and current ownership tables and update the current one
 	removedIDs, updatedIDs, insertedIDs, err = updateAddressOwnership(tx, chainID, ownerAddress, uuid)
@@ -397,15 +400,22 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 		return
 	}
 
+	// Update timestamp
+	err = updateAddressOwnershipTimestamp(tx, ownerAddress, chainID, timestamp)
+	return
+}
+
+// Reports what a committed ownership write did to the cache. Called only after
+// a successful commit, so the log never claims a change that was rolled back.
+func logOwnershipChanges(chainID w_common.ChainID, ownerAddress common.Address, fetched int, removedIDs, insertedIDs []thirdparty.CollectibleUniqueID) {
 	if len(removedIDs) > 0 {
 		logutils.ZapLogger().Info("collectibles ownership removed by fetched set",
 			zap.Uint64("chainID", uint64(chainID)),
 			zap.String("owner", logutils.TruncateWithDot(ownerAddress.Hex())),
-			zap.Int("fetchedBalances", len(balances)),
+			zap.Int("fetchedBalances", fetched),
 			zap.Int("removed", len(removedIDs)),
 			zap.Int("inserted", len(insertedIDs)))
 	}
-	// Trace every removal/insertion the fetched provider data causes
 	if len(removedIDs) > 0 || len(insertedIDs) > 0 {
 		idStrings := func(ids []thirdparty.CollectibleUniqueID) []string {
 			res := make([]string, 0, len(ids))
@@ -417,15 +427,10 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 		logutils.ZapLogger().Debug("collectibles ownership updated",
 			zap.Uint64("chainID", uint64(chainID)),
 			zap.String("owner", ownerAddress.Hex()),
-			zap.Int("fetchedBalances", len(balances)),
+			zap.Int("fetchedBalances", fetched),
 			zap.Strings("removed", idStrings(removedIDs)),
 			zap.Strings("inserted", idStrings(insertedIDs)))
 	}
-
-	// Update timestamp
-	err = updateAddressOwnershipTimestamp(tx, ownerAddress, chainID, timestamp)
-
-	return
 }
 
 func (o *OwnershipDB) Upsert(chainID w_common.ChainID, ownerAddress common.Address, balances []thirdparty.CollectibleIDBalance) (updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error) {
@@ -433,10 +438,6 @@ func (o *OwnershipDB) Upsert(chainID w_common.ChainID, ownerAddress common.Addre
 	defer o.mu.Unlock()
 
 	uuid := fmt.Sprintf("%d_%s", chainID, ownerAddress.Hex())
-	err = insertTmpOwnership(o.db, chainID, ownerAddress, balances, uuid)
-	if err != nil {
-		return
-	}
 
 	var tx *sql.Tx
 	tx, err = o.db.Begin()
@@ -450,6 +451,11 @@ func (o *OwnershipDB) Upsert(chainID w_common.ChainID, ownerAddress common.Addre
 		}
 		_ = tx.Rollback()
 	}()
+
+	err = insertTmpOwnership(tx, chainID, ownerAddress, balances, uuid)
+	if err != nil {
+		return
+	}
 
 	updatedIDs, err = updateChangedAddressOwnership(tx, chainID, ownerAddress, uuid)
 	if err != nil {
