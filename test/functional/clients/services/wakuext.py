@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TypedDict, Union, Optional
 
+from typing_extensions import NotRequired
+
 from clients.rpc import RpcClient
 from clients.services.service import Service
 from utils.rpc_helpers import list_or_empty
@@ -82,6 +84,7 @@ class SendChatMessagePayload(TypedDict):
     chat_id: str
     text: str
     content_type: int
+    image_path: NotRequired[str]
 
 
 class CommunityPermissionsAccess(Enum):
@@ -440,29 +443,33 @@ class WakuextService(Service):
         message,
         content_type=MessageContentType.TEXT_PLAIN.value,
         responseTo: str = "",
+        image_path: str = "",
     ):
-        params = [
-            {
-                "chatId": chat_id,
-                "text": message,
-                "contentType": content_type,
-                "responseTo": responseTo,
-            }
-        ]
+        payload = {
+            "chatId": chat_id,
+            "text": message,
+            "contentType": content_type,
+            "responseTo": responseTo,
+        }
+        if image_path:
+            payload["imagePath"] = image_path
+        params = [payload]
         response = self.rpc_request("sendChatMessage", params)
         return response
 
     def send_chat_messages(self, messages: list[SendChatMessagePayload]):
-        params = [
-            [
-                {
-                    "chatId": m["chat_id"],
-                    "text": m["text"],
-                    "contentType": m["content_type"],
-                }
-                for m in messages
-            ]
-        ]
+        rpc_messages = []
+        for m in messages:
+            entry = {
+                "chatId": m["chat_id"],
+                "text": m["text"],
+                "contentType": m["content_type"],
+            }
+            image_path = m.get("image_path")
+            if image_path:
+                entry["imagePath"] = image_path
+            rpc_messages.append(entry)
+        params = [rpc_messages]
         response = self.rpc_request("sendChatMessages", params)
         return response
 
