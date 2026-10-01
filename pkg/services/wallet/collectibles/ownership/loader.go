@@ -33,6 +33,10 @@ type CollectibleOwnershipFetcher interface {
 type CollectibleOwnershipStorage interface {
 	GetOwnershipUpdateTimestamp(owner common.Address, chainID walletCommon.ChainID) (int64, error)
 	Update(chainID walletCommon.ChainID, ownerAddress common.Address, balances []thirdparty.CollectibleIDBalance, timestamp int64) (removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error)
+	// Upsert writes the balances fetched so far and leaves every other cached
+	// row alone: an in-progress initial load must not evict collectibles that
+	// later pages will confirm.
+	Upsert(chainID walletCommon.ChainID, ownerAddress common.Address, balances []thirdparty.CollectibleIDBalance) (updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error)
 }
 
 type LoaderParams struct {
@@ -213,7 +217,7 @@ func (l *Loader) Load(ctx context.Context) ([]thirdparty.CollectibleIDBalance, e
 				PartialOwnership: accumulatedOwnership,
 			}
 
-			_, _, partialEvent.Added, tmpErr = l.storage.Update(l.chainID, l.account, accumulatedOwnership, InvalidTimestamp)
+			_, partialEvent.Added, tmpErr = l.storage.Upsert(l.chainID, l.account, accumulatedOwnership)
 			if tmpErr != nil {
 				err = tmpErr
 				return nil, err

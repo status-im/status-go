@@ -419,6 +419,37 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 	return
 }
 
+func (o *OwnershipDB) Upsert(chainID w_common.ChainID, ownerAddress common.Address, balances []thirdparty.CollectibleIDBalance) (updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	uuid := fmt.Sprintf("%d_%s", chainID, ownerAddress.Hex())
+	err = insertTmpOwnership(o.db, chainID, ownerAddress, balances, uuid)
+	if err != nil {
+		return
+	}
+
+	var tx *sql.Tx
+	tx, err = o.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	updatedIDs, err = updateChangedAddressOwnership(tx, chainID, ownerAddress, uuid)
+	if err != nil {
+		return
+	}
+	insertedIDs, err = insertNewAddressOwnership(tx, chainID, ownerAddress, uuid)
+	return
+}
+
 func (o *OwnershipDB) GetOwnedCollectibles(chainIDs []w_common.ChainID, ownerAddresses []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, error) {
 	query, args, err := sqlx.In(fmt.Sprintf(`SELECT DISTINCT %s
 		FROM collectibles_ownership_cache
