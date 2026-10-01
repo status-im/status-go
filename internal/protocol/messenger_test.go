@@ -306,6 +306,13 @@ func (s *MessengerSuite) TestSendPublic() {
 	s.Require().Equal(clock+1, outputMessage.Clock, "it correctly sets the clock")
 	s.Require().Equal(clock+1, chat.LastClockValue, "it correctly sets the last-clock-value")
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
+	s.Require().Greater(chat.LastOwnMessageTimestamp, int64(0), "it records the own send")
+	s.Require().Equal(int64(outputMessage.Timestamp), chat.LastOwnMessageTimestamp, "own send timestamp is the authored timestamp")
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal(chat.LastOwnMessageTimestamp, response.Chats()[0].LastOwnMessageTimestamp)
+	savedChat, err := s.m.persistence.Chat(chat.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(chat.LastOwnMessageTimestamp, savedChat.LastOwnMessageTimestamp, "it persists the own send timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
 	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
@@ -484,6 +491,46 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
 	// It sets the last message
 	s.Require().NotNil(actualChat.LastMessage)
+	// A message from someone else is not an own send
+	s.Require().Equal(int64(0), actualChat.LastOwnMessageTimestamp)
+}
+
+// Retrieve a public message sent from another device of ours
+func (s *MessengerSuite) TestRetrieveOwnDevicePublic() {
+	otherDevice := s.anotherMessenger()
+	otherDeviceChat := CreatePublicChat("status", s.m.getTimesource())
+	err := otherDevice.SaveChat(otherDeviceChat)
+	s.Require().NoError(err)
+
+	chat := CreatePublicChat("status", s.m.getTimesource())
+	err = s.m.SaveChat(chat)
+	s.Require().NoError(err)
+
+	_, err = s.m.Join(chat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*chat)
+
+	_, err = otherDevice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(s.m.myHexIdentity(), response.Messages()[0].From)
+	s.Require().Len(response.Chats(), 1)
+	actualChat := response.Chats()[0]
+	s.Require().Greater(actualChat.LastOwnMessageTimestamp, int64(0))
+	s.Require().Equal(int64(response.Messages()[0].Timestamp), actualChat.LastOwnMessageTimestamp)
+
+	savedChat, err := s.m.persistence.Chat(chat.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(actualChat.LastOwnMessageTimestamp, savedChat.LastOwnMessageTimestamp)
 }
 
 // Drop audio message in public group
