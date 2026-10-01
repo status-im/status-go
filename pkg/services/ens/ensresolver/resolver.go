@@ -3,11 +3,13 @@ package ensresolver
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 	"sync"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,24 +29,39 @@ const ensRecordABI = `[` +
 	`{"name":"contenthash","inputs":[{"type":"bytes32"}],"outputs":[{"type":"bytes"}],"stateMutability":"view","type":"function"}` +
 	`]`
 
-var ensRecordMethods = func() abi.ABI {
-	parsed, err := abi.JSON(strings.NewReader(ensRecordABI))
+var ensRecordMethods = mustParseABI(ensRecordABI)
+
+// ensRegistryABI is the subset of the ENS registry used to find a name's resolver.
+const ensRegistryABI = `[{"name":"resolver","inputs":[{"type":"bytes32"}],"outputs":[{"type":"address"}],"stateMutability":"view","type":"function"}]`
+
+var ensRegistryMethods = mustParseABI(ensRegistryABI)
+
+// ensRegistryAddress is the ENS registry on Ethereum mainnet and its testnets.
+// source: https://docs.ens.domains/learn/deployments
+var ensRegistryAddress = common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")
+
+var errNoRegistryResolver = errors.New("no resolver set in the ENS registry")
+
+func mustParseABI(definition string) abi.ABI {
+	parsed, err := abi.JSON(strings.NewReader(definition))
 	if err != nil {
-		panic(err) // ensRecordABI is a compile-time constant
+		panic(err) // the definitions are compile-time constants
 	}
 	return parsed
-}()
+}
 
 func NewEnsResolver(rpcClient *rpc.Client) *EnsResolver {
 	return &EnsResolver{
-		contractMaker: contracts.NewContractMaker(rpcClient),
+		contractMaker:   contracts.NewContractMaker(rpcClient),
+		ethClientGetter: rpcClient,
 
 		quit: make(chan struct{}),
 	}
 }
 
 type EnsResolver struct {
-	contractMaker *contracts.ContractMaker
+	contractMaker   *contracts.ContractMaker
+	ethClientGetter rpc.EthClientGetter
 
 	quitOnce sync.Once
 	quit     chan struct{}
@@ -61,26 +78,9 @@ func (e *EnsResolver) GetRegistrarAddress(ctx context.Context, chainID uint64) (
 }
 
 // resolveENSRecord executes a public-resolver record call (e.g. `addr`, `pubkey`,
-// `contenthash`) for the given username through the ENS Universal Resolver and
-// returns the decoded output values.
+// `contenthash`) for the given username and returns the decoded output values.
 func (e *EnsResolver) resolveENSRecord(ctx context.Context, chainID uint64, username, method string) ([]interface{}, error) {
-	if err := walletCommon.ValidateENSUsername(username); err != nil {
-		return nil, err
-	}
-
-	universalResolver, err := e.contractMaker.NewUniversalResolver(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	node := [32]byte(walletCommon.NameHash(username))
-	data, err := ensRecordMethods.Pack(method, node)
-	if err != nil {
-		return nil, err
-	}
-
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	result, _, err := universalResolver.Resolve(callOpts, universalresolver.DNSEncode(username), data)
+	result, _, err := e.resolve(ctx, chainID, username, method)
 	if err != nil {
 		return nil, err
 	}
@@ -88,25 +88,76 @@ func (e *EnsResolver) resolveENSRecord(ctx context.Context, chainID uint64, user
 	return ensRecordMethods.Unpack(method, result)
 }
 
-func (e *EnsResolver) Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
+// resolve executes a record call through the ENS Universal Resolver. Status usernames
+// it cannot resolve are read from the ENS registry instead.
+func (e *EnsResolver) resolve(ctx context.Context, chainID uint64, username, method string) ([]byte, common.Address, error) {
 	if err := walletCommon.ValidateENSUsername(username); err != nil {
-		return nil, err
+		return nil, common.Address{}, err
 	}
 
 	universalResolver, err := e.contractMaker.NewUniversalResolver(chainID)
 	if err != nil {
-		return nil, err
+		return nil, common.Address{}, err
 	}
 
-	// Resolve an addr() record to discover the resolver that answers for this name.
-	node := [32]byte(walletCommon.NameHash(username))
-	data, err := ensRecordMethods.Pack("addr", node)
+	node := walletCommon.NameHash(username)
+	data, err := ensRecordMethods.Pack(method, [32]byte(node))
 	if err != nil {
-		return nil, err
+		return nil, common.Address{}, err
 	}
 
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	_, resolverAddress, err := universalResolver.Resolve(callOpts, universalresolver.DNSEncode(username), data)
+	result, resolverAddress, err := universalResolver.Resolve(callOpts, universalresolver.DNSEncode(username), data)
+	if err == nil || !isStatusUsername(username) {
+		return result, resolverAddress, err
+	}
+
+	result, resolverAddress, registryErr := e.resolveThroughRegistry(ctx, chainID, node, data)
+	if registryErr != nil {
+		return nil, common.Address{}, err
+	}
+	return result, resolverAddress, nil
+}
+
+// resolveThroughRegistry executes a record call on the resolver the ENS registry
+// holds for the node.
+func (e *EnsResolver) resolveThroughRegistry(ctx context.Context, chainID uint64, node common.Hash, data []byte) ([]byte, common.Address, error) {
+	backend, err := e.ethClientGetter.EthClient(chainID)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+
+	registryCall, err := ensRegistryMethods.Pack("resolver", [32]byte(node))
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	output, err := backend.CallContract(ctx, ethereum.CallMsg{To: &ensRegistryAddress, Data: registryCall}, nil)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	values, err := ensRegistryMethods.Unpack("resolver", output)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	resolverAddress := *abi.ConvertType(values[0], new(common.Address)).(*common.Address)
+	if resolverAddress == (common.Address{}) {
+		return nil, common.Address{}, errNoRegistryResolver
+	}
+
+	result, err := backend.CallContract(ctx, ethereum.CallMsg{To: &resolverAddress, Data: data}, nil)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	return result, resolverAddress, nil
+}
+
+func isStatusUsername(username string) bool {
+	return strings.HasSuffix(username, "."+walletCommon.StatusDomain)
+}
+
+func (e *EnsResolver) Resolver(ctx context.Context, chainID uint64, username string) (*common.Address, error) {
+	// Resolve an addr() record to discover the resolver that answers for this name.
+	_, resolverAddress, err := e.resolve(ctx, chainID, username, "addr")
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +189,7 @@ func (e *EnsResolver) OwnerOf(ctx context.Context, chainID uint64, username stri
 
 	// Status usernames are tracked by the username registrar itself, so ownership
 	// is answered there without going through the ENS registry.
-	if strings.HasSuffix(username, "."+walletCommon.StatusDomain) {
+	if isStatusUsername(username) {
 		return e.statusUsernameOwner(ctx, chainID, username)
 	}
 
