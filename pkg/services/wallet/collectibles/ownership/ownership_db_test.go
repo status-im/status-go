@@ -466,3 +466,36 @@ func TestCollectibleTransferID(t *testing.T) {
 		}
 	}
 }
+
+func TestUpsertKeepsRowsNotInTheBatch(t *testing.T) {
+	oDB, cleanup := setupOwnershipDBTest(t)
+	defer cleanup()
+
+	chainID := w_common.ChainID(1)
+	owner := common.HexToAddress("0x1234")
+	owned := generateTestCollectibles(chainID, 0, 6)
+
+	_, _, _, err := oDB.Update(chainID, owner, owned, 1000)
+	require.NoError(t, err)
+
+	// First half again with changed balances, plus one new collectible.
+	batch := make([]thirdparty.CollectibleIDBalance, 0, 4)
+	for _, b := range owned[:3] {
+		b.Balance = &bigint.BigInt{Int: big.NewInt(b.Balance.Int64() + 10)}
+		batch = append(batch, b)
+	}
+	batch = append(batch, generateTestCollectibles(chainID, 6, 1)...)
+
+	updated, inserted, err := oDB.Upsert(chainID, owner, batch)
+	require.NoError(t, err)
+	require.Len(t, updated, 3)
+	require.Len(t, inserted, 1)
+
+	ids, err := oDB.GetOwnedCollectibles([]w_common.ChainID{chainID}, []common.Address{owner}, 0, 1000)
+	require.NoError(t, err)
+	require.Len(t, ids, 7, "rows outside the batch stay")
+
+	ts, err := oDB.GetOwnershipUpdateTimestamp(owner, chainID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1000), ts, "an upsert is not a completed load")
+}
