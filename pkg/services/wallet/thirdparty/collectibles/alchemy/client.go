@@ -215,7 +215,14 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 	queryParams["owner"] = []string{owner.String()}
 	queryParams["withMetadata"] = []string{"true"}
 	queryParams["orderBy"] = []string{"transferTime"}
-	queryParams["pageSize"] = []string{fmt.Sprintf("%d", getNFTsForOwnerPageSize)}
+	// Ask for exactly what the caller will consume: the provider's page key points
+	// past the whole page, so returning fewer items than requested would skip the
+	// rest of that page on the next call.
+	pageSize := getNFTsForOwnerPageSize
+	if limit != thirdparty.FetchNoLimit && limit < pageSize {
+		pageSize = limit
+	}
+	queryParams["pageSize"] = []string{fmt.Sprintf("%d", pageSize)}
 	queryParams["excludeFilters[]"] = []string{"SPAM"}
 
 	if len(cursor) > 0 {
@@ -272,10 +279,6 @@ func (o *Client) fetchOwnedAssets(ctx context.Context, chainID walletCommon.Chai
 		}
 
 		queryParams["pageKey"] = []string{assets.NextCursor}
-	}
-
-	if limit != thirdparty.FetchNoLimit && len(assets.Items) > limit {
-		assets.Items = assets.Items[:limit]
 	}
 
 	return assets, nil
