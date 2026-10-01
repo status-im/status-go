@@ -26,6 +26,7 @@ const InvalidTimestamp = int64(-1)
 type OwnershipStorage interface {
 	GetOwnership(id thirdparty.CollectibleUniqueID) ([]thirdparty.AccountBalance, error)
 	Update(chainID w_common.ChainID, ownerAddress common.Address, balances []thirdparty.CollectibleIDBalance, timestamp int64) (removedIDs, updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error)
+	Upsert(chainID w_common.ChainID, ownerAddress common.Address, balances []thirdparty.CollectibleIDBalance) (updatedIDs, insertedIDs []thirdparty.CollectibleUniqueID, err error)
 	SetTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID, transferID common.Hash) (bool, error)
 	GetTransferID(ownerAddress common.Address, id thirdparty.CollectibleUniqueID) (*common.Hash, error)
 	GetCollectiblesWithNoTransferID(account common.Address, chainID w_common.ChainID) ([]thirdparty.CollectibleUniqueID, error)
@@ -396,6 +397,14 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 		return
 	}
 
+	if len(removedIDs) > 0 {
+		logutils.ZapLogger().Info("collectibles ownership removed by fetched set",
+			zap.Uint64("chainID", uint64(chainID)),
+			zap.String("owner", logutils.TruncateWithDot(ownerAddress.Hex())),
+			zap.Int("fetchedBalances", len(balances)),
+			zap.Int("removed", len(removedIDs)),
+			zap.Int("inserted", len(insertedIDs)))
+	}
 	// Trace every removal/insertion the fetched provider data causes
 	if len(removedIDs) > 0 || len(insertedIDs) > 0 {
 		idStrings := func(ids []thirdparty.CollectibleUniqueID) []string {
