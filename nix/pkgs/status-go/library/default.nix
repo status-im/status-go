@@ -16,7 +16,7 @@ in pkgs.buildGoModule {
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
 
   # WARNING: Needs to be updated when go.mod is changed.
-  vendorHash = "sha256-9Dx4UbFwN0+O0teBz5Hi82Tm7hbC/iS6LH6CY4//cbg=";
+  vendorHash = "sha256-m47TbIGeMipKgZLT0sGFM//4v1FOqM4AVPu1arG3W/8=";
 
   inherit meta version;
 
