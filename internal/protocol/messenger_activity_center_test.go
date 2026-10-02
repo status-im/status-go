@@ -445,6 +445,48 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadInCommunityMarksNot
 	s.confirmMentionAndReplyNotificationsRead(alice, mentionMessage, replyMessage, true)
 }
 
+func (s *MessengerActivityCenterMessageSuite) TestMarkAllReadInCommunityMarksThreadsRead() {
+	alice, _, _, replyMessage, community := s.prepareCommunityChannelWithMentionAndReply()
+	alice.featureFlags.Threads = true
+
+	chat, ok := alice.allChats.Load(replyMessage.ChatId)
+	s.Require().True(ok)
+
+	threadID := replyMessage.ID
+	s.Require().NoError(alice.persistence.UpsertThread(threadID, chat.ID, threadID, "Thread"))
+
+	unreadReply := buildTestMessage(*chat)
+	unreadReply.ID = "thread-reply"
+	unreadReply.Text = "Unread thread reply"
+	unreadReply.ChatMessage.Text = unreadReply.Text
+	unreadReply.ChatMessage.ThreadId = &threadID
+	unreadReply.ResponseTo = threadID
+	unreadReply.Mentioned = true
+	unreadReply.Seen = false
+	s.Require().NoError(alice.SaveMessages([]*common.Message{unreadReply}))
+
+	thread, err := alice.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(1), thread.UnviewedMessagesCount)
+	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
+
+	response, err := alice.MarkAllReadInCommunity(context.Background(), community.IDString())
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal(unreadReply.Clock, response.Threads()[0].ReadMessagesAtClockValue)
+	s.Require().Equal(uint(0), response.Threads()[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(0), response.Threads()[0].UnviewedMentionsCount)
+
+	thread, err = alice.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(0), thread.UnviewedMessagesCount)
+	s.Require().Equal(uint(0), thread.UnviewedMentionsCount)
+
+	threadReply, err := alice.MessageByID(unreadReply.ID)
+	s.Require().NoError(err)
+	s.Require().True(threadReply.Seen)
+}
+
 func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificationsReadMarksMessagesAsSeen() {
 	alice, _, mentionMessage, replyMessage, _ := s.prepareCommunityChannelWithMentionAndReply()
 

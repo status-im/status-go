@@ -4403,6 +4403,15 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 		return nil, err
 	}
 
+	threads, err := m.persistence.ThreadsByChatIDs(chatIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, thread := range threads {
+		response.AddThread(thread)
+	}
+
 	for _, chatID := range chatIDs {
 		chat, ok := m.allChats.Load(chatID)
 
