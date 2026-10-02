@@ -10,17 +10,36 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/db/appdatabase"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdb"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	mock_chainutils "github.com/status-im/status-go/pkg/services/connector/chainutils/mock"
+	persistence "github.com/status-im/status-go/pkg/services/connector/database"
 	"github.com/status-im/status-go/pkg/services/networks"
 	network_testutil "github.com/status-im/status-go/pkg/services/networks/testutil"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
+
+type eventType struct {
+	Type  string          `json:"type"`
+	Event json.RawMessage `json:"event"`
+}
+
+func persistDAppData(db *sql.DB, dApp signal.ConnectorDApp, sharedAccount types.Address, chainID uint64) error {
+	return persistence.UpsertDApp(db, &persistence.DApp{
+		URL:           dApp.URL,
+		Name:          dApp.Name,
+		IconURL:       dApp.IconURL,
+		ClientID:      dApp.ClientID,
+		SharedAccount: sharedAccount,
+		ChainID:       chainID,
+	})
+}
 
 type testState struct {
 	ctx             context.Context

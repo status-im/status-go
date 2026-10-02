@@ -112,11 +112,10 @@ bindata.go
 migrations.go
 cmd/status-backend/server/endpoints.go
 internal/protocol/messenger_handlers.go
-pkg/version/VERSION
-pkg/version/GIT_COMMIT
-pkg/sentry/SENTRY_CONTEXT_NAME
-pkg/sentry/SENTRY_CONTEXT_VERSION
-pkg/sentry/SENTRY_PRODUCTION
+
+# A checkout build with the default STATUSGO_BUILD_DIR writes its nim-sds
+# artifacts here.
+/.sds-build/
 
 go.work
 go.work.sum
@@ -129,3 +128,6 @@ libs
 
 # CODEX (ChatGPT plugin)
 .codex
+nimble.develop
+nimble.paths
+nimbledeps

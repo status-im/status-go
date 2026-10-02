@@ -99,24 +99,53 @@ export GOPATH ?= $(HOME)/go
 export GOPROXY ?= https://proxy.golang.org|direct
 
 GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
+# A consumer builds this tree from a nimble store copy, which is not a git
+# checkout and must not pick up whatever repository happens to be above it.
+# `git -C` answers from an ancestor repository, so the probes here and in
+# STATUS_GO_VERSION run only when this tree carries its own .git (a directory
+# in a clone, a file in a worktree). Empty is then the answer;
+# BUILD_VARS_LDFLAGS substitutes a placeholder, and an embedder that knows the
+# real version passes it in.
+GIT_ROOT_IS_CHECKOUT := $(wildcard $(GIT_ROOT).git)
+GIT_COMMIT ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" rev-parse --short HEAD 2>/dev/null))
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
+
+# Output directory. EVERY artifact of a library build goes here; a consumer
+# building a READ-ONLY copy of this tree points it outside the tree, so
+# `go build` never has to write into the module.
+STATUS_GO_BUILD_DIR ?= $(GIT_ROOT)build
+STATUS_GO_BIN_DIR ?= $(STATUS_GO_BUILD_DIR)/bin
+
+# The generated cbindings entry point (statusgo-lib/main.go) is written into
+# the output directory and handed to `go build` as a FILE, not as a package
+# path: with an out-of-tree output directory there is no in-module directory to
+# name, and nothing may be created inside the module to make one. Go builds
+# such a file as the synthetic `command-line-arguments` package, resolving its
+# imports against the main module of the working directory (this tree).
 
 BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
 
-# Pin nim-sds revision here. Can be a tag (default) or commit hash.
-# v0.3.3 lives on the release/v0.3 branch: it carries the SDS retrieval-hint
-# provider required by the sds-go-bindings pin in go.mod, on the CamelCase FFI
-# ABI, with the causalHistory wire format kept backward-compatible with released
-# (v0.2.x) nodes. master/release-v0.4 moved to the snake_case CBOR ABI, which
-# these bindings do not link against, so we track release/v0.3.
-NIM_SDS_VERSION ?= v0.3.3
+# The pin lives in statusgo.nimble, the single source of truth also read by
+# nimble consumers: both the repository URL and the revision come from its
+# requires line, so flipping the pin needs no Makefile change. That line
+# documents the pin itself (nim-sds's master line, built by its nimble tasks).
+NIM_SDS_VERSION ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\3|p' $(GIT_ROOT)statusgo.nimble)
+NIM_SDS_REPO ?= $(shell sed -n 's|^requires "\(https://github.com/[^"]*/nim-sds\)\(.git\)\{0,1\}\#\([^"]*\)".*|\1|p' $(GIT_ROOT)statusgo.nimble)
 
-# Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
+# The nimble task that builds the host's shared libsds is named by platform.
+ifeq ($(detected_OS),Darwin)
+ SDS_HOST := Mac
+else ifeq ($(detected_OS),Windows)
+ SDS_HOST := Windows
+else
+ SDS_HOST := Linux
+endif
+
+# Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy
 # to guarantee a clean checkout on every build.
-NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
+NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
 ifeq ($(mkspecs),win32)
 	NIM_SDS_SOURCE_DIR := $(subst \,/,$(NIM_SDS_SOURCE_DIR))
@@ -140,8 +169,9 @@ else
 endif
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+# override: these must survive CGO_* passed as make command-line args (else -lsds is silently dropped).
+override CGO_CFLAGS += -I$(NIM_SDS_INC_DIR)
+override CGO_LDFLAGS += -L$(NIM_SDS_LIB_DIR) -lsds
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -170,8 +200,8 @@ RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage
-	CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
-	CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
+	override CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
+	override CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
 	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
 	LOGOS_STORAGE_BUILD_DEPS += $(LIBSTORAGE)
 endif
@@ -237,13 +267,50 @@ history-archive-help: ##@build Show history archive build/test toggles and env v
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
  # On Windows, use portable C implementations and add -Werror=implicit-function-declaration workaround
- CGO_CFLAGS+=-Wno-implicit-function-declaration
+ override CGO_CFLAGS += -Wno-implicit-function-declaration
 endif
 
 # Common flags
 
-BUILD_FLAGS ?= -ldflags=""
+# Build values pkg/version and pkg/sentry take as plain package vars set at
+# LINK time, rather than generated files: generating them writes into the
+# source tree, which a consumer building a read-only copy of this tree cannot
+# do. Inputs: git describe / git rev-parse for the version pair, and the
+# SENTRY_CONTEXT_NAME / SENTRY_CONTEXT_VERSION / SENTRY_PRODUCTION environment
+# variables for the Sentry trio.
+VERSION_PKG := github.com/status-im/status-go/pkg/version
+SENTRY_PKG := github.com/status-im/status-go/pkg/sentry
+STATUS_GO_VERSION ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" describe --tags 2>/dev/null))
+ifeq ($(strip $(STATUS_GO_VERSION)),)
+ STATUS_GO_VERSION := 0.0.0-dev
+endif
+ifeq ($(strip $(GIT_COMMIT)),)
+ STATUS_GO_GIT_COMMIT := unknown
+else
+ STATUS_GO_GIT_COMMIT := $(GIT_COMMIT)
+endif
+SENTRY_CONTEXT_VERSION ?= $(STATUS_GO_VERSION)
+BUILD_VARS_LDFLAGS := \
+	-X $(VERSION_PKG).version=$(STATUS_GO_VERSION) \
+	-X $(VERSION_PKG).gitCommit=$(STATUS_GO_GIT_COMMIT) \
+	-X $(SENTRY_PKG).defaultContextName=$(SENTRY_CONTEXT_NAME) \
+	-X $(SENTRY_PKG).defaultContextVersion=$(SENTRY_CONTEXT_VERSION) \
+	-X $(SENTRY_PKG).production=$(SENTRY_PRODUCTION)
+
+# Extra link flags for the caller. They go in here, NOT in BUILD_FLAGS:
+# overriding BUILD_FLAGS wholesale replaces BUILD_VARS_LDFLAGS and silently
+# leaves the build unstamped.
+GO_EXTRA_LDFLAGS ?=
+BUILD_FLAGS ?= -ldflags="$(BUILD_VARS_LDFLAGS) $(GO_EXTRA_LDFLAGS)"
 BUILD_FLAGS_MOBILE ?=
+
+# The library targets never generate into the tree: their generated sources
+# (protobufs, migration bindata, endpoint and handler tables) go under
+# STATUS_GO_BUILD_DIR and reach `go build` through -overlay, so a checkout and
+# a read-only copy of this tree (nimble's package store) build the same way.
+# `make generate` still generates in place, for tests, linters and editors.
+GO_OVERLAY_DIR := $(STATUS_GO_BUILD_DIR)/generated
+GO_OVERLAY_FLAG := -overlay="$(GO_OVERLAY_DIR)/overlay.json"
 
 networkid ?= StatusChain
 
@@ -321,33 +388,51 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-# Flag needed by nim-based dependencies (e.g., nim-sds) that also use nimbus-build-system.
+# Flag for logos-storage-nim, which still builds through nimbus-build-system.
 # When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
-# enforces to use system-installed Nim.
+# enforces to use system-installed Nim. libsds no longer reads it: nim-sds
+# builds through its nimble tasks, and nimble is the Nim-side prerequisite:
+# 0.24.1 standalone materialises a compiler into its store; any nimble from
+# 0.22.2 works with a Nim the nim-sds manifest accepts on PATH, and reuses it.
 USE_SYSTEM_NIM ?= 1
+
+# -y: nimble 0.22.2 (bundled with Nim 2.2.10) asks questions during setup.
+# On Windows nimble fetches packages with `git submodule update`, a shell
+# script: it must find Git's own sed first, or a foreign sed on PATH breaks it.
+ifeq ($(detected_OS),Windows)
+ GIT_TOOLS_ENV = PATH="$$(r=$$(cd "$$(git --exec-path)/../../.." && pwd); echo "$${r%/}/usr/bin"):$$PATH"
+endif
+NIMBLE_SETUP = $(GIT_TOOLS_ENV) nimble -y setup
 
 # libsds targets
 
 .PHONY: clone-nim-sds
 clone-nim-sds: ##@build Clone or update nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@test -n "$(NIM_SDS_VERSION)" || { echo "ERROR: NIM_SDS_VERSION is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
+	@test -n "$(NIM_SDS_REPO)" || { echo "ERROR: NIM_SDS_REPO is empty (statusgo.nimble missing or unparsable)" >&2; exit 1; }
 	@echo "Cloning or updating nim-sds ..."
 	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
-		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
+		git clone "$(NIM_SDS_REPO).git" "$(NIM_SDS_SOURCE_DIR)"; \
 	else \
-		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
+		cd "$(NIM_SDS_SOURCE_DIR)" && git remote set-url origin "$(NIM_SDS_REPO).git" && git fetch --tags origin; \
 	fi
 	cd "$(NIM_SDS_SOURCE_DIR)" && \
-		git switch --no-recurse-submodules --force --detach "$(NIM_SDS_VERSION)" && \
-		git clean -fdx && \
-		git submodule update --init --recursive --force
+		git switch --force --detach "$(NIM_SDS_VERSION)" && \
+		git clean -fdx
 endif
 
+# `nimble setup` resolves nim-sds's lock (and the pinned compiler) into
+# nimble's store; the task then writes the library to build/ under the
+# working directory, which is NIM_SDS_LIB_DIR. The API header cgo includes is the
+# hand-written library/libsds.h in the nim-sds tree (NIM_SDS_INC_DIR), not
+# the header Nim generates into the nimcache. -d:noSignalHandler (the Go
+# runtime owns signal handling in the process) is passed by the tasks
+# themselves.
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE_SETUP) && nimble libsdsDynamic$(SDS_HOST)
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -356,20 +441,35 @@ endif
 build-libsds: $(LIBSDS)
 
 
-## Target-specific architecture mapping for libsds Android build
-# Note: nim-sds uses 'amd64' for both x86 and x86_64
-build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
-	$(if $(filter arm,$(ARCH)),arm,\
-	$(if $(filter amd64,$(ARCH)),amd64,\
-	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
+## Target-specific task mapping for the libsds Android build
+# nim-sds has one nimble task per target CPU (each sets ARCH itself), so
+# status-go's ARCH picks the task. 32-bit x86 is i386 to Nim: libsdsAndroidX86.
+# statusgo.nims' libsdsAndroid task maps the same way.
+build-libsds-android: SDS_ANDROID_TASK = $(strip $(if $(filter arm64,$(ARCH)),libsdsAndroidArm64,\
+	$(if $(filter arm,$(ARCH)),libsdsAndroidArm,\
+	$(if $(filter amd64 x86_64,$(ARCH)),libsdsAndroidAmd64,\
+	$(if $(filter x86,$(ARCH)),libsdsAndroidX86,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
+# The mobile targets name libsds by the target platform's extension: LIBSDS
+# carries the host one.
 build-libsds-android: clone-nim-sds
-	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=$(MAKE_SHELL)
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@echo "Building nim-sds for Android: $(SDS_ANDROID_TASK)"
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE_SETUP) && ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" nimble $(SDS_ANDROID_TASK)
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.so || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.so" && exit 1)
+endif
 
+# The iOS task reads the target CPU from ARCH, in Nim's naming (amd64 for the
+# x86_64 simulator), and the SDK from IOS_SDK_PATH.
+build-libsds-ios: SDS_IOS_ARCH = $(if $(filter x86_64,$(ARCH)),amd64,$(ARCH))
 build-libsds-ios: clone-nim-sds
-	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+	@echo "Building nim-sds for iOS"
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE_SETUP) && ARCH="$(SDS_IOS_ARCH)" IOS_SDK_PATH="$$(xcrun --sdk $(or $(IPHONE_SDK),iphoneos) --show-sdk-path)" nimble libsdsIOS
+else
+	@test -f $(NIM_SDS_LIB_DIR)/libsds.a || (echo "Error: libsds not found at $(NIM_SDS_LIB_DIR)/libsds.a" && exit 1)
+endif
 
 clean-libsds:
 	@echo "Removing libsds"
@@ -390,7 +490,7 @@ run-status-backend: $(LIBSDS)
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
+	go run -mod=mod -ldflags="$(BUILD_VARS_LDFLAGS)" ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -405,14 +505,17 @@ status-go-deps:
 # GOOS and GOARCH are essential to generate cbindings when cross compiling on macos
 GO_HOST_ENV = GOOS=$(shell go env GOHOSTOS) GOARCH=$(shell go env GOHOSTARCH)
 
-statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+# Global (not target-specific): every library target below names this path,
+# and the c-bindings target writes it.
+STATUS_GO_BINDINGS_PATH ?= $(STATUS_GO_BIN_DIR)/statusgo-lib
+
 statusgo-c-bindings:
 	@## tools/generate-cbindings/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
 	$(GO_HOST_ENV) go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= build/bin
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= build/bin/libstatus.h
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= $(STATUS_GO_BIN_DIR)
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= $(STATUS_GO_BIN_DIR)/libstatus.h
 statusgo-stub-bindings:
 	@## Generate stub bindings based on libstatus.h
 	mkdir -p $(STATUS_GO_STUB_BINDINGS_OUT)
@@ -420,59 +523,58 @@ statusgo-stub-bindings:
 		--header $(STATUS_GO_STUB_BINDINGS_HEADER) \
 		--out-dir $(STATUS_GO_STUB_BINDINGS_OUT)
 
-statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-library: generate
+statusgo-library: STATUS_GO_LIBRARY_OUT ?= $(STATUS_GO_BIN_DIR)
+statusgo-library: generate-overlay
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
 		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
+		$(BUILD_FLAGS) $(GO_OVERLAY_FLAG) \
 		-buildmode=c-archive \
 		-o $(STATUS_GO_LIBRARY_OUT)/libstatus.a \
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
-statusgo-shared-library: generate
+statusgo-shared-library: generate-overlay
 statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
  	go build \
 		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
+		$(BUILD_FLAGS) $(GO_OVERLAY_FLAG) \
 		-buildmode=c-shared \
-		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
-		./build/bin/statusgo-lib
+		-o $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 ifeq ($(detected_OS),Linux)
-	cd build/bin && \
+	cd $(STATUS_GO_BIN_DIR) && \
 	ls -lah . && \
 	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
-	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
+	ln -sf ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
-	@ls -la build/bin/libstatus.*
+	@ls -la $(STATUS_GO_BIN_DIR)/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate-overlay statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
-		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
+	go build $(GO_OVERLAY_FLAG) -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.so" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Android library built"
-	@file build/bin/libstatus.so
+	@file $(STATUS_GO_BIN_DIR)/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate-overlay statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
-		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
-		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
+	go build $(GO_OVERLAY_FLAG) -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.a" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "iOS library built"
-	@file build/bin/libstatus.a
+	@file $(STATUS_GO_BIN_DIR)/libstatus.a
 
 docker-image: SHELL := /bin/sh
 docker-image: BUILD_TARGET ?= cmd
@@ -515,6 +617,15 @@ generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_HOST_ENV) $(GO_GENERATE_CMD) $(PACKAGES)
 	@$(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./pkg/services/logosstorage
+
+# Inputs of the directives scripts/generate-overlay.sh runs.
+GO_OVERLAY_INPUTS := scripts/generate-overlay.sh mobile/status.go \
+	$(shell find cmd/status-backend/server/parse-api tools/generate-handlers internal pkg \
+		-name '*.proto' -o -name '*.sql' -o -name '*_template.txt' -o -name 'template.txt' -o -name 'doc.go' -o -name 'main.go' 2>/dev/null)
+$(GO_OVERLAY_DIR)/overlay.json: $(GO_OVERLAY_INPUTS)
+	bash ./scripts/generate-overlay.sh "$(GO_OVERLAY_DIR)"
+
+generate-overlay: $(GO_OVERLAY_DIR)/overlay.json ##@generate Generate the library's sources outside the tree, for -overlay
 
 generate-contracts:
 	go generate ./contracts

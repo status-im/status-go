@@ -1,0 +1,3 @@
+# The Makefile sed-parses the requires line out of statusgo.nimble; a CRLF
+# checkout would put a \r inside a git revision.
+*.nimble text eol=lf

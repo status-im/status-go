@@ -24,29 +24,29 @@ RUN set -eu && \
     rm /tmp/protoc.zip && \
     protoc --version
 
-# Install Nim from pre-built binaries
-ARG NIM_VERSION=2.2.4
+# Install nimble from pre-built binaries. nimble is the only Nim-side
+# prerequisite: nim-sds pins its compiler and `nimble setup` (run by `make
+# build-libsds`) materialises it into nimble's store. No nim is installed
+# here: one beside nimble would shadow the pin.
+ARG NIMBLE_VERSION=0.24.1
+ARG NIMBLE_SHA256_AMD64=5bbcea2999f79b7a5aff1409fa28ffead5954e5aa4a87a5055a53530d0d615de
+ARG NIMBLE_SHA256_ARM64=6017123580c151256cd82c0135580c09e2ee4bbba34020bee005f5255021d7cd
 RUN set -eu && \
     DPKG_ARCH="$(dpkg --print-architecture)" && \
     case "$DPKG_ARCH" in \
-    amd64) NIM_ARCH="x64" ;; \
-    arm64) NIM_ARCH="arm64" ;; \
+    amd64) NIMBLE_ARCH="x64"; NIMBLE_SHA256="$NIMBLE_SHA256_AMD64" ;; \
+    arm64) NIMBLE_ARCH="aarch64"; NIMBLE_SHA256="$NIMBLE_SHA256_ARM64" ;; \
     *) echo "Unsupported architecture: $DPKG_ARCH" >&2; exit 1 ;; \
     esac && \
-    NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
-    | jq -r --arg ver "$NIM_VERSION" --arg arch "$NIM_ARCH" \
-    '.[$ver]["linux_" + $arch].github_url // empty') && \
-    if [ -z "$NIM_URL" ]; then \
-    echo "ERROR: No download URL found for Nim $NIM_VERSION linux_$NIM_ARCH" >&2; \
-    exit 1; \
-    fi && \
-    curl -sSfL "$NIM_URL" -o /tmp/nim.tar.xz && \
-    mkdir -p /opt/nim && \
-    tar -xJf /tmp/nim.tar.xz -C /opt/nim --strip-components=1 && \
-    rm /tmp/nim.tar.xz && \
-    /opt/nim/bin/nim --version
+    curl -sSfL "https://github.com/nim-lang/nimble/releases/download/v${NIMBLE_VERSION}/nimble-linux_${NIMBLE_ARCH}.tar.gz" -o /tmp/nimble.tar.gz && \
+    echo "${NIMBLE_SHA256}  /tmp/nimble.tar.gz" | sha256sum -c && \
+    mkdir -p /opt/nimble && \
+    tar -xzf /tmp/nimble.tar.gz -C /opt/nimble && \
+    rm /tmp/nimble.tar.gz && \
+    chmod 755 /opt/nimble/nimble && \
+    /opt/nimble/nimble --version
 
-ENV PATH="/opt/nim/bin:${PATH}"
+ENV PATH="/opt/nimble:${PATH}"
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''

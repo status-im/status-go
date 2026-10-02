@@ -129,7 +129,8 @@ def assembePath(List<String> extraPaths) {
       'C:/Windows/system32',
       'C:/Windows',
       'C:/ProgramData/scoop/apps/go/1.26.5/bin',
-      'C:/ProgramData/scoop/apps/nim/2.2.6/bin',
+      /* Nim 2.2.10 and the nimble it bundles (0.22.2), for the libsds build. */
+      'C:/ProgramData/scoop/apps/nim/2.2.10/bin',
       'C:/ProgramData/scoop/apps/cmake/3.31.6/bin',
       'C:/ProgramData/scoop/apps/python/3.13.5',
       'C:/ProgramData/scoop/apps/python/3.13.5/Scripts',

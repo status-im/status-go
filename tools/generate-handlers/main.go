@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -30,6 +31,10 @@ type MethodInfo struct {
 func main() {
 	inputFile := "../../internal/protocol/protobuf/application_metadata_message.proto"
 	outputFile := "../../internal/protocol/messenger_handlers.go"
+	// scripts/generate-overlay.sh generates outside the source tree.
+	if root := os.Getenv("STATUSGO_GENERATE_ROOT"); root != "" {
+		outputFile = filepath.Join(root, "internal/protocol/messenger_handlers.go")
+	}
 	templateFile := "./template.txt"
 	enumName := "Type"
 

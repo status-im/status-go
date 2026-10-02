@@ -22,8 +22,3 @@ find . -path './vendor' -prune -o -type f -name 'migrations.go' -exec $CMD {} +
 
 $CMD ./cmd/status-backend/server/endpoints.go
 $CMD ./internal/protocol/messenger_handlers.go
-$CMD ./pkg/version/VERSION
-$CMD ./pkg/version/GIT_COMMIT
-$CMD ./pkg/sentry/SENTRY_CONTEXT_NAME
-$CMD ./pkg/sentry/SENTRY_CONTEXT_VERSION
-$CMD ./pkg/sentry/SENTRY_PRODUCTION

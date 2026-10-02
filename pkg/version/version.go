@@ -1,31 +1,20 @@
 package version
 
-import (
-	_ "embed"
-	"strings"
-)
-
-// Use go:generate script to get the version and git commit.
-// VERSION and GIT_COMMIT files are used in further `go:embed` commands to load values to the variables.
-// Suppress errors, assuming files have already been properly generated. Required for Docker builds.
-//go:generate sh -c "git describe --tags > VERSION || true"
-//go:generate sh -c "git rev-parse --short HEAD > GIT_COMMIT || true"
-
+// version and gitCommit are set at LINK time by the Makefile:
+//
+//	-ldflags "-X github.com/status-im/status-go/pkg/version.version=... \
+//	          -X github.com/status-im/status-go/pkg/version.gitCommit=..."
+//
+// Link-time, not generated into files read back with go:embed: generating them
+// writes into the source tree, and a consumer resolving status-go as a nimble
+// dependency builds a read-only copy of this tree in place. The Makefile takes
+// the values from `git describe --tags` and `git rev-parse --short HEAD`; the
+// defaults below are what a plain `go build` with no -ldflags gets.
 var (
-	// version is defined in git tags.
-	// We set it from the Makefile.
-	//go:embed VERSION
-	version string
+	version = "0.0.0-dev"
 
-	// gitCommit is a commit hash.
-	//go:embed GIT_COMMIT
-	gitCommit string
+	gitCommit = "unknown"
 )
-
-func init() {
-	version = strings.TrimSpace(version)
-	gitCommit = strings.TrimSpace(gitCommit)
-}
 
 func Version() string {
 	return version
