@@ -1,6 +1,8 @@
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportAttributeAccessIssue=false
+import json
 import logging
+import os
 import time
 from contextlib import contextmanager
 from uuid import uuid4
@@ -73,6 +75,24 @@ def validate_signal_event_against_response(signal_event, fields_to_validate, exp
     raise AssertionError(
         "Some Sender RPC responses are not matching the signals received by the receiver.\n" "Details of mismatches:\n" + "\n".join(message_mismatch)
     )
+
+
+def assert_outgoing_status(node, message_id: str, expected_status: str):
+    message = node.wakuext_service.message_by_message_id(message_id)
+    actual_status = message.get("outgoingStatus", "")
+    assert actual_status == expected_status, f"Message {message_id} outgoing status was '{actual_status}', expected '{expected_status}'"
+
+
+def import_test_image(node, filename: str = "test-image-200x200.jpg", container_dir: str = "/tmp/images/") -> str:
+    host_path = os.path.abspath(os.path.join(os.path.dirname(__file__), f"../resources/images/{filename}"))
+    node.import_data(host_path, container_dir)
+    return f"{container_dir}{filename}"
+
+
+def assert_no_signal_with_pattern(node, signal_type, pattern: str, start_index: int):
+    for signal in node.received_signals[signal_type][start_index:]:
+        if pattern in json.dumps(signal):
+            raise AssertionError(f"Unexpected {signal_type} signal matching '{pattern}': {signal}")
 
 
 # --- Contact operations ---
@@ -830,6 +850,39 @@ def community_messages(message_chat_id, message_count, sender=None, receiver=Non
             fields_to_validate={"text": "text"},
             expected_message=expected_message,
         )
+
+
+def community_image_messages(
+    message_chat_id,
+    image_path: str,
+    message_count: int,
+    sender=None,
+    receiver=None,
+):
+    start_index = len(receiver.received_signals[SignalType.MESSAGES_NEW])
+    messages = [
+        {
+            "chat_id": message_chat_id,
+            "text": "",
+            "content_type": MessageContentType.IMAGE.value,
+            "image_path": image_path,
+        }
+        for _ in range(message_count)
+    ]
+    response = sender.wakuext_service.send_chat_messages(messages)
+    sent_messages = get_message_by_content_type(response, content_type=MessageContentType.IMAGE.value)
+    assert len(sent_messages) == message_count, f"Expected {message_count} image messages, got {response}"
+
+    for expected_message in sent_messages:
+        with receiver.expect_signal(SignalType.MESSAGES_NEW, pattern=expected_message.get("id"), timeout=120, start=start_index) as exp:
+            pass
+        validate_signal_event_against_response(
+            signal_event=exp.result,
+            fields_to_validate={"id": "id"},
+            expected_message=expected_message,
+        )
+
+    return sent_messages
 
 
 # --- Network conditions ---

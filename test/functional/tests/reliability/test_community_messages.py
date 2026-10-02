@@ -9,14 +9,6 @@ from resources.constants import USE_IPV6
 @pytest.mark.reliability
 class TestCommunityMessages:
 
-    @pytest.fixture()
-    def community_admin(self, backend_new_profile):
-        return backend_new_profile("community_admin", bridge_network=True)
-
-    @pytest.fixture()
-    def community_member(self, backend_new_profile):
-        return backend_new_profile("community_member", bridge_network=True)
-
     def _run_community_messages_baseline(
         self,
         community_admin,
