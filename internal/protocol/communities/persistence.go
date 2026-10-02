@@ -290,6 +290,35 @@ func (p *Persistence) JoinedOrSpectatedCommunities(memberIdentity *ecdsa.PublicK
 	return p.queryCommunities(memberIdentity, query)
 }
 
+func (p *Persistence) JoinedOrSpectatedCommunitiesMuteStatus() ([]CommunityMuteStatus, error) {
+	rows, err := p.db.Query(`
+		SELECT id, muted, muted_till
+		FROM communities_communities
+		WHERE joined OR spectated`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var statuses []CommunityMuteStatus
+	for rows.Next() {
+		status := CommunityMuteStatus{}
+		var mutedTill sql.NullTime
+		if err := rows.Scan(&status.ID, &status.Muted, &mutedTill); err != nil {
+			return nil, err
+		}
+		if mutedTill.Valid {
+			status.MuteTill = mutedTill.Time
+		}
+		statuses = append(statuses, status)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return statuses, nil
+}
+
 func (p *Persistence) rowsToCommunityRecords(rows *sql.Rows) (result []*CommunityRecordBundle, err error) {
 	defer func() {
 		if err != nil {
