@@ -18,14 +18,6 @@ class TestPostReconnectDelivery:
     """
 
     @pytest.fixture()
-    def community_admin(self, backend_new_profile):
-        return backend_new_profile("community_admin", bridge_network=True)
-
-    @pytest.fixture()
-    def community_member(self, backend_new_profile):
-        return backend_new_profile("community_member", bridge_network=True)
-
-    @pytest.fixture()
     def sender(self, backend_new_profile):
         return backend_new_profile("sender", bridge_network=True)
 
@@ -58,6 +50,7 @@ class TestPostReconnectDelivery:
         raise last_exc
 
     def test_community_message_after_reconnect(self, community_admin, community_member):
+        """Community delivery must still work after offline/online reconnect."""
         community_id = messenger.create_community(community_admin)
         chat_id = messenger.join_community(member=community_member, admin=community_admin, community_id=community_id)
 

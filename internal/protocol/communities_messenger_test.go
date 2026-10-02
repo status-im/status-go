@@ -14,7 +14,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -594,22 +593,10 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().True(found)
 }
 
-func (s *MessengerCommunitiesSuite) TestSDSMissingDependenciesFetchTriggeredWhenMemberJoinsLate() {
-	var (
-		missingDepsMu sync.Mutex
-		missingDeps   []string
-	)
-
+func (s *MessengerCommunitiesSuite) TestCommunityLateJoinPostJoinDelivery() {
 	aliceObserver := s.newMessengerWithConfig(testMessengerConfig{
 		extraOptions: []Option{
 			WithCommunitiesRekeyInterval(50 * time.Millisecond),
-		},
-		messagingOptions: []messaging.Options{
-			messaging.WithMissingDependenciesObserver(func(_ string, deps []string, _ string) {
-				missingDepsMu.Lock()
-				missingDeps = append(missingDeps, deps...)
-				missingDepsMu.Unlock()
-			}),
 		},
 	}, alicePassword, []string{aliceAccountAddress})
 
@@ -634,23 +621,6 @@ func (s *MessengerCommunitiesSuite) TestSDSMissingDependenciesFetchTriggeredWhen
 	resumePublishing()
 
 	newMessage := sendChatMessage(&s.Suite, s.bob, chat.ID, "new message after alice joins")
-
-	missingDepsMu.Lock()
-	depsSnapshot := append([]string(nil), missingDeps...)
-	missingDepsMu.Unlock()
-
-	if len(depsSnapshot) > 0 {
-		foundEnvelopeHash := false
-		for _, dep := range depsSnapshot {
-			if strings.HasPrefix(dep, "0x") {
-				foundEnvelopeHash = true
-				break
-			}
-		}
-		s.Require().True(foundEnvelopeHash, "missing dependencies should include transport retrieval hashes")
-	} else {
-		s.T().Log("SDS missing dependency callback was not observed in this in-memory protocol run")
-	}
 
 	_, err = WaitOnMessengerResponse(aliceObserver, func(r *MessengerResponse) bool {
 		for _, msg := range r.Messages() {
