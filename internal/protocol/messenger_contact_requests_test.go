@@ -86,6 +86,11 @@ func (s *MessengerContactRequestSuite) sendContactRequestWithState(request *requ
 	// Check contact's primary name matches notification's name
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, addedContacts[0].PrimaryName())
 
+	// A contact request is a system message, not an own send
+	chat, ok := messenger.allChats.Load(request.ID)
+	s.Require().True(ok)
+	s.Require().Equal(int64(0), chat.LastOwnMessageTimestamp)
+
 	return resp
 }
 

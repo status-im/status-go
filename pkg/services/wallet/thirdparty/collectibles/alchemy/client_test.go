@@ -303,13 +303,16 @@ func TestFetchOwnedAssetsPagination(t *testing.T) {
 			expectCursorSet: true,
 		},
 		{
-			name:  "trims items to limit",
+			// The page key points past everything the provider sent; dropping
+			// items here would skip them for good on the next call.
+			name:  "keeps every item of an over-delivered page",
 			limit: 3,
 			handler: func(t *testing.T, _ int32, w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "3", r.URL.Query().Get("pageSize"))
 				makeNFTResponse(t, w, 5, "next-page")
 			},
 			expectedPages:   1,
-			expectedItems:   3,
+			expectedItems:   5,
 			expectCursorSet: true,
 		},
 		{
@@ -429,4 +432,66 @@ func TestAssetAnimation(t *testing.T) {
 			assert.Equal(t, tc.expectedSize, size)
 		})
 	}
+}
+
+// The ownership loader pages an initial load with a small limit and follows
+// NextCursor. The cursor must point right after the items returned, not after
+// whatever page size the client asked the provider for, or every page silently
+// drops the items between the limit and the provider page.
+func TestFetchOwnedAssetsLimitedPagesCoverTheWholeCollection(t *testing.T) {
+	const total = 1450
+	const limit = 50
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := 0
+		if key := r.URL.Query().Get("pageKey"); key != "" {
+			_, err := fmt.Sscanf(key, "%d", &start)
+			require.NoError(t, err)
+		}
+		pageSize := 0
+		_, err := fmt.Sscanf(r.URL.Query().Get("pageSize"), "%d", &pageSize)
+		require.NoError(t, err)
+		end := start + pageSize
+		if end > total {
+			end = total
+		}
+
+		nfts := make([]map[string]any, 0, end-start)
+		for i := start; i < end; i++ {
+			nfts = append(nfts, map[string]any{
+				"contract": map[string]any{"address": "0x0000000000000000000000000000000000000001", "tokenType": "ERC721"},
+				"tokenId":  fmt.Sprintf("%d", i+1),
+				"name":     fmt.Sprintf("NFT #%d", i+1),
+				"raw":      map[string]any{"tokenUri": "", "metadata": map[string]any{}, "error": nil, "rawMetadata": map[string]any{"attributes": []any{}}},
+				"image":    map[string]any{},
+			})
+		}
+		resp := map[string]any{"ownedNfts": nfts}
+		if end < total {
+			resp["pageKey"] = fmt.Sprintf("%d", end)
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(resp))
+	}))
+	defer server.Close()
+
+	client := newTestClient(server.URL)
+	seen := make(map[string]struct{}, total)
+	cursor := ""
+	for calls := 0; ; calls++ {
+		require.Less(t, calls, total, "cursor never ran out")
+		assets, err := client.FetchAllAssetsByOwner(
+			context.Background(), w_common.ChainID(w_common.EthereumMainnet), testOwner, cursor, limit,
+		)
+		require.NoError(t, err)
+		assert.LessOrEqual(t, len(assets.Items), limit)
+		for _, item := range assets.Items {
+			seen[item.CollectibleData.ID.TokenID.String()] = struct{}{}
+		}
+		if assets.NextCursor == "" {
+			break
+		}
+		cursor = assets.NextCursor
+	}
+
+	assert.Len(t, seen, total, "every owned collectible is reached by following the cursor")
 }

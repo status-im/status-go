@@ -105,6 +105,8 @@ type Chat struct {
 
 	// Timestamp indicates the last time this chat has received/sent a message
 	Timestamp int64 `json:"timestamp"`
+	// LastOwnMessageTimestamp is the last time the user posted a chat message here from any of their devices
+	LastOwnMessageTimestamp int64 `json:"lastOwnMessageTimestamp"`
 	// LastClockValue indicates the last clock value to be used when sending messages
 	LastClockValue uint64 `json:"lastClockValue"`
 	// DeletedAtClockValue indicates the clock value at time of deletion, messages
@@ -442,6 +444,38 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 		c.LastClockValue = message.Clock
 	}
 	return nil
+}
+
+// RecordOwnSend marks that the user posted a chat message here; call after UpdateFromMessage.
+// Only user-composed content types count; system, contact-request and bridged messages do not.
+// Uses the authored timestamp, not the receipt time, so a late-delivered paired-device message
+// does not move the chat to the top of the recency ranking.
+func (c *Chat) RecordOwnSend(message *common.Message) {
+	if !isUserComposedMessage(message) {
+		return
+	}
+	timestamp := int64(message.Timestamp)
+	if timestamp == 0 {
+		timestamp = c.Timestamp
+	}
+	if timestamp > c.LastOwnMessageTimestamp {
+		c.LastOwnMessageTimestamp = timestamp
+	}
+}
+
+// isUserComposedMessage reports whether the content type is one the user composes from the chat input.
+func isUserComposedMessage(message *common.Message) bool {
+	switch message.ContentType {
+	case protobuf.ChatMessage_TEXT_PLAIN,
+		protobuf.ChatMessage_EMOJI,
+		protobuf.ChatMessage_STICKER,
+		protobuf.ChatMessage_IMAGE,
+		protobuf.ChatMessage_AUDIO,
+		protobuf.ChatMessage_TRANSACTION_COMMAND,
+		protobuf.ChatMessage_COMMUNITY:
+		return true
+	}
+	return false
 }
 
 func (c *Chat) UpdateFirstMessageTimestamp(timestamp uint32) bool {

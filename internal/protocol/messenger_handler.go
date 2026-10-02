@@ -2351,6 +2351,9 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		if err != nil {
 			return err
 		}
+		if receivedMessage.From == m.myHexIdentity() {
+			chat.RecordOwnSend(receivedMessage)
+		}
 	}
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)

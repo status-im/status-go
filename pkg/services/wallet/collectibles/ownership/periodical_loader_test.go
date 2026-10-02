@@ -84,6 +84,10 @@ func (fakeStorage) Update(_ walletCommon.ChainID, _ common.Address, _ []thirdpar
 	return nil, nil, nil, nil
 }
 
+func (fakeStorage) Upsert(_ walletCommon.ChainID, _ common.Address, _ []thirdparty.CollectibleIDBalance) ([]thirdparty.CollectibleUniqueID, []thirdparty.CollectibleUniqueID, error) {
+	return nil, nil, nil
+}
+
 func newTestLoader(t *testing.T, fetcher CollectibleOwnershipFetcher, storage CollectibleOwnershipStorage, params PeriodicalLoaderParams) *PeriodicalLoader {
 	t.Helper()
 	pl, _ := newTestLoaderWithPublisher(t, fetcher, storage, params)
