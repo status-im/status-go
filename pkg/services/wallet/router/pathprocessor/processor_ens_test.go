@@ -3,6 +3,8 @@ package pathprocessor
 import (
 	"context"
 	"errors"
+	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,8 +12,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/internal/contracts/registrar"
+	"github.com/status-im/status-go/internal/contracts/snt"
 	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
@@ -141,6 +146,49 @@ func TestENSPublicKeyProcessor_EstimateGas(t *testing.T) {
 		_, err := processor.EstimateGas(params, []byte{})
 		assert.Error(t, err)
 	})
+}
+
+func TestENSRegisterProcessor_PackTxInputData_RegistersLabelWithoutStatusDomain(t *testing.T) {
+	registrarAddress := common.HexToAddress("0x0000000000000000000000000000000000000E15")
+	price := big.NewInt(10)
+
+	sntABI, err := abi.JSON(strings.NewReader(snt.SNTABI))
+	require.NoError(t, err)
+	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
+	require.NoError(t, err)
+	encodedPrice, err := registrarABI.Methods["getPrice"].Outputs.Pack(price)
+	require.NoError(t, err)
+
+	for _, username := range []string{"myname", "myname.stateofus.eth"} {
+		t.Run(username, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockRPCClient := mock_rpcclient.NewMockClientInterface(ctrl)
+			mockEthClient := mock_ethclient.NewMockEthClientInterface(ctrl)
+			processor := NewENSRegisterProcessor(mockRPCClient, nil, nil)
+			processor.ensResolver = &fakeEnsResolver{registrarAddress: registrarAddress}
+
+			mockRPCClient.EXPECT().EthClient(walletCommon.EthereumMainnet).Return(mockEthClient, nil)
+			mockEthClient.EXPECT().CallContract(gomock.Any(), gomock.Any(), gomock.Any()).Return(encodedPrice, nil)
+
+			input, err := processor.PackTxInputData(ProcessorInputParams{
+				FromChain: &mainnet,
+				FromAddr:  testFromAddr,
+				Username:  username,
+				PublicKey: "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d5708fbd652d0bc616376bf90a87f7d4e3ca73043f3746e017119a3f36cbf711b8c0dd25",
+			})
+			require.NoError(t, err)
+
+			approveAndCallArgs, err := sntABI.Methods["approveAndCall"].Inputs.Unpack(input[4:])
+			require.NoError(t, err)
+			extraData := approveAndCallArgs[2].([]byte)
+			registerArgs, err := registrarABI.Methods["register"].Inputs.Unpack(extraData[4:])
+			require.NoError(t, err)
+
+			assert.Equal(t, walletCommon.UsernameToLabel("myname"), registerArgs[0].([32]byte))
+		})
+	}
 }
 
 func TestENSRegisterProcessor_EstimateGas(t *testing.T) {
