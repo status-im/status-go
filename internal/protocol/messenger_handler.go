@@ -1868,6 +1868,9 @@ func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage E
 	}
 
 	state.Response.AddMessage(editedMessage)
+	if err := m.addAffectedThreadToResponse(state.Response, editedMessage); err != nil {
+		return err
+	}
 
 	// pull updated messages
 	updatedMessages, err := m.persistence.MessagesByResponseTo(messageID)
@@ -1992,6 +1995,9 @@ func (m *Messenger) handleDeleteMessage(ctx context.Context, state *ReceivedMess
 		}
 
 		state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
+		if err := m.addAffectedThreadToResponse(state.Response, messageToDelete); err != nil {
+			return err
+		}
 		state.Response.AddNotification(DeletedMessageNotification(messageToDelete.ID, chat))
 		state.Response.AddActivityCenterNotification(&ActivityCenterNotification{
 			ID:      cryptotypes.FromHex(messageToDelete.ID),
@@ -2100,6 +2106,9 @@ func (m *Messenger) HandleSyncDeleteForMeMessage(ctx context.Context, state *Rec
 		}
 
 		state.Response.AddMessage(messageToDelete)
+		if err := m.addAffectedThreadToResponse(state.Response, messageToDelete); err != nil {
+			return err
+		}
 	}
 	state.Response.AddChat(chat)
 

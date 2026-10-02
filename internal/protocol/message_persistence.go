@@ -54,13 +54,154 @@ var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE 
 var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
 
 type Thread struct {
-	ThreadID                 string `json:"threadId"`
-	ChatID                   string `json:"chatId"`
-	ParentMessageID          string `json:"parentMessageId"`
-	Name                     string `json:"name"`
-	ReadMessagesAtClockValue uint64 `json:"readMessagesAtClockValue"`
-	UnviewedMessagesCount    uint   `json:"unviewedMessagesCount"`
-	UnviewedMentionsCount    uint   `json:"unviewedMentionsCount"`
+	ThreadID                 string             `json:"threadId"`
+	ChatID                   string             `json:"chatId"`
+	ParentMessageID          string             `json:"parentMessageId"`
+	Name                     string             `json:"name"`
+	ReadMessagesAtClockValue uint64             `json:"readMessagesAtClockValue"`
+	UnviewedMessagesCount    uint               `json:"unviewedMessagesCount"`
+	UnviewedMentionsCount    uint               `json:"unviewedMentionsCount"`
+	MessagesCount            uint               `json:"messagesCount"`
+	ParticipantsCount        uint               `json:"participantsCount"`
+	ParticipantsPreviewIDs   []string           `json:"participantsPreviewIds"`
+	LastMessage              *ThreadLastMessage `json:"lastMessage,omitempty"`
+}
+
+const defaultThreadParticipantPreviewLimit = 6
+
+type ThreadLastMessage struct {
+	From      string `json:"from"`
+	Text      string `json:"text"`
+	Timestamp uint64 `json:"timestamp"`
+}
+
+// populateThreadsSummaries enriches an already loaded, bounded set of threads in
+// one query. Callers should pass threads associated with a message page or event,
+// rather than every thread in a chat.
+func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, participantPreviewLimit int) error {
+	if len(threads) == 0 {
+		return nil
+	}
+
+	threadByID := make(map[string]*Thread, len(threads))
+	args := make([]interface{}, 0, len(threads))
+	for _, thread := range threads {
+		thread.ParticipantsPreviewIDs = make([]string, 0)
+		thread.ParticipantsCount = 0
+		thread.MessagesCount = 0
+		thread.LastMessage = nil
+		threadByID[thread.ThreadID] = thread
+		args = append(args, thread.ThreadID)
+	}
+
+	placeholders := strings.Repeat(",?", len(threads))[1:]
+
+	summaryArgs := make([]interface{}, 0, len(args)*2+1)
+	summaryArgs = append(summaryArgs, args...)
+	summaryArgs = append(summaryArgs, args...)
+	summaryArgs = append(summaryArgs, participantPreviewLimit)
+	// Derive counts, recent participants, and the latest message in one query.
+	// nolint: gosec
+	summaryQuery := fmt.Sprintf(`
+		WITH candidates AS (
+			SELECT
+				threads.thread_id AS summary_thread_id,
+				user_messages.id,
+				user_messages.source,
+				user_messages.text,
+				user_messages.timestamp,
+				user_messages.clock_value,
+				1 AS is_thread_creator
+			FROM threads
+			JOIN user_messages ON user_messages.id = threads.parent_message_id
+			WHERE threads.thread_id IN (%s)
+			UNION ALL
+			SELECT thread_id, id, source, text, timestamp, clock_value, 0
+			FROM user_messages
+			WHERE thread_id IN (%s)
+				AND NOT deleted
+				AND NOT deleted_for_me
+		), aggregates AS (
+			SELECT
+				summary_thread_id,
+				COUNT(1) AS messages_count,
+				COUNT(DISTINCT CASE WHEN source <> '' THEN source END) AS participants_count
+			FROM candidates
+			GROUP BY summary_thread_id
+		), participants AS (
+			SELECT
+				summary_thread_id,
+				source,
+				MAX(is_thread_creator) AS is_thread_creator,
+				MAX(clock_value) AS latest_clock
+			FROM candidates
+			WHERE source <> ''
+			GROUP BY summary_thread_id, source
+		), ranked_participants AS (
+			SELECT
+				summary_thread_id,
+				source,
+				is_thread_creator,
+				latest_clock,
+				ROW_NUMBER() OVER (
+					PARTITION BY summary_thread_id
+					ORDER BY is_thread_creator DESC, latest_clock DESC, source
+				) AS row_number
+			FROM participants
+		), ranked_messages AS (
+			SELECT
+				summary_thread_id,
+				source,
+				text,
+				timestamp,
+				ROW_NUMBER() OVER (
+					PARTITION BY summary_thread_id
+					ORDER BY clock_value DESC, id DESC
+				) AS row_number
+			FROM candidates
+		)
+		SELECT
+			aggregates.summary_thread_id,
+			aggregates.messages_count,
+			aggregates.participants_count,
+			COALESCE(ranked_participants.source, ''),
+			ranked_messages.source,
+			ranked_messages.text,
+			ranked_messages.timestamp
+		FROM aggregates
+		JOIN ranked_messages
+			ON ranked_messages.summary_thread_id = aggregates.summary_thread_id
+			AND ranked_messages.row_number = 1
+		LEFT JOIN ranked_participants
+			ON ranked_participants.summary_thread_id = aggregates.summary_thread_id
+			AND ranked_participants.row_number <= ?
+		ORDER BY
+			aggregates.summary_thread_id,
+			ranked_participants.row_number`, placeholders, placeholders)
+	rows, err := db.db.Query(summaryQuery, summaryArgs...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var threadID, participantID, source, text string
+		var messagesCount, participantsCount uint
+		var timestamp uint64
+		if err := rows.Scan(&threadID, &messagesCount, &participantsCount, &participantID, &source, &text, &timestamp); err != nil {
+			return err
+		}
+		thread := threadByID[threadID]
+		if thread != nil {
+			thread.MessagesCount = messagesCount
+			thread.ParticipantsCount = participantsCount
+			if participantID != "" && len(thread.ParticipantsPreviewIDs) < participantPreviewLimit {
+				thread.ParticipantsPreviewIDs = append(thread.ParticipantsPreviewIDs, participantID)
+			}
+			thread.LastMessage = &ThreadLastMessage{From: source, Text: text, Timestamp: timestamp}
+		}
+	}
+
+	return rows.Err()
 }
 
 func (db sqlitePersistence) buildMessagesQueryWithAdditionalFields(additionalSelectFields, whereAndTheRest string) string {
@@ -945,8 +1086,19 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 	if err != nil {
 		return nil, err
 	}
-
 	return &thread, nil
+}
+
+// ThreadWithSummaryByID returns one thread with the data required by a thread card.
+func (db sqlitePersistence) ThreadWithSummaryByID(chatID string, threadID string) (*Thread, error) {
+	thread, err := db.ThreadByID(chatID, threadID)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.populateThreadsSummaries([]*Thread{thread}, defaultThreadParticipantPreviewLimit); err != nil {
+		return nil, err
+	}
+	return thread, nil
 }
 
 func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
@@ -1072,6 +1224,59 @@ func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error
 	return threads, nil
 }
 
+// ThreadsWithSummariesByParentMessageIDs returns enriched threads whose parent
+// messages belong to the requested message page.
+func (db sqlitePersistence) ThreadsWithSummariesByParentMessageIDs(chatID string, parentMessageIDs []string, participantPreviewLimit int) ([]*Thread, error) {
+	threads := make([]*Thread, 0)
+	if len(parentMessageIDs) == 0 {
+		return threads, nil
+	}
+	if participantPreviewLimit < 0 {
+		participantPreviewLimit = 0
+	}
+
+	args := make([]interface{}, 0, len(parentMessageIDs)+1)
+	args = append(args, chatID)
+	for _, parentMessageID := range parentMessageIDs {
+		args = append(args, parentMessageID)
+	}
+
+	// nolint: gosec
+	query := fmt.Sprintf(`
+		SELECT
+			threads.thread_id,
+			threads.chat_id,
+			threads.parent_message_id,
+			threads.name,
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
+		FROM threads
+		WHERE chat_id = ? AND parent_message_id IN (%s)`, strings.Repeat(",?", len(parentMessageIDs))[1:])
+
+	rows, err := db.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		thread := &Thread{}
+		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		threads = append(threads, thread)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := db.populateThreadsSummaries(threads, participantPreviewLimit); err != nil {
+		return nil, err
+	}
+	return threads, nil
+}
 func (db sqlitePersistence) MessageByChatID(chatID string, threadID string, currCursor string, limit int, threadsEnabled bool) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {

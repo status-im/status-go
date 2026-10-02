@@ -20,6 +20,15 @@ func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	return m.persistence.ThreadsByChatID(chatID)
 }
 
+// ThreadSummariesByParentMessageIDs returns card data only for the requested
+// parent messages, keeping summary work aligned with message pagination.
+func (m *Messenger) ThreadSummariesByParentMessageIDs(chatID string, parentMessageIDs []string, participantPreviewLimit int) ([]*Thread, error) {
+	if !m.featureFlags.Threads {
+		return []*Thread{}, nil
+	}
+	return m.persistence.ThreadsWithSummariesByParentMessageIDs(chatID, parentMessageIDs, participantPreviewLimit)
+}
+
 func (m *Messenger) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error) {
 	if !m.featureFlags.Threads {
 		return nil, ErrThreadFeatureDisabled
@@ -94,7 +103,7 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, err
 	}
 
-	thread, err := m.persistence.ThreadByID(chatID, parentMessageID)
+	thread, err := m.persistence.ThreadWithSummaryByID(chatID, parentMessageID)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +217,7 @@ func (m *Messenger) addThreadsToResponse(response *MessengerResponse, messages [
 		}
 		seen[key] = struct{}{}
 
-		thread, err := m.persistence.ThreadByID(chatID, threadID)
+		thread, err := m.persistence.ThreadWithSummaryByID(chatID, threadID)
 		if errors.Is(err, common.ErrRecordNotFound) {
 			continue
 		}
@@ -219,5 +228,33 @@ func (m *Messenger) addThreadsToResponse(response *MessengerResponse, messages [
 		response.AddThread(thread)
 	}
 
+	return nil
+}
+
+// addAffectedThreadToResponse includes the recalculated thread summary in the
+// same response as a message change, so clients do not need to refetch it.
+func (m *Messenger) addAffectedThreadToResponse(response *MessengerResponse, message *common.Message) error {
+	if !m.featureFlags.Threads || response == nil || message == nil {
+		return nil
+	}
+
+	if threadID := message.GetThreadId(); threadID != "" {
+		thread, err := m.persistence.ThreadWithSummaryByID(message.LocalChatID, threadID)
+		if errors.Is(err, common.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		response.AddThread(thread)
+		return nil
+	}
+
+	threads, err := m.persistence.ThreadsWithSummariesByParentMessageIDs(
+		message.LocalChatID, []string{message.ID}, defaultThreadParticipantPreviewLimit)
+	if err != nil {
+		return err
+	}
+	response.AddThreads(threads)
 	return nil
 }
