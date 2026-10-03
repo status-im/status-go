@@ -19,6 +19,9 @@ requires "nim >= 2.2.6"
 # Pins the nim-sds revision whose C ABI the bindings match.
 requires "https://github.com/logos-messaging/sds-go-bindings#31ab7f40"
 
+# Pins the logos-delivery revision whose C ABI the bindings match.
+requires "https://github.com/logos-messaging/logos-delivery-go-bindings#d59108af"
+
 
 ### Helpers
 
@@ -50,3 +53,7 @@ task libsdsAndroid, "Build libsds for Android; ARCH selects the architecture":
 task libsdsIOS, "Build libsds for iOS":
   runBindingsTask("libsdsIOS")
 
+task liblogosdelivery, "Build the liblogosdelivery status-go links against":
+  ## LIBLOGOSDELIVERY_OUT and NIM_PARAMS come from the caller.
+  withDir nimblePkgDir("logos_delivery_go_bindings"):
+    exec "nimble liblogosdelivery"
