@@ -48,6 +48,23 @@ RUN set -eu && \
 
 ENV PATH="/opt/nim/bin:${PATH}"
 
+# nim-sds builds through Nimble; the one bundled with Nim is too old for it.
+ARG NIMBLE_VERSION=0.26.0
+RUN set -eu && \
+    case "$(dpkg --print-architecture)" in \
+    amd64) NIMBLE_ARCH="linux_x64" ;; \
+    arm64) NIMBLE_ARCH="linux_aarch64" ;; \
+    *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /opt/nimble/bin && \
+    curl -sSfL -o /tmp/nimble.tar.gz \
+    "https://github.com/nim-lang/nimble/releases/download/v${NIMBLE_VERSION}/nimble-${NIMBLE_ARCH}.tar.gz" && \
+    tar -xzf /tmp/nimble.tar.gz -C /opt/nimble/bin && \
+    rm /tmp/nimble.tar.gz && \
+    chmod +x /opt/nimble/bin/nimble
+
+ENV PATH="/opt/nimble/bin:${PATH}"
+
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
 ARG build_target='cmd'
