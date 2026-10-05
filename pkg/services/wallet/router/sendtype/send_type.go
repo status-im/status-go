@@ -123,13 +123,13 @@ func (s SendType) IsAvailableBetween(fromChainID, toChainID uint64) bool {
 	return true
 }
 
-func (s SendType) IsAvailableFor(chainID uint64) bool {
-	// Whether a chain is supported for swap is checked on the client side via the `GetChainsSupportedForSwap` endpoint.
-	// Basically if this request https://api.paraswap.io/tokens/CHAIN-ID returns the list (no error), means the chain is supported.
-	// For now these are supported chains via paraswap:
-	// 1, 10, 56, 100, 130, 137, 146, 8453, 42161, 43114
-	// even not needed to check here, because of the client side check, we still keep it here for reference when adding new swap providers.
+func (s SendType) IsAvailableFor(chainID uint64, swapProvider string) bool {
 	if s == Swap {
+		// LI.FI and Relay should support all chains, if not, they will respond with an error.
+		if swapProvider == pathProcessorCommon.ProcessorLiFiName || swapProvider == pathProcessorCommon.ProcessorRelayName {
+			return true
+		}
+		// Paraswap supports these chains only: https://api.paraswap.io/tokens/CHAIN-ID
 		swapAllowedNetworks := map[uint64]bool{
 			walletCommon.EthereumMainnet: true, // 1
 			walletCommon.OptimismMainnet: true, // 10

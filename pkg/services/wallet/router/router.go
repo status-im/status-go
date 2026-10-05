@@ -164,6 +164,15 @@ func (r *Router) GetFeesManager() *fees.FeeManager {
 	return r.feesManager
 }
 
+func (r *Router) swapProcessorName() string {
+	for name := range r.pathProcessors {
+		if walletCommon.IsProcessorSwap(name) {
+			return name
+		}
+	}
+	return ""
+}
+
 func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
 	return r.pathProcessors
 }
@@ -975,7 +984,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 		})
 	}
 
-	if !input.SendType.IsAvailableFor(input.FromChainID) {
+	if !input.SendType.IsAvailableFor(input.FromChainID, r.swapProcessorName()) {
 		r.logger.Error("resolveRoute: send type not available for from chain",
 			zap.String("uuid", input.Uuid),
 			zap.Int("sendType", int(input.SendType)),
@@ -1152,7 +1161,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		zap.String("fromToken", fromToken.Symbol),
 		zap.Int("transferDetailsIndex", useCommunityTokenTransferDetailsAtIndex))
 
-	if !input.SendType.IsAvailableFor(input.FromChainID) {
+	if !input.SendType.IsAvailableFor(input.FromChainID, r.swapProcessorName()) {
 		return nil, ErrPathNotSupportedForProvidedChain
 	}
 
