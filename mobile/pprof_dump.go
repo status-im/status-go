@@ -7,15 +7,6 @@ import (
 	"runtime/pprof"
 )
 
-// WriteHeapProfile writes the Go heap profile (gzipped pprof proto) to path and the runtime
-// MemStats to path+".memstats.json". For devices whose pprof port cannot be reached (iOS):
-// the client writes into its own container and copies the files off.
-func WriteHeapProfile(path string) string { return callWithResponse(writeHeapProfile, path) }
-
-func writeHeapProfile(path string) string {
-	return makeJSONResponse(writeHeapProfileFiles(path))
-}
-
 func writeHeapProfileFiles(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
