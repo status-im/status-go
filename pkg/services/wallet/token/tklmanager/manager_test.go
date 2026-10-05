@@ -21,7 +21,7 @@ func TestBootstrapAndOwnedReads(t *testing.T) {
 		return tkl.Bootstrap{Customs: []tkl.Token{{ChainID: 1, Address: "0x0000000000000000000000000000000000000001", Symbol: "ONE", Decimals: 18}}}, nil
 	})
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	token, ok := m.GetTokenByChainAddress(1, common.HexToAddress("0x1"))
 	require.True(t, ok)
@@ -51,7 +51,7 @@ func TestStartRetryAndPrestartChains(t *testing.T) {
 		return tkl.Bootstrap{}, nil
 	})
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.SetChains([]uint64{10}))
 	require.Error(t, m.Start(context.Background(), false, nil))
 	require.Empty(t, m.UniqueTokens())
@@ -67,7 +67,7 @@ func TestStartRetryAndPrestartChains(t *testing.T) {
 func TestListsLoadOnlyOnDemandAndInvalidate(t *testing.T) {
 	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	first := m.mirror.Load()
 	require.Nil(t, first.lists)
@@ -91,7 +91,7 @@ func TestAliasPolicyRebuiltWithRevision(t *testing.T) {
 	config := tkl.Config{Chains: []uint64{1}, Policy: tkl.Policy{NativeAliases: []tkl.Identity{alias}}}
 	m, err := New(config, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	config.Policy.NativeAliases[0].Address = "0x0000000000000000000000000000000000000003"
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	_, ok := m.GetTokenByChainAddress(1, common.HexToAddress(alias.Address))
@@ -118,7 +118,7 @@ func TestAliasesListsAndConcurrentReads(t *testing.T) {
 	const document = `{"name":"Test","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tags":{"nested":{"name":"original"}},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","symbol":"ONE","name":"One","decimals":18}]}`
 	m, err := New(tkl.Config{Chains: []uint64{1}, InitialLists: []tkl.ListContent{{ID: "test", Body: document, Format: tkl.StandardFormat}}, Policy: tkl.Policy{NativeAliases: []tkl.Identity{{ChainID: 1, Address: "0x0000000000000000000000000000000000000002"}}}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	tokens, err := m.GetTokensByKeys([]string{"1-0x0000000000000000000000000000000000000002", "missing"})
 	require.NoError(t, err)
@@ -158,7 +158,7 @@ var benchmarkToken *types.Token
 func BenchmarkMirrorLookup(b *testing.B) {
 	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(b, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(b, m.Start(context.Background(), false, nil))
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -176,7 +176,7 @@ func BenchmarkMirrorRebuild(b *testing.B) {
 	require.NoError(b, err)
 	m, err := New(tkl.Config{Chains: []uint64{1}, InitialLists: []tkl.ListContent{{ID: "benchmark", Format: tkl.StandardFormat, Body: string(body)}}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(b, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(b, m.Start(context.Background(), false, nil))
 	require.Len(b, m.UniqueTokens(), 10001)
 	b.ReportAllocs()

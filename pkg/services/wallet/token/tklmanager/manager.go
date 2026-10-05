@@ -49,6 +49,9 @@ type Manager struct {
 	load      func(context.Context) (tkl.Bootstrap, error)
 	mirror    atomic.Pointer[snapshot]
 	refreshIO *refreshRuntime
+	// A durable custom write awaiting native/mirror publication. The pointer is
+	// atomic so ordinary token reads retain their lock-free path.
+	customResync atomic.Pointer[tkl.Mutation]
 	// Policy changes must go through this facade under mu, updating both the
 	// core and these inputs before rebuilding/publishing a new snapshot.
 	policy           tkl.Policy
@@ -98,11 +101,27 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 		return ErrRefreshUnavailable
 	}
 	if m.started {
-		return nil
+		return m.resyncCustom()
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := m.ensureLoaded(ctx); err != nil {
+		return err
+	}
+	if err := m.rebuild(); err != nil {
+		return err
+	}
+	m.notify = notify
+	if err := m.startRefresh(ctx, autoRefresh); err != nil {
+		return err
+	}
+	m.started = true
+	return nil
+}
+
+// ensureLoaded runs under mu and is also used by configuration writes before Start.
+func (m *Manager) ensureLoaded(ctx context.Context) error {
 	if !m.loaded {
 		bootstrap, err := m.load(ctx)
 		if err != nil {
@@ -116,20 +135,15 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 		}
 		m.loaded = true
 	}
+	if err := m.resyncCustom(); err != nil {
+		return err
+	}
 	if m.hasPendingChains {
 		if _, err := m.handle.SetChains(m.pendingChains); err != nil {
 			return err
 		}
 		m.hasPendingChains = false
 	}
-	if err := m.rebuild(); err != nil {
-		return err
-	}
-	m.notify = notify
-	if err := m.startRefresh(ctx, autoRefresh); err != nil {
-		return err
-	}
-	m.started = true
 	return nil
 }
 
@@ -166,6 +180,7 @@ func (m *Manager) Stop() error {
 	err := m.handle.Destroy()
 	m.handle = nil
 	m.mirror.Store(nil)
+	m.customResync.Store(nil)
 	return err
 }
 
@@ -179,6 +194,9 @@ func (m *Manager) SetChains(chains []uint64) error {
 		m.pendingChains = append([]uint64(nil), chains...)
 		m.hasPendingChains = true
 		return nil
+	}
+	if err := m.resyncCustom(); err != nil {
+		return err
 	}
 	before := m.mirror.Load()
 	change, err := m.handle.SetChains(chains)
@@ -237,6 +255,9 @@ func (m *Manager) rebuild() error {
 // the fetch. Failures are not cached: the SDK read interface has no error return,
 // so this call reports no lists and a subsequent call can retry.
 func (m *Manager) loadLists() (*snapshot, error) {
+	if err := m.resyncCustom(); err != nil {
+		return nil, err
+	}
 	s := m.mirror.Load()
 	if s == nil || m.handle == nil {
 		return nil, nil
@@ -291,13 +312,13 @@ func cloneTokens(tokens []*types.Token) []*types.Token {
 	return out
 }
 func (m *Manager) UniqueTokens() []*types.Token {
-	if s := m.mirror.Load(); s != nil {
+	if s, _ := m.readSnapshot(); s != nil {
 		return cloneTokens(s.tokens)
 	}
 	return nil
 }
 func (m *Manager) GetTokenByChainAddress(chain uint64, address common.Address) (*types.Token, bool) {
-	s := m.mirror.Load()
+	s, _ := m.readSnapshot()
 	if s == nil {
 		return nil, false
 	}
@@ -309,13 +330,16 @@ func (m *Manager) GetTokenByChainAddress(chain uint64, address common.Address) (
 	return cloneToken(token), ok
 }
 func (m *Manager) GetTokensByChain(chain uint64) []*types.Token {
-	if s := m.mirror.Load(); s != nil {
+	if s, _ := m.readSnapshot(); s != nil {
 		return cloneTokens(s.byChain[chain])
 	}
 	return nil
 }
 func (m *Manager) GetTokensByKeys(keys []string) ([]*types.Token, error) {
-	s := m.mirror.Load()
+	s, err := m.readSnapshot()
+	if err != nil {
+		return nil, err
+	}
 	if s == nil {
 		return nil, nil
 	}
@@ -334,6 +358,20 @@ func (m *Manager) GetTokensByKeys(keys []string) ([]*types.Token, error) {
 	}
 	return result, nil
 }
+
+func (m *Manager) readSnapshot() (*snapshot, error) {
+	if m.customResync.Load() == nil {
+		return m.mirror.Load(), nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.resyncCustom(); err != nil {
+		logutils.ZapLogger().Error("catalogue custom resync failed", zap.Error(err))
+		return nil, err
+	}
+	return m.mirror.Load(), nil
+}
+
 func cloneList(list *types.TokenList) *types.TokenList {
 	value := *list
 	value.Tokens = cloneTokens(list.Tokens)

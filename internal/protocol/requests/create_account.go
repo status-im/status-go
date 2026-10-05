@@ -98,10 +98,11 @@ type CreateAccount struct {
 	ThirdpartyServicesEnabled bool `json:"thirdpartyServicesEnabled"`
 }
 type WalletConfig struct {
-	TokensListsAutoRefreshInterval      int `json:"tokensListsAutoRefreshInterval"`      // in seconds
-	TokensListsAutoRefreshCheckInterval int `json:"tokensListsAutoRefreshCheckInterval"` // in seconds
-	MarketDataFullDataRefreshInterval   int `json:"marketDataFullDataRefreshInterval"`   // in seconds
-	MarketDataPriceRefreshInterval      int `json:"marketDataPriceRefreshInterval"`      // in seconds
+	TokenListsUseNim                    bool `json:"tokenListsUseNim"`                    // requires the tkl build tag
+	TokensListsAutoRefreshInterval      int  `json:"tokensListsAutoRefreshInterval"`      // in seconds
+	TokensListsAutoRefreshCheckInterval int  `json:"tokensListsAutoRefreshCheckInterval"` // in seconds
+	MarketDataFullDataRefreshInterval   int  `json:"marketDataFullDataRefreshInterval"`   // in seconds
+	MarketDataPriceRefreshInterval      int  `json:"marketDataPriceRefreshInterval"`      // in seconds
 
 	MulticallOverrides              map[uint64]common.Address `json:"multicallOverrides"`              // map[chainID]multicall3 contract address
 	CommunityTokenDeployerOverrides map[uint64]common.Address `json:"communityTokenDeployerOverrides"` // map[chainID]CommunityTokenDeployer contract address

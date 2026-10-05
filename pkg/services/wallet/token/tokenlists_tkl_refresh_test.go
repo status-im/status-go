@@ -4,10 +4,11 @@ package token
 
 import (
 	"context"
-	"github.com/status-im/nim-token-lists/go/tkl"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/status-im/nim-token-lists/go/tkl"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTKLPutBatchRollsBackAndPreservesFetchTime(t *testing.T) {
