@@ -236,8 +236,9 @@ type WalletConfig struct {
 	EthRpcProxyPassword      security.SensitiveString `json:"EthRpcProxyPassword"`
 	EthRpcProxyUsePuzzleAuth bool                     `json:"EthRpcProxyUsePuzzleAuth"`
 
-	TokensListsAutoRefreshInterval      int `json:"TokensListsAutoRefreshInterval"`      // in seconds
-	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
+	TokensListsAutoRefreshInterval      int  `json:"TokensListsAutoRefreshInterval"`      // in seconds
+	TokensListsAutoRefreshCheckInterval int  `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
+	TokenListsUseNim                    bool `json:"TokenListsUseNim"`                    // requires the tkl build tag
 
 	MulticallOverrides              map[uint64]common.Address `json:"MulticallOverrides"`              // map[chainID]multicall3 contract address
 	CommunityTokenDeployerOverrides map[uint64]common.Address `json:"CommunityTokenDeployerOverrides"` // map[chainID]CommunityTokenDeployer contract address
@@ -266,6 +267,7 @@ type NftProxyConfig struct {
 // there's a function called `startNode` will log NodeConfig which include WalletConfig
 func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
+		TokenListsUseNim                    bool                      `json:"TokenListsUseNim"`
 		Enabled                             bool                      `json:"Enabled"`
 		EnableMercuryoProvider              bool                      `json:"EnableMercuryoProvider"`
 		EnableParaswapProvider              bool                      `json:"EnableParaswapProvider"`
@@ -277,6 +279,7 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 		CommunityTokenDeployerOverrides     map[uint64]common.Address `json:"CommunityTokenDeployerOverrides"`
 		CustomTokens                        []*tokentypes.Token       `json:"CustomTokens"`
 	}{
+		TokenListsUseNim:                    wc.TokenListsUseNim,
 		Enabled:                             wc.Enabled,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
 		EnableParaswapProvider:              wc.EnableParaswapProvider,
