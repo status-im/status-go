@@ -13,6 +13,10 @@
   };
 
   inputs = {
+    nim-token-lists = {
+      url = "git+https://github.com/status-im/nim-token-lists?submodules=1&rev=7b3c5e715f4ed76c235a5ed043760a8e0c230352";
+      flake = false;
+    };
     # We are pinning the commit because ultimately we want to use same commit across different projects.
     # A commit from nixpkgs 25.11 release : https://github.com/NixOS/nixpkgs/tree/release-25.11
     nixpkgs.url = "github:NixOS/nixpkgs/535f3e6942cb1cead3929c604320d3db54b542b9";
@@ -25,7 +29,7 @@
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&ref=refs/tags/v0.3.4&rev=d317821fe2737de44cf993cef608e110c2b94660";
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -49,6 +53,7 @@
         overlays = [
           pkgsOverlay
           (final: prev: {
+            libtkl = final.callPackage ./nix/pkgs/libtkl { src = nim-token-lists; };
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
           })
@@ -65,6 +70,8 @@
       statusGo = import ./nix/pkgs/status-go { inherit self pkgs; };
     in {
       status-go-library = statusGo.library;
+      libtkl = pkgs.libtkl;
+      status-go-library-tkl = statusGo.library.override { withTokenLists = true; };
       status-go-mobile-android = statusGo.mobile.android {};
       status-go-mobile-ios = statusGo.mobile.ios {};
     });
