@@ -171,29 +171,38 @@ func TestSendType_IsAvailableFor(t *testing.T) {
 	}
 	ensNetworks := []uint64{walletCommon.EthereumMainnet, walletCommon.EthereumSepolia, walletCommon.AnvilMainnet}
 
-	// Test Swap
+	// Test Swap via Paraswap: limited to the chains Paraswap serves
 	for _, chainID := range chainIDs {
 		expected := slices.Contains(swapNetworks, chainID)
-		assert.Equal(t, expected, Swap.IsAvailableFor(chainID), "Swap on chain %d", chainID)
+		assert.Equal(t, expected, Swap.IsAvailableFor(chainID, pathProcessorCommon.ProcessorSwapParaswapName), "Swap via Paraswap on chain %d", chainID)
+		assert.Equal(t, expected, Swap.IsAvailableFor(chainID, ""), "Swap without a registered provider on chain %d", chainID)
+	}
+
+	// Test Swap via LI.FI or Relay: chain support is checked live by the processor, nothing gated here
+	for _, provider := range []string{pathProcessorCommon.ProcessorLiFiName, pathProcessorCommon.ProcessorRelayName} {
+		for _, chainID := range chainIDs {
+			assert.True(t, Swap.IsAvailableFor(chainID, provider), "Swap via %s on chain %d", provider, chainID)
+		}
+		assert.True(t, Swap.IsAvailableFor(4663, provider), "Swap via %s on a chain Paraswap does not serve", provider)
 	}
 
 	// Test Bridge (a real check is performed when AvailableFor for path processor is called, here it's always true)
 	for _, chainID := range chainIDs {
 		expected := true
-		assert.Equal(t, expected, Bridge.IsAvailableFor(chainID), "Bridge on chain %d", chainID)
+		assert.Equal(t, expected, Bridge.IsAvailableFor(chainID, ""), "Bridge on chain %d", chainID)
 	}
 
 	// Test ENS and Stickers
 	for _, chainID := range chainIDs {
 		expected := slices.Contains(ensNetworks, chainID)
-		assert.Equal(t, expected, ENSRegister.IsAvailableFor(chainID), "ENS on chain %d", chainID)
-		assert.Equal(t, expected, StickersBuy.IsAvailableFor(chainID), "Stickers on chain %d", chainID)
+		assert.Equal(t, expected, ENSRegister.IsAvailableFor(chainID, ""), "ENS on chain %d", chainID)
+		assert.Equal(t, expected, StickersBuy.IsAvailableFor(chainID, ""), "Stickers on chain %d", chainID)
 	}
 
 	// Test others (always true)
 	for _, chainID := range chainIDs {
-		assert.True(t, Transfer.IsAvailableFor(chainID))
-		assert.True(t, ERC721Transfer.IsAvailableFor(chainID))
-		assert.True(t, CommunityBurn.IsAvailableFor(chainID))
+		assert.True(t, Transfer.IsAvailableFor(chainID, ""))
+		assert.True(t, ERC721Transfer.IsAvailableFor(chainID, ""))
+		assert.True(t, CommunityBurn.IsAvailableFor(chainID, ""))
 	}
 }
