@@ -23,6 +23,23 @@ func (m *Messenger) SendPinMessage(ctx context.Context, message *common.PinMessa
 	return m.sendPinMessage(ctx, message)
 }
 
+func (m *Messenger) validatePinMessageTarget(chatID, messageID string) error {
+	target, err := m.persistence.MessageByID(messageID)
+	if errors.Is(err, common.ErrRecordNotFound) {
+		return ErrPinMessageTargetNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if target.LocalChatID != chatID {
+		return ErrPinMessageTargetNotFound
+	}
+	if target.GetThreadId() != "" {
+		return ErrThreadMessagePinningUnsupported
+	}
+	return nil
+}
+
 func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessage) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -30,6 +47,9 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
 		return nil, errors.New("chat not found")
+	}
+	if err := m.validatePinMessageTarget(chat.ID, message.MessageId); err != nil {
+		return nil, err
 	}
 
 	err := m.handleStandaloneChatIdentity(chat)
