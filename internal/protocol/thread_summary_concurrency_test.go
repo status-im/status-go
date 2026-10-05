@@ -136,6 +136,58 @@ func checkThreadSummaryState(thread *Thread) error {
 	return nil
 }
 
+func TestBackedUpThreadSummarySnapshotDuringExternalCommit(t *testing.T) {
+	for _, warm := range []bool{false, true} {
+		t.Run(fmt.Sprintf("warm_%t", warm), func(t *testing.T) {
+			db, teardown, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "backed-up-thread-summary-snapshot")
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, teardown()) })
+			require.NoError(t, protocolsqlite.Migrate(db))
+			db.SetMaxOpenConns(2)
+			db.SetMaxIdleConns(2)
+			p := newSQLitePersistence(db)
+			seedThreadSummaryCache(t, p)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			require.NoError(t, writeThreadSummaryState(ctx, db, 0, false))
+			_, err = db.Exec("UPDATE threads SET read_messages_at_clock_value = 42 WHERE thread_id = 'thread'")
+			require.NoError(t, err)
+			writer, err := db.Conn(ctx)
+			require.NoError(t, err)
+			defer writer.Close()
+			identities := []threadIdentity{{chatID: testPublicChatID, threadID: "thread"}}
+			if warm {
+				_, err = p.threadsWithSummariesByIDs(identities)
+				require.NoError(t, err)
+			}
+
+			threads, err := p.readThreadsWithSummaries(defaultThreadParticipantPreviewLimit,
+				func(queryer threadSummaryQuerier) ([]*Thread, error) {
+					threads, err := p.threadsByIDs(queryer, identities)
+					if err != nil {
+						return nil, err
+					}
+					if err := writeThreadSummaryState(ctx, writer, 1, false); err != nil {
+						return nil, err
+					}
+					return threads, nil
+				})
+			require.NoError(t, err)
+			require.Len(t, threads, 1)
+			require.Equal(t, "state-0", threads[0].Name)
+			require.EqualValues(t, 42, threads[0].ReadMessagesAtClockValue)
+			require.NoError(t, checkThreadSummaryState(threads[0]))
+
+			threads, err = p.threadsWithSummariesByIDs(identities)
+			require.NoError(t, err)
+			require.Len(t, threads, 1)
+			require.Equal(t, "state-1", threads[0].Name)
+			require.EqualValues(t, 42, threads[0].ReadMessagesAtClockValue)
+			require.NoError(t, checkThreadSummaryState(threads[0]))
+		})
+	}
+}
+
 func TestThreadSummaryConcurrentReadersAndWriter(t *testing.T) {
 	for _, cached := range []bool{false, true} {
 		for _, single := range []bool{false, true} {
