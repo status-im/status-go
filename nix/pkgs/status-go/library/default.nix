@@ -4,6 +4,7 @@
   meta,
   version,
   stdenv,
+  withTokenLists ? false,
 }:
 
 let
@@ -16,7 +17,7 @@ in pkgs.buildGoModule {
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
 
   # WARNING: Needs to be updated when go.mod is changed.
-  vendorHash = "sha256-CPcumXkQAiglhv9aS25WWZfP3vE6KcPz4xN9MZ1sIS4=";
+  vendorHash = "sha256-F/P9E3LJl8hxehn/X43fC7UnSJ/QWiTYMsS0QjRpgWg=";
 
   inherit meta version;
 
@@ -25,7 +26,11 @@ in pkgs.buildGoModule {
     protobuf_36
   ];
 
-  phases = ["unpackPhase" "configurePhase" "buildPhase"];
+  phases = ["unpackPhase" "patchPhase" "configurePhase" "buildPhase"];
+
+  postPatch = ''
+    patchShebangs --build scripts
+  '';
 
   # https://pkg.go.dev/net#hdr-Name_Resolution
   # https://github.com/status-im/status-mobile/issues/19736
@@ -60,7 +65,8 @@ in pkgs.buildGoModule {
   buildPhase = ''
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
-    make statusgo-library \
+    ${optionalString withTokenLists ''NIM_TKL_INC_DIR="${pkgs.libtkl}/include" NIM_TKL_LIB_DIR="${pkgs.libtkl}/lib" bash scripts/tkl_env.sh''} make statusgo-library \
+        ${optionalString withTokenLists "BUILD_TAGS='gowaku_no_rln tkl'"} \
         USE_LOGOS_STORAGE=true \
         NIM_SDS_INC_DIR="${pkgs.libsds}/include" \
         NIM_SDS_LIB_DIR="${pkgs.libsds}/lib" \
