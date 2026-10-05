@@ -861,7 +861,6 @@ func (m *Messenger) handlePinMessage(pinner *contacts.Contact, whisperTimestamp 
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
-
 	pinMessage.ID, err = generatePinMessageID(&m.identity.PublicKey, pinMessage, chat)
 	if err != nil {
 		return err
