@@ -76,8 +76,8 @@ type ThreadLastMessage struct {
 }
 
 // populateThreadsSummaries enriches an already loaded, bounded set of threads in
-// one query. Callers should pass threads associated with a message page or event,
-// rather than every thread in a chat.
+// one query. Callers should pass threads associated with a message page, event,
+// or bounded restore batch, rather than every thread in a chat.
 func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, participantPreviewLimit int) error {
 	if len(threads) == 0 {
 		return nil
@@ -278,6 +278,7 @@ func (db sqlitePersistence) tableUserMessagesProtobufFields() string {
     		m1.text,
     		m1.source,
 			m1.response_to,
+			COALESCE(m1.thread_id, ''),
     		m1.local_chat_id,
     		m1.message_type,
     		m1.content_type,
@@ -1058,9 +1059,78 @@ func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentM
 	return db.upsertThread(tx, threadID, chatID, parentMessageID, name)
 }
 
-func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread, error) {
-	var thread Thread
-	err := db.db.QueryRow(`
+func (db sqlitePersistence) AllThreadsForBackup() ([]*protobuf.BackedUpThread, error) {
+	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name, read_messages_at_clock_value
+		FROM threads ORDER BY chat_id, thread_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	threads := make([]*protobuf.BackedUpThread, 0)
+	for rows.Next() {
+		thread := &protobuf.BackedUpThread{}
+		if err := rows.Scan(&thread.ThreadId, &thread.ChatId, &thread.ParentMessageId, &thread.Name, &thread.ReadMessagesAtClockValue); err != nil {
+			return nil, err
+		}
+		threads = append(threads, thread)
+	}
+	return threads, rows.Err()
+}
+
+func (db sqlitePersistence) SaveBackedUpThreads(threads []*protobuf.BackedUpThread) (err error) {
+	if len(threads) == 0 {
+		return nil
+	}
+
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
+	for _, thread := range threads {
+		if thread == nil || thread.ThreadId == "" || thread.ChatId == "" {
+			return errors.New("backed up thread requires thread ID and chat ID")
+		}
+
+		var chatID string
+		err = tx.QueryRow(`SELECT chat_id FROM threads WHERE thread_id = ?`, thread.ThreadId).Scan(&chatID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if err == nil && chatID != thread.ChatId {
+			return fmt.Errorf("backed up thread %s belongs to a different chat", thread.ThreadId)
+		}
+
+		err = db.upsertThread(tx, thread.ThreadId, thread.ChatId, thread.ParentMessageId, thread.Name)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(`UPDATE threads
+			SET parent_message_id = CASE WHEN parent_message_id = '' THEN ? ELSE parent_message_id END,
+				read_messages_at_clock_value = MAX(read_messages_at_clock_value, ?)
+			WHERE thread_id = ? AND chat_id = ?`,
+			thread.ParentMessageId, thread.ReadMessagesAtClockValue, thread.ThreadId, thread.ChatId)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type threadIdentity struct {
+	chatID   string
+	threadID string
+}
+
+const threadMetadataSelect = `
 		SELECT
 			threads.thread_id,
 			threads.chat_id,
@@ -1071,22 +1141,68 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
 		LEFT JOIN chats ON chats.id = threads.chat_id
-		WHERE thread_id = ? AND chat_id = ?`, ChatTypeOneToOne, threadID, chatID).Scan(
-		&thread.ThreadID,
-		&thread.ChatID,
-		&thread.ParentMessageID,
-		&thread.Name,
-		&thread.ReadMessagesAtClockValue,
-		&thread.UnviewedMessagesCount,
-		&thread.UnviewedMentionsCount,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, common.ErrRecordNotFound
+`
+
+// threadsByIDs loads a bounded set of exact chat/thread pairs in input order.
+// Missing pairs are errors, just as they are for ThreadByID.
+func (db sqlitePersistence) threadsByIDs(identities []threadIdentity) ([]*Thread, error) {
+	if len(identities) == 0 {
+		return []*Thread{}, nil
 	}
+
+	args := make([]interface{}, 0, 1+2*len(identities))
+	for _, identity := range identities {
+		args = append(args, identity.chatID, identity.threadID)
+	}
+	args = append(args, ChatTypeOneToOne)
+	// nolint: gosec
+	query := fmt.Sprintf(`WITH requested(chat_id, thread_id) AS (VALUES %s)`,
+		strings.TrimSuffix(strings.Repeat("(?, ?),", len(identities)), ",")) +
+		threadMetadataSelect + `
+		JOIN requested ON requested.chat_id = threads.chat_id AND requested.thread_id = threads.thread_id`
+	rows, err := db.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
-	return &thread, nil
+	defer rows.Close()
+
+	byID := make(map[threadIdentity]*Thread, len(identities))
+	for rows.Next() {
+		thread := &Thread{}
+		if err := rows.Scan(
+			&thread.ThreadID,
+			&thread.ChatID,
+			&thread.ParentMessageID,
+			&thread.Name,
+			&thread.ReadMessagesAtClockValue,
+			&thread.UnviewedMessagesCount,
+			&thread.UnviewedMentionsCount,
+		); err != nil {
+			return nil, err
+		}
+		byID[threadIdentity{chatID: thread.ChatID, threadID: thread.ThreadID}] = thread
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	threads := make([]*Thread, 0, len(identities))
+	for _, identity := range identities {
+		thread, ok := byID[identity]
+		if !ok {
+			return nil, common.ErrRecordNotFound
+		}
+		threads = append(threads, thread)
+	}
+	return threads, nil
+}
+
+func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread, error) {
+	threads, err := db.threadsByIDs([]threadIdentity{{chatID: chatID, threadID: threadID}})
+	if err != nil {
+		return nil, err
+	}
+	return threads[0], nil
 }
 
 // ThreadWithSummaryByID returns one thread with the data required by a thread card.
@@ -1873,6 +1989,7 @@ func (db sqlitePersistence) AllMessagesForBackup() ([]*protobuf.BackedUpMessage,
 			msgContentType                            int64
 			msgType                                   int64
 			msgResponseTo                             string
+			msgThreadID                               string
 			pinnedBy                                  sql.NullString
 			// reaction fields (nullable)
 			rClock                        sql.NullInt64
@@ -1895,6 +2012,7 @@ func (db sqlitePersistence) AllMessagesForBackup() ([]*protobuf.BackedUpMessage,
 			&msgText,
 			&msgSource,
 			&msgResponseTo,
+			&msgThreadID,
 			&msgLocalChatID,
 			&msgType,
 			&msgContentType,
@@ -1933,6 +2051,7 @@ func (db sqlitePersistence) AllMessagesForBackup() ([]*protobuf.BackedUpMessage,
 				Text:        msgText,
 				From:        msgSource,
 				ResponseTo:  msgResponseTo,
+				ThreadId:    msgThreadID,
 				ChatId:      msgLocalChatID,
 				MessageType: protobuf.MessageType(msgType),
 				ContentType: msgContentType,
@@ -2259,8 +2378,7 @@ func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf
 		false,                         // replied
 		"",                            // discord_message_id
 		serializedPaymentRequests,     // payment_requests
-		// TODO backup thread messages too
-		"", // thread_id
+		message.GetThreadId(),         // thread_id
 	}, nil
 }
 
